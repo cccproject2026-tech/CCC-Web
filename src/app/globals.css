@@ -24,3 +24,34 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@import "swiper/css";
+@import "swiper/css/navigation";
+@import "swiper/css/pagination";
+
+
+.swiper-pagination-custom {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+}
+
+.swiper-pagination-bullet {
+  background: white !important;
+  opacity: 0.4 !important;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.swiper-pagination-bullet-active {
+  opacity: 1 !important;
+  width: 10px;
+  height: 10px;
+}
+
+.form-input {
+  @apply w-full px-4 py-2 rounded-md border border-[#47A3FF]/40 bg-white/5 text-white placeholder-gray-300 focus:outline-none focus:ring-1 focus:ring-[#47A3FF];
+}
