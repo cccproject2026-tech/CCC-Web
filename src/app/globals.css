@@ -55,3 +55,17 @@ body {
 .form-input {
   @apply w-full px-4 py-2 rounded-md border border-[#47A3FF]/40 bg-white/5 text-white placeholder-gray-300 focus:outline-none focus:ring-1 focus:ring-[#47A3FF];
 }
+
+
+@keyframes slide-left {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-left {
+  animation: slide-left 0.3s ease forwards;
+}
