@@ -26,7 +26,6 @@ import {
 
 export default function PastorHeader({ showFullHeader = false }) {
   const pathname = usePathname();
-
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
@@ -302,6 +301,12 @@ export default function PastorHeader({ showFullHeader = false }) {
           </>
         )}
       </div>
+
+      {/* Notification Popup */}
+      <NotificationPopup
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+      />
     </header>
   );
 }
