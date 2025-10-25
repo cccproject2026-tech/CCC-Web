@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
 import Image from "next/image";
-import DirectorHeader from "@/app/Components/DirectorHeader";
-import DirectorFooter from "@/app/Components/DirectorFooter";
+import AppHeader from "@/app/Components/AppHeader";
+import AppFooter from "@/app/Components/AppFooter";
+import AppHero from "@/app/Components/AppHero";
 import MentorBg from "../../Assets/mentor-bg.png";
 import Mentor1 from "../../Assets/mentor1.png";
 
@@ -91,29 +92,16 @@ export default function MenteeProfilePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
-      <DirectorHeader showFullHeader={true} />
+      <AppHeader showFullHeader={true} />
 
-      {/* Hero Section with Background */}
-      <section
-        className="relative bg-cover bg-center text-white"
-        style={{ backgroundImage: `url(${MentorBg.src})` }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1A2E5C]/80 to-[#2876AC]/70"></div>
-
-        {/* Breadcrumb and Title */}
-        <div className="relative z-10 px-6 md:px-12 lg:px-20 pt-8 pb-16">
-          <div className="text-sm text-white/80 mb-6">
-            <span className="hover:text-white cursor-pointer">
-              Invite to be a Field Mentor
-            </span>
-            <span className="mx-2">&gt;</span>
-            <span className="font-semibold">John Ross</span>
-          </div>
-          <h1 className="text-[42px] md:text-[48px] lg:text-[56px] font-semibold leading-tight">
-            John Ross
-          </h1>
-        </div>
-      </section>
+      <AppHero
+        title={`${menteeData.firstName} ${menteeData.lastName}`}
+        backgroundImageUrl={MentorBg.src}
+        breadcrumbItems={[
+          { label: "Invite to be a Field Mentor", href: "/director/mentees" },
+          { label: `${menteeData.firstName} ${menteeData.lastName}` },
+        ]}
+      />
 
       {/* Profile Content */}
       <section className="px-6 md:px-12 lg:px-20 py-10 bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
@@ -643,7 +631,7 @@ export default function MenteeProfilePage() {
         ></div>
       )}
 
-      <DirectorFooter />
+      <AppFooter />
     </div>
   );
 }

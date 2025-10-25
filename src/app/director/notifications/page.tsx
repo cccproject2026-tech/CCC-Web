@@ -1,6 +1,6 @@
 "use client";
-import DirectorHeader from "@/app/Components/DirectorHeader";
-import DirectorFooter from "@/app/Components/DirectorFooter";
+import AppHeader from "@/app/Components/AppHeader";
+import AppFooter from "@/app/Components/AppFooter";
 
 export default function NotificationsPage() {
   const notifications = [
@@ -250,7 +250,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <DirectorHeader showFullHeader={true} />
+      <AppHeader showFullHeader={true} />
 
       {/* Main Content */}
       <section className="flex-1 bg-gradient-to-b from-[#2876AC] to-[#3A8EC4] py-12 px-20">
@@ -342,7 +342,7 @@ export default function NotificationsPage() {
         </div>
       </section>
 
-      <DirectorFooter />
+      <AppFooter />
     </div>
   );
 }

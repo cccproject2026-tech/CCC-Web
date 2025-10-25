@@ -9,7 +9,7 @@ import SearchIcon from "../Assets/search.png";
 import UserProfile from "../Assets/user-profile.png";
 import NotificationPopup from "./NotificationPopup";
 
-export default function DirectorHeader({ showFullHeader = false }) {
+export default function AppHeader({ showFullHeader = false }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const pathname = usePathname();
 

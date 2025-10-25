@@ -3,7 +3,7 @@ import Image from "next/image";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import Logo from "../Assets/Frame-logo-1.png";
 
-export default function DirectorFooter() {
+export default function AppFooter() {
   return (
     <footer className="relative bg-[#2E3B8E] text-white px-20 py-14 overflow-hidden">
       {/* Background decoration */}

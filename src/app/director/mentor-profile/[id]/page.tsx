@@ -2,8 +2,9 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import DirectorHeader from "@/app/Components/DirectorHeader";
-import DirectorFooter from "@/app/Components/DirectorFooter";
+import AppHero from "@/app/Components/AppHero";
+import AppHeader from "@/app/Components/AppHeader";
+import AppFooter from "@/app/Components/AppFooter";
 import ConfirmModal from "@/app/Components/ConfirmModal";
 import MentorBg from "../../../Assets/mentor-bg.png";
 import Mentor1 from "../../../Assets/mentor1.png";
@@ -96,34 +97,16 @@ export default function MentorProfilePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
-      <DirectorHeader showFullHeader={true} />
+      <AppHeader showFullHeader={true} />
 
-      {/* Hero Section with Background */}
-      <section
-        className="relative bg-cover bg-center text-white"
-        style={{ backgroundImage: `url(${MentorBg.src})` }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1A2E5C]/80 to-[#2876AC]/70"></div>
-
-        {/* Breadcrumb and Title */}
-        <div className="relative z-10 px-6 md:px-12 lg:px-20 pt-8 pb-16">
-          <div className="text-sm text-white/80 mb-6">
-            <Link
-              href="/director/mentors"
-              className="hover:text-white cursor-pointer"
-            >
-              Mentors
-            </Link>
-            <span className="mx-2">&gt;</span>
-            <span className="font-semibold">
-              {mentorData.firstName} {mentorData.lastName}
-            </span>
-          </div>
-          <h1 className="text-[42px] md:text-[48px] lg:text-[56px] font-semibold leading-tight">
-            {mentorData.firstName} {mentorData.lastName}
-          </h1>
-        </div>
-      </section>
+      <AppHero
+        title={`${mentorData.firstName} ${mentorData.lastName}`}
+        backgroundImageUrl={MentorBg.src}
+        breadcrumbItems={[
+          { label: "Mentors", href: "/director/mentors" },
+          { label: `${mentorData.firstName} ${mentorData.lastName}` },
+        ]}
+      />
 
       {/* Profile Content */}
       <section className="px-6 md:px-12 lg:px-20 py-10 bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
@@ -488,7 +471,7 @@ export default function MentorProfilePage() {
         ></div>
       )}
 
-      <DirectorFooter />
+      <AppFooter />
     </div>
   );
 }

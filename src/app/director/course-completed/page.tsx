@@ -2,9 +2,10 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import DirectorHeader from "@/app/Components/DirectorHeader";
-import DirectorFooter from "@/app/Components/DirectorFooter";
+import AppHeader from "@/app/Components/AppHeader";
+import AppFooter from "@/app/Components/AppFooter";
 import MentorBg from "../../Assets/mentor-bg.png";
+import AppHero from "@/app/Components/AppHero";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
@@ -276,24 +277,16 @@ export default function CourseCompletedPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
-      <DirectorHeader showFullHeader={true} />
+      <AppHeader showFullHeader={true} />
 
-      {/* Hero Section with Background */}
-      <section
-        className="relative bg-cover bg-center text-white"
-        style={{ backgroundImage: `url(${MentorBg.src})` }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-[#1A2E5C]/80 to-[#2876AC]/70"></div>
-
-        {/* Hero Title */}
-        <div className="relative z-10 px-6 md:px-12 lg:px-20 pt-16 pb-8">
-          <h1 className="text-[42px] md:text-[48px] lg:text-[56px] font-semibold leading-tight">
-            {activeTab === "invited"
-              ? "Invite to be a Field Mentor"
-              : "Course Completed"}
-          </h1>
-        </div>
-      </section>
+      <AppHero
+        title={
+          activeTab === "invited"
+            ? "Invite to be a Field Mentor"
+            : "Course Completed"
+        }
+        backgroundImageUrl={MentorBg.src}
+      />
 
       {/* Controls Section - Below Hero Banner */}
       <section className="relative bg-gradient-to-b from-[#4A90C0] to-[#5BA3D0] px-6 md:px-12 lg:px-20 py-8">
@@ -537,7 +530,7 @@ export default function CourseCompletedPage() {
         ></div>
       )}
 
-      <DirectorFooter />
+      <AppFooter />
     </div>
   );
 }
