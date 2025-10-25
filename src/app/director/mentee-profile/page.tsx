@@ -4,6 +4,7 @@ import Image from "next/image";
 import AppHeader from "@/app/Components/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import AppHero from "@/app/Components/AppHero";
+import ProfileForm from "@/app/Components/ProfileForm";
 import MentorBg from "../../Assets/mentor-bg.png";
 import Mentor1 from "../../Assets/mentor1.png";
 
@@ -195,15 +196,12 @@ export default function MenteeProfilePage() {
             </div>
           </div>
 
-          {/* Right Content - Form */}
+          {/* Right Content - Reusable Profile Form */}
           <div className="flex-1">
-            <div className="bg-gradient-to-b from-[#5089B8] to-[#6BA5D5] rounded-xl p-8 shadow-lg">
-              {/* Header with Actions */}
-              <div className="flex items-center justify-between mb-8">
-                <h2 className="text-[22px] font-bold text-white">
-                  Personal information
-                </h2>
-                <div className="flex items-center gap-3">
+            <ProfileForm
+              title="Personal information"
+              headerActions={
+                <>
                   <button
                     onClick={() => setShowDeleteModal(true)}
                     className="px-4 py-2 bg-white border-2 border-red-500 text-red-500 rounded-lg text-[13px] font-semibold hover:bg-red-50 transition-all flex items-center gap-2"
@@ -225,8 +223,6 @@ export default function MenteeProfilePage() {
                     >
                       <i className="fa-solid fa-ellipsis-vertical"></i>
                     </button>
-
-                    {/* Options Dropdown Menu */}
                     {showOptionsMenu && (
                       <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl py-3 px-2 min-w-[260px] z-50">
                         {optionsMenuItems.map((item, index) => (
@@ -249,322 +245,28 @@ export default function MenteeProfilePage() {
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
-
-              {/* Personal Information Form */}
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    First Name
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.firstName}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Last Name
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.lastName}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Phone Number
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.phoneNumber}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={menteeData.email}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Current Church -1 Information */}
-              <h2 className="text-[22px] font-bold text-white mb-6">
-                Current Church -1 Information
-              </h2>
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Church Name
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church1.name}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Church Phone
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church1.phone}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Church Website
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church1.website}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Church Address
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church1.address}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    City
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church1.city}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    State
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church1.state}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Zip Code
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church1.zipCode}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Country
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church1.country}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Current Church -2 Information */}
-              <h2 className="text-[22px] font-bold text-white mb-6">
-                Current Church -2 Information
-              </h2>
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Church Name
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church2.name}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Church Phone
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church2.phone}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Church Website
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church2.website}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Church Address
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church2.address}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    City
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church2.city}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    State
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church2.state}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Zip Code
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church2.zipCode}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Country
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.church2.country}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Other Information */}
-              <h2 className="text-[22px] font-bold text-white mb-6">
-                Other Information
-              </h2>
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Title
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.otherInfo.title}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Years in Ministry
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.otherInfo.yearsInMinistry}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Conference
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.otherInfo.conference}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Current Community Service Projects
-                  </label>
-                  <input
-                    type="text"
-                    value={menteeData.otherInfo.communityServiceProjects}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-[13px] text-white/80 mb-2">
-                  Interests
-                </label>
-                <textarea
-                  value={menteeData.otherInfo.interests}
-                  readOnly
-                  rows={3}
-                  className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none resize-none"
-                ></textarea>
-              </div>
-
-              <div>
-                <label className="block text-[13px] text-white/80 mb-2">
-                  Comments
-                </label>
-                <textarea
-                  value={menteeData.otherInfo.comments}
-                  readOnly
-                  rows={3}
-                  className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none resize-none"
-                ></textarea>
-              </div>
-            </div>
+                </>
+              }
+              personal={{
+                firstName: menteeData.firstName,
+                lastName: menteeData.lastName,
+                phoneNumber: menteeData.phoneNumber,
+                email: menteeData.email,
+              }}
+              church1={menteeData.church1}
+              church2={menteeData.church2}
+              other={{
+                title: menteeData.otherInfo.title,
+                yearsInMinistry: menteeData.otherInfo.yearsInMinistry,
+                conference: menteeData.otherInfo.conference,
+                communityServiceProjects:
+                  menteeData.otherInfo.communityServiceProjects,
+              }}
+              interests={menteeData.otherInfo.interests}
+              comments={menteeData.otherInfo.comments}
+              showInterests
+              showComments
+            />
           </div>
         </div>
       </section>
