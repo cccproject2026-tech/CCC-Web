@@ -37,6 +37,13 @@ interface ProfileFormProps {
   comments?: string;
   showInterests?: boolean;
   showComments?: boolean;
+  editable?: boolean;
+  onPersonalChange?: (next: PersonalInfo) => void;
+  onChurch1Change?: (next: ChurchInfo) => void;
+  onChurch2Change?: (next: ChurchInfo) => void;
+  onOtherChange?: (next: OtherInfo) => void;
+  onInterestsChange?: (value: string) => void;
+  onCommentsChange?: (value: string) => void;
 }
 
 export default function ProfileForm({
@@ -50,6 +57,13 @@ export default function ProfileForm({
   comments,
   showInterests = false,
   showComments = false,
+  editable = false,
+  onPersonalChange,
+  onChurch1Change,
+  onChurch2Change,
+  onOtherChange,
+  onInterestsChange,
+  onCommentsChange,
 }: ProfileFormProps) {
   return (
     <div className="bg-gradient-to-b from-[#5089B8] to-[#6BA5D5] rounded-xl p-8 shadow-lg">
@@ -70,7 +84,13 @@ export default function ProfileForm({
             <input
               type="text"
               value={personal.firstName || ""}
-              readOnly
+              readOnly={!editable}
+              onChange={(e) =>
+                onPersonalChange?.({
+                  ...personal,
+                  firstName: e.target.value,
+                })
+              }
               className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
             />
           </div>
@@ -81,7 +101,13 @@ export default function ProfileForm({
             <input
               type="text"
               value={personal.lastName || ""}
-              readOnly
+              readOnly={!editable}
+              onChange={(e) =>
+                onPersonalChange?.({
+                  ...personal,
+                  lastName: e.target.value,
+                })
+              }
               className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
             />
           </div>
@@ -92,7 +118,13 @@ export default function ProfileForm({
             <input
               type="text"
               value={personal.phoneNumber || ""}
-              readOnly
+              readOnly={!editable}
+              onChange={(e) =>
+                onPersonalChange?.({
+                  ...personal,
+                  phoneNumber: e.target.value,
+                })
+              }
               className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
             />
           </div>
@@ -103,7 +135,13 @@ export default function ProfileForm({
             <input
               type="email"
               value={personal.email || ""}
-              readOnly
+              readOnly={!editable}
+              onChange={(e) =>
+                onPersonalChange?.({
+                  ...personal,
+                  email: e.target.value,
+                })
+              }
               className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
             />
           </div>
@@ -116,7 +154,7 @@ export default function ProfileForm({
             Current Church -1 Information
           </h2>
           <div className="grid grid-cols-2 gap-4 mb-8">
-            {renderChurchGrid(church1)}
+            {renderChurchGrid(church1, editable, onChurch1Change)}
           </div>
         </>
       )}
@@ -127,7 +165,7 @@ export default function ProfileForm({
             Current Church -2 Information
           </h2>
           <div className="grid grid-cols-2 gap-4 mb-8">
-            {renderChurchGrid(church2)}
+            {renderChurchGrid(church2, editable, onChurch2Change)}
           </div>
         </>
       )}
@@ -145,7 +183,13 @@ export default function ProfileForm({
               <input
                 type="text"
                 value={other.title || ""}
-                readOnly
+                readOnly={!editable}
+                onChange={(e) =>
+                  onOtherChange?.({
+                    ...other,
+                    title: e.target.value,
+                  })
+                }
                 className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
               />
             </div>
@@ -156,7 +200,13 @@ export default function ProfileForm({
               <input
                 type="text"
                 value={other.yearsInMinistry || ""}
-                readOnly
+                readOnly={!editable}
+                onChange={(e) =>
+                  onOtherChange?.({
+                    ...other,
+                    yearsInMinistry: e.target.value,
+                  })
+                }
                 className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
               />
             </div>
@@ -167,7 +217,13 @@ export default function ProfileForm({
               <input
                 type="text"
                 value={other.conference || ""}
-                readOnly
+                readOnly={!editable}
+                onChange={(e) =>
+                  onOtherChange?.({
+                    ...other,
+                    conference: e.target.value,
+                  })
+                }
                 className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
               />
             </div>
@@ -178,7 +234,13 @@ export default function ProfileForm({
               <input
                 type="text"
                 value={other.communityServiceProjects || ""}
-                readOnly
+                readOnly={!editable}
+                onChange={(e) =>
+                  onOtherChange?.({
+                    ...other,
+                    communityServiceProjects: e.target.value,
+                  })
+                }
                 className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
               />
             </div>
@@ -193,7 +255,8 @@ export default function ProfileForm({
           </label>
           <textarea
             value={interests || ""}
-            readOnly
+            readOnly={!editable}
+            onChange={(e) => onInterestsChange?.(e.target.value)}
             rows={3}
             className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none resize-none"
           ></textarea>
@@ -207,7 +270,8 @@ export default function ProfileForm({
           </label>
           <textarea
             value={comments || ""}
-            readOnly
+            readOnly={!editable}
+            onChange={(e) => onCommentsChange?.(e.target.value)}
             rows={3}
             className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none resize-none"
           ></textarea>
@@ -217,7 +281,11 @@ export default function ProfileForm({
   );
 }
 
-function renderChurchGrid(church: ChurchInfo) {
+function renderChurchGrid(
+  church: ChurchInfo,
+  editable: boolean,
+  onChange?: (next: ChurchInfo) => void
+) {
   return (
     <>
       <div>
@@ -227,7 +295,8 @@ function renderChurchGrid(church: ChurchInfo) {
         <input
           type="text"
           value={church.name || ""}
-          readOnly
+          readOnly={!editable}
+          onChange={(e) => onChange?.({ ...church, name: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
         />
       </div>
@@ -238,7 +307,8 @@ function renderChurchGrid(church: ChurchInfo) {
         <input
           type="text"
           value={church.phone || ""}
-          readOnly
+          readOnly={!editable}
+          onChange={(e) => onChange?.({ ...church, phone: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
         />
       </div>
@@ -249,7 +319,8 @@ function renderChurchGrid(church: ChurchInfo) {
         <input
           type="text"
           value={church.website || ""}
-          readOnly
+          readOnly={!editable}
+          onChange={(e) => onChange?.({ ...church, website: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
         />
       </div>
@@ -260,7 +331,8 @@ function renderChurchGrid(church: ChurchInfo) {
         <input
           type="text"
           value={church.address || ""}
-          readOnly
+          readOnly={!editable}
+          onChange={(e) => onChange?.({ ...church, address: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
         />
       </div>
@@ -269,7 +341,8 @@ function renderChurchGrid(church: ChurchInfo) {
         <input
           type="text"
           value={church.city || ""}
-          readOnly
+          readOnly={!editable}
+          onChange={(e) => onChange?.({ ...church, city: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
         />
       </div>
@@ -278,7 +351,8 @@ function renderChurchGrid(church: ChurchInfo) {
         <input
           type="text"
           value={church.state || ""}
-          readOnly
+          readOnly={!editable}
+          onChange={(e) => onChange?.({ ...church, state: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
         />
       </div>
@@ -287,7 +361,8 @@ function renderChurchGrid(church: ChurchInfo) {
         <input
           type="text"
           value={church.zipCode || ""}
-          readOnly
+          readOnly={!editable}
+          onChange={(e) => onChange?.({ ...church, zipCode: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
         />
       </div>
@@ -296,7 +371,8 @@ function renderChurchGrid(church: ChurchInfo) {
         <input
           type="text"
           value={church.country || ""}
-          readOnly
+          readOnly={!editable}
+          onChange={(e) => onChange?.({ ...church, country: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
         />
       </div>

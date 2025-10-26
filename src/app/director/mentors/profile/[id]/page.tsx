@@ -1,15 +1,18 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import AppHero from "@/app/Components/AppHero";
 import AppHeader from "@/app/Components/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import ConfirmModal from "@/app/Components/ConfirmModal";
-import MentorBg from "../../../Assets/mentor-bg.png";
-import Mentor1 from "../../../Assets/mentor1.png";
+import MentorBg from "@/app/Assets/mentor-bg.png";
+import Mentor1 from "@/app/Assets/mentor1.png";
+import ProfileForm from "@/app/Components/ProfileForm";
 
 export default function MentorProfilePage() {
+  const router = useRouter();
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -215,13 +218,9 @@ export default function MentorProfilePage() {
 
           {/* Right Content - Information & Assigned Mentees */}
           <div className="flex-1 space-y-6">
-            {/* Personal Information Section */}
-            <div className="bg-gradient-to-b from-[#5089B8] to-[#6BA5D5] rounded-xl p-8 shadow-lg">
-              {/* Header with Actions */}
-              <div className="flex items-center justify-between mb-8">
-                <h2 className="text-[22px] font-bold text-white">
-                  Personal Information
-                </h2>
+            <ProfileForm
+              title="Personal Information"
+              headerActions={
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setShowDeleteModal(true)}
@@ -231,142 +230,31 @@ export default function MentorProfilePage() {
                     Delete Profile
                   </button>
                   <button
-                    onClick={() => setShowEditModal(true)}
+                    onClick={() =>
+                      router.push(`/director/mentors/profile/edit`)
+                    }
                     className="px-4 py-2 bg-white border-2 border-blue-600 text-blue-600 rounded-lg text-[13px] font-semibold hover:bg-blue-50 transition-all flex items-center gap-2"
                   >
                     <i className="fa-regular fa-pen-to-square"></i>
                     Edit Profile
                   </button>
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowOptionsMenu(!showOptionsMenu)}
-                      className="w-10 h-10 bg-white border-2 border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition-all flex items-center justify-center"
-                    >
-                      <i className="fa-solid fa-ellipsis-vertical"></i>
-                    </button>
-
-                    {/* Options Dropdown Menu */}
-                    {showOptionsMenu && (
-                      <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl py-3 px-2 min-w-[260px] z-50">
-                        {optionsMenuItems.map((item, index) => (
-                          <button
-                            key={index}
-                            onClick={() => {
-                              setShowOptionsMenu(false);
-                              setToast(`${item.label} clicked`);
-                              setTimeout(() => setToast(null), 2000);
-                            }}
-                            className="w-full text-left px-4 py-3 rounded-lg text-[14px] transition-all flex items-center gap-3 hover:bg-gray-50"
-                          >
-                            <i
-                              className={`${item.icon} ${item.color} text-lg w-5`}
-                            ></i>
-                            <span className="text-gray-700 font-medium">
-                              {item.label}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
                 </div>
-              </div>
-
-              {/* Form Fields */}
-              <div className="grid grid-cols-2 gap-4 mb-8">
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    First Name
-                  </label>
-                  <input
-                    type="text"
-                    value={mentorData.firstName}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Last Name
-                  </label>
-                  <input
-                    type="text"
-                    value={mentorData.lastName}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Phone Number
-                  </label>
-                  <input
-                    type="text"
-                    value={mentorData.phoneNumber}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={mentorData.email}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Years of Experience
-                  </label>
-                  <input
-                    type="text"
-                    value={`${mentorData.experience} years`}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[13px] text-white/80 mb-2">
-                    Specialization
-                  </label>
-                  <input
-                    type="text"
-                    value={mentorData.specialization}
-                    readOnly
-                    className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="mb-6">
-                <label className="block text-[13px] text-white/80 mb-2">
-                  Areas of Expertise
-                </label>
-                <textarea
-                  value={mentorData.otherInfo.expertise}
-                  readOnly
-                  rows={2}
-                  className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none resize-none"
-                ></textarea>
-              </div>
-
-              <div>
-                <label className="block text-[13px] text-white/80 mb-2">
-                  Certifications
-                </label>
-                <input
-                  type="text"
-                  value={mentorData.otherInfo.certifications}
-                  readOnly
-                  className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
-                />
-              </div>
-            </div>
-
+              }
+              personal={{
+                firstName: mentorData.firstName,
+                lastName: mentorData.lastName,
+                phoneNumber: mentorData.phoneNumber,
+                email: mentorData.email,
+              }}
+              other={{
+                title: mentorData.otherInfo.title,
+                yearsInMinistry: mentorData.otherInfo.yearsInMinistry,
+                conference: mentorData.otherInfo.conference,
+                communityServiceProjects: "",
+              }}
+              showInterests={false}
+              showComments={false}
+            />
             {/* Assigned Mentees Section */}
             <div className="bg-white rounded-xl p-8 shadow-lg">
               <div className="flex items-center justify-between mb-6">
@@ -403,7 +291,7 @@ export default function MentorProfilePage() {
                         </p>
                       </div>
                       <Link
-                        href="/director/mentee-profile"
+                        href="/director/mentees/profile"
                         className="px-4 py-2 bg-[#1F2A6E] text-white rounded-lg text-[12px] font-semibold hover:bg-[#2E3B8E] transition-all"
                       >
                         View Profile

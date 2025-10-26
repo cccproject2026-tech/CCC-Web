@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import Image, { StaticImageData } from "next/image";
 import Link from "next/link";
 
@@ -23,6 +24,18 @@ interface PersonListCardProps {
     response: "Accepted" | "Waiting" | "Not Interested";
   };
   menteeCount?: number;
+  // Progress info for mentees
+  progress?: {
+    phase: string;
+    value: number;
+  };
+  // Options menu items
+  optionsMenu?: {
+    icon: string;
+    label: string;
+    color: string;
+    onClick: () => void;
+  }[];
 }
 
 export default function PersonListCard({
@@ -37,9 +50,13 @@ export default function PersonListCard({
   profileLink,
   invitationInfo,
   menteeCount,
+  progress,
+  optionsMenu,
 }: PersonListCardProps) {
+  const [showOptions, setShowOptions] = useState(false);
+
   return (
-    <div className="bg-white rounded-xl p-5 flex gap-5 items-start shadow-lg hover:shadow-xl transition-all">
+    <div className="bg-white rounded-xl p-5 flex gap-5 items-start shadow-lg hover:shadow-xl transition-all relative">
       {/* Image with relative positioning for "New" badge - Clickable */}
       <Link
         href={profileLink}
@@ -53,6 +70,45 @@ export default function PersonListCard({
         )}
       </Link>
 
+      {/* Three-dot menu */}
+      {optionsMenu && optionsMenu.length > 0 && (
+        <div className="absolute top-4 right-4">
+          <button
+            onClick={() => setShowOptions(!showOptions)}
+            className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-all text-gray-600"
+          >
+            <i className="fa-solid fa-ellipsis-vertical"></i>
+          </button>
+          {showOptions && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowOptions(false)}
+              ></div>
+              <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl py-2 px-1 min-w-[220px] z-50">
+                {optionsMenu.map((item, index) => (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      item.onClick();
+                      setShowOptions(false);
+                    }}
+                    className="w-full text-left px-4 py-2.5 rounded-lg text-[13px] transition-all flex items-center gap-3 hover:bg-gray-50"
+                  >
+                    <i
+                      className={`${item.icon} ${item.color} text-base w-5`}
+                    ></i>
+                    <span className="text-gray-700 font-medium">
+                      {item.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Content */}
       <div className="flex-1 flex flex-col justify-between min-h-[120px]">
         <div>
@@ -63,7 +119,6 @@ export default function PersonListCard({
             <h3 className="font-bold text-[#1A2E7A] text-[16px]">{name}</h3>
             <i className="fa-solid fa-circle-check text-[#5B9FD7] text-sm"></i>
           </Link>
-          {role && <p className="text-[12px] text-gray-500 mb-2">{role}</p>}
           <p className="text-[13px] text-gray-500 mb-3 leading-relaxed">
             {description}
           </p>
@@ -79,6 +134,28 @@ export default function PersonListCard({
           {menteeCount !== undefined && (
             <div className="inline-block px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-[11px] font-semibold">
               {menteeCount} Mentees
+            </div>
+          )}
+
+          {progress && (
+            <div className="mb-3">
+              <p className="text-[12px] font-semibold text-[#2E3B8E] mb-2">
+                Phase : {progress.phase}
+              </p>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <div className="text-[11px] text-gray-500 mb-1">Progress</div>
+                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-green-500 transition-all"
+                      style={{ width: `${progress.value}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <span className="text-[14px] font-bold text-gray-700">
+                  {progress.value}%
+                </span>
+              </div>
             </div>
           )}
 

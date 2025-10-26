@@ -6,7 +6,7 @@ Pixel-perfect implementation of the "My Mentors" page matching all Figma designs
 
 ## 📱 Pages Implemented
 
-### `/director/my-mentors/page.tsx` - Main My Mentors Page
+### `/director/mentors/page.tsx` - Main My Mentors Page
 
 #### ✅ Key Features Implemented:
 
@@ -372,7 +372,7 @@ const [selectedMentor, setSelectedMentor] = useState<Mentor | null>(null);
 
 ```typescript
 // Navigate to My Mentors page
-<Link href="/director/my-mentors">My Mentors</Link>
+<Link href="/director/mentors">My Mentors</Link>
 ```
 
 ### Modal Usage

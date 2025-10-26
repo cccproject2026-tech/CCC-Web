@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import AppHeader from "@/app/Components/AppHeader";
 import AppHero from "@/app/Components/AppHero";
@@ -98,6 +99,7 @@ const MENTORS: Mentor[] = [
 ];
 
 export default function MyMentorsPage() {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("Mentors");
   const [sortBy, setSortBy] = useState("Least Mentees");
@@ -221,6 +223,9 @@ export default function MyMentorsPage() {
         break;
       case "Remove a Mentee":
         handleRemoveMentee(mentor);
+        break;
+      case "Edit Profile":
+        router.push(`/director/mentors/profile/edit`);
         break;
       default:
         setToast(`${action} clicked for ${mentor.name}`);
