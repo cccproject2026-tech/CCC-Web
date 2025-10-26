@@ -30,7 +30,7 @@ export default function AppHeader({ showFullHeader = false }) {
   ];
 
   return (
-    <header className="flex items-center justify-between px-10 py-3 bg-[#2E3B8E] text-white shadow-md relative z-50">
+    <header className="flex items-center justify-between px-10 py-3 bg-[#1A2E7A] text-white shadow-md relative z-50">
       {/* Logo */}
       <div className="flex items-center gap-3">
         <Image src={Framelogo1} alt="Logo" width={26} height={26} />
@@ -95,7 +95,7 @@ export default function AppHeader({ showFullHeader = false }) {
             </button>
 
             {/* User Profile */}
-            <div className="flex items-center gap-2 bg-[#3D4FA8] px-3 py-1 rounded-full">
+            <div className="flex items-center gap-2 bg-[#2E3B8E] px-3 py-1 rounded-full">
               <div className="text-right text-[11px] leading-tight">
                 <p className="text-white/80">Good Morning</p>
                 <p className="text-white font-medium">Admin</p>
