@@ -5,14 +5,15 @@ import Image from "next/image";
 import AppHeader from "@/app/Components/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import AppHero from "@/app/Components/AppHero";
-import RoadmapBg from "../../Assets/roadmap-bg.png";
+import AssessmentBg from "../../Assets/assessment-bg.png";
 import Thumb1 from "../../Assets/thumb1.png";
 import Thumb2 from "../../Assets/thumb2.png";
+import Mentor1 from "../../Assets/mentor1.png";
 
-export default function AssignmentsPage() {
+export default function AssessmentsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedAssignments, setSelectedAssignments] = useState<number[]>([]);
+  const [selectedAssessments, setSelectedAssessments] = useState<number[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -20,31 +21,33 @@ export default function AssignmentsPage() {
   const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
-  const assignments = [
+  const assessments = [
     {
       id: 1,
-      title: "Prayer and Visitation Strategy",
-      description: "Finalize the teams vision for the church",
+      title: "Church Assessment Evaluation(CMA)",
+      description:
+        "This Survey is about Lorem ipsum dolor sit amet, consectetur",
       image: Thumb1,
     },
     {
       id: 2,
-      title: "Calendar",
+      title: "Pastoral Ministry Profile (PMP)",
       description:
-        "Finalize a vision team meeting schedule through the end of the year",
+        "This Survey is about Lorem ipsum dolor sit amet, consectetur",
       image: Thumb2,
     },
     {
       id: 3,
-      title: "Prayer",
+      title: "Pastoral Ministry Profile (PMP)",
       description:
-        "Prioritize church prayer times and meet consistently for prayer with your congregation",
+        "This Survey is about Lorem ipsum dolor sit amet, consectetur",
       image: Thumb1,
     },
     {
       id: 4,
-      title: "Mentoring Conversations",
-      description: "Schedule two mentoring conversations with your mentor",
+      title: "Pastoral Ministry Profile (PMP)",
+      description:
+        "This Survey is about Lorem ipsum dolor sit amet, consectetur",
       image: Thumb2,
     },
   ];
@@ -59,30 +62,30 @@ export default function AssignmentsPage() {
     { id: 7, name: "John Ross", role: "Pastor" },
   ];
 
-  const handleSelectAssignment = (id: number) => {
-    if (selectedAssignments.includes(id)) {
-      setSelectedAssignments(selectedAssignments.filter((aid) => aid !== id));
+  const handleSelectAssessment = (id: number) => {
+    if (selectedAssessments.includes(id)) {
+      setSelectedAssessments(selectedAssessments.filter((aid) => aid !== id));
     } else {
-      setSelectedAssignments([...selectedAssignments, id]);
+      setSelectedAssessments([...selectedAssessments, id]);
     }
   };
 
   const handleSelectAll = () => {
-    if (selectedAssignments.length === assignments.length) {
-      setSelectedAssignments([]);
+    if (selectedAssessments.length === assessments.length) {
+      setSelectedAssessments([]);
     } else {
-      setSelectedAssignments(assignments.map((a) => a.id));
+      setSelectedAssessments(assessments.map((a) => a.id));
     }
   };
 
   const handleSelectMode = () => {
     setIsSelectionMode(true);
-    setSelectedAssignments([]);
+    setSelectedAssessments([]);
   };
 
   const handleCancelSelection = () => {
     setIsSelectionMode(false);
-    setSelectedAssignments([]);
+    setSelectedAssessments([]);
   };
 
   const handleAssign = () => {
@@ -94,10 +97,10 @@ export default function AssignmentsPage() {
 
   const handleDelete = () => {
     setShowDeleteModal(false);
-    setToast(`${selectedAssignments.length} Items Deleted`);
+    setToast(`${selectedAssessments.length} Items Deleted`);
     setTimeout(() => setToast(null), 3000);
     setIsSelectionMode(false);
-    setSelectedAssignments([]);
+    setSelectedAssessments([]);
   };
 
   const handleUserToggle = (userId: number) => {
@@ -108,19 +111,23 @@ export default function AssignmentsPage() {
     }
   };
 
-  const filteredAssignments = assignments.filter((assignment) =>
-    assignment.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredAssessments = assessments.filter((assessment) =>
+    assessment.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Close options menu when clicking outside
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (!target.closest(".options-menu-container")) {
         setShowOptionsMenu(null);
       }
+    };
+
+    if (showOptionsMenu !== null) {
+      document.addEventListener("mousedown", handleClickOutside);
     }
 
-    document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
@@ -132,8 +139,8 @@ export default function AssignmentsPage() {
 
       {/* Hero Section */}
       <AppHero
-        title="Roadmap"
-        backgroundImageUrl={RoadmapBg.src}
+        title="Assessments"
+        backgroundImageUrl={AssessmentBg.src}
         heightClasses="h-[280px]"
       />
 
@@ -168,7 +175,7 @@ export default function AssignmentsPage() {
                     Select
                   </button>
                   <button
-                    onClick={() => router.push("/director/assignments/create")}
+                    onClick={() => router.push("/director/assessments/create")}
                     className="px-6 py-3 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-50 shadow-md flex items-center gap-2"
                   >
                     <i className="fa-solid fa-plus"></i>
@@ -192,7 +199,7 @@ export default function AssignmentsPage() {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-4">
                 <span className="text-white font-semibold">
-                  {selectedAssignments.length} Selected Items
+                  {selectedAssessments.length} Selected Items
                 </span>
                 <button
                   onClick={handleSelectAll}
@@ -204,7 +211,7 @@ export default function AssignmentsPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setShowDeleteModal(true)}
-                  disabled={selectedAssignments.length === 0}
+                  disabled={selectedAssessments.length === 0}
                   className="w-10 h-10 bg-white text-red-600 rounded-lg hover:bg-red-50 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <i className="fa-solid fa-trash"></i>
@@ -219,13 +226,13 @@ export default function AssignmentsPage() {
             </div>
           )}
 
-          {/* Assignments Grid */}
+          {/* Assessments Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredAssignments.map((assignment) => (
+            {filteredAssessments.map((assessment) => (
               <div
-                key={assignment.id}
+                key={assessment.id}
                 className={`bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all relative ${
-                  selectedAssignments.includes(assignment.id)
+                  selectedAssessments.includes(assessment.id)
                     ? "ring-2 ring-[#2E3B8E]"
                     : ""
                 }`}
@@ -235,8 +242,8 @@ export default function AssignmentsPage() {
                   <div className="absolute top-4 left-4 z-10">
                     <input
                       type="checkbox"
-                      checked={selectedAssignments.includes(assignment.id)}
-                      onChange={() => handleSelectAssignment(assignment.id)}
+                      checked={selectedAssessments.includes(assessment.id)}
+                      onChange={() => handleSelectAssessment(assessment.id)}
                       className="w-5 h-5 text-[#2E3B8E] rounded focus:ring-2 focus:ring-[#2E3B8E] cursor-pointer"
                     />
                   </div>
@@ -248,16 +255,16 @@ export default function AssignmentsPage() {
                     <button
                       onClick={() =>
                         setShowOptionsMenu(
-                          showOptionsMenu === assignment.id
+                          showOptionsMenu === assessment.id
                             ? null
-                            : assignment.id
+                            : assessment.id
                         )
                       }
                       className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-lg"
                     >
                       <i className="fa-solid fa-ellipsis-vertical"></i>
                     </button>
-                    {showOptionsMenu === assignment.id && (
+                    {showOptionsMenu === assessment.id && (
                       <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-[200] animate-slide-down">
                         <button
                           onClick={() => {
@@ -275,7 +282,7 @@ export default function AssignmentsPage() {
                         </button>
                         <button
                           onClick={() => {
-                            setSelectedAssignments([assignment.id]);
+                            setSelectedAssessments([assessment.id]);
                             setShowDeleteModal(true);
                             setShowOptionsMenu(null);
                           }}
@@ -290,27 +297,32 @@ export default function AssignmentsPage() {
                 )}
 
                 <div className="flex gap-4 p-6">
-                  {/* Assignment Image */}
+                  {/* Assessment Image */}
                   <div className="w-32 h-32 flex-shrink-0 rounded-lg overflow-hidden">
                     <Image
-                      src={assignment.image}
-                      alt={assignment.title}
+                      src={assessment.image}
+                      alt={assessment.title}
                       className="w-full h-full object-cover"
                     />
                   </div>
 
-                  {/* Assignment Info */}
+                  {/* Assessment Info */}
                   <div className="flex-1 flex flex-col justify-between">
                     <div>
                       <h3 className="text-lg font-bold text-gray-900 mb-2">
-                        {assignment.title}
+                        {assessment.title}
                       </h3>
                       <p className="text-sm text-gray-600">
-                        {assignment.description}
+                        {assessment.description}
                       </p>
                     </div>
 
-                    <button className="self-end px-6 py-2 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E] transition text-sm mt-4">
+                    <button
+                      onClick={() =>
+                        router.push(`/director/assessments/${assessment.id}`)
+                      }
+                      className="self-end px-6 py-2 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E] transition text-sm mt-4"
+                    >
                       View
                     </button>
                   </div>
@@ -319,12 +331,12 @@ export default function AssignmentsPage() {
             ))}
           </div>
 
-          {filteredAssignments.length === 0 && (
-            <div className="text-center py-16">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 mb-4">
-                <i className="fa-regular fa-folder-open text-white text-2xl"></i>
+          {filteredAssessments.length === 0 && (
+            <div className="text-center py-12">
+              <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i className="fa-regular fa-folder-open text-white text-4xl"></i>
               </div>
-              <p className="text-white text-lg">No assignments found</p>
+              <p className="text-white text-lg">No assessments found</p>
             </div>
           )}
         </div>
@@ -332,33 +344,38 @@ export default function AssignmentsPage() {
 
       {/* Assign Modal */}
       {showAssignModal && (
-        <div className="fixed inset-0 bg-black/50 flex justify-end items-start z-50">
-          <div className="bg-white w-full max-w-md h-full overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex justify-between items-center z-10">
-              <h3 className="text-xl font-bold text-gray-900">Assigned to</h3>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-end z-50">
+          <div className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col animate-slide-left">
+            {/* Header */}
+            <div className="p-6 border-b flex items-center justify-between">
+              <h2 className="text-xl font-bold text-gray-900">Assigned to</h2>
               <button
                 onClick={() => setShowAssignModal(false)}
-                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg transition"
+                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg"
               >
-                <i className="fa-solid fa-xmark text-gray-600"></i>
+                <i className="fa-solid fa-xmark text-xl text-gray-600"></i>
               </button>
             </div>
 
-            <div className="p-6">
-              <div className="relative mb-6">
+            {/* Search */}
+            <div className="p-6 border-b">
+              <div className="relative">
                 <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
                 <input
                   type="text"
                   placeholder="Search"
-                  className="w-full pl-12 pr-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E]"
+                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E]"
                 />
               </div>
+            </div>
 
-              <div className="space-y-3 mb-6">
+            {/* User List */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-3">
                 {users.map((user) => (
                   <label
                     key={user.id}
-                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition"
+                    className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer"
                   >
                     <input
                       type="checkbox"
@@ -366,23 +383,33 @@ export default function AssignmentsPage() {
                       onChange={() => handleUserToggle(user.id)}
                       className="w-5 h-5 text-[#2E3B8E] rounded focus:ring-2 focus:ring-[#2E3B8E]"
                     />
-                    <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-semibold">
-                      {user.name.charAt(0)}
+                    <Image
+                      src={Mentor1}
+                      alt={user.name}
+                      width={40}
+                      height={40}
+                      className="rounded-full"
+                    />
+                    <div className="flex-1">
+                      <div className="font-semibold text-gray-900">
+                        {user.name}
+                      </div>
+                      <div className="text-sm text-gray-600">{user.role}</div>
                     </div>
-                    <span className="text-gray-900 font-medium">
-                      {user.name}
-                    </span>
                   </label>
                 ))}
               </div>
+            </div>
 
-              <p className="text-sm text-gray-600 mb-6">
-                John Doe, John Doe, John Doe and 3 Others
-              </p>
-
+            {/* Footer */}
+            <div className="p-6 border-t">
+              <div className="text-sm text-gray-600 mb-4">
+                Who Am I Do You Why Doe and 3 Others
+              </div>
               <button
                 onClick={handleAssign}
-                className="w-full py-3 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E] transition"
+                disabled={selectedUsers.length === 0}
+                className="w-full px-6 py-3 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E] transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Assign
               </button>
@@ -393,21 +420,23 @@ export default function AssignmentsPage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 shadow-2xl">
             <div className="flex justify-center mb-6">
               <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
-                <i className="fa-regular fa-trash-can text-3xl text-red-500"></i>
+                <i className="fa-solid fa-trash text-red-600 text-2xl"></i>
               </div>
             </div>
-            <h3 className="text-xl font-bold text-center text-[#2E3B8E] mb-6">
-              Are you sure want to Delete {selectedAssignments.length}{" "}
-              Assignments ?
+            <h3 className="text-xl font-bold text-center text-gray-900 mb-2">
+              Are you sure want to
             </h3>
-            <div className="flex gap-4">
+            <h3 className="text-xl font-bold text-center text-red-600 mb-6">
+              Delete ! Assignments ?
+            </h3>
+            <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
+                className="flex-1 px-6 py-3 border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg font-semibold hover:bg-[#2E3B8E]/10 transition"
               >
                 Cancel
               </button>
@@ -424,12 +453,10 @@ export default function AssignmentsPage() {
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed top-8 right-8 z-[70] animate-fade-in">
-          <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3 border border-gray-200">
-            <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-              <i className="fa-solid fa-check text-white text-xs"></i>
-            </div>
-            <span className="text-[#2E3B8E] font-semibold">{toast}</span>
+        <div className="fixed top-6 right-6 z-[70] animate-fade-in">
+          <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3">
+            <i className="fa-solid fa-circle-check text-green-500 text-xl"></i>
+            <span className="text-gray-800 font-semibold">{toast}</span>
           </div>
         </div>
       )}

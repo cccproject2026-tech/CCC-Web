@@ -57,7 +57,7 @@ export default function InterestDetailPage() {
 
   const handleAccept = () => {
     setToast("Interest accepted successfully");
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 3000);L
   };
 
   return (
