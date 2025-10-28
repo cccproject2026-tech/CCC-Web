@@ -11,6 +11,13 @@ export default function TrackProgressPage() {
   const [activeTab, setActiveTab] = useState("pastors");
   const [searchQuery, setSearchQuery] = useState("");
 
+  const stats = {
+    totalPastors: 3,
+    activeMentors: 3,
+    avgProgress: 47,
+    sessions: 81,
+  };
+
   const pastorProgress = [
     {
       id: 1,
@@ -116,75 +123,85 @@ export default function TrackProgressPage() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#2E6BA5] via-[#2876AC] to-[#3284B8]">
       <AppHeader showFullHeader={true} />
 
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-400 p-12 text-center">
-        <h1 className="text-4xl font-bold text-white mb-3">Track Progress</h1>
-        <p className="text-white/90 text-lg max-w-2xl mx-auto">
-          Monitor and analyze progress across all programs and participants
-        </p>
-      </div>
-
-      {/* Main Content */}
-      <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-12">
+      {/* Stats Cards */}
+      <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 pt-8 pb-6">
         <div className="max-w-[1400px] mx-auto">
-          {/* Overall Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-xl p-6 shadow-lg">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {/* Total Pastors */}
+            <div className="bg-white rounded-2xl p-6 shadow-lg">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-[#2E3B8E]/10 rounded-lg flex items-center justify-center">
-                  <i className="fa-solid fa-users text-[#2E3B8E] text-xl"></i>
+                <div className="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <i className="fa-solid fa-users text-purple-600 text-2xl"></i>
                 </div>
                 <div>
-                  <p className="text-gray-600 text-sm">Total Pastors</p>
-                  <h3 className="text-2xl font-bold text-gray-900">
-                    {pastorProgress.length}
+                  <p className="text-gray-500 text-sm font-medium">
+                    Total Pastors
+                  </p>
+                  <h3 className="text-3xl font-bold text-gray-900">
+                    {stats.totalPastors}
                   </h3>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-lg">
+            {/* Active Mentors */}
+            <div className="bg-white rounded-2xl p-6 shadow-lg">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <i className="fa-solid fa-user-tie text-blue-600 text-xl"></i>
+                <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <i className="fa-solid fa-user-tie text-blue-600 text-2xl"></i>
                 </div>
                 <div>
-                  <p className="text-gray-600 text-sm">Active Mentors</p>
-                  <h3 className="text-2xl font-bold text-gray-900">
-                    {mentorProgress.length}
+                  <p className="text-gray-500 text-sm font-medium">
+                    Active Mentors
+                  </p>
+                  <h3 className="text-3xl font-bold text-gray-900">
+                    {stats.activeMentors}
                   </h3>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-lg">
+            {/* Avg Progress */}
+            <div className="bg-white rounded-2xl p-6 shadow-lg">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <i className="fa-solid fa-chart-line text-green-600 text-xl"></i>
+                <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <i className="fa-solid fa-chart-line text-green-600 text-2xl"></i>
                 </div>
                 <div>
-                  <p className="text-gray-600 text-sm">Avg. Progress</p>
-                  <h3 className="text-2xl font-bold text-gray-900">47%</h3>
+                  <p className="text-gray-500 text-sm font-medium">
+                    Avg. Progress
+                  </p>
+                  <h3 className="text-3xl font-bold text-gray-900">
+                    {stats.avgProgress}%
+                  </h3>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-lg">
+            {/* Sessions */}
+            <div className="bg-white rounded-2xl p-6 shadow-lg">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                  <i className="fa-solid fa-calendar-check text-yellow-600 text-xl"></i>
+                <div className="w-14 h-14 bg-orange-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <i className="fa-solid fa-calendar-check text-orange-600 text-2xl"></i>
                 </div>
                 <div>
-                  <p className="text-gray-600 text-sm">Sessions</p>
-                  <h3 className="text-2xl font-bold text-gray-900">81</h3>
+                  <p className="text-gray-500 text-sm font-medium">Sessions</p>
+                  <h3 className="text-3xl font-bold text-gray-900">
+                    {stats.sessions}
+                  </h3>
                 </div>
               </div>
             </div>
           </div>
+        </div>
+      </section>
 
+      {/* Main Content */}
+      <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-6 flex-1">
+        <div className="max-w-[1400px] mx-auto">
           {/* Search and Tabs */}
           <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
             <div className="flex flex-col md:flex-row gap-4 items-center">
@@ -203,23 +220,23 @@ export default function TrackProgressPage() {
               </div>
 
               {/* Tabs */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 bg-gray-100 p-1 rounded-lg">
                 <button
                   onClick={() => setActiveTab("pastors")}
-                  className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all ${
+                  className={`px-8 py-2.5 rounded-md font-bold text-sm transition-all ${
                     activeTab === "pastors"
-                      ? "bg-[#2E3B8E] text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      ? "bg-[#1F2A6E] text-white shadow-md"
+                      : "bg-transparent text-gray-700 hover:bg-gray-200"
                   }`}
                 >
                   Pastors
                 </button>
                 <button
                   onClick={() => setActiveTab("mentors")}
-                  className={`px-6 py-3 rounded-lg font-semibold text-sm transition-all ${
+                  className={`px-8 py-2.5 rounded-md font-bold text-sm transition-all ${
                     activeTab === "mentors"
-                      ? "bg-[#2E3B8E] text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      ? "bg-[#1F2A6E] text-white shadow-md"
+                      : "bg-transparent text-gray-700 hover:bg-gray-200"
                   }`}
                 >
                   Mentors
@@ -234,30 +251,30 @@ export default function TrackProgressPage() {
               {filteredPastors.map((pastor) => (
                 <div
                   key={pastor.id}
-                  className="bg-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition-all"
+                  className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all"
                 >
-                  <div className="flex flex-col lg:flex-row gap-6">
+                  <div className="flex flex-col lg:flex-row gap-6 items-center">
                     {/* Pastor Info */}
                     <div className="flex items-center gap-4 lg:w-1/4">
                       <Image
                         src={pastor.image}
                         alt={pastor.name}
-                        width={70}
-                        height={70}
+                        width={80}
+                        height={80}
                         className="rounded-full"
                       />
                       <div>
-                        <h3 className="text-lg font-bold text-gray-900">
+                        <h3 className="text-xl font-bold text-gray-900">
                           {pastor.name}
                         </h3>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-600 font-medium">
                           {pastor.currentPhase}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 mt-1">
                           Mentor: {pastor.mentor}
                         </p>
                         <span
-                          className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-bold ${getStatusColor(
+                          className={`inline-block mt-2 px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(
                             pastor.status
                           )}`}
                         >
@@ -272,17 +289,17 @@ export default function TrackProgressPage() {
                     {/* Progress Bars */}
                     <div className="flex-1 space-y-4">
                       <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-semibold text-gray-700">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-bold text-gray-900">
                             Overall Progress
                           </span>
                           <span className="text-sm font-bold text-gray-900">
                             {pastor.overallProgress}%
                           </span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-gray-200 rounded-full h-3">
                           <div
-                            className={`h-2 rounded-full ${getProgressColor(
+                            className={`h-3 rounded-full ${getProgressColor(
                               pastor.overallProgress
                             )}`}
                             style={{ width: `${pastor.overallProgress}%` }}
@@ -293,16 +310,16 @@ export default function TrackProgressPage() {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs text-gray-600">
+                            <span className="text-xs text-gray-700 font-semibold">
                               Roadmap
                             </span>
-                            <span className="text-xs font-bold">
+                            <span className="text-xs font-bold text-gray-900">
                               {pastor.roadmapProgress}%
                             </span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-1.5">
+                          <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
-                              className="h-1.5 rounded-full bg-blue-500"
+                              className="h-2 rounded-full bg-blue-600"
                               style={{ width: `${pastor.roadmapProgress}%` }}
                             ></div>
                           </div>
@@ -310,16 +327,16 @@ export default function TrackProgressPage() {
 
                         <div>
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs text-gray-600">
+                            <span className="text-xs text-gray-700 font-semibold">
                               Assessments
                             </span>
-                            <span className="text-xs font-bold">
+                            <span className="text-xs font-bold text-gray-900">
                               {pastor.assessmentProgress}%
                             </span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-1.5">
+                          <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
-                              className="h-1.5 rounded-full bg-purple-500"
+                              className="h-2 rounded-full bg-purple-600"
                               style={{
                                 width: `${pastor.assessmentProgress}%`,
                               }}
@@ -329,16 +346,16 @@ export default function TrackProgressPage() {
 
                         <div>
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs text-gray-600">
+                            <span className="text-xs text-gray-700 font-semibold">
                               Assignments
                             </span>
-                            <span className="text-xs font-bold">
+                            <span className="text-xs font-bold text-gray-900">
                               {pastor.assignmentProgress}%
                             </span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-1.5">
+                          <div className="w-full bg-gray-200 rounded-full h-2">
                             <div
-                              className="h-1.5 rounded-full bg-green-500"
+                              className="h-2 rounded-full bg-green-600"
                               style={{ width: `${pastor.assignmentProgress}%` }}
                             ></div>
                           </div>
@@ -348,7 +365,7 @@ export default function TrackProgressPage() {
 
                     {/* Actions */}
                     <div className="flex items-center">
-                      <button className="px-4 py-2 bg-[#2E3B8E] text-white rounded-lg font-semibold text-sm hover:bg-[#1F2A6E] transition">
+                      <button className="px-6 py-3 bg-[#1F2A6E] text-white rounded-lg font-bold text-sm hover:bg-[#0F1A5E] transition shadow-md">
                         View Details
                       </button>
                     </div>
@@ -363,24 +380,26 @@ export default function TrackProgressPage() {
               {filteredMentors.map((mentor) => (
                 <div
                   key={mentor.id}
-                  className="bg-white rounded-xl shadow-lg p-6 hover:shadow-2xl transition-all"
+                  className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-all"
                 >
                   {/* Mentor Info */}
-                  <div className="flex items-center gap-4 mb-4">
+                  <div className="flex items-center gap-4 mb-6">
                     <Image
                       src={mentor.image}
                       alt={mentor.name}
-                      width={60}
-                      height={60}
+                      width={70}
+                      height={70}
                       className="rounded-full"
                     />
                     <div className="flex-1">
                       <h3 className="text-lg font-bold text-gray-900">
                         {mentor.name}
                       </h3>
-                      <p className="text-sm text-gray-600">{mentor.role}</p>
+                      <p className="text-sm text-gray-600 font-medium">
+                        {mentor.role}
+                      </p>
                       <span
-                        className={`inline-block mt-1 px-2 py-1 rounded-full text-xs font-bold ${getStatusColor(
+                        className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(
                           mentor.status
                         )}`}
                       >
@@ -391,37 +410,43 @@ export default function TrackProgressPage() {
                   </div>
 
                   {/* Stats */}
-                  <div className="space-y-3 mb-4">
+                  <div className="space-y-3 mb-6">
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-600">Mentees</span>
-                      <span className="text-lg font-bold text-[#2E3B8E]">
+                      <span className="text-sm text-gray-700 font-medium">
+                        Mentees
+                      </span>
+                      <span className="text-xl font-bold text-[#2E3B8E]">
                         {mentor.mentees}
                       </span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-gray-700 font-medium">
                         Completed Sessions
                       </span>
-                      <span className="text-lg font-bold text-green-600">
+                      <span className="text-xl font-bold text-green-600">
                         {mentor.completedSessions}
                       </span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-600">Upcoming</span>
-                      <span className="text-lg font-bold text-yellow-600">
+                      <span className="text-sm text-gray-700 font-medium">
+                        Upcoming
+                      </span>
+                      <span className="text-xl font-bold text-orange-600">
                         {mentor.upcomingSessions}
                       </span>
                     </div>
                     <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-600">Rating</span>
-                      <span className="text-lg font-bold text-yellow-500">
+                      <span className="text-sm text-gray-700 font-medium">
+                        Rating
+                      </span>
+                      <span className="text-xl font-bold text-yellow-500">
                         ⭐ {mentor.overallRating}
                       </span>
                     </div>
                   </div>
 
                   {/* Action Button */}
-                  <button className="w-full px-4 py-2 bg-[#2E3B8E] text-white rounded-lg font-semibold text-sm hover:bg-[#1F2A6E] transition">
+                  <button className="w-full px-4 py-3 bg-[#1F2A6E] text-white rounded-lg font-bold text-sm hover:bg-[#0F1A5E] transition shadow-md">
                     View Profile
                   </button>
                 </div>
