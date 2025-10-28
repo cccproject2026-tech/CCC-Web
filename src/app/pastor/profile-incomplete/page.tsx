@@ -3,8 +3,10 @@ import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
 import ProfileLogo from "../../Assets/profile.png";
 import EditLogo from "../../Assets/Edit.png";
+import { useRouter } from "next/navigation"; 
 
 export default function ProfileIncomplete() {
+  const router = useRouter();
   return (
     <div className="min-h-screen flex flex-col">
     
@@ -20,7 +22,9 @@ export default function ProfileIncomplete() {
           </div>
 
        
-          <button className="absolute top-3 right-4 text-xs text-gray-600 bg-gray-100 px-3 py-[2px] rounded-full hover:bg-gray-200 transition">
+          <button className="absolute top-3 right-4 text-xs text-gray-600 bg-gray-100 px-3 py-[2px] rounded-full hover:bg-gray-200 transition"
+           onClick={() =>router.push(`/pastor/home`)}
+          >
             Skip <span className="ml-1">{">"}</span>
           </button>
 

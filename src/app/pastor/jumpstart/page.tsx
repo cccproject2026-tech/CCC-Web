@@ -336,7 +336,7 @@ export default function JumpStartPage() {
         </div>
       </main>
 
-      <PastorFooter />
+  
     </div>
   );
 }

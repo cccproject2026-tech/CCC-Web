@@ -15,8 +15,11 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import PastorFooter from "@/app/Components/PastorFooter";
+import { useRouter } from "next/navigation"; 
 
 export default function PastorDashboard() {
+
+    const router = useRouter();
   return (
     <div className="min-h-screen flex flex-col">
    
@@ -54,7 +57,9 @@ export default function PastorDashboard() {
     <div className="flex flex-col items-end">
       <p className="text-white/90 text-sm mb-2">Good Morning</p>
 
-      <div className="bg-white/15 backdrop-blur-md border border-white/30 rounded-md p-4 w-[280px] shadow-lg">
+      <div className="bg-white/15 backdrop-blur-md border border-white/30 rounded-md p-4 w-[280px] shadow-lg"
+       onClick={() =>router.push(`/pastor/profile`)}
+      >
         <div className="flex items-center gap-3">
           <Image
             src={UserProfile}
@@ -123,7 +128,9 @@ export default function PastorDashboard() {
                 className="w-full h-[180px] object-cover"
               />
               <div className="absolute inset-0 flex items-center justify-center">
-                <button className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center hover:scale-110 transition">
+                <button className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center hover:scale-110 transition"
+                   onClick={() =>router.push(`/pastor/VideoPage`)}
+                >
                   <i className="fa-solid fa-play text-[#103C8C] text-sm"></i>
                 </button>
               </div>
@@ -507,7 +514,7 @@ export default function PastorDashboard() {
         className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 p-3"
       >
      
-        <div className="relative">
+        <div className="relative" onClick={() =>router.push(`/pastor/Mymentors`)}>
           <img
             src={mentor.img.src}
             alt={mentor.name}

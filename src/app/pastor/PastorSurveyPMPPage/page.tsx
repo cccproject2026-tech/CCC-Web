@@ -4,6 +4,12 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 
 export default function PastorSurveyPMPPage() {
   const [activeSection, setActiveSection] = useState(1);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showMeeting, setShowMeeting] = useState(false);
+  const [showMentorSidebar, setShowMentorSidebar] = useState(false);
+  const [showScheduleSidebar, setShowScheduleSidebar] = useState(false);
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false);
+  const [selectedMentor, setSelectedMentor] = useState("");
 
   const sections = [
     "Personal Well-Being",
@@ -21,33 +27,52 @@ export default function PastorSurveyPMPPage() {
 
   const handleNext = () => {
     if (activeSection < sections.length) setActiveSection(activeSection + 1);
-    else alert("✅ Survey submitted successfully!");
+    else {
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        setShowMeeting(true);
+      }, 4000);
+    }
+  };
+
+  const handleScheduleClick = () => {
+    setShowMeeting(false);
+    setShowMentorSidebar(true);
+  };
+
+  const handleMentorNext = () => {
+    if (selectedMentor) {
+      setShowMentorSidebar(false);
+      setShowScheduleSidebar(true);
+    }
+  };
+
+  const handleFinalSchedule = () => {
+    setShowScheduleSidebar(false);
+    setShowConfirmPopup(true);
+    setTimeout(() => setShowConfirmPopup(false), 3000);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] flex flex-col text-white transition-all duration-300">
-      {/* HEADER */}
-
-
+    <div className="min-h-screen bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] flex flex-col text-white relative transition-all duration-300">
       {/* MAIN CONTENT */}
       <main className="flex flex-1 px-12 py-10 gap-10">
         {/* LEFT TIMELINE */}
         <aside className="relative w-[300px] flex flex-col gap-5 h-[400px]">
           <div className="absolute left-[10px] top-6 bottom-6 w-[2px] bg-gradient-to-b from-[#B3D3F8] to-[#2C6DCC]" />
-
           {sections.map((title, index) => (
             <div
               key={index}
               onClick={() => setActiveSection(index + 1)}
               className="relative flex items-start gap-3 cursor-pointer transition-all"
             >
-              {/* CIRCLE INDICATOR */}
               <div
                 className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-4 ${
                   activeSection === index + 1
                     ? "border-[#FFD84E] bg-[#FFD84E]"
                     : activeSection > index + 1
-                    ? "border-[#65D26E] bg-[#65D26E]" // completed green
+                    ? "border-[#65D26E] bg-[#65D26E]"
                     : "border-[#6FA8F6] bg-[#103C8C]/30"
                 }`}
               >
@@ -56,7 +81,6 @@ export default function PastorSurveyPMPPage() {
                 ) : null}
               </div>
 
-              {/* SECTION CARD */}
               <div
                 className={`flex-1 border rounded-lg px-4 py-3 transition-all ${
                   activeSection === index + 1
@@ -296,20 +320,78 @@ export default function PastorSurveyPMPPage() {
           </div>
         </section>
       </main>
+
+      {/* ✅ SUCCESS POPUP */}
+      {showSuccess && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+          <div className="bg-white rounded-xl shadow-lg px-8 py-6 flex items-center gap-3 animate-fadeIn">
+            <div className="bg-[#4ADE80] rounded-full p-2 flex items-center justify-center">
+              <i className="fa-solid fa-check text-white text-lg"></i>
+            </div>
+            <h3 className="text-[#165A92] font-semibold text-lg">
+              Survey Uploaded Successfully
+            </h3>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ MEETING POPUP */}
+      {showMeeting && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+          <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-[500px] text-center p-8 animate-fadeIn">
+            <p className="text-[#0B1C58] text-[15px] font-medium leading-relaxed mb-6">
+              On completion of the PMP and CMA assessment tools please schedule
+              a meeting with your mentor.
+            </p>
+            <button
+              onClick={handleScheduleClick}
+              className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm font-medium px-6 py-2 rounded-md shadow-sm"
+            >
+              Schedule Meeting
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ MENTOR SIDEBAR */}
+      {showMentorSidebar && (
+        <MentorSidebar
+          selectedMentor={selectedMentor}
+          setSelectedMentor={setSelectedMentor}
+          handleMentorNext={handleMentorNext}
+        />
+      )}
+
+      {/* ✅ SCHEDULE SIDEBAR */}
+      {showScheduleSidebar && (
+        <ScheduleSidebar
+          handleFinalSchedule={handleFinalSchedule}
+          setShowScheduleSidebar={setShowScheduleSidebar}
+          setShowMentorSidebar={setShowMentorSidebar}
+        />
+      )}
+
+      {/* ✅ CONFIRM POPUP */}
+      {showConfirmPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 animate-fadeIn">
+          <div className="bg-white rounded-xl shadow-lg px-10 py-6 flex items-center gap-3">
+            <div className="bg-[#4ADE80] rounded-full p-2 flex items-center justify-center">
+              <i className="fa-solid fa-check text-white text-lg"></i>
+            </div>
+            <h3 className="text-[#165A92] font-semibold text-lg">
+              New Appointment has been Scheduled
+            </h3>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 /* 🔹 Reusable Question Block Component */
-function QuestionBlock({
-  title,
-  options,
-}: {
-  title: string;
-  options: string[];
-}) {
+function QuestionBlock({ title, options }) {
   return (
-    <div className="border border-[#5A8DCB] rounded-md p-4">
+    <div className="border border-[#5A8DCB] rounded-md p-4 mb-4">
       <h4 className="font-semibold mb-2">{title}</h4>
       {options.map((opt, i) => (
         <label key={i} className="flex items-center gap-2 cursor-pointer">
@@ -320,3 +402,137 @@ function QuestionBlock({
     </div>
   );
 }
+
+/* 🔹 Mentor Sidebar Component */
+function MentorSidebar({ selectedMentor, setSelectedMentor, handleMentorNext }) {
+  return (
+    <div className="fixed right-0 top-0 w-[400px] h-full bg-white shadow-2xl z-50 animate-slideIn flex flex-col">
+      <div className="p-6 border-b">
+        <h2 className="text-[#0B1C58] text-xl font-semibold">
+          Choose Mentor for the Meeting
+        </h2>
+        <input
+          type="text"
+          placeholder="Search"
+          className="w-full mt-4 p-2 border border-gray-300 rounded-md focus:outline-none"
+        />
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <label
+            key={i}
+            className={`flex items-center gap-3 p-3 border rounded-md cursor-pointer transition-all ${
+              selectedMentor === `Mentor ${i}`
+                ? "border-[#103C8C] bg-[#F5F8FF]"
+                : "border-gray-200 hover:bg-gray-50"
+            }`}
+          >
+            <input
+              type="radio"
+              name="mentor"
+              checked={selectedMentor === `Mentor ${i}`}
+              onChange={() => setSelectedMentor(`Mentor ${i}`)}
+            />
+            <img
+              src="https://i.pravatar.cc/40?img=8"
+              className="w-10 h-10 rounded-full"
+            />
+            <div>
+              <p className="text-[#0B1C58] font-medium">John Ross</p>
+              <p className="text-gray-500 text-sm">
+                {i % 2 === 0 ? "Mentor" : "Field Mentor"}
+              </p>
+            </div>
+          </label>
+        ))}
+      </div>
+
+      <div className="p-4 border-t">
+        <button
+          onClick={handleMentorNext}
+          disabled={!selectedMentor}
+          className={`w-full py-2 rounded-md text-white font-medium ${
+            selectedMentor
+              ? "bg-[#103C8C] hover:bg-[#0B2E72]"
+              : "bg-gray-400 cursor-not-allowed"
+          }`}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* 🔹 Schedule Sidebar Component */
+function ScheduleSidebar({
+  handleFinalSchedule,
+  setShowScheduleSidebar,
+  setShowMentorSidebar,
+}) {
+  return (
+    <div className="fixed right-0 top-0 w-[400px] h-full bg-white shadow-2xl z-50 animate-slideIn flex flex-col">
+      <div className="p-6 border-b flex items-center gap-3">
+        <i className="fa-regular fa-calendar text-[#103C8C] text-lg"></i>
+        <h2 className="text-[#0B1C58] text-xl font-semibold">
+          Schedule a Meeting
+        </h2>
+      </div>
+
+      <div className="p-5 overflow-y-auto flex-1">
+        <p className="text-[#0B1C58] text-sm font-medium mb-2">
+          Select Available Date
+        </p>
+        <div className="bg-[#0D3971]/10 rounded-lg p-4 text-center text-[#0B1C58] font-semibold mb-6">
+                   August 2024 (Static Calendar Placeholder)
+        </div>
+
+        <p className="text-[#0B1C58] text-sm font-medium mb-2">
+          Select a Time
+        </p>
+        <div className="grid grid-cols-2 gap-3 mb-6">
+          {[
+            "09:00 am - 10:00 am",
+            "11:00 am - 12:00 pm",
+            "01:00 pm - 02:00 pm",
+            "03:00 pm - 04:00 pm",
+            "05:00 pm - 06:00 pm",
+          ].map((t, i) => (
+            <button
+              key={i}
+              className="border border-gray-300 rounded-md py-2 hover:bg-[#103C8C] hover:text-white transition-all text-sm"
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+
+        <select className="w-full border border-gray-300 rounded-md p-2 text-gray-600">
+          <option>Preferred meeting option</option>
+          <option>Online</option>
+          <option>Offline</option>
+        </select>
+      </div>
+
+      <div className="p-4 border-t flex justify-between gap-3">
+        <button
+          onClick={() => {
+            setShowScheduleSidebar(false);
+            setShowMentorSidebar(true);
+          }}
+          className="flex-1 border border-gray-400 text-[#0B1C58] py-2 rounded-md hover:bg-gray-50"
+        >
+          Back
+        </button>
+        <button
+          onClick={handleFinalSchedule}
+          className="flex-1 bg-[#103C8C] hover:bg-[#0B2E72] text-white py-2 rounded-md"
+        >
+          Schedule
+        </button>
+      </div>
+    </div>
+  );
+}
+

@@ -1,16 +1,17 @@
 "use client";
 import { useState } from "react";
-import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
-import HeroBg from "@/app/Assets/jumpstart-hero.png"; // replace with correct background
+import HeroBg from "@/app/Assets/jumpstart-hero.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import { useRouter } from "next/navigation";
 
 export default function PastoralMinistryProfilePage() {
+   const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
+  const [showPopup, setShowPopup] = useState(false);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F4A85]">
+    <div className="min-h-screen flex flex-col bg-[#0F4A85] relative">
       <PastorHeader showFullHeader={true} />
 
       {/* HERO SECTION */}
@@ -36,7 +37,6 @@ export default function PastoralMinistryProfilePage() {
       {/* MAIN CONTENT */}
       <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white pb-24">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-10">
-
           {/* LEFT PANEL */}
           <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 w-full h-[250px]">
             {[
@@ -73,7 +73,6 @@ export default function PastoralMinistryProfilePage() {
           <div>
             {activeTab === "overview" && (
               <>
-                {/* HEADER */}
                 <div className="flex justify-between items-center mb-2">
                   <h2 className="text-xl font-semibold">Over View</h2>
                   <button className="bg-white rounded-md w-8 h-8 flex items-center justify-center text-[#103C8C] hover:bg-gray-100">
@@ -81,7 +80,6 @@ export default function PastoralMinistryProfilePage() {
                   </button>
                 </div>
 
-                {/* HR LINE */}
                 <hr className="border-t border-white/40 mb-8" />
 
                 {/* ROADMAP SECTION */}
@@ -102,7 +100,10 @@ export default function PastoralMinistryProfilePage() {
 
                 {/* CTA BUTTON */}
                 <div className="flex justify-end">
-                  <button className="bg-transparent border border-[#A6B8E8] hover:bg-[#103C8C] hover:text-white transition text-[#E8ECFF] text-sm font-medium px-6 py-2 rounded-md shadow-sm">
+                  <button
+                    onClick={() => setShowPopup(true)}
+                    className="bg-transparent border border-[#A6B8E8] hover:bg-[#103C8C] hover:text-white transition text-[#E8ECFF] text-sm font-medium px-6 py-2 rounded-md shadow-sm"
+                  >
                     Take PMP Survey
                   </button>
                 </div>
@@ -118,7 +119,65 @@ export default function PastoralMinistryProfilePage() {
         </div>
       </main>
 
+      {/* ✅ POPUP MODAL */}
+      {showPopup && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white w-[90%] max-w-[600px] rounded-xl shadow-lg overflow-hidden animate-fadeIn">
+            {/* Header */}
+            <div className="bg-[#0099A8] px-6 py-4 text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-lg font-semibold">
+                  Pastoral Ministry Profile (PMP)
+                </h3>
+                <p className="text-[13px] text-white/90">
+                  This survey is about your current personal well being
+                </p>
+              </div>
+              <button
+                onClick={() => setShowPopup(false)}
+                className="text-white hover:text-gray-200 text-lg"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
 
+            {/* Body */}
+            <div className="p-6 text-[#0B1C58]">
+              <h4 className="font-semibold mb-3">Assessment Guidelines</h4>
+              <div className="border border-[#D0DAF9] rounded-lg p-4">
+                <ul className="list-disc list-inside space-y-2 text-sm text-[#1E2952]">
+                  <li>
+                    Please complete the Assessment in a single session without
+                    taking breaks.
+                  </li>
+                  <li>
+                    If there is a power outage or loss of internet connection,
+                    the survey will restart from the beginning.
+                  </li>
+                  <li>You will not be able to return to previous sections.</li>
+                  <li>
+                    This Assessment consists of 5 sections to complete.
+                  </li>
+                  <li>
+                    The Assessment should take approximately 45 minutes to
+                    complete.
+                  </li>
+                </ul>
+              </div>
+
+              {/* Button */}
+              <div className="flex justify-end mt-6">
+                <button
+                 onClick={() =>router.push(`/pastor/PastorSurveyPMPPage`)}
+                  className="bg-[#103C8C] hover:bg-[#0B2E72] text-white font-medium text-sm px-6 py-2 rounded-md transition"
+                >
+                  Start Now
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import Book from "../Assets/book.png";
+import { useRouter } from "next/navigation"; 
 
 const cards = [
   {
@@ -28,6 +29,7 @@ const cards = [
 ];
 
 export default function WhatWeDoSection() {
+     const router = useRouter();
   return (
     <section className="bg-[#103C8C] text-white py-16 px-12 relative overflow-hidden">
       <div className="max-w-[1300px] mx-auto flex flex-wrap lg:flex-nowrap justify-between items-start lg:items-center gap-10">
@@ -75,7 +77,9 @@ export default function WhatWeDoSection() {
                     />
                
                     <div className="absolute inset-0 flex items-center justify-center">
-                      <button className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center hover:scale-110 transition">
+                      <button className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center hover:scale-110 transition"
+                         onClick={() =>router.push(`/pastor/VideoPage`)}
+                      >
                         <i className="fa-solid fa-play text-[#103C8C]"></i>
                       </button>
                     </div>

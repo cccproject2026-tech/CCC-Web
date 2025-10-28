@@ -2,9 +2,11 @@
 import Image from "next/image";
 import CCCLogo from "../../Assets/CCCLogo.png";
 import PastorHeader from "@/app/Components/PastorHeader";
-import AndrewsLogo from "../../Assets/andrews-logo.png"; 
+import AndrewsLogo from "../../Assets/andrews-logo.png";
+import { useRouter } from "next/navigation"; 
 
 export default function LoginPage() {
+   const router = useRouter();
   return (
     <div>
       <PastorHeader />
@@ -44,8 +46,9 @@ export default function LoginPage() {
 
            
               <button
-                type="submit"
+              type="button"
                 className="w-full mt-4 bg-white text-[#103C8C] font-medium py-2 rounded-md hover:opacity-90 transition"
+               onClick={() =>router.push(`/pastor/profile-incomplete`)}
               >
                 Login
               </button>
@@ -62,18 +65,18 @@ export default function LoginPage() {
             </div>
 
           
-            <div className="flex gap-2 mt-6">
-              <button
-                className="flex-1 bg-gradient-to-r from-[#C850C0] to-[#4158D0] text-white py-2 rounded-md text-sm font-medium hover:opacity-90 transition"
-              >
-                New User <span className="ml-2">»</span>
-              </button>
-              <button
-                className="flex-1 bg-transparent border border-white/60 text-white py-2 rounded-md text-sm font-medium hover:bg-white hover:text-[#103C8C] transition"
-              >
-                Submit Interest
-              </button>
-            </div>
+          <div className="flex mt-6">
+  <button
+  className="w-full bg-gradient-to-r from-[#A150C0] to-[#1158D0] text-white py-2 px-12 rounded-lg text-sm font-medium flex items-center justify-between hover:opacity-90 transition cursor-pointer"
+onClick={() =>router.push(`/pastor/InterestForm`)}
+>
+  <span>New User <span className="ml-1">&nbsp;&nbsp;» </span></span>
+  <span>Submit Interest</span>
+</button>
+
+
+</div>
+
           </div>
 
        
