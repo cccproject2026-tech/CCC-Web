@@ -1,8 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import AppHeader from "@/app/Components/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
+import RoadmapCard from "@/app/Components/RoadmapCard";
+import FeaturedAvatars from "@/app/Components/FeaturedAvatars";
+import MentorCard from "@/app/Components/MentorCard";
 import HeroBg from "../../Assets/roadmap-bg.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
@@ -17,6 +20,16 @@ export default function RevitalizationRoadmapPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("least-mentees");
   const [filterCount, setFilterCount] = useState(3);
+  const [showSortPopup, setShowSortPopup] = useState(false);
+  const [showFilterPopup, setShowFilterPopup] = useState(false);
+  const [filters, setFilters] = useState({
+    country: true,
+    state: true,
+    conference: true,
+  });
+
+  const sortPopupRef = useRef(null);
+  const filterPopupRef = useRef(null);
 
   // Roadmap Library Data
   const roadmapLibrary = [
@@ -24,28 +37,28 @@ export default function RevitalizationRoadmapPage() {
       id: 1,
       title: "Jump-start",
       description: "Interested in receiving mentoring in community engagement",
-      completionTime: "Months 1-2",
+      completionTime: "Months 1 - 2",
       img: Card1,
     },
     {
       id: 2,
       title: "Self Revitalization Phase",
       description: "Interested in receiving mentoring in community engagement",
-      completionTime: "Months 1-2",
+      completionTime: "Months 1 - 2",
       img: Card2,
     },
     {
       id: 3,
       title: "Church Empowerment Phase",
       description: "Interested in receiving mentoring in community engagement",
-      completionTime: "Months 1-2",
+      completionTime: "Months 1 - 2",
       img: Card3,
     },
     {
       id: 4,
       title: "Community Revitalization and Multiplication Phase",
       description: "Interested in receiving mentoring in community engagement",
-      completionTime: "Months 1-2",
+      completionTime: "Months 1 - 2",
       img: Card4,
     },
   ];
@@ -167,10 +180,63 @@ export default function RevitalizationRoadmapPage() {
     },
   ];
 
+  // Close popups when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        sortPopupRef.current &&
+        !sortPopupRef.current.contains(event.target)
+      ) {
+        setShowSortPopup(false);
+      }
+      if (
+        filterPopupRef.current &&
+        !filterPopupRef.current.contains(event.target)
+      ) {
+        setShowFilterPopup(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const getProgressColor = (progress) => {
     if (progress >= 100) return "bg-green-500";
     if (progress >= 70) return "bg-yellow-500";
     return "bg-red-500";
+  };
+
+  const handleToggleFilter = (filterKey) => {
+    setFilters((prev) => {
+      const newFilters = {
+        ...prev,
+        [filterKey]: !prev[filterKey],
+      };
+
+      // Update filter count
+      const activeFilters = Object.values(newFilters).filter(Boolean).length;
+      setFilterCount(activeFilters);
+
+      return newFilters;
+    });
+  };
+
+  const handleClearSort = () => {
+    setSortBy("least-mentees");
+    setShowSortPopup(false);
+  };
+
+  const handleClearFilter = () => {
+    setFilters({
+      country: false,
+      state: false,
+      conference: false,
+    });
+    setFilterCount(0);
+    setShowFilterPopup(false);
   };
 
   return (
@@ -257,54 +323,13 @@ export default function RevitalizationRoadmapPage() {
           {activeTab === "roadmap-library" && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 ">
               {roadmapLibrary.map((roadmap) => (
-                <div
+                <RoadmapCard
                   key={roadmap.id}
-                  className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all"
-                >
-                  {/* Card Header */}
-                  <div className="relative h-48  p-6 text-white">
-                    <div className="absolute top-4 right-4">
-                      <button className="text-white/80 hover:text-white">
-                        <i className="fa-solid fa-ellipsis-vertical text-xl"></i>
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-4 mb-4 text-black">
-                      <div className="w-16 h-16 bg-white/20 rounded-lg flex items-center justify-center">
-                        <Image
-                          src={roadmap.img}
-                          alt={roadmap.title}
-                          className="w-12 h-12 object-cover rounded"
-                        />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-bold mb-1 text-black">
-                          {roadmap.title}
-                        </h3>
-                        <p className=" text-sm text-black">
-                          {roadmap.completionTime}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card Body */}
-                  <div className="p-6">
-                    <p className="text-gray-700 mb-4 text-[14px] leading-relaxed">
-                      {roadmap.description}
-                    </p>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-3">
-                      <button className="flex-1 px-4 py-2 bg-[#2E3B8E] text-white rounded-lg text-[14px] font-semibold hover:bg-[#1F2A6E] transition-all">
-                        View Details
-                      </button>
-                      <button className="px-4 py-2 bg-white border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg text-[14px] font-semibold hover:bg-[#2E3B8E]/10 transition-all">
-                        <i className="fa-solid fa-ellipsis-vertical"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                  img={roadmap.img}
+                  title={roadmap.title}
+                  description={roadmap.description}
+                  completionTime={roadmap.completionTime}
+                />
               ))}
             </div>
           )}
@@ -312,101 +337,191 @@ export default function RevitalizationRoadmapPage() {
           {activeTab === "mentors" && (
             <div>
               {/* Mentor Avatars */}
-              <div className="flex gap-4 mb-6 overflow-x-auto">
-                {mentors.map((mentor) => (
-                  <div key={mentor.id} className="flex-shrink-0 text-center">
-                    <div className="w-16 h-16 rounded-full overflow-hidden mb-2">
-                      <Image
-                        src={mentor.image}
-                        alt={mentor.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <p className="text-sm text-white">{mentor.name}</p>
-                  </div>
-                ))}
-              </div>
+              <FeaturedAvatars
+                items={mentors.map((mentor) => ({
+                  id: mentor.id,
+                  name: mentor.name,
+                  img: mentor.image,
+                }))}
+                gapClass="gap-4"
+                nameClass="text-sm text-white"
+                className="mb-6"
+                showGradientBorder={false}
+              />
 
               {/* Sort and Filter */}
               <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-4">
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="bg-white border-2 border-gray-200 rounded-lg px-4 py-2 text-gray-700 font-semibold text-[14px] focus:outline-none focus:border-[#2E3B8E]"
+                <div
+                  className="flex items-center gap-4 relative"
+                  ref={sortPopupRef}
+                >
+                  <button
+                    onClick={() => setShowSortPopup(!showSortPopup)}
+                    className="bg-white border-2 border-gray-200 rounded-lg px-4 py-2 text-gray-700 font-semibold text-[14px] focus:outline-none focus:border-[#2E3B8E] hover:bg-gray-50 transition-all"
                   >
-                    <option value="least-mentees">
-                      Sort By: Least Mentees
-                    </option>
-                    <option value="most-mentees">Sort By: Most Mentees</option>
-                  </select>
+                    Sort By:{" "}
+                    {sortBy === "least-mentees"
+                      ? "Least Mentees"
+                      : "Most Mentees"}
+                  </button>
+
+                  {/* Sort Popup */}
+                  {showSortPopup && (
+                    <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-4 min-w-[250px] z-50">
+                      <h3 className="text-[14px] font-bold text-gray-900 mb-3">
+                        Sort Mentees popup 15
+                      </h3>
+
+                      {/* Radio Options */}
+                      <div className="space-y-3 mb-4">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="sort"
+                            value="least-mentees"
+                            checked={sortBy === "least-mentees"}
+                            onChange={(e) => {
+                              setSortBy(e.target.value);
+                              setShowSortPopup(false);
+                            }}
+                            className="w-4 h-4 text-[#2E3B8E] focus:ring-[#2E3B8E]"
+                          />
+                          <span className="text-[14px] text-gray-700">
+                            Least number of Mentees
+                          </span>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="sort"
+                            value="most-mentees"
+                            checked={sortBy === "most-mentees"}
+                            onChange={(e) => {
+                              setSortBy(e.target.value);
+                              setShowSortPopup(false);
+                            }}
+                            className="w-4 h-4 text-[#2E3B8E] focus:ring-[#2E3B8E]"
+                          />
+                          <span className="text-[14px] text-gray-700">
+                            Most number of Mentees
+                          </span>
+                        </label>
+                      </div>
+
+                      {/* Clear Sort Button */}
+                      <button
+                        onClick={handleClearSort}
+                        className="text-[#2E3B8E] text-[14px] font-semibold hover:underline"
+                      >
+                        Clear Sort
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <button className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 rounded-lg text-gray-700 font-semibold text-[14px] hover:bg-gray-50 transition-all">
-                  <i className="fa-solid fa-filter"></i>
-                  Filter
-                  <span className="bg-yellow-400 text-black text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                    {filterCount}
-                  </span>
-                </button>
+
+                <div className="relative" ref={filterPopupRef}>
+                  <button
+                    onClick={() => setShowFilterPopup(!showFilterPopup)}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 rounded-lg text-gray-700 font-semibold text-[14px] hover:bg-gray-50 transition-all"
+                  >
+                    <i className="fa-solid fa-filter"></i>
+                    Filter
+                    <span className="bg-yellow-400 text-black text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {filterCount}
+                    </span>
+                  </button>
+
+                  {/* Filter Popup */}
+                  {showFilterPopup && (
+                    <div className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-4 min-w-[200px] z-50">
+                      <h3 className="text-[14px] font-bold text-gray-900 mb-3">
+                        Filter
+                      </h3>
+
+                      {/* Filter Options */}
+                      <div className="space-y-3 mb-4">
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-[14px] text-gray-700">
+                            Country
+                          </span>
+                          <button
+                            onClick={() => handleToggleFilter("country")}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                              filters.country
+                                ? "bg-[#2E3B8E] border-[#2E3B8E]"
+                                : "bg-white border-gray-300"
+                            }`}
+                          >
+                            {filters.country && (
+                              <i className="fa-solid fa-check text-white text-xs"></i>
+                            )}
+                          </button>
+                        </label>
+
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-[14px] text-gray-700">
+                            State
+                          </span>
+                          <button
+                            onClick={() => handleToggleFilter("state")}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                              filters.state
+                                ? "bg-[#2E3B8E] border-[#2E3B8E]"
+                                : "bg-white border-gray-300"
+                            }`}
+                          >
+                            {filters.state && (
+                              <i className="fa-solid fa-check text-white text-xs"></i>
+                            )}
+                          </button>
+                        </label>
+
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-[14px] text-gray-700">
+                            Conference
+                          </span>
+                          <button
+                            onClick={() => handleToggleFilter("conference")}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                              filters.conference
+                                ? "bg-[#2E3B8E] border-[#2E3B8E]"
+                                : "bg-white border-gray-300"
+                            }`}
+                          >
+                            {filters.conference && (
+                              <i className="fa-solid fa-check text-white text-xs"></i>
+                            )}
+                          </button>
+                        </label>
+                      </div>
+
+                      {/* Clear Filter Button */}
+                      <button
+                        onClick={handleClearFilter}
+                        className="text-[#2E3B8E] text-[14px] font-semibold hover:underline"
+                      >
+                        Clear Filter
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Mentor Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {mentorCards.map((mentor) => (
-                  <div
+                  <MentorCard
                     key={mentor.id}
-                    className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all"
-                  >
-                    {/* Profile Image */}
-                    <div className="flex justify-center mb-4">
-                      <div className="relative w-24 h-24 rounded-full overflow-hidden">
-                        <Image
-                          src={mentor.image}
-                          alt={mentor.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Name and Role */}
-                    <div className="text-center mb-3">
-                      <h3 className="text-[17px] font-bold text-gray-900 mb-1">
-                        {mentor.name}
-                      </h3>
-                      <p className="text-[14px] text-gray-600">{mentor.role}</p>
-                    </div>
-
-                    {/* Mentee Count Badge */}
-                    <div className="flex justify-center mb-3">
-                      <span className="inline-block px-3 py-1.5 bg-yellow-100 text-[#2E3B8E] rounded-full text-[12px] font-bold">
-                        {mentor.menteeCount} Mentees
-                      </span>
-                    </div>
-
-                    {/* Description */}
-                    <p className="text-[13px] text-gray-600 text-center mb-4">
-                      {mentor.description}
-                    </p>
-
-                    {/* Action Icons */}
-                    <div className="flex justify-center gap-3">
-                      <button className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-all">
-                        <i className="fa-solid fa-square-check text-gray-600"></i>
-                      </button>
-                      <button className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-all">
-                        <i className="fa-solid fa-envelope text-gray-600"></i>
-                      </button>
-                      <button className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-all">
-                        <i className="fa-brands fa-whatsapp text-gray-600"></i>
-                      </button>
-                      <button className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-all">
-                        <i className="fa-solid fa-phone text-gray-600"></i>
-                      </button>
-                      <button className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-all">
-                        <i className="fa-solid fa-external-link-alt text-gray-600"></i>
-                      </button>
-                    </div>
-                  </div>
+                    image={mentor.image}
+                    name={mentor.name}
+                    role={mentor.role}
+                    menteeCount={mentor.menteeCount}
+                    onViewDetails={() => {
+                      // Handle view details action
+                      console.log(`View details for ${mentor.name}`);
+                    }}
+                  />
                 ))}
               </div>
             </div>

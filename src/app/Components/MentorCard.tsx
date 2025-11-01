@@ -45,7 +45,7 @@ export default function MentorCard({
       {/* Actions Section */}
       <div className="flex justify-between items-center mt-8">
         {/* Contact Icons */}
-        <div className="flex gap-6 text-[#2E3B8E]">
+        <div className="flex gap-1 text-[#2E3B8E]">
           <button
             className="hover:opacity-70 transition"
             aria-label="Send email"
@@ -62,14 +62,14 @@ export default function MentorCard({
             <i className="fa-brands fa-whatsapp text-[28px]"></i>
           </button>
           <button className="hover:opacity-70 transition" aria-label="Call">
-            <i className="fa-solid fa-phone text-[28px]"></i>
+            <i className="fa-solid fa-phone text-[24px]"></i>
           </button>
         </div>
 
         {/* View Details Button */}
         <button
           onClick={onViewDetails}
-          className="w-14 h-14 flex items-center justify-center rounded-xl border-2 border-[#2E3B8E] text-[#2E3B8E] hover:bg-[#2E3B8E] hover:text-white transition"
+          className="w-12 h-12 flex items-center justify-center rounded-xl border-2 border-[#2E3B8E] text-[#2E3B8E] hover:bg-[#2E3B8E] hover:text-white transition"
           aria-label="View details"
         >
           <i className="fa-solid fa-arrow-up-right-from-square text-[18px]"></i>
