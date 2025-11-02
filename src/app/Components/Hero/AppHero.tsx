@@ -26,7 +26,7 @@ export default function AppHero({
         className="relative bg-cover bg-center text-white min-h-[220px] sm:min-h-[260px] md:min-h-[300px]"
         style={{ backgroundImage: `url(${backgroundImageUrl})` }}
       >
-        <div className="relative h-full flex gap-20 flex-col items-start justify-between z-10 px-6 md:px-12 lg:px-20 pt-8 pb-10">
+        <div className="relative h-full flex flex-col gap-10 justify-between z-10 px-6 md:px-12 lg:px-20 pt-8 pb-10">
           <div className="text-sm text-white/80 mb-6">
             {breadcrumbItems.map((item, idx) => (
               <span key={idx}>
@@ -54,7 +54,7 @@ export default function AppHero({
           </div>
           <div>
             {children && <div className="mb-2">{children}</div>}
-            <h1 className="text-[42px] md:text-[48px] lg:text-[56px] font-semibold leading-tight">
+            <h1 className="text-[24px] md:text-[32px] lg:text-[40px] font-semibold leading-tight">
               {title}
             </h1>
           </div>

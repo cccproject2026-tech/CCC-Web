@@ -1,25 +1,92 @@
 "use client";
 import React, { useState } from "react";
 import { useParams } from "next/navigation";
-import AppHero from "@/app/Components/Hero/AppHero";
-import MicroGrantBg from "@/app/Assets/micro-grant.jpg";
+import Image from "next/image";
+import MicroGrantDetailHero from "@/app/Components/Hero/MicroGrantDetailHero";
+import RoadmapJumpStartBg from "@/app/Assets/roadmap-jump-start-bg.jpg";
+import Mentor2 from "@/app/Assets/mentor2.png";
 
 const Page = () => {
   const [activeStep, setActiveStep] = useState(1);
   const params = useParams();
   const slug = params?.slug || "0";
 
+  // Right card content for the hero - matching exact design
+  const rightCard = (
+    <div className="bg-white rounded-lg shadow-lg p-4 h-[160px] w-full md:w-[340px] relative">
+      {/* Application received date - top right */}
+      <div className="absolute top-4 right-4 text-right">
+        <p className="text-xs text-gray-500 mb-1">Application received on:</p>
+        <p className="text-sm font-semibold text-gray-900">15 Nov 2024</p>
+      </div>
+
+      {/* Profile section */}
+      <div className="flex items-start gap-3 mt-10">
+        {/* Profile Picture - Circular with light gray background */}
+        <div className="relative w-16 h-16 flex-shrink-0">
+          <div className="absolute inset-0 rounded-full bg-gray-200"></div>
+          <div className="relative w-full h-full rounded-full overflow-hidden">
+            <Image
+              src={Mentor2}
+              alt="Robert Fox"
+              fill
+              className="object-cover"
+            />
+          </div>
+        </div>
+
+        {/* Name, Role, and Contact Icons */}
+        <div className="flex-1 min-w-0">
+          <div className="mb-2">
+            <h3 className="text-base font-bold text-gray-900 mb-0.5">
+              Robert Fox
+            </h3>
+            <p className="text-xs text-gray-600">Pastor</p>
+          </div>
+
+          <div className="flex justify-between items-center">
+            {/* Contact Icons */}
+            <div className="flex items-center gap-2 mt-1.5">
+              <button
+                className="text-gray-600 hover:opacity-70 transition"
+                aria-label="Send email"
+              >
+                <i className="fa-regular fa-envelope text-sm"></i>
+              </button>
+              <button
+                className="text-gray-600 hover:opacity-70 transition"
+                aria-label="Send message"
+              >
+                <i className="fa-regular fa-comment-dots text-sm"></i>
+              </button>
+              <button
+                className="text-gray-600 hover:opacity-70 transition"
+                aria-label="Call"
+              >
+                <i className="fa-solid fa-phone text-sm"></i>
+              </button>
+            </div>
+            <button className="bg-[#1E366F] text-white text-xs font-semibold px-5 py-2 rounded-lg hover:bg-[#1a2f5a] transition-colors">
+              View Profile
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1d538d] to-[#1d538d]">
       {/* Hero Section */}
-      <AppHero
-        title="Micro Grant – Application Received"
-        backgroundImageUrl={MicroGrantBg.src}
+      <MicroGrantDetailHero
+        title="The Center for Community Change Micro-Grant Application"
+        subtitle="Please keep in mind that the church applying for a grant must become a partner with the CCC by signing a MOU."
+        backgroundImageUrl={RoadmapJumpStartBg.src}
         breadcrumbItems={[
-          { label: "Home", href: "/director/home" },
           { label: "Micro Grant", href: "/director/micro-grant" },
-          { label: "Application Detail" },
+          { label: "Robert Fox" },
         ]}
+        rightCard={rightCard}
       />
 
       {/* Main Content */}
@@ -82,7 +149,9 @@ const Page = () => {
                   : "bg-gray-100 text-black border-gray-200"
               }`}
             >
-              <h3 className="text-nowrap font-semibold">Reporting Procedures</h3>
+              <h3 className="text-nowrap font-semibold">
+                Reporting Procedures
+              </h3>
             </div>
           </div>
         </div>

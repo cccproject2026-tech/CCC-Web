@@ -66,7 +66,7 @@ export default function ProfileForm({
   onCommentsChange,
 }: ProfileFormProps) {
   return (
-    <div className="bg-gradient-to-b from-[#5089B8] to-[#6BA5D5] rounded-xl p-8 shadow-lg">
+    <div className="p-8">
       {/* Header with optional actions */}
       <div className="flex items-center justify-between mb-8">
         <h2 className="text-[22px] font-bold text-white">{title}</h2>
