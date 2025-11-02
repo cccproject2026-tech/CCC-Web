@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import AppHeader from "@/app/Components/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import Mentor1 from "../../Assets/mentor1.png";
 import DuoLogo from "../../Assets/duo.png";

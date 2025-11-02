@@ -9,6 +9,7 @@ interface RoadmapHomeCardProps {
   status: "Not Started" | "In-progress" | "Completed" | "Over Due";
   completionTime: string;
   showDateSelector?: boolean;
+  dateLabel?: string;
   onViewClick?: () => void;
   onCardClick?: () => void;
   // Optional fields for completed status
@@ -30,6 +31,7 @@ export default function RoadmapHomeCard({
   status,
   completionTime,
   showDateSelector = false,
+  dateLabel,
   onViewClick,
   onCardClick,
   completedOn,
@@ -163,11 +165,11 @@ export default function RoadmapHomeCard({
                 </div>
               )}
 
-            {/* Date of the Project - Conditional */}
+            {/* Date Selector - Conditional */}
             {showDateSelector && status === "Not Started" && (
               <div className="mb-4">
                 <p className="text-[14px] font-bold text-black mb-2">
-                  Date of the Project
+                  {dateLabel || "Date of the Project"}
                 </p>
                 <div className="relative">
                   <i className="fa-solid fa-calendar absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none text-sm"></i>

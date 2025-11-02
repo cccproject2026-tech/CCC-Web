@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import AppHeader from "@/app/Components/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import MentorBg from "../../../Assets/mentor-bg.png";
 import Mentor1 from "../../../Assets/mentor1.png";

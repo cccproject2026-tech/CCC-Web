@@ -77,9 +77,14 @@ export default function RevitalizationRoadmapHome() {
       router.push("/director/revitalization-roadmap/home/jump-start");
     } else if (title === "Self Revitalization Phase") {
       router.push("/director/revitalization-roadmap/home/self-revitalization");
+    } else if (title === "Church Empowerment Phase") {
+      router.push("/director/revitalization-roadmap/home/church-empowerment");
+    } else if (title === "Community Revitalization and Multiplication Phase") {
+      router.push(
+        "/director/revitalization-roadmap/home/community-revitalization-and-multiplication"
+      );
     } else {
       console.log(`View clicked for phase ${phaseId}`);
-      // Navigate to other phase pages when created
     }
   };
 
@@ -89,9 +94,14 @@ export default function RevitalizationRoadmapHome() {
       router.push("/director/revitalization-roadmap/home/jump-start");
     } else if (title === "Self Revitalization Phase") {
       router.push("/director/revitalization-roadmap/home/self-revitalization");
+    } else if (title === "Church Empowerment Phase") {
+      router.push("/director/revitalization-roadmap/home/church-empowerment");
+    } else if (title === "Community Revitalization and Multiplication Phase") {
+      router.push(
+        "/director/revitalization-roadmap/home/community-revitalization-and-multiplication"
+      );
     } else {
       console.log(`Card clicked for phase ${phaseId}: ${title}`);
-      // Navigate to other phase pages when created
     }
   };
 

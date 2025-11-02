@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import AppHeader from "@/app/Components/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import MentorBg from "../../../Assets/mentor-bg.png";
 

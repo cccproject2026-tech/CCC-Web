@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import AppHeader from "@/app/Components/AppHeader";
 import SurveyHero from "@/app/Components/Hero/SurveyHero";
 import CMALogo from "@/app/Assets/CMA logo.png";
 import PMPLogo from "@/app/Assets/pastoral-ministry-profile.png";
@@ -55,58 +54,133 @@ export default function SurveyPage({ params }: SurveyPageProps) {
     },
   ];
 
-  // Sample questions for Section 1
-  const section1Questions = [
-    [
-      "Feeling physically drained most of the time.",
-      "Often feeling drained",
-      "Feeling mostly energized and engaged",
-      "Feeling fully energized and enjoying life",
+  // Complete survey data for all sections
+  const surveyData = {
+    1: [
+      [
+        "Lost a sense of call to pastoral ministry—considering other careers",
+        'Not sure if serving at faith community that "fits"',
+        "Mostly feeling connected with the assigned congregation and its leaders",
+        "Finds joy in working with the church and local community leaders",
+      ],
     ],
-    [
-      "Not physically active",
-      "Occasional exercise",
-      "In the process of adopting an exercise plan",
-      "Committed to a exercise plan",
+    2: [
+      [
+        "Feeling burned out—not doing much ministry-wise or doing ministry with a sense of resentment (dreading showing up at work, vis-a-vis church)",
+        "Performing only required tasks without any enthusiasm",
+        "Excited to offer a personal skillset and expertise, serving the church in the area of CE",
+        "Regularly provides CE guidance in and outside of the congregation",
+      ],
     ],
-    [
-      "Constant perception of stress/anxiety",
-      "Thinking about getting professional help to deal with stress and anxiety (addiction(s))",
-      "Working with a mental health professional",
-      "Demonstrating high El - have a consistent routine for maintaining strong mental health",
+    3: [
+      [
+        "Unfamiliar with the CMA ministry concept",
+        "Not fully understanding but approaching the CMA method in relationship to evangelism",
+        "Fully embraces the CMA approach to ministry and evangelism",
+        "Fully implements the CMA approach in all areas of life—inside and outside of the church",
+      ],
+      [
+        "No collaborations with outside community players",
+        "Some relationships with local community influencers and players",
+        "Actively participating in the community life outside of the church",
+        "Holds a leadership role in the community life outside of the church",
+      ],
+      [
+        "Occasional participation but no strategic leadership in CE initiatives",
+        "Formal support but not active strategic leadership in the church's CE efforts",
+        "Prominent leadership role in CE ministries at home congregation",
+        "Conducts formal training classes/workshops in the area of CE for other ministry leaders",
+      ],
+      [
+        "Feeling cynical, distrusting self and others",
+        "Not trusting local church leaders",
+        "Working confidently with the local church leaders and finding it mutually rewarding",
+        "Raising the next generation of church leaders",
+      ],
     ],
-  ];
-
-  // Sample questions for Section 1 (additional from second image)
-  const section1AdditionalQuestions = [
-    [
-      "Significant marital/parental challenges",
-      "Experiencing regular relational challenges",
-      "Pays close attention to family relationships",
-      "Actively engaged in the family life, prioritizing it as the most important personal and professional responsibility",
+    4: [
+      [
+        "Membership/attendance is in decline",
+        "Plateauing or declining membership",
+        "Church membership and attendance are on the rise",
+        "Increasing volunteer participation in CE projects—successfully implements the CMA principle in all aspects of church life",
+      ],
+      [
+        "No clear vision and mission statements",
+        "Vague sense of vision and mission",
+        "Committed to strong vision and mission statements",
+        "Compellingly embodies the church's vision and mission statements",
+      ],
+      [
+        "The average age of the church is above 60",
+        "Experiencing congregational aging",
+        "Has shown signs of healthy growth and CE ministry sustainability",
+        "Growing younger as a congregation",
+      ],
+      [
+        "Many toxic church members",
+        "Often dealing with unnecessary judgmental comments and rumors",
+        "Fosters open and trusting social atmosphere—always acknowledging areas for growth and celebrating achievements",
+        "Actively pursuing inward and outward holistic communal transformation as the primary method of evangelism",
+      ],
+      [
+        "Absence of CE leaders/volunteers",
+        "An example of the 10/90 rule of active participation",
+        "High level of community engagement among the members",
+        "Inspires and leads other congregations and partners in community-transformation initiatives and projects",
+      ],
+      [
+        'Dysfunctional church board; church members/church leaders often talk about about each other as "us" and "them"',
+        "Lack of adequate representation in the church leadership",
+        "The leadership team is trusted and adequately represents the congregation",
+        "Shows deep care for its leaders",
+      ],
+      [
+        "The church presence not impactful in the surrounding area",
+        "CE is focused mostly on distribution goods and services and not transformation",
+        "Clear signs of positive transformation in the community as a result of CE undertakings",
+        "Increasing number of people in the surrounding community whose quality of life has been significantly improved",
+      ],
+      [
+        "The CMA is not embodied in the life of the church",
+        "Occasional community-oriented events",
+        "Members practice the CMA principle—all CE work is seen as building relationships outside of the church",
+        "Recognition among and strong personal relationships with community stakeholders",
+      ],
     ],
-    [
-      "Feeling lost",
-      "A vague sense of self-identity; relies on others for personal and professional affirmation",
-      "Has a plan and an accountability partner(s) for personal spiritual and professional growth",
-      "provides spiritual guidance and professional coaching to colleagues",
+    5: [
+      [
+        "No formal community engagement/services training/certification",
+        "Some community engagement/services training/ no certification",
+        "Completed formal training/certification in the area of CE",
+        "Teaches and supports others in the area of CE",
+      ],
+      [
+        "Master's degree in a ministry-related field",
+        "Has fulfilled all educational requirements for pastoral ordination",
+        "Holding/finishing an advanced graduate degree relevant to ministry",
+        "Has a learning plan for post-graduate educational development",
+      ],
+      [
+        "No current continuing education enrollment",
+        "Additional formal education in field relevant to community engagement",
+        "Continuing formal/self-education in the field of CE",
+        "Diverse cultural awareness and language skills",
+      ],
+      [
+        "Limited cultural/language proficiency",
+        "Thinking about pursuing another educational goal (another degree or doctorate studies)",
+        "Developing personal cultural awareness or expanding linguistic skill through formal/self-organized educational plan",
+        "Teaches and mentors others in the areas of anthropology and culture change",
+      ],
+      [
+        "Disconnected from other non-denominational entities",
+        "Sporadic relationships with some CE players outside of the church",
+        "Has strong personal connections with many CE players in the community",
+        "Plays a vital leadership role in the community outside of the church",
+      ],
     ],
-    [
-      "Struggling with keeping the faith",
-      "Not sensing a strong personal connection with God",
-      "Lives in a structured spiritual-life rhythm",
-      "incorporates faith in all aspects of personal and professional life",
-    ],
-    [
-      "Struggling with addiction(s)",
-      "Has identified a number of obstacles detrimental to personal growth and professional success",
-      "Regularly receives professional/expert guidance regarding personal well being",
-      "Has experienced positive transformation and committed to continued improvement",
-    ],
-    ["Lack of sleep"],
-    ["Limited supporting relationships"],
-    ["No plan for self-care"],
-  ];
+  };
 
   const getTitle = () => {
     if (slug === "pastoral-ministry-profile-pmp") {
@@ -123,10 +197,7 @@ export default function SurveyPage({ params }: SurveyPageProps) {
   };
 
   const getQuestions = () => {
-    if (activeSection === 1) {
-      return [...section1Questions, ...section1AdditionalQuestions];
-    }
-    return [];
+    return surveyData[activeSection as keyof typeof surveyData] || [];
   };
 
   const getRightContent = () => {
@@ -226,8 +297,24 @@ export default function SurveyPage({ params }: SurveyPageProps) {
               ))}
             </div>
 
-            {/* View Next Section Button */}
-            <div className="flex justify-end mt-8">
+            {/* Navigation Buttons */}
+            <div className="flex justify-end gap-4 mt-8">
+              <button
+                onClick={() => {
+                  if (activeSection > 1) {
+                    setActiveSection(activeSection - 1);
+                  }
+                }}
+                disabled={activeSection === 1}
+                className={`${
+                  activeSection === 1
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-gray-100"
+                } bg-white text-[#1A2E5C] rounded-lg px-6 py-3 text-sm font-semibold transition-all flex items-center gap-2`}
+              >
+                <i className="fa-solid fa-chevron-left"></i> View Previous
+                Section
+              </button>
               <button
                 onClick={() => {
                   if (activeSection < sections.length) {
@@ -236,7 +323,12 @@ export default function SurveyPage({ params }: SurveyPageProps) {
                     // Handle completion or next action
                   }
                 }}
-                className="bg-[#1A2E5C] text-white rounded-lg px-6 py-3 text-sm font-semibold hover:bg-[#0F1E44] transition-all flex items-center gap-2"
+                disabled={activeSection === sections.length}
+                className={`${
+                  activeSection === sections.length
+                    ? "opacity-50 cursor-not-allowed"
+                    : "hover:bg-[#0F1E44]"
+                } bg-[#1A2E5C] text-white border border-white/20 rounded-lg px-6 py-3 text-sm font-semibold transition-all flex items-center gap-2`}
               >
                 View Next Section <i className="fa-solid fa-chevron-right"></i>
               </button>

@@ -1,7 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import AppHeader from "@/app/Components/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import AppHero from "@/app/Components/Hero/AppHero";
 import ProgressBg from "../../../Assets/progress-bg.jpg";

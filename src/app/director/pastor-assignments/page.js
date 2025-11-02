@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/AppHeader";
 import AppHero from "@/app/Components/Hero/AppHero";
 import AppFooter from "@/app/Components/AppFooter";
 import AssignmentCard from "@/app/Components/AssignmentCard";
