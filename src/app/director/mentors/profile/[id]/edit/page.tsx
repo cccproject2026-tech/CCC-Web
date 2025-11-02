@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/app/Components/AppHeader";
-import AppHero from "@/app/Components/AppHero";
+import AppHero from "@/app/Components/Hero/AppHero";
 import AppFooter from "@/app/Components/AppFooter";
 import ConfirmModal from "@/app/Components/ConfirmModal";
 import ProfileForm, {

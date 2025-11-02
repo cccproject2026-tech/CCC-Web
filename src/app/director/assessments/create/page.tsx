@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/app/Components/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
-import AppHero from "@/app/Components/AppHero";
+import AppHero from "@/app/Components/Hero/AppHero";
 import AssessmentBg from "../../../Assets/assessment-bg.png";
 
 export default function CreateAssessmentPage() {

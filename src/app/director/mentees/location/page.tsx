@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import AppHeader from "@/app/Components/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
-import AppHero from "@/app/Components/AppHero";
+import AppHero from "@/app/Components/Hero/AppHero";
 import MapCard, { MapMarker } from "@/app/Components/MapCard";
 import SearchBar from "@/app/Components/SearchBar";
 import FeaturedAvatars, {

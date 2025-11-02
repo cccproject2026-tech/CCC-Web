@@ -10,7 +10,10 @@ export default function DirectorLayout({
   const pathname = usePathname();
 
   // List of routes where header should be visible
-  const showHeaderOn = ["/director/waitingforapproval"];
+  const showHeaderOn = [
+    "/director/waitingforapproval",
+    "/director/revitalization-roadmap",
+  ];
 
   // Check if current route matches any of them
   const showHeader = showHeaderOn.some((path) => pathname.startsWith(path));

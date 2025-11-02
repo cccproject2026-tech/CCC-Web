@@ -10,6 +10,7 @@ interface RoadmapHomeCardProps {
   completionTime: string;
   showDateSelector?: boolean;
   onViewClick?: () => void;
+  onCardClick?: () => void;
   // Optional fields for completed status
   completedOn?: string;
   lastUpdatedOn?: string;
@@ -30,6 +31,7 @@ export default function RoadmapHomeCard({
   completionTime,
   showDateSelector = false,
   onViewClick,
+  onCardClick,
   completedOn,
   lastUpdatedOn,
   taskCompleted,
@@ -57,8 +59,26 @@ export default function RoadmapHomeCard({
     return (taskCompleted.completed / taskCompleted.total) * 100;
   };
 
+  const handleCardClick = () => {
+    if (onCardClick) {
+      onCardClick();
+    }
+  };
+
+  const handleViewButtonClick = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click when View button is clicked
+    if (onViewClick) {
+      onViewClick();
+    }
+  };
+
   return (
-    <div className="bg-white rounded-2xl shadow-[0_2px_6px_rgba(0,0,0,0.05)] border border-[#E5EAF1] flex overflow-hidden hover:shadow-md transition-all">
+    <div
+      onClick={handleCardClick}
+      className={`bg-white rounded-2xl shadow-[0_2px_6px_rgba(0,0,0,0.05)] border border-[#E5EAF1] flex overflow-hidden hover:shadow-md transition-all ${
+        onCardClick ? "cursor-pointer" : ""
+      }`}
+    >
       {/* Left Image Section - 40-45% width */}
       <div className="relative w-[42%] shrink-0">
         <div className="relative h-full min-h-[220px] rounded-l-2xl overflow-hidden">
@@ -179,7 +199,7 @@ export default function RoadmapHomeCard({
               {/* Only show View button if not completed */}
               {status !== "Completed" && (
                 <button
-                  onClick={onViewClick}
+                  onClick={handleViewButtonClick}
                   className="bg-[#2E3B8E] text-white rounded-lg px-6 py-2.5 text-[14px] font-semibold hover:bg-[#1F2A6E] transition-all"
                 >
                   View

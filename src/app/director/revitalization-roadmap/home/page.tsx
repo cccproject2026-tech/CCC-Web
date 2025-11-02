@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/app/Components/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
-import AppHero from "@/app/Components/AppHero";
+import AppHero from "@/app/Components/Hero/AppHero";
 import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import Card1 from "@/app/Assets/card1.png";
@@ -75,8 +75,22 @@ export default function RevitalizationRoadmapHome() {
     // Navigate to phase detail page based on phase
     if (title === "Jump-start") {
       router.push("/director/revitalization-roadmap/home/jump-start");
+    } else if (title === "Self Revitalization Phase") {
+      router.push("/director/revitalization-roadmap/home/self-revitalization");
     } else {
       console.log(`View clicked for phase ${phaseId}`);
+      // Navigate to other phase pages when created
+    }
+  };
+
+  const handleCardClick = (phaseId: number, title: string) => {
+    // Navigate to phase detail page based on phase when card is clicked
+    if (title === "Jump-start") {
+      router.push("/director/revitalization-roadmap/home/jump-start");
+    } else if (title === "Self Revitalization Phase") {
+      router.push("/director/revitalization-roadmap/home/self-revitalization");
+    } else {
+      console.log(`Card clicked for phase ${phaseId}: ${title}`);
       // Navigate to other phase pages when created
     }
   };
@@ -225,6 +239,7 @@ export default function RevitalizationRoadmapHome() {
                 taskCompleted={phase.taskCompleted}
                 showCheckmark={phase.showCheckmark}
                 onViewClick={() => handleViewClick(phase.id, phase.title)}
+                onCardClick={() => handleCardClick(phase.id, phase.title)}
               />
             ))}
           </div>
