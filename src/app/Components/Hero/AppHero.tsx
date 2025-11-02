@@ -70,7 +70,7 @@ export default function AppHero({
       style={{ backgroundImage: `url(${backgroundImageUrl})` }}
     >
       <div className="relative z-10 pb-8 md:pb-10 w-full">
-        <h1 className="text-[40px] sm:text-[48px] md:text-[56px] lg:text-[64px] font-semibold leading-tight">
+        <h1 className="text-[32px] font-semibold leading-tight">
           {title}
         </h1>
         {children}
