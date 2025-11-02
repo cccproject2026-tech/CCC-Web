@@ -74,19 +74,21 @@ export default function ProgressCard({
 
           {/* Progress Section */}
           <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-gray-900">
-                Progress
-              </span>
-              <span className="text-sm font-semibold text-green-600">
+            {/* Progress Label */}
+            <span className="text-sm font-semibold text-gray-900 block mb-2">
+              Progress
+            </span>
+            {/* Progress Bar with Percentage on the right */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 bg-gray-200 rounded-full h-2.5">
+                <div
+                  className="h-2.5 rounded-full bg-green-500 transition-all"
+                  style={{ width: `${progress}%` }}
+                ></div>
+              </div>
+              <span className="text-sm font-semibold text-gray-900 whitespace-nowrap">
                 {progress}%
               </span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div
-                className="h-2.5 rounded-full bg-green-500 transition-all"
-                style={{ width: `${progress}%` }}
-              ></div>
             </div>
           </div>
 
@@ -96,28 +98,28 @@ export default function ProgressCard({
             <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
               <button
                 onClick={onEmailClick}
-                className="text-gray-600 hover:opacity-70 transition"
+                className="text-black hover:opacity-70 transition"
                 aria-label="Send email"
               >
                 <i className="fa-regular fa-envelope text-lg"></i>
               </button>
               <button
                 onClick={onMessageClick}
-                className="text-gray-600 hover:opacity-70 transition"
+                className="text-black hover:opacity-70 transition"
                 aria-label="Send message"
               >
                 <i className="fa-regular fa-comment-dots text-lg"></i>
               </button>
               <button
                 onClick={onWhatsAppClick}
-                className="text-gray-600 hover:opacity-70 transition"
+                className="text-black hover:opacity-70 transition"
                 aria-label="WhatsApp"
               >
                 <i className="fa-brands fa-whatsapp text-lg"></i>
               </button>
               <button
                 onClick={onPhoneClick}
-                className="text-gray-600 hover:opacity-70 transition"
+                className="text-black hover:opacity-70 transition"
                 aria-label="Call"
               >
                 <i className="fa-solid fa-phone text-lg"></i>
