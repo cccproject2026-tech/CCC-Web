@@ -40,12 +40,12 @@ export default function ProgressCard({
 
   return (
     <div
-      className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all cursor-pointer"
+      className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all cursor-pointer flex"
       onClick={handleCardClick}
     >
-      <div className="flex gap-4">
-        {/* Profile Picture - Square */}
-        <div className="relative w-24 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200">
+      <div className="flex gap-4 flex-1 items-stretch">
+        {/* Profile Picture - Full Height */}
+        <div className="relative w-42 flex-shrink-0 rounded-lg overflow-hidden bg-gray-200 h-full self-stretch">
           {typeof image === "string" ? (
             <img
               src={image}
@@ -58,12 +58,13 @@ export default function ProgressCard({
               alt={name}
               fill
               className="object-cover"
+              sizes="96px"
             />
           )}
         </div>
 
         {/* Content Section */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 flex flex-col">
           {/* Name */}
           <h3 className="text-lg font-bold text-gray-900 mb-1">{name}</h3>
 
@@ -93,9 +94,12 @@ export default function ProgressCard({
           </div>
 
           {/* Contact Icons and Button */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mt-auto">
             {/* Contact Icons */}
-            <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="flex items-center gap-3"
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
                 onClick={onEmailClick}
                 className="text-black hover:opacity-70 transition"
@@ -141,4 +145,3 @@ export default function ProgressCard({
     </div>
   );
 }
-
