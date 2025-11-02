@@ -1,7 +1,6 @@
 "use client";
 import React from "react";
 import Image from "next/image";
-import PastorHeader from "@/app/Components/PastorHeader";
 import {
   Phone,
   MessageSquare,
@@ -14,7 +13,6 @@ import {
 const ProfilePage = () => {
   return (
     <div className="min-h-screen bg-[#1f518c] text-white">
-      <PastorHeader showFullHeader={true} />
       <div className="w-full h-80 bg-amber-800"></div>
 
       {/* Main Content */}

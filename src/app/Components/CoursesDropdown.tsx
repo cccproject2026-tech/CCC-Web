@@ -37,19 +37,24 @@ export default function CoursesDropdown({
 
   const menuItems = [
     {
-      icon: "fa-solid fa-book-open",
-      label: "All Courses",
-      path: "/director/courses",
+      icon: "fa-solid fa-trophy",
+      label: "Micro Grant",
+      path: "/director/micro-grant",
     },
     {
-      icon: "fa-solid fa-graduation-cap",
-      label: "Course Library",
-      path: "/director/courses/library",
+      icon: "fa-solid fa-chalkboard-user",
+      label: "Invite to be a Field Mentor",
+      path: "/director/invite-field-mentor",
     },
     {
-      icon: "fa-solid fa-chart-line",
-      label: "Course Progress",
-      path: "/director/courses/progress",
+      icon: "fa-solid fa-play",
+      label: "Videos",
+      path: "/director/videos",
+    },
+    {
+      icon: "fa-solid fa-phone",
+      label: "Contact Details",
+      path: "/director/contact-details",
     },
   ];
 
@@ -61,17 +66,24 @@ export default function CoursesDropdown({
   return (
     <div
       ref={dropdownRef}
-      className="absolute top-[60px] left-0 w-[240px] bg-white rounded-xl shadow-2xl overflow-hidden z-50 animate-slide-down border border-gray-100"
+      className="absolute top-full mt-10 left-0 w-[280px] bg-white rounded-lg shadow-2xl overflow-hidden z-50"
     >
-      <div className="py-2">
+      {/* Arrow pointer pointing up */}
+      <div className="absolute -top-2 left-[15px] w-4 h-4 bg-white transform rotate-45 border-l border-t border-gray-200"></div>
+
+      <div className="py-2 bg-white">
         {menuItems.map((item, index) => (
           <button
             key={index}
             onClick={() => handleNavigation(item.path)}
             className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors text-left"
           >
-            <i className={`${item.icon} text-[#2E3B8E] text-lg w-5`}></i>
-            <span className="text-gray-800 font-medium">{item.label}</span>
+            <i
+              className={`${item.icon} text-[#2E3B8E] text-base w-5 flex-shrink-0`}
+            ></i>
+            <span className="text-[#2E3B8E] font-medium text-sm">
+              {item.label}
+            </span>
           </button>
         ))}
       </div>

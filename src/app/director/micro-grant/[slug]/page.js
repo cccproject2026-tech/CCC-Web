@@ -1,17 +1,29 @@
 "use client";
 import React, { useState } from "react";
-import PastorHeader from "@/app/Components/PastorHeader";
+import { useParams } from "next/navigation";
+import AppHero from "@/app/Components/Hero/AppHero";
+import MicroGrantBg from "@/app/Assets/micro-grant.jpg";
 
 const Page = () => {
   const [activeStep, setActiveStep] = useState(1);
+  const params = useParams();
+  const slug = params?.slug || "0";
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#1d538d]">
-      <PastorHeader showFullHeader={true} />
-      <div className="w-full h-80 bg-amber-800"></div>
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1d538d] to-[#1d538d]">
+      {/* Hero Section */}
+      <AppHero
+        title="Micro Grant – Application Received"
+        backgroundImageUrl={MicroGrantBg.src}
+        breadcrumbItems={[
+          { label: "Home", href: "/director/home" },
+          { label: "Micro Grant", href: "/director/micro-grant" },
+          { label: "Application Detail" },
+        ]}
+      />
 
       {/* Main Content */}
-      <div className="bg-[#1d538d] py-10 px-6 md:px-16 lg:px-24 flex flex-col md:flex-row gap-10">
+      <div className="bg-transparent py-10 px-6 md:px-16 lg:px-24 flex flex-col md:flex-row gap-10">
         {/* Sidebar */}
         <div className="flex items-start space-x-4 flex-shrink-0 md:w-1/3 lg:w-1/4">
           {/* Step Indicators */}
@@ -70,7 +82,7 @@ const Page = () => {
                   : "bg-gray-100 text-black border-gray-200"
               }`}
             >
-              <h3 className="text-xl font-semibold">Reporting Procedures</h3>
+              <h3 className="text-nowrap font-semibold">Reporting Procedures</h3>
             </div>
           </div>
         </div>
@@ -149,29 +161,38 @@ const Page = () => {
 
               {/* File Upload Section */}
               <div className="mt-6">
-                <label className="block text-sm font-semibold mb-2">
-                  Please upload supporting documents or media (photos, videos,
-                  publications, etc.)
+                <label className="flex items-center gap-3 text-sm font-semibold mb-4 text-white">
+                  <i className="fa-solid fa-cloud-arrow-up text-white text-xl"></i>
+                  Please upload here any supporting documents or media (photos,
+                  videos, publications, etc.)
                 </label>
-                <div className="flex items-center justify-between bg-gray-100 border border-gray-300 rounded-lg p-3">
-                  <div className="flex items-center space-x-3">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="w-6 h-6 text-red-500"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
+                {/* Supporting Document Card - Half Width */}
+                <div className="w-full max-w-md">
+                  <div className="bg-white rounded-lg p-4 flex items-center justify-between gap-4 shadow-md">
+                    <div className="flex items-center gap-4 flex-1">
+                      {/* PDF Icon */}
+                      <div className="w-10 h-10 flex-shrink-0 bg-orange-100 rounded flex items-center justify-center">
+                        <i className="fa-solid fa-file-pdf text-orange-500 text-xl"></i>
+                      </div>
+                      {/* File Info */}
+                      <div className="flex flex-col">
+                        <span className="text-black font-semibold text-sm">
+                          supporting documents.pdf
+                        </span>
+                        <span className="text-gray-500 text-xs">
+                          20 Oct 2024
+                        </span>
+                      </div>
+                    </div>
+                    {/* Download Icon */}
+                    <button
+                      type="button"
+                      className="text-[#1d538d] hover:opacity-70 transition p-2"
+                      aria-label="Download"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth="2"
-                        d="M12 4v16m8-8H4"
-                      />
-                    </svg>
-                    <span className="text-black">supporting_documents.pdf</span>
+                      <i className="fa-solid fa-download text-xl"></i>
+                    </button>
                   </div>
-                  <span className="text-sm text-gray-500">21 Oct 2024</span>
                 </div>
               </div>
 
@@ -179,7 +200,7 @@ const Page = () => {
               <div className="flex justify-end mt-8">
                 <button
                   type="submit"
-                  className="bg-[#1d538d] text-white px-6 py-2 rounded-lg hover:bg-[#16406e]"
+                  className="bg-[#1d538d] text-white px-6 py-2 rounded-lg border-2 border-white font-semibold hover:bg-[#16406e] transition-colors"
                 >
                   Next
                 </button>

@@ -3,6 +3,8 @@ import { useState } from "react";
 import Image from "next/image";
 import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
+import AppHero from "@/app/Components/Hero/AppHero";
+import MentorBg from "../../Assets/mentor-bg.png";
 import Card1 from "../../Assets/card1.png";
 import Card2 from "../../Assets/card2.png";
 import Card3 from "../../Assets/card3.png";
@@ -99,13 +101,19 @@ export default function CoursesPage() {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-400 p-12 text-center">
-        <h1 className="text-4xl font-bold text-white mb-3">Courses</h1>
-        <p className="text-white/90 text-lg max-w-2xl mx-auto">
+      <AppHero
+        title="Courses"
+        backgroundImageUrl={MentorBg.src}
+        breadcrumbItems={[
+          { label: "Home", href: "/director" },
+          { label: "Courses" },
+        ]}
+      >
+        <p className="text-white/90 text-lg max-w-2xl">
           Explore our comprehensive course catalog designed to equip pastors and
           mentors for effective ministry
         </p>
-      </div>
+      </AppHero>
 
       {/* Main Content */}
       <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-12">

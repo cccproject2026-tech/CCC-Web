@@ -3,6 +3,8 @@ import { useState } from "react";
 import Image from "next/image";
 import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
+import AppHero from "@/app/Components/Hero/AppHero";
+import MentorBg from "../../../Assets/mentor-bg.png";
 import Mentor1 from "../../../Assets/mentor1.png";
 import Mentor2 from "../../../Assets/mentor2.png";
 import Mentor3 from "../../../Assets/mentor3.png";
@@ -118,12 +120,19 @@ export default function CourseProgressPage() {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
       {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-400 p-12 text-center">
-        <h1 className="text-4xl font-bold text-white mb-3">Course Progress</h1>
-        <p className="text-white/90 text-lg max-w-2xl mx-auto">
+      <AppHero
+        title="Course Progress"
+        backgroundImageUrl={MentorBg.src}
+        breadcrumbItems={[
+          { label: "Home", href: "/director" },
+          { label: "Courses", href: "/director/courses" },
+          { label: "Course Progress" },
+        ]}
+      >
+        <p className="text-white/90 text-lg max-w-2xl">
           Monitor student progress and course completion rates
         </p>
-      </div>
+      </AppHero>
 
       {/* Main Content */}
       <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-12">
