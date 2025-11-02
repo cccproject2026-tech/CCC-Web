@@ -1,11 +1,13 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import AppHeader from "@/app/Components/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import RoadmapCard from "@/app/Components/RoadmapCard";
 import FeaturedAvatars from "@/app/Components/FeaturedAvatars";
-import MentorCard from "@/app/Components/MentorCard";
+import MentorCard from "@/app/Components/Card/MentorCard";
+import PastorCard from "@/app/Components/Card/PastorCard";
 import HeroBg from "../../Assets/roadmap-bg.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
@@ -16,6 +18,7 @@ import Card3 from "../../Assets/card3.png";
 import Card4 from "../../Assets/card4.png";
 
 export default function RevitalizationRoadmapPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("roadmap-library");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("least-mentees");
@@ -203,12 +206,6 @@ export default function RevitalizationRoadmapPage() {
     };
   }, []);
 
-  const getProgressColor = (progress) => {
-    if (progress >= 100) return "bg-green-500";
-    if (progress >= 70) return "bg-yellow-500";
-    return "bg-red-500";
-  };
-
   const handleToggleFilter = (filterKey) => {
     setFilters((prev) => {
       const newFilters = {
@@ -311,7 +308,12 @@ export default function RevitalizationRoadmapPage() {
                 >
                   Pastor's Roadmaps
                 </button>
-                <button className="px-6 py-3 bg-[#2E3B8E] text-white rounded-lg font-semibold text-[14px] hover:bg-[#1F2A6E] transition-all flex items-center gap-2">
+                <button
+                  onClick={() =>
+                    router.push("/director/revitalization-roadmap/home")
+                  }
+                  className="px-6 py-3 bg-[#2E3B8E] text-white rounded-lg font-semibold text-[14px] hover:bg-[#1F2A6E] transition-all flex items-center gap-2"
+                >
                   <i className="fa-solid fa-plus"></i>
                   New Roadmap
                 </button>
@@ -357,12 +359,14 @@ export default function RevitalizationRoadmapPage() {
                 >
                   <button
                     onClick={() => setShowSortPopup(!showSortPopup)}
-                    className="bg-white border-2 border-gray-200 rounded-lg px-4 py-2 text-gray-700 font-semibold text-[14px] focus:outline-none focus:border-[#2E3B8E] hover:bg-gray-50 transition-all"
+                    className="bg-white border-2 border-gray-200 rounded-lg px-4 py-2 text-gray-700 font-semibold text-[14px] focus:outline-none focus:border-[#2E3B8E] hover:bg-gray-50 transition-all flex items-center gap-2"
                   >
-                    Sort By:{" "}
-                    {sortBy === "least-mentees"
-                      ? "Least Mentees"
-                      : "Most Mentees"}
+                    <span>
+                      {sortBy === "least-mentees"
+                        ? "Least Mentees"
+                        : "Most Mentees"}
+                    </span>
+                    <i className="fa-solid fa-chevron-down text-gray-600 text-xs"></i>
                   </button>
 
                   {/* Sort Popup */}
@@ -425,11 +429,12 @@ export default function RevitalizationRoadmapPage() {
                     onClick={() => setShowFilterPopup(!showFilterPopup)}
                     className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 rounded-lg text-gray-700 font-semibold text-[14px] hover:bg-gray-50 transition-all"
                   >
-                    <i className="fa-solid fa-filter"></i>
-                    Filter
+                    <i className="fa-solid fa-filter text-gray-700"></i>
+                    <span>Filter</span>
                     <span className="bg-yellow-400 text-black text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
                       {filterCount}
                     </span>
+                    <i className="fa-solid fa-chevron-down text-gray-600 text-xs"></i>
                   </button>
 
                   {/* Filter Popup */}
@@ -528,86 +533,207 @@ export default function RevitalizationRoadmapPage() {
           )}
 
           {activeTab === "pastor-roadmaps" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {pastorRoadmaps.map((pastor) => (
+            <div>
+              {/* Featured Avatars */}
+              <FeaturedAvatars
+                items={pastorRoadmaps
+                  .map((pastor) => ({
+                    id: pastor.id,
+                    name: pastor.name,
+                    img: pastor.image,
+                  }))
+                  .filter(
+                    (pastor, index, self) =>
+                      index === self.findIndex((p) => p.name === pastor.name)
+                  )}
+                gapClass="gap-4"
+                nameClass="text-sm text-white"
+                className="mb-6"
+                showGradientBorder={false}
+              />
+
+              {/* Horizontal Line */}
+              <div className="h-px bg-white/30 mb-6"></div>
+
+              {/* Sort and Filter */}
+              <div className="flex justify-between items-center mb-6">
                 <div
-                  key={pastor.id}
-                  className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all"
+                  className="flex items-center gap-4 relative"
+                  ref={sortPopupRef}
                 >
-                  {/* Profile Image */}
-                  <div className="flex justify-center mb-4">
-                    <div className="relative w-24 h-24 rounded-full overflow-hidden">
-                      <Image
-                        src={pastor.image}
-                        alt={pastor.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Name */}
-                  <div className="text-center mb-3">
-                    <h3 className="text-[17px] font-bold text-gray-900 mb-1">
-                      {pastor.name}
-                    </h3>
-                  </div>
-
-                  {/* Description */}
-                  <p className="text-[13px] text-gray-600 text-center mb-4">
-                    {pastor.description}
-                  </p>
-
-                  {/* Phase */}
-                  <div className="text-center mb-4">
-                    <span className="inline-block px-3 py-1 bg-[#2E3B8E] text-white rounded-full text-[12px] font-bold">
-                      Phase: {pastor.phase}
+                  <button
+                    onClick={() => setShowSortPopup(!showSortPopup)}
+                    className="bg-white border-2 border-gray-200 rounded-lg px-4 py-2 text-gray-700 font-semibold text-[14px] focus:outline-none focus:border-[#2E3B8E] hover:bg-gray-50 transition-all flex items-center gap-2"
+                  >
+                    <span>
+                      {sortBy === "least-mentees"
+                        ? "Least Mentees"
+                        : "Most Mentees"}
                     </span>
-                  </div>
+                    <i className="fa-solid fa-chevron-down text-gray-600 text-xs"></i>
+                  </button>
 
-                  {/* Progress Bar */}
-                  <div className="mb-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-semibold text-gray-700">
-                        Tasks Completed
-                      </span>
-                      <span className="text-sm font-bold text-gray-900">
-                        {pastor.progress}%
-                      </span>
+                  {/* Sort Popup */}
+                  {showSortPopup && (
+                    <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-4 min-w-[250px] z-50">
+                      <h3 className="text-[14px] font-bold text-gray-900 mb-3">
+                        Sort Mentees popup 15
+                      </h3>
+
+                      {/* Radio Options */}
+                      <div className="space-y-3 mb-4">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="sort"
+                            value="least-mentees"
+                            checked={sortBy === "least-mentees"}
+                            onChange={(e) => {
+                              setSortBy(e.target.value);
+                              setShowSortPopup(false);
+                            }}
+                            className="w-4 h-4 text-[#2E3B8E] focus:ring-[#2E3B8E]"
+                          />
+                          <span className="text-[14px] text-gray-700">
+                            Least number of Mentees
+                          </span>
+                        </label>
+
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="sort"
+                            value="most-mentees"
+                            checked={sortBy === "most-mentees"}
+                            onChange={(e) => {
+                              setSortBy(e.target.value);
+                              setShowSortPopup(false);
+                            }}
+                            className="w-4 h-4 text-[#2E3B8E] focus:ring-[#2E3B8E]"
+                          />
+                          <span className="text-[14px] text-gray-700">
+                            Most number of Mentees
+                          </span>
+                        </label>
+                      </div>
+
+                      {/* Clear Sort Button */}
+                      <button
+                        onClick={handleClearSort}
+                        className="text-[#2E3B8E] text-[14px] font-semibold hover:underline"
+                      >
+                        Clear Sort
+                      </button>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full ${getProgressColor(
-                          pastor.progress
-                        )}`}
-                        style={{ width: `${pastor.progress}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {/* Action Icons */}
-                  <div className="flex justify-center gap-3 mb-4">
-                    <button className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-all">
-                      <i className="fa-solid fa-envelope text-gray-600"></i>
-                    </button>
-                    <button className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-all">
-                      <i className="fa-solid fa-comment text-gray-600"></i>
-                    </button>
-                    <button className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-all">
-                      <i className="fa-solid fa-phone text-gray-600"></i>
-                    </button>
-                    <button className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-all">
-                      <i className="fa-solid fa-external-link-alt text-gray-600"></i>
-                    </button>
-                  </div>
-
-                  {/* Arrow Button */}
-                  <div className="flex justify-end">
-                    <button className="w-8 h-8 bg-[#2E3B8E] rounded-lg flex items-center justify-center hover:bg-[#1F2A6E] transition-all">
-                      <i className="fa-solid fa-arrow-right text-white text-sm"></i>
-                    </button>
-                  </div>
+                  )}
                 </div>
-              ))}
+
+                <div className="relative" ref={filterPopupRef}>
+                  <button
+                    onClick={() => setShowFilterPopup(!showFilterPopup)}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 rounded-lg text-gray-700 font-semibold text-[14px] hover:bg-gray-50 transition-all"
+                  >
+                    <i className="fa-solid fa-filter text-gray-700"></i>
+                    <span>Filter</span>
+                    <span className="bg-yellow-400 text-black text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {filterCount}
+                    </span>
+                    <i className="fa-solid fa-chevron-down text-gray-600 text-xs"></i>
+                  </button>
+
+                  {/* Filter Popup */}
+                  {showFilterPopup && (
+                    <div className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-4 min-w-[200px] z-50">
+                      <h3 className="text-[14px] font-bold text-gray-900 mb-3">
+                        Filter
+                      </h3>
+
+                      {/* Filter Options */}
+                      <div className="space-y-3 mb-4">
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-[14px] text-gray-700">
+                            Country
+                          </span>
+                          <button
+                            onClick={() => handleToggleFilter("country")}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                              filters.country
+                                ? "bg-[#2E3B8E] border-[#2E3B8E]"
+                                : "bg-white border-gray-300"
+                            }`}
+                          >
+                            {filters.country && (
+                              <i className="fa-solid fa-check text-white text-xs"></i>
+                            )}
+                          </button>
+                        </label>
+
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-[14px] text-gray-700">
+                            State
+                          </span>
+                          <button
+                            onClick={() => handleToggleFilter("state")}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                              filters.state
+                                ? "bg-[#2E3B8E] border-[#2E3B8E]"
+                                : "bg-white border-gray-300"
+                            }`}
+                          >
+                            {filters.state && (
+                              <i className="fa-solid fa-check text-white text-xs"></i>
+                            )}
+                          </button>
+                        </label>
+
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-[14px] text-gray-700">
+                            Conference
+                          </span>
+                          <button
+                            onClick={() => handleToggleFilter("conference")}
+                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+                              filters.conference
+                                ? "bg-[#2E3B8E] border-[#2E3B8E]"
+                                : "bg-white border-gray-300"
+                            }`}
+                          >
+                            {filters.conference && (
+                              <i className="fa-solid fa-check text-white text-xs"></i>
+                            )}
+                          </button>
+                        </label>
+                      </div>
+
+                      {/* Clear Filter Button */}
+                      <button
+                        onClick={handleClearFilter}
+                        className="text-[#2E3B8E] text-[14px] font-semibold hover:underline"
+                      >
+                        Clear Filter
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Pastor Cards Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {pastorRoadmaps.map((pastor) => (
+                  <PastorCard
+                    key={pastor.id}
+                    image={pastor.image}
+                    name={pastor.name}
+                    description={pastor.description}
+                    phase={pastor.phase}
+                    progress={pastor.progress}
+                    onViewDetails={() => {
+                      // Handle view details action
+                      console.log(`View details for ${pastor.name}`);
+                    }}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>

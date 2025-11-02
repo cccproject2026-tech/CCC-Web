@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
-import MentorCard from "@/app/Components/MentorCard";
+import MentorCard from "@/app/Components/Card/MentorCard";
 import ExploreCCCCard from "@/app/Components/ExploreCCCCard";
 import HeroBg from "../../Assets/hero-bg.png";
 import Book from "../../Assets/book.png";

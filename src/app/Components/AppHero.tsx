@@ -53,6 +53,7 @@ export default function AppHero({
               </span>
             ))}
           </div>
+          {children && <div className="mb-2">{children}</div>}
           <h1 className="text-[42px] md:text-[48px] lg:text-[56px] font-semibold leading-tight">
             {title}
           </h1>
