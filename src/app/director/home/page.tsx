@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Image from "next/image";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import DirectorFooter from "@/app/Components/AppFooter";
 import MentorCard from "@/app/Components/Card/MentorCard";
 import ExploreCCCCard from "@/app/Components/ExploreCCCCard";
@@ -66,8 +66,6 @@ export default function DirectorHome() {
   const currentData = activeTab === "mentors" ? mentorsData : pastorsData;
   return (
     <div className="min-h-screen flex flex-col">
-      <AppHeader showFullHeader={true} />
-
       {/* Hero Section */}
       <section
         className="relative bg-cover bg-center text-white h-[500px] flex flex-col justify-between px-20 pt-6 pb-10"

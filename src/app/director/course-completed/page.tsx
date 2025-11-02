@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import MentorBg from "../../Assets/mentor-bg.png";
 import AppHero from "@/app/Components/Hero/AppHero";
@@ -277,8 +277,6 @@ export default function CourseCompletedPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
-      <AppHeader showFullHeader={true} />
-
       <AppHero
         title={
           activeTab === "invited"

@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/app/Components/AppHeader";
-import AppHero from "@/app/Components/AppHero";
+import AppHero from "@/app/Components/Hero/AppHero";
 import AppFooter from "@/app/Components/AppFooter";
 import MentorBg from "../../Assets/mentor-bg.png";
 
@@ -106,7 +106,6 @@ export default function InterestReceivedPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHeader showFullHeader={true} />
       <AppHero title="Interest Received" backgroundImageUrl={MentorBg.src} />
 
       {/* Main Content */}

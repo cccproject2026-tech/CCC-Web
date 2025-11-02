@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Image from "next/image";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import Card1 from "../../../Assets/card1.png";
 import Card2 from "../../../Assets/card2.png";
@@ -148,8 +148,6 @@ export default function CourseLibraryPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHeader showFullHeader={true} />
-
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-400 p-12 text-center">
         <h1 className="text-4xl font-bold text-white mb-3">Course Library</h1>

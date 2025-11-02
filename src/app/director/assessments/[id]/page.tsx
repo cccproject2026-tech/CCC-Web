@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 
 interface Recommendation {
@@ -305,8 +305,6 @@ export default function ViewEditAssessmentPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#2876AC]">
-      <AppHeader showFullHeader={true} />
-
       <section className="relative py-10 px-4 sm:px-6 md:px-12 lg:px-20 flex-1">
         <div className="max-w-[1600px] mx-auto flex gap-6 h-full">
           {/* Left Sidebar - Sections */}

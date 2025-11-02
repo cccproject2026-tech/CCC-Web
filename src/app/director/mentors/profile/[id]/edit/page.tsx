@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import AppHero from "@/app/Components/Hero/AppHero";
 import AppFooter from "@/app/Components/AppFooter";
 import ConfirmModal from "@/app/Components/ConfirmModal";
@@ -88,8 +88,6 @@ export default function EditMentorProfilePage({
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
-      <AppHeader showFullHeader={true} />
-
       <AppHero
         title={`${personal.firstName} ${personal.lastName}`}
         backgroundImageUrl={MentorBg.src}

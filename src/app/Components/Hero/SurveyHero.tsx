@@ -16,12 +16,12 @@ export default function SurveyHero({
   subtitle,
   breadcrumbItems,
   rightContent,
-  backgroundColor = "#008e94",
+  backgroundColor = "#00a5ab",
 }: SurveyHeroProps) {
   return (
     <>
       {/* Breadcrumbs */}
-      <div className="px-6 md:px-8 lg:px-20 py-4">
+      <div className="px-6 md:px-8 lg:px-20 py-4 bg-[#00a5ab]">
         <div className="text-sm text-white/80">
           {breadcrumbItems.map((item, idx) => (
             <span key={idx}>

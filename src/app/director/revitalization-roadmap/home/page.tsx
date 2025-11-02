@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import AppHero from "@/app/Components/Hero/AppHero";
 import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
@@ -142,8 +142,6 @@ export default function RevitalizationRoadmapHome() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHeader showFullHeader={true} />
-
       {/* Hero Section with Breadcrumbs */}
       <AppHero
         title="Revitalization Roadmap"

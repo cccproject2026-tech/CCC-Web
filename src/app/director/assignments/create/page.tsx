@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import AppHero from "@/app/Components/Hero/AppHero";
 import RoadmapBg from "../../../Assets/roadmap-bg.png";
@@ -258,8 +258,6 @@ export default function CreateAssignmentPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#2876AC]">
-      <AppHeader showFullHeader={true} />
-
       {/* Hero Section */}
       <AppHero
         title="Assignments"

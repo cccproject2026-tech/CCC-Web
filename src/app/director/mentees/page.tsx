@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import AppHero from "@/app/Components/Hero/AppHero";
 import AppFooter from "@/app/Components/AppFooter";
 import PersonListCard from "@/app/Components/PersonListCard";
@@ -253,8 +253,6 @@ export default function MenteesPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHeader showFullHeader={true} />
-
       <AppHero title="Mentees" backgroundImageUrl={MentorBg.src} />
 
       {/* Search and Featured Avatars Section */}

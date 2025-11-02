@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Image from "next/image";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import DocumentsModal from "@/app/Components/DocumentsModal";
 import UserProfile from "../../Assets/user-profile.png";
@@ -116,8 +116,6 @@ export default function DirectorProfilePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#2876AC] via-[#3A8EC4] to-[#4A9FD4]">
-      <AppHeader showFullHeader={true} />
-
       {/* Main Content */}
       <div className="flex-1 py-12 px-20">
         {/* Title */}

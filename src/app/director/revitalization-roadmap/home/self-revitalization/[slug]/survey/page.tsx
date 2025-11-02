@@ -153,8 +153,7 @@ export default function SurveyPage({ params }: SurveyPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#1A2E5C]">
-      <AppHeader showFullHeader={true} />
+    <div className="min-h-screen bg-[#1b5a90]">
       <SurveyHero
         title={getTitle()}
         subtitle={getSubtitle()}

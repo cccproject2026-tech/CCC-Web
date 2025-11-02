@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import Image from "next/image";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
@@ -124,8 +124,6 @@ export default function TrackProgressPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#2E6BA5] via-[#2876AC] to-[#3284B8]">
-      <AppHeader showFullHeader={true} />
-
       {/* Stats Cards */}
       <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 pt-8 pb-6">
         <div className="max-w-[1400px] mx-auto">

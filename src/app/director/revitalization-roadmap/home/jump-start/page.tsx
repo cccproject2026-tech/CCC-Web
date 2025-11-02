@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import JumpStartHero from "@/app/Components/Hero/JumpStartHero";
 import JumpStartBg from "@/app/Assets/roadmap-jump-start-bg.jpg";
 import UserProfile from "@/app/Assets/user-profile.png";
@@ -115,8 +115,6 @@ export default function JumpStartPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHeader showFullHeader={true} />
-
       {/* Hero Section with Breadcrumbs */}
       <JumpStartHero
         backgroundImageUrl={JumpStartBg.src}

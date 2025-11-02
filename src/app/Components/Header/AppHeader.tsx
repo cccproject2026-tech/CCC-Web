@@ -2,17 +2,17 @@
 import Image from "next/image";
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import Framelogo1 from "../Assets/Frame-logo-1.png";
-import Connecticon from "../Assets/Connect-icon.png";
-import NotificationIcon from "../Assets/notification.png";
-import SearchIcon from "../Assets/search.png";
-import UserProfile from "../Assets/user-profile.png";
-import NotificationPopup from "./NotificationPopup";
-import ProfileDropdown from "./ProfileDropdown";
-import SettingsModal from "./SettingsModal";
-import CoursesDropdown from "./CoursesDropdown";
-import CCCDropdown from "./CCCDropdown";
-import DocumentsModal from "./DocumentsModal";
+import Framelogo1 from "@/app/Assets/Frame-logo-1.png";
+import Connecticon from "@/app/Assets/Connect-icon.png";
+import NotificationIcon from "@/app/Assets/notification.png";
+import SearchIcon from "@/app/Assets/search.png";
+import UserProfile from "@/app/Assets/user-profile.png";
+import NotificationPopup from "../NotificationPopup";
+import ProfileDropdown from "../ProfileDropdown";
+import SettingsModal from "../SettingsModal";
+import CoursesDropdown from "../CoursesDropdown";
+import CCCDropdown from "../CCCDropdown";
+import DocumentsModal from "../DocumentsModal";
 
 export default function AppHeader({ showFullHeader = false }) {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -90,7 +90,7 @@ export default function AppHeader({ showFullHeader = false }) {
       <div className="flex items-center gap-3">
         <Image src={Framelogo1} alt="Logo" width={26} height={26} />
       </div>
-
+ 
       {/* Navigation */}
       {showFullHeader && (
         <nav className="hidden lg:flex items-center gap-6">

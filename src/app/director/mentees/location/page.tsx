@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import AppHero from "@/app/Components/Hero/AppHero";
 import MapCard, { MapMarker } from "@/app/Components/MapCard";
@@ -82,8 +82,6 @@ export default function MenteesLocationPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHeader showFullHeader={true} />
-
       <AppHero title="Mentees" backgroundImageUrl={MentorBg.src} />
 
       {/* Search, Close and Featured Profiles */}

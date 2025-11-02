@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import RoadmapCard from "@/app/Components/RoadmapCard";
 import FeaturedAvatars from "@/app/Components/FeaturedAvatars";
@@ -238,8 +237,6 @@ export default function RevitalizationRoadmapPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHeader showFullHeader={true} />
-
       {/* Hero Section */}
       <section
         className="relative bg-cover bg-center text-white h-[250px] flex items-end pb-10 px-20"

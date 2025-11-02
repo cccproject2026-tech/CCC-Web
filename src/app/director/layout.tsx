@@ -1,6 +1,6 @@
 "use client";
 import { usePathname } from "next/navigation";
-import AppHeader from "../Components/AppHeader";
+import AppHeader from "../Components/Header/AppHeader";
 
 export default function DirectorLayout({
   children,
@@ -20,7 +20,8 @@ export default function DirectorLayout({
 
   return (
     <div className="min-h-screen flex flex-col">
-      {showHeader && <AppHeader />} {/* Header only for selected pages */}
+      {showHeader && <AppHeader showFullHeader={true} />}
+      {/* Header only for selected pages */}
       <main className="flex-1">{children}</main>
     </div>
   );

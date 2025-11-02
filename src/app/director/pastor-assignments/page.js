@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/app/Components/AppHeader";
-import AppHero from "@/app/Components/AppHero";
+import AppHero from "@/app/Components/Hero/AppHero";
 import AppFooter from "@/app/Components/AppFooter";
 import AssignmentCard from "@/app/Components/AssignmentCard";
 import AssignMenteesModal from "@/app/Components/AssignMenteesModal";
@@ -112,8 +112,6 @@ export default function PastorAssignmentsPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHeader showFullHeader={true} />
-
       <AppHero title="Roadmap" backgroundImageUrl={MentorBg.src} />
 
       {/* Content Section */}

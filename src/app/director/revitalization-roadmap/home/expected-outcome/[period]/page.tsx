@@ -2,18 +2,22 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import CCCLogo from "@/app/Assets/CCCLogo.png";
 
 interface ExpectedOutcomePageProps {
-  params: Promise<{
-    period: string;
-  }> | {
-    period: string;
-  };
+  params:
+    | Promise<{
+        period: string;
+      }>
+    | {
+        period: string;
+      };
 }
 
-export default function ExpectedOutcomePage({ params }: ExpectedOutcomePageProps) {
+export default function ExpectedOutcomePage({
+  params,
+}: ExpectedOutcomePageProps) {
   const router = useRouter();
   const [period, setPeriod] = useState<string>("");
 
@@ -60,8 +64,6 @@ export default function ExpectedOutcomePage({ params }: ExpectedOutcomePageProps
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      <AppHeader showFullHeader={true} />
-
       {/* Main Content */}
       <main className="flex-1 px-6 md:px-12 lg:px-20 py-10 bg-white">
         <div className="max-w-5xl mx-auto">
@@ -127,4 +129,3 @@ export default function ExpectedOutcomePage({ params }: ExpectedOutcomePageProps
     </div>
   );
 }
-

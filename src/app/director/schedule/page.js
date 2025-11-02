@@ -150,8 +150,6 @@ export default function SchedulePage() {
       className="min-h-screen flex flex-col bg-gradient-to-b from-[#2868A0] via-[#2876AC] to-[#2884B8]"
       onClick={() => setOpenMenuId(null)}
     >
-      <AppHeader showFullHeader={true} />
-
       {/* Hero Section with Wave Pattern */}
       <div className="relative bg-gradient-to-r from-[#1e3a8a] to-[#2563eb] py-16 px-4 overflow-hidden">
         <div className="absolute inset-0 opacity-20">

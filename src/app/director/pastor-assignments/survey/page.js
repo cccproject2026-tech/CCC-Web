@@ -56,8 +56,6 @@ export default function SurveyPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHeader showFullHeader={true} />
-
       <div className="flex flex-1">
         {/* Sidebar */}
         <div className="w-80 bg-[#2E3B8E]/20 p-6">

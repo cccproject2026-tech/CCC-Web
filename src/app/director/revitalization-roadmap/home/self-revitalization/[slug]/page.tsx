@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import JumpStartHero from "@/app/Components/Hero/JumpStartHero";
 import SelfRevitalizationHeroBg from "@/app/Assets/self-revitalization-hero.png";
 import UserProfile from "@/app/Assets/user-profile.png";
@@ -198,8 +198,6 @@ export default function SelfRevitalizationDetailPage({
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHeader showFullHeader={true} />
-
       {/* Hero Section with Breadcrumbs */}
       <JumpStartHero
         backgroundImageUrl={SelfRevitalizationHeroBg.src}
@@ -739,7 +737,9 @@ export default function SelfRevitalizationDetailPage({
                 <button
                   onClick={() => {
                     setShowSurveyModal(false);
-                    router.push(`/director/revitalization-roadmap/home/self-revitalization/${slug}/survey`);
+                    router.push(
+                      `/director/revitalization-roadmap/home/self-revitalization/${slug}/survey`
+                    );
                   }}
                   className="bg-[#2E3B8E] text-white rounded-lg px-8 py-3 text-sm font-semibold hover:bg-[#1F2A6E] transition-all"
                 >

@@ -57,13 +57,12 @@ export default function InterestDetailPage() {
 
   const handleAccept = () => {
     setToast("Interest accepted successfully");
-    setTimeout(() => setToast(null), 3000);L
+    setTimeout(() => setToast(null), 3000);
+    L;
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHeader showFullHeader={true} />
-
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-400 p-12 text-center mb-8">
         <h1 className="text-4xl font-bold text-white">Interest Details</h1>

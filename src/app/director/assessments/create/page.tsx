@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import AppHero from "@/app/Components/Hero/AppHero";
 import AssessmentBg from "../../../Assets/assessment-bg.png";
@@ -129,8 +129,6 @@ export default function CreateAssessmentPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#2876AC]">
-      <AppHeader showFullHeader={true} />
-
       <AppHero
         title="Assessments"
         backgroundImageUrl={AssessmentBg.src}

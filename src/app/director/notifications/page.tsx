@@ -1,5 +1,5 @@
 "use client";
-import AppHeader from "@/app/Components/AppHeader";
+import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 
 export default function NotificationsPage() {
@@ -250,8 +250,6 @@ export default function NotificationsPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <AppHeader showFullHeader={true} />
-
       {/* Main Content */}
       <section className="flex-1 bg-gradient-to-b from-[#2876AC] to-[#3A8EC4] py-12 px-20">
         <div className="max-w-5xl mx-auto">
