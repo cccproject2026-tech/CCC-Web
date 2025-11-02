@@ -6,10 +6,20 @@ interface RoadmapHomeCardProps {
   img: any;
   title: string;
   description: string;
-  status: "Not Started" | "In-progress" | "Completed" | "Due";
+  status: "Not Started" | "In-progress" | "Completed" | "Over Due";
   completionTime: string;
   showDateSelector?: boolean;
   onViewClick?: () => void;
+  // Optional fields for completed status
+  completedOn?: string;
+  lastUpdatedOn?: string;
+  // Optional fields for task completion progress
+  taskCompleted?: {
+    completed: number;
+    total: number;
+  };
+  // Show checkmark overlay on image
+  showCheckmark?: boolean;
 }
 
 export default function RoadmapHomeCard({
@@ -20,6 +30,10 @@ export default function RoadmapHomeCard({
   completionTime,
   showDateSelector = false,
   onViewClick,
+  completedOn,
+  lastUpdatedOn,
+  taskCompleted,
+  showCheckmark = false,
 }: RoadmapHomeCardProps) {
   const [selectedDate, setSelectedDate] = useState("");
 
@@ -28,14 +42,19 @@ export default function RoadmapHomeCard({
       case "Not Started":
         return "bg-[#B8E6FF] text-[#0066CC]";
       case "In-progress":
-        return "bg-[#FFF4B8] text-[#996600]";
+        return "bg-[#FFB84D] text-white";
       case "Completed":
-        return "bg-[#B8FFC9] text-[#006633]";
-      case "Due":
-        return "bg-[#FFB8B8] text-[#CC0000]";
+        return "bg-[#4CAF50] text-white";
+      case "Over Due":
+        return "bg-[#F44336] text-white";
       default:
         return "bg-[#B8E6FF] text-[#0066CC]";
     }
+  };
+
+  const getProgressPercentage = () => {
+    if (!taskCompleted) return 0;
+    return (taskCompleted.completed / taskCompleted.total) * 100;
   };
 
   return (
@@ -44,6 +63,18 @@ export default function RoadmapHomeCard({
       <div className="relative w-[42%] shrink-0">
         <div className="relative h-full min-h-[220px] rounded-l-2xl overflow-hidden">
           <Image src={img} alt={title} fill className="object-cover" />
+          {/* Checkmark overlay for completed status - centered */}
+          {showCheckmark && (
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              {/* Outer green border circle with transparent center */}
+              <div className="w-20 h-20 border-2 border-[#4CAF50] rounded-full flex items-center justify-center shadow-lg relative bg-transparent">
+                {/* Inner green filled circle with checkmark */}
+                <div className="w-12 h-12 bg-[#4CAF50] rounded-full flex items-center justify-center">
+                  <i className="fa-solid fa-check text-white text-xl font-bold"></i>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -67,14 +98,53 @@ export default function RoadmapHomeCard({
               <span className="text-[14px] font-bold text-black">Status</span>
               <div className="w-px h-4 bg-gray-300"></div>
               <span
-                className={`inline-block px-3 py-1 rounded-full text-[12px] font-semibold ${getStatusColor()}`}
+                className={`inline-block px-3 py-1 rounded-lg text-[12px] font-semibold ${getStatusColor()}`}
               >
                 {status}
               </span>
             </div>
 
+            {/* Completed Dates - Only show for Completed status */}
+            {status === "Completed" && completedOn && lastUpdatedOn && (
+              <div className="mb-4 space-y-2">
+                <div>
+                  <p className="text-[14px] font-bold text-black">
+                    Completed on:{" "}
+                    <span className="font-normal">{completedOn}</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[14px] font-bold text-black">
+                    Last Updated on:{" "}
+                    <span className="font-normal">{lastUpdatedOn}</span>
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Task Completion Progress - Show for In-progress and Over Due */}
+            {taskCompleted &&
+              (status === "In-progress" || status === "Over Due") && (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[14px] font-bold text-black">
+                      Task Completed
+                    </p>
+                    <p className="text-[14px] text-black">
+                      {taskCompleted.completed}/{taskCompleted.total}
+                    </p>
+                  </div>
+                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#4CAF50] rounded-full transition-all duration-300"
+                      style={{ width: `${getProgressPercentage()}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
             {/* Date of the Project - Conditional */}
-            {showDateSelector && (
+            {showDateSelector && status === "Not Started" && (
               <div className="mb-4">
                 <p className="text-[14px] font-bold text-black mb-2">
                   Date of the Project
@@ -98,7 +168,7 @@ export default function RoadmapHomeCard({
               </div>
             )}
 
-            {/* Completion Time */}
+            {/* Completion Time and View Button */}
             <div className="flex justify-between items-center">
               <div>
                 <p className="text-[14px] font-bold text-black mb-1">
@@ -106,12 +176,15 @@ export default function RoadmapHomeCard({
                 </p>
                 <p className="text-[14px] text-black">{completionTime}</p>
               </div>
-              <button
-                onClick={onViewClick}
-                className="bg-[#2E3B8E] text-white rounded-lg px-6 py-2.5 text-[14px] font-semibold hover:bg-[#1F2A6E] transition-all"
-              >
-                View
-              </button>
+              {/* Only show View button if not completed */}
+              {status !== "Completed" && (
+                <button
+                  onClick={onViewClick}
+                  className="bg-[#2E3B8E] text-white rounded-lg px-6 py-2.5 text-[14px] font-semibold hover:bg-[#1F2A6E] transition-all"
+                >
+                  View
+                </button>
+              )}
             </div>
           </div>
         </div>

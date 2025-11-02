@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import AppHeader from "@/app/Components/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import AppHero from "@/app/Components/AppHero";
@@ -11,7 +12,13 @@ import Card3 from "@/app/Assets/card3.png";
 import Card4 from "@/app/Assets/card4.png";
 
 export default function RevitalizationRoadmapHome() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const [showExpectedOutcomePopup, setShowExpectedOutcomePopup] =
+    useState(false);
+  const [selectedOutcome, setSelectedOutcome] = useState("4");
+  const popupRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   // Roadmap phases data
   const roadmapPhases = [
@@ -19,43 +26,104 @@ export default function RevitalizationRoadmapHome() {
       id: 1,
       title: "Jump-start",
       description: "Join a two-day group revitalization session hosted by CCC",
-      status: "Not Started" as const,
-      completionTime: "Months 1-2",
+      status: "Completed" as const,
+      completionTime: "Months 1 - 2",
       img: Card1,
-      showDateSelector: true,
+      showDateSelector: false,
+      completedOn: "20 Oct 2024",
+      lastUpdatedOn: "25 Oct 2024",
+      showCheckmark: true,
     },
     {
       id: 2,
       title: "Self Revitalization Phase",
       description: "Interested in receiving mentoring in community engagement",
-      status: "Not Started" as const,
-      completionTime: "Months 1-2",
+      status: "Over Due" as const,
+      completionTime: "Months 1 - 2",
       img: Card2,
       showDateSelector: false,
+      taskCompleted: {
+        completed: 6,
+        total: 8,
+      },
     },
     {
       id: 3,
       title: "Church Empowerment Phase",
-      description: "Join a two-day group revitalization session hosted by CCC",
-      status: "Not Started" as const,
-      completionTime: "Months 3-9",
+      description: "Interested in receiving mentoring in community engagement",
+      status: "In-progress" as const,
+      completionTime: "Months 3 - 9",
       img: Card3,
       showDateSelector: false,
+      taskCompleted: {
+        completed: 12,
+        total: 18,
+      },
     },
     {
       id: 4,
       title: "Community Revitalization and Multiplication Phase",
       description: "Interested in receiving mentoring in community engagement",
       status: "Not Started" as const,
-      completionTime: "Months 10-12",
+      completionTime: "Months 10 - 12",
       img: Card4,
       showDateSelector: false,
     },
   ];
 
-  const handleViewClick = (phaseId: number) => {
-    console.log(`View clicked for phase ${phaseId}`);
-    // Navigate to phase detail page
+  const handleViewClick = (phaseId: number, title: string) => {
+    // Navigate to phase detail page based on phase
+    if (title === "Jump-start") {
+      router.push("/director/revitalization-roadmap/home/jump-start");
+    } else {
+      console.log(`View clicked for phase ${phaseId}`);
+      // Navigate to other phase pages when created
+    }
+  };
+
+  // Close popup when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        popupRef.current &&
+        !popupRef.current.contains(event.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target as Node)
+      ) {
+        setShowExpectedOutcomePopup(false);
+      }
+    };
+
+    if (showExpectedOutcomePopup) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showExpectedOutcomePopup]);
+
+  const expectedOutcomes = [
+    { id: "4", label: "Expected Outcome - 4 Months", period: "4-months" },
+    { id: "6", label: "Expected Outcome - 6 Months", period: "6-months" },
+    { id: "9", label: "Expected Outcome - 9 Months", period: "9-months" },
+    {
+      id: "end",
+      label: "Expected Outcome - End of Year",
+      period: "end-of-year",
+    },
+  ];
+
+  const handleOutcomeClick = (outcomeId: string) => {
+    setSelectedOutcome(outcomeId);
+    const outcome = expectedOutcomes.find((o) => o.id === outcomeId);
+    if (outcome) {
+      // Navigate to expected outcome page
+      router.push(
+        `/director/revitalization-roadmap/home/expected-outcome/${outcome.period}`
+      );
+      setShowExpectedOutcomePopup(false);
+    }
   };
 
   return (
@@ -67,7 +135,10 @@ export default function RevitalizationRoadmapHome() {
         title="Revitalization Roadmap"
         backgroundImageUrl={HeroBg.src}
         breadcrumbItems={[
-          { label: "Revitalization Roadmap", href: "/director/revitalization-roadmap" },
+          {
+            label: "Revitalization Roadmap",
+            href: "/director/revitalization-roadmap",
+          },
           { label: "John Ross" },
         ]}
         heightClasses="h-[240px]"
@@ -94,10 +165,47 @@ export default function RevitalizationRoadmapHome() {
             </div>
 
             {/* Three dots menu - positioned to the right */}
-            <div className="ml-4">
-              <button className="text-white hover:text-white/80 transition-all p-2">
-                <i className="fa-solid fa-ellipsis-vertical text-xl"></i>
+            <div className="ml-4 relative">
+              <button
+                ref={buttonRef}
+                onClick={() =>
+                  setShowExpectedOutcomePopup(!showExpectedOutcomePopup)
+                }
+                className="bg-white  border-2 border-white rounded-lg px-4 py-3 transition-all flex items-center justify-center"
+              >
+                <i className="fa-solid fa-ellipsis-vertical text-[#1F2A6E] text-lg"></i>
               </button>
+
+              {/* Expected Outcome Popup */}
+              {showExpectedOutcomePopup && (
+                <div
+                  ref={popupRef}
+                  className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-4 min-w-[280px] z-50"
+                >
+                  <div className="space-y-1">
+                    {expectedOutcomes.map((outcome, index) => (
+                      <button
+                        key={outcome.id}
+                        onClick={() => handleOutcomeClick(outcome.id)}
+                        className={`w-full text-nowrap text-left px-4 py-3 rounded-lg text-[14px] font-medium transition-all flex items-center gap-3 ${
+                          selectedOutcome === outcome.id
+                            ? "bg-[#E6F3FF] text-[#0066CC]"
+                            : "text-[#214080] hover:bg-gray-50"
+                        }`}
+                      >
+                        <i
+                          className={`fa-solid fa-download ${
+                            selectedOutcome === outcome.id
+                              ? "text-[#0066CC]"
+                              : "text-[#214080]"
+                          }`}
+                        ></i>
+                        <span>{outcome.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -112,7 +220,11 @@ export default function RevitalizationRoadmapHome() {
                 status={phase.status}
                 completionTime={phase.completionTime}
                 showDateSelector={phase.showDateSelector}
-                onViewClick={() => handleViewClick(phase.id)}
+                completedOn={phase.completedOn}
+                lastUpdatedOn={phase.lastUpdatedOn}
+                taskCompleted={phase.taskCompleted}
+                showCheckmark={phase.showCheckmark}
+                onViewClick={() => handleViewClick(phase.id, phase.title)}
               />
             ))}
           </div>
@@ -123,4 +235,3 @@ export default function RevitalizationRoadmapHome() {
     </div>
   );
 }
-
