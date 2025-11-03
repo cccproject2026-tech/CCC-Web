@@ -18,7 +18,7 @@ import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { useRouter } from "next/navigation";
 
-export default function PastorDashboard() {
+export default function home() {
   const router = useRouter();
 
   return (
