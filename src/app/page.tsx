@@ -1,103 +1,69 @@
+"use client";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
-// Test
+import "@fortawesome/fontawesome-free/css/all.min.css";
 
-export default function Home() {
+
+export default function LandingPage() {
+  const router = useRouter();
+
+  const roles = [
+    {
+      name: "Pastor",
+      desc: "Access the full Pastor module with assessments, appointments, and reports.",
+      color: "from-[#103C8C] to-[#0B2E72]",
+      path: "/pastor/splash",
+    },
+    {
+      name: "Mentor",
+      desc: "View the Mentor tools including mentee tracking, meetings, and analytics.",
+      color: "from-[#007B8C] to-[#005A70]",
+      path: "/mentor/home",
+    },
+    {
+      name: "Director",
+      desc: "Explore the Director dashboard with organization insights and reports.",
+      color: "from-[#7340C4] to-[#4B1E8E]",
+      path: "/director/home",
+    },
+  ];
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-[#EAF1FB] to-[#C9E0F9] text-[#0B1C58] px-6 py-12">
+      {/* HEADER */}
+      <header className="text-center mb-12">
+        <h1 className="text-4xl font-semibold mb-3 text-[#0B1C58] tracking-wide">
+          Welcome to the CCC Demo Portal
+        </h1>
+        <p className="text-gray-600 text-sm">
+          Select a module below to explore its complete workflow and features.
+        </p>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      {/* ROLE CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl w-full">
+        {roles.map((role, index) => (
+          <div
+            key={index}
+            onClick={() => router.push(role.path)}
+            className={`bg-gradient-to-br ${role.color} rounded-2xl shadow-lg cursor-pointer transform transition-all duration-300 hover:scale-105 hover:shadow-2xl flex flex-col items-center justify-center text-white text-center p-10`}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+          
+            <h2 className="text-2xl font-semibold mb-3">{role.name}</h2>
+            <p className="text-sm text-white/90 leading-relaxed max-w-[240px]">
+              {role.desc}
+            </p>
+            <div className="mt-6 flex items-center gap-2 text-white/90 text-sm font-medium">
+              <span>View {role.name} Module</span>
+              <i className="fa-solid fa-arrow-right"></i>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* FOOTER */}
+      <footer className="mt-16 text-center text-xs text-gray-600">
+        ©️ {new Date().getFullYear()} CCC Demo Portal — Built for presentation
       </footer>
     </div>
   );
