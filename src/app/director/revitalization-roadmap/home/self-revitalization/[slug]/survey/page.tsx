@@ -1,33 +1,15 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useParams } from "next/navigation";
 import Image from "next/image";
 import SurveyHero from "@/app/Components/Hero/SurveyHero";
 import CMALogo from "@/app/Assets/CMA logo.png";
 import PMPLogo from "@/app/Assets/pastoral-ministry-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
-interface SurveyPageProps {
-  params:
-    | Promise<{
-        slug: string;
-      }>
-    | {
-        slug: string;
-      };
-}
-
-export default function SurveyPage({ params }: SurveyPageProps) {
-  const [slug, setSlug] = useState<string>("");
-
-  useEffect(() => {
-    if (params instanceof Promise) {
-      params.then((resolvedParams) => {
-        setSlug(resolvedParams.slug);
-      });
-    } else {
-      setSlug(params.slug);
-    }
-  }, [params]);
+export default function SurveyPage() {
+  const params = useParams();
+  const slug = (params?.slug as string) || "";
 
   const [activeSection, setActiveSection] = useState(1);
 

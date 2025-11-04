@@ -1,21 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import JumpStartHero from "@/app/Components/Hero/JumpStartHero";
 import SelfRevitalizationHeroBg from "@/app/Assets/self-revitalization-hero.png";
 import NatureImage from "@/app/Assets/Shared Media/nature.jpeg";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-
-interface SharedMediaPageProps {
-  params:
-    | Promise<{
-        slug: string;
-      }>
-    | {
-        slug: string;
-      };
-}
 
 // Helper function to convert slug to title
 const slugToTitle = (slug: string): string => {
@@ -38,25 +28,16 @@ const slugToTitle = (slug: string): string => {
   );
 };
 
-export default function SharedMediaPage({ params }: SharedMediaPageProps) {
+export default function SharedMediaPage() {
   const router = useRouter();
-  const [slug, setSlug] = useState<string>("");
+  const params = useParams();
+  const slug = (params?.slug as string) || "";
   const [activeTab, setActiveTab] = useState<"Photos" | "Videos">("Photos");
   const [selectedItems, setSelectedItems] = useState<number[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [playingVideo, setPlayingVideo] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (params instanceof Promise) {
-      params.then((resolvedParams) => {
-        setSlug(resolvedParams.slug);
-      });
-    } else {
-      setSlug(params.slug);
-    }
-  }, [params]);
 
   const title = slug ? slugToTitle(slug) : "";
 

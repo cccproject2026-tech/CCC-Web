@@ -186,7 +186,7 @@ export default function SelfRevitalizationPhasePage() {
                       {card.title}
                     </h3>
                     <p className="text-[13px] text-[#6B7280] leading-snug mb-[8px]">
-                      {card.description ||
+                      {'description' in card && card.description ? card.description :
                         "Complete a Pastoral Assessment evaluation or develop strategy as part of your roadmap."}
                     </p>
 

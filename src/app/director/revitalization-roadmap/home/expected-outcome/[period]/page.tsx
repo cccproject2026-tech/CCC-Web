@@ -1,35 +1,13 @@
 "use client";
-import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import AppHeader from "@/app/Components/Header/AppHeader";
 import CCCLogo from "@/app/Assets/CCCLogo.png";
 
-interface ExpectedOutcomePageProps {
-  params:
-    | Promise<{
-        period: string;
-      }>
-    | {
-        period: string;
-      };
-}
-
-export default function ExpectedOutcomePage({
-  params,
-}: ExpectedOutcomePageProps) {
+export default function ExpectedOutcomePage() {
   const router = useRouter();
-  const [period, setPeriod] = useState<string>("");
-
-  useEffect(() => {
-    if (params instanceof Promise) {
-      params.then((resolvedParams) => {
-        setPeriod(resolvedParams.period);
-      });
-    } else {
-      setPeriod(params.period);
-    }
-  }, [params]);
+  const params = useParams();
+  const period = (params?.period as string) || "";
 
   // Map period to title
   const getTitle = (period: string) => {

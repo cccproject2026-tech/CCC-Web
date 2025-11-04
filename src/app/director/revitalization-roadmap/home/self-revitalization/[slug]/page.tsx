@@ -1,22 +1,12 @@
 "use client";
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import AppHeader from "@/app/Components/Header/AppHeader";
 import JumpStartHero from "@/app/Components/Hero/JumpStartHero";
 import SelfRevitalizationHeroBg from "@/app/Assets/self-revitalization-hero.png";
 import UserProfile from "@/app/Assets/user-profile.png";
 import CMALogo from "@/app/Assets/CMA logo.png";
-
-interface SelfRevitalizationDetailPageProps {
-  params:
-    | Promise<{
-        slug: string;
-      }>
-    | {
-        slug: string;
-      };
-}
 
 // Helper function to convert title to slug
 const titleToSlug = (title: string): string => {
@@ -49,11 +39,10 @@ const slugToTitle = (slug: string): string => {
   );
 };
 
-export default function SelfRevitalizationDetailPage({
-  params,
-}: SelfRevitalizationDetailPageProps) {
+export default function SelfRevitalizationDetailPage() {
   const router = useRouter();
-  const [slug, setSlug] = useState<string>("");
+  const params = useParams();
+  const slug = (params?.slug as string) || "";
   const [notes, setNotes] = useState("");
   const [sessionDate, setSessionDate] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
@@ -63,16 +52,6 @@ export default function SelfRevitalizationDetailPage({
     {}
   );
   const [showSurveyModal, setShowSurveyModal] = useState(false);
-
-  useEffect(() => {
-    if (params instanceof Promise) {
-      params.then((resolvedParams) => {
-        setSlug(resolvedParams.slug);
-      });
-    } else {
-      setSlug(params.slug);
-    }
-  }, [params]);
 
   const title = slug ? slugToTitle(slug) : "";
 
