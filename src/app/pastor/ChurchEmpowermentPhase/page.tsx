@@ -1,9 +1,10 @@
 "use client";
 import Image from "next/image";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
-import HeroBg from "../../Assets/self-revitalization-hero.png"; // 🖼️ replace with your hero image
+import HeroBg from "../../Assets/self-revitalization-hero.png";
 
 // Card images
 import Card1 from "../../Assets/card1.png";
@@ -13,15 +14,21 @@ import Card4 from "../../Assets/card4.png";
 import Card5 from "../../Assets/card5.png";
 import Card6 from "../../Assets/card6.png";
 import Card7 from "../../Assets/card7.png";
-import { useRouter } from "next/navigation";
 
+type CardItem = {
+  title: string;
+  description: string;
+  status: string;
+  completion: string;
+  img: any;
+  href: string; // ← unique route per card
+};
 
 export default function ChurchEmpowermentPhasePage() {
   const router = useRouter();
-
   const [filter, setFilter] = useState("Church");
 
-  const cards = [
+  const cards: CardItem[] = [
     {
       title: "Community Engagement Project",
       description:
@@ -29,6 +36,7 @@ export default function ChurchEmpowermentPhasePage() {
       status: "Not Started",
       completion: "Months 3 – 4",
       img: Card1,
+      href: "/pastor/CommunityEngagementProject",
     },
     {
       title: "Facility Review",
@@ -37,6 +45,7 @@ export default function ChurchEmpowermentPhasePage() {
       status: "Not Started",
       completion: "Months 3 – 4",
       img: Card2,
+      href: "/pastor/FacilityReview",
     },
     {
       title: "Welcome Team",
@@ -45,6 +54,7 @@ export default function ChurchEmpowermentPhasePage() {
       status: "Not Started",
       completion: "Months 3 – 4",
       img: Card3,
+      href: "/pastor/WelcomeTeam",
     },
     {
       title: "Guest Contact Information",
@@ -53,6 +63,7 @@ export default function ChurchEmpowermentPhasePage() {
       status: "Not Started",
       completion: "Months 3 – 4",
       img: Card4,
+      href: "/pastor/GuestContactInformation",
     },
     {
       title: "Community Assessment",
@@ -61,6 +72,7 @@ export default function ChurchEmpowermentPhasePage() {
       status: "Not Started",
       completion: "Months 5 – 6",
       img: Card5,
+      href: "/pastor/CommunityAssessment",
     },
     {
       title: "Community Engagement Events",
@@ -69,6 +81,7 @@ export default function ChurchEmpowermentPhasePage() {
       status: "Not Started",
       completion: "Months 5 – 6",
       img: Card6,
+      href: "/pastor/CommunityEngagementEvents",
     },
     {
       title: "Empower Ministry Leaders",
@@ -77,6 +90,7 @@ export default function ChurchEmpowermentPhasePage() {
       status: "Not Started",
       completion: "Months 5 – 6",
       img: Card7,
+      href: "/pastor/EmpowerMinistryLeaders",
     },
   ];
 
@@ -89,16 +103,13 @@ export default function ChurchEmpowermentPhasePage() {
         className="relative h-[300px] bg-cover bg-center text-white flex flex-col justify-end px-20 pb-10"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0F1E44]/80 via-[#0F4A85]/50 to-transparent"></div>
-
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0F1E44]/80 via-[#0F4A85]/50 to-transparent" />
         <div className="relative z-10">
           <div className="flex items-center gap-3 mb-2">
             <span className="bg-[#FFD84E] text-[#0B1C58] text-xs font-semibold px-3 py-[3px] rounded-md">
               Phase 2
             </span>
-            <h1 className="text-3xl font-semibold">
-              Church Empowerment Phase
-            </h1>
+            <h1 className="text-3xl font-semibold">Church Empowerment Phase</h1>
           </div>
         </div>
       </section>
@@ -106,7 +117,6 @@ export default function ChurchEmpowermentPhasePage() {
       {/* MAIN CONTENT */}
       <main className="flex-1 px-16 py-10 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white">
         <div className="max-w-7xl mx-auto">
-
           {/* Search + Filters Row */}
           <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
             {/* Search Box */}
@@ -127,15 +137,13 @@ export default function ChurchEmpowermentPhasePage() {
                     <button
                       key={tab}
                       onClick={() => setFilter(tab)}
-                      className={`relative px-5 py-[7px] text-sm font-medium transition-all duration-200
-                        ${
-                          filter === tab
-                            ? "bg-[#103C8C] text-white"
-                            : "text-gray-500 hover:text-[#103C8C]"
-                        }`}
+                      className={`relative px-5 py-[7px] text-sm font-medium transition-all duration-200 ${
+                        filter === tab
+                          ? "bg-[#103C8C] text-white"
+                          : "text-gray-500 hover:text-[#103C8C]"
+                      }`}
                     >
                       {tab}
-
                       {tab === "Due" && (
                         <span className="absolute top-2 -right-1 bg-[#FFD84E] text-[#0B1C58] text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center border border-white">
                           3
@@ -148,7 +156,7 @@ export default function ChurchEmpowermentPhasePage() {
 
               {/* Ellipsis Menu */}
               <button className="bg-white rounded-lg w-8 h-10 flex items-center justify-center shadow-sm hover:bg-gray-50">
-                <i className="fa-solid fa-ellipsis-vertical text-[#103C8C]"></i>
+                <i className="fa-solid fa-ellipsis-vertical text-[#103C8C]" />
               </button>
             </div>
           </div>
@@ -199,13 +207,12 @@ export default function ChurchEmpowermentPhasePage() {
                   </div>
 
                   <div className="flex justify-end -mt-4">
-                 <button
-  onClick={() => router.push(`/pastor/CommunityEngagementProject`)}
-  className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-[12px] font-medium px-6 py-[6px] rounded-md shadow-sm"
->
-  View
-</button>
-
+                    <button
+                      onClick={() => router.push(card.href)}
+                      className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-[12px] font-medium px-6 py-[6px] rounded-md shadow-sm"
+                    >
+                      View
+                    </button>
                   </div>
                 </div>
               </div>
@@ -213,6 +220,8 @@ export default function ChurchEmpowermentPhasePage() {
           </div>
         </div>
       </main>
+
+    
     </div>
   );
 }

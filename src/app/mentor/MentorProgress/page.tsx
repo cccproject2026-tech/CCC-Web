@@ -9,6 +9,7 @@ import progressBg from "@/app/Assets/progress-bg.png";
 import card1 from "@/app/Assets/card1.png";
 import card2 from "@/app/Assets/card2.png";
 import card3 from "@/app/Assets/card3.png";
+import MentorHeader from "@/app/Components/MentorHeader";
 
 export default function PastorProgressPage() {
   const [filter, setFilter] = useState("Remaining");
@@ -28,7 +29,7 @@ export default function PastorProgressPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white">
-      <PastorHeader showFullHeader={true} />
+      <MentorHeader showFullHeader={true} />
 
       {/* HERO HEADER */}
       <section

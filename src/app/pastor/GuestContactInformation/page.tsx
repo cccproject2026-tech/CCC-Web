@@ -7,21 +7,25 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import { useRouter } from "next/navigation";
 
 export default function GuestContactInformation() {
-     const router = useRouter();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
   const [attendanceTracker, setAttendanceTracker] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 
   const handleSubmit = () => {
-    if (attendanceTracker.trim() !== "") {
+    // Show popup immediately (no validation)
+    setShowSuccessPopup(true);
+
+    // Hide popup and mark as completed after delay
+    setTimeout(() => {
+      setShowSuccessPopup(false);
       setIsCompleted(true);
-    } else {
-      alert("Please enter attendance tracker system details.");
-    }
+    }, 2000);
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white">
+    <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white relative">
       <PastorHeader showFullHeader={true} />
 
       {/* HERO SECTION */}
@@ -31,7 +35,7 @@ export default function GuestContactInformation() {
       >
         <div className="absolute inset-0 bg-black/60"></div>
         <div className="relative z-10">
-          <p className="text-xs text-white/80 mb-2">
+          <p className="text-xs text-white/80 mb-40">
             Revitalization Roadmap &gt;{" "}
             <span className="text-white font-medium">
               Church Empowerment Phase
@@ -45,7 +49,7 @@ export default function GuestContactInformation() {
                 Completed
               </span>
               <span className="bg-white/20 text-white text-xs px-3 py-[3px] rounded-md">
-                Completed on 20 Oct 2024
+                Completed on {new Date().toLocaleDateString("en-GB")}
               </span>
             </div>
           )}
@@ -58,7 +62,7 @@ export default function GuestContactInformation() {
       </section>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] pb-24">
+      <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] pb-24 transition-all duration-700 ease-in-out">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-10">
           {/* LEFT PANEL */}
           <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 w-full h-fit">
@@ -132,7 +136,7 @@ export default function GuestContactInformation() {
 
                   {isCompleted ? (
                     <div className="border border-[#5A8DCB] rounded-md p-3 text-sm text-white/90 bg-transparent">
-                      {attendanceTracker}
+                      {attendanceTracker || "ChurchTrack Pro System"}
                     </div>
                   ) : (
                     <textarea
@@ -148,8 +152,9 @@ export default function GuestContactInformation() {
                 <div className="flex justify-end">
                   {isCompleted ? (
                     <button
-                    //   onClick={() => setIsCompleted(false)}
-                       onClick={() => router.push(`/pastor/CommunityAssessment`)}
+                      onClick={() =>
+                        router.push(`/pastor/CommunityAssessment`)
+                      }
                       className="bg-transparent border border-[#A6B8E8] hover:bg-[#103C8C] hover:text-white transition text-[#E8ECFF] text-sm font-medium px-6 py-2 rounded-md shadow-sm"
                     >
                       Resubmit
@@ -175,6 +180,22 @@ export default function GuestContactInformation() {
           </div>
         </div>
       </main>
+
+      {/* SUCCESS POPUP */}
+      {showSuccessPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+          <div className="bg-white text-[#0F4A85] px-8 py-5 rounded-xl shadow-lg flex items-center gap-3 fade-in">
+            <div className="bg-[#3DBE72] text-white w-6 h-6 flex items-center justify-center rounded-full">
+              <i className="fa-solid fa-check text-xs"></i>
+            </div>
+            <p className="font-medium text-[15px]">
+              Guest Contact Information Submitted Successfully
+            </p>
+          </div>
+        </div>
+      )}
+
+
     </div>
   );
 }

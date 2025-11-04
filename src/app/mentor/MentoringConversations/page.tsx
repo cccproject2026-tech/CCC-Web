@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "@/app/Assets/jumpstart-hero.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import MentorHeader from "@/app/Components/MentorHeader";
 
 type LeftTab = "overview" | "notes";
 type NotesTab = "add" | "list";
@@ -64,7 +65,7 @@ export default function MentoringConversationsPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white">
-      <PastorHeader showFullHeader />
+      <MentorHeader showFullHeader />
 
       {/* HERO */}
       <section

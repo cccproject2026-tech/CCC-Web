@@ -9,6 +9,7 @@ import Mentor1 from "@/app/Assets/mentor1.png";
 import Mentor2 from "@/app/Assets/mentor2.png";
 import Mentor3 from "@/app/Assets/mentor3.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import MentorHeader from "@/app/Components/MentorHeader";
 
 export default function MyMenteesPage() {
   const [filter, setFilter] = useState("In-Progress");
@@ -47,7 +48,7 @@ export default function MyMenteesPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white">
-      <PastorHeader showFullHeader={true} />
+      <MentorHeader showFullHeader={true} />
 
       {/* 🟦 HERO SECTION */}
       <section

@@ -17,6 +17,7 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { useRouter } from "next/navigation";
+import MentorHeader from "@/app/Components/MentorHeader";
 
 export default function home() {
   const router = useRouter();
@@ -24,7 +25,7 @@ export default function home() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* HEADER */}
-      <PastorHeader showFullHeader={true} />
+      <MentorHeader showFullHeader={true} />
 
       {/* 🟦 HERO SECTION */}
       <section

@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "../../Assets/self-revitalization-hero.png";
@@ -14,12 +15,12 @@ import Card5 from "../../Assets/card5.png";
 
 export default function CommunityRevitalizationPage() {
   const [filter, setFilter] = useState("Church");
+  const router = useRouter();
 
   const cards = [
     {
       title: "Inactive Member List",
-      description:
-        "Develop an inactive member list and a relational map.",
+      description: "Develop an inactive member list and a relational map.",
       status: "Not Started",
       completion: "Months 10 – 12",
       fields: [
@@ -27,6 +28,7 @@ export default function CommunityRevitalizationPage() {
         { label: "Meeting Date 2", placeholder: "Select Date" },
       ],
       img: Card1,
+      route: "/pastor/InactiveMemberList",
     },
     {
       title: "Doorway Events",
@@ -35,6 +37,7 @@ export default function CommunityRevitalizationPage() {
       status: "Not Started",
       completion: "Months 10 – 12",
       img: Card2,
+      route: "/pastor/DoorwayEvents",
     },
     {
       title: "CMA Assessment",
@@ -44,28 +47,26 @@ export default function CommunityRevitalizationPage() {
       completion: "Months 10 – 12",
       fields: [{ label: "Completion Date", placeholder: "Select Date" }],
       img: Card3,
+      route: "/pastor/CMAAssessment",
     },
     {
       title: "Attendance",
-      description:
-        "Develop an intentional strategy for noticing lack of attendance.",
+      description: "Develop an intentional strategy for noticing lack of attendance.",
       status: "Not Started",
       completion: "Months 10 – 12",
       img: Card4,
+      route: "/pastor/Attendance",
     },
     {
       title: "Final Revitalization Review",
-      description:
-        "Celebrate wins and identify next steps for growth.",
+      description: "Celebrate wins and identify next steps for growth.",
       status: "Not Started",
       completion: "Months 10 – 12",
       fields: [
-        {
-          label: "Praise and Thanksgiving Date",
-          placeholder: "Select Date",
-        },
+        { label: "Praise and Thanksgiving Date", placeholder: "Select Date" },
       ],
       img: Card5,
+      route: "/pastor/FinalRevitalizationReview",
     },
   ];
 
@@ -141,16 +142,14 @@ export default function CommunityRevitalizationPage() {
                     src={card.img}
                     alt={card.title}
                     fill
-                    className="object-cover"
+                    className="object-cover rounded-lg"
                   />
                 </div>
 
                 {/* Right Content */}
                 <div className="flex flex-col justify-between w-[60%] p-5 text-[#0B1C58]">
                   <div>
-                    <h3 className="text-[15px] font-semibold mb-1">
-                      {card.title}
-                    </h3>
+                    <h3 className="text-[15px] font-semibold mb-1">{card.title}</h3>
                     <p className="text-[13px] text-[#6B7280] mb-2 leading-snug">
                       {card.description}
                     </p>
@@ -186,8 +185,12 @@ export default function CommunityRevitalizationPage() {
                     </p>
                   </div>
 
+                  {/* View Button — routes dynamically */}
                   <div className="flex justify-end mt-3">
-                    <button className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-[12px] font-medium px-6 py-[6px] rounded-md shadow-sm">
+                    <button
+                      onClick={() => router.push(card.route)}
+                      className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-[12px] font-medium px-6 py-[6px] rounded-md shadow-sm"
+                    >
                       View
                     </button>
                   </div>
@@ -198,7 +201,7 @@ export default function CommunityRevitalizationPage() {
         </div>
       </main>
 
-
+      
     </div>
   );
 }

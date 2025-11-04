@@ -8,6 +8,7 @@ import DuoIcon from "../../Assets/duo.png";
 import MeetIcon from "../../Assets/meet.png";
 import UserProfile from "../../Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import MentorHeader from "@/app/Components/MentorHeader";
 
 export default function MentorSchedule() {
   const [activeTab, setActiveTab] = useState<"Appointments" | "Availability" | "Schedule">(
@@ -45,7 +46,7 @@ export default function MentorSchedule() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#F5F7FB] text-[#0B1C58] relative">
-      <PastorHeader showFullHeader={true} />
+      <MentorHeader showFullHeader={true} />
 
       {/* 🟦 HERO SECTION */}
       <section

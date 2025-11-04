@@ -7,22 +7,31 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import { useRouter } from "next/navigation";
 
 export default function CommunityAssessmentPage() {
-         const router = useRouter();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 
   // Handle file upload
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const uploaded = event.target.files?.[0];
     if (uploaded) {
       setUploadedFile(uploaded);
-      setIsCompleted(true);
+
+      // show popup immediately
+      setShowSuccessPopup(true);
+
+      // hide popup after delay
+      setTimeout(() => {
+        setShowSuccessPopup(false);
+        setIsCompleted(true);
+      }, 2000);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white">
+    <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white relative">
       <PastorHeader showFullHeader={true} />
 
       {/* HERO SECTION */}
@@ -32,7 +41,7 @@ export default function CommunityAssessmentPage() {
       >
         <div className="absolute inset-0 bg-black/60"></div>
         <div className="relative z-10">
-          <p className="text-xs text-white/80 mb-2">
+          <p className="text-xs text-white/80 mb-40">
             Revitalization Roadmap &gt;{" "}
             <span className="text-white font-medium">
               Church Empowerment Phase
@@ -177,7 +186,7 @@ export default function CommunityAssessmentPage() {
                   <button
                     onClick={() =>
                       uploadedFile
-                        ?  router.push(`/pastor/CommunityEngagementEvents`)
+                        ? router.push(`/pastor/CommunityEngagementEvents`)
                         : document.getElementById("file-upload")?.click()
                     }
                     className="bg-transparent border border-[#A6B8E8] hover:bg-[#103C8C] hover:text-white transition text-[#E8ECFF] text-sm font-medium px-6 py-2 rounded-md shadow-sm"
@@ -198,7 +207,21 @@ export default function CommunityAssessmentPage() {
         </div>
       </main>
 
-     
+      {/* SUCCESS POPUP */}
+      {showSuccessPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+          <div className="bg-white text-[#0F4A85] px-8 py-5 rounded-xl shadow-lg flex items-center gap-3 fade-in">
+            <div className="bg-[#3DBE72] text-white w-6 h-6 flex items-center justify-center rounded-full">
+              <i className="fa-solid fa-check text-xs"></i>
+            </div>
+            <p className="font-medium text-[15px]">
+              Document Uploaded Successfully
+            </p>
+          </div>
+        </div>
+      )}
+
+  
     </div>
   );
 }

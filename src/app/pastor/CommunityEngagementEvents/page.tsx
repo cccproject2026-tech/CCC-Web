@@ -12,9 +12,10 @@ interface FollowUp {
 }
 
 export default function CommunityEngagementEventsPage() {
-      const router = useRouter();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("overview");
   const [isCompleted, setIsCompleted] = useState(false);
+  const [showPopup, setShowPopup] = useState<string | null>(null);
 
   // Event 1 state
   const [event1Desc, setEvent1Desc] = useState("");
@@ -57,19 +58,17 @@ export default function CommunityEngagementEventsPage() {
     }
   };
 
-  const handleSubmit = () => {
-    if (
-      (event1Desc && event1Date) ||
-      (event2Desc && event2Date)
-    ) {
+  // ✅ Show popup for event 1 or 2
+  const handleSubmitEvent = (index: number) => {
+    setShowPopup(`Submitted Community Engagement Event ${index}`);
+    setTimeout(() => {
+      setShowPopup(null);
       setIsCompleted(true);
-    } else {
-      alert("Please fill in both events before submitting.");
-    }
+    }, 2000);
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white">
+    <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white relative">
       <PastorHeader showFullHeader={true} />
 
       {/* HERO */}
@@ -79,7 +78,7 @@ export default function CommunityEngagementEventsPage() {
       >
         <div className="absolute inset-0 bg-black/60"></div>
         <div className="relative z-10">
-          <p className="text-xs text-white/80 mb-2">
+          <p className="text-xs text-white/80 mb-40">
             Revitalization Roadmap &gt;{" "}
             <span className="text-white font-medium">
               Church Empowerment Phase
@@ -93,7 +92,7 @@ export default function CommunityEngagementEventsPage() {
                 Completed
               </span>
               <span className="bg-white/20 text-white text-xs px-3 py-[3px] rounded-md">
-                Completed on 20 Oct 2024
+                Completed on {new Date().toLocaleDateString("en-GB")}
               </span>
             </div>
           )}
@@ -166,7 +165,9 @@ export default function CommunityEngagementEventsPage() {
                 <div className="mb-10">
                   <h3 className="text-sm font-semibold mb-2">Description</h3>
                   <div className="border border-[#5A8DCB] rounded-md p-3 text-sm text-white/90 bg-transparent">
-                    Plan two community engagement events with at least one follow-up bridge event that addresses felt needs in the community.
+                    Plan two community engagement events with at least one
+                    follow-up bridge event that addresses felt needs in the
+                    community.
                   </div>
                 </div>
 
@@ -185,6 +186,7 @@ export default function CommunityEngagementEventsPage() {
                   file={event1File}
                   handleFileUpload={handleFileUpload}
                   isCompleted={isCompleted}
+                  handleSubmitEvent={handleSubmitEvent}
                 />
 
                 {/* --- Event 2 --- */}
@@ -202,17 +204,20 @@ export default function CommunityEngagementEventsPage() {
                   file={event2File}
                   handleFileUpload={handleFileUpload}
                   isCompleted={isCompleted}
+                  handleSubmitEvent={handleSubmitEvent}
                 />
 
-                {/* Submit */}
+                {/* Submit All */}
                 <div className="flex justify-end mt-10">
                   <button
                     onClick={() =>
-                      isCompleted ?  router.push(`/pastor/EmpowerMinistryLeaders`) : handleSubmit()
+                      isCompleted
+                        ? router.push(`/pastor/EmpowerMinistryLeaders`)
+                        : setIsCompleted(true)
                     }
                     className="bg-transparent border border-[#A6B8E8] hover:bg-[#103C8C] hover:text-white transition text-[#E8ECFF] text-sm font-medium px-6 py-2 rounded-md shadow-sm"
                   >
-                    {isCompleted ? "Re-Submit" : "Submit"}
+                    {isCompleted ? "Re-Submit" : "Submit All"}
                   </button>
                 </div>
               </>
@@ -221,12 +226,24 @@ export default function CommunityEngagementEventsPage() {
         </div>
       </main>
 
+      {/* SUCCESS POPUP */}
+      {showPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+          <div className="bg-white text-[#0F4A85] px-8 py-5 rounded-xl shadow-lg flex items-center gap-3 fade-in">
+            <div className="bg-[#3DBE72] text-white w-6 h-6 flex items-center justify-center rounded-full">
+              <i className="fa-solid fa-check text-xs"></i>
+            </div>
+            <p className="font-medium text-[15px]">{showPopup}</p>
+          </div>
+        </div>
+      )}
 
+    
     </div>
   );
 }
 
-/* ---------- Reusable Event Block Component ---------- */
+/* ---------- Reusable Event Block ---------- */
 function EventBlock({
   index,
   title,
@@ -241,12 +258,12 @@ function EventBlock({
   file,
   handleFileUpload,
   isCompleted,
+  handleSubmitEvent,
 }: any) {
   return (
     <div className="mb-10 border border-[#5A8DCB] rounded-xl p-6 bg-[#103C8C]/10">
       <h3 className="text-sm font-semibold mb-3">{title}</h3>
 
-      {/* Description */}
       <textarea
         disabled={isCompleted}
         value={desc}
@@ -255,8 +272,9 @@ function EventBlock({
         className="w-full bg-transparent border border-[#5A8DCB] rounded-md px-3 py-2 text-sm text-white h-[100px] resize-none mb-4 focus:outline-none"
       ></textarea>
 
-      {/* Event Date */}
-      <h4 className="text-sm font-semibold mb-2">Community Engagement Event Date</h4>
+      <h4 className="text-sm font-semibold mb-2">
+        Community Engagement Event Date
+      </h4>
       <input
         type="date"
         disabled={isCompleted}
@@ -265,7 +283,7 @@ function EventBlock({
         className="w-[250px] bg-transparent border border-[#5A8DCB] rounded-md px-3 py-2 text-sm text-white focus:outline-none mb-4"
       />
 
-      {/* Follow-up Events */}
+      {/* Follow-ups */}
       <div className="mb-4">
         <h4 className="text-sm font-semibold mb-2 flex justify-between items-center">
           Follow-up Events
@@ -314,13 +332,12 @@ function EventBlock({
         ))}
       </div>
 
-      {/* Upload */}
-      <div className="mb-4">
+      {/* Upload Section */}
+      <div className="mb-6">
         <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
           <i className="fa-regular fa-file-arrow-up text-white/80 text-[14px]"></i>
           Upload Videos / Pictures
         </h4>
-
         {file ? (
           <div className="flex items-center justify-between bg-white text-gray-800 rounded-lg shadow-sm p-4 w-full max-w-md">
             <div className="flex items-center gap-3">
@@ -352,22 +369,23 @@ function EventBlock({
               <p className="text-sm text-white/80">
                 Drag & Drop or Click here to choose file
               </p>
-              <p className="text-xs text-white/50 mt-1">
-                Max file size : 10 MB
-              </p>
+              <p className="text-xs text-white/50 mt-1">Max file size : 10 MB</p>
             </label>
           )
         )}
       </div>
 
-      {/* Completed view link */}
-      {isCompleted && (
-        <div className="mt-4">
-          <button className="bg-transparent border border-[#A6B8E8] text-[#E8ECFF] hover:bg-[#103C8C] transition text-sm px-4 py-2 rounded-md">
-            View your Shared Media
+      {/* Submit Button per Event */}
+      <div className="flex justify-end">
+        {!isCompleted && (
+          <button
+            onClick={() => handleSubmitEvent(index)}
+            className="bg-transparent border border-[#A6B8E8] hover:bg-[#103C8C] hover:text-white transition text-[#E8ECFF] text-sm font-medium px-6 py-2 rounded-md shadow-sm"
+          >
+            Submit
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

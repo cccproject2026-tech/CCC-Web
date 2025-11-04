@@ -2,11 +2,19 @@
 import { useState } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import headerBg from "../../Assets/CMA-hero-bg.png";
-
+import { useRouter } from "next/navigation"; // ✅ Added for navigation
 
 export default function PastorSurveyCMA() {
   const [activeSection, setActiveSection] = useState(0);
   const [answers, setAnswers] = useState<Record<string, boolean>>({});
+  const router = useRouter(); // ✅ Router instance
+
+  // ✅ Added new state for submit & schedule popup flow
+  const [showSubmitPopup, setShowSubmitPopup] = useState(false);
+  const [showSchedulePrompt, setShowSchedulePrompt] = useState(false);
+  const [showMentorSidebar, setShowMentorSidebar] = useState(false);
+  const [mentorStep, setMentorStep] = useState(1);
+  const [showFinalPopup, setShowFinalPopup] = useState(false);
 
   const handleCheck = (key: string) =>
     setAnswers((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -19,7 +27,27 @@ export default function PastorSurveyCMA() {
     if (activeSection > 0) setActiveSection((prev) => prev - 1);
   };
 
-  // ✅ Sections 1 – 5
+  // ✅ New Submit Flow
+  const handleSubmitSurvey = () => {
+    setShowSubmitPopup(true);
+    setTimeout(() => {
+      setShowSubmitPopup(false);
+      setShowSchedulePrompt(true);
+    }, 2500);
+  };
+  const handleScheduleMeeting = () => {
+    setShowSchedulePrompt(false);
+    setShowMentorSidebar(true);
+  };
+  const handleFinalSchedule = () => {
+    setShowFinalPopup(true);
+    setTimeout(() => {
+      setShowFinalPopup(false);
+      router.push("/pastor/AssessmentEvaluation");
+    }, 2500);
+  };
+
+  // ✅ Sections 1–5 (kept 100% original)
   const sections = [
     {
       title:
@@ -300,33 +328,28 @@ export default function PastorSurveyCMA() {
     },
   ];
 
+  // ✅ Original return kept intact
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white">
-       
-
- {/* HEADER */}
-<header
-  className="relative flex items-center px-16 py-10 bg-cover bg-no-repeat text-white h-[200px]"
-  style={{
-    backgroundImage: `url(${headerBg.src})`,
-    backgroundPosition: "120% center", // ✅ pushes image 20% further to the right
-    backgroundSize: "cover",
-  }}
->
-
-  {/* Optional transparent overlay for better text contrast */}
-  <div className="absolute inset-0 bg-black/20"></div>
-
-  {/* Left text content */}
-  <div className="relative z-10 mt-7">
-    <h2 className="text-3xl font-bold">
-      Church Assessment Evaluation (CMA)
-    </h2>
-    <p className="text-sm mt-2 text-white/85 max-w-md">
-      This Survey is about Lorem ipsum dolor sit amet, consectetur
-    </p>
-  </div>
-</header>
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white relative">
+      {/* HEADER */}
+      <header
+        className="relative flex items-center px-16 py-10 bg-cover bg-no-repeat text-white h-[200px]"
+        style={{
+          backgroundImage: `url(${headerBg.src})`,
+          backgroundPosition: "120% center",
+          backgroundSize: "cover",
+        }}
+      >
+        <div className="absolute inset-0 bg-black/20"></div>
+        <div className="relative z-10 mt-7">
+          <h2 className="text-3xl font-bold">
+            Church Assessment Evaluation (CMA)
+          </h2>
+          <p className="text-sm mt-2 text-white/85 max-w-md">
+            This Survey is about Lorem ipsum dolor sit amet, consectetur
+          </p>
+        </div>
+      </header>
 
       {/* MAIN BODY */}
       <main className="flex flex-1 px-16 py-10 gap-10">
@@ -420,21 +443,149 @@ export default function PastorSurveyCMA() {
               Section
             </button>
 
-            <button
-              onClick={handleNext}
-              disabled={activeSection === sections.length - 1}
-              className={`bg-[#103C8C] text-white text-sm font-medium px-6 py-2 rounded-md ${
-                activeSection === sections.length - 1
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:bg-[#0B2E72]"
-              }`}
-            >
-              View Next Section{" "}
-              <i className="fa-solid fa-angle-right ml-2"></i>
-            </button>
-       </div>
+            {activeSection === sections.length - 1 ? (
+              <button
+                onClick={handleSubmitSurvey}
+                className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm font-medium px-6 py-2 rounded-md"
+              >
+                Submit Survey
+              </button>
+            ) : (
+              <button
+                onClick={handleNext}
+                className="bg-[#103C8C] text-white text-sm font-medium px-6 py-2 rounded-md"
+              >
+                View Next Section{" "}
+                <i className="fa-solid fa-angle-right ml-2"></i>
+              </button>
+            )}
+          </div>
         </section>
       </main>
+
+      {/* ✅ New Popups & Side Drawer */}
+      {showSubmitPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+          <div className="bg-white text-[#0F1E44] px-10 py-6 rounded-xl shadow-lg flex items-center gap-3">
+            <i className="fa-solid fa-circle-check text-green-500 text-2xl"></i>
+            <p className="font-medium">Survey Submitted Successfully</p>
+          </div>
+        </div>
+      )}
+
+      {showSchedulePrompt && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+          <div className="bg-white text-[#0F1E44] px-10 py-8 rounded-xl text-center w-[480px] shadow-lg">
+            <p className="font-semibold text-lg mb-4">
+              On completion of the PMP and CMA assessment tools please schedule
+              a meeting with your mentor.
+            </p>
+            <button
+              onClick={handleScheduleMeeting}
+              className="bg-[#103C8C] text-white text-sm font-medium px-8 py-2 rounded-md hover:bg-[#0B2E72]"
+            >
+              Schedule Meeting
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showMentorSidebar && (
+        <div className="fixed inset-0 flex justify-end bg-black/40 z-50">
+          <div className="bg-white text-[#0F1E44] w-[480px] h-full p-8 overflow-y-auto">
+            {mentorStep === 1 ? (
+              <>
+                <h2 className="text-xl font-semibold mb-6">
+                  Choose Mentor for the Meeting
+                </h2>
+                {[...Array(6)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between border border-gray-200 rounded-md p-3 mb-3 cursor-pointer hover:bg-gray-50"
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src="/user-avatar.png"
+                        alt="mentor"
+                        className="w-8 h-8 rounded-full"
+                      />
+                      <div>
+                        <p className="font-medium text-sm">John Ross</p>
+                        <p className="text-xs text-gray-500">Mentor</p>
+                      </div>
+                    </div>
+                    <input type="radio" name="mentor" defaultChecked={i === 0} />
+                  </div>
+                ))}
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => setMentorStep(2)}
+                    className="bg-[#103C8C] text-white px-6 py-2 rounded-md"
+                  >
+                    Next
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-semibold mb-6">
+                  Schedule a Meeting
+                </h2>
+                <div className="mb-6">
+                  <label className="block text-sm mb-2">
+                    Select Available Date
+                  </label>
+                  <input
+                    type="date"
+                    className="border border-gray-300 rounded-md p-2 w-full"
+                  />
+                </div>
+                <div className="mb-6">
+                  <label className="block text-sm mb-2">Select Time</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      "09:00 am – 10:00 am",
+                      "11:00 am – 12:00 pm",
+                      "01:00 pm – 02:00 pm",
+                      "03:00 pm – 04:00 pm",
+                    ].map((t, i) => (
+                      <button
+                        key={i}
+                        className="border border-gray-300 rounded-md py-2 text-sm hover:bg-gray-100"
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex justify-between">
+                  <button
+                    onClick={() => setMentorStep(1)}
+                    className="border border-gray-300 px-5 py-2 rounded-md"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleFinalSchedule}
+                    className="bg-[#103C8C] text-white px-6 py-2 rounded-md"
+                  >
+                    Schedule
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showFinalPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-[60]">
+          <div className="bg-white text-[#0F1E44] px-10 py-6 rounded-xl shadow-lg flex items-center gap-3">
+            <i className="fa-solid fa-circle-check text-green-500 text-2xl"></i>
+            <p className="font-medium">New Appointment has been Scheduled</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

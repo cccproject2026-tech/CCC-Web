@@ -9,17 +9,27 @@ export default function EmpowerMinistryLeadersPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
 
+  // Handle file upload
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setUploadedFile(file);
-      setIsCompleted(true);
     }
   };
 
+  // ✅ Show popup when clicking Upload button
+  const handleUploadClick = () => {
+    setShowPopup(true);
+    setTimeout(() => {
+      setShowPopup(false);
+      setIsCompleted(true);
+    }, 2000); // popup visible for 2 seconds
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white">
+    <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white relative">
       <PastorHeader showFullHeader={true} />
 
       {/* ---------- HERO SECTION ---------- */}
@@ -29,7 +39,7 @@ export default function EmpowerMinistryLeadersPage() {
       >
         <div className="absolute inset-0 bg-black/60"></div>
         <div className="relative z-10">
-          <p className="text-xs text-white/80 mb-2">
+          <p className="text-xs text-white/80 mb-40">
             Revitalization Roadmap &gt;{" "}
             <span className="text-white font-medium">
               Church Empowerment Phase
@@ -171,11 +181,7 @@ export default function EmpowerMinistryLeadersPage() {
                 {/* Upload / Re-upload Button */}
                 <div className="flex justify-end">
                   <button
-                    onClick={() =>
-                      uploadedFile
-                        ? setIsCompleted(false)
-                        : document.getElementById("file-upload")?.click()
-                    }
+                    onClick={handleUploadClick}
                     className="bg-transparent border border-[#A6B8E8] hover:bg-[#103C8C] hover:text-white transition text-[#E8ECFF] text-sm font-medium px-6 py-2 rounded-md shadow-sm"
                   >
                     {uploadedFile ? "Re-Upload" : "Upload"}
@@ -193,6 +199,19 @@ export default function EmpowerMinistryLeadersPage() {
           </div>
         </div>
       </main>
+
+      {/* ✅ SUCCESS POPUP */}
+      {showPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+          <div className="bg-white text-[#0F4A85] px-8 py-5 rounded-xl shadow-lg flex items-center gap-3 fade-in">
+            <div className="bg-[#3DBE72] text-white w-6 h-6 flex items-center justify-center rounded-full">
+              <i className="fa-solid fa-check text-xs"></i>
+            </div>
+            <p className="font-medium text-[15px]">Document Uploaded Successfully</p>
+          </div>
+        </div>
+      )}
+
 
     </div>
   );

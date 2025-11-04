@@ -1,47 +1,70 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
-import HeroBg from "../../Assets/jumpstart-hero.png"; // 🖼 replace with correct hero image
+import HeroBg from "../../Assets/jumpstart-hero.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import { useRouter } from "next/navigation";
 
 export default function CommunityEngagementProject() {
-     const router = useRouter();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "comments" | "queries">("overview");
   const [selectedDate, setSelectedDate] = useState("");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [isCompleted, setIsCompleted] = useState(false);
 
-  // Handle upload
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const uploaded = event.target.files?.[0];
-    if (uploaded) {
-      setUploadedFile(uploaded);
-      setIsCompleted(true);
-    }
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [completedOn, setCompletedOn] = useState<string>(""); // formatted date
+  const [showToast, setShowToast] = useState(false);
+
+  // Format helper
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+
+  // When a file is chosen
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0] ?? null;
+    setUploadedFile(f);
   };
+
+  // Clicking the Upload button -> toast + complete state
+  const handleUpload = () => {
+    // Optional: guard if no file selected
+    // if (!uploadedFile) { alert("Please choose a file to upload."); return; }
+
+    const dateToUse = selectedDate ? fmt(new Date(selectedDate)) : fmt(new Date());
+    setCompletedOn(dateToUse);
+
+    // show toast briefly, then mark completed
+    setShowToast(true);
+    setTimeout(() => {
+      setShowToast(false);
+      setIsCompleted(true);
+    }, 1400);
+  };
+
+  // Re-Upload resets state (keeps previous date typed so user can change if needed)
+  const handleReupload = () => {
+    setIsCompleted(false);
+    setUploadedFile(null);
+  };
+
+  const crumbs = useMemo(
+    () =>
+      `Revitalization Roadmap > Church Empowerment Phase > Community Engagement Project`,
+    []
+  );
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0F4A85]">
-      <PastorHeader showFullHeader={true} />
+      <PastorHeader showFullHeader />
 
-      {/* HERO SECTION */}
+      {/* HERO */}
       <section
         className="relative h-[320px] bg-cover bg-center text-white flex flex-col justify-end px-20 pb-10"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-black/60"></div>
+        <div className="absolute inset-0 bg-black/60" />
         <div className="relative z-10">
-          <p className="text-xs text-white/80 mb-2">
-            Revitalization Roadmap &gt;{" "}
-            <span className="text-white font-medium">
-              Church Empowerment Phase
-            </span>{" "}
-            &gt; Community Engagement Project
-          </p>
+          <p className="text-xs text-white/80 mb-40">{crumbs}</p>
 
-          {/* Title & Completion Info */}
           <div className="flex items-center gap-3 mb-2">
             {isCompleted && (
               <>
@@ -49,7 +72,7 @@ export default function CommunityEngagementProject() {
                   Completed
                 </span>
                 <span className="bg-white/20 text-white text-xs px-3 py-[3px] rounded-md">
-                  Completed on 20 Oct 2024
+                  Completed on {completedOn}
                 </span>
               </>
             )}
@@ -62,11 +85,10 @@ export default function CommunityEngagementProject() {
         </div>
       </section>
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white pb-24">
+      {/* MAIN */}
+      <main className="relative flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white pb-24">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-10">
-
-          {/* LEFT PANEL */}
+          {/* LEFT NAV */}
           <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 w-full h-fit">
             {[
               { key: "overview", label: "Over View" },
@@ -75,7 +97,7 @@ export default function CommunityEngagementProject() {
             ].map((item) => (
               <button
                 key={item.key}
-                onClick={() => setActiveTab(item.key)}
+                onClick={() => setActiveTab(item.key as typeof activeTab)}
                 className={`flex justify-between items-center px-4 py-3 rounded-md text-sm font-medium transition-all ${
                   activeTab === item.key
                     ? "bg-[#103C8C] text-white shadow-sm"
@@ -100,48 +122,37 @@ export default function CommunityEngagementProject() {
 
           {/* RIGHT CONTENT */}
           <div>
-            {activeTab === "overview" && (
+            {activeTab === "overview" ? (
               <>
-                {/* HEADER */}
                 <div className="flex justify-between items-center mb-2">
                   <h2 className="text-xl font-semibold">Over View</h2>
                   <button className="bg-white rounded-md w-8 h-8 flex items-center justify-center text-[#103C8C] hover:bg-gray-100">
-                    <i className="fa-solid fa-ellipsis-vertical"></i>
+                    <i className="fa-solid fa-ellipsis-vertical" />
                   </button>
                 </div>
                 <hr className="border-t border-white/40 mb-8" />
 
-                {/* PASTORAL ROADMAP */}
+                {/* Pastoral Roadmap */}
                 <div className="mb-6">
-                  <h3 className="text-sm font-semibold mb-2">
-                    Pastoral Roadmap
-                  </h3>
-                  <div
-                    className={`border border-[#5A8DCB] rounded-md p-3 text-sm bg-transparent text-white/90 ${
-                      isCompleted ? "opacity-75" : ""
-                    }`}
-                  >
+                  <h3 className="text-sm font-semibold mb-2">Pastoral Roadmap</h3>
+                  <div className={`border border-[#5A8DCB] rounded-md p-3 text-sm bg-transparent text-white/90 ${isCompleted ? "opacity-75" : ""}`}>
                     The church will complete a community engagement project
                   </div>
                 </div>
 
-                {/* DESCRIPTION */}
+                {/* Description */}
                 <div className="mb-6">
                   <h3 className="text-sm font-semibold mb-2">Description</h3>
-                  <div
-                    className={`border border-[#5A8DCB] rounded-md p-3 text-sm text-white/90 bg-transparent ${
-                      isCompleted ? "opacity-75" : ""
-                    }`}
-                  >
-                    Complete a community engagement project with the
-                    member/discipleship and share the stories of God&apos;s work
+                  <div className={`border border-[#5A8DCB] rounded-md p-3 text-sm text-white/90 bg-transparent ${isCompleted ? "opacity-75" : ""}`}>
+                    Complete a community engagement project with the member/discipleship and share
+                    the stories of God&apos;s work
                   </div>
                 </div>
 
-                {/* PROJECT DATE */}
+                {/* Project Date */}
                 <div className="mb-8">
                   <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                    <i className="fa-regular fa-calendar text-white/80 text-[14px]"></i>
+                    <i className="fa-regular fa-calendar text-white/80 text-[14px]" />
                     Project Date
                   </h3>
                   <div className="relative w-[250px]">
@@ -157,19 +168,20 @@ export default function CommunityEngagementProject() {
                   </div>
                 </div>
 
-                {/* AFTER UPLOAD VIEW */}
+                {/* Completed vs Upload UI */}
                 {isCompleted ? (
-                  <div className="flex justify-between items-center w-full max-w-lg">
-                    <button className="bg-white text-[#103C8C] hover:bg-gray-100 text-sm font-medium px-6 py-2 rounded-md shadow-sm"
-                     onClick={() => router.push(`/pastor/SharedMedia`)}
+                  <div className="flex flex-wrap gap-3 items-center w-full max-w-lg">
+                  <a href="/pastor/SharedMedia">
+                    <button
+                      className="bg-white text-[#103C8C] hover:bg-gray-100 text-sm font-medium px-6 py-2 rounded-md shadow-sm"
                     >
                       View your Shared Media
                     </button>
+                  </a>
+                   
+
                     <button
-                      onClick={() => {
-                        setUploadedFile(null);
-                        setIsCompleted(false);
-                      }}
+                      onClick={handleReupload}
                       className="bg-transparent border border-white hover:bg-[#103C8C] hover:text-white text-white text-sm font-medium px-6 py-2 rounded-md shadow-sm"
                     >
                       Re-Upload
@@ -177,38 +189,33 @@ export default function CommunityEngagementProject() {
                   </div>
                 ) : (
                   <>
-                    {/* UPLOAD SECTION */}
+                    {/* Upload field */}
                     <div className="mb-10">
                       <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                        <i className="fa-regular fa-file-arrow-up text-white/80 text-[14px]"></i>
+                        <i className="fa-regular fa-file-arrow-up text-white/80 text-[14px]" />
                         Upload Video / Pictures
                       </h3>
 
-                      {/* Upload Box */}
                       <label
                         htmlFor="file-upload"
                         className="border-2 border-dashed border-[#5A8DCB] rounded-md bg-transparent text-center flex flex-col items-center justify-center h-[160px] cursor-pointer hover:bg-[#174F8A]/20 transition"
                       >
-                        <input
-                          type="file"
-                          id="file-upload"
-                          className="hidden"
-                          onChange={handleFileUpload}
-                        />
-                        <i className="fa-solid fa-plus text-white text-xl mb-2"></i>
-                        <p className="text-sm text-white/80">
-                          Drag & Drop or Click here to choose file
-                        </p>
-                        <p className="text-xs text-white/50 mt-1">
-                          Max file size : 10 MB
-                        </p>
+                        <input id="file-upload" type="file" className="hidden" onChange={handleFileUpload} />
+                        <i className="fa-solid fa-plus text-white text-xl mb-2" />
+                        <p className="text-sm text-white/80">Drag & Drop or Click here to choose file</p>
+                        <p className="text-xs text-white/50 mt-1">Max file size : 10 MB</p>
+                        {uploadedFile && (
+                          <span className="mt-2 text-xs text-white/80">
+                            Selected: <b>{uploadedFile.name}</b>
+                          </span>
+                        )}
                       </label>
                     </div>
 
-                    {/* UPLOAD BUTTON */}
+                    {/* Upload button */}
                     <div className="flex justify-end">
                       <button
-                        onClick={() => setIsCompleted(true)}
+                        onClick={handleUpload}
                         className="bg-transparent border border-[#A6B8E8] hover:bg-[#103C8C] hover:text-white transition text-[#E8ECFF] text-sm font-medium px-6 py-2 rounded-md shadow-sm"
                       >
                         Upload
@@ -217,18 +224,29 @@ export default function CommunityEngagementProject() {
                   </>
                 )}
               </>
-            )}
-
-            {/* OTHER TABS PLACEHOLDER */}
-            {activeTab !== "overview" && (
-              <div className="text-white/70 text-sm mt-10">
-                Under Construction
-              </div>
+            ) : (
+              <div className="text-white/70 text-sm mt-10">Under Construction</div>
             )}
           </div>
         </div>
+
+        {/* SUCCESS TOAST */}
+        {showToast && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center">
+            {/* light blur overlay */}
+            <div className="absolute inset-0 backdrop-blur-[1.5px]" />
+            <div className="relative bg-white text-[#0B1C58] rounded-xl shadow-2xl px-6 py-4 flex items-center gap-3">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#3DBE72] text-white">
+                <i className="fa-solid fa-check" />
+              </span>
+              <span className="text-sm font-semibold">Project Submitted Successfully</span>
+            </div>
+          </div>
+        )}
       </main>
 
+      {/* (Optional) footer if you need it */}
+      {/* <PastorFooter /> */}
     </div>
   );
 }

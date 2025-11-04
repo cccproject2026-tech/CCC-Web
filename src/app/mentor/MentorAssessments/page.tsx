@@ -9,6 +9,7 @@ import Card2 from "@/app/Assets/card2.png";
 import Card3 from "@/app/Assets/card3.png";
 import Card4 from "@/app/Assets/card4.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import MentorHeader from "@/app/Components/MentorHeader";
 
 export default function MentorAssessments() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -70,7 +71,7 @@ export default function MentorAssessments() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0A3C8C] text-[#0B1C58]">
-      <PastorHeader showFullHeader={true} />
+      <MentorHeader showFullHeader={true} />
 
       {/* HERO */}
       <section

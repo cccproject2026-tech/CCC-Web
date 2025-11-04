@@ -3,6 +3,7 @@ import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { useState } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import MentorHeader from "@/app/Components/MentorHeader";
 // import PlaneIcon from "@/app/Assets/send-plane.png"; // add your paper-plane image here
 
 export default function NotificationsPage() {
@@ -109,7 +110,7 @@ export default function NotificationsPage() {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#0E458A] to-[#1B5FA9] relative">
       {/* 🟣 HEADER */}
-      <PastorHeader showFullHeader={true} />
+      <MentorHeader showFullHeader={true} />
 
       {/* 🟦 MAIN CONTENT */}
       <main className="flex-1 px-20 py-10 text-white overflow-y-auto">

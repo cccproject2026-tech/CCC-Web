@@ -2,7 +2,7 @@
 import { useState } from "react";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
-import HeroBg from "../../Assets/jumpstart-hero.png"; // 🖼 Replace with correct hero
+import HeroBg from "../../Assets/jumpstart-hero.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 export default function InactiveMemberList() {
@@ -11,43 +11,43 @@ export default function InactiveMemberList() {
   const [meeting1Count, setMeeting1Count] = useState("");
   const [meeting2Date, setMeeting2Date] = useState("");
   const [meeting2Count, setMeeting2Count] = useState("");
+  const [showPopup, setShowPopup] = useState(false);
 
+  // ✅ Show popup when submit is clicked
   const handleSubmit = (meeting: string) => {
     console.log(`${meeting} submitted`);
+    setShowPopup(true);
+    setTimeout(() => setShowPopup(false), 2000); // auto-hide after 2s
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F4A85]">
+    <div className="min-h-screen flex flex-col bg-[#0F4A85] relative">
       <PastorHeader showFullHeader={true} />
 
-      {/* HERO SECTION */}
+      {/* ---------- HERO SECTION ---------- */}
       <section
         className="relative h-[320px] bg-cover bg-center text-white flex flex-col justify-end px-20 pb-10"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-black/60"></div>
         <div className="relative z-10">
-          <p className="text-xs text-white/80 mb-2">
+          <p className="text-xs text-white/80 mb-40">
             Revitalization Roadmap &gt;{" "}
             <span className="text-white font-medium">
               Community Revitalization and Multiplication Phase
             </span>{" "}
             &gt; Inactive Member List
           </p>
-
           <h1 className="text-3xl font-semibold mb-1">Inactive Member List</h1>
-          <p className="text-white/70 text-sm">
-            Completion Time Months 10 – 12
-          </p>
+          <p className="text-white/70 text-sm">Completion Time Months 10 – 12</p>
         </div>
       </section>
 
-      {/* MAIN CONTENT */}
+      {/* ---------- MAIN SECTION ---------- */}
       <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white pb-24">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-10">
-
           {/* LEFT PANEL */}
-          <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 w-full h-fit">
+          <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 h-fit">
             {[
               { key: "overview", label: "Over View" },
               { key: "comments", label: "Comments", count: 2 },
@@ -82,7 +82,7 @@ export default function InactiveMemberList() {
           <div>
             {activeTab === "overview" && (
               <>
-                {/* HEADER */}
+                {/* Header */}
                 <div className="flex justify-between items-center mb-2">
                   <h2 className="text-xl font-semibold">Over View</h2>
                   <button className="bg-white rounded-md w-8 h-8 flex items-center justify-center text-[#103C8C] hover:bg-gray-100">
@@ -91,26 +91,23 @@ export default function InactiveMemberList() {
                 </div>
                 <hr className="border-t border-white/40 mb-8" />
 
-                {/* CHURCH ROADMAP */}
+                {/* Church Roadmap */}
                 <div className="mb-6">
-                  <h3 className="text-sm font-semibold mb-2">
-                    Church Roadmap
-                  </h3>
-                  <div className="border border-[#5A8DCB] rounded-md p-3 text-sm bg-transparent text-white/90">
+                  <h3 className="text-sm font-semibold mb-2">Church Roadmap</h3>
+                  <div className="border border-[#5A8DCB] rounded-md p-3 text-sm text-white/90">
                     Develop an inactive member list
                   </div>
                 </div>
 
-                {/* DESCRIPTION */}
+                {/* Description */}
                 <div className="mb-6">
                   <h3 className="text-sm font-semibold mb-2">Description</h3>
-                  <div className="border border-[#5A8DCB] rounded-md p-3 text-sm text-white/90 bg-transparent">
-                    Input a meeting date that the inactive member list was
-                    reviewed
+                  <div className="border border-[#5A8DCB] rounded-md p-3 text-sm text-white/90">
+                    Input a meeting date that the inactive member list was reviewed
                   </div>
                 </div>
 
-                {/* MEETING 1 */}
+                {/* Meeting 1 */}
                 <div className="bg-[#0F4A85]/60 rounded-lg p-6 mb-6 border border-[#5A8DCB]/60">
                   <h3 className="text-base font-semibold mb-3">Meeting 1</h3>
                   <div className="mb-4">
@@ -142,7 +139,7 @@ export default function InactiveMemberList() {
                   </div>
                 </div>
 
-                {/* MEETING 2 */}
+                {/* Meeting 2 */}
                 <div className="bg-[#0F4A85]/60 rounded-lg p-6 border border-[#5A8DCB]/60">
                   <h3 className="text-base font-semibold mb-3">Meeting 2</h3>
                   <div className="mb-4">
@@ -176,17 +173,27 @@ export default function InactiveMemberList() {
               </>
             )}
 
-            {/* COMMENTS & QUERIES PLACEHOLDER */}
+            {/* Other Tabs */}
             {activeTab !== "overview" && (
-              <div className="text-white/70 text-sm mt-10">
-                Under Construction
-              </div>
+              <div className="text-white/70 text-sm mt-10">Under Construction</div>
             )}
           </div>
         </div>
       </main>
 
-   
+      {/* ✅ Popup (Task Completed) */}
+      {showPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+          <div className="bg-white text-[#0F4A85] px-8 py-5 rounded-xl shadow-lg flex items-center gap-3 fade-in">
+            <div className="bg-[#3DBE72] text-white w-6 h-6 flex items-center justify-center rounded-full">
+              <i className="fa-solid fa-check text-xs"></i>
+            </div>
+            <p className="font-medium text-[15px]">Task Completed</p>
+          </div>
+        </div>
+      )}
+
+    
     </div>
   );
 }

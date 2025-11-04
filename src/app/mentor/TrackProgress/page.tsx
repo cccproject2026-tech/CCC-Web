@@ -7,6 +7,7 @@ import HeroBg from "@/app/Assets/progress-bg.png";
 import PastorImg from "@/app/Assets/mentor1.png"; // 👤 example pastor image
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { useRouter } from "next/navigation";
+import MentorHeader from "@/app/Components/MentorHeader";
 
 
 export default function TrackProgressPage() {
@@ -35,7 +36,7 @@ export default function TrackProgressPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white">
-      <PastorHeader showFullHeader />
+      <MentorHeader showFullHeader />
 
       {/* HERO SECTION */}
       <section

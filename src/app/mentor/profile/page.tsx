@@ -4,6 +4,7 @@ import { useState } from "react";
 import PastorHeader from "@/app/Components/PastorHeader";
 import ProfilePic from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import MentorHeader from "@/app/Components/MentorHeader";
 
 export default function MentorProfile() {
   const [isEditing, setIsEditing] = useState(false);
@@ -26,7 +27,7 @@ export default function MentorProfile() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#103C8C] to-[#1A4B9A] text-white">
       {/* HEADER */}
-      <PastorHeader showFullHeader={true} />
+      <MentorHeader showFullHeader={true} />
 
       {/* MAIN CONTENT */}
       <main className="px-10 py-8 flex justify-center">

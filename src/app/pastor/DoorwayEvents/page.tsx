@@ -2,7 +2,7 @@
 import { useState } from "react";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
-import HeroBg from "../../Assets/jumpstart-hero.png"; // 🖼 replace with correct hero image
+import HeroBg from "../../Assets/jumpstart-hero.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 export default function DoorwayEvents() {
@@ -10,23 +10,26 @@ export default function DoorwayEvents() {
   const [event1Date, setEvent1Date] = useState("");
   const [event2Date, setEvent2Date] = useState("");
   const [event3Date, setEvent3Date] = useState("");
+  const [showPopup, setShowPopup] = useState(false);
 
   const handleSubmit = () => {
-    console.log("Submitted doorway events data");
+    console.log("Doorway events submitted");
+    setShowPopup(true);
+    setTimeout(() => setShowPopup(false), 2000); // popup auto-hides after 2s
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F4A85]">
+    <div className="min-h-screen flex flex-col bg-[#0F4A85] relative">
       <PastorHeader showFullHeader={true} />
 
-      {/* HERO SECTION */}
+      {/* ---------- HERO SECTION ---------- */}
       <section
         className="relative h-[320px] bg-cover bg-center text-white flex flex-col justify-end px-20 pb-10"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-black/60"></div>
         <div className="relative z-10">
-          <p className="text-xs text-white/80 mb-2">
+          <p className="text-xs text-white/80 mb-40">
             Revitalization Roadmap &gt;{" "}
             <span className="text-white font-medium">
               Community Revitalization and Multiplication Phase
@@ -35,18 +38,16 @@ export default function DoorwayEvents() {
           </p>
 
           <h1 className="text-3xl font-semibold mb-1">Doorway Events</h1>
-          <p className="text-white/70 text-sm">
-            Completion Time Months 10 – 12
-          </p>
+          <p className="text-white/70 text-sm">Completion Time Months 10 – 12</p>
         </div>
       </section>
 
-      {/* MAIN CONTENT */}
+      {/* ---------- MAIN CONTENT ---------- */}
       <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white pb-24">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-10">
 
-          {/* LEFT SIDEBAR */}
-          <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 w-full h-fit">
+          {/* LEFT PANEL */}
+          <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 h-fit">
             {[
               { key: "overview", label: "Over View" },
               { key: "comments", label: "Comments", count: 2 },
@@ -92,10 +93,8 @@ export default function DoorwayEvents() {
 
                 {/* CHURCH ROADMAP */}
                 <div className="mb-6">
-                  <h3 className="text-sm font-semibold mb-2">
-                    Church Roadmap
-                  </h3>
-                  <div className="border border-[#5A8DCB] rounded-md p-3 text-sm bg-transparent text-white/90">
+                  <h3 className="text-sm font-semibold mb-2">Church Roadmap</h3>
+                  <div className="border border-[#5A8DCB] rounded-md p-3 text-sm text-white/90">
                     Invite inactive members
                   </div>
                 </div>
@@ -103,13 +102,12 @@ export default function DoorwayEvents() {
                 {/* DESCRIPTION */}
                 <div className="mb-6">
                   <h3 className="text-sm font-semibold mb-2">Description</h3>
-                  <div className="border border-[#5A8DCB] rounded-md p-3 text-sm text-white/90 bg-transparent">
-                    Schedule at least 3 intentional “doorway” events on your
-                    church calendar and invite inactive members to attend
+                  <div className="border border-[#5A8DCB] rounded-md p-3 text-sm text-white/90">
+                    Schedule at least 3 intentional “doorway” events on your church calendar and invite inactive members to attend.
                   </div>
                 </div>
 
-                {/* DATE FIELDS */}
+                {/* EVENT DATE INPUTS */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div>
                     <label className="block text-sm mb-1">Date of Event 1</label>
@@ -163,7 +161,6 @@ export default function DoorwayEvents() {
               </>
             )}
 
-            {/* COMMENTS & QUERIES PLACEHOLDER */}
             {activeTab !== "overview" && (
               <div className="text-white/70 text-sm mt-10">
                 Under Construction
@@ -172,6 +169,20 @@ export default function DoorwayEvents() {
           </div>
         </div>
       </main>
+
+      {/* ✅ POPUP */}
+      {showPopup && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
+          <div className="bg-white text-[#0F4A85] px-8 py-5 rounded-xl shadow-lg flex items-center gap-3 fade-in">
+            <div className="bg-[#3DBE72] text-white w-6 h-6 flex items-center justify-center rounded-full">
+              <i className="fa-solid fa-check text-xs"></i>
+            </div>
+            <p className="font-medium text-[15px]">Task Completed</p>
+          </div>
+        </div>
+      )}
+
+    
     </div>
   );
 }
