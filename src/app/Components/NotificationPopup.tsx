@@ -1,0 +1,189 @@
+"use client";
+import { useEffect, useRef } from "react";
+
+interface NotificationPopupProps {
+  isOpen: boolean;
+  onClose: () => void;
+  notifications?: Array<{
+    id: string;
+    icon: string;
+    iconColor: string;
+    title: string;
+    subtitle?: string;
+    link?: string;
+    linkText?: string;
+    time: string;
+    isStarred?: boolean;
+    avatarGroup?: boolean;
+    count?: string;
+  }>;
+}
+
+export default function NotificationPopup({
+  isOpen,
+  onClose,
+  notifications = [],
+}: NotificationPopupProps) {
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        popupRef.current &&
+        !popupRef.current.contains(event.target as Node)
+      ) {
+        onClose();
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const defaultNotifications = [
+    {
+      id: "1",
+      icon: "fa-solid fa-user-plus",
+      iconColor: "text-blue-500",
+      title: "NEW MENTEE ASSIGNMENT",
+      subtitle: "Pr. John Doe has been assigned to you Lorem Ipsum",
+      time: "9:43 am",
+      isStarred: true,
+    },
+    {
+      id: "2",
+      icon: "fa-regular fa-clipboard",
+      iconColor: "text-cyan-500",
+      title: "ROADMAP NOTIFICATION",
+      subtitle: "Roadmap: Complete a Community Engagement Project",
+      time: "9:43 am",
+      isStarred: true,
+    },
+    {
+      id: "3",
+      icon: "fa-regular fa-file",
+      iconColor: "text-yellow-600",
+      title: "NEW ASSIGNMENT SUBMISSION",
+      avatarGroup: true,
+      count: "3+ Mentees",
+      link: "Click here to Review",
+      time: "9:43 am",
+      isStarred: true,
+    },
+    {
+      id: "4",
+      icon: "fa-regular fa-book",
+      iconColor: "text-green-600",
+      title: "COURSE COMPLETION",
+      avatarGroup: true,
+      count: "3+ Mentees",
+      link: "Mark program as completed",
+      time: "9:43 am",
+    },
+    {
+      id: "5",
+      icon: "fa-solid fa-link",
+      iconColor: "text-red-500",
+      title: "PROFILE INCOMPLETE",
+      avatarGroup: true,
+      count: "4+ Mentees",
+      link: "Click here for more details",
+      time: "9:43 am",
+    },
+  ];
+
+  const displayNotifications =
+    notifications.length > 0 ? notifications : defaultNotifications;
+
+  return (
+    <div
+      ref={popupRef}
+      className="absolute top-[60px] right-10 w-[420px] max-h-[600px] bg-white rounded-xl shadow-2xl overflow-hidden z-50 animate-slide-down"
+    >
+      {/* Header */}
+      <div className="bg-gradient-to-r from-[#2E3B8E] to-[#4A5FB8] px-6 py-4 flex justify-between items-center">
+        <h3 className="text-white font-semibold text-[17px]">Notifications</h3>
+        <a
+          href="/director/notifications"
+          className="text-white text-[13px] hover:underline"
+        >
+          View All
+        </a>
+      </div>
+
+      {/* Notification List */}
+      <div className="max-h-[500px] overflow-y-auto">
+        {displayNotifications.map((notification) => (
+          <div
+            key={notification.id}
+            className="border-b border-gray-100 px-6 py-4 hover:bg-gray-50 transition relative"
+          >
+            <div className="flex gap-4">
+              {/* Icon */}
+              <div className="flex-shrink-0 mt-1">
+                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                  <i
+                    className={`${notification.icon} ${notification.iconColor}`}
+                  ></i>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1">
+                <h4 className="text-[13px] font-semibold text-gray-900 mb-1">
+                  {notification.title}
+                </h4>
+
+                {notification.avatarGroup && (
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex -space-x-2">
+                      <div className="w-5 h-5 rounded-full bg-gray-300 border-2 border-white"></div>
+                      <div className="w-5 h-5 rounded-full bg-gray-400 border-2 border-white"></div>
+                      <div className="w-5 h-5 rounded-full bg-gray-500 border-2 border-white"></div>
+                    </div>
+                    <span className="text-[11px] text-gray-600">
+                      {notification.count}
+                    </span>
+                  </div>
+                )}
+
+                {notification.subtitle && (
+                  <p className="text-[12px] text-gray-600 mb-1">
+                    {notification.subtitle}
+                  </p>
+                )}
+
+                {notification.link && (
+                  <a
+                    href="#"
+                    className="text-[12px] text-[#2E3B8E] hover:underline"
+                  >
+                    {notification.linkText || notification.link}
+                  </a>
+                )}
+
+                <p className="text-[11px] text-gray-400 mt-2">
+                  {notification.time}
+                </p>
+              </div>
+
+              {/* Star Icon */}
+              {notification.isStarred && (
+                <div className="flex-shrink-0">
+                  <i className="fa-solid fa-star text-[#FFD700] text-sm"></i>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
