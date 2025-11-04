@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import AppHeader from "@/app/Components/Header/AppHeader";
 import AppHero from "@/app/Components/Hero/AppHero";
 import AppFooter from "@/app/Components/AppFooter";
@@ -12,12 +12,9 @@ import ProfileForm, {
 } from "@/app/Components/ProfileForm";
 import MentorBg from "@/app/Assets/mentor-bg.png";
 
-export default function EditMentorProfilePage({
-  params,
-}: {
-  params: { id: string };
-}) {
+export default function EditMentorProfilePage() {
   const router = useRouter();
+  const params = useParams();
 
   // Seed data – replace with real fetch later
   const [personal, setPersonal] = useState<PersonalInfo>({

@@ -17,11 +17,10 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import PastorFooter from "@/app/Components/PastorFooter";
-import { useRouter } from "next/navigation"; 
+import { useRouter } from "next/navigation";
 
 export default function PastorDashboard() {
-
-    const router = useRouter();
+  const router = useRouter();
   return (
     <div className="min-h-screen flex flex-col">
       <PastorHeader showFullHeader={true} />
@@ -32,56 +31,10 @@ export default function PastorDashboard() {
       >
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-transparent"></div>
 
-  
-<section
-  className="relative bg-cover bg-top text-white h-[450px] flex flex-col justify-between px-20 pt-6 pb-10"
-  style={{ backgroundImage: `url(${HeroBg.src})` }}
->
-
-  <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-transparent"></div>
-
-
-  <div className="relative z-10 flex justify-end">
-    <div className="text-right">
-      <div className="text-3xl font-bold tracking-wide">11 : 59 AM</div>
-      <p className="text-sm text-white/80">Tuesday, Sep 23</p>
-    </div>
-  </div>
-
-
-  <div className="relative z-10 flex justify-between items-end">
- 
-    <div className="max-w-2xl">
-      <h1 className="text-4xl font-semibold leading-snug">
-        Cultivate Spiritual, Professional, Social, And Community–
-        <br />
-        Engagement Developments
-      </h1>
-    </div>
-
-  
-    <div className="flex flex-col items-end">
-      <p className="text-white/90 text-sm mb-2">Good Morning</p>
-
-      <div className="bg-white/15 backdrop-blur-md border border-white/30 rounded-md p-4 w-[280px] shadow-lg"
-       onClick={() =>router.push(`/pastor/profile`)}
-      >
-        <div className="flex items-center gap-3">
-          <Image
-            src={UserProfile}
-            alt="User"
-            width={42}
-            height={42}
-            className="rounded-full border border-white/40"
-          />
-          <div className="flex flex-col items-start">
-            <p className="text-xs text-white font-semibold">
-              John Ross, Welcome Aboard!
-            </p>
-            <div className="w-[120px] h-2 bg-white/30 rounded-full mt-1">
-              <div className="h-2 bg-[#00B3FF] rounded-full w-[70%]" />
-            </div>
-            <p className="text-[10px] mt-1 text-white/70">Progress 70%</p>
+        <div className="relative z-10 flex justify-end">
+          <div className="text-right">
+            <div className="text-3xl font-bold tracking-wide">11 : 59 AM</div>
+            <p className="text-sm text-white/80">Tuesday, Sep 23</p>
           </div>
         </div>
 
@@ -97,7 +50,10 @@ export default function PastorDashboard() {
           <div className="flex flex-col items-end">
             <p className="text-white/90 text-sm mb-2">Good Morning</p>
 
-            <div className="bg-white/15 backdrop-blur-md border border-white/30 rounded-md p-4 w-[280px] shadow-lg">
+            <div
+              className="bg-white/15 backdrop-blur-md border border-white/30 rounded-md p-4 w-[280px] shadow-lg cursor-pointer"
+              onClick={() => router.push(`/pastor/profile`)}
+            >
               <div className="flex items-center gap-3">
                 <Image
                   src={UserProfile}
@@ -225,8 +181,9 @@ export default function PastorDashboard() {
                 className="w-[65px] h-[65px]"
               />
               <div className="absolute inset-0 flex items-center justify-center">
-                <button className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center hover:scale-110 transition"
-                   onClick={() =>router.push(`/pastor/VideoPage`)}
+                <button
+                  className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center hover:scale-110 transition"
+                  onClick={() => router.push(`/pastor/VideoPage`)}
                 >
                   <i className="fa-solid fa-play text-[#103C8C] text-sm"></i>
                 </button>
@@ -317,14 +274,22 @@ export default function PastorDashboard() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {mentorsData.map((mentor) => (
+          {[
+            { img: Mentor1, name: "John Doe", role: "Mentor" },
+            { img: Mentor2, name: "Jacob Jones", role: "Field Mentor" },
+            { img: Mentor3, name: "Robert Fox", role: "Field Mentor" },
+            { img: Mentor1, name: "John Doe", role: "Mentor" },
+          ].map((mentor, i) => (
             <div
-              key={mentor.id}
+              key={i}
               className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 p-3"
             >
-              <div className="relative">
+              <div
+                className="relative"
+                onClick={() => router.push(`/pastor/Mymentors`)}
+              >
                 <img
-                  src={mentor.image.src}
+                  src={mentor.img.src}
                   alt={mentor.name}
                   className="w-full h-[180px] object-cover"
                 />
@@ -362,103 +327,7 @@ export default function PastorDashboard() {
         </div>
       </section>
 
-        {/* top icon */}
-        <div className="relative z-10">
-          <i className={`${item.icon} text-2xl text-white mb-4`}></i>
-        </div>
-
-        {/* title + desc */}
-        <div className="relative z-10">
-          <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
-          <p className="text-sm text-white/80 leading-snug">{item.desc}</p>
-        </div>
-
-        {/* bottom right "More" link */}
-        <div className="relative z-10 flex justify-end mt-6">
-          <button className="flex items-center gap-2 text-sm font-medium text-white hover:text-[#BFD9FF]">
-            More
-            <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
-          </button>
-        </div>
-      </div>
-    ))}
-  </div>
-</section>
-
-
-
-<section className="py-16 px-20 bg-[#F2F6FC]">
-
-  <div className="flex justify-between items-center mb-8">
-    <h2 className="text-[22px] font-semibold text-[#000]">My Mentors</h2>
-    <a
-      href="#"
-      className="text-[#103C8C] text-sm font-medium hover:underline hover:text-[#0D2E6E]"
-    >
-      See all
-    </a>
-  </div>
-
- 
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-    {[
-      { img: Mentor1, name: "John Doe", role: "Mentor" },
-      { img: Mentor2, name: "Jacob Jones", role: "Field Mentor" },
-      { img: Mentor3, name: "Robert Fox", role: "Field Mentor" },
-      { img: Mentor1, name: "John Doe", role: "Mentor" },
-    ].map((mentor, i) => (
-      <div
-        key={i}
-        className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 p-3"
-      >
-     
-        <div className="relative" onClick={() =>router.push(`/pastor/Mymentors`)}>
-          <img
-            src={mentor.img.src}
-            alt={mentor.name}
-            className="w-full h-[180px] object-cover"
-          />
-          <button className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center bg-white/80 rounded-full text-[#0B1C58] hover:bg-white shadow">
-            <i className="fa-solid fa-ellipsis-vertical text-sm"></i>
-          </button>
-        </div>
-
-      
-        <div className="p-4">
-          <h4 className="font-semibold text-gray-900 text-[16px] leading-tight mb-1">
-            {mentor.name}
-          </h4>
-          <p className="text-sm text-gray-500">{mentor.role}</p>
-          <p className="text-[13px] text-gray-400 mt-2">
-            Sub text area write something here.
-            <br />
-            That you can read more
-          </p>
-
-       
-          <div className="flex justify-between items-center mt-5">
-            <div className="flex gap-4 text-[#103C8C] text-[14px]">
-              <i className="fa-regular fa-envelope cursor-pointer hover:text-[#0B1C58]"></i>
-              <i className="fa-regular fa-comment cursor-pointer hover:text-[#0B1C58]"></i>
-              <i className="fa-solid fa-phone cursor-pointer hover:text-[#0B1C58]"></i>
-              <i className="fa-brands fa-whatsapp cursor-pointer hover:text-[#0B1C58]"></i>
-            </div>
-
-        
-            <button className="w-8 h-8 flex items-center justify-center rounded-md border border-[#103C8C]/30 text-[#103C8C] hover:bg-[#103C8C] hover:text-white transition">
-              <i className="fa-solid fa-arrow-up-right-from-square text-[11px]"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-    ))}
-  </div>
-</section>
-
-
-
-   
-      <PastorFooter/>
+      <PastorFooter />
     </div>
   );
 }

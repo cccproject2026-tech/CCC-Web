@@ -7,6 +7,7 @@ import Connecticon from "../Assets/Connect-icon.png";
 import NotificationIcon from "../Assets/notification.png";
 import SearchIcon from "../Assets/search.png";
 import UserProfile from "../Assets/user-profile.png";
+import NotificationPopup from "./NotificationPopup";
 import {
   Clipboard,
   FileText,
@@ -99,9 +100,21 @@ export default function PastorHeader({ showFullHeader = false }) {
   ];
 
   const settingsSubMenu = [
-    { icon: <Lock size={18} className="text-[#0033A0]" />, label: "Change Password", active: true },
-    { icon: <BellOff size={18} className="text-[#0033A0]" />, label: "Turn Off Notifications", active: true },
-    { icon: <UserX size={18} className="text-gray-400" />, label: "Change Mentor", active: false },
+    {
+      icon: <Lock size={18} className="text-[#0033A0]" />,
+      label: "Change Password",
+      active: true,
+    },
+    {
+      icon: <BellOff size={18} className="text-[#0033A0]" />,
+      label: "Turn Off Notifications",
+      active: true,
+    },
+    {
+      icon: <UserX size={18} className="text-gray-400" />,
+      label: "Change Mentor",
+      active: false,
+    },
   ];
 
   return (
@@ -113,26 +126,25 @@ export default function PastorHeader({ showFullHeader = false }) {
 
       {/* ✅ Middle Nav Links */}
       {showFullHeader && (
-  <nav className="hidden lg:flex items-center gap-6">
-    {navLinks.map((link, index) => {
-      const isActive = pathname === link.path;
-      return (
-        <a
-          key={index}
-          href={link.path}
-          className={`text-sm cursor-pointer transition-all duration-200 ${
-            isActive
-              ? "font-semibold text-white"
-              : "text-white/80 hover:text-white"
-          }`}
-        >
-          {link.name}
-        </a>
-      );
-    })}
-  </nav>
-)}
-
+        <nav className="hidden lg:flex items-center gap-6">
+          {navLinks.map((link, index) => {
+            const isActive = pathname === link.path;
+            return (
+              <a
+                key={index}
+                href={link.path}
+                className={`text-sm cursor-pointer transition-all duration-200 ${
+                  isActive
+                    ? "font-semibold text-white"
+                    : "text-white/80 hover:text-white"
+                }`}
+              >
+                {link.name}
+              </a>
+            );
+          })}
+        </nav>
+      )}
 
       {/* ✅ Right Icons */}
       <div className="flex items-center gap-5 relative" ref={dropdownRef}>

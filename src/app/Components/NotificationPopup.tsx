@@ -165,7 +165,7 @@ export default function NotificationPopup({
                     href="#"
                     className="text-[12px] text-[#2E3B8E] hover:underline"
                   >
-                    {notification.linkText || notification.link}
+                    {'linkText' in notification && notification.linkText ? notification.linkText : notification.link}
                   </a>
                 )}
 

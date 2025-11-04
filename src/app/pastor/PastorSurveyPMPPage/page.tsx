@@ -389,7 +389,7 @@ export default function PastorSurveyPMPPage() {
 }
 
 /* 🔹 Reusable Question Block Component */
-function QuestionBlock({ title, options }) {
+function QuestionBlock({ title, options }: { title: string; options: string[] }) {
   return (
     <div className="border border-[#5A8DCB] rounded-md p-4 mb-4">
       <h4 className="font-semibold mb-2">{title}</h4>
@@ -404,7 +404,7 @@ function QuestionBlock({ title, options }) {
 }
 
 /* 🔹 Mentor Sidebar Component */
-function MentorSidebar({ selectedMentor, setSelectedMentor, handleMentorNext }) {
+function MentorSidebar({ selectedMentor, setSelectedMentor, handleMentorNext }: { selectedMentor: string | null; setSelectedMentor: (value: string) => void; handleMentorNext: () => void }) {
   return (
     <div className="fixed right-0 top-0 w-[400px] h-full bg-white shadow-2xl z-50 animate-slideIn flex flex-col">
       <div className="p-6 border-b">
@@ -470,7 +470,7 @@ function ScheduleSidebar({
   handleFinalSchedule,
   setShowScheduleSidebar,
   setShowMentorSidebar,
-}) {
+}: { handleFinalSchedule: () => void; setShowScheduleSidebar: (value: boolean) => void; setShowMentorSidebar: (value: boolean) => void }) {
   return (
     <div className="fixed right-0 top-0 w-[400px] h-full bg-white shadow-2xl z-50 animate-slideIn flex flex-col">
       <div className="p-6 border-b flex items-center gap-3">

@@ -733,8 +733,8 @@ export default function IndividualProgressPage() {
                   title={card.title}
                   description={card.description}
                   status={card.status}
-                  submittedDate={card.submittedDate}
-                  dueDate={card.dueDate}
+                  submittedDate={'submittedDate' in card ? card.submittedDate : undefined}
+                  dueDate={'dueDate' in card ? card.dueDate : undefined}
                   onButtonClick={() => console.log("Customized Development Plans clicked")}
                 />
               ))}
