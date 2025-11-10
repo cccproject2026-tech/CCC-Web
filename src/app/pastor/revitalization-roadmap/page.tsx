@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
@@ -7,69 +7,80 @@ import PastorFooter from "@/app/Components/PastorFooter";
 import PhaseImg from "@/app/Assets/phase-img.png";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+// import { apiGetRoadmaps } from "@/app/api/api"; // ✅ import API function
+import { apiGetRoadmaps } from "../../Services/api"; // ✅ import API function
 
 interface Phase {
-  id: number;
+  id: string;
   title: string;
   description: string;
   phase: string;
   months: string;
-  status: "Not Started" | "In-progress" | "Completed" | "Due";
+  status: string;
   sessionDate?: string;
   route: string;
+  imageUrl: string;
 }
 
 export default function RevitalizationRoadmap() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
+  const [phases, setPhases] = useState<Phase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const [phases] = useState<Phase[]>([
-    {
-      id: 1,
-      title: "Jump-start",
-      description:
-        "Attend a two-day revitalization jump-start session to strengthen your ministry.",
-      phase: "Phase 1",
-      months: "1 – 2",
-      status: "Not Started",
-      sessionDate: "10 Nov 2024",
-      route: "/pastor/jumpstart",
-    },
-    {
-      id: 2,
-      title: "Self Revitalization Phase",
-      description:
-        "Take a deeper look into your ministry to bring conflict resolution and change.",
-      phase: "Phase 2",
-      months: "1 – 2",
-      status: "Not Started",
-      sessionDate: "12 Dec 2024",
-      route: "/pastor/SelfRevitalizationPhasePage",
-    },
-    {
-      id: 3,
-      title: "Church Empowerment Phase",
-      description:
-        "Create community to empower your church and make a long-term plan for growth.",
-      phase: "Phase 3",
-      months: "3 – 9",
-      status: "In-progress",
-      sessionDate: "05 Jan 2025",
-      route: "/pastor/ChurchEmpowermentPhase",
-    },
-    {
-      id: 4,
-      title: "Community Revitalization and Multiplication Phase",
-      description:
-        "Review community service outcomes and empower others as you explore opportunities for further growth.",
-      phase: "Phase 4",
-      months: "10 – 12",
-      status: "Completed",
-      sessionDate: "20 Feb 2025",
-      route: "/pastor/CommunityRevitalizationPage",
-    },
-  ]);
+  // ✅ Fetch Roadmaps from API
+  useEffect(() => {
+    const fetchRoadmaps = async () => {
+      try {
+        setLoading(true);
+        const res = await apiGetRoadmaps();
+        const data = res.data?.data || [];
+
+        // ✅ Map backend fields to frontend structure
+        const mappedPhases = data.map((item: any) => {
+          // Validate image URL - only use if it's a valid HTTP/HTTPS URL
+          const isValidImageUrl = (url: string) => {
+            return (
+              url && (url.startsWith("http://") || url.startsWith("https://"))
+            );
+          };
+
+          return {
+            id: item._id,
+            title: item.name,
+            description:
+              item.description || item.roadMapDetails || "No description",
+            phase: item.phase || "N/A",
+            months: item.duration || "N/A",
+            status:
+              item.status?.toLowerCase() === "in progress"
+                ? "In-progress"
+                : item.status
+                ? item.status.charAt(0).toUpperCase() + item.status.slice(1)
+                : "Not Started",
+            sessionDate:
+              item.extras?.find((ex: any) => ex.name === "Session Date")
+                ?.date || "",
+            route: `/pastor/${item.name.replace(/\s+/g, "")}`, // simple route builder
+            imageUrl: isValidImageUrl(item.imageUrl)
+              ? item.imageUrl
+              : PhaseImg.src,
+          };
+        });
+
+        setPhases(mappedPhases);
+      } catch (err: any) {
+        console.error("Error fetching roadmaps:", err);
+        setError("Failed to load roadmaps. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRoadmaps();
+  }, []);
 
   // ✅ Filtering logic
   const filteredPhases = phases.filter((phase) => {
@@ -80,6 +91,23 @@ export default function RevitalizationRoadmap() {
       activeTab === "All" || phase.status === activeTab.replace("-", " ");
     return matchesSearch && matchesTab;
   });
+
+  // ✅ Loading and Error States
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#1C578E]">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white bg-[#1C578E]">
+        <p>{error}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#1C578E]">
@@ -99,7 +127,7 @@ export default function RevitalizationRoadmap() {
       {/* ✅ MAIN CONTENT */}
       <main className="flex-1 px-16 py-10">
         <div className="max-w-7xl mx-auto">
-          {/* ✅ Top Controls: Search + Tabs + Icons */}
+          {/* ✅ Top Controls: Search + Tabs */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
             {/* Search */}
             <div className="flex items-center bg-white rounded-lg shadow-sm px-4 py-2 w-full max-w-md">
@@ -134,7 +162,7 @@ export default function RevitalizationRoadmap() {
 
             {/* Right Icons */}
             <div className="flex items-center gap-3">
-             <button className="w-9 h-9 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 shadow-sm transition">
+              <button className="w-9 h-9 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 shadow-sm transition">
                 <i className="fa-solid fa-ellipsis-vertical text-[#1A2E7A] text-sm"></i>
               </button>
             </div>
@@ -150,13 +178,15 @@ export default function RevitalizationRoadmap() {
                 {/* LEFT IMAGE */}
                 <div className="relative w-[200px] h-[200px] flex-shrink-0 m-5">
                   <Image
-                    src={PhaseImg}
+                    src={phase.imageUrl}
                     alt={phase.title}
-                    className="w-full h-full object-cover"
+                    width={200}
+                    height={200}
+                    className="w-full h-full object-cover rounded-lg"
                   />
-                  <div className="absolute top-2 left-2 bg-yellow-400 text-black text-xs font-semibold px-2 py-1 rounded-md">
-                    {phase.phase}
-                  </div>
+                  {/* <div className="absolute top-2 left-2 bg-yellow-400 text-black text-xs font-semibold px-2 py-1 rounded-md">
+                    {phase.phase || "Phase"}
+                  </div> */}
                 </div>
 
                 {/* RIGHT CONTENT */}
@@ -188,15 +218,17 @@ export default function RevitalizationRoadmap() {
                     </div>
 
                     {/* SESSION DATE */}
-                    <div className="flex items-center gap-2 mb-3">
-                      <i className="fa-regular fa-calendar text-[#103C8C] text-sm"></i>
-                      <input
-                        type="text"
-                        value={phase.sessionDate}
-                        readOnly
-                        className="border border-gray-300 rounded-md px-2 py-1 text-xs text-gray-600 focus:outline-none w-[150px]"
-                      />
-                    </div>
+                    {phase.sessionDate && (
+                      <div className="flex items-center gap-2 mb-3">
+                        <i className="fa-regular fa-calendar text-[#103C8C] text-sm"></i>
+                        <input
+                          type="text"
+                          value={phase.sessionDate}
+                          readOnly
+                          className="border border-gray-300 rounded-md px-2 py-1 text-xs text-gray-600 focus:outline-none w-[150px]"
+                        />
+                      </div>
+                    )}
 
                     {/* COMPLETION TIME */}
                     <div>
@@ -204,7 +236,7 @@ export default function RevitalizationRoadmap() {
                         Completion Time
                       </p>
                       <p className="text-sm font-medium text-gray-800">
-                        Months {phase.months}
+                        {phase.months}
                       </p>
                     </div>
                   </div>
@@ -225,7 +257,7 @@ export default function RevitalizationRoadmap() {
         </div>
       </main>
 
-  
+      <PastorFooter />
     </div>
   );
 }
