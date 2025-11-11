@@ -63,7 +63,7 @@ export default function RevitalizationRoadmap() {
             sessionDate:
               item.extras?.find((ex: any) => ex.name === "Session Date")
                 ?.date || "",
-            route: `/pastor/${item.name.replace(/\s+/g, "")}`, // simple route builder
+            route: `/pastor/roadmap-detail/${item._id}`, // dynamic route to roadmap detail
             imageUrl: isValidImageUrl(item.imageUrl)
               ? item.imageUrl
               : PhaseImg.src,
@@ -244,7 +244,7 @@ export default function RevitalizationRoadmap() {
                   {/* ✅ VIEW BUTTON */}
                   <div className="flex justify-end">
                     <button
-                      onClick={() => router.push(phase.route)}
+onClick={() => router.push(`/pastor/roadmap-detail/${phase.id}`)}
                       className="bg-[#103C8C] text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-[#0B2E72] transition"
                     >
                       View
