@@ -84,7 +84,7 @@ export default function RoadmapDetailPage() {
   const [loadingComments, setLoadingComments] = useState(false);
   const [loadingQueries, setLoadingQueries] = useState(false);
   const [queryTab, setQueryTab] = useState("New");
-  
+
   // Mock user data - replace with actual auth context
   const currentUserId = "6909ce4bd1348c6f2bb51b85";
   const currentMentorId = "6909c4dcd1348c6f2bb51b72";
@@ -163,7 +163,7 @@ export default function RoadmapDetailPage() {
       await apiAddComment(params.id as string, {
         text: newComment,
         userId: currentUserId,
-        mentorId: currentMentorId
+        mentorId: currentMentorId,
       });
       setNewComment("");
       fetchComments();
@@ -178,7 +178,7 @@ export default function RoadmapDetailPage() {
     try {
       await apiAddQuery(params.id as string, {
         actualQueryText: newQuery,
-        userId: currentUserId
+        userId: currentUserId,
       });
       setNewQuery("");
       fetchQueries();
@@ -288,14 +288,20 @@ export default function RoadmapDetailPage() {
     }
   };
 
-  const renderExtraComponent = (extra: ExtraComponent, index: number) => {
+  const renderExtraComponent = (
+    extra: ExtraComponent,
+    index: number,
+    parentKey = ""
+  ) => {
+    const componentKey = `${parentKey}_${extra.name}_${index}`;
+
     switch (extra.type) {
       case "TEXT_DISPLAY":
         return (
-          <div key={index} className="mb-4">
+          <div key={componentKey} className="mb-6">
             <a
               href="#"
-              className="text-white underline text-sm hover:text-blue-200"
+              className="text-[13px] text-white underline underline-offset-2 hover:text-[#FFD84E]"
             >
               {extra.name}
             </a>
@@ -304,39 +310,36 @@ export default function RoadmapDetailPage() {
 
       case "TEXT_AREA":
         return (
-          <div key={index} className="rounded-lg p-4 mb-4">
-            <h3 className="text-sm font-semibold text-white mb-3">
-              {extra.name}
-            </h3>
+          <div key={componentKey} className="mb-6">
+            <h3 className="text-sm font-semibold mb-2">{extra.name}</h3>
             <textarea
               placeholder={extra.placeHolder || "Write Your Notes here..."}
-              value={formData[extra.name] || ""}
-              onChange={(e) => handleInputChange(extra.name, e.target.value)}
-              className="w-full rounded-md bg-transparent border border-[#52A1D1] text-white text-sm p-3 focus:outline-none focus:ring-1 focus:ring-[#00B3FF] resize-none h-20"
+              value={formData[componentKey] || ""}
+              onChange={(e) => handleInputChange(componentKey, e.target.value)}
+              className="w-full border border-[#5A8DCB] rounded-md p-3 text-sm text-white/90 bg-transparent focus:outline-none resize-none h-20"
             />
           </div>
         );
 
       case "TEXT_FIELD":
         return (
-          <div key={index} className="mb-4">
-            <label className="block text-sm font-semibold mb-2">
-              {extra.name}
-            </label>
+          <div key={componentKey} className="mb-6">
+            <h3 className="text-sm font-semibold mb-2">{extra.name}</h3>
             <input
               type="text"
               placeholder={extra.placeHolder}
-              value={formData[extra.name] || ""}
-              onChange={(e) => handleInputChange(extra.name, e.target.value)}
-              className="w-full bg-transparent border border-[#5A8DCB] rounded-md px-3 py-2 text-sm text-white focus:outline-none"
+              value={formData[componentKey] || ""}
+              onChange={(e) => handleInputChange(componentKey, e.target.value)}
+              className="w-full border border-[#5A8DCB] rounded-md px-3 py-2 text-sm text-white/90 bg-transparent focus:outline-none"
             />
           </div>
         );
 
       case "DATE_PICKER":
+        const dateValue = formData[componentKey] || extra.date || "";
         return (
           <div
-            key={index}
+            key={componentKey}
             className="flex items-center justify-between gap-4 mt-6"
           >
             <div className="flex items-center gap-3">
@@ -344,7 +347,7 @@ export default function RoadmapDetailPage() {
               <input
                 type="text"
                 readOnly
-                value={formData[extra.name] || extra.date || "10 Nov 2024"}
+                value={dateValue}
                 className="bg-transparent border border-[#52A1D1] text-sm text-white px-3 py-2 rounded-md focus:outline-none w-[180px]"
               />
             </div>
@@ -353,34 +356,47 @@ export default function RoadmapDetailPage() {
                 {extra.buttonName}
               </button>
             )}
+            {/* Render nested checkboxes */}
+            {extra.checkboxes && (
+              <div className="mt-4 space-y-2">
+                {extra.checkboxes.map((checkbox, cbIndex) =>
+                  renderExtraComponent(
+                    checkbox,
+                    cbIndex,
+                    `${componentKey}_checkbox`
+                  )
+                )}
+              </div>
+            )}
           </div>
         );
 
       case "UPLOAD":
         return (
-          <div key={index} className="mb-6">
-            <label className="block text-sm font-semibold mb-2">
-              {extra.name}
-            </label>
-            {uploadedFiles[extra.name] ? (
+          <div key={componentKey} className="mb-6">
+            <h3 className="text-sm font-semibold mb-2">{extra.name}</h3>
+            {uploadedFiles[componentKey] ? (
               <div className="bg-white text-gray-800 rounded-lg p-3 flex items-center gap-3">
                 <i className="fa-solid fa-file text-blue-600"></i>
                 <span className="text-sm">
-                  {uploadedFiles[extra.name].name}
+                  {uploadedFiles[componentKey].name}
                 </span>
               </div>
             ) : (
-              <div className="border-2 border-dashed border-[#52A1D1] rounded-lg p-4 text-center">
+              <div className="border-2 border-dashed border-[#5A8DCB] rounded-lg p-4 text-center">
                 <input
                   type="file"
                   onChange={(e) =>
                     e.target.files?.[0] &&
-                    handleFileUpload(extra.name, e.target.files[0])
+                    handleFileUpload(componentKey, e.target.files[0])
                   }
                   className="hidden"
-                  id={`upload-${index}`}
+                  id={`upload-${componentKey}`}
                 />
-                <label htmlFor={`upload-${index}`} className="cursor-pointer">
+                <label
+                  htmlFor={`upload-${componentKey}`}
+                  className="cursor-pointer"
+                >
                   <i className="fa-solid fa-cloud-upload text-white/60 text-2xl mb-2 block"></i>
                   <span className="text-sm text-white/80">
                     Click to upload file
@@ -393,28 +409,80 @@ export default function RoadmapDetailPage() {
 
       case "CHECKBOX":
         return (
-          <div key={index} className="flex items-center gap-2 mb-2">
-            <input
-              type="checkbox"
-              id={`checkbox-${index}`}
-              checked={formData[extra.name] || false}
-              onChange={(e) => handleInputChange(extra.name, e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-            />
-            <label htmlFor={`checkbox-${index}`} className="text-sm text-white">
-              {extra.name}
+          <div
+            key={componentKey}
+            className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mt-8"
+          >
+            <label className="flex items-start text-[13px] text-white/90 gap-2 leading-tight">
+              <input
+                type="checkbox"
+                checked={formData[componentKey] || false}
+                onChange={(e) =>
+                  handleInputChange(componentKey, e.target.checked)
+                }
+                className="mt-[3px] accent-[#103C8C]"
+              />
+              <span>{extra.name}</span>
             </label>
+            {extra.haveButton && extra.buttonName && (
+              <button className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-6 py-2 rounded-md shadow-md">
+                {extra.buttonName}
+              </button>
+            )}
+          </div>
+        );
+
+      case "ASSESSMENT":
+        return (
+          <div key={componentKey} className="mb-6">
+            <h3 className="text-sm font-semibold mb-2">{extra.name}</h3>
+            {extra.buttonName && (
+              <button className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-6 py-2 rounded-md shadow-md mb-4">
+                {extra.buttonName}
+              </button>
+            )}
+            {/* Render nested checkboxes */}
+            {extra.checkboxes && (
+              <div className="space-y-2">
+                {extra.checkboxes.map((checkbox, cbIndex) =>
+                  renderExtraComponent(
+                    checkbox,
+                    cbIndex,
+                    `${componentKey}_assessment`
+                  )
+                )}
+              </div>
+            )}
           </div>
         );
 
       case "SECTION":
         return (
-          <div key={index} className="mb-6">
-            <h3 className="text-lg font-semibold text-white mb-4">
-              {extra.name}
-            </h3>
-            {extra.sections?.map((section, sIndex) =>
-              renderExtraComponent(section, sIndex)
+          <div key={componentKey} className="mb-6">
+            <h3 className="text-sm font-semibold mb-4">{extra.name}</h3>
+            {/* Render nested checkboxes */}
+            {extra.checkboxes && (
+              <div className="mb-4 space-y-2">
+                {extra.checkboxes.map((checkbox, cbIndex) =>
+                  renderExtraComponent(
+                    checkbox,
+                    cbIndex,
+                    `${componentKey}_section_checkbox`
+                  )
+                )}
+              </div>
+            )}
+            {/* Render nested sections */}
+            {extra.sections && (
+              <div className="space-y-4">
+                {extra.sections.map((section, sIndex) =>
+                  renderExtraComponent(
+                    section,
+                    sIndex,
+                    `${componentKey}_section`
+                  )
+                )}
+              </div>
             )}
           </div>
         );
@@ -422,6 +490,62 @@ export default function RoadmapDetailPage() {
       default:
         return null;
     }
+  };
+
+  // Render sub-roadmap detail view
+  const renderSubRoadmapDetail = (subRoadmap: SubRoadmap) => {
+    return (
+      <>
+        {activeTab === "overview" && (
+          <>
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <button
+                  onClick={() => setSelectedSubRoadmap(null)}
+                  className="text-white/80 hover:text-white text-sm mb-2 flex items-center gap-2"
+                >
+                  <i className="fa-solid fa-arrow-left"></i>
+                  Back to {roadmap?.name}
+                </button>
+                <h2 className="text-xl font-semibold">Over View</h2>
+              </div>
+              <button className="bg-white rounded-md w-8 h-8 flex items-center justify-center text-[#103C8C] hover:bg-gray-100">
+                <i className="fa-solid fa-ellipsis-vertical"></i>
+              </button>
+            </div>
+
+            {/* Roadmap Section */}
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold mb-2">Roadmap</h3>
+              <div className="border border-[#5A8DCB] rounded-md p-3 text-sm bg-transparent text-white/90">
+                {subRoadmap.roadMapDetails}
+              </div>
+            </div>
+
+            {/* Description Section */}
+            <div className="mb-6">
+              <h3 className="text-sm font-semibold mb-2">Description</h3>
+              <div className="border border-[#5A8DCB] rounded-md p-3 text-sm text-white/90 bg-transparent">
+                {subRoadmap.description}
+              </div>
+            </div>
+
+            {/* Render sub-roadmap extras */}
+            {subRoadmap.extras?.map((extra, index) =>
+              renderExtraComponent(extra, index, `subroadmap_${subRoadmap._id}`)
+            )}
+          </>
+        )}
+
+        {activeTab === "comments" && (
+          <div className="text-white/70 text-sm mt-10">No comments yet</div>
+        )}
+
+        {activeTab === "queries" && (
+          <div className="text-white/70 text-sm mt-10">No queries yet</div>
+        )}
+      </>
+    );
   };
 
   if (loading) {
@@ -470,11 +594,19 @@ export default function RoadmapDetailPage() {
         <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white">
           <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-10">
             {/* LEFT PANEL */}
-            <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 w-full h-fit">
+            <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 w-full h-[220px]">
               {[
                 { key: "overview", label: "Over View" },
-                { key: "comments", label: "Comments", count: comments.length || 0 },
-                { key: "queries", label: "Queries", count: queries.length || 0 },
+                {
+                  key: "comments",
+                  label: "Comments",
+                  count: comments.length || 0,
+                },
+                {
+                  key: "queries",
+                  label: "Queries",
+                  count: queries.length || 0,
+                },
               ].map((item) => (
                 <button
                   key={item.key}
@@ -503,73 +635,63 @@ export default function RoadmapDetailPage() {
 
             {/* RIGHT CONTENT */}
             <div>
-              {activeTab === "overview" && (
+              {selectedSubRoadmap ? (
+                renderSubRoadmapDetail(
+                  roadmap.roadmaps.find((r) => r._id === selectedSubRoadmap)!
+                )
+              ) : (
                 <>
-                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-semibold">Over View</h2>
-                    <button className="text-white/80 hover:text-white text-sm">
-                      <i className="fa-solid fa-ellipsis-vertical"></i>
-                    </button>
-                  </div>
+                  {activeTab === "overview" && (
+                    <>
+                      <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-xl font-semibold">Over View</h2>
+                        <button className="text-white/80 hover:text-white text-sm">
+                          <i className="fa-solid fa-ellipsis-vertical"></i>
+                        </button>
+                      </div>
 
-                  <div className="bg-[#1070A9]/70 rounded-lg p-4 mb-4 border border-[#3B8CC2]">
-                    <h3 className="text-sm font-semibold text-white mb-2">
-                      Roadmap
-                    </h3>
-                    <p className="bg-[#22A0CA]/50 text-white text-sm px-4 py-2 rounded-md">
-                      {roadmap.roadMapDetails}
-                    </p>
-                  </div>
+                      <div className="bg-[#1070A9]/70 rounded-lg p-4 mb-4 border border-[#3B8CC2]">
+                        <h3 className="text-sm font-semibold text-white mb-2">
+                          Roadmap
+                        </h3>
+                        <p className="bg-[#22A0CA]/50 text-white text-sm px-4 py-2 rounded-md">
+                          {roadmap.roadMapDetails}
+                        </p>
+                      </div>
 
-                  <div className="bg-[#1070A9]/70 rounded-lg p-4 mb-4 border border-[#3B8CC2]">
-                    <h3 className="text-sm font-semibold text-white mb-3">
-                      Description
-                    </h3>
-                    {/* <div className="text-sm text-white/90">
-                      {roadmap.description}
-                    </div> */}
-                    <div className="text-sm text-white/90 space-y-2">
-                      {roadmap.description.split("\n").map((item, index) => (
-                        <div key={index}>{item}</div>
-                      ))}
-                    </div>
-                  </div>
+                      <div className="bg-[#1070A9]/70 rounded-lg p-4 mb-4 border border-[#3B8CC2]">
+                        <h3 className="text-sm font-semibold text-white mb-3">
+                          Description
+                        </h3>
+                        <div className="text-sm text-white/90 space-y-2">
+                          {roadmap.description
+                            .split("\n")
+                            .map((item, index) => (
+                              <div key={index}>{item}</div>
+                            ))}
+                        </div>
+                      </div>
 
-                  <div className="rounded-lg p-4 mb-4">
-                    <h3 className="text-sm font-semibold text-white mb-3">
-                      Notes
-                    </h3>
-                    <textarea
-                      placeholder="Write Your Notes here..."
-                      className="w-full rounded-md bg-transparent border border-[#52A1D1] text-white text-sm p-3 focus:outline-none focus:ring-1 focus:ring-[#00B3FF] resize-none h-20"
-                    ></textarea>
-                  </div>
+                      {/* Render main roadmap extras */}
+                      {roadmap.extras?.map((extra, index) =>
+                        renderExtraComponent(extra, index, "main_roadmap")
+                      )}
 
-                  <div className="flex items-center justify-between gap-4 mt-6">
-                    <div className="flex items-center gap-3">
-                      <i className="fa-regular fa-calendar text-white/80 text-sm"></i>
-                      <input
-                        type="text"
-                        readOnly
-                        value="10 Nov 2024"
-                        className="bg-transparent border border-[#52A1D1] text-sm text-white px-3 py-2 rounded-md focus:outline-none w-[180px]"
-                      />
-                    </div>
-                  </div>
+                      {/* Render first sub-roadmap extras for Jump-start layout */}
+                      {roadmap.roadmaps?.[0]?.extras?.map((extra, index) =>
+                        renderExtraComponent(extra, index, "first_subroadmap")
+                      )}
 
-                  {/* Render Dynamic Components */}
-                  {roadmap.extras?.map((extra, index) =>
-                    renderExtraComponent(extra, index)
+                      <div className="flex justify-end mt-6">
+                        <button
+                          // onClick={handleSubmit}
+                          className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-6 py-2 rounded-md shadow"
+                        >
+                          Jump-start Completed
+                        </button>
+                      </div>
+                    </>
                   )}
-
-                  <div className="flex justify-end mt-8">
-                    <button
-                      onClick={handleSubmit}
-                      className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm font-medium px-6 py-2 rounded-md"
-                    >
-                      Save Progress
-                    </button>
-                  </div>
                 </>
               )}
 
@@ -578,7 +700,9 @@ export default function RoadmapDetailPage() {
                   <h2 className="text-xl font-semibold mb-6">Comments</h2>
                   <div className="space-y-4">
                     {loadingComments ? (
-                      <div className="text-white/70 text-sm">Loading comments...</div>
+                      <div className="text-white/70 text-sm">
+                        Loading comments...
+                      </div>
                     ) : comments.length > 0 ? (
                       comments.map((comment) => (
                         <div
@@ -593,10 +717,14 @@ export default function RoadmapDetailPage() {
                               <div className="flex items-center gap-2">
                                 <h4 className="font-semibold text-sm">User</h4>
                                 <span className="text-xs text-gray-400">
-                                  {new Date(comment.addedDate).toLocaleDateString()}
+                                  {new Date(
+                                    comment.addedDate
+                                  ).toLocaleDateString()}
                                 </span>
                               </div>
-                              <p className="text-xs text-gray-500 mb-1">Member</p>
+                              <p className="text-xs text-gray-500 mb-1">
+                                Member
+                              </p>
                               <p className="text-sm">{comment.text}</p>
                             </div>
                           </div>
@@ -612,7 +740,9 @@ export default function RoadmapDetailPage() {
                         </div>
                       ))
                     ) : (
-                      <div className="text-white/70 text-sm">No comments yet</div>
+                      <div className="text-white/70 text-sm">
+                        No comments yet
+                      </div>
                     )}
                   </div>
                 </>
@@ -665,7 +795,7 @@ export default function RoadmapDetailPage() {
                       </div>
 
                       <div className="flex justify-end mt-4">
-                        <button 
+                        <button
                           onClick={handleAddQuery}
                           disabled={!newQuery.trim()}
                           className="bg-[#103C8C] hover:bg-[#0B2E72] disabled:opacity-50 transition text-white text-sm font-medium px-8 py-[6px] rounded-md border border-[#2C57A6] shadow-sm"
@@ -679,48 +809,68 @@ export default function RoadmapDetailPage() {
                   {queryTab === "Answered" && (
                     <div className="space-y-8 mt-4">
                       {loadingQueries ? (
-                        <div className="text-white/70 text-sm">Loading queries...</div>
-                      ) : queries.filter(q => q.status === 'answered').length > 0 ? (
-                        queries.filter(q => q.status === 'answered').map((query) => (
-                          <div key={query._id} className="border-b border-white/20 pb-6">
-                            {/* User Message */}
-                            <div className="flex items-start gap-3 mb-3">
-                              <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
-                                <i className="fa-solid fa-user text-gray-600 text-xs"></i>
-                              </div>
-                              <div>
-                                <h4 className="font-semibold text-sm">Me</h4>
-                                <p className="text-xs text-white/70 mb-1">
-                                  {new Date(query.createdDate).toLocaleDateString()}
-                                </p>
-                                <p className="text-sm text-white/90">
-                                  {query.actualQueryText}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Mentor Reply */}
-                            <div className="ml-11 bg-[#325C9C]/50 rounded-lg p-4 w-[90%]">
-                              <div className="flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center">
-                                  <i className="fa-solid fa-user text-white text-xs"></i>
+                        <div className="text-white/70 text-sm">
+                          Loading queries...
+                        </div>
+                      ) : queries.filter((q) => q.status === "answered")
+                          .length > 0 ? (
+                        queries
+                          .filter((q) => q.status === "answered")
+                          .map((query) => (
+                            <div
+                              key={query._id}
+                              className="border-b border-white/20 pb-6"
+                            >
+                              {/* User Message */}
+                              <div className="flex items-start gap-3 mb-3">
+                                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
+                                  <i className="fa-solid fa-user text-gray-600 text-xs"></i>
                                 </div>
                                 <div>
-                                  <h4 className="font-semibold text-sm">Mentor</h4>
+                                  <h4 className="font-semibold text-sm">Me</h4>
                                   <p className="text-xs text-white/70 mb-1">
-                                    {query.repliedDate ? new Date(query.repliedDate).toLocaleDateString() : ''}
+                                    {new Date(
+                                      query.createdDate
+                                    ).toLocaleDateString()}
                                   </p>
-                                  <p className="text-xs text-white/70 mb-2">Mentor</p>
                                   <p className="text-sm text-white/90">
-                                    {query.repliedAnswer}
+                                    {query.actualQueryText}
                                   </p>
                                 </div>
                               </div>
+
+                              {/* Mentor Reply */}
+                              <div className="ml-11 bg-[#325C9C]/50 rounded-lg p-4 w-[90%]">
+                                <div className="flex items-start gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center">
+                                    <i className="fa-solid fa-user text-white text-xs"></i>
+                                  </div>
+                                  <div>
+                                    <h4 className="font-semibold text-sm">
+                                      Mentor
+                                    </h4>
+                                    <p className="text-xs text-white/70 mb-1">
+                                      {query.repliedDate
+                                        ? new Date(
+                                            query.repliedDate
+                                          ).toLocaleDateString()
+                                        : ""}
+                                    </p>
+                                    <p className="text-xs text-white/70 mb-2">
+                                      Mentor
+                                    </p>
+                                    <p className="text-sm text-white/90">
+                                      {query.repliedAnswer}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        ))
+                          ))
                       ) : (
-                        <div className="text-white/70 text-sm">No answered queries yet</div>
+                        <div className="text-white/70 text-sm">
+                          No answered queries yet
+                        </div>
                       )}
                     </div>
                   )}
@@ -728,35 +878,49 @@ export default function RoadmapDetailPage() {
                   {queryTab === "Pending" && (
                     <div className="space-y-8 mt-4">
                       {loadingQueries ? (
-                        <div className="text-white/70 text-sm">Loading queries...</div>
-                      ) : queries.filter(q => q.status === 'pending').length > 0 ? (
-                        queries.filter(q => q.status === 'pending').map((query) => (
-                          <div key={query._id} className="border-b border-white/20 pb-6">
-                            {/* User Message */}
-                            <div className="flex items-start gap-3 mb-3">
-                              <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
-                                <i className="fa-solid fa-user text-gray-600 text-xs"></i>
+                        <div className="text-white/70 text-sm">
+                          Loading queries...
+                        </div>
+                      ) : queries.filter((q) => q.status === "pending").length >
+                        0 ? (
+                        queries
+                          .filter((q) => q.status === "pending")
+                          .map((query) => (
+                            <div
+                              key={query._id}
+                              className="border-b border-white/20 pb-6"
+                            >
+                              {/* User Message */}
+                              <div className="flex items-start gap-3 mb-3">
+                                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
+                                  <i className="fa-solid fa-user text-gray-600 text-xs"></i>
+                                </div>
+                                <div>
+                                  <h4 className="font-semibold text-sm">Me</h4>
+                                  <p className="text-xs text-white/70 mb-1">
+                                    {new Date(
+                                      query.createdDate
+                                    ).toLocaleDateString()}
+                                  </p>
+                                  <p className="text-sm text-white/90">
+                                    {query.actualQueryText}
+                                  </p>
+                                </div>
                               </div>
-                              <div>
-                                <h4 className="font-semibold text-sm">Me</h4>
-                                <p className="text-xs text-white/70 mb-1">
-                                  {new Date(query.createdDate).toLocaleDateString()}
-                                </p>
-                                <p className="text-sm text-white/90">
-                                  {query.actualQueryText}
-                                </p>
-                              </div>
-                            </div>
 
-                            {/* Waiting for Response */}
-                            <div className="ml-11 bg-[#325C9C]/50 rounded-lg p-4 w-[90%] flex items-center gap-2">
-                              <i className="fa-solid fa-spinner animate-spin text-white/70 text-sm"></i>
-                              <p className="text-sm text-white/80">Waiting for response</p>
+                              {/* Waiting for Response */}
+                              <div className="ml-11 bg-[#325C9C]/50 rounded-lg p-4 w-[90%] flex items-center gap-2">
+                                <i className="fa-solid fa-spinner animate-spin text-white/70 text-sm"></i>
+                                <p className="text-sm text-white/80">
+                                  Waiting for response
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        ))
+                          ))
                       ) : (
-                        <div className="text-white/70 text-sm">No pending queries yet</div>
+                        <div className="text-white/70 text-sm">
+                          No pending queries yet
+                        </div>
                       )}
                     </div>
                   )}
@@ -791,66 +955,133 @@ export default function RoadmapDetailPage() {
         >
           <div className="absolute inset-0 bg-black/50"></div>
           <div className="relative z-10">
-            <p className="text-xs text-white/80 mb-2">
-              Revitalization Roadmap &gt;{" "}
-              <span className="text-white font-medium">{roadmap.name}</span>
-            </p>
-            <div className="flex items-center gap-2">
-              <span className="bg-[#FFD84E] text-[#0B1C58] text-xs font-semibold px-3 py-[3px] rounded-md">
-                {roadmap.phase}
-              </span>
-              <h1 className="text-3xl font-semibold">{roadmap.name}</h1>
-            </div>
+            {selectedSubRoadmap ? (
+              <>
+                <h1 className="text-3xl font-semibold mb-1">
+                  {
+                    roadmap.roadmaps.find((r) => r._id === selectedSubRoadmap)
+                      ?.name
+                  }
+                </h1>
+                <p className="text-white/70 text-sm">
+                  Completion Time{" "}
+                  {
+                    roadmap.roadmaps.find((r) => r._id === selectedSubRoadmap)
+                      ?.duration
+                  }
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-white/80 mb-2">
+                  Revitalization Roadmap &gt;{" "}
+                  <span className="text-white font-medium">{roadmap.name}</span>
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="bg-[#FFD84E] text-[#0B1C58] text-xs font-semibold px-3 py-[3px] rounded-md">
+                    {roadmap.phase}
+                  </span>
+                  <h1 className="text-3xl font-semibold">{roadmap.name}</h1>
+                </div>
+              </>
+            )}
           </div>
         </section>
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 px-16 py-10 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white">
-          <div className="max-w-7xl mx-auto">
-            {/* Search & Filter Row */}
-            <div className="flex justify-between items-center mb-8">
-              {/* Search Box */}
-              <div className="flex items-center w-[40%] bg-white rounded-md overflow-hidden shadow-sm">
-                <i className="fa-solid fa-magnifying-glass text-gray-400 px-3"></i>
-                <input
-                  type="text"
-                  placeholder="Search"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-3 py-2 text-sm text-gray-600 focus:outline-none"
-                />
+        <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white">
+          {selectedSubRoadmap ? (
+            <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-10">
+              {/* LEFT PANEL */}
+              <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 w-full h-fit">
+                {[
+                  { key: "overview", label: "Over View" },
+                  { key: "comments", label: "Comments", count: 0 },
+                  { key: "queries", label: "Queries", count: 0 },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => setActiveTab(item.key)}
+                    className={`flex justify-between items-center px-4 py-3 rounded-md text-sm font-medium transition-all ${
+                      activeTab === item.key
+                        ? "bg-[#103C8C] text-white shadow-sm"
+                        : "bg-[#F8FAFF] text-gray-600 hover:bg-[#E9EEFF]"
+                    }`}
+                  >
+                    {item.label}
+                    {item.count !== undefined && (
+                      <span
+                        className={`text-xs font-semibold rounded-full px-2 py-[1px] ${
+                          activeTab === item.key
+                            ? "bg-white/20 text-white"
+                            : "bg-white border border-[#D0DAF9] text-[#103C8C]"
+                        }`}
+                      >
+                        {item.count}
+                      </span>
+                    )}
+                  </button>
+                ))}
               </div>
 
-              {/* Filter Tabs + Menu */}
-              <div className="flex items-center gap-3">
-                <div className="flex bg-white rounded-lg shadow-sm overflow-hidden p-1">
-                  {["All", "completed", "in progress", "submitted"].map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setFilterTab(tab)}
-                      className={`relative px-5 py-[7px] text-sm font-medium transition-all duration-200 ${
-                        filterTab === tab
-                          ? "bg-[#103C8C] text-white"
-                          : "text-gray-500 hover:text-[#103C8C]"
-                      }`}
-                    >
-                      {tab === "All" ? "All" : tab.charAt(0).toUpperCase() + tab.slice(1)}
-                    </button>
-                  ))}
+              {/* RIGHT CONTENT */}
+              <div>
+                {renderSubRoadmapDetail(
+                  roadmap.roadmaps.find((r) => r._id === selectedSubRoadmap)!
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="max-w-7xl mx-auto">
+              {/* Search & Filter Row */}
+              <div className="flex justify-between items-center mb-8">
+                {/* Search Box */}
+                <div className="flex items-center w-[40%] bg-white rounded-md overflow-hidden shadow-sm">
+                  <i className="fa-solid fa-magnifying-glass text-gray-400 px-3"></i>
+                  <input
+                    type="text"
+                    placeholder="Search"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full px-3 py-2 text-sm text-gray-600 focus:outline-none"
+                  />
                 </div>
 
-                {/* Menu Button */}
-                <button className="bg-white rounded-lg w-8 h-10 flex items-center justify-center shadow-sm hover:bg-gray-50">
-                  <i className="fa-solid fa-ellipsis-vertical text-[#103C8C]"></i>
-                </button>
+                {/* Filter Tabs + Menu */}
+                <div className="flex items-center gap-3">
+                  <div className="flex bg-white rounded-lg shadow-sm overflow-hidden p-1">
+                    {["All", "completed", "in progress", "submitted"].map(
+                      (tab) => (
+                        <button
+                          key={tab}
+                          onClick={() => setFilterTab(tab)}
+                          className={`relative px-5 py-[7px] text-sm font-medium transition-all duration-200 ${
+                            filterTab === tab
+                              ? "bg-[#103C8C] text-white"
+                              : "text-gray-500 hover:text-[#103C8C]"
+                          }`}
+                        >
+                          {tab === "All"
+                            ? "All"
+                            : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                        </button>
+                      )
+                    )}
+                  </div>
+
+                  {/* Menu Button */}
+                  <button className="bg-white rounded-lg w-8 h-10 flex items-center justify-center shadow-sm hover:bg-gray-50">
+                    <i className="fa-solid fa-ellipsis-vertical text-[#103C8C]"></i>
+                  </button>
+                </div>
+              </div>
+
+              {/* Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {filteredRoadmaps.map(renderPhaseCard)}
               </div>
             </div>
-
-            {/* Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {filteredRoadmaps.map(renderPhaseCard)}
-            </div>
-          </div>
+          )}
         </main>
       </div>
     );
@@ -858,19 +1089,66 @@ export default function RoadmapDetailPage() {
 
   // Simple phase layout
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#103C8C] to-[#1E5BB8]">
-      <PastorHeader />
-      <div className="px-8 py-6">
-        <div className="bg-white rounded-lg p-8">
-          <h1 className="text-3xl font-bold text-[#0B1C58] mb-4">
-            {roadmap.name}
-          </h1>
-          <p className="text-gray-700 mb-6">{roadmap.description}</p>
-          <div className="prose max-w-none">
-            <p>{roadmap.roadMapDetails}</p>
+    <div className="min-h-screen flex flex-col bg-[#0F4A85]">
+      <PastorHeader showFullHeader={true} />
+
+      {/* HERO SECTION */}
+      <section
+        className="relative h-[320px] bg-cover bg-center text-white flex flex-col justify-end px-20 pb-10"
+        style={{ backgroundImage: `url(${HeroBg.src})` }}
+      >
+        <div className="absolute inset-0 bg-black/50"></div>
+        <div className="relative z-10">
+          <p className="text-xs text-white/80 mb-2">
+            Revitalization Roadmap &gt;{" "}
+            <span className="text-white font-medium">{roadmap.name}</span>
+          </p>
+          <div className="flex items-center gap-2">
+            {roadmap.phase && (
+              <span className="bg-[#FFD84E] text-[#0B1C58] text-xs font-semibold px-3 py-[3px] rounded-md">
+                {roadmap.phase}
+              </span>
+            )}
+            <h1 className="text-3xl font-semibold">{roadmap.name}</h1>
+          </div>
+          <p className="text-white/70 text-sm mt-1">
+            Completion Time {roadmap.duration}
+          </p>
+        </div>
+      </section>
+
+      {/* MAIN CONTENT */}
+      <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-[#1070A9]/70 rounded-lg p-6 mb-6 border border-[#3B8CC2]">
+            <h3 className="text-lg font-semibold text-white mb-4">
+              Roadmap Details
+            </h3>
+            <p className="bg-[#22A0CA]/50 text-white text-sm px-4 py-2 rounded-md mb-4">
+              {roadmap.roadMapDetails}
+            </p>
+            <div className="text-sm text-white/90 space-y-2">
+              {roadmap.description.split("\n").map((item, index) => (
+                <div key={index}>{item}</div>
+              ))}
+            </div>
+          </div>
+
+          {/* Render all extras */}
+          {roadmap.extras?.map((extra, index) =>
+            renderExtraComponent(extra, index, "simple_phase")
+          )}
+
+          <div className="flex justify-end mt-8">
+            <button
+              onClick={handleSubmit}
+              className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm font-medium px-6 py-2 rounded-md"
+            >
+              Complete
+            </button>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
