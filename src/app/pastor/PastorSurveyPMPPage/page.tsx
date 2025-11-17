@@ -57,18 +57,18 @@ export default function PastorSurveyPMPPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] flex flex-col text-white relative transition-all duration-300">
       {/* MAIN CONTENT */}
-      <main className="flex flex-1 px-12 py-10 gap-10">
+      <main className="flex flex-1 flex-col sm:flex-row px-4 sm:px-8 md:px-12 py-5 sm:py-8 md:py-10 gap-5 sm:gap-8 md:gap-10">
         {/* LEFT TIMELINE */}
-        <aside className="relative w-[300px] flex flex-col gap-5 h-[400px]">
+        <aside className="relative w-full sm:w-[250px] md:w-[300px] flex flex-col gap-3 sm:gap-4 md:gap-5 h-auto sm:h-[350px] md:h-[400px]">
           <div className="absolute left-[10px] top-6 bottom-6 w-[2px] bg-gradient-to-b from-[#B3D3F8] to-[#2C6DCC]" />
           {sections.map((title, index) => (
             <div
               key={index}
               onClick={() => setActiveSection(index + 1)}
-              className="relative flex items-start gap-3 cursor-pointer transition-all"
+              className="relative flex items-start gap-2 sm:gap-3 cursor-pointer transition-all"
             >
               <div
-                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mt-4 ${
+                className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 flex items-center justify-center mt-3 sm:mt-4 ${
                   activeSection === index + 1
                     ? "border-[#FFD84E] bg-[#FFD84E]"
                     : activeSection > index + 1
@@ -77,18 +77,20 @@ export default function PastorSurveyPMPPage() {
                 }`}
               >
                 {activeSection === index + 1 || activeSection > index + 1 ? (
-                  <div className="w-2 h-2 bg-white rounded-full"></div>
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-white rounded-full"></div>
                 ) : null}
               </div>
 
               <div
-                className={`flex-1 border rounded-lg px-4 py-3 transition-all ${
+                className={`flex-1 border rounded-lg px-3 sm:px-4 py-2 sm:py-3 transition-all ${
                   activeSection === index + 1
                     ? "bg-[#103C8C] border-[#103C8C]"
                     : "bg-[#FFFFFF]/10 border-[#3C75C0]/40 hover:bg-[#123E88]/40"
                 }`}
               >
-                <p className="text-sm font-semibold">{`Section ${index + 1}`}</p>
+                <p className="text-xs sm:text-sm font-semibold">{`Section ${
+                  index + 1
+                }`}</p>
                 <p className="text-xs text-white/80">{title}</p>
               </div>
             </div>
@@ -98,9 +100,9 @@ export default function PastorSurveyPMPPage() {
         {/* RIGHT CONTENT */}
         <section
           key={activeSection}
-          className="flex-1 bg-transparent rounded-lg p-2 overflow-y-auto transition-all duration-500"
+          className="flex-1 bg-transparent rounded-lg p-1 sm:p-2 overflow-y-auto transition-all duration-500"
         >
-          <p className="text-sm text-white/90 mb-6 leading-relaxed">
+          <p className="text-xs sm:text-sm text-white/90 mb-4 sm:mb-6 leading-relaxed">
             Choose the option in each box that best matches how you feel and who
             you are, as this self-assessment helps you understand yourself
             better. Your accuracy allows us to provide the best support and
@@ -110,7 +112,7 @@ export default function PastorSurveyPMPPage() {
 
           {/* SECTION 1 */}
           {activeSection === 1 && (
-            <div className="space-y-6 text-[14px]">
+            <div className="space-y-4 sm:space-y-6 text-[13px] sm:text-[14px]">
               <QuestionBlock
                 title="Feeling physically drained most of the time."
                 options={[
@@ -304,16 +306,16 @@ export default function PastorSurveyPMPPage() {
           )}
 
           {/* BUTTONS */}
-          <div className="flex justify-end gap-4 mt-10">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 mt-6 sm:mt-8 md:mt-10">
             <button
               onClick={handleClear}
-              className="bg-transparent border border-[#A6B8E8] hover:bg-[#103C8C] text-[#E8ECFF] text-sm px-5 py-2 rounded-md"
+              className="bg-transparent border border-[#A6B8E8] hover:bg-[#103C8C] text-[#E8ECFF] text-xs sm:text-sm px-4 sm:px-5 py-2 rounded-md"
             >
               Clear Responses
             </button>
             <button
               onClick={handleNext}
-              className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm px-6 py-2 rounded-md"
+              className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-xs sm:text-sm px-5 sm:px-6 py-2 rounded-md"
             >
               {activeSection === 5 ? "Submit Survey" : "Next Section"}
             </button>
@@ -338,14 +340,14 @@ export default function PastorSurveyPMPPage() {
       {/* ✅ MEETING POPUP */}
       {showMeeting && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-[500px] text-center p-8 animate-fadeIn">
-            <p className="text-[#0B1C58] text-[15px] font-medium leading-relaxed mb-6">
+          <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-[500px] text-center p-6 sm:p-8 animate-fadeIn">
+            <p className="text-[#0B1C58] text-sm sm:text-[15px] font-medium leading-relaxed mb-4 sm:mb-6">
               On completion of the PMP and CMA assessment tools please schedule
               a meeting with your mentor.
             </p>
             <button
               onClick={handleScheduleClick}
-              className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm font-medium px-6 py-2 rounded-md shadow-sm"
+              className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-xs sm:text-sm font-medium px-5 sm:px-6 py-2 rounded-md shadow-sm"
             >
               Schedule Meeting
             </button>
@@ -389,14 +391,23 @@ export default function PastorSurveyPMPPage() {
 }
 
 /* 🔹 Reusable Question Block Component */
-function QuestionBlock({ title, options }: { title: string; options: string[] }) {
+function QuestionBlock({
+  title,
+  options,
+}: {
+  title: string;
+  options: string[];
+}) {
   return (
-    <div className="border border-[#5A8DCB] rounded-md p-4 mb-4">
-      <h4 className="font-semibold mb-2">{title}</h4>
+    <div className="border border-[#5A8DCB] rounded-md p-3 sm:p-4 mb-4">
+      <h4 className="font-semibold mb-2 text-sm sm:text-base">{title}</h4>
       {options.map((opt, i) => (
         <label key={i} className="flex items-center gap-2 cursor-pointer">
-          <input type="checkbox" className="accent-[#FFD84E] w-4 h-4" />
-          <span>{opt}</span>
+          <input
+            type="checkbox"
+            className="accent-[#FFD84E] w-3 h-3 sm:w-4 sm:h-4"
+          />
+          <span className="text-sm sm:text-base">{opt}</span>
         </label>
       ))}
     </div>
@@ -404,11 +415,19 @@ function QuestionBlock({ title, options }: { title: string; options: string[] })
 }
 
 /* 🔹 Mentor Sidebar Component */
-function MentorSidebar({ selectedMentor, setSelectedMentor, handleMentorNext }: { selectedMentor: string | null; setSelectedMentor: (value: string) => void; handleMentorNext: () => void }) {
+function MentorSidebar({
+  selectedMentor,
+  setSelectedMentor,
+  handleMentorNext,
+}: {
+  selectedMentor: string | null;
+  setSelectedMentor: (value: string) => void;
+  handleMentorNext: () => void;
+}) {
   return (
-    <div className="fixed right-0 top-0 w-[400px] h-full bg-white shadow-2xl z-50 animate-slideIn flex flex-col">
-      <div className="p-6 border-b">
-        <h2 className="text-[#0B1C58] text-xl font-semibold">
+    <div className="fixed right-0 top-0 w-full sm:w-[400px] h-full bg-white shadow-2xl z-50 animate-slideIn flex flex-col">
+      <div className="p-4 sm:p-6 border-b">
+        <h2 className="text-[#0B1C58] text-lg sm:text-xl font-semibold">
           Choose Mentor for the Meeting
         </h2>
         <input
@@ -418,7 +437,7 @@ function MentorSidebar({ selectedMentor, setSelectedMentor, handleMentorNext }: 
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
         {Array.from({ length: 8 }).map((_, i) => (
           <label
             key={i}
@@ -448,7 +467,7 @@ function MentorSidebar({ selectedMentor, setSelectedMentor, handleMentorNext }: 
         ))}
       </div>
 
-      <div className="p-4 border-t">
+      <div className="p-3 sm:p-4 border-t">
         <button
           onClick={handleMentorNext}
           disabled={!selectedMentor}
@@ -470,9 +489,13 @@ function ScheduleSidebar({
   handleFinalSchedule,
   setShowScheduleSidebar,
   setShowMentorSidebar,
-}: { handleFinalSchedule: () => void; setShowScheduleSidebar: (value: boolean) => void; setShowMentorSidebar: (value: boolean) => void }) {
+}: {
+  handleFinalSchedule: () => void;
+  setShowScheduleSidebar: (value: boolean) => void;
+  setShowMentorSidebar: (value: boolean) => void;
+}) {
   return (
-    <div className="fixed right-0 top-0 w-[400px] h-full bg-white shadow-2xl z-50 animate-slideIn flex flex-col">
+    <div className="fixed right-0 top-0 w-full sm:w-[400px] h-full bg-white shadow-2xl z-50 animate-slideIn flex flex-col">
       <div className="p-6 border-b flex items-center gap-3">
         <i className="fa-regular fa-calendar text-[#103C8C] text-lg"></i>
         <h2 className="text-[#0B1C58] text-xl font-semibold">
@@ -480,17 +503,15 @@ function ScheduleSidebar({
         </h2>
       </div>
 
-      <div className="p-5 overflow-y-auto flex-1">
+      <div className="p-4 sm:p-5 overflow-y-auto flex-1">
         <p className="text-[#0B1C58] text-sm font-medium mb-2">
           Select Available Date
         </p>
         <div className="bg-[#0D3971]/10 rounded-lg p-4 text-center text-[#0B1C58] font-semibold mb-6">
-                   August 2024 (Static Calendar Placeholder)
+          August 2024 (Static Calendar Placeholder)
         </div>
 
-        <p className="text-[#0B1C58] text-sm font-medium mb-2">
-          Select a Time
-        </p>
+        <p className="text-[#0B1C58] text-sm font-medium mb-2">Select a Time</p>
         <div className="grid grid-cols-2 gap-3 mb-6">
           {[
             "09:00 am - 10:00 am",
@@ -515,7 +536,7 @@ function ScheduleSidebar({
         </select>
       </div>
 
-      <div className="p-4 border-t flex justify-between gap-3">
+      <div className="p-3 sm:p-4 border-t flex justify-between gap-3">
         <button
           onClick={() => {
             setShowScheduleSidebar(false);
@@ -535,4 +556,3 @@ function ScheduleSidebar({
     </div>
   );
 }
-

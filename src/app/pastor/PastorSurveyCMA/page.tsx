@@ -3,7 +3,6 @@ import { useState } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import headerBg from "../../Assets/CMA-hero-bg.png";
 
-
 export default function PastorSurveyCMA() {
   const [activeSection, setActiveSection] = useState(0);
   const [answers, setAnswers] = useState<Record<string, boolean>>({});
@@ -302,40 +301,37 @@ export default function PastorSurveyCMA() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white">
-       
+      {/* HEADER */}
+      <header
+        className="relative flex items-center px-4 sm:px-8 md:px-16 py-5 sm:py-8 md:py-10 bg-cover bg-no-repeat text-white h-[150px] sm:h-[200px]"
+        style={{
+          backgroundImage: `url(${headerBg.src})`,
+          backgroundPosition: "center", // Adjusted for mobile
+          backgroundSize: "cover",
+        }}
+      >
+        {/* Optional transparent overlay for better text contrast */}
+        <div className="absolute inset-0 bg-black/20"></div>
 
- {/* HEADER */}
-<header
-  className="relative flex items-center px-16 py-10 bg-cover bg-no-repeat text-white h-[200px]"
-  style={{
-    backgroundImage: `url(${headerBg.src})`,
-    backgroundPosition: "120% center", // ✅ pushes image 20% further to the right
-    backgroundSize: "cover",
-  }}
->
-
-  {/* Optional transparent overlay for better text contrast */}
-  <div className="absolute inset-0 bg-black/20"></div>
-
-  {/* Left text content */}
-  <div className="relative z-10 mt-7">
-    <h2 className="text-3xl font-bold">
-      Church Assessment Evaluation (CMA)
-    </h2>
-    <p className="text-sm mt-2 text-white/85 max-w-md">
-      This Survey is about Lorem ipsum dolor sit amet, consectetur
-    </p>
-  </div>
-</header>
+        {/* Left text content */}
+        <div className="relative z-10 mt-4 sm:mt-7">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold">
+            Church Assessment Evaluation (CMA)
+          </h2>
+          <p className="text-xs sm:text-sm mt-2 text-white/85 max-w-full sm:max-w-md">
+            This Survey is about Lorem ipsum dolor sit amet, consectetur
+          </p>
+        </div>
+      </header>
 
       {/* MAIN BODY */}
-      <main className="flex flex-1 px-16 py-10 gap-10">
+      <main className="flex flex-1 flex-col sm:flex-row px-4 sm:px-8 md:px-16 py-5 sm:py-8 md:py-10 gap-5 sm:gap-8 md:gap-10">
         {/* LEFT PANEL */}
-        <aside className="w-[340px] bg-white rounded-xl p-6 shadow-lg h-[550px]">
-          <h2 className="text-[#0F1E44] text-lg font-semibold mb-6">
+        <aside className="w-full sm:w-[300px] md:w-[340px] bg-white rounded-xl p-4 sm:p-6 shadow-lg h-auto sm:h-[500px] md:h-[550px]">
+          <h2 className="text-[#0F1E44] text-base sm:text-lg font-semibold mb-4 sm:mb-6">
             My Responses
           </h2>
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 sm:gap-4">
             {sections.map((sec, i) => (
               <div
                 key={i}
@@ -346,9 +342,9 @@ export default function PastorSurveyCMA() {
                     : "bg-[#F7F9FC] text-[#0F1E44] border-[#E0E7F1]"
                 }`}
               >
-                <div className="px-4 py-3">
+                <div className="px-3 sm:px-4 py-2 sm:py-3">
                   <p
-                    className={`text-sm font-semibold mb-1 ${
+                    className={`text-xs sm:text-sm font-semibold mb-1 ${
                       activeSection === i ? "text-white" : "text-[#103C8C]"
                     }`}
                   >
@@ -371,19 +367,21 @@ export default function PastorSurveyCMA() {
 
         {/* RIGHT PANEL */}
         <section className="flex-1">
-          <p className="text-sm leading-relaxed mb-6 max-w-2xl">
+          <p className="text-xs sm:text-sm leading-relaxed mb-4 sm:mb-6 max-w-full sm:max-w-2xl">
             Choose the option in each box that best matches how you feel and who
             you are. Your accuracy allows us to provide the best support and
             guidance.
           </p>
 
-          <div className="space-y-6 text-[14px]">
+          <div className="space-y-4 sm:space-y-6 text-[13px] sm:text-[14px]">
             {sections[activeSection].questions.map((q, qi) => (
               <div
                 key={qi}
-                className="border border-[#5A8DCB] rounded-md p-4 space-y-2"
+                className="border border-[#5A8DCB] rounded-md p-3 sm:p-4 space-y-2"
               >
-                <h4 className="font-semibold mb-2">{q.title}</h4>
+                <h4 className="font-semibold mb-2 text-sm sm:text-base">
+                  {q.title}
+                </h4>
                 {q.options.map((opt, oi) => {
                   const key = `${activeSection}-${qi}-${oi}`;
                   return (
@@ -395,9 +393,11 @@ export default function PastorSurveyCMA() {
                         type="checkbox"
                         checked={!!answers[key]}
                         onChange={() => handleCheck(key)}
-                        className="accent-[#FFD84E] w-4 h-4 mt-[2px]"
+                        className="accent-[#FFD84E] w-3 h-3 sm:w-4 sm:h-4 mt-[2px]"
                       />
-                      <span className="leading-snug">{opt}</span>
+                      <span className="leading-snug text-sm sm:text-base">
+                        {opt}
+                      </span>
                     </label>
                   );
                 })}
@@ -406,11 +406,11 @@ export default function PastorSurveyCMA() {
           </div>
 
           {/* Navigation */}
-          <div className="flex justify-between items-center mt-10">
+          <div className="flex flex-col sm:flex-row justify-between items-center mt-6 sm:mt-10 gap-4 sm:gap-0">
             <button
               onClick={handlePrev}
               disabled={activeSection === 0}
-              className={`border border-[#A6B8E8] text-[#E8ECFF] text-sm font-medium px-6 py-2 rounded-md ${
+              className={`border border-[#A6B8E8] text-[#E8ECFF] text-xs sm:text-sm font-medium px-4 sm:px-6 py-2 rounded-md ${
                 activeSection === 0
                   ? "opacity-50 cursor-not-allowed"
                   : "hover:bg-[#103C8C]"
@@ -423,16 +423,15 @@ export default function PastorSurveyCMA() {
             <button
               onClick={handleNext}
               disabled={activeSection === sections.length - 1}
-              className={`bg-[#103C8C] text-white text-sm font-medium px-6 py-2 rounded-md ${
+              className={`bg-[#103C8C] text-white text-xs sm:text-sm font-medium px-4 sm:px-6 py-2 rounded-md ${
                 activeSection === sections.length - 1
                   ? "opacity-50 cursor-not-allowed"
                   : "hover:bg-[#0B2E72]"
               }`}
             >
-              View Next Section{" "}
-              <i className="fa-solid fa-angle-right ml-2"></i>
+              View Next Section <i className="fa-solid fa-angle-right ml-2"></i>
             </button>
-       </div>
+          </div>
         </section>
       </main>
     </div>

@@ -99,7 +99,7 @@ export default function NotificationsPage() {
       icon: "fa-file-pen",
       color: "text-yellow-500",
     },
-     {
+    {
       id: 11,
       title:
         "ROBERT HAS REQUESTED YOU TO SUBMIT ASSIGNMENT (MENTORING CONVERSATIONS)",
@@ -189,9 +189,9 @@ export default function NotificationsPage() {
       <PastorHeader showFullHeader={true} />
 
       {/* Main Section */}
-      <main className="flex-1 px-20 py-10 text-white">
+      <main className="flex-1 px-4 sm:px-10 md:px-20 py-5 sm:py-8 md:py-10 text-white">
         <div className="max-w-5xl mx-auto">
-          <h1 className="text-2xl font-semibold mb-6 border-b border-white/30 pb-2">
+          <h1 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6 border-b border-white/30 pb-2">
             Notifications
           </h1>
 
@@ -200,12 +200,12 @@ export default function NotificationsPage() {
             {notifications.map((note) => (
               <div
                 key={note.id}
-                className="bg-white text-gray-800 rounded-md shadow-sm border border-gray-200 p-4 flex justify-between items-start hover:shadow-md transition"
+                className="bg-white text-gray-800 rounded-md shadow-sm border border-gray-200 p-3 sm:p-4 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0 hover:shadow-md transition"
               >
                 {/* Left Side */}
-                <div className="flex items-start gap-4">
+                <div className="flex items-start gap-3 sm:gap-4">
                   <div
-                    className={`mt-1 text-lg ${note.color} w-8 h-8 flex items-center justify-center bg-gray-100 rounded-full`}
+                    className={`mt-1 text-base sm:text-lg ${note.color} w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-gray-100 rounded-full`}
                   >
                     <i className={`fa-solid ${note.icon}`}></i>
                   </div>
@@ -234,7 +234,7 @@ export default function NotificationsPage() {
                 </div>
 
                 {/* Right Side: Time */}
-                <div className="text-xs text-gray-500 mt-1">{note.time}</div>
+                <div className="text-xs text-gray-500 sm:mt-1">{note.time}</div>
               </div>
             ))}
           </div>
