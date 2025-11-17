@@ -2,6 +2,7 @@
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import Framelogo1 from "../Assets/Frame-logo-1.png";
 import Connecticon from "../Assets/Connect-icon.png";
 import NotificationIcon from "../Assets/notification.png";
@@ -27,13 +28,18 @@ import {
   X,
 } from "lucide-react";
 
-export default function PastorHeader({ showFullHeader = false }) {
+function PastorHeaderComponent({ showFullHeader = false }) {
   const pathname = usePathname();
   const router = useRouter();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
@@ -164,10 +170,11 @@ export default function PastorHeader({ showFullHeader = false }) {
       {/* ✅ Right Icons */}
       <div className="flex items-center gap-3 md:gap-5 relative" ref={dropdownRef}>
         {/* Mobile Menu Button */}
-        {showFullHeader && (
+        {showFullHeader && isClient && (
           <button
             onClick={() => setShowMobileMenu(!showMobileMenu)}
             className="lg:hidden p-1 hover:bg-white/10 rounded transition"
+            suppressHydrationWarning
           >
             {showMobileMenu ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -188,6 +195,7 @@ export default function PastorHeader({ showFullHeader = false }) {
                   setShowSettingsMenu(false);
                 }}
                 className="relative hover:opacity-80 transition cursor-pointer"
+                suppressHydrationWarning
               >
                 <Image
                   src={NotificationIcon}
@@ -264,6 +272,7 @@ export default function PastorHeader({ showFullHeader = false }) {
                   setShowSettingsMenu(false);
                 }}
                 className="flex items-center gap-2 bg-[#223C8C] px-2 md:px-3 py-1 rounded-full hover:opacity-90 transition cursor-pointer"
+                suppressHydrationWarning
               >
                 <div className="hidden md:block text-right text-[11px] leading-tight">
                   <p className="text-white/80">Good Morning</p>
@@ -298,6 +307,7 @@ export default function PastorHeader({ showFullHeader = false }) {
                               ? "bg-[#F5F7FA]"
                               : ""
                           }`}
+                          suppressHydrationWarning
                         >
                           <span className="text-[#0033A0]">{item.icon}</span>
                           <span className="text-[15px] font-medium">
@@ -320,6 +330,7 @@ export default function PastorHeader({ showFullHeader = false }) {
                                       ? "hover:bg-[#F5F7FA] text-[#0033A0]"
                                       : "text-gray-400 cursor-not-allowed"
                                   }`}
+                                  suppressHydrationWarning
                                 >
                                   {sub.icon}
                                   <span>{sub.label}</span>
@@ -358,6 +369,7 @@ export default function PastorHeader({ showFullHeader = false }) {
                       ? "font-semibold text-white bg-white/10"
                       : "text-white/80 hover:text-white hover:bg-white/5"
                   }`}
+                  suppressHydrationWarning
                 >
                   {link.name}
                 </button>
@@ -365,11 +377,11 @@ export default function PastorHeader({ showFullHeader = false }) {
             })}
             {/* Mobile Search & Connect */}
             <div className="flex items-center gap-4 px-4 py-3 border-t border-white/10">
-              <button className="flex items-center gap-2 text-white/80 hover:text-white text-sm cursor-pointer">
+              <button className="flex items-center gap-2 text-white/80 hover:text-white text-sm cursor-pointer" suppressHydrationWarning>
                 <Image src={SearchIcon} alt="Search" width={16} height={16} />
                 Search
               </button>
-              <button className="flex items-center gap-2 text-white/80 hover:text-white text-sm cursor-pointer">
+              <button className="flex items-center gap-2 text-white/80 hover:text-white text-sm cursor-pointer" suppressHydrationWarning>
                 <Image src={Connecticon} alt="Connect" width={18} height={18} />
                 Connect
               </button>
@@ -386,3 +398,9 @@ export default function PastorHeader({ showFullHeader = false }) {
     </header>
   );
 }
+
+const PastorHeader = dynamic(() => Promise.resolve(PastorHeaderComponent), {
+  ssr: false
+});
+
+export default PastorHeader;

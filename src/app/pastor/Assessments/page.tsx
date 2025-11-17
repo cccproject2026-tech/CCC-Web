@@ -115,6 +115,7 @@ export default function PastorAssessments() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-white border border-gray-200 rounded-md pl-10 pr-4 py-2 text-sm text-gray-600 shadow-sm outline-none focus:ring-2 focus:ring-[#103C8C]"
+                suppressHydrationWarning
               />
             </div>
 
@@ -130,6 +131,7 @@ export default function PastorAssessments() {
                         ? "bg-[#103C8C] text-white"
                         : "text-gray-600 hover:bg-gray-100"
                     }`}
+                    suppressHydrationWarning
                   >
                     {tab}
                   </button>
@@ -209,6 +211,7 @@ export default function PastorAssessments() {
                           ? "bg-[#103C8C]"
                           : "bg-[#103C8C]"
                       } text-white text-xs md:text-sm font-medium px-4 md:px-5 py-2 rounded-lg hover:bg-[#0B2E72] transition`}
+                      suppressHydrationWarning
                     >
                       {item.button}
                     </button>

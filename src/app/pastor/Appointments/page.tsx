@@ -51,8 +51,9 @@ export default function PastorAppointmentsPage() {
             type="text"
             placeholder="Enter a date (dd-mm-yyyy)"
             className="w-full md:w-[320px] border bg-[white] border-[#DDE2EB] rounded-md px-4 py-2 text-sm text-gray-600 shadow-sm focus:outline-none focus:border-[#103C8C]"
+            suppressHydrationWarning
           />
-          <button className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-4 py-2 rounded-md shadow-sm flex items-center justify-center gap-2 whitespace-nowrap">
+          <button className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-4 py-2 rounded-md shadow-sm flex items-center justify-center gap-2 whitespace-nowrap" suppressHydrationWarning>
             <i className="fa-solid fa-plus text-xs"></i> New Meeting
           </button>
         </div>
@@ -150,7 +151,7 @@ export default function PastorAppointmentsPage() {
                         <i className="fa-brands fa-whatsapp cursor-pointer hover:text-[#0B1C58]"></i>
                       </div>
 
-                      <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[11px] md:text-[12px] px-4 md:px-5 py-[6px] rounded-md font-medium">
+                      <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[11px] md:text-[12px] px-4 md:px-5 py-[6px] rounded-md font-medium" suppressHydrationWarning>
                         Details
                       </button>
                     </div>
@@ -220,7 +221,7 @@ export default function PastorAppointmentsPage() {
                         <i className="fa-brands fa-whatsapp opacity-80 hover:opacity-100 cursor-pointer"></i>
                       </div>
                     </div>
-                    <button className="bg-[#0B1C58] hover:bg-[#122D80] transition px-4 md:px-6 py-[6px] rounded-md text-xs md:text-sm font-medium">
+                    <button className="bg-[#0B1C58] hover:bg-[#122D80] transition px-4 md:px-6 py-[6px] rounded-md text-xs md:text-sm font-medium" suppressHydrationWarning>
                       Details
                     </button>
                   </div>
