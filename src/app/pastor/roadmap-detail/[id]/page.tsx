@@ -206,36 +206,36 @@ export default function RoadmapDetailPage() {
     return (
       <div
         key={subRoadmap._id}
-        className="bg-white rounded-2xl shadow-[0_2px_6px_rgba(0,0,0,0.05)] border border-[#E5EAF1] flex overflow-hidden hover:shadow-md transition-all"
+        className="bg-white rounded-2xl shadow-[0_2px_6px_rgba(0,0,0,0.05)] border border-[#E5EAF1] flex flex-col md:flex-row overflow-hidden hover:shadow-md transition-all"
       >
-        {/* Left Image - 42% width */}
-        <div className="relative w-[42%] h-[200px] shrink-0 m-3">
+        {/* Left Image */}
+        <div className="relative w-full md:w-[42%] h-[180px] md:h-[200px] shrink-0 m-3">
           <Image
             src={subRoadmap.imageUrl || PhaseImg.src}
             alt={subRoadmap.name}
             fill
-            className="object-cover rounded-l-2xl"
+            className="object-cover rounded-t-2xl md:rounded-l-2xl md:rounded-t-none"
           />
         </div>
 
-        {/* Right Content - 58% width */}
-        <div className="flex flex-col justify-between w-[58%] px-5 py-4 text-[#0B1C58]">
+        {/* Right Content */}
+        <div className="flex flex-col justify-between w-full md:w-[58%] px-4 md:px-5 py-4 text-[#0B1C58]">
           <div>
-            <h3 className="text-[15px] font-semibold leading-snug mb-[6px]">
+            <h3 className="text-[14px] md:text-[15px] font-semibold leading-snug mb-[6px]">
               {subRoadmap.name}
             </h3>
-            <p className="text-[13px] text-[#6B7280] leading-snug mb-[8px]">
+            <p className="text-[12px] md:text-[13px] text-[#6B7280] leading-snug mb-[8px]">
               {subRoadmap.description ||
                 subRoadmap.roadMapDetails ||
                 "Complete this roadmap component as part of your journey."}
             </p>
 
             <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="text-[12px] text-[#6B7280] font-medium">
+              <span className="text-[11px] md:text-[12px] text-[#6B7280] font-medium">
                 Status
               </span>
               <span
-                className={`text-[11px] px-2 py-[3px] rounded-full font-medium border ${getStatusColor(
+                className={`text-[10px] md:text-[11px] px-2 py-[3px] rounded-full font-medium border ${getStatusColor(
                   subRoadmap.status
                 )}`}
               >
@@ -243,7 +243,7 @@ export default function RoadmapDetailPage() {
               </span>
             </div>
 
-            <p className="text-[12px] text-[#6B7280] mt-10">
+            <p className="text-[11px] md:text-[12px] text-[#6B7280] mt-6 md:mt-10">
               Completion Time{" "}
               <span className="font-semibold text-[#0B1C58]">
                 {subRoadmap.duration}
@@ -251,10 +251,10 @@ export default function RoadmapDetailPage() {
             </p>
           </div>
 
-          <div className="flex justify-end -mt-6">
+          <div className="flex justify-end mt-4 md:-mt-6">
             <button
               onClick={() => setSelectedSubRoadmap(subRoadmap._id)}
-              className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-[12px] font-medium px-6 py-[6px] rounded-md shadow-sm"
+              className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-[11px] md:text-[12px] font-medium px-4 md:px-6 py-[6px] rounded-md shadow-sm"
             >
               View
             </button>
@@ -591,10 +591,10 @@ export default function RoadmapDetailPage() {
         </section>
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white">
-          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-10">
+        <main className="flex-1 px-4 md:px-8 lg:px-16 py-8 lg:py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white">
+          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-6 lg:gap-10">
             {/* LEFT PANEL */}
-            <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 w-full h-[220px]">
+            <div className="bg-white rounded-xl shadow-md p-4 flex flex-row lg:flex-col gap-2 w-full h-fit lg:h-[220px] overflow-x-auto lg:overflow-x-visible">
               {[
                 { key: "overview", label: "Over View" },
                 {
@@ -611,7 +611,7 @@ export default function RoadmapDetailPage() {
                 <button
                   key={item.key}
                   onClick={() => setActiveTab(item.key)}
-                  className={`flex justify-between items-center px-4 py-3 rounded-md text-sm font-medium transition-all ${
+                  className={`flex justify-between items-center px-3 lg:px-4 py-2 lg:py-3 rounded-md text-xs lg:text-sm font-medium transition-all whitespace-nowrap ${
                     activeTab === item.key
                       ? "bg-[#103C8C] text-white shadow-sm"
                       : "bg-[#F8FAFF] text-gray-600 hover:bg-[#E9EEFF]"
@@ -950,14 +950,14 @@ export default function RoadmapDetailPage() {
 
         {/* HERO SECTION */}
         <section
-          className="relative h-[320px] bg-cover bg-center text-white flex flex-col justify-end px-20 pb-10"
+          className="relative h-[250px] md:h-[320px] bg-cover bg-center text-white flex flex-col justify-end px-4 md:px-8 lg:px-20 pb-6 md:pb-10"
           style={{ backgroundImage: `url(${HeroBg.src})` }}
         >
           <div className="absolute inset-0 bg-black/50"></div>
           <div className="relative z-10">
             {selectedSubRoadmap ? (
               <>
-                <h1 className="text-3xl font-semibold mb-1">
+                <h1 className="text-2xl md:text-3xl font-semibold mb-1">
                   {
                     roadmap.roadmaps.find((r) => r._id === selectedSubRoadmap)
                       ?.name
@@ -977,11 +977,11 @@ export default function RoadmapDetailPage() {
                   Revitalization Roadmap &gt;{" "}
                   <span className="text-white font-medium">{roadmap.name}</span>
                 </p>
-                <div className="flex items-center gap-2">
-                  <span className="bg-[#FFD84E] text-[#0B1C58] text-xs font-semibold px-3 py-[3px] rounded-md">
+                <div className="flex flex-col md:flex-row md:items-center gap-2">
+                  <span className="bg-[#FFD84E] text-[#0B1C58] text-xs font-semibold px-3 py-[3px] rounded-md w-fit">
                     {roadmap.phase}
                   </span>
-                  <h1 className="text-3xl font-semibold">{roadmap.name}</h1>
+                  <h1 className="text-2xl md:text-3xl font-semibold">{roadmap.name}</h1>
                 </div>
               </>
             )}
@@ -989,11 +989,11 @@ export default function RoadmapDetailPage() {
         </section>
 
         {/* MAIN CONTENT */}
-        <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white">
+        <main className="flex-1 px-4 md:px-8 lg:px-16 py-8 lg:py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white">
           {selectedSubRoadmap ? (
-            <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-10">
+            <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-6 lg:gap-10">
               {/* LEFT PANEL */}
-              <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 w-full h-fit">
+              <div className="bg-white rounded-xl shadow-md p-4 flex flex-row lg:flex-col gap-2 w-full h-fit overflow-x-auto lg:overflow-x-visible">
                 {[
                   { key: "overview", label: "Over View" },
                   { key: "comments", label: "Comments", count: 0 },
@@ -1002,7 +1002,7 @@ export default function RoadmapDetailPage() {
                   <button
                     key={item.key}
                     onClick={() => setActiveTab(item.key)}
-                    className={`flex justify-between items-center px-4 py-3 rounded-md text-sm font-medium transition-all ${
+                    className={`flex justify-between items-center px-3 lg:px-4 py-2 lg:py-3 rounded-md text-xs lg:text-sm font-medium transition-all whitespace-nowrap ${
                       activeTab === item.key
                         ? "bg-[#103C8C] text-white shadow-sm"
                         : "bg-[#F8FAFF] text-gray-600 hover:bg-[#E9EEFF]"
@@ -1034,9 +1034,9 @@ export default function RoadmapDetailPage() {
           ) : (
             <div className="max-w-7xl mx-auto">
               {/* Search & Filter Row */}
-              <div className="flex justify-between items-center mb-8">
+              <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-8">
                 {/* Search Box */}
-                <div className="flex items-center w-[40%] bg-white rounded-md overflow-hidden shadow-sm">
+                <div className="flex items-center w-full lg:w-[40%] bg-white rounded-md overflow-hidden shadow-sm">
                   <i className="fa-solid fa-magnifying-glass text-gray-400 px-3"></i>
                   <input
                     type="text"
@@ -1049,13 +1049,13 @@ export default function RoadmapDetailPage() {
 
                 {/* Filter Tabs + Menu */}
                 <div className="flex items-center gap-3">
-                  <div className="flex bg-white rounded-lg shadow-sm overflow-hidden p-1">
+                  <div className="flex bg-white rounded-lg shadow-sm overflow-hidden p-1 overflow-x-auto">
                     {["All", "completed", "in progress", "submitted"].map(
                       (tab) => (
                         <button
                           key={tab}
                           onClick={() => setFilterTab(tab)}
-                          className={`relative px-5 py-[7px] text-sm font-medium transition-all duration-200 ${
+                          className={`relative px-3 md:px-5 py-[7px] text-xs md:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
                             filterTab === tab
                               ? "bg-[#103C8C] text-white"
                               : "text-gray-500 hover:text-[#103C8C]"
@@ -1070,14 +1070,14 @@ export default function RoadmapDetailPage() {
                   </div>
 
                   {/* Menu Button */}
-                  <button className="bg-white rounded-lg w-8 h-10 flex items-center justify-center shadow-sm hover:bg-gray-50">
+                  <button className="bg-white rounded-lg w-8 h-10 flex items-center justify-center shadow-sm hover:bg-gray-50 shrink-0">
                     <i className="fa-solid fa-ellipsis-vertical text-[#103C8C]"></i>
                   </button>
                 </div>
               </div>
 
               {/* Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
                 {filteredRoadmaps.map(renderPhaseCard)}
               </div>
             </div>

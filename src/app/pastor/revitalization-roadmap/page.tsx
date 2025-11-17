@@ -7,8 +7,7 @@ import PastorFooter from "@/app/Components/PastorFooter";
 import PhaseImg from "@/app/Assets/phase-img.png";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-// import { apiGetRoadmaps } from "@/app/api/api"; // ✅ import API function
-import { apiGetRoadmaps } from "../../Services/api"; // ✅ import API function
+import { apiGetRoadmaps } from "../../Services/api";
 
 interface Phase {
   id: string;
@@ -30,7 +29,7 @@ export default function RevitalizationRoadmap() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // ✅ Fetch Roadmaps from API
+  // Fetch API
   useEffect(() => {
     const fetchRoadmaps = async () => {
       try {
@@ -38,9 +37,7 @@ export default function RevitalizationRoadmap() {
         const res = await apiGetRoadmaps();
         const data = res.data?.data || [];
 
-        // ✅ Map backend fields to frontend structure
         const mappedPhases = data.map((item: any) => {
-          // Validate image URL - only use if it's a valid HTTP/HTTPS URL
           const isValidImageUrl = (url: string) => {
             return (
               url && (url.startsWith("http://") || url.startsWith("https://"))
@@ -63,7 +60,7 @@ export default function RevitalizationRoadmap() {
             sessionDate:
               item.extras?.find((ex: any) => ex.name === "Session Date")
                 ?.date || "",
-            route: `/pastor/roadmap-detail/${item._id}`, // dynamic route to roadmap detail
+            route: `/pastor/roadmap-detail/${item._id}`,
             imageUrl: isValidImageUrl(item.imageUrl)
               ? item.imageUrl
               : PhaseImg.src,
@@ -72,7 +69,7 @@ export default function RevitalizationRoadmap() {
 
         setPhases(mappedPhases);
       } catch (err: any) {
-        console.error("Error fetching roadmaps:", err);
+        console.error(err);
         setError("Failed to load roadmaps. Please try again later.");
       } finally {
         setLoading(false);
@@ -82,7 +79,6 @@ export default function RevitalizationRoadmap() {
     fetchRoadmaps();
   }, []);
 
-  // ✅ Filtering logic
   const filteredPhases = phases.filter((phase) => {
     const matchesSearch = phase.title
       .toLowerCase()
@@ -92,7 +88,7 @@ export default function RevitalizationRoadmap() {
     return matchesSearch && matchesTab;
   });
 
-  // ✅ Loading and Error States
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1C578E]">
@@ -101,6 +97,7 @@ export default function RevitalizationRoadmap() {
     );
   }
 
+  // Error state
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white bg-[#1C578E]">
@@ -113,24 +110,32 @@ export default function RevitalizationRoadmap() {
     <div className="min-h-screen flex flex-col bg-[#1C578E]">
       <PastorHeader showFullHeader={true} />
 
-      {/* ✅ HERO SECTION */}
+      {/* HERO SECTION */}
       <section
-        className="relative bg-cover bg-bottom text-white h-[250px] flex items-end pb-10 px-20"
+        className="
+          relative bg-cover bg-bottom text-white 
+          h-[180px] sm:h-[200px] md:h-[250px]
+          flex items-end 
+          pb-6 sm:pb-8 md:pb-10 
+          px-6 sm:px-10 md:px-20
+        "
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-[#001845]/70 via-[#0B2E72]/50 to-[#1A4A9A]/90"></div>
         <div className="relative z-10">
-          <h1 className="text-3xl font-semibold">Revitalization Roadmap</h1>
+          <h1 className="text-2xl sm:text-3xl font-semibold">
+            Revitalization Roadmap
+          </h1>
         </div>
       </section>
 
-      {/* ✅ MAIN CONTENT */}
-      <main className="flex-1 px-16 py-10">
+      {/* MAIN CONTENT */}
+      <main className="flex-1 px-4 sm:px-8 md:px-16 py-6 sm:py-8 md:py-10">
         <div className="max-w-7xl mx-auto">
-          {/* ✅ Top Controls: Search + Tabs */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
-            {/* Search */}
-            <div className="flex items-center bg-white rounded-lg shadow-sm px-4 py-2 w-full max-w-md">
+          {/* Top Controls */}
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 mb-8">
+            {/* Search Bar */}
+            <div className="flex items-center bg-white rounded-lg shadow-sm px-4 py-2 w-full lg:max-w-md">
               <i className="fa-solid fa-magnifying-glass text-gray-400 mr-3"></i>
               <input
                 type="text"
@@ -141,42 +146,43 @@ export default function RevitalizationRoadmap() {
               />
             </div>
 
-            {/* Tabs */}
-            <div className="flex items-center bg-white rounded-lg shadow-sm px-2 py-1 ml-17">
-              {["All", "Due", "Not Started", "Completed", "In-progress"].map(
-                (tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
-                      activeTab === tab
-                        ? "bg-[#1A2E7A] text-white"
-                        : "text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                )
-              )}
-            </div>
+            {/* Tabs and Menu Container */}
+            <div className="flex items-center gap-3 w-full lg:w-auto">
+              {/* Tabs */}
+              <div className="flex items-center bg-white rounded-lg shadow-sm px-2 py-1 overflow-x-auto flex-1 lg:flex-none">
+                {["All", "Due", "Not Started", "Completed", "In-progress"].map(
+                  (tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`px-3 lg:px-4 py-1.5 whitespace-nowrap text-xs lg:text-sm font-medium rounded-md transition-all ${
+                        activeTab === tab
+                          ? "bg-[#1A2E7A] text-white"
+                          : "text-gray-600 hover:bg-gray-100"
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  )
+                )}
+              </div>
 
-            {/* Right Icons */}
-            <div className="flex items-center gap-3">
-              <button className="w-9 h-9 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 shadow-sm transition">
+              {/* Right Icons */}
+              <button className="w-9 h-9 flex items-center justify-center rounded-full bg-white hover:bg-gray-100 shadow-sm transition shrink-0">
                 <i className="fa-solid fa-ellipsis-vertical text-[#1A2E7A] text-sm"></i>
               </button>
             </div>
           </div>
 
-          {/* ✅ PHASE CARDS GRID */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Cards Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
             {filteredPhases.map((phase) => (
               <div
                 key={phase.id}
-                className="bg-white rounded-xl shadow-md hover:shadow-lg overflow-hidden flex transition-all duration-300"
+                className="bg-white rounded-xl shadow-md hover:shadow-lg overflow-hidden flex flex-col sm:flex-row transition-all duration-300"
               >
-                {/* LEFT IMAGE */}
-                <div className="relative w-[200px] h-[200px] flex-shrink-0 m-5">
+                {/* Left Image */}
+                <div className="relative w-full sm:w-[180px] md:w-[200px] h-[180px] md:h-[200px] flex-shrink-0 m-4">
                   <Image
                     src={phase.imageUrl}
                     alt={phase.title}
@@ -184,22 +190,19 @@ export default function RevitalizationRoadmap() {
                     height={200}
                     className="w-full h-full object-cover rounded-lg"
                   />
-                  {/* <div className="absolute top-2 left-2 bg-yellow-400 text-black text-xs font-semibold px-2 py-1 rounded-md">
-                    {phase.phase || "Phase"}
-                  </div> */}
                 </div>
 
-                {/* RIGHT CONTENT */}
-                <div className="flex flex-col justify-between flex-1 p-5">
+                {/* Right Content */}
+                <div className="flex flex-col justify-between flex-1 p-4 md:p-5">
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-[17px] leading-tight mb-1">
+                    <h3 className="font-semibold text-gray-900 text-[16px] md:text-[17px] mb-1">
                       {phase.title}
                     </h3>
                     <p className="text-sm text-gray-600 mb-3">
                       {phase.description}
                     </p>
 
-                    {/* STATUS */}
+                    {/* Status */}
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-xs text-gray-500 font-medium">
                         Status
@@ -217,7 +220,7 @@ export default function RevitalizationRoadmap() {
                       </span>
                     </div>
 
-                    {/* SESSION DATE */}
+                    {/* Session Date */}
                     {phase.sessionDate && (
                       <div className="flex items-center gap-2 mb-3">
                         <i className="fa-regular fa-calendar text-[#103C8C] text-sm"></i>
@@ -225,12 +228,12 @@ export default function RevitalizationRoadmap() {
                           type="text"
                           value={phase.sessionDate}
                           readOnly
-                          className="border border-gray-300 rounded-md px-2 py-1 text-xs text-gray-600 focus:outline-none w-[150px]"
+                          className="border border-gray-300 rounded-md px-2 py-1 text-xs text-gray-600 focus:outline-none w-[140px] sm:w-[150px]"
                         />
                       </div>
                     )}
 
-                    {/* COMPLETION TIME */}
+                    {/* Completion Time */}
                     <div>
                       <p className="text-[12px] text-gray-500">
                         Completion Time
@@ -241,10 +244,12 @@ export default function RevitalizationRoadmap() {
                     </div>
                   </div>
 
-                  {/* ✅ VIEW BUTTON */}
-                  <div className="flex justify-end">
+                  {/* View Button */}
+                  <div className="flex justify-end mt-3 sm:mt-0">
                     <button
-onClick={() => router.push(`/pastor/roadmap-detail/${phase.id}`)}
+                      onClick={() =>
+                        router.push(`/pastor/roadmap-detail/${phase.id}`)
+                      }
                       className="bg-[#103C8C] text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-[#0B2E72] transition"
                     >
                       View
