@@ -33,14 +33,15 @@ export default function Attendance() {
           </p>
 
           <h1 className="text-3xl font-semibold mb-1">Attendance</h1>
-          <p className="text-white/70 text-sm">Completion Time Months 10 – 12</p>
+          <p className="text-white/70 text-sm">
+            Completion Time Months 10 – 12
+          </p>
         </div>
       </section>
 
       {/* MAIN CONTENT */}
       <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white pb-24">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-10">
-
           {/* LEFT SIDEBAR */}
           <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 w-full h-fit">
             {[
@@ -56,6 +57,7 @@ export default function Attendance() {
                     ? "bg-[#103C8C] text-white shadow-sm"
                     : "bg-[#F8FAFF] text-gray-600 hover:bg-[#E9EEFF]"
                 }`}
+                suppressHydrationWarning={true}
               >
                 {item.label}
                 {item.count && (
@@ -80,7 +82,10 @@ export default function Attendance() {
                 {/* HEADER */}
                 <div className="flex justify-between items-center mb-2">
                   <h2 className="text-xl font-semibold">Over View</h2>
-                  <button className="bg-white rounded-md w-8 h-8 flex items-center justify-center text-[#103C8C] hover:bg-gray-100">
+                  <button
+                    className="bg-white rounded-md w-8 h-8 flex items-center justify-center text-[#103C8C] hover:bg-gray-100"
+                    suppressHydrationWarning={true}
+                  >
                     <i className="fa-solid fa-ellipsis-vertical"></i>
                   </button>
                 </div>
@@ -88,9 +93,7 @@ export default function Attendance() {
 
                 {/* CHURCH ROADMAP */}
                 <div className="mb-6">
-                  <h3 className="text-sm font-semibold mb-2">
-                    Church Roadmap
-                  </h3>
+                  <h3 className="text-sm font-semibold mb-2">Church Roadmap</h3>
                   <div className="border border-[#5A8DCB] rounded-md p-3 text-sm bg-transparent text-white/90">
                     Create Strategy for noticing lack of attendance
                   </div>
@@ -100,9 +103,9 @@ export default function Attendance() {
                 <div className="mb-6">
                   <h3 className="text-sm font-semibold mb-2">Description</h3>
                   <div className="border border-[#5A8DCB] rounded-md p-3 text-sm text-white/90 bg-transparent">
-                    Develop an intentional strategy for noticing lack of attendance
-                    and how the church will reach out to those who have stopped attending,
-                    including Proclamation event.
+                    Develop an intentional strategy for noticing lack of
+                    attendance and how the church will reach out to those who
+                    have stopped attending, including Proclamation event.
                   </div>
                 </div>
 
@@ -118,6 +121,7 @@ export default function Attendance() {
                       value={eventDate}
                       onChange={(e) => setEventDate(e.target.value)}
                       className="w-full bg-transparent border border-[#5A8DCB] rounded-md px-8 py-2 text-sm text-white focus:outline-none"
+                      suppressHydrationWarning={true}
                     />
                   </div>
                 </div>
@@ -127,6 +131,7 @@ export default function Attendance() {
                   <button
                     onClick={handleSubmit}
                     className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-8 py-[8px] rounded-md shadow-sm"
+                    suppressHydrationWarning={true}
                   >
                     Mark as Complete
                   </button>
@@ -143,8 +148,6 @@ export default function Attendance() {
           </div>
         </div>
       </main>
-
-    
     </div>
   );
 }

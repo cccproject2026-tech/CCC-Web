@@ -48,19 +48,19 @@ function PastorHeaderComponent({ showFullHeader = false }) {
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
-      
+
       // Check if click is outside dropdown area
       if (dropdownRef.current && !dropdownRef.current.contains(target)) {
         setShowNotifications(false);
         setShowProfileMenu(false);
         setShowSettingsMenu(false);
       }
-      
+
       // Check if click is outside mobile menu area
       if (
-        mobileMenuRef.current && 
+        mobileMenuRef.current &&
         !mobileMenuRef.current.contains(target) &&
-        dropdownRef.current && 
+        dropdownRef.current &&
         !dropdownRef.current.contains(target)
       ) {
         setShowMobileMenu(false);
@@ -75,7 +75,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
     { name: "My Mentors", path: "/pastor/Mymentors" },
     { name: "Revitalization Roadmap", path: "/pastor/revitalization-roadmap" },
     { name: "Assessments", path: "/pastor/assessments" },
-    { name: "Progress", path: "/pastor/progress" },
+    { name: "Progress", path: "/pastor/Myprogress" },
     { name: "Appointments", path: "/pastor/appointments" },
   ];
 
@@ -168,7 +168,10 @@ function PastorHeaderComponent({ showFullHeader = false }) {
       )}
 
       {/* ✅ Right Icons */}
-      <div className="flex items-center gap-3 md:gap-5 relative" ref={dropdownRef}>
+      <div
+        className="flex items-center gap-3 md:gap-5 relative"
+        ref={dropdownRef}
+      >
         {/* Mobile Menu Button */}
         {showFullHeader && isClient && (
           <button
@@ -351,7 +354,10 @@ function PastorHeaderComponent({ showFullHeader = false }) {
 
       {/* Mobile Navigation Menu */}
       {showFullHeader && showMobileMenu && (
-        <div ref={mobileMenuRef} className="lg:hidden absolute top-full left-0 right-0 bg-[#1A2E7A] border-t border-white/10 shadow-lg z-50">
+        <div
+          ref={mobileMenuRef}
+          className="lg:hidden absolute top-full left-0 right-0 bg-[#1A2E7A] border-t border-white/10 shadow-lg z-50"
+        >
           <nav className="flex flex-col py-2">
             {navLinks.map((link, index) => {
               const isActive = pathname === link.path;
@@ -377,11 +383,17 @@ function PastorHeaderComponent({ showFullHeader = false }) {
             })}
             {/* Mobile Search & Connect */}
             <div className="flex items-center gap-4 px-4 py-3 border-t border-white/10">
-              <button className="flex items-center gap-2 text-white/80 hover:text-white text-sm cursor-pointer" suppressHydrationWarning>
+              <button
+                className="flex items-center gap-2 text-white/80 hover:text-white text-sm cursor-pointer"
+                suppressHydrationWarning
+              >
                 <Image src={SearchIcon} alt="Search" width={16} height={16} />
                 Search
               </button>
-              <button className="flex items-center gap-2 text-white/80 hover:text-white text-sm cursor-pointer" suppressHydrationWarning>
+              <button
+                className="flex items-center gap-2 text-white/80 hover:text-white text-sm cursor-pointer"
+                suppressHydrationWarning
+              >
                 <Image src={Connecticon} alt="Connect" width={18} height={18} />
                 Connect
               </button>
@@ -400,7 +412,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
 }
 
 const PastorHeader = dynamic(() => Promise.resolve(PastorHeaderComponent), {
-  ssr: false
+  ssr: false,
 });
 
 export default PastorHeader;

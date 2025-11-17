@@ -62,19 +62,17 @@ export default function PastorAssignments() {
 
       {/* 🟣 HERO SECTION */}
       <section
-        className="relative h-[250px] flex items-end justify-start px-16 pb-12 bg-cover bg-center"
+        className="relative h-[250px] flex items-end justify-start px-16 pb-12 sm:px-4 sm:pb-6 bg-cover bg-center"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-[#09256F]/70 via-[#0E2F8A]/40 to-[#133A9E]/90"></div>
-        <h1 className="relative z-10 text-4xl font-semibold text-white mb-1">
+        <h1 className="relative z-10 text-4xl sm:text-2xl font-semibold text-white mb-1">
           Assignments
         </h1>
-
-   
       </section>
 
       {/* 🟦 MAIN CONTENT */}
-      <main className="flex-1 bg-[#254487] pt-24 pb-20 px-10 md:px-20">
+      <main className="flex-1 bg-[#254487] pt-24 pb-20 px-10 md:px-20 sm:px-4">
         <div className="max-w-7xl mx-auto">
           {/* 🔍 Search + Tabs */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-5 mb-10">
@@ -87,6 +85,7 @@ export default function PastorAssignments() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-white border border-gray-200 rounded-md pl-10 pr-4 py-2 text-sm text-gray-600 shadow-sm outline-none focus:ring-2 focus:ring-[#103C8C]"
+                suppressHydrationWarning={true}
               />
             </div>
 
@@ -101,6 +100,7 @@ export default function PastorAssignments() {
                       ? "bg-[#103C8C] text-white"
                       : "text-gray-600 hover:bg-gray-100"
                   }`}
+                  suppressHydrationWarning={true}
                 >
                   {tab}
                   {tab === "Due" && (
@@ -119,7 +119,7 @@ export default function PastorAssignments() {
                 className="bg-white rounded-xl shadow-md hover:shadow-lg overflow-hidden flex flex-col md:flex-row w-full md:w-[48%] transition-all duration-300"
               >
                 {/* LEFT IMAGE */}
-                <div className="relative w-full md:w-[200px] h-[200px] flex-shrink-0 m-5">
+                <div className="relative w-full md:w-[200px] h-[200px] sm:h-[150px] flex-shrink-0 m-5 sm:m-3">
                   <Image
                     src={item.img}
                     alt={item.title}
@@ -128,19 +128,21 @@ export default function PastorAssignments() {
                 </div>
 
                 {/* RIGHT CONTENT */}
-                <div className="flex flex-col justify-between flex-1 p-5">
+                <div className="flex flex-col justify-between flex-1 p-5 sm:p-3">
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-[17px] leading-tight mb-1">
+                    <h3 className="font-semibold text-gray-900 text-[17px] sm:text-base leading-tight mb-1">
                       {item.title}
                     </h3>
-                    <p className="text-sm text-gray-600 mb-3">{item.desc}</p>
+                    <p className="text-sm sm:text-xs text-gray-600 mb-3">
+                      {item.desc}
+                    </p>
 
                     {/* STATUS */}
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs text-gray-500 font-medium">
+                      <span className="text-xs sm:text-[10px] text-gray-500 font-medium">
                         Status
                       </span>
-                      <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-[2px] rounded">
+                      <span className="bg-blue-100 text-blue-700 text-xs sm:text-[10px] font-medium px-2 py-[2px] rounded">
                         {item.status}
                       </span>
                     </div>
@@ -150,12 +152,12 @@ export default function PastorAssignments() {
                       <div className="flex gap-4 mb-3">
                         {item.meetingDates.map((date, i) => (
                           <div key={i} className="flex flex-col">
-                            <p className="text-[12px] text-gray-500">
+                            <p className="text-[12px] sm:text-[10px] text-gray-500">
                               {i === 0
                                 ? "Month 3 meeting date"
                                 : "Month 4 meeting date"}
                             </p>
-                            <div className="bg-[#EFF6FF] border border-[#E5E7EB] rounded-md px-3 py-[6px] text-[12px] text-gray-600 mt-1 min-w-[120px] text-center">
+                            <div className="bg-[#EFF6FF] border border-[#E5E7EB] rounded-md px-3 py-[6px] text-[12px] sm:text-[10px] text-gray-600 mt-1 min-w-[120px] sm:min-w-[100px] text-center">
                               {date}
                             </div>
                           </div>
@@ -165,10 +167,10 @@ export default function PastorAssignments() {
 
                     {/* COMPLETION TIME */}
                     <div>
-                      <p className="text-[12px] text-gray-500">
+                      <p className="text-[12px] sm:text-[10px] text-gray-500">
                         Completion Time
                       </p>
-                      <p className="text-sm font-medium text-gray-800">
+                      <p className="text-sm sm:text-xs font-medium text-gray-800">
                         Months {item.months}
                       </p>
                     </div>
@@ -177,10 +179,9 @@ export default function PastorAssignments() {
                   {/* ✅ VIEW BUTTON */}
                   <div className="flex justify-end">
                     <button
-                      onClick={() =>
-                        router.push("/pastor/assignments/details")
-                      }
-                      className="bg-[#103C8C] text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-[#0B2E72] transition"
+                      onClick={() => router.push("/pastor/assignments/details")}
+                      className="bg-[#103C8C] text-white text-sm sm:text-xs font-medium px-5 py-2 sm:px-4 rounded-lg hover:bg-[#0B2E72] transition"
+                      suppressHydrationWarning={true}
                     >
                       View
                     </button>
@@ -191,8 +192,6 @@ export default function PastorAssignments() {
           </div>
         </div>
       </main>
-
-
     </div>
   );
 }
