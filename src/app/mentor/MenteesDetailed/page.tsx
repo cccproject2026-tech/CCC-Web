@@ -51,7 +51,7 @@ export default function MyMenteesPage() {
 
       {/* 🟦 HERO SECTION */}
       <section
-        className="relative h-[280px] bg-cover bg-center flex flex-col justify-end px-20 pb-10"
+        className="relative h-[280px] bg-cover bg-center flex flex-col justify-end px-4 md:px-20 pb-10"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-r from-[#0F1E44]/80 via-[#0F4A85]/50 to-transparent"></div>
@@ -61,11 +61,11 @@ export default function MyMenteesPage() {
       </section>
 
       {/* 🟩 MAIN SECTION */}
-      <main className="flex-1 px-20 py-10 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971]">
+      <main className="flex-1 px-4 md:px-20 py-10 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971]">
         <div className="max-w-7xl mx-auto">
           {/* 🔍 SEARCH + ICONS */}
-          <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
-            <div className="flex items-center w-[360px] bg-white rounded-md overflow-hidden shadow-sm">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+            <div className="flex items-center w-full sm:w-[360px] bg-white rounded-md overflow-hidden shadow-sm">
               <i className="fa-solid fa-magnifying-glass text-gray-400 px-3"></i>
               <input
                 type="text"
@@ -146,7 +146,7 @@ export default function MyMenteesPage() {
           ) : (
             <>
               {/* CARD VIEW */}
-              <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
                 <div className="flex bg-white rounded-lg shadow-sm overflow-hidden">
                   {["All", "In-Progress", "Completed"].map((tab) => (
                     <button
@@ -186,7 +186,7 @@ export default function MyMenteesPage() {
                     className="bg-white rounded-xl text-[#0B1C58] p-4 shadow-md hover:shadow-lg transition-all duration-200 relative"
                   >
                     {/* HEADER */}
-                    <div className="flex items-center gap-4 mb-3">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-3">
                       <Image
                         src={mentee.img}
                         alt={mentee.name}
@@ -194,8 +194,10 @@ export default function MyMenteesPage() {
                         height={60}
                         className="rounded-md object-cover"
                       />
-                      <div>
-                        <h4 className="text-[15px] font-semibold">{mentee.name}</h4>
+                      <div className="flex-1">
+                        <h4 className="text-[15px] font-semibold">
+                          {mentee.name}
+                        </h4>
                         <p className="text-sm text-gray-500">{mentee.role}</p>
                         <p className="text-[12px] text-gray-400 mt-1">
                           {mentee.desc}
