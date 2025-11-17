@@ -3,91 +3,90 @@ import Image from "next/image";
 import CCCLogo from "../../Assets/CCCLogo.png";
 import PastorHeader from "@/app/Components/PastorHeader";
 import AndrewsLogo from "../../Assets/andrews-logo.png";
-import { useRouter } from "next/navigation"; 
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-   const router = useRouter();
+  const router = useRouter();
+
   return (
     <div>
       <PastorHeader />
 
-      <section className="flex min-h-screen">
-   
-        <div className="w-full md:w-1/2 bg-white flex flex-col items-center justify-center p-8">
+      <section className="flex flex-col md:flex-row min-h-screen">
+        {/* LEFT LOGO SECTION */}
+        <div className="w-full md:w-1/2 bg-white flex flex-col items-center justify-center p-6 sm:p-8">
           <Image
             src={CCCLogo}
             alt="CCC Logo"
-            className="w-full object-contain mb-4"
+            className="w-[70%] sm:w-[55%] md:w-full max-w-[400px] object-contain mb-4"
+            priority
           />
         </div>
 
-      
-        <div className="w-full md:w-1/2 bg-gradient-to-b from-[#103C8C] to-[#1B4C9E] flex flex-col items-center justify-center px-8 py-12 relative">
-          
-
-          
-          <div className="text-left w-full max-w-[380px] mb-6">
-            <h1 className="text-white text-xl font-semibold">Login</h1>
+        {/* RIGHT LOGIN SECTION */}
+        <div className="w-full md:w-1/2 bg-gradient-to-b from-[#103C8C] to-[#1B4C9E] flex flex-col items-center justify-center px-6 sm:px-8 py-10 md:py-12 relative min-h-[600px]">
+          {/* HEADER */}
+          <div className="text-left w-full max-w-[380px] mb-4 sm:mb-6">
+            <h1 className="text-white text-lg sm:text-xl font-semibold">
+              Login
+            </h1>
           </div>
 
-        
+          {/* FORM */}
           <div className="w-full max-w-[380px] bg-transparent">
-            <form className="flex flex-col gap-4">
+            <form className="flex flex-col gap-3 sm:gap-4">
               <input
                 type="text"
                 placeholder="Email or User Name"
-                className="w-full rounded-md px-4 py-2 text-sm bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white"
+                className="w-full rounded-md px-4 py-2 text-sm sm:text-base bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white"
               />
+
               <input
                 type="password"
                 placeholder="Password"
-                className="w-full rounded-md px-4 py-2 text-sm bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white"
+                className="w-full rounded-md px-4 py-2 text-sm sm:text-base bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white"
               />
 
-           
               <button
-              type="button"
-                className="w-full mt-4 bg-white text-[#103C8C] font-medium py-2 rounded-md hover:opacity-90 transition"
-               onClick={() =>router.push(`/pastor/profile-incomplete`)}
+                type="button"
+                className="w-full mt-3 sm:mt-4 bg-white text-[#103C8C] font-medium py-2 rounded-md text-sm sm:text-base hover:opacity-90 transition"
+                onClick={() => router.push(`/pastor/profile-incomplete`)}
               >
                 Login
               </button>
             </form>
 
-        
             <div className="text-right mt-2">
               <a
                 href="#"
-                className="text-[13px] text-white/80 hover:text-white transition"
+                className="text-[12px] sm:text-[13px] text-white/80 hover:text-white transition"
               >
                 Forgot Password ?
               </a>
             </div>
 
-          
-          <div className="flex mt-6">
-  <button
-  className="w-full bg-gradient-to-r from-[#A150C0] to-[#1158D0] text-white py-2 px-12 rounded-lg text-sm font-medium flex items-center justify-between hover:opacity-90 transition cursor-pointer"
-onClick={() =>router.push(`/pastor/InterestForm`)}
->
-  <span>New User <span className="ml-1">&nbsp;&nbsp;» </span></span>
-  <span>Submit Interest</span>
-</button>
-
-
-</div>
-
+            {/* NEW USER BUTTON */}
+            <div className="flex mt-5 sm:mt-6">
+              <button
+                className="w-full bg-gradient-to-r from-[#A150C0] to-[#1158D0] text-white py-2 px-6 sm:px-12 rounded-lg text-xs sm:text-sm font-medium flex items-center justify-between hover:opacity-90 transition cursor-pointer"
+                onClick={() => router.push(`/pastor/InterestForm`)}
+              >
+                <span className="flex items-center gap-1">
+                  New User <span>»</span>
+                </span>
+                <span className="hidden sm:flex">Submit Interest</span>
+                <span className="sm:hidden">Submit</span>
+              </button>
+            </div>
           </div>
 
-       
-          <div className="absolute bottom-6">
-            <div className="flex flex-col items-center">
-              <Image
-                src={AndrewsLogo}
-                alt="Andrews University Logo"
-                className="w-[220px] object-contain"
-              />
-            </div>
+          {/* ANDREWS LOGO - FIXED FOR LARGE SCREENS */}
+          <div className="absolute bottom-4 md:bottom-6 inset-x-0 flex justify-center">
+            <Image
+              src={AndrewsLogo}
+              alt="Andrews University Logo"
+              className="w-[150px] sm:w-[200px] md:w-[230px] lg:w-[250px] object-contain"
+            />
           </div>
         </div>
       </section>
