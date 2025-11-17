@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Framelogo1 from "../Assets/Frame-logo-1.png";
 import Connecticon from "../Assets/Connect-icon.png";
 import NotificationIcon from "../Assets/notification.png";
@@ -23,26 +23,41 @@ import {
   Lock,
   BellOff,
   UserX,
+  Menu,
+  X,
 } from "lucide-react";
 
 export default function PastorHeader({ showFullHeader = false }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   // ✅ Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(e.target as Node)
-      ) {
+      const target = e.target as Node;
+      
+      // Check if click is outside dropdown area
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
         setShowNotifications(false);
         setShowProfileMenu(false);
         setShowSettingsMenu(false);
+      }
+      
+      // Check if click is outside mobile menu area
+      if (
+        mobileMenuRef.current && 
+        !mobileMenuRef.current.contains(target) &&
+        dropdownRef.current && 
+        !dropdownRef.current.contains(target)
+      ) {
+        setShowMobileMenu(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -118,7 +133,7 @@ export default function PastorHeader({ showFullHeader = false }) {
   ];
 
   return (
-    <header className="flex items-center justify-between px-10 py-3 bg-[#1A2E7A] text-white shadow-md relative z-50 font-[Albert_Sans]">
+    <header className="flex items-center justify-between px-4 md:px-6 lg:px-10 py-3 bg-[#1A2E7A] text-white shadow-md relative z-40 font-[Albert_Sans]">
       {/* ✅ Left Logo */}
       <div className="flex items-center gap-3">
         <Image src={Framelogo1} alt="Logo" width={26} height={26} />
@@ -147,11 +162,20 @@ export default function PastorHeader({ showFullHeader = false }) {
       )}
 
       {/* ✅ Right Icons */}
-      <div className="flex items-center gap-5 relative" ref={dropdownRef}>
+      <div className="flex items-center gap-3 md:gap-5 relative" ref={dropdownRef}>
+        {/* Mobile Menu Button */}
+        {showFullHeader && (
+          <button
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            className="lg:hidden p-1 hover:bg-white/10 rounded transition"
+          >
+            {showMobileMenu ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        )}
         {showFullHeader && (
           <>
             {/* 🔍 Search */}
-            <button className="hover:opacity-80 transition">
+            <button className="hidden md:block hover:opacity-80 transition">
               <Image src={SearchIcon} alt="Search" width={18} height={18} />
             </button>
 
@@ -178,9 +202,9 @@ export default function PastorHeader({ showFullHeader = false }) {
 
               {/* Notification Dropdown */}
               {showNotifications && (
-                <div className="absolute -right-8 mt-4 w-[450px] bg-white rounded-2xl shadow-lg border border-gray-100">
+                <div className="absolute -right-4 md:-right-8 mt-4 w-[300px] md:w-[450px] bg-white rounded-2xl shadow-lg border border-gray-100">
                   {/* Pointer */}
-                  <div className="absolute -top-2 right-8 w-4 h-4 bg-white rotate-45 border-t border-l border-gray-100"></div>
+                  <div className="absolute -top-2 right-4 md:right-8 w-4 h-4 bg-white rotate-45 border-t border-l border-gray-100"></div>
 
                   {/* Header */}
                   <div className="px-5 py-3 border-b border-gray-200 flex justify-between items-center">
@@ -227,7 +251,7 @@ export default function PastorHeader({ showFullHeader = false }) {
             </div>
 
             {/* 🔗 Connect */}
-            <button className="hover:opacity-80 transition">
+            <button className="hidden md:block hover:opacity-80 transition">
               <Image src={Connecticon} alt="Connect" width={22} height={22} />
             </button>
 
@@ -239,9 +263,9 @@ export default function PastorHeader({ showFullHeader = false }) {
                   setShowNotifications(false);
                   setShowSettingsMenu(false);
                 }}
-                className="flex items-center gap-2 bg-[#223C8C] px-3 py-1 rounded-full hover:opacity-90 transition cursor-pointer"
+                className="flex items-center gap-2 bg-[#223C8C] px-2 md:px-3 py-1 rounded-full hover:opacity-90 transition cursor-pointer"
               >
-                <div className="text-right text-[11px] leading-tight">
+                <div className="hidden md:block text-right text-[11px] leading-tight">
                   <p className="text-white/80">Good Morning</p>
                   <p className="text-white font-medium">John Ross</p>
                 </div>
@@ -256,7 +280,7 @@ export default function PastorHeader({ showFullHeader = false }) {
 
               {/* Profile Menu Dropdown */}
               {showProfileMenu && (
-                <div className="absolute right-0 mt-3 w-[230px] bg-white rounded-2xl shadow-lg border border-gray-100 text-[#0033A0] font-[Albert_Sans]">
+                <div className="absolute right-0 mt-3 w-[200px] md:w-[230px] bg-white rounded-2xl shadow-lg border border-gray-100 text-[#0033A0] font-[Albert_Sans]">
                   {/* Pointer */}
                   <div className="absolute -top-2 right-6 w-4 h-4 bg-white rotate-45 border-t border-l border-gray-100"></div>
 
@@ -283,7 +307,7 @@ export default function PastorHeader({ showFullHeader = false }) {
 
                         {/* ⚙️ Settings Sub-Menu */}
                         {item.subMenu && showSettingsMenu && (
-                          <div className="absolute -left-[240px] top-0 mt-1 w-[230px] bg-white rounded-2xl shadow-lg border border-gray-100 text-[#0033A0]">
+                          <div className="absolute -left-[200px] md:-left-[240px] top-0 mt-1 w-[200px] md:w-[230px] bg-white rounded-2xl shadow-lg border border-gray-100 text-[#0033A0]">
                             {/* <div className="absolute -right-2 top-3 w-4 h-4 bg-white rotate-45 border-l border-t border-gray-100"></div> */}
 
                             <div className="flex flex-col py-2">
@@ -313,6 +337,46 @@ export default function PastorHeader({ showFullHeader = false }) {
           </>
         )}
       </div>
+
+      {/* Mobile Navigation Menu */}
+      {showFullHeader && showMobileMenu && (
+        <div ref={mobileMenuRef} className="lg:hidden absolute top-full left-0 right-0 bg-[#1A2E7A] border-t border-white/10 shadow-lg z-50">
+          <nav className="flex flex-col py-2">
+            {navLinks.map((link, index) => {
+              const isActive = pathname === link.path;
+              return (
+                <button
+                  key={index}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push(link.path);
+                    setShowMobileMenu(false);
+                  }}
+                  className={`px-4 py-3 text-sm transition-all duration-200 border-b border-white/5 last:border-b-0 text-left w-full cursor-pointer ${
+                    isActive
+                      ? "font-semibold text-white bg-white/10"
+                      : "text-white/80 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  {link.name}
+                </button>
+              );
+            })}
+            {/* Mobile Search & Connect */}
+            <div className="flex items-center gap-4 px-4 py-3 border-t border-white/10">
+              <button className="flex items-center gap-2 text-white/80 hover:text-white text-sm cursor-pointer">
+                <Image src={SearchIcon} alt="Search" width={16} height={16} />
+                Search
+              </button>
+              <button className="flex items-center gap-2 text-white/80 hover:text-white text-sm cursor-pointer">
+                <Image src={Connecticon} alt="Connect" width={18} height={18} />
+                Connect
+              </button>
+            </div>
+          </nav>
+        </div>
+      )}
 
       {/* Notification Popup */}
       <NotificationPopup
