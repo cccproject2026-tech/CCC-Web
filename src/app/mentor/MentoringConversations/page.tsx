@@ -68,7 +68,7 @@ export default function MentoringConversationsPage() {
 
       {/* HERO */}
       <section
-        className="relative h-[300px] bg-cover bg-center flex flex-col justify-end px-20 pb-10"
+        className="relative h-[300px] bg-cover bg-center flex flex-col justify-end px-4 md:px-20 pb-10"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-black/55" />
@@ -89,7 +89,7 @@ export default function MentoringConversationsPage() {
       </section>
 
       {/* MAIN */}
-      <main className="flex-1 px-16 py-10 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971]">
+      <main className="flex-1 px-4 md:px-16 py-10 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971]">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[270px_1fr] gap-10">
           {/* LEFT SIDE */}
           <aside className="bg-white rounded-xl p-4 h-fit">
@@ -166,7 +166,7 @@ export default function MentoringConversationsPage() {
             ) : (
               <>
                 {/* NOTES HEADER */}
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <h2 className="text-xl font-semibold">Notes</h2>
                   <div className="flex items-center gap-3">
                     {/* Segmented Control */}

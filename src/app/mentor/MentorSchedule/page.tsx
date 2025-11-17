@@ -10,9 +10,9 @@ import UserProfile from "../../Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 export default function MentorSchedule() {
-  const [activeTab, setActiveTab] = useState<"Appointments" | "Availability" | "Schedule">(
-    "Appointments"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "Appointments" | "Availability" | "Schedule"
+  >("Appointments");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerStep, setDrawerStep] = useState<1 | 2>(1);
   const [showMenu, setShowMenu] = useState<number | null>(null);
@@ -49,7 +49,7 @@ export default function MentorSchedule() {
 
       {/* 🟦 HERO SECTION */}
       <section
-        className="relative h-[260px] flex flex-col justify-center px-20 text-white bg-cover bg-center"
+        className="relative h-[260px] flex flex-col justify-center px-4 md:px-20 text-white bg-cover bg-center"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-r from-[#0A3C8C]/90 to-[#052860]/70"></div>
@@ -59,45 +59,45 @@ export default function MentorSchedule() {
       </section>
 
       {/* 🟩 TAB CONTROLS */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-20 py-8 bg-[#176192] gap-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 md:px-20 py-8 bg-[#176192] gap-5">
         <input
           type="text"
           placeholder="Enter a date (dd-mm-yyyy)"
-          className="w-[320px] border bg-white border-[#DDE2EB] rounded-md px-4 py-2 text-sm text-gray-600 shadow-sm focus:outline-none focus:border-[#103C8C]"
+          className="w-full sm:w-[320px] border bg-white border-[#DDE2EB] rounded-md px-4 py-2 text-sm text-gray-600 shadow-sm focus:outline-none focus:border-[#103C8C]"
         />
-        <div className="flex gap-3">
-         {["Appointments", "Availability", "Schedule"].map((tab) => (
-  <button
-    key={tab}
-    onClick={() => {
-      setActiveTab(tab as any);
-      if (tab === "Schedule") {
-        // setDrawerStep(1);
-        setIsDrawerOpen(true);
-      }
-    }}
-    className={`px-5 py-2 text-sm rounded-md font-medium transition-all ${
-      activeTab === tab
-        ? "bg-[#103C8C] text-white shadow-sm"
-        : "bg-white text-[#103C8C] border border-[#103C8C] hover:bg-[#F5F8FF]"
-    }`}
-  >
-    {tab}
-  </button>
-))}
-
+        <div className="flex gap-3 flex-wrap">
+          {["Appointments", "Availability", "Schedule"].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => {
+                setActiveTab(tab as any);
+                if (tab === "Schedule") {
+                  // setDrawerStep(1);
+                  setIsDrawerOpen(true);
+                }
+              }}
+              className={`px-3 sm:px-5 py-2 text-sm rounded-md font-medium transition-all ${
+                activeTab === tab
+                  ? "bg-[#103C8C] text-white shadow-sm"
+                  : "bg-white text-[#103C8C] border border-[#103C8C] hover:bg-[#F5F8FF]"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* 🟦 TAB CONTENT */}
-      <main className="flex-1 bg-[#176192] text-white px-20 pb-20">
+      <main className="flex-1 bg-[#176192] text-white px-4 md:px-20 pb-20">
         {/* 🟨 APPOINTMENTS TAB */}
         {activeTab === "Appointments" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Calendar */}
             <div className="bg-[#0C4A85] rounded-2xl p-6 text-white shadow-md">
               <h3 className="text-[15px] font-medium mb-4 flex items-center gap-2">
-                <i className="fa-regular fa-calendar"></i> Monthly Meeting Calendar
+                <i className="fa-regular fa-calendar"></i> Monthly Meeting
+                Calendar
               </h3>
 
               <div className="bg-[#103C8C] rounded-xl p-5 text-center">
@@ -137,15 +137,29 @@ export default function MentorSchedule() {
                     className="bg-white rounded-xl p-5 shadow-sm border border-[#E5E7EB] flex items-center gap-5 relative"
                   >
                     <div className="bg-[#F3F6FB] w-[100px] h-[100px] rounded-xl flex items-center justify-center">
-                      <Image src={appt.icon} alt={appt.mode} className="w-[55px] h-[55px]" />
+                      <Image
+                        src={appt.icon}
+                        alt={appt.mode}
+                        className="w-[55px] h-[55px]"
+                      />
                     </div>
 
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <Image src={UserProfile} alt="Mentor" width={36} height={36} className="rounded-full" />
+                        <Image
+                          src={UserProfile}
+                          alt="Mentor"
+                          width={36}
+                          height={36}
+                          className="rounded-full"
+                        />
                         <div>
-                          <h4 className="font-semibold text-[#0B1C58] text-sm">{appt.mentor}</h4>
-                          <p className="text-[12px] text-gray-500">{appt.role}</p>
+                          <h4 className="font-semibold text-[#0B1C58] text-sm">
+                            {appt.mentor}
+                          </h4>
+                          <p className="text-[12px] text-gray-500">
+                            {appt.role}
+                          </p>
                         </div>
                       </div>
 
@@ -161,7 +175,10 @@ export default function MentorSchedule() {
                       </div>
 
                       <p className="text-[12px] text-[#6B7280] mb-2">
-                        Mode: <span className="text-[#103C8C] font-semibold">{appt.mode}</span>
+                        Mode:{" "}
+                        <span className="text-[#103C8C] font-semibold">
+                          {appt.mode}
+                        </span>
                       </p>
 
                       <div className="flex justify-between items-center">
@@ -173,7 +190,9 @@ export default function MentorSchedule() {
 
                         <div className="relative">
                           <button
-                            onClick={() => setShowMenu(showMenu === index ? null : index)}
+                            onClick={() =>
+                              setShowMenu(showMenu === index ? null : index)
+                            }
                             className="text-[#103C8C] px-3 py-1 hover:text-[#0B2E72]"
                           >
                             <i className="fa-solid fa-ellipsis-vertical"></i>
@@ -211,22 +230,26 @@ export default function MentorSchedule() {
         {activeTab === "Availability" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
             <div className="bg-[#0C4A85] p-6 rounded-2xl text-white shadow-md">
-              <h3 className="text-[15px] font-medium mb-5">My Weekly Availability</h3>
+              <h3 className="text-[15px] font-medium mb-5">
+                My Weekly Availability
+              </h3>
               <div className="bg-[#103C8C] rounded-xl p-5 text-center mb-6">
                 <p className="text-sm text-white/70 mb-2">August 2024</p>
                 <div className="grid grid-cols-7 gap-2 text-[13px]">
-                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-                    <div
-                      key={d}
-                      className={`py-2 rounded-md ${
-                        d === "Wed"
-                          ? "bg-[#00B3FF] text-white font-bold"
-                          : "text-white/80 hover:bg-[#00B3FF]/40 cursor-pointer"
-                      }`}
-                    >
-                      {d}
-                    </div>
-                  ))}
+                  {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(
+                    (d) => (
+                      <div
+                        key={d}
+                        className={`py-2 rounded-md ${
+                          d === "Wed"
+                            ? "bg-[#00B3FF] text-white font-bold"
+                            : "text-white/80 hover:bg-[#00B3FF]/40 cursor-pointer"
+                        }`}
+                      >
+                        {d}
+                      </div>
+                    )
+                  )}
                 </div>
               </div>
 
@@ -254,24 +277,33 @@ export default function MentorSchedule() {
             {/* Available Hours */}
             <div className="text-white">
               <h3 className="text-[15px] font-medium mb-3">Available Hours</h3>
-              {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map((day) => (
-                <div key={day} className="flex items-center gap-3 mb-3 border-b border-white/20 pb-2">
-                  <input type="checkbox" defaultChecked className="accent-[#103C8C]" />
-                  <p className="w-[100px]">{day}</p>
-                  <select className="bg-white text-[#0B1C58] rounded-md text-xs px-2 py-1">
-                    <option>10:00 AM</option>
-                    <option>03:00 PM</option>
-                  </select>
-                  <span>to</span>
-                  <select className="bg-white text-[#0B1C58] rounded-md text-xs px-2 py-1">
-                    <option>07:00 PM</option>
-                    <option>09:00 PM</option>
-                  </select>
-                  <button className="bg-white text-[#103C8C] text-xs px-3 py-[4px] rounded-md ml-2">
-                    + Add
-                  </button>
-                </div>
-              ))}
+              {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"].map(
+                (day) => (
+                  <div
+                    key={day}
+                    className="flex items-center gap-3 mb-3 border-b border-white/20 pb-2"
+                  >
+                    <input
+                      type="checkbox"
+                      defaultChecked
+                      className="accent-[#103C8C]"
+                    />
+                    <p className="w-[100px]">{day}</p>
+                    <select className="bg-white text-[#0B1C58] rounded-md text-xs px-2 py-1">
+                      <option>10:00 AM</option>
+                      <option>03:00 PM</option>
+                    </select>
+                    <span>to</span>
+                    <select className="bg-white text-[#0B1C58] rounded-md text-xs px-2 py-1">
+                      <option>07:00 PM</option>
+                      <option>09:00 PM</option>
+                    </select>
+                    <button className="bg-white text-[#103C8C] text-xs px-3 py-[4px] rounded-md ml-2">
+                      + Add
+                    </button>
+                  </div>
+                )
+              )}
             </div>
           </div>
         )}
@@ -390,7 +422,7 @@ export default function MentorSchedule() {
                 </div>
 
                 {/* Times */}
-                              <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="grid grid-cols-2 gap-3 mb-6">
                   <button className="border border-[#103C8C] text-[#103C8C] text-sm font-medium px-3 py-2 rounded-md hover:bg-[#F5F8FF]">
                     09:00 am - 10:00 am
                   </button>
@@ -453,9 +485,6 @@ export default function MentorSchedule() {
           </div>
         </div>
       )}
-
-
     </div>
   );
 }
-

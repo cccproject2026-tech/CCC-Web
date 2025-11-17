@@ -15,7 +15,10 @@ export default function MentorProfile() {
   const handleAddChurch = () => {
     setChurchList([
       ...churchList,
-      { id: Date.now(), title: `Current Church – ${churchList.length + 1} Information` },
+      {
+        id: Date.now(),
+        title: `Current Church – ${churchList.length + 1} Information`,
+      },
     ]);
   };
 
@@ -29,7 +32,7 @@ export default function MentorProfile() {
       <PastorHeader showFullHeader={true} />
 
       {/* MAIN CONTENT */}
-      <main className="px-10 py-8 flex justify-center">
+      <main className="px-4 md:px-10 py-8 flex justify-center">
         <div className="flex flex-col md:flex-row gap-8 w-full max-w-7xl">
           {/* 🟦 LEFT PROFILE CARD */}
           <div className="bg-white rounded-xl shadow-md p-5 text-center w-full h-[400px] md:w-[280px] flex-shrink-0">
@@ -57,7 +60,8 @@ export default function MentorProfile() {
               rows={3}
             />
             <button className="text-xs font-medium text-[#103C8C] border border-[#DADADA] rounded-md px-3 py-2 flex items-center justify-center gap-2 w-full hover:bg-[#F5F7FB] transition">
-              <i className="fa-solid fa-paperclip text-[#103C8C]"></i> Upload documents
+              <i className="fa-solid fa-paperclip text-[#103C8C]"></i> Upload
+              documents
             </button>
           </div>
 
@@ -124,7 +128,10 @@ export default function MentorProfile() {
 
               {/* 🟣 Dynamic Church Information */}
               {churchList.map((church) => (
-                <div key={church.id} className="col-span-2 border-t border-white/20 pt-4">
+                <div
+                  key={church.id}
+                  className="col-span-2 border-t border-white/20 pt-4"
+                >
                   <div className="flex justify-between items-center mb-3">
                     <h3 className="text-white font-semibold">{church.title}</h3>
                     {isEditing && (

@@ -58,7 +58,7 @@ export default function RevitalizationRoadmapPage() {
 
       {/* 🟦 HERO SECTION */}
       <section
-        className="relative h-[280px] bg-cover bg-center flex flex-col justify-end px-20 pb-10"
+        className="relative h-[280px] bg-cover bg-center flex flex-col justify-end px-4 md:px-20 pb-10"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-r from-[#0F1E44]/80 via-[#0F4A85]/50 to-transparent"></div>
@@ -68,12 +68,12 @@ export default function RevitalizationRoadmapPage() {
       </section>
 
       {/* 🟩 MAIN CONTENT */}
-      <main className="flex-1 px-20 py-10 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971]">
+      <main className="flex-1 px-4 md:px-20 py-10 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971]">
         <div className="max-w-7xl mx-auto">
           {/* 🔍 SEARCH + TABS */}
-          <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
             {/* Search Input */}
-            <div className="flex items-center w-[340px] bg-white rounded-md overflow-hidden shadow-sm">
+            <div className="flex items-center w-full sm:w-[340px] bg-white rounded-md overflow-hidden shadow-sm">
               <i className="fa-solid fa-magnifying-glass text-gray-400 px-3"></i>
               <input
                 type="text"
@@ -145,66 +145,66 @@ export default function RevitalizationRoadmapPage() {
           {/* 🧱 ROADMAP CARDS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {mentees.map((mentee) => (
-            <div
-  key={mentee.id}
-  className="flex bg-white rounded-xl border border-[#E5EAF1] overflow-hidden"
->
-  {/* LEFT IMAGE */}
-  <div className="w-[150px] h-[150px] flex-shrink-0">
-    <Image
-      src={mentee.img}
-      alt={mentee.name}
-      width={150}
-      height={150}
-      className="w-full h-full object-cover"
-    />
-  </div>
+              <div
+                key={mentee.id}
+                className="flex bg-white rounded-xl border border-[#E5EAF1] overflow-hidden"
+              >
+                {/* LEFT IMAGE */}
+                <div className="w-[150px] h-[150px] flex-shrink-0">
+                  <Image
+                    src={mentee.img}
+                    alt={mentee.name}
+                    width={150}
+                    height={150}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
 
-  {/* RIGHT CONTENT */}
-  <div className="flex flex-col justify-between p-4 flex-1 text-[#0B1C58]">
-    <div>
-      <h4 className="text-[15px] font-semibold mb-0.5">{mentee.name}</h4>
-      <p className="text-[13px] text-[#6B7280] mb-2 leading-snug">
-        {mentee.desc}
-      </p>
+                {/* RIGHT CONTENT */}
+                <div className="flex flex-col justify-between p-4 flex-1 text-[#0B1C58]">
+                  <div>
+                    <h4 className="text-[15px] font-semibold mb-0.5">
+                      {mentee.name}
+                    </h4>
+                    <p className="text-[13px] text-[#6B7280] mb-2 leading-snug">
+                      {mentee.desc}
+                    </p>
 
-      <div className="inline-block bg-[#EAF4FF] text-[#0F4A85] text-[12px] px-3 py-[3px] rounded-full font-medium mb-3">
-        Phase : {mentee.phase}
-      </div>
+                    <div className="inline-block bg-[#EAF4FF] text-[#0F4A85] text-[12px] px-3 py-[3px] rounded-full font-medium mb-3">
+                      Phase : {mentee.phase}
+                    </div>
 
-      <p className="text-[12px] text-[#6B7280] mb-1 font-medium">
-        Tasks Completed
-      </p>
+                    <p className="text-[12px] text-[#6B7280] mb-1 font-medium">
+                      Tasks Completed
+                    </p>
 
-      {/* PROGRESS BAR */}
-      <div className="flex items-center gap-2">
-        <div className="flex-1 bg-gray-200 h-[6px] rounded-full">
-          <div
-            className="h-[6px] bg-[#00B16A] rounded-full"
-            style={{ width: `${mentee.progress}%` }}
-          ></div>
-        </div>
-        <span className="text-[12px] text-[#6B7280]">
-          {mentee.progress}%
-        </span>
-      </div>
-    </div>
+                    {/* PROGRESS BAR */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-gray-200 h-[6px] rounded-full">
+                        <div
+                          className="h-[6px] bg-[#00B16A] rounded-full"
+                          style={{ width: `${mentee.progress}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-[12px] text-[#6B7280]">
+                        {mentee.progress}%
+                      </span>
+                    </div>
+                  </div>
 
-    {/* ACTION ICONS */}
-    <div className="flex items-center gap-5 text-[#0F4A85] mt-4 text-[15px]">
-      <i className="fa-regular fa-envelope cursor-pointer hover:text-[#0B1C58]"></i>
-      <i className="fa-regular fa-comment cursor-pointer hover:text-[#0B1C58]"></i>
-      <i className="fa-brands fa-whatsapp cursor-pointer hover:text-[#0B1C58]"></i>
-      <i className="fa-solid fa-phone cursor-pointer hover:text-[#0B1C58]"></i>
-    </div>
-  </div>
-</div>
-
+                  {/* ACTION ICONS */}
+                  <div className="flex items-center gap-5 text-[#0F4A85] mt-4 text-[15px]">
+                    <i className="fa-regular fa-envelope cursor-pointer hover:text-[#0B1C58]"></i>
+                    <i className="fa-regular fa-comment cursor-pointer hover:text-[#0B1C58]"></i>
+                    <i className="fa-brands fa-whatsapp cursor-pointer hover:text-[#0B1C58]"></i>
+                    <i className="fa-solid fa-phone cursor-pointer hover:text-[#0B1C58]"></i>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         </div>
       </main>
-
     </div>
   );
 }

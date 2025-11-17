@@ -112,7 +112,7 @@ export default function NotificationsPage() {
       <PastorHeader showFullHeader={true} />
 
       {/* 🟦 MAIN CONTENT */}
-      <main className="flex-1 px-20 py-10 text-white overflow-y-auto">
+      <main className="flex-1 px-4 md:px-20 py-10 text-white overflow-y-auto">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-2xl font-semibold mb-6 border-b border-white/30 pb-2">
             Notifications
@@ -139,7 +139,9 @@ export default function NotificationsPage() {
                         {note.title}
                       </p>
                       {note.tag && (
-                        <span className="text-yellow-400 text-xs">{note.tag}</span>
+                        <span className="text-yellow-400 text-xs">
+                          {note.tag}
+                        </span>
                       )}
                     </div>
                     <p className="text-xs text-gray-500 mt-1">{note.desc}</p>
@@ -158,7 +160,7 @@ export default function NotificationsPage() {
 
       {/* 🟢 FIXED BOTTOM FLOAT BUTTON */}
       <button className="fixed bottom-6 right-6 w-[55px] h-[55px] rounded-full bg-gradient-to-r from-[#00B3FF] to-[#0057C2] flex items-center justify-center shadow-lg hover:scale-110 transition">
-        <Image src="" alt="Send" width={24} height={24} />
+        <i className="fa-solid fa-paper-plane text-white text-lg"></i>
       </button>
     </div>
   );
