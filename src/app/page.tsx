@@ -24,7 +24,7 @@ export default function LandingPage() {
       name: "Director",
       desc: "Explore the Director dashboard with organization insights and reports.",
       color: "from-[#7340C4] to-[#4B1E8E]",
-      path: "/director",
+      path: "/director/home",
     },
   ];
 
@@ -63,7 +63,7 @@ export default function LandingPage() {
 
       {/* FOOTER */}
       <footer className="mt-16 text-center text-xs text-gray-600">
-        © {new Date().getFullYear()} CCC Demo Portal — Built for presentation
+        ©️ {new Date().getFullYear()} CCC Demo Portal — Built for presentation
       </footer>
     </div>
   );
