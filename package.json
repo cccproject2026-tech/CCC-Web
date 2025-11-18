@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.1.0",
+    "axios": "^1.13.2",
     "chart.js": "^4.5.1",
     "lucide-react": "^0.552.0",
     "next": "15.5.4",

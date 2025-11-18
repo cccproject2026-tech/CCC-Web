@@ -56,15 +56,15 @@ export default function PastorProgressPage() {
           height:"220px"
         }}
       >
-        <h1 className="text-3xl font-semibold tracking-wide mt-35 pl-17">My Progress</h1>
+        <h1 className="text-2xl md:text-3xl font-semibold tracking-wide mt-8 md:mt-12 px-4 md:px-8 lg:px-16">My Progress</h1>
       </div>
 
       {/* CONTENT */}
       <main className="flex-1 bg-[#F4F7FC] text-[#0B1C58]">
         {/* --- OVERALL + INDIVIDUAL PROGRESS --- */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-8 px-16 py-12 bg-[#176192]">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 px-4 md:px-8 lg:px-16 py-8 md:py-12 bg-[#176192]">
           {/* Left Card */}
-          <div className="bg-white rounded-xl shadow-sm p-8">
+          <div className="bg-white rounded-xl shadow-sm p-4 md:p-8">
             <h3 className="text-lg font-semibold mb-4">Overall Progress</h3>
             <div className="flex justify-center">
               <Image
@@ -77,7 +77,7 @@ export default function PastorProgressPage() {
           </div>
 
           {/* Right Card */}
-          <div className="bg-white rounded-xl shadow-sm p-8">
+          <div className="bg-white rounded-xl shadow-sm p-4 md:p-8">
             <h3 className="text-lg font-semibold mb-4">Individual Progress</h3>
             <div className="flex justify-center">
               <Image
@@ -92,16 +92,16 @@ export default function PastorProgressPage() {
 
         {/* --- ROADMAP PROGRESS --- */}
       {/* --- ROADMAP PROGRESS --- */}
-<section className="px-16 mb-12 bg-gradient-to-b from-[#BBD6E9] to-[#E3F1FF] pt-8">
-  <div className="flex justify-between items-center mb-6">
-    <h2 className="text-xl font-semibold">Revitalization Roadmap Progress</h2>
+<section className="px-4 md:px-8 lg:px-16 mb-12 bg-gradient-to-b from-[#BBD6E9] to-[#E3F1FF] pt-8">
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+    <h2 className="text-lg md:text-xl font-semibold">Revitalization Roadmap Progress</h2>
 
-    <div className="flex bg-white rounded-lg shadow overflow-hidden">
+    <div className="flex bg-white rounded-lg shadow overflow-hidden text-sm">
       {["All", "Completed", "Remaining"].map((tab) => (
         <button
           key={tab}
           onClick={() => setFilter(tab)}
-          className={`px-5 py-2 text-sm font-medium transition-all ${
+          className={`px-3 md:px-5 py-2 text-xs md:text-sm font-medium transition-all ${
             filter === tab
               ? "bg-[#103C8C] text-white"
               : "text-gray-600 hover:text-[#103C8C]"
@@ -113,11 +113,11 @@ export default function PastorProgressPage() {
     </div>
   </div>
 
-  <div className="grid lg:grid-cols-2 gap-8">
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">
     {/* CARD 1 */}
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-all">
       <div className="flex">
-        <div className="w-1/3">
+        <div className="w-1/3 sm:w-1/4 md:w-1/3">
           <Image
             src={card1}
             alt="Self Revitalization"
@@ -125,11 +125,11 @@ export default function PastorProgressPage() {
           />
         </div>
 
-        <div className="flex-1 p-5">
-          <h4 className="text-[15px] font-semibold mb-1">
+        <div className="flex-1 p-3 md:p-5">
+          <h4 className="text-sm md:text-[15px] font-semibold mb-1">
             Self Revitalization Phase
           </h4>
-          <p className="text-[13px] text-[#6B7280] mb-3">
+          <p className="text-xs md:text-[13px] text-[#6B7280] mb-3">
             Interested in receiving mentoring in community engagement
           </p>
 
@@ -153,7 +153,7 @@ export default function PastorProgressPage() {
           </p>
 
           <div className="flex justify-end mt-4">
-            <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[12px] px-6 py-[6px] rounded-md font-medium">
+            <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[10px] md:text-[12px] px-3 md:px-6 py-[6px] rounded-md font-medium">
               View
             </button>
           </div>
@@ -164,7 +164,7 @@ export default function PastorProgressPage() {
     {/* CARD 2 */}
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-all">
       <div className="flex">
-        <div className="w-1/3">
+        <div className="w-1/3 sm:w-1/4 md:w-1/3">
           <Image
             src={card2}
             alt="Church Empowerment Phase"
@@ -172,11 +172,11 @@ export default function PastorProgressPage() {
           />
         </div>
 
-        <div className="flex-1 p-5">
-          <h4 className="text-[15px] font-semibold mb-1">
+        <div className="flex-1 p-3 md:p-5">
+          <h4 className="text-sm md:text-[15px] font-semibold mb-1">
             Church Empowerment Phase
           </h4>
-          <p className="text-[13px] text-[#6B7280] mb-3">
+          <p className="text-xs md:text-[13px] text-[#6B7280] mb-3">
             Interested in receiving mentoring in community engagement
           </p>
 
@@ -199,7 +199,7 @@ export default function PastorProgressPage() {
           </p>
 
           <div className="flex justify-end mt-4">
-            <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[12px] px-6 py-[6px] rounded-md font-medium">
+            <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[10px] md:text-[12px] px-3 md:px-6 py-[6px] rounded-md font-medium">
               View
             </button>
           </div>
@@ -210,7 +210,7 @@ export default function PastorProgressPage() {
     {/* CARD 3 */}
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-all">
       <div className="flex">
-        <div className="w-1/3">
+        <div className="w-1/3 sm:w-1/4 md:w-1/3">
           <Image
             src={card3}
             alt="Community Revitalization"
@@ -218,11 +218,11 @@ export default function PastorProgressPage() {
           />
         </div>
 
-        <div className="flex-1 p-5">
-          <h4 className="text-[15px] font-semibold mb-1">
+        <div className="flex-1 p-3 md:p-5">
+          <h4 className="text-sm md:text-[15px] font-semibold mb-1">
             Community Revitalization and Multiplication Phase
           </h4>
-          <p className="text-[13px] text-[#6B7280] mb-3">
+          <p className="text-xs md:text-[13px] text-[#6B7280] mb-3">
             Interested in receiving mentoring in community engagement
           </p>
 
@@ -245,7 +245,7 @@ export default function PastorProgressPage() {
           </p>
 
           <div className="flex justify-end mt-4">
-            <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[12px] px-6 py-[6px] rounded-md font-medium">
+            <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[10px] md:text-[12px] px-3 md:px-6 py-[6px] rounded-md font-medium">
               View
             </button>
           </div>
@@ -256,15 +256,15 @@ export default function PastorProgressPage() {
 </section>
 
 {/* --- SURVEY PROGRESS --- */}
-<section className="px-16 pb-10 bg-gradient-to-b from-[#0D3C78] to-[#0B2A55] pt-8">
-  <div className="flex justify-between items-center mb-6 text-white">
-    <h2 className="text-xl font-semibold">Survey Progress</h2>
-    <div className="flex bg-white rounded-lg shadow overflow-hidden">
+<section className="px-4 md:px-8 lg:px-16 pb-10 bg-gradient-to-b from-[#0D3C78] to-[#0B2A55] pt-8">
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 text-white gap-4">
+    <h2 className="text-lg md:text-xl font-semibold">Survey Progress</h2>
+    <div className="flex bg-white rounded-lg shadow overflow-hidden text-sm">
       {["All", "Completed", "Remaining"].map((tab) => (
         <button
           key={tab}
           onClick={() => setFilter(tab)}
-          className={`px-5 py-2 text-sm font-medium transition-all ${
+          className={`px-3 md:px-5 py-2 text-xs md:text-sm font-medium transition-all ${
             filter === tab
               ? "bg-[#103C8C] text-white"
               : "text-gray-500 hover:text-[#103C8C]"
@@ -276,9 +276,9 @@ export default function PastorProgressPage() {
     </div>
   </div>
 
-  <div className="bg-white rounded-2xl overflow-hidden shadow-sm max-w-xl">
+  <div className="bg-white rounded-2xl overflow-hidden shadow-sm max-w-full sm:max-w-xl">
     <div className="flex">
-      <div className="w-1/3">
+      <div className="w-1/3 sm:w-1/4 md:w-1/3">
         <Image
           src={card1}
           alt={surveyCard.title}
@@ -286,11 +286,11 @@ export default function PastorProgressPage() {
         />
       </div>
 
-      <div className="flex-1 p-5 text-[#0B1C58]">
-        <h4 className="text-[15px] font-semibold mb-1">
+      <div className="flex-1 p-3 md:p-5 text-[#0B1C58]">
+        <h4 className="text-sm md:text-[15px] font-semibold mb-1">
           {surveyCard.title}
         </h4>
-        <p className="text-[13px] text-[#6B7280] mb-3">
+        <p className="text-xs md:text-[13px] text-[#6B7280] mb-3">
           Interested in receiving mentoring in community engagement
         </p>
         <p className="text-[12px] text-[#6B7280] mb-1">Due</p>
@@ -299,7 +299,7 @@ export default function PastorProgressPage() {
         </p>
 
         <div className="flex justify-end">
-          <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[12px] px-6 py-[6px] rounded-md font-medium">
+          <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[10px] md:text-[12px] px-3 md:px-6 py-[6px] rounded-md font-medium">
             View
           </button>
         </div>

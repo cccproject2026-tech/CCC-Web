@@ -323,7 +323,7 @@ export default function PastorDetailPage({ params }) {
       <AppHero
         title={pastorData.name}
         backgroundImageUrl={ProgressBg.src}
-        heightClasses="h-[180px]"
+        heightClasses="h-[140px] sm:h-[160px] md:h-[180px]"
         breadcrumbItems={[
           { label: "Track Progress", href: "/director/all-pastors" },
           { label: pastorData.name },
@@ -332,12 +332,12 @@ export default function PastorDetailPage({ params }) {
 
       {/* Completed Notification - Top Right */}
       {showCompletedNotification && (
-        <div className="fixed top-24 right-8 z-[100] animate-slide-left">
-          <div className="bg-white rounded-lg shadow-2xl p-4 flex items-center gap-3 min-w-[380px] border-l-4 border-cyan-400">
-            <div className="w-10 h-10 rounded-full bg-cyan-400 flex items-center justify-center flex-shrink-0">
-              <i className="fa-solid fa-check text-white text-lg"></i>
+        <div className="fixed top-20 sm:top-24 right-4 sm:right-8 z-[100] animate-slide-left">
+          <div className="bg-white rounded-lg shadow-2xl p-3 sm:p-4 flex items-center gap-2 sm:gap-3 min-w-[300px] sm:min-w-[380px] border-l-4 border-cyan-400">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-cyan-400 flex items-center justify-center flex-shrink-0">
+              <i className="fa-solid fa-check text-white text-sm sm:text-lg"></i>
             </div>
-            <p className="text-gray-900 font-semibold text-[15px]">
+            <p className="text-gray-900 font-semibold text-sm sm:text-[15px]">
               This programme has Marked as Completed
             </p>
           </div>
@@ -349,64 +349,64 @@ export default function PastorDetailPage({ params }) {
         <div className="max-w-[1400px] mx-auto">
           {/* Add Final Comments Button */}
           {!isCompleted && (
-            <div className="flex justify-end mb-6">
+            <div className="flex justify-end mb-4 sm:mb-6">
               <button
                 onClick={() => setShowCommentsModal(true)}
-                className="px-6 py-3 bg-[#1F2A6E] text-white rounded-lg text-[15px] font-semibold hover:bg-[#0F1A5E] transition-all shadow-lg"
+                className="px-4 sm:px-6 py-2.5 sm:py-3 bg-[#1F2A6E] text-white rounded-lg text-sm sm:text-[15px] font-semibold hover:bg-[#0F1A5E] transition-all shadow-lg"
               >
                 Add Final Comments
               </button>
             </div>
           )}
 
-          <div className="space-y-10">
+          <div className="space-y-6 sm:space-y-8 md:space-y-10">
             {/* Overall and Individual Progress Cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* Overall Progress Card */}
-              <div className="bg-white rounded-2xl shadow-xl p-8">
-                <h2 className="text-[24px] font-bold text-gray-900 mb-6">
+              <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 md:p-8">
+                <h2 className="text-[20px] sm:text-[22px] md:text-[24px] font-bold text-gray-900 mb-4 sm:mb-6">
                   Overall Progress
                 </h2>
 
                 {/* Legend */}
-                <div className="flex items-center gap-6 mb-6 text-sm">
+                <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-4 sm:mb-6 text-xs sm:text-sm">
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-sm bg-cyan-400"></div>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-sm bg-cyan-400"></div>
                     <span className="text-gray-700 font-medium">Completed</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-sm bg-orange-400"></div>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-sm bg-orange-400"></div>
                     <span className="text-gray-700 font-medium">Remaining</span>
                   </div>
                 </div>
 
                 {/* Doughnut Chart */}
                 <div className="flex justify-center items-center relative">
-                  <div className="w-[300px] h-[300px] relative">
+                  <div className="w-[250px] h-[250px] sm:w-[280px] sm:h-[280px] md:w-[300px] md:h-[300px] relative">
                     <Doughnut data={doughnutData} options={doughnutOptions} />
                     {/* Center Text */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                      <span className="text-[28px] font-bold text-gray-900">
+                      <span className="text-[20px] sm:text-[24px] md:text-[28px] font-bold text-gray-900">
                         Completed
                       </span>
                     </div>
                   </div>
                   {/* Left Percentage Badge */}
-                  <div className="absolute left-8 top-1/2 -translate-y-1/2">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-[#1F2A6E] text-white px-4 py-2 rounded-lg font-bold text-lg">
+                  <div className="absolute left-2 sm:left-6 md:left-8 top-1/2 -translate-y-1/2">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <div className="bg-[#1F2A6E] text-white px-2 sm:px-3 md:px-4 py-1 sm:py-2 rounded-lg font-bold text-sm sm:text-base md:text-lg">
                         {remainingPercentage.toFixed(1)}%
                       </div>
-                      <div className="w-12 h-0.5 bg-gray-300"></div>
-                      <div className="w-3 h-3 bg-[#1F2A6E] rounded-full"></div>
+                      <div className="w-8 sm:w-10 md:w-12 h-0.5 bg-gray-300"></div>
+                      <div className="w-2 h-2 sm:w-3 sm:h-3 bg-[#1F2A6E] rounded-full"></div>
                     </div>
                   </div>
                   {/* Right Percentage Badge */}
-                  <div className="absolute right-8 top-1/2 -translate-y-1/2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 bg-[#1F2A6E] rounded-full"></div>
-                      <div className="w-12 h-0.5 bg-gray-300"></div>
-                      <div className="bg-[#1F2A6E] text-white px-4 py-2 rounded-lg font-bold text-lg">
+                  <div className="absolute right-2 sm:right-6 md:right-8 top-1/2 -translate-y-1/2">
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <div className="w-2 h-2 sm:w-3 sm:h-3 bg-[#1F2A6E] rounded-full"></div>
+                      <div className="w-8 sm:w-10 md:w-12 h-0.5 bg-gray-300"></div>
+                      <div className="bg-[#1F2A6E] text-white px-2 sm:px-3 md:px-4 py-1 sm:py-2 rounded-lg font-bold text-sm sm:text-base md:text-lg">
                         {completedPercentage}%
                       </div>
                     </div>
@@ -415,30 +415,30 @@ export default function PastorDetailPage({ params }) {
               </div>
 
               {/* Individual Progress Card */}
-              <div className="bg-white rounded-2xl shadow-xl p-8">
-                <h2 className="text-[24px] font-bold text-gray-900 mb-6">
+              <div className="bg-white rounded-2xl shadow-xl p-4 sm:p-6 md:p-8">
+                <h2 className="text-[20px] sm:text-[22px] md:text-[24px] font-bold text-gray-900 mb-4 sm:mb-6">
                   Individual Progress
                 </h2>
 
                 {/* Legend */}
-                <div className="flex flex-wrap items-center gap-4 mb-6 text-sm">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4 mb-4 sm:mb-6 text-xs sm:text-sm">
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-sm bg-[#6366F1]"></div>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-sm bg-[#6366F1]"></div>
                     <span className="text-gray-700 font-medium">Total</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-sm bg-cyan-400"></div>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-sm bg-cyan-400"></div>
                     <span className="text-gray-700 font-medium">Completed</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 rounded-sm bg-orange-400"></div>
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-sm bg-orange-400"></div>
                     <span className="text-gray-700 font-medium">Remaining</span>
                   </div>
                 </div>
 
                 {/* Bar Chart */}
                 <div className="relative">
-                  <div className="h-[320px]">
+                  <div className="h-[280px] sm:h-[300px] md:h-[320px]">
                     <Bar data={barData} options={barOptions} />
                   </div>
                   {/* Percentage Badge */}
@@ -470,18 +470,18 @@ export default function PastorDetailPage({ params }) {
             </div>
 
             {/* Revitalization Roadmap Progress */}
-            <div className="bg-blue-100/30 rounded-3xl p-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-[28px] font-bold text-gray-900">
+            <div className="bg-blue-100/30 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-4">
+                <h2 className="text-[24px] sm:text-[26px] md:text-[28px] font-bold text-gray-900">
                   Revitalization Roadmap Progress
                 </h2>
                 {/* Filter Tabs */}
-                <div className="flex items-center gap-2 bg-white rounded-lg p-1.5 shadow-md">
+                <div className="flex items-center gap-1 sm:gap-2 bg-white rounded-lg p-1 sm:p-1.5 shadow-md w-full sm:w-auto">
                   {["All", "Completed", "Remaining"].map((filter) => (
                     <button
                       key={filter}
                       onClick={() => setRoadmapFilter(filter)}
-                      className={`px-5 py-2 rounded-md font-semibold text-sm transition-all ${
+                      className={`px-3 sm:px-4 md:px-5 py-2 rounded-md font-semibold text-xs sm:text-sm transition-all flex-1 sm:flex-none ${
                         roadmapFilter === filter
                           ? "bg-[#2E3B8E] text-white"
                           : "bg-transparent text-gray-700 hover:bg-gray-100"
@@ -492,14 +492,14 @@ export default function PastorDetailPage({ params }) {
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 {filteredPhases.map((phase) => (
                   <div
                     key={phase.id}
-                    className="bg-white rounded-2xl shadow-lg p-5"
+                    className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-3 sm:p-4 md:p-5"
                   >
-                    <div className="flex gap-5">
-                      <div className="relative w-[190px] h-[150px] flex-shrink-0 rounded-xl overflow-hidden">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-5">
+                      <div className="relative w-full sm:w-[160px] md:w-[190px] h-[120px] sm:h-[130px] md:h-[150px] flex-shrink-0 rounded-xl overflow-hidden mx-auto sm:mx-0">
                         <Image
                           src={phase.image}
                           alt={phase.title}
@@ -510,10 +510,10 @@ export default function PastorDetailPage({ params }) {
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="relative">
                               {/* Green border ring */}
-                              <div className="w-16 h-16 rounded-full bg-white/30 backdrop-blur-sm border-4 border-green-500 flex items-center justify-center">
+                              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full bg-white/30 backdrop-blur-sm border-3 sm:border-4 border-green-500 flex items-center justify-center">
                                 {/* Green circle with check */}
-                                <div className="w-11 h-11 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
-                                  <i className="fa-solid fa-check text-white text-lg"></i>
+                                <div className="w-8 h-8 sm:w-9 sm:h-9 md:w-11 md:h-11 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
+                                  <i className="fa-solid fa-check text-white text-sm sm:text-base md:text-lg"></i>
                                 </div>
                               </div>
                             </div>
@@ -522,9 +522,9 @@ export default function PastorDetailPage({ params }) {
                         {phase.status === "In Progress" && (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="relative">
-                              <div className="w-16 h-16 rounded-full bg-white/30 backdrop-blur-sm border-4 border-orange-500 flex items-center justify-center">
-                                <div className="w-11 h-11 bg-orange-500 rounded-full flex items-center justify-center shadow-lg">
-                                  <i className="fa-solid fa-clock text-white text-lg"></i>
+                              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full bg-white/30 backdrop-blur-sm border-3 sm:border-4 border-orange-500 flex items-center justify-center">
+                                <div className="w-8 h-8 sm:w-9 sm:h-9 md:w-11 md:h-11 bg-orange-500 rounded-full flex items-center justify-center shadow-lg">
+                                  <i className="fa-solid fa-clock text-white text-sm sm:text-base md:text-lg"></i>
                                 </div>
                               </div>
                             </div>
@@ -533,9 +533,9 @@ export default function PastorDetailPage({ params }) {
                         {phase.status === "Remaining" && (
                           <div className="absolute inset-0 flex items-center justify-center">
                             <div className="relative">
-                              <div className="w-16 h-16 rounded-full bg-white/30 backdrop-blur-sm border-4 border-gray-400 flex items-center justify-center">
-                                <div className="w-11 h-11 bg-gray-400 rounded-full flex items-center justify-center shadow-lg">
-                                  <i className="fa-solid fa-hourglass text-white text-lg"></i>
+                              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full bg-white/30 backdrop-blur-sm border-3 sm:border-4 border-gray-400 flex items-center justify-center">
+                                <div className="w-8 h-8 sm:w-9 sm:h-9 md:w-11 md:h-11 bg-gray-400 rounded-full flex items-center justify-center shadow-lg">
+                                  <i className="fa-solid fa-hourglass text-white text-sm sm:text-base md:text-lg"></i>
                                 </div>
                               </div>
                             </div>
@@ -543,19 +543,19 @@ export default function PastorDetailPage({ params }) {
                         )}
                       </div>
                       <div className="flex-1">
-                        <h3 className="text-[17px] font-bold text-gray-900 mb-2 leading-tight">
+                        <h3 className="text-[15px] sm:text-[16px] md:text-[17px] font-bold text-gray-900 mb-2 leading-tight">
                           {phase.title}
                         </h3>
-                        <p className="text-[13px] text-gray-500 mb-3 leading-relaxed">
+                        <p className="text-[12px] sm:text-[13px] text-gray-500 mb-3 leading-relaxed">
                           {phase.description}
                         </p>
                         <div className="space-y-2">
                           <div className="inline-flex items-center gap-2">
-                            <span className="text-[13px] font-semibold text-gray-700">
+                            <span className="text-[12px] sm:text-[13px] font-semibold text-gray-700">
                               Status
                             </span>
                             <span
-                              className={`px-3 py-1 rounded text-[13px] font-bold ${
+                              className={`px-2 sm:px-3 py-1 rounded text-[11px] sm:text-[12px] md:text-[13px] font-bold ${
                                 phase.status === "Completed"
                                   ? "bg-green-100 text-green-700"
                                   : phase.status === "In Progress"
@@ -567,7 +567,7 @@ export default function PastorDetailPage({ params }) {
                             </span>
                           </div>
                           {phase.completedDate && (
-                            <p className="text-[13px] text-gray-600">
+                            <p className="text-[12px] sm:text-[13px] text-gray-600">
                               <span className="font-semibold">
                                 Completed on :
                               </span>{" "}
@@ -583,18 +583,18 @@ export default function PastorDetailPage({ params }) {
             </div>
 
             {/* Survey Progress */}
-            <div className="bg-[#1F3A5F] rounded-3xl p-8">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-[28px] font-bold text-white">
+            <div className="bg-[#1F3A5F] rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 sm:mb-6 gap-4">
+                <h2 className="text-[24px] sm:text-[26px] md:text-[28px] font-bold text-white">
                   Survey Progress
                 </h2>
                 {/* Filter Tabs */}
-                <div className="flex items-center gap-2 bg-white rounded-lg p-1.5 shadow-md">
+                <div className="flex items-center gap-1 sm:gap-2 bg-white rounded-lg p-1 sm:p-1.5 shadow-md w-full sm:w-auto">
                   {["All", "Completed", "Remaining"].map((filter) => (
                     <button
                       key={filter}
                       onClick={() => setSurveyFilter(filter)}
-                      className={`px-5 py-2 rounded-md font-semibold text-sm transition-all ${
+                      className={`px-3 sm:px-4 md:px-5 py-2 rounded-md font-semibold text-xs sm:text-sm transition-all flex-1 sm:flex-none ${
                         surveyFilter === filter
                           ? "bg-[#2E3B8E] text-white"
                           : "bg-transparent text-gray-700 hover:bg-gray-100"
@@ -605,33 +605,33 @@ export default function PastorDetailPage({ params }) {
                   ))}
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 {filteredSurveys.map((survey) => (
                   <div
                     key={survey.id}
-                    className="bg-white rounded-2xl shadow-lg p-5"
+                    className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-3 sm:p-4 md:p-5"
                   >
-                    <div className="flex gap-5">
-                      <div className="relative w-[190px] h-[150px] flex-shrink-0 rounded-xl bg-gray-50 flex items-center justify-center">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-5">
+                      <div className="relative w-full sm:w-[160px] md:w-[190px] h-[120px] sm:h-[130px] md:h-[150px] flex-shrink-0 rounded-xl bg-gray-50 flex items-center justify-center mx-auto sm:mx-0">
                         <Image
                           src={survey.image}
                           alt={survey.title}
-                          className="w-28 h-28 object-contain"
+                          className="w-20 h-20 sm:w-24 sm:h-24 md:w-28 md:h-28 object-contain"
                         />
                       </div>
                       <div className="flex-1 flex flex-col">
-                        <h3 className="text-[17px] font-bold text-gray-900 mb-2 leading-tight">
+                        <h3 className="text-[15px] sm:text-[16px] md:text-[17px] font-bold text-gray-900 mb-2 leading-tight">
                           {survey.title}
                         </h3>
-                        <p className="text-[13px] text-gray-500 mb-4 leading-relaxed flex-1">
+                        <p className="text-[12px] sm:text-[13px] text-gray-500 mb-3 sm:mb-4 leading-relaxed flex-1">
                           {survey.description}
                         </p>
                         {survey.status === "Completed" && (
                           <>
-                            <button className="w-full px-4 py-2.5 bg-[#2E3B8E] text-white rounded-lg text-[13px] font-semibold hover:bg-[#1F2A6E] transition-all shadow-md mb-3">
+                            <button className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-[#2E3B8E] text-white rounded-lg text-[12px] sm:text-[13px] font-semibold hover:bg-[#1F2A6E] transition-all shadow-md mb-2 sm:mb-3">
                               {survey.buttonText}
                             </button>
-                            <p className="text-[13px] text-gray-600">
+                            <p className="text-[12px] sm:text-[13px] text-gray-600">
                               <span className="font-semibold">
                                 Submitted On :
                               </span>{" "}
@@ -640,7 +640,7 @@ export default function PastorDetailPage({ params }) {
                           </>
                         )}
                         {survey.status === "Remaining" && (
-                          <p className="text-[13px] text-gray-600">
+                          <p className="text-[12px] sm:text-[13px] text-gray-600">
                             <span className="font-semibold">Due :</span>{" "}
                             {survey.dueDate}
                           </p>
@@ -659,52 +659,52 @@ export default function PastorDetailPage({ params }) {
       {showCommentsModal && (
         <>
           <div
-            className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center"
+            className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4"
             onClick={() => setShowCommentsModal(false)}
           ></div>
-          <div className="fixed inset-0 z-[101] flex items-center justify-center pointer-events-none">
-            <div className="bg-white rounded-xl shadow-2xl w-[500px] max-w-[90vw] animate-fade-in pointer-events-auto">
+          <div className="fixed inset-0 z-[101] flex items-center justify-center pointer-events-none p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-[500px] max-h-[90vh] animate-fade-in pointer-events-auto overflow-hidden">
               {/* Modal Header */}
-              <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 flex items-center justify-between">
                 <div>
-                  <h3 className="text-[20px] font-bold text-gray-900">
+                  <h3 className="text-[18px] sm:text-[20px] font-bold text-gray-900">
                     Final Comments
                   </h3>
-                  <p className="text-sm text-gray-500 mt-0.5">
+                  <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
                     Pr. {pastorData.name}
                   </p>
                 </div>
                 <button
                   onClick={() => setShowCommentsModal(false)}
-                  className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors"
+                  className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center transition-colors flex-shrink-0"
                 >
-                  <i className="fa-solid fa-xmark text-gray-500 text-xl"></i>
+                  <i className="fa-solid fa-xmark text-gray-500 text-lg sm:text-xl"></i>
                 </button>
               </div>
 
               {/* Modal Body */}
-              <div className="p-6">
+              <div className="p-4 sm:p-6 overflow-y-auto max-h-[50vh]">
                 <textarea
                   value={finalComments}
                   onChange={(e) => setFinalComments(e.target.value)}
                   placeholder="Write the Comments here..."
-                  rows={8}
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 resize-none text-gray-900 placeholder-gray-400"
+                  rows={6}
+                  className="w-full px-3 sm:px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 resize-none text-gray-900 placeholder-gray-400 text-sm sm:text-base"
                 />
               </div>
 
               {/* Modal Footer */}
-              <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between gap-3">
+              <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
                 <button
                   onClick={() => setShowCommentsModal(false)}
-                  className="px-6 py-2.5 text-[#2E3B8E] rounded-lg text-[15px] font-semibold hover:bg-gray-50 transition-all"
+                  className="px-4 sm:px-6 py-2.5 text-[#2E3B8E] rounded-lg text-sm sm:text-[15px] font-semibold hover:bg-gray-50 transition-all order-2 sm:order-1"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSubmitComments}
                   disabled={!finalComments.trim()}
-                  className={`px-6 py-2.5 rounded-lg text-[15px] font-semibold transition-all ${
+                  className={`px-4 sm:px-6 py-2.5 rounded-lg text-sm sm:text-[15px] font-semibold transition-all order-1 sm:order-2 ${
                     finalComments.trim()
                       ? "bg-[#2E3B8E] text-white hover:bg-[#1F2A6E]"
                       : "bg-gray-200 text-gray-400 cursor-not-allowed"
@@ -720,12 +720,12 @@ export default function PastorDetailPage({ params }) {
 
       {/* Success Toast */}
       {showSuccessToast && (
-        <div className="fixed bottom-8 right-8 z-[100] animate-slide-left">
-          <div className="bg-white rounded-lg shadow-2xl px-6 py-4 flex items-center gap-3 min-w-[320px] border-l-4 border-green-500">
-            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-              <i className="fa-solid fa-check text-green-600 text-lg"></i>
+        <div className="fixed bottom-4 sm:bottom-8 right-4 sm:right-8 z-[100] animate-slide-left">
+          <div className="bg-white rounded-lg shadow-2xl px-4 sm:px-6 py-3 sm:py-4 flex items-center gap-2 sm:gap-3 min-w-[280px] sm:min-w-[320px] border-l-4 border-green-500">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+              <i className="fa-solid fa-check text-green-600 text-sm sm:text-lg"></i>
             </div>
-            <p className="text-gray-900 font-semibold">
+            <p className="text-gray-900 font-semibold text-sm sm:text-base">
               Programme marked as completed successfully!
             </p>
           </div>

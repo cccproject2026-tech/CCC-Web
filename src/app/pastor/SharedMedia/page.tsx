@@ -83,7 +83,7 @@ export default function SharedMedia() {
 
       {/* HERO */}
       <section
-        className="relative h-[280px] bg-cover bg-center flex flex-col justify-end px-20 pb-10"
+        className="relative h-[200px] sm:h-[240px] md:h-[280px] bg-cover bg-center flex flex-col justify-end px-4 sm:px-10 md:px-20 pb-5 sm:pb-8 md:pb-10"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-black/60" />
@@ -98,7 +98,7 @@ export default function SharedMedia() {
       </section>
 
       {/* CONTENT */}
-      <main className="flex-1 px-16 py-10 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971]">
+      <main className="flex-1 px-4 sm:px-8 md:px-16 py-5 sm:py-8 md:py-10 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971]">
         <div className="max-w-7xl mx-auto">
 
           {/* Tabs + Select/Cancel (top-right) */}

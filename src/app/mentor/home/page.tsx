@@ -1,4 +1,5 @@
 "use client";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
@@ -10,17 +11,55 @@ import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
 import UserProfile from "../../Assets/user-profile.png";
-import MapImg from "../../Assets/map-placeholder.png"; // static map image
+import MapImg from "../../Assets/map-placeholder.png";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { useRouter } from "next/navigation";
+import { apiGetMentors } from "@/app/Services/api";
 import MentorHeader from "@/app/Components/MentorHeader";
 
 export default function home() {
   const router = useRouter();
+  const [mentors, setMentors] = useState<any[]>([]);
+
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+
+        try {
+          const mentorsRes = await apiGetMentors();
+          setMentors(mentorsRes.data.data.mentors || []);
+          console.log("Mentors loaded:", mentorsRes.data.data.mentors);
+        } catch (error) {
+          console.log("Mentors API not available, using fallback");
+          setMentors([]);
+        }
+      } catch (error) {
+        console.error("Error fetching mentor home data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#103C8C] mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -29,31 +68,33 @@ export default function home() {
 
       {/* 🟦 HERO SECTION */}
       <section
-        className="relative bg-cover bg-top text-white h-[450px] flex flex-col justify-between px-20 pt-6 pb-10"
+        className="relative bg-cover bg-top text-white h-[450px] flex flex-col justify-between px-4 sm:px-8 md:px-16 lg:px-20 pt-6 pb-10"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-transparent"></div>
 
         {/* TIME */}
-        <div className="relative z-10 flex justify-end">
-          <div className="text-right">
-            <div className="text-3xl font-bold tracking-wide">11 : 59 AM</div>
+        <div className="relative z-10 flex justify-center sm:justify-end">
+          <div className="text-center sm:text-right">
+            <div className="text-2xl sm:text-3xl font-bold tracking-wide">
+              11 : 59 AM
+            </div>
             <p className="text-sm text-white/80">Tuesday, Sep 23</p>
           </div>
         </div>
 
         {/* GREETING */}
-        <div className="relative z-10 flex justify-between items-end">
-          <div className="max-w-2xl">
-            <h1 className="text-4xl font-semibold leading-snug">
+        <div className="relative z-10 flex flex-col sm:flex-row justify-between items-center sm:items-end gap-4 sm:gap-0">
+          <div className="max-w-full sm:max-w-2xl text-center sm:text-left">
+            <h1 className="text-2xl sm:text-4xl font-semibold leading-snug">
               Cultivate Spiritual, Professional, Social, And Community–
-              <br />
+              <br className="hidden sm:block" />
               Engagement Developments
             </h1>
           </div>
 
           {/* USER CARD */}
-          <div className="flex flex-col items-end">
+          <div className="flex flex-col items-center sm:items-end">
             <p className="text-white/90 text-sm mb-2">Good Morning</p>
             <div
               className="bg-white/15 backdrop-blur-md border border-white/30 rounded-md p-4 w-[280px] shadow-lg"
@@ -83,7 +124,7 @@ export default function home() {
       </section>
 
       {/* 📘 CONTINUE WATCHING SECTION */}
-      <section className="py-16 bg-[#F8FAFF] px-16 flex flex-col lg:flex-row items-start justify-between gap-10">
+      <section className="py-16 bg-[#F8FAFF] px-4 md:px-16 flex flex-col lg:flex-row items-start justify-between gap-10">
         <div className="lg:w-1/4 flex flex-col justify-center">
           <h2 className="text-3xl font-semibold text-[#000] leading-tight mb-4">
             Continue <br /> Watching{" "}
@@ -147,97 +188,101 @@ export default function home() {
       </section>
 
       {/* 📅 TODAY'S APPOINTMENTS */}
-      <section className="bg-white py-16 px-20 relative overflow-hidden">
+      <section className="bg-white py-16 px-4 md:px-20 relative overflow-hidden">
         <div className="absolute right-0 top-0 w-[400px] h-[400px] bg-[radial-gradient(circle_at_70%_30%,#103C8C_10%,transparent_70%)] opacity-5"></div>
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-[22px] font-semibold text-[#000]">
             Today’s Appointments
           </h2>
-          <a href="#" className="text-[#103C8C] text-sm font-medium hover:underline">
+          <a
+            href="#"
+            className="text-[#103C8C] text-sm font-medium hover:underline"
+          >
             See all
           </a>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
-          {[{ icon: DuoIcon, mode: "Duo" }, { icon: MeetIcon, mode: "Google Meet" }].map(
-            (appt, i) => (
-              <div
-                key={i}
-                className="bg-[#14517d] rounded-2xl p-6 flex gap-5 items-center shadow-lg border border-[#0B1C58]/40"
-              >
-                <div className="bg-white rounded-xl flex items-center justify-center w-[150px] h-[150px] shrink-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 relative z-10">
+          {[
+            { icon: DuoIcon, mode: "Duo" },
+            { icon: MeetIcon, mode: "Google Meet" },
+          ].map((appt, i) => (
+            <div
+              key={i}
+              className="bg-[#14517d] rounded-2xl p-4 sm:p-6 flex flex-col sm:flex-row gap-4 sm:gap-5 items-center shadow-lg border border-[#0B1C58]/40"
+            >
+              <div className="bg-white rounded-xl flex items-center justify-center w-[100px] h-[100px] sm:w-[150px] sm:h-[150px] shrink-0">
+                <Image
+                  src={appt.icon}
+                  alt="App Icon"
+                  className="w-[50px] h-[50px] sm:w-[65px] sm:h-[65px]"
+                />
+              </div>
+
+              <div className="flex flex-col text-white w-full text-center sm:text-left">
+                <div className="flex items-center gap-3 mb-3">
                   <Image
-                    src={appt.icon}
-                    alt="App Icon"
-                    className="w-[65px] h-[65px]"
+                    src={UserProfile}
+                    alt="User"
+                    width={36}
+                    height={36}
+                    className="rounded-full border border-white/40"
                   />
+                  <div>
+                    <h4 className="text-white font-semibold text-sm">
+                      John Ross
+                    </h4>
+                    <p className="text-white/70 text-xs">
+                      {i === 0 ? "Mentor" : "Field Mentor"}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="flex flex-col text-white w-full">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Image
-                      src={UserProfile}
-                      alt="User"
-                      width={36}
-                      height={36}
-                      className="rounded-full border border-white/40"
-                    />
-                    <div>
-                      <h4 className="text-white font-semibold text-sm">
-                        John Ross
-                      </h4>
-                      <p className="text-white/70 text-xs">
-                        {i === 0 ? "Mentor" : "Field Mentor"}
-                      </p>
-                    </div>
+                <div className="flex flex-wrap gap-2 mb-3 text-xs">
+                  <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-[3px] flex items-center gap-2">
+                    <i className="fa-regular fa-calendar text-[#E3D247]"></i>
+                    <span>Date : 04 Aug 24</span>
                   </div>
+                  <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-[3px] flex items-center gap-2">
+                    <i className="fa-regular fa-clock text-[#24E0C2]"></i>
+                    <span>Time : 11:30 hrs EST</span>
+                  </div>
+                </div>
 
-                  <div className="flex flex-wrap gap-2 mb-3 text-xs">
-                    <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-[3px] flex items-center gap-2">
-                      <i className="fa-regular fa-calendar text-[#E3D247]"></i>
-                      <span>Date : 04 Aug 24</span>
-                    </div>
-                    <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-[3px] flex items-center gap-2">
-                      <i className="fa-regular fa-clock text-[#24E0C2]"></i>
-                      <span>Time : 11:30 hrs EST</span>
+                <div className="flex justify-between items-end">
+                  <div>
+                    <p className="text-xs mb-2">
+                      Mode :{" "}
+                      <span className="underline underline-offset-2 text-[#B8D4FF]">
+                        {appt.mode}
+                      </span>
+                    </p>
+                    <div className="flex gap-4 text-white text-sm">
+                      <i className="fa-solid fa-phone"></i>
+                      <i className="fa-regular fa-comment"></i>
+                      <i className="fa-brands fa-whatsapp"></i>
                     </div>
                   </div>
-
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <p className="text-xs mb-2">
-                        Mode :{" "}
-                        <span className="underline underline-offset-2 text-[#B8D4FF]">
-                          {appt.mode}
-                        </span>
-                      </p>
-                      <div className="flex gap-4 text-white text-sm">
-                        <i className="fa-solid fa-phone"></i>
-                        <i className="fa-regular fa-comment"></i>
-                        <i className="fa-brands fa-whatsapp"></i>
-                      </div>
-                    </div>
-                    <button className="bg-[#0B1C58] hover:bg-[#122D80] px-6 py-[6px] rounded-md text-sm">
-                      Details
-                    </button>
-                  </div>
+                  <button className="bg-[#0B1C58] hover:bg-[#122D80] px-6 py-[6px] rounded-md text-sm">
+                    Details
+                  </button>
                 </div>
               </div>
-            )
-          )}
+            </div>
+          ))}
         </div>
       </section>
 
       {/* 🧾 TODAY'S ROADMAP LIST */}
-      <section className="py-16 px-20 bg-[#196394]">
+      <section className="py-16 px-4 md:px-20 bg-[#196394]">
         <div className="bg-white rounded-2xl p-8 shadow-md max-w-5xl mx-auto">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <h3 className="text-lg font-semibold">Today’s Roadmap List</h3>
-            <div className="flex bg-[#F1F4F9] rounded-md overflow-hidden">
+            <div className="flex bg-[#F1F4F9] rounded-md overflow-hidden w-full sm:w-auto">
               {["All", "Roadmap", "Survey"].map((tab, index) => (
                 <button
                   key={tab}
-                  className={`px-4 py-[6px] text-sm font-medium ${
+                  className={`px-3 sm:px-4 py-[6px] text-sm font-medium flex-1 sm:flex-none ${
                     index === 0
                       ? "bg-[#0B1C58] text-white"
                       : "text-gray-500 hover:text-[#0B1C58]"
@@ -286,7 +331,7 @@ export default function home() {
       </section>
 
       {/* 🌐 EXPLORE CCC */}
-      <section className="py-20 px-20 bg-gradient-to-b from-[#E8F1FA] to-[#F7FAFF]">
+      <section className="py-20 px-4 md:px-20 bg-gradient-to-b from-[#E8F1FA] to-[#F7FAFF]">
         <h2 className="text-[22px] font-semibold text-[#000] mb-10">
           Explore CCC
         </h2>
@@ -324,7 +369,8 @@ export default function home() {
               </div>
               <div className="flex justify-end mt-4">
                 <button className="flex items-center gap-2 text-sm hover:text-[#BFD9FF]">
-                  More <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                  More{" "}
+                  <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
                 </button>
               </div>
             </div>
@@ -333,7 +379,7 @@ export default function home() {
       </section>
 
       {/* 👥 MY MENTORS */}
-      <section className="py-16 px-20 bg-[#F2F6FC]">
+      <section className="py-16 px-4 md:px-20 bg-[#F2F6FC]">
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-[22px] font-semibold text-[#000]">My Mentors</h2>
           <a
@@ -345,56 +391,73 @@ export default function home() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {[Mentor1, Mentor2, Mentor3, Mentor1].map((img, i) => (
-            <div
-              key={i}
-              className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 p-3"
-            >
+          {(mentors.length > 0
+            ? mentors
+            : [
+                { firstName: "John", lastName: "Doe", role: "Field Mentor" },
+                { firstName: "Jane", lastName: "Smith", role: "Senior Mentor" },
+                { firstName: "Mike", lastName: "Johnson", role: "Lead Mentor" },
+                {
+                  firstName: "Sarah",
+                  lastName: "Wilson",
+                  role: "Field Mentor",
+                },
+              ]
+          )
+            .slice(0, 4)
+            .map((mentor, i) => (
               <div
-                className="relative"
-                onClick={() => router.push(`/pastor/Mymentors`)}
+                key={i}
+                className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 p-3"
               >
-                <Image
-                  src={img}
-                  alt="Mentor"
-                  className="w-full h-[180px] object-cover"
-                />
-                <button className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center bg-white/80 rounded-full text-[#0B1C58] hover:bg-white shadow">
-                  <i className="fa-solid fa-ellipsis-vertical text-sm"></i>
-                </button>
-              </div>
-
-              <div className="p-4">
-                <h4 className="font-semibold text-gray-900 text-[16px] leading-tight mb-1">
-                  John Doe
-                </h4>
-                <p className="text-sm text-gray-500">Field Mentor</p>
-                <p className="text-[13px] text-gray-400 mt-2">
-                  Sub text area write something here.
-                  <br />
-                  That you can read more
-                </p>
-
-                <div className="flex justify-between items-center mt-5">
-                  <div className="flex gap-4 text-[#103C8C] text-[14px]">
-                    <i className="fa-regular fa-envelope cursor-pointer hover:text-[#0B1C58]"></i>
-                    <i className="fa-regular fa-comment cursor-pointer hover:text-[#0B1C58]"></i>
-                    <i className="fa-solid fa-phone cursor-pointer hover:text-[#0B1C58]"></i>
-                    <i className="fa-brands fa-whatsapp cursor-pointer hover:text-[#0B1C58]"></i>
-                  </div>
-
-                  <button className="w-8 h-8 flex items-center justify-center rounded-md border border-[#103C8C]/30 text-[#103C8C] hover:bg-[#103C8C] hover:text-white transition">
-                    <i className="fa-solid fa-arrow-up-right-from-square text-[11px]"></i>
+                <div
+                  className="relative"
+                  onClick={() => router.push(`/pastor/Mymentors`)}
+                >
+                  <Image
+                    src={
+                      mentor.profilePicture ||
+                      [Mentor1, Mentor2, Mentor3][i % 3]
+                    }
+                    alt="Mentor"
+                    className="w-full h-[180px] object-cover"
+                  />
+                  <button className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center bg-white/80 rounded-full text-[#0B1C58] hover:bg-white shadow">
+                    <i className="fa-solid fa-ellipsis-vertical text-sm"></i>
                   </button>
                 </div>
+
+                <div className="p-4">
+                  <h4 className="font-semibold text-gray-900 text-[16px] leading-tight mb-1">
+                    {mentor.firstName} {mentor.lastName}
+                  </h4>
+                  <p className="text-sm text-gray-500">{mentor.role}</p>
+                  <p className="text-[13px] text-gray-400 mt-2">
+                    Sub text area write something here.
+                    <br />
+                    That you can read more
+                  </p>
+
+                  <div className="flex justify-between items-center mt-5">
+                    <div className="flex gap-4 text-[#103C8C] text-[14px]">
+                      <i className="fa-regular fa-envelope cursor-pointer hover:text-[#0B1C58]"></i>
+                      <i className="fa-regular fa-comment cursor-pointer hover:text-[#0B1C58]"></i>
+                      <i className="fa-solid fa-phone cursor-pointer hover:text-[#0B1C58]"></i>
+                      <i className="fa-brands fa-whatsapp cursor-pointer hover:text-[#0B1C58]"></i>
+                    </div>
+
+                    <button className="w-8 h-8 flex items-center justify-center rounded-md border border-[#103C8C]/30 text-[#103C8C] hover:bg-[#103C8C] hover:text-white transition">
+                      <i className="fa-solid fa-arrow-up-right-from-square text-[11px]"></i>
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       </section>
 
       {/* 🗺️ MENTEES (MAP SECTION) */}
-      <section className="py-20 px-20 bg-[#0F4A85] text-white">
+      <section className="py-20 px-4 md:px-20 bg-[#0F4A85] text-white">
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-[22px] font-semibold">Mentees</h2>
           <input

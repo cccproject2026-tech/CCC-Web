@@ -92,22 +92,22 @@ export default function PastorAssessments() {
 
       {/* 🟣 HERO SECTION */}
       <section
-        className="relative h-[250px] flex items-end justify-start px-16 pb-12 bg-cover bg-center"
+        className="relative h-[200px] md:h-[250px] flex items-end justify-start px-4 md:px-8 lg:px-16 pb-8 md:pb-12 bg-cover bg-center"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-[#09256F]/70 via-[#0E2F8A]/40 to-[#133A9E]/90"></div>
-        <h1 className="relative z-10 text-4xl font-semibold text-white mb-1">
+        <h1 className="relative z-10 text-2xl md:text-4xl font-semibold text-white mb-1">
           Assessments
         </h1>
       </section>
 
       {/* 🟦 MAIN CONTENT */}
-      <main className="flex-1 bg-[#EEF3FF] pt-16 pb-20 px-10 md:px-20">
+      <main className="flex-1 bg-[#EEF3FF] pt-8 md:pt-16 pb-12 md:pb-20 px-4 md:px-10 lg:px-20">
         <div className="max-w-7xl mx-auto">
           {/* 🔍 Search + Tabs */}
-          <div className="flex flex-col md:flex-row items-center justify-between gap-5 mb-10">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 mb-8 md:mb-10">
             {/* Search Box */}
-            <div className="relative w-full md:w-[350px]">
+            <div className="relative w-full lg:w-[350px]">
               <i className="fa-solid fa-magnifying-glass text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2 text-sm"></i>
               <input
                 type="text"
@@ -115,21 +115,23 @@ export default function PastorAssessments() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full bg-white border border-gray-200 rounded-md pl-10 pr-4 py-2 text-sm text-gray-600 shadow-sm outline-none focus:ring-2 focus:ring-[#103C8C]"
+                suppressHydrationWarning
               />
             </div>
 
             {/* Tabs */}
-            <div className="flex bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="flex bg-white rounded-lg shadow-sm overflow-x-auto">
               {["All", "Due", "Not Started", "Completed", "Submitted"].map(
                 (tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-5 py-2 text-sm font-medium transition-all ${
+                    className={`px-3 md:px-5 py-2 text-xs md:text-sm font-medium transition-all whitespace-nowrap ${
                       activeTab === tab
                         ? "bg-[#103C8C] text-white"
                         : "text-gray-600 hover:bg-gray-100"
                     }`}
+                    suppressHydrationWarning
                   >
                     {tab}
                   </button>
@@ -139,14 +141,14 @@ export default function PastorAssessments() {
           </div>
 
           {/* 🟩 FLEX CARD LAYOUT */}
-          <div className="flex flex-wrap justify-between gap-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             {filtered.map((item) => (
               <div
                 key={item.id}
-                className="bg-white rounded-xl shadow-md hover:shadow-lg overflow-hidden flex flex-col md:flex-row w-full md:w-[48%] transition-all duration-300"
+                className="bg-white rounded-xl shadow-md hover:shadow-lg overflow-hidden flex flex-col md:flex-row transition-all duration-300"
               >
                 {/* LEFT IMAGE */}
-                <div className="relative w-full md:w-[200px] h-[200px] flex-shrink-0 m-5">
+                <div className="relative w-full md:w-[200px] h-[180px] md:h-[200px] flex-shrink-0 m-4 md:m-5">
                   <Image
                     src={item.img}
                     alt={item.title}
@@ -160,9 +162,9 @@ export default function PastorAssessments() {
                 </div>
 
                 {/* RIGHT CONTENT */}
-                <div className="flex flex-col justify-between flex-1 p-5">
+                <div className="flex flex-col justify-between flex-1 p-4 md:p-5">
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-[17px] leading-tight mb-1">
+                    <h3 className="font-semibold text-gray-900 text-[15px] md:text-[17px] leading-tight mb-1">
                       {item.title}
                     </h3>
                     <p className="text-sm text-gray-600 mb-3">{item.desc}</p>
@@ -208,7 +210,8 @@ export default function PastorAssessments() {
                         item.status === "Completed"
                           ? "bg-[#103C8C]"
                           : "bg-[#103C8C]"
-                      } text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-[#0B2E72] transition`}
+                      } text-white text-xs md:text-sm font-medium px-4 md:px-5 py-2 rounded-lg hover:bg-[#0B2E72] transition`}
+                      suppressHydrationWarning
                     >
                       {item.button}
                     </button>

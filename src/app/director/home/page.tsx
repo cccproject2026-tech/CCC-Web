@@ -62,13 +62,23 @@ export default function DirectorHome() {
     },
   ];
 
+  // Chart data for bar chart
+  const chartData = [
+    { pastor: 45, mentor: 65 },
+    { pastor: 55, mentor: 75 },
+    { pastor: 35, mentor: 85 },
+    { pastor: 65, mentor: 45 },
+    { pastor: 75, mentor: 55 },
+    { pastor: 85, mentor: 35 },
+  ];
+
   // Get current data based on active tab
   const currentData = activeTab === "mentors" ? mentorsData : pastorsData;
   return (
     <div className="min-h-screen flex flex-col">
       {/* Hero Section */}
       <section
-        className="relative bg-cover bg-center text-white h-[500px] flex flex-col justify-between px-20 pt-6 pb-10"
+        className="relative bg-cover bg-center text-white h-[300px] sm:h-[400px] md:h-[500px] flex flex-col justify-between px-4 sm:px-8 md:px-16 lg:px-20 pt-4 pb-6 sm:pt-6 sm:pb-10"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-black/30 to-transparent"></div>
@@ -76,15 +86,21 @@ export default function DirectorHome() {
         {/* Top Right - Time and Date */}
         <div className="relative z-10 flex justify-end">
           <div className="text-right">
-            <div className="text-5xl font-bold tracking-wide">11 : 59 AM</div>
-            <p className="text-lg text-white/90 mt-1">Tuesday, Sep 23</p>
-            <p className="text-xl text-white/90 mt-2">Good Morning</p>
+            <div className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-wide">
+              11 : 59 AM
+            </div>
+            <p className="text-base sm:text-lg text-white/90 mt-1">
+              Tuesday, Sep 23
+            </p>
+            <p className="text-lg sm:text-xl text-white/90 mt-2">
+              Good Morning
+            </p>
           </div>
         </div>
 
         {/* Bottom - Hero Text */}
         <div className="relative z-10">
-          <h1 className="text-5xl font-semibold leading-snug max-w-4xl">
+          <h1 className="text-3xl sm:text-4xl max-sm:text-xl  md:text-5xl font-semibold leading-snug max-w-4xl">
             Cultivate Spiritual, Professional,
             <br />
             Social, And Community–
@@ -95,9 +111,9 @@ export default function DirectorHome() {
       </section>
 
       {/* Today's Appointments */}
-      <section className="py-16 px-20 bg-white">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-[28px] font-semibold text-[#000]">
+      <section className="py-8 px-4 sm:py-12 sm:px-8 md:py-16 md:px-16 lg:px-20 bg-white">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 sm:mb-8 gap-2">
+          <h2 className="text-xl sm:text-2xl md:text-[28px] font-semibold text-[#000]">
             Today&apos;s Appointments
           </h2>
           <a
@@ -108,51 +124,51 @@ export default function DirectorHome() {
           </a>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
           {/* Duo Appointment */}
-          <div className="bg-[#1B5A8E] rounded-2xl p-6 flex gap-5 items-center shadow-lg">
-            <div className="bg-white rounded-xl flex items-center justify-center w-[180px] h-[180px] shrink-0">
+          <div className="bg-[#1B5A8E] rounded-2xl p-4 sm:p-5 lg:p-6 flex flex-col lg:flex-row gap-4 lg:gap-5 items-start lg:items-center shadow-lg">
+            <div className="bg-white rounded-xl flex items-center justify-center w-[80px] h-[80px] sm:w-[100px] sm:h-[100px] lg:w-[140px] lg:h-[140px] xl:w-[160px] xl:h-[160px] shrink-0 mx-auto lg:mx-0">
               <Image
                 src={DuoIcon}
                 alt="Duo Icon"
-                className="w-[80px] h-[80px]"
+                className="w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] lg:w-[70px] lg:h-[70px] xl:w-[80px] xl:h-[80px]"
               />
             </div>
 
             <div className="flex flex-col w-full text-white">
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-2 sm:gap-3 mb-3">
                 <Image
                   src={UserProfile}
                   alt="User"
-                  width={40}
-                  height={40}
-                  className="rounded-full border border-white/40"
+                  width={32}
+                  height={32}
+                  className="sm:w-[36px] sm:h-[36px] rounded-full border border-white/40"
                 />
                 <div>
-                  <h4 className="text-white font-semibold text-base">
+                  <h4 className="text-white font-semibold text-sm lg:text-base">
                     John Ross
                   </h4>
-                  <p className="text-white/70 text-sm">Mentor</p>
+                  <p className="text-white/70 text-xs lg:text-sm">Mentor</p>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 mb-3">
-                <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-1 text-xs flex items-center gap-2">
+              <div className="flex flex-wrap gap-1 sm:gap-2 mb-3">
+                <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-2 sm:px-3 py-1 text-xs flex items-center gap-1 sm:gap-2">
                   <i className="fa-regular fa-calendar text-[#FFD700]"></i>
-                  <span>Date : 04 Aug 24</span>
+                  <span className="text-xs">Date : 04 Aug 24</span>
                 </div>
-                <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-1 text-xs flex items-center gap-2">
+                <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-2 sm:px-3 py-1 text-xs flex items-center gap-1 sm:gap-2">
                   <i className="fa-regular fa-clock text-[#24E0C2]"></i>
-                  <span>Time : 11:30 hrs EST</span>
+                  <span className="text-xs">Time : 11:30 hrs EST</span>
                 </div>
               </div>
 
-              <div className="flex justify-between items-end">
-                <div>
-                  <p className="text-sm text-white/90 mb-2">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-3 lg:gap-4">
+                <div className="flex-1">
+                  <p className="text-xs lg:text-sm text-white/90 mb-2">
                     Mode : <span className="underline">Duo</span>
                   </p>
-                  <div className="flex gap-4 text-white text-base">
+                  <div className="flex gap-3 lg:gap-4 text-white text-sm lg:text-base">
                     <i className="fa-solid fa-phone cursor-pointer hover:opacity-80"></i>
                     <i className="fa-regular fa-comment cursor-pointer hover:opacity-80"></i>
                     <i className="fa-solid fa-envelope cursor-pointer hover:opacity-80"></i>
@@ -160,7 +176,7 @@ export default function DirectorHome() {
                   </div>
                 </div>
 
-                <button className="bg-[#0B1C58] hover:bg-[#122D80] transition px-6 py-2 rounded-md text-sm font-medium">
+                <button className="bg-[#0B1C58] hover:bg-[#122D80] transition px-4 lg:px-6 py-2 rounded-md text-xs lg:text-sm font-medium w-full sm:w-auto lg:w-auto shrink-0">
                   Details
                 </button>
               </div>
@@ -168,49 +184,49 @@ export default function DirectorHome() {
           </div>
 
           {/* Google Meet Appointment */}
-          <div className="bg-[#1B5A8E] rounded-2xl p-6 flex gap-5 items-center shadow-lg">
-            <div className="bg-white rounded-xl flex items-center justify-center w-[180px] h-[180px] shrink-0">
+          <div className="bg-[#1B5A8E] rounded-2xl p-4 sm:p-5 lg:p-6 flex flex-col lg:flex-row gap-4 lg:gap-5 items-start lg:items-center shadow-lg">
+            <div className="bg-white rounded-xl flex items-center justify-center w-[80px] h-[80px] sm:w-[100px] sm:h-[100px] lg:w-[140px] lg:h-[140px] xl:w-[160px] xl:h-[160px] shrink-0 mx-auto lg:mx-0">
               <Image
                 src={MeetIcon}
                 alt="Meet Icon"
-                className="w-[80px] h-[80px]"
+                className="w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] lg:w-[70px] lg:h-[70px] xl:w-[80px] xl:h-[80px]"
               />
             </div>
 
             <div className="flex flex-col w-full text-white">
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-2 sm:gap-3 mb-3">
                 <Image
                   src={UserProfile}
                   alt="User"
-                  width={40}
-                  height={40}
-                  className="rounded-full border border-white/40"
+                  width={32}
+                  height={32}
+                  className="sm:w-[36px] sm:h-[36px] rounded-full border border-white/40"
                 />
                 <div>
-                  <h4 className="text-white font-semibold text-base">
+                  <h4 className="text-white font-semibold text-sm lg:text-base">
                     John Ross
                   </h4>
-                  <p className="text-white/70 text-sm">Field Mentor</p>
+                  <p className="text-white/70 text-xs lg:text-sm">Field Mentor</p>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 mb-3">
-                <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-1 text-xs flex items-center gap-2">
+              <div className="flex flex-wrap gap-1 sm:gap-2 mb-3">
+                <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-2 sm:px-3 py-1 text-xs flex items-center gap-1 sm:gap-2">
                   <i className="fa-regular fa-calendar text-[#FFD700]"></i>
-                  <span>Date : 04 Aug 24</span>
+                  <span className="text-xs">Date : 04 Aug 24</span>
                 </div>
-                <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-1 text-xs flex items-center gap-2">
+                <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-2 sm:px-3 py-1 text-xs flex items-center gap-1 sm:gap-2">
                   <i className="fa-regular fa-clock text-[#24E0C2]"></i>
-                  <span>Time : 11:30 hrs EST</span>
+                  <span className="text-xs">Time : 11:30 hrs EST</span>
                 </div>
               </div>
 
-              <div className="flex justify-between items-end">
-                <div>
-                  <p className="text-sm text-white/90 mb-2">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-3 lg:gap-4">
+                <div className="flex-1">
+                  <p className="text-xs lg:text-sm text-white/90 mb-2">
                     Mode : <span className="underline">Google Meet</span>
                   </p>
-                  <div className="flex gap-4 text-white text-base">
+                  <div className="flex gap-3 lg:gap-4 text-white text-sm lg:text-base">
                     <i className="fa-solid fa-phone cursor-pointer hover:opacity-80"></i>
                     <i className="fa-regular fa-comment cursor-pointer hover:opacity-80"></i>
                     <i className="fa-solid fa-envelope cursor-pointer hover:opacity-80"></i>
@@ -218,7 +234,7 @@ export default function DirectorHome() {
                   </div>
                 </div>
 
-                <button className="bg-[#0B1C58] hover:bg-[#122D80] transition px-6 py-2 rounded-md text-sm font-medium">
+                <button className="bg-[#0B1C58] hover:bg-[#122D80] transition px-4 lg:px-6 py-2 rounded-md text-xs lg:text-sm font-medium w-full sm:w-auto lg:w-auto shrink-0">
                   Details
                 </button>
               </div>
@@ -228,11 +244,13 @@ export default function DirectorHome() {
       </section>
 
       {/* New Interests Section */}
-      <section className="py-16 px-20 bg-[#2876AC]">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+      <section className="py-8 px-4 sm:py-12 sm:px-8 md:py-16 md:px-16 lg:px-20 bg-[#2876AC]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
           {/* Left side - Description */}
           <div className="text-white">
-            <h2 className="text-[32px] font-semibold mb-4">New Interests</h2>
+            <h2 className="text-2xl sm:text-3xl md:text-[32px] font-semibold mb-4">
+              New Interests
+            </h2>
             <p className="text-white/90 text-base mb-6 leading-relaxed">
               Review the details of the newly submitted interest and take the
               next steps to guide and support the process effectively.
@@ -247,7 +265,7 @@ export default function DirectorHome() {
             {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
-                className="bg-white rounded-xl p-5 flex justify-between items-center shadow-md"
+                className="bg-white rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 shadow-md"
               >
                 <div className="flex items-center gap-4">
                   <div className="w-[50px] h-[50px] bg-[#2E3B8E] rounded-full flex items-center justify-center">
@@ -261,7 +279,7 @@ export default function DirectorHome() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                   <button className="hover:opacity-80">
                     <i className="fa-solid fa-envelope text-[#2E3B8E] text-lg"></i>
                   </button>
@@ -271,7 +289,7 @@ export default function DirectorHome() {
                   <button className="hover:opacity-80">
                     <i className="fa-solid fa-phone text-[#2E3B8E] text-lg"></i>
                   </button>
-                  <button className="bg-[#2E3B8E] text-white px-6 py-2 rounded-md font-medium hover:bg-[#1F2A6E] transition">
+                  <button className="bg-[#2E3B8E] text-white px-4 sm:px-6 py-2 rounded-md font-medium hover:bg-[#1F2A6E] transition w-full sm:w-auto">
                     View
                   </button>
                 </div>
@@ -282,12 +300,14 @@ export default function DirectorHome() {
       </section>
 
       {/* Add User Section */}
-      <section className="py-16 px-20 bg-[#F0F4F8]">
-        <div className="bg-gradient-to-br from-[#2876AC] to-[#2E3B8E] rounded-3xl p-12 max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+      <section className="py-8 px-4 sm:py-12 sm:px-8 md:py-16 md:px-16 lg:px-20 bg-[#F0F4F8]">
+        <div className="bg-gradient-to-br from-[#2876AC] to-[#2E3B8E] rounded-3xl p-8 sm:p-12 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
             {/* Left side */}
             <div className="text-white">
-              <h2 className="text-[32px] font-bold mb-3">Add User</h2>
+              <h2 className="text-2xl sm:text-3xl md:text-[32px] font-bold mb-3">
+                Add User
+              </h2>
               <p className="text-white/90">
                 Add new pastors and mentors to the platform
               </p>
@@ -337,12 +357,12 @@ export default function DirectorHome() {
         </div>
 
         {/* Mentors/Pastors Section */}
-        <div className="mt-16">
-          <div className="flex justify-between items-center mb-8">
-            <div className="flex gap-4 bg-[#E8F0F8] p-2 rounded-[20px]">
+        <div className="mt-12 sm:mt-16">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+            <div className="flex gap-2 sm:gap-4 bg-[#E8F0F8] p-2 rounded-[20px] w-full sm:w-auto">
               <button
                 onClick={() => setActiveTab("mentors")}
-                className={`px-10 py-3 rounded-[16px] font-semibold text-[16px] transition-all duration-300 ${
+                className={`px-6 sm:px-8 md:px-10 py-3 rounded-[16px] font-semibold text-sm sm:text-[16px] transition-all duration-300 flex-1 sm:flex-none ${
                   activeTab === "mentors"
                     ? "bg-[#2E3B8E] text-white shadow-lg"
                     : "bg-transparent text-gray-500 hover:text-gray-700"
@@ -352,7 +372,7 @@ export default function DirectorHome() {
               </button>
               <button
                 onClick={() => setActiveTab("pastors")}
-                className={`px-10 py-3 rounded-[16px] font-semibold text-[16px] transition-all duration-300 ${
+                className={`px-6 sm:px-8 md:px-10 py-3 rounded-[16px] font-semibold text-sm sm:text-[16px] transition-all duration-300 flex-1 sm:flex-none ${
                   activeTab === "pastors"
                     ? "bg-[#2E3B8E] text-white shadow-lg"
                     : "bg-transparent text-gray-500 hover:text-gray-700"
@@ -363,13 +383,13 @@ export default function DirectorHome() {
             </div>
             <a
               href="#"
-              className="text-[#2E3B8E] text-[15px] font-semibold hover:underline"
+              className="text-[#2E3B8E] text-sm sm:text-[15px] font-semibold hover:underline"
             >
               See all
             </a>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
             {currentData.map((person) => (
               <MentorCard
                 key={person.id}
@@ -387,10 +407,12 @@ export default function DirectorHome() {
       </section>
 
       {/* Explore CCC */}
-      <section className="py-16 px-20 bg-white">
-        <h2 className="text-[32px] font-bold text-[#000] mb-10">Explore CCC</h2>
+      <section className="py-8 px-4 sm:py-12 sm:px-8 md:py-16 md:px-16 lg:px-20 bg-white">
+        <h2 className="text-2xl sm:text-3xl md:text-[32px] font-bold text-[#000] mb-8 sm:mb-10">
+          Explore CCC
+        </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
           <ExploreCCCCard
             title="Mentees"
             description="Schedule and manage appointments with ease for personalized guidance."
@@ -421,12 +443,12 @@ export default function DirectorHome() {
       </section>
 
       {/* Over View */}
-      <section className="py-16 px-20 bg-[#D8E8F5]">
-        <h2 className="text-[28px] font-semibold text-[#000] mb-8">
+      <section className="py-8 px-4 sm:py-12 sm:px-8 md:py-16 md:px-16 lg:px-20 bg-[#D8E8F5]">
+        <h2 className="text-2xl sm:text-[28px] font-semibold text-[#000] mb-8">
           Over View
         </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
           {[
             { label: "Total Mentors", value: "501" },
             { label: "Total Pastors", value: "501" },
@@ -442,11 +464,11 @@ export default function DirectorHome() {
         </div>
 
         {/* Overall Progress */}
-        <h2 className="text-[28px] font-semibold text-[#000] mb-8">
+        <h2 className="text-2xl sm:text-[28px] font-semibold text-[#000] mb-8">
           Overall Progress
         </h2>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
           {/* Donut Chart */}
           <div className="bg-white rounded-xl p-8 shadow-sm">
             <div className="flex justify-between items-center mb-6">
@@ -476,10 +498,10 @@ export default function DirectorHome() {
                     </div>
                   </div>
                 </div>
-                <div className="absolute -left-20 top-1/2 transform -translate-y-1/2 bg-[#2E3B8E] text-white px-4 py-2 rounded-md font-semibold">
+                <div className="absolute -left-12 sm:-left-20 top-1/2 transform -translate-y-1/2 bg-[#2E3B8E] text-white px-2 sm:px-4 py-2 rounded-md font-semibold text-sm">
                   37.5%
                 </div>
-                <div className="absolute -right-20 top-1/2 transform -translate-y-1/2 bg-[#2E3B8E] text-white px-4 py-2 rounded-md font-semibold">
+                <div className="absolute -right-12 sm:-right-20 top-1/2 transform -translate-y-1/2 bg-[#2E3B8E] text-white px-2 sm:px-4 py-2 rounded-md font-semibold text-sm">
                   62.5%
                 </div>
               </div>
@@ -487,12 +509,12 @@ export default function DirectorHome() {
           </div>
 
           {/* Bar Chart */}
-          <div className="bg-white rounded-xl p-8 shadow-sm">
-            <div className="flex justify-between items-center mb-6">
+          <div className="bg-white rounded-xl p-4 sm:p-8 shadow-sm">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
               <h3 className="text-lg font-semibold text-[#000]">
                 Roadmap & Assessments
               </h3>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                 <div className="flex items-center gap-2 text-sm">
                   <div className="w-3 h-3 bg-[#5B7FDB] rounded-full"></div>
                   <span className="text-gray-600">Pastor</span>
@@ -507,20 +529,20 @@ export default function DirectorHome() {
               </div>
             </div>
 
-            <div className="h-[280px] flex items-end justify-between gap-4">
+            <div className="h-[200px] sm:h-[280px] flex items-end justify-between gap-2 sm:gap-4">
               {["Jan", "Feb", "Mar", "Apr", "May", "Jun"].map((month, i) => (
                 <div
                   key={i}
                   className="flex-1 flex flex-col items-center gap-2"
                 >
-                  <div className="w-full flex gap-1 items-end h-[220px]">
+                  <div className="w-full flex gap-1 items-end h-[160px] sm:h-[220px]">
                     <div
                       className="flex-1 bg-[#5B7FDB] rounded-t-md"
-                      style={{ height: `${Math.random() * 80 + 20}%` }}
+                      style={{ height: `${chartData[i].pastor}%` }}
                     ></div>
                     <div
                       className="flex-1 bg-[#4AC5D9] rounded-t-md"
-                      style={{ height: `${Math.random() * 80 + 20}%` }}
+                      style={{ height: `${chartData[i].mentor}%` }}
                     ></div>
                   </div>
                   <span className="text-xs text-gray-600">{month}</span>
@@ -532,33 +554,37 @@ export default function DirectorHome() {
       </section>
 
       {/* Course Completed & Invite */}
-      <section className="py-16 px-20 bg-white">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-gradient-to-r from-[#2E3B8E] to-[#4A5FB8] rounded-xl p-8 flex justify-between items-center text-white">
+      <section className="py-8 px-4 sm:py-12 sm:px-8 md:py-16 md:px-16 lg:px-20 bg-white">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          <div className="bg-gradient-to-r from-[#2E3B8E] to-[#4A5FB8] rounded-xl p-6 sm:p-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 text-white">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
                 <i className="fa-solid fa-award text-2xl"></i>
               </div>
-              <h3 className="text-xl font-semibold">Course Completed</h3>
-              <div className="w-7 h-7 bg-[#FFD700] text-[#2E3B8E] rounded-full flex items-center justify-center text-sm font-bold">
-                3
+              <div>
+                <h3 className="text-lg sm:text-xl font-semibold">
+                  Course Completed
+                </h3>
+                <div className="w-7 h-7 bg-[#FFD700] text-[#2E3B8E] rounded-full flex items-center justify-center text-sm font-bold mt-1">
+                  3
+                </div>
               </div>
             </div>
-            <button className="hover:opacity-80">
+            <button className="hover:opacity-80 self-end sm:self-auto">
               <i className="fa-solid fa-arrow-up-right-from-square text-xl"></i>
             </button>
           </div>
 
-          <div className="bg-gradient-to-r from-[#2876AC] to-[#3A8EC4] rounded-xl p-8 flex justify-between items-center text-white">
+          <div className="bg-gradient-to-r from-[#2876AC] to-[#3A8EC4] rounded-xl p-6 sm:p-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 text-white">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
                 <i className="fa-solid fa-user-plus text-2xl"></i>
               </div>
-              <h3 className="text-xl font-semibold">
+              <h3 className="text-lg sm:text-xl font-semibold">
                 Invite to be a Field Mentor
               </h3>
             </div>
-            <button className="hover:opacity-80">
+            <button className="hover:opacity-80 self-end sm:self-auto">
               <i className="fa-solid fa-arrow-up-right-from-square text-xl"></i>
             </button>
           </div>

@@ -33,7 +33,7 @@ export default function PastorProgressPage() {
 
       {/* HERO HEADER */}
       <section
-        className="relative h-[220px] bg-cover bg-center flex flex-col justify-center px-20"
+        className="relative h-[220px] bg-cover bg-center flex flex-col justify-center px-4 md:px-20"
         style={{ backgroundImage: `url(${progressBg.src})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-r from-[#103D8C]/95 to-[#06285A]/90"></div>
@@ -45,7 +45,7 @@ export default function PastorProgressPage() {
       {/* MAIN CONTENT */}
       <main className="flex-1 bg-[#F4F7FC] text-[#0B1C58] relative">
         {/* 🟦 OVERALL + INDIVIDUAL PROGRESS */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-8 px-16 py-12 bg-[#176192]">
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-8 px-4 md:px-16 py-12 bg-[#176192]">
           {/* Overall Progress */}
           <div className="bg-white rounded-xl shadow-sm p-8">
             <h3 className="text-lg font-semibold mb-4">Overall Progress</h3>
@@ -97,8 +97,8 @@ export default function PastorProgressPage() {
         </section>
 
         {/* 🟩 REVITALIZATION ROADMAP PROGRESS */}
-        <section className="px-16 py-10 bg-gradient-to-b from-[#BBD6E9] to-[#E3F1FF]">
-          <div className="flex justify-between items-center mb-6">
+        <section className="px-4 md:px-16 py-10 bg-gradient-to-b from-[#BBD6E9] to-[#E3F1FF]">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <h2 className="text-xl font-semibold">
               Revitalization Roadmap Progress
             </h2>
@@ -154,8 +154,8 @@ export default function PastorProgressPage() {
         </section>
 
         {/* 🟪 SURVEY PROGRESS */}
-        <section className="px-16 pb-12 bg-gradient-to-b from-[#0D3C78] to-[#0B2A55] pt-8 text-white">
-          <div className="flex justify-between items-center mb-6">
+        <section className="px-4 md:px-16 pb-12 bg-gradient-to-b from-[#0D3C78] to-[#0B2A55] pt-8 text-white">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <h2 className="text-xl font-semibold">Survey Progress</h2>
             <div className="flex bg-white rounded-lg shadow overflow-hidden">
               {["All", "Completed", "Remaining"].map((tab) => (
@@ -216,7 +216,9 @@ export default function PastorProgressPage() {
               <div className="flex justify-between items-center px-6 py-5 border-b border-gray-200">
                 <div>
                   <h2 className="text-lg font-semibold">
-                    {isCompleted ? "Final Comments & Summary" : "Final Comments"}
+                    {isCompleted
+                      ? "Final Comments & Summary"
+                      : "Final Comments"}
                   </h2>
                   <p className="text-sm text-gray-500 mt-1">Pr. John Doe</p>
                 </div>
@@ -241,7 +243,9 @@ export default function PastorProgressPage() {
                           : "text-gray-500 hover:text-[#103C8C]"
                       }`}
                     >
-                      {tab === "comments" ? "Final Comments" : "Programme Summary"}
+                      {tab === "comments"
+                        ? "Final Comments"
+                        : "Programme Summary"}
                     </button>
                   ))}
                 </div>
@@ -261,10 +265,13 @@ export default function PastorProgressPage() {
 
                 {isCompleted && activeTab === "summary" && (
                   <div className="text-sm text-gray-700">
-                    <p className="mb-2 font-medium">Programme Completion Summary:</p>
+                    <p className="mb-2 font-medium">
+                      Programme Completion Summary:
+                    </p>
                     <p>
-                      The participant has successfully completed all phases of the
-                      Revitalization Programme. Review comments have been recorded.
+                      The participant has successfully completed all phases of
+                      the Revitalization Programme. Review comments have been
+                      recorded.
                     </p>
                   </div>
                 )}
@@ -303,13 +310,21 @@ export default function PastorProgressPage() {
           </div>
         )}
       </main>
-
     </div>
   );
 }
 
 /* RoadmapCard unchanged */
-function RoadmapCard({ img, title, desc, status, statusColor, progress, completed, time }: any) {
+function RoadmapCard({
+  img,
+  title,
+  desc,
+  status,
+  statusColor,
+  progress,
+  completed,
+  time,
+}: any) {
   return (
     <div className="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-all">
       <div className="flex">
@@ -320,8 +335,12 @@ function RoadmapCard({ img, title, desc, status, statusColor, progress, complete
           <h4 className="text-[15px] font-semibold mb-1">{title}</h4>
           <p className="text-[13px] text-[#6B7280] mb-3">{desc}</p>
           <div className="flex items-center gap-2 mb-2">
-            <span className="text-[12px] text-[#6B7280] font-medium">Status</span>
-            <span className={`text-[11px] px-2 py-[3px] rounded-full font-medium border ${statusColor}`}>
+            <span className="text-[12px] text-[#6B7280] font-medium">
+              Status
+            </span>
+            <span
+              className={`text-[11px] px-2 py-[3px] rounded-full font-medium border ${statusColor}`}
+            >
               {status}
             </span>
           </div>
@@ -332,9 +351,12 @@ function RoadmapCard({ img, title, desc, status, statusColor, progress, complete
               style={{ width: `${progress}%` }}
             ></div>
           </div>
-          <p className="text-[12px] text-[#0B1C58] font-medium mb-2">{completed}</p>
+          <p className="text-[12px] text-[#0B1C58] font-medium mb-2">
+            {completed}
+          </p>
           <p className="text-[12px] text-[#6B7280]">
-            Completion Time <span className="font-semibold text-[#0B1C58]">{time}</span>
+            Completion Time{" "}
+            <span className="font-semibold text-[#0B1C58]">{time}</span>
           </p>
           <div className="flex justify-end mt-4">
             <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[12px] px-6 py-[6px] rounded-md font-medium">
