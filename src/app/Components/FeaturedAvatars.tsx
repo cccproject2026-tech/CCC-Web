@@ -46,6 +46,9 @@ export default function FeaturedAvatars({
                     src={item.img}
                     alt={item.name}
                     className="w-full h-full object-cover rounded-full"
+                    // style={{ objectFit: 'cover', borderRadius: '50%' }}
+                    fill
+                    sizes={`${sizePx}px`}
                   />
                 </button>
               </div>

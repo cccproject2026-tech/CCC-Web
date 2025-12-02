@@ -1,67 +1,65 @@
 //api.ts
+// Central export file for all API services
 
-import axiosInstance from "./config/axios-instance";
+// Export all types
+export * from './types';
 
-// Types
-interface Comment {
-  _id: string;
-  text: string;
-  addedDate: string;
-  mentorId: { _id: string };
-}
+// Export appointment services
+export {
+  apiGetAppointments,
+  apiGetTodaysAppointments,
+  apiGetUserAppointments,
+  apiGetMentorAppointments,
+} from './appointments.service';
 
-interface Query {
-  _id: string;
-  actualQueryText: string;
-  createdDate: string;
-  repliedAnswer?: string;
-  repliedDate?: string;
-  repliedMentorId?: { _id: string };
-  status: 'pending' | 'answered';
-}
+// Export interest services
+export {
+  apiGetAllInterests,
+  apiGetInterestById,
+  apiGetInterestByEmail,
+} from './interests.service';
 
-export const apiGetMentors = () => {
-    return axiosInstance.get(`/home/mentors`);
-};
+// Export user services
+export {
+  apiCreateUser,
+  apiGetUserById,
+  apiGetAllUsers,
+} from './users.service';
 
-// ✅ Roadmap APIs
-export const apiGetRoadmaps = (queryParams = '') => {
-  return axiosInstance.get(`/roadmaps${queryParams}`);
-};
+// Export mentor/pastor services
+export {
+  apiGetMentors,
+  apiGetPastors,
+  apiGetMentees,
+} from './mentors.service';
 
-export const apiGetRoadmapById = (id: string) => {
-  return axiosInstance.get(`/roadmaps/${id}`);
-};
+// Export roadmap services
+export {
+  apiGetRoadmaps,
+  apiGetRoadmapById,
+  apiUpdateRoadmapData,
+  apiUploadRoadmapFile,
+  apiAddComment,
+  apiGetComments,
+  apiAddQuery,
+  apiGetQueries,
+  apiReplyToQuery,
+} from './roadmaps.service';
 
-export const apiUpdateRoadmapData = (id: string, data: any) => {
-  return axiosInstance.patch(`/roadmaps/${id}`, data);
-};
+// Export progress services
+export {
+  apiGetDirectorOverview,
+  apiGetOverallProgress,
+  apiGetUserProgress,
+  apiAssignRoadmap,
+  apiAssignAssessment,
+  apiUpdateRoadmapProgress,
+  apiUpdateAssessmentProgress,
+  apiAddFinalComment,
+  apiGetFinalComments,
+  apiUpdateFinalComment,
+  apiDeleteFinalComment,
+} from './progress.service';
 
-export const apiUploadRoadmapFile = (id: string, formData: FormData) => {
-  return axiosInstance.post(`/roadmaps/${id}/upload`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
-};
-
-// Comments APIs
-export const apiAddComment = (roadmapId: string, data: { text: string; userId: string; mentorId: string }) => {
-  return axiosInstance.post(`/roadmaps/${roadmapId}/comments`, data);
-};
-
-export const apiGetComments = (roadmapId: string, userId: string) => {
-  return axiosInstance.get(`/roadmaps/${roadmapId}/comments?userId=${userId}`);
-};
-
-// Queries APIs
-export const apiAddQuery = (roadmapId: string, data: { actualQueryText: string; userId: string }) => {
-  return axiosInstance.post(`/roadmaps/${roadmapId}/queries`, data);
-};
-
-export const apiGetQueries = (roadmapId: string, userId: string) => {
-  return axiosInstance.get(`/roadmaps/${roadmapId}/queries?userId=${userId}`);
-};
-
-export const apiReplyToQuery = (roadmapId: string, queryId: string, data: { repliedAnswer: string; repliedMentorId: string }) => {
-  return axiosInstance.patch(`/roadmaps/${roadmapId}/queries/${queryId}/reply`, data);
-};
-        
+// Re-export axios instance for direct usage if needed
+export { default as axiosInstance } from './config/axios-instance';

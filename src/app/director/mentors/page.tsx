@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import AppHeader from "@/app/Components/Header/AppHeader";
@@ -16,9 +16,11 @@ import MentorBg from "../../Assets/mentor-bg.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
+import { apiGetAllUsers } from "@/app/Services/users.service";
+import { User } from "@/app/Services/types";
 
 interface Mentor {
-  id: number;
+  id: string;
   name: string;
   role: string;
   description: string;
@@ -26,77 +28,26 @@ interface Mentor {
   menteeCount: number;
   isFeatured?: boolean;
   lastContact?: string;
-  status: "active" | "inactive";
+  status: string;
 }
 
-const MENTORS: Mentor[] = [
-  {
-    id: 1,
-    name: "Jacob Jones",
-    role: "Field Mentor",
-    description: "Sub text area write something here. That you can read more",
-    img: Mentor1,
-    menteeCount: 5,
-    isFeatured: true,
-    lastContact: "2 days ago",
-    status: "active",
-  },
-  {
-    id: 2,
-    name: "John Doe",
-    role: "Field Mentor",
-    description: "Sub text area write something here. That you can read more",
-    img: Mentor2,
-    menteeCount: 3,
-    isFeatured: true,
-    lastContact: "1 day ago",
-    status: "active",
-  },
-  {
-    id: 3,
-    name: "Robert Fox",
-    role: "Field Mentor",
-    description: "Sub text area write something here. That you can read more",
-    img: Mentor3,
-    menteeCount: 7,
-    isFeatured: true,
-    lastContact: "3 days ago",
-    status: "active",
-  },
-  {
-    id: 4,
-    name: "Jacob Jones",
-    role: "Field Mentor",
-    description: "Sub text area write something here. That you can read more",
-    img: Mentor1,
-    menteeCount: 4,
-    isFeatured: true,
-    lastContact: "1 week ago",
-    status: "active",
-  },
-  {
-    id: 5,
-    name: "Robert Fox",
-    role: "Field Mentor",
-    description: "Sub text area write something here. That you can read more",
-    img: Mentor3,
-    menteeCount: 6,
-    isFeatured: true,
-    lastContact: "2 days ago",
-    status: "active",
-  },
-  {
-    id: 6,
-    name: "John Doe",
-    role: "Field Mentor",
-    description: "Sub text area write something here. That you can read more",
-    img: Mentor2,
-    menteeCount: 2,
-    isFeatured: true,
-    lastContact: "4 days ago",
-    status: "active",
-  },
-];
+// Helper function to convert User to Mentor
+const convertUserToMentor = (user: User): Mentor => {
+  const defaultImages = [Mentor1, Mentor2, Mentor3];
+  const randomImage = defaultImages[Math.floor(Math.random() * defaultImages.length)];
+
+  return {
+    id: user._id,
+    name: `${user.firstName} ${user.lastName}`,
+    role: user.role,
+    description: `${user.role} with ${user.assignedId?.length || 0} assigned mentees`,
+    img: user.profilePicture || randomImage,
+    menteeCount: user.assignedId?.length || 0,
+    isFeatured: false,
+    lastContact: undefined,
+    status: user.status,
+  };
+};
 
 export default function MyMentorsPage() {
   const router = useRouter();
@@ -113,24 +64,70 @@ export default function MyMentorsPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
-  const featuredMentors = MENTORS.filter((m) => m.isFeatured);
-  const featuredItems: FeaturedAvatarItem[] = featuredMentors.map((m) => ({
-    id: m.id,
-    name: m.name,
-    img: m.img,
-  }));
-  const allMentors = MENTORS;
+  const [allMentors, setAllMentors] = useState<Mentor[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
+    const fetchMentors = async () => {
+      setLoading(true);
+      try {
+        let role: string;
+        let roleMatch: 'exact' | 'mixed' | undefined;
+
+        if (activeFilter === "All") {
+          role = "mentor";
+          roleMatch = "mixed";
+        } else if (activeFilter === "Mentors") {
+          role = "mentor";
+        } else if (activeFilter === "Field Mentor") {
+          role = "field mentor";
+        } else {
+          role = "mentor";
+          roleMatch = "mixed";
+        }
+
+        const response = await apiGetAllUsers({
+          role,
+          roleMatch,
+          search: debouncedQuery || undefined,
+        });
+
+        const users = response.data.data.users;
+        const mentors = users.map(convertUserToMentor);
+        setAllMentors(mentors);
+      } catch (error) {
+        console.error("Error fetching mentors:", error);
+        setAllMentors([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMentors();
+  }, [activeFilter, debouncedQuery]);
+
+  const featuredMentors = useMemo(() => allMentors.slice(0, 6), [allMentors]);
+  const featuredItems: FeaturedAvatarItem[] = useMemo(
+    () =>
+      featuredMentors.map((m) => ({
+        id: m.id,
+        name: m.name,
+        img: m.img,
+      })),
+    [featuredMentors]
+  );
 
   const filteredMentors = useMemo(() => {
-    let filtered = allMentors.filter((m) =>
-      m.name.toLowerCase().includes(query.toLowerCase())
-    );
-
-    if (activeFilter === "Mentors") {
-      filtered = filtered.filter((m) => m.status === "active");
-    } else if (activeFilter === "Field Mentor") {
-      filtered = filtered.filter((m) => m.role === "Field Mentor");
-    }
+    const filtered = [...allMentors];
 
     // Sort
     filtered.sort((a, b) => {
@@ -149,7 +146,7 @@ export default function MyMentorsPage() {
     });
 
     return filtered;
-  }, [query, activeFilter, sortBy]);
+  }, [allMentors, sortBy]);
 
   const sortOptions = [
     "Least Mentees",
@@ -264,16 +261,17 @@ export default function MyMentorsPage() {
                 }
               >
                 <i
-                  className={`fa-solid ${
-                    viewMode === "grid" ? "fa-bars" : "fa-th"
-                  } text-base`}
+                  className={`fa-solid ${viewMode === "grid" ? "fa-bars" : "fa-th"
+                    } text-base`}
                 ></i>
               </button>
             </div>
           </div>
 
           {/* Featured Mentors - Horizontal Scroll */}
-          <FeaturedAvatars items={featuredItems} showDivider className="mb-2" />
+          {!loading && featuredItems.length > 0 && (
+            <FeaturedAvatars items={featuredItems} showDivider className="mb-2" />
+          )}
         </div>
       </section>
 
@@ -286,11 +284,10 @@ export default function MyMentorsPage() {
               <button
                 key={option.value}
                 onClick={() => setActiveFilter(option.value)}
-                className={`px-5 sm:px-7 py-2.5 rounded-lg text-[13px] sm:text-[14px] font-semibold transition-all duration-200 whitespace-nowrap ${
-                  activeFilter === option.value
-                    ? "bg-[#2E3B8E] text-white shadow-sm"
-                    : "text-gray-600 hover:text-gray-800"
-                }`}
+                className={`px-5 sm:px-7 py-2.5 rounded-lg text-[13px] sm:text-[14px] font-semibold transition-all duration-200 whitespace-nowrap ${activeFilter === option.value
+                  ? "bg-[#2E3B8E] text-white shadow-sm"
+                  : "text-gray-600 hover:text-gray-800"
+                  }`}
               >
                 {option.label}
               </button>
@@ -320,18 +317,16 @@ export default function MyMentorsPage() {
                         setSortBy(option);
                         setShowSortMenu(false);
                       }}
-                      className={`w-full text-left px-4 py-2.5 rounded-lg text-[13px] sm:text-[14px] transition-all flex items-center gap-3 ${
-                        sortBy === option
-                          ? "bg-green-50 text-green-700 font-semibold"
-                          : "text-gray-700 hover:bg-gray-50"
-                      }`}
+                      className={`w-full text-left px-4 py-2.5 rounded-lg text-[13px] sm:text-[14px] transition-all flex items-center gap-3 ${sortBy === option
+                        ? "bg-green-50 text-green-700 font-semibold"
+                        : "text-gray-700 hover:bg-gray-50"
+                        }`}
                     >
                       <span
-                        className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                          sortBy === option
-                            ? "border-green-500 bg-green-500"
-                            : "border-gray-300"
-                        }`}
+                        className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center flex-shrink-0 ${sortBy === option
+                          ? "border-green-500 bg-green-500"
+                          : "border-gray-300"
+                          }`}
                       >
                         {sortBy === option && (
                           <i className="fa-solid fa-check text-white text-[9px]"></i>
@@ -350,7 +345,22 @@ export default function MyMentorsPage() {
       {/* Mentors Grid/List */}
       <section className="px-4 sm:px-6 md:px-12 lg:px-20 py-6 md:py-8">
         <div className="max-w-[1400px] mx-auto">
-          {viewMode === "grid" ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+                <p className="text-white text-lg font-medium">Loading mentors...</p>
+              </div>
+            </div>
+          ) : filteredMentors.length === 0 ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <i className="fa-solid fa-users text-white text-5xl mb-4 opacity-50"></i>
+                <p className="text-white text-lg font-medium">No mentors found</p>
+                <p className="text-white/70 text-sm mt-2">Try adjusting your search or filters</p>
+              </div>
+            </div>
+          ) : viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
               {filteredMentors.map((mentor) => (
                 <div
@@ -362,7 +372,12 @@ export default function MyMentorsPage() {
                     <Image
                       src={mentor.img}
                       alt={mentor.name}
-                      className="w-full h-full object-cover"
+                      fill
+                      // className="object-cover"
+                      style={{ objectFit: 'cover' }}
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                      // priority={false}
+                      quality={85}
                     />
 
                     {/* Options Menu - Positioned in top-right corner of image */}
@@ -469,11 +484,16 @@ export default function MyMentorsPage() {
                   <div className="flex items-center gap-3 md:gap-5">
                     {/* Profile Image */}
                     <div className="relative flex-shrink-0">
-                      <div className="w-14 h-14 md:w-16 md:h-16 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
+                      <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
                         <Image
                           src={mentor.img}
                           alt={mentor.name}
                           className="w-full h-full object-cover"
+                          fill
+                          // style={{ objectFit: 'cover' }}
+                          sizes="64px"
+                        // priority={false}
+                        // quality={85}
                         />
                       </div>
                     </div>
@@ -584,7 +604,7 @@ export default function MyMentorsPage() {
           setToast(`${selectedMentees.length} Mentees Assigned Successfully`);
           setTimeout(() => setToast(null), 3000);
         }}
-        mentor={selectedMentor}
+        mentor={selectedMentor ? { name: selectedMentor.name, id: Number(selectedMentor.id) || 0 } : undefined}
       />
 
       {/* Remove Mentee Modal */}

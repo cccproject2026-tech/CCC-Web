@@ -1,13 +1,13 @@
-"use client";
-import Image, { StaticImageData } from "next/image";
+import Image from 'next/image';
+import type { StaticImageData } from 'next/image';
 
-interface MentorCardProps {
-  image: StaticImageData;
+type MentorCardProps = {
+  image: string | StaticImageData;
   name: string;
-  role: string;
-  menteeCount: number;
+  role?: string;
+  menteeCount?: number;
   onViewDetails?: () => void;
-}
+};
 
 export default function MentorCard({
   image,
@@ -18,12 +18,12 @@ export default function MentorCard({
 }: MentorCardProps) {
   return (
     <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 p-6">
-      {/* Image Section */}
-      <div className="relative mb-6">
+      <div className="relative mb-6 h-[340px] w-full rounded-xl overflow-hidden">
         <Image
           src={image}
           alt={name}
           className="w-full h-[340px] object-cover rounded-xl"
+          fill
         />
       </div>
 
@@ -44,18 +44,11 @@ export default function MentorCard({
 
       {/* Actions Section */}
       <div className="flex justify-between items-center mt-8">
-        {/* Contact Icons */}
         <div className="flex gap-1 text-[#2E3B8E]">
-          <button
-            className="hover:opacity-70 transition"
-            aria-label="Send email"
-          >
+          <button className="hover:opacity-70 transition" aria-label="Send email">
             <i className="fa-regular fa-envelope text-[28px]"></i>
           </button>
-          <button
-            className="hover:opacity-70 transition"
-            aria-label="Send message"
-          >
+          <button className="hover:opacity-70 transition" aria-label="Send message">
             <i className="fa-regular fa-comment-dots text-[28px]"></i>
           </button>
           <button className="hover:opacity-70 transition" aria-label="WhatsApp">
@@ -66,7 +59,6 @@ export default function MentorCard({
           </button>
         </div>
 
-        {/* View Details Button */}
         <button
           onClick={onViewDetails}
           className="w-12 h-12 flex items-center justify-center rounded-xl border-2 border-[#2E3B8E] text-[#2E3B8E] hover:bg-[#2E3B8E] hover:text-white transition"
