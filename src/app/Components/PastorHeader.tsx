@@ -27,6 +27,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { getSingleUser } from "../Services/pastor.service";
 
 function PastorHeaderComponent({ showFullHeader = false }) {
   const pathname = usePathname();
@@ -36,9 +37,32 @@ function PastorHeaderComponent({ showFullHeader = false }) {
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isClient, setIsClient] = useState(false);
+   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
     setIsClient(true);
+  }, []);
+
+    useEffect(() => {
+    // Read user info from localStorage
+    const storedUser = typeof window !== "undefined"
+      ? JSON.parse(localStorage.getItem("user") || "{}")
+      : {};
+
+    const userId = storedUser?.id;
+
+    if (!userId) return;
+
+    async function fetchProfile() {
+      try {
+        const res = await getSingleUser(userId);
+        setProfile(res.data?.data);
+      } catch (error) {
+        console.error("Error fetching user:", error);
+      }
+    }
+
+    fetchProfile();
   }, []);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -76,7 +100,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
     { name: "Revitalization Roadmap", path: "/pastor/revitalization-roadmap" },
     { name: "Assessments", path: "/pastor/assessments" },
     { name: "Progress", path: "/pastor/Myprogress" },
-    { name: "Appointments", path: "/pastor/appointments" },
+    { name: "Appointments", path: "/pastor/Appointments" },
   ];
 
   const notifications = [
@@ -279,10 +303,13 @@ function PastorHeaderComponent({ showFullHeader = false }) {
               >
                 <div className="hidden md:block text-right text-[11px] leading-tight">
                   <p className="text-white/80">Good Morning</p>
-                  <p className="text-white font-medium">John Ross</p>
+                  <p className="text-white font-medium">
+  {profile ? `${profile.firstName} ${profile.lastName}` : "..."}
+</p>
+
                 </div>
                 <Image
-                  src={UserProfile}
+                 src={profile?.profilePicture || UserProfile}
                   alt="User"
                   width={30}
                   height={30}
@@ -381,7 +408,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
                 </button>
               );
             })}
-            {/* Mobile Search & Connect */}
+
             <div className="flex items-center gap-4 px-4 py-3 border-t border-white/10">
               <button
                 className="flex items-center gap-2 text-white/80 hover:text-white text-sm cursor-pointer"
@@ -403,10 +430,12 @@ function PastorHeaderComponent({ showFullHeader = false }) {
       )}
 
       {/* Notification Popup */}
+      {showMobileMenu && (
       <NotificationPopup
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
       />
+)}
     </header>
   );
 }

@@ -1,12 +1,67 @@
 "use client";
 import Image from "next/image";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
 import CCCLogo from "../../Assets/CCCLogo.png";
 import PastorHeader from "@/app/Components/PastorHeader";
 import AndrewsLogo from "../../Assets/andrews-logo.png";
-import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg(null);
+
+    if (!email || !password) {
+      setErrorMsg("Please enter email and password.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      const res = await fetch("http://13.221.25.133/api/v1/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,       // must match API spec
+          password,    // must match API spec
+        }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        // API returns { success: false, message: "..." } on failure
+        setErrorMsg(json.message || "Login failed. Please try again.");
+        return;
+      }
+
+      const { accessToken, refreshToken, user } = json.data || {};
+
+      // save tokens / user – you can later move this to a context or Zustand store
+      if (accessToken) localStorage.setItem("accessToken", accessToken);
+      if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
+      if (user) localStorage.setItem("user", JSON.stringify(user));
+
+      // redirect – adjust based on role/status if needed
+      router.push("/pastor/profile-incomplete");
+    } catch (err) {
+      console.error("Login error:", err);
+      setErrorMsg("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div>
@@ -34,31 +89,41 @@ export default function LoginPage() {
 
           {/* FORM */}
           <div className="w-full max-w-[380px] bg-transparent">
-            <form className="flex flex-col gap-3 sm:gap-4">
+            <form className="flex flex-col gap-3 sm:gap-4" onSubmit={handleLogin}>
               <input
-                type="text"
-                placeholder="Email or User Name"
+                type="email"
+                placeholder="Email"
                 className="w-full rounded-md px-4 py-2 text-sm sm:text-base bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
 
               <input
                 type="password"
                 placeholder="Password"
                 className="w-full rounded-md px-4 py-2 text-sm sm:text-base bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
               />
 
+              {errorMsg && (
+                <p className="text-red-200 text-xs sm:text-sm mt-1">
+                  {errorMsg}
+                </p>
+              )}
+
               <button
-                type="button"
-                className="w-full mt-3 sm:mt-4 bg-white text-[#103C8C] font-medium py-2 rounded-md text-sm sm:text-base hover:opacity-90 transition"
-                onClick={() => router.push(`/pastor/profile-incomplete`)}
+                type="submit"
+                className="w-full mt-3 sm:mt-4 bg-white text-[#103C8C] font-medium py-2 rounded-md text-sm sm:text-base hover:opacity-90 transition disabled:opacity-60"
+                disabled={isLoading}
               >
-                Login
+                {isLoading ? "Logging in..." : "Login"}
               </button>
             </form>
 
             <div className="text-right mt-2">
               <a
-                href="#"
+                href="resetpassword"
                 className="text-[12px] sm:text-[13px] text-white/80 hover:text-white transition"
               >
                 Forgot Password ?
