@@ -58,14 +58,14 @@ export default function AppHeader({ showFullHeader = false }) {
       name: "Courses",
       path: "/director/courses",
       hasDropdown: true,
-      onClick: () => setShowCoursesDropdown(!showCoursesDropdown),
+      onClick: () => setShowCCCDropdown(!showCCCDropdown),
     },
     { name: "New Interests", path: "/director/interest-list", hasBadge: "3" },
     {
       name: "CCC",
       path: "/director/ccc",
       hasDropdown: true,
-      onClick: () => setShowCCCDropdown(!showCCCDropdown),
+      onClick: () => setShowCoursesDropdown(!showCoursesDropdown),
     },
     { name: "Track Progress", path: "/director/track-progress" },
     { name: "Schedule", path: "/director/schedule" },
@@ -100,11 +100,10 @@ export default function AppHeader({ showFullHeader = false }) {
               <div key={index} className="relative">
                 <button
                   onClick={(e) => handleNavClick(link, e)}
-                  className={`text-sm transition relative flex items-center gap-1 ${
-                    pathname === link.path
-                      ? "font-semibold text-white"
-                      : "text-white/90 hover:text-white"
-                  }`}
+                  className={`text-sm transition relative flex items-center gap-1 ${pathname === link.path
+                    ? "font-semibold text-white"
+                    : "text-white/90 hover:text-white"
+                    }`}
                 >
                   {link.name}
                   {link.hasDropdown && (
@@ -118,16 +117,16 @@ export default function AppHeader({ showFullHeader = false }) {
                 </button>
                 {/* Dropdown for Courses */}
                 {link.name === "Courses" && (
-                  <CoursesDropdown
-                    isOpen={showCoursesDropdown && !showMobileMenu}
-                    onClose={() => setShowCoursesDropdown(false)}
+                  <CCCDropdown
+                    isOpen={showCCCDropdown && !showMobileMenu}
+                    onClose={() => setShowCCCDropdown(false)}
                   />
                 )}
                 {/* Dropdown for CCC */}
                 {link.name === "CCC" && (
-                  <CCCDropdown
-                    isOpen={showCCCDropdown && !showMobileMenu}
-                    onClose={() => setShowCCCDropdown(false)}
+                  <CoursesDropdown
+                    isOpen={showCoursesDropdown && !showMobileMenu}
+                    onClose={() => setShowCoursesDropdown(false)}
                   />
                 )}
               </div>
@@ -196,9 +195,8 @@ export default function AppHeader({ showFullHeader = false }) {
                 className="lg:hidden p-2 hover:opacity-80 transition"
               >
                 <i
-                  className={`fa-solid ${
-                    showMobileMenu ? "fa-times" : "fa-bars"
-                  } text-lg`}
+                  className={`fa-solid ${showMobileMenu ? "fa-times" : "fa-bars"
+                    } text-lg`}
                 ></i>
               </button>
             </>
@@ -224,11 +222,10 @@ export default function AppHeader({ showFullHeader = false }) {
                     handleNavClick(link, e);
                     if (!link.hasDropdown) setShowMobileMenu(false);
                   }}
-                  className={`w-full text-left px-4 py-3 rounded-md transition flex items-center justify-between ${
-                    pathname === link.path
-                      ? "bg-[#2E3B8E] font-semibold text-white"
-                      : "text-white/90 hover:bg-[#2E3B8E]/50 hover:text-white"
-                  }`}
+                  className={`w-full text-left px-4 py-3 rounded-md transition flex items-center justify-between ${pathname === link.path
+                    ? "bg-[#2E3B8E] font-semibold text-white"
+                    : "text-white/90 hover:bg-[#2E3B8E]/50 hover:text-white"
+                    }`}
                 >
                   <span className="flex items-center gap-2">
                     {link.name}
@@ -240,12 +237,11 @@ export default function AppHeader({ showFullHeader = false }) {
                   </span>
                   {link.hasDropdown && (
                     <i
-                      className={`fa-solid fa-chevron-${
-                        (link.name === "Courses" && showCoursesDropdown) ||
+                      className={`fa-solid fa-chevron-${(link.name === "Courses" && showCoursesDropdown) ||
                         (link.name === "CCC" && showCCCDropdown)
-                          ? "up"
-                          : "down"
-                      } text-xs`}
+                        ? "up"
+                        : "down"
+                        } text-xs`}
                     ></i>
                   )}
                 </button>

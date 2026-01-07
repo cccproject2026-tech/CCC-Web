@@ -186,3 +186,38 @@ export interface DirectorOverviewDto {
   monthlyData: MonthlyCompletionDto[];
   users?: UserOverallProgressDto[];
 }
+
+export interface MicroGrantApplication {
+  _id: string;
+  userId?: { _id: string; email: string } | null;
+  formId?: { _id: string; title: string } | null;
+  answers?: {
+    [key: string]: string;
+  };
+  supportingDocs?: string[];  // <-- ONLY THIS
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type MicroGrantResponse = {
+  user: {
+    _id: string;
+    email: string;
+    role: string;
+  };
+  application: {
+    _id: string;
+    userId: string;
+    formId: {
+      _id: string;
+      title: string;
+      description: string;
+    };
+    answers: Record<string, string>;
+    supportingDocs: any[];
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+};
