@@ -29,3 +29,14 @@ export const apiGetAllUsers = (params?: {
     };
   }>(`/users${queryString}`);
 };
+
+export const apiGetAssignedUsers = (userId: string) => {
+  return axiosInstance.get<{ success: boolean; data: any[] }>(`/users/${userId}/assigned`);
+};
+
+export const apiAssignUsers = (userId: string, assignedIds: string[]) => {
+  return axiosInstance.post<{ success: boolean; message: string; data: any }>(
+    `/users/${userId}/assign`,
+    { assignedId: assignedIds }
+  );
+};

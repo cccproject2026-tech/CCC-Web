@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useCallback, memo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import AppHeader from "@/app/Components/Header/AppHeader";
@@ -12,12 +12,12 @@ import FeaturedAvatars, {
 import ConfirmModal from "@/app/Components/ConfirmModal";
 import ScheduleMeetingModal from "@/app/Components/ScheduleMeetingModal";
 import AssignMenteesModal from "@/app/Components/AssignMenteesModal";
+import ListMenteesModal from "@/app/Components/ListMenteesModal";
 import MentorBg from "../../Assets/mentor-bg.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
 import { apiGetAllUsers } from "@/app/Services/users.service";
-import { User } from "@/app/Services/types";
 
 interface Mentor {
   id: string;
@@ -29,15 +29,16 @@ interface Mentor {
   isFeatured?: boolean;
   lastContact?: string;
   status: string;
+  assignedIds: string[];
 }
 
 // Helper function to convert User to Mentor
-const convertUserToMentor = (user: User): Mentor => {
+const convertUserToMentor = (user: any): Mentor => {
   const defaultImages = [Mentor1, Mentor2, Mentor3];
   const randomImage = defaultImages[Math.floor(Math.random() * defaultImages.length)];
 
   return {
-    id: user._id,
+    id: user.id || user._id,
     name: `${user.firstName} ${user.lastName}`,
     role: user.role,
     description: `${user.role} with ${user.assignedId?.length || 0} assigned mentees`,
@@ -46,8 +47,278 @@ const convertUserToMentor = (user: User): Mentor => {
     isFeatured: false,
     lastContact: undefined,
     status: user.status,
+    assignedIds: user.assignedId || [],
   };
 };
+
+const optionsMenuItems = [
+  {
+    icon: "fa-solid fa-users",
+    label: "List of Mentees",
+    color: "text-[#2E3B8E]",
+  },
+  {
+    icon: "fa-solid fa-user-plus",
+    label: "Assign New Mentee",
+    color: "text-[#2E3B8E]",
+  },
+  {
+    icon: "fa-solid fa-user-minus",
+    label: "Remove a Mentee",
+    color: "text-[#2E3B8E]",
+  },
+  {
+    icon: "fa-regular fa-calendar",
+    label: "Schedule an Appointment",
+    color: "text-[#2E3B8E]",
+  },
+  {
+    icon: "fa-regular fa-pen-to-square",
+    label: "Edit Profile",
+    color: "text-[#2E3B8E]",
+  },
+  // {
+  //   icon: "fa-solid fa-times-circle",
+  //   label: "Remove as Field Mentor",
+  //   color: "text-[#2E3B8E]",
+  // },
+];
+
+// Memoized Grid Card Component
+const MentorGridCard = memo(({
+  mentor,
+  isMenuOpen,
+  onToggleMenu,
+  onMenuAction
+}: {
+  mentor: Mentor;
+  isMenuOpen: boolean;
+  onToggleMenu: (mentorId: string) => void;
+  onMenuAction: (action: string, mentor: Mentor) => void;
+}) => {
+  return (
+    <div className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all border border-gray-100">
+      {/* Profile Image with Options Menu */}
+      <div className="relative w-full h-[240px] bg-gray-100">
+        <Image
+          src={mentor.img}
+          alt={mentor.name}
+          fill
+          style={{ objectFit: 'cover' }}
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+          quality={85}
+        />
+
+        {/* Options Menu - Positioned in top-right corner of image */}
+        <div className="absolute top-2 right-2">
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleMenu(mentor.id);
+              }}
+              className="w-7 h-7 bg-white/95 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-white transition-all shadow-sm"
+            >
+              <i className="fa-solid fa-ellipsis-vertical text-gray-700 text-sm"></i>
+            </button>
+
+            {isMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl py-2 px-1 min-w-[240px] z-50">
+                {optionsMenuItems.map((item, index) => (
+                  <button
+                    key={index}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMenuAction(item.label, mentor);
+                    }}
+                    className="w-full text-left px-4 py-2.5 rounded-lg text-[13px] transition-all flex items-center gap-3 hover:bg-gray-50"
+                  >
+                    <i className={`${item.icon} ${item.color} text-base w-5`}></i>
+                    <span className="text-gray-700 font-medium">
+                      {item.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Mentor Info */}
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex-1">
+            <h3 className="text-[17px] font-bold text-gray-900 mb-0.5">
+              {mentor.name}
+            </h3>
+            <p className="text-[13px] text-gray-500">
+              {mentor.role}
+            </p>
+          </div>
+          <span className="px-2.5 py-1 bg-yellow-50 text-yellow-700 rounded-full text-[11px] font-semibold whitespace-nowrap ml-2 border border-yellow-200">
+            {mentor.menteeCount} Mentees
+          </span>
+        </div>
+        <p className="text-[12px] text-gray-400 leading-relaxed mb-4">
+          {mentor.description}
+        </p>
+
+        {/* Action Icons */}
+        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+          <div className="flex items-center gap-3 sm:gap-4 text-[#2E3B8E]">
+            <button
+              className="hover:opacity-70 transition"
+              aria-label="Email"
+            >
+              <i className="fa-regular fa-envelope text-[16px] sm:text-[17px]"></i>
+            </button>
+            <button
+              className="hover:opacity-70 transition"
+              aria-label="Message"
+            >
+              <i className="fa-regular fa-comment text-[16px] sm:text-[17px]"></i>
+            </button>
+            <button
+              className="hover:opacity-70 transition"
+              aria-label="WhatsApp"
+            >
+              <i className="fa-brands fa-whatsapp text-[16px] sm:text-[17px]"></i>
+            </button>
+            <button
+              className="hover:opacity-70 transition"
+              aria-label="Call"
+            >
+              <i className="fa-solid fa-phone text-[16px] sm:text-[17px]"></i>
+            </button>
+          </div>
+          <button className="w-9 h-9 bg-[#2E3B8E] text-white rounded-lg flex items-center justify-center hover:bg-[#3A4BA0] transition-all flex-shrink-0">
+            <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+MentorGridCard.displayName = "MentorGridCard";
+
+// Memoized List Card Component
+const MentorListCard = memo(({
+  mentor,
+  isMenuOpen,
+  onToggleMenu,
+  onMenuAction
+}: {
+  mentor: Mentor;
+  isMenuOpen: boolean;
+  onToggleMenu: (mentorId: string) => void;
+  onMenuAction: (action: string, mentor: Mentor) => void;
+}) => {
+  return (
+    <div className="bg-white rounded-2xl p-4 md:p-5 shadow-md hover:shadow-lg transition-all border border-gray-100">
+      <div className="flex items-center gap-3 md:gap-5">
+        {/* Profile Image */}
+        <div className="relative flex-shrink-0">
+          <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
+            <Image
+              src={mentor.img}
+              alt={mentor.name}
+              className="w-full h-full object-cover"
+              fill
+              sizes="64px"
+            />
+          </div>
+        </div>
+
+        {/* Mentor Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1">
+            <h3 className="text-[15px] md:text-[17px] font-bold text-gray-900">
+              {mentor.name}
+            </h3>
+            <span className="px-2.5 py-1 bg-yellow-50 text-yellow-700 rounded-full text-[10px] md:text-[11px] font-semibold whitespace-nowrap border border-yellow-200">
+              {mentor.menteeCount} Mentees
+            </span>
+          </div>
+          <p className="text-[12px] md:text-[13px] text-gray-500 mb-1">
+            {mentor.role}
+          </p>
+          <p className="text-[11px] md:text-[12px] text-gray-400 leading-relaxed hidden sm:block">
+            {mentor.description}
+          </p>
+        </div>
+
+        {/* Action Icons */}
+        <div className="flex items-center gap-2 md:gap-4 text-[#2E3B8E]">
+          <button
+            className="hover:opacity-70 transition p-1 hidden sm:block"
+            aria-label="Email"
+          >
+            <i className="fa-regular fa-envelope text-[16px] md:text-[17px]"></i>
+          </button>
+          <button
+            className="hover:opacity-70 transition p-1 hidden sm:block"
+            aria-label="Message"
+          >
+            <i className="fa-regular fa-comment text-[16px] md:text-[17px]"></i>
+          </button>
+          <button
+            className="hover:opacity-70 transition p-1 hidden md:block"
+            aria-label="WhatsApp"
+          >
+            <i className="fa-brands fa-whatsapp text-[17px]"></i>
+          </button>
+          <button
+            className="hover:opacity-70 transition p-1"
+            aria-label="Call"
+          >
+            <i className="fa-solid fa-phone text-[16px] md:text-[17px]"></i>
+          </button>
+          <div className="relative">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleMenu(mentor.id);
+              }}
+              className="w-7 h-7 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-all"
+            >
+              <i className="fa-solid fa-ellipsis-vertical text-gray-600 text-sm"></i>
+            </button>
+
+            {isMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl py-2 px-1 min-w-[240px] z-50">
+                {optionsMenuItems.map((item, index) => (
+                  <button
+                    key={index}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMenuAction(item.label, mentor);
+                    }}
+                    className="w-full text-left px-4 py-2.5 rounded-lg text-[13px] transition-all flex items-center gap-3 hover:bg-gray-50"
+                  >
+                    <i className={`${item.icon} ${item.color} text-base w-5`}></i>
+                    <span className="text-gray-700 font-medium">
+                      {item.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison function for memo
+  return (
+    prevProps.mentor.id === nextProps.mentor.id &&
+    prevProps.isMenuOpen === nextProps.isMenuOpen
+  );
+});
+
+MentorListCard.displayName = "MentorListCard";
 
 export default function MyMentorsPage() {
   const router = useRouter();
@@ -55,13 +326,13 @@ export default function MyMentorsPage() {
   const [activeFilter, setActiveFilter] = useState("Mentors");
   const [sortBy, setSortBy] = useState("Least Mentees");
   const [showSortMenu, setShowSortMenu] = useState(false);
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
-  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
+  const [showListMenteesModal, setShowListMenteesModal] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [selectedMentor, setSelectedMentor] = useState<Mentor | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const [allMentors, setAllMentors] = useState<Mentor[]>([]);
@@ -162,56 +433,39 @@ export default function MyMentorsPage() {
     { label: "Field Mentor", value: "Field Mentor" },
   ];
 
-  const optionsMenuItems = [
-    {
-      icon: "fa-solid fa-users",
-      label: "List of Mentees",
-      color: "text-[#2E3B8E]",
-    },
-    {
-      icon: "fa-solid fa-user-plus",
-      label: "Assign New Mentee",
-      color: "text-[#2E3B8E]",
-    },
-    {
-      icon: "fa-solid fa-user-minus",
-      label: "Remove a Mentee",
-      color: "text-[#2E3B8E]",
-    },
-    {
-      icon: "fa-regular fa-calendar",
-      label: "Schedule an Appointment",
-      color: "text-[#2E3B8E]",
-    },
-    {
-      icon: "fa-regular fa-pen-to-square",
-      label: "Edit Profile",
-      color: "text-[#2E3B8E]",
-    },
-    {
-      icon: "fa-solid fa-times-circle",
-      label: "Remove as Field Mentor",
-      color: "text-[#2E3B8E]",
-    },
-  ];
+  const handleToggleMenu = useCallback((mentorId: string) => {
+    setOpenMenuId((prev) => (prev === mentorId ? null : mentorId));
+  }, []);
 
-  const handleScheduleMeeting = (mentor: Mentor) => {
+  const handleScheduleMeeting = useCallback((mentor: Mentor) => {
     setSelectedMentor(mentor);
     setShowScheduleModal(true);
-  };
+    setOpenMenuId(null);
+  }, []);
 
-  const handleAssignMentees = (mentor: Mentor) => {
+  const handleAssignMentees = useCallback((mentor: Mentor) => {
     setSelectedMentor(mentor);
     setShowAssignModal(true);
-  };
+    setOpenMenuId(null);
+  }, []);
 
-  const handleRemoveMentee = (mentor: Mentor) => {
+  const handleRemoveMentee = useCallback((mentor: Mentor) => {
     setSelectedMentor(mentor);
     setShowRemoveModal(true);
-  };
+    setOpenMenuId(null);
+  }, []);
 
-  const handleAction = (action: string, mentor: Mentor) => {
+  const handleListMentees = useCallback((mentor: Mentor) => {
+    setSelectedMentor(mentor);
+    setShowListMenteesModal(true);
+    setOpenMenuId(null);
+  }, []);
+
+  const handleMenuAction = useCallback((action: string, mentor: Mentor) => {
     switch (action) {
+      case "List of Mentees":
+        handleListMentees(mentor);
+        break;
       case "Schedule an Appointment":
         handleScheduleMeeting(mentor);
         break;
@@ -223,12 +477,14 @@ export default function MyMentorsPage() {
         break;
       case "Edit Profile":
         router.push(`/director/mentors/profile/edit`);
+        setOpenMenuId(null);
         break;
       default:
-        setToast(`${action} clicked for ${mentor.name}`);
+        setToast({ message: `${action} clicked for ${mentor.name}`, type: 'success' });
         setTimeout(() => setToast(null), 2000);
+        setOpenMenuId(null);
     }
-  };
+  }, [router, handleScheduleMeeting, handleAssignMentees, handleRemoveMentee, handleListMentees]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
@@ -363,222 +619,25 @@ export default function MyMentorsPage() {
           ) : viewMode === "grid" ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
               {filteredMentors.map((mentor) => (
-                <div
+                <MentorGridCard
                   key={mentor.id}
-                  className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all border border-gray-100"
-                >
-                  {/* Profile Image with Options Menu */}
-                  <div className="relative w-full h-[240px] bg-gray-100">
-                    <Image
-                      src={mentor.img}
-                      alt={mentor.name}
-                      fill
-                      // className="object-cover"
-                      style={{ objectFit: 'cover' }}
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
-                      // priority={false}
-                      quality={85}
-                    />
-
-                    {/* Options Menu - Positioned in top-right corner of image */}
-                    <div className="absolute top-2 right-2">
-                      <div className="relative">
-                        <button
-                          onClick={() => {
-                            setSelectedMentor(mentor);
-                            setShowOptionsMenu(!showOptionsMenu);
-                          }}
-                          className="w-7 h-7 bg-white/95 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-white transition-all shadow-sm"
-                        >
-                          <i className="fa-solid fa-ellipsis-vertical text-gray-700 text-sm"></i>
-                        </button>
-
-                        {showOptionsMenu &&
-                          selectedMentor?.id === mentor.id && (
-                            <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl py-2 px-1 min-w-[240px] z-50">
-                              {optionsMenuItems.map((item, index) => (
-                                <button
-                                  key={index}
-                                  onClick={() => {
-                                    handleAction(item.label, mentor);
-                                    setShowOptionsMenu(false);
-                                  }}
-                                  className="w-full text-left px-4 py-2.5 rounded-lg text-[13px] transition-all flex items-center gap-3 hover:bg-gray-50"
-                                >
-                                  <i
-                                    className={`${item.icon} ${item.color} text-base w-5`}
-                                  ></i>
-                                  <span className="text-gray-700 font-medium">
-                                    {item.label}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Mentor Info */}
-                  <div className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <h3 className="text-[17px] font-bold text-gray-900 mb-0.5">
-                          {mentor.name}
-                        </h3>
-                        <p className="text-[13px] text-gray-500">
-                          {mentor.role}
-                        </p>
-                      </div>
-                      <span className="px-2.5 py-1 bg-yellow-50 text-yellow-700 rounded-full text-[11px] font-semibold whitespace-nowrap ml-2 border border-yellow-200">
-                        {mentor.menteeCount} Mentees
-                      </span>
-                    </div>
-                    <p className="text-[12px] text-gray-400 leading-relaxed mb-4">
-                      {mentor.description}
-                    </p>
-
-                    {/* Action Icons */}
-                    <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                      <div className="flex items-center gap-3 sm:gap-4 text-[#2E3B8E]">
-                        <button
-                          className="hover:opacity-70 transition"
-                          aria-label="Email"
-                        >
-                          <i className="fa-regular fa-envelope text-[16px] sm:text-[17px]"></i>
-                        </button>
-                        <button
-                          className="hover:opacity-70 transition"
-                          aria-label="Message"
-                        >
-                          <i className="fa-regular fa-comment text-[16px] sm:text-[17px]"></i>
-                        </button>
-                        <button
-                          className="hover:opacity-70 transition"
-                          aria-label="WhatsApp"
-                        >
-                          <i className="fa-brands fa-whatsapp text-[16px] sm:text-[17px]"></i>
-                        </button>
-                        <button
-                          className="hover:opacity-70 transition"
-                          aria-label="Call"
-                        >
-                          <i className="fa-solid fa-phone text-[16px] sm:text-[17px]"></i>
-                        </button>
-                      </div>
-                      <button className="w-9 h-9 bg-[#2E3B8E] text-white rounded-lg flex items-center justify-center hover:bg-[#3A4BA0] transition-all flex-shrink-0">
-                        <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                  mentor={mentor}
+                  isMenuOpen={openMenuId === mentor.id}
+                  onToggleMenu={handleToggleMenu}
+                  onMenuAction={handleMenuAction}
+                />
               ))}
             </div>
           ) : (
             <div className="space-y-3 md:space-y-4">
               {filteredMentors.map((mentor) => (
-                <div
+                <MentorListCard
                   key={mentor.id}
-                  className="bg-white rounded-2xl p-4 md:p-5 shadow-md hover:shadow-lg transition-all border border-gray-100"
-                >
-                  <div className="flex items-center gap-3 md:gap-5">
-                    {/* Profile Image */}
-                    <div className="relative flex-shrink-0">
-                      <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
-                        <Image
-                          src={mentor.img}
-                          alt={mentor.name}
-                          className="w-full h-full object-cover"
-                          fill
-                          // style={{ objectFit: 'cover' }}
-                          sizes="64px"
-                        // priority={false}
-                        // quality={85}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Mentor Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1">
-                        <h3 className="text-[15px] md:text-[17px] font-bold text-gray-900">
-                          {mentor.name}
-                        </h3>
-                        <span className="px-2.5 py-1 bg-yellow-50 text-yellow-700 rounded-full text-[10px] md:text-[11px] font-semibold whitespace-nowrap border border-yellow-200">
-                          {mentor.menteeCount} Mentees
-                        </span>
-                      </div>
-                      <p className="text-[12px] md:text-[13px] text-gray-500 mb-1">
-                        {mentor.role}
-                      </p>
-                      <p className="text-[11px] md:text-[12px] text-gray-400 leading-relaxed hidden sm:block">
-                        {mentor.description}
-                      </p>
-                    </div>
-
-                    {/* Action Icons */}
-                    <div className="flex items-center gap-2 md:gap-4 text-[#2E3B8E]">
-                      <button
-                        className="hover:opacity-70 transition p-1 hidden sm:block"
-                        aria-label="Email"
-                      >
-                        <i className="fa-regular fa-envelope text-[16px] md:text-[17px]"></i>
-                      </button>
-                      <button
-                        className="hover:opacity-70 transition p-1 hidden sm:block"
-                        aria-label="Message"
-                      >
-                        <i className="fa-regular fa-comment text-[16px] md:text-[17px]"></i>
-                      </button>
-                      <button
-                        className="hover:opacity-70 transition p-1 hidden md:block"
-                        aria-label="WhatsApp"
-                      >
-                        <i className="fa-brands fa-whatsapp text-[17px]"></i>
-                      </button>
-                      <button
-                        className="hover:opacity-70 transition p-1"
-                        aria-label="Call"
-                      >
-                        <i className="fa-solid fa-phone text-[16px] md:text-[17px]"></i>
-                      </button>
-                      <div className="relative">
-                        <button
-                          onClick={() => {
-                            setSelectedMentor(mentor);
-                            setShowOptionsMenu(!showOptionsMenu);
-                          }}
-                          className="w-7 h-7 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-all"
-                        >
-                          <i className="fa-solid fa-ellipsis-vertical text-gray-600 text-sm"></i>
-                        </button>
-
-                        {showOptionsMenu &&
-                          selectedMentor?.id === mentor.id && (
-                            <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl py-2 px-1 min-w-[240px] z-50">
-                              {optionsMenuItems.map((item, index) => (
-                                <button
-                                  key={index}
-                                  onClick={() => {
-                                    handleAction(item.label, mentor);
-                                    setShowOptionsMenu(false);
-                                  }}
-                                  className="w-full text-left px-4 py-2.5 rounded-lg text-[13px] transition-all flex items-center gap-3 hover:bg-gray-50"
-                                >
-                                  <i
-                                    className={`${item.icon} ${item.color} text-base w-5`}
-                                  ></i>
-                                  <span className="text-gray-700 font-medium">
-                                    {item.label}
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  mentor={mentor}
+                  isMenuOpen={openMenuId === mentor.id}
+                  onToggleMenu={handleToggleMenu}
+                  onMenuAction={handleMenuAction}
+                />
               ))}
             </div>
           )}
@@ -590,7 +649,7 @@ export default function MyMentorsPage() {
         isOpen={showScheduleModal}
         onClose={() => setShowScheduleModal(false)}
         onConfirm={(meetingData) => {
-          setToast("Meeting Scheduled Successfully");
+          setToast({ message: "Meeting Scheduled Successfully", type: 'success' });
           setTimeout(() => setToast(null), 3000);
         }}
         mentor={selectedMentor}
@@ -600,11 +659,51 @@ export default function MyMentorsPage() {
       <AssignMenteesModal
         isOpen={showAssignModal}
         onClose={() => setShowAssignModal(false)}
-        onConfirm={(selectedMentees) => {
-          setToast(`${selectedMentees.length} Mentees Assigned Successfully`);
+        onSuccess={(message) => {
+          setToast({ message, type: 'success' });
+          setTimeout(() => setToast(null), 3000);
+          // Refresh the mentors list to show updated assigned counts
+          const fetchMentors = async () => {
+            try {
+              let role: string;
+              let roleMatch: 'exact' | 'mixed' | undefined;
+
+              if (activeFilter === "All") {
+                role = "mentor";
+                roleMatch = "mixed";
+              } else if (activeFilter === "Mentors") {
+                role = "mentor";
+              } else if (activeFilter === "Field Mentor") {
+                role = "field mentor";
+              } else {
+                role = "mentor";
+                roleMatch = "mixed";
+              }
+
+              const response = await apiGetAllUsers({
+                role,
+                roleMatch,
+                search: debouncedQuery || undefined,
+              });
+
+              const users = response.data.data.users;
+              const mentors = users.map(convertUserToMentor);
+              setAllMentors(mentors);
+            } catch (error) {
+              console.error("Error refreshing mentors:", error);
+            }
+          };
+          fetchMentors();
+        }}
+        onError={(message) => {
+          setToast({ message, type: 'error' });
           setTimeout(() => setToast(null), 3000);
         }}
-        mentor={selectedMentor ? { name: selectedMentor.name, id: Number(selectedMentor.id) || 0 } : undefined}
+        mentor={selectedMentor ? {
+          name: selectedMentor.name,
+          id: selectedMentor.id,
+          assignedIds: selectedMentor.assignedIds
+        } : undefined}
       />
 
       {/* Remove Mentee Modal */}
@@ -612,7 +711,7 @@ export default function MyMentorsPage() {
         isOpen={showRemoveModal}
         onClose={() => setShowRemoveModal(false)}
         onConfirm={() => {
-          setToast("Mentee Removed Successfully");
+          setToast({ message: "Mentee Removed Successfully", type: 'success' });
           setTimeout(() => setToast(null), 3000);
         }}
         title="Remove a Mentee"
@@ -624,25 +723,33 @@ export default function MyMentorsPage() {
         iconColor="text-red-500 bg-red-100"
       />
 
+      {/* List Mentees Modal */}
+      <ListMenteesModal
+        isOpen={showListMenteesModal}
+        onClose={() => setShowListMenteesModal(false)}
+        mentorId={selectedMentor?.id || null}
+        mentorName={selectedMentor?.name || null}
+      />
+
       {/* Toast Notification */}
       {toast && (
         <div className="fixed top-6 right-6 z-[100] animate-fade-in">
           <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3 border border-gray-100">
-            <i className="fa-solid fa-circle-check text-green-500 text-xl"></i>
+            <i className={`fa-solid ${toast.type === 'success' ? 'fa-circle-check text-green-500' : 'fa-circle-exclamation text-red-500'} text-xl`}></i>
             <span className="text-[#2E3B8E] font-semibold text-[15px]">
-              {toast}
+              {toast.message}
             </span>
           </div>
         </div>
       )}
 
       {/* Click outside to close menus */}
-      {(showSortMenu || showOptionsMenu) && (
+      {(showSortMenu || openMenuId) && (
         <div
           className="fixed inset-0 z-40"
           onClick={() => {
             setShowSortMenu(false);
-            setShowOptionsMenu(false);
+            setOpenMenuId(null);
           }}
         ></div>
       )}

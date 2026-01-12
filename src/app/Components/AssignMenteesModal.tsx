@@ -1,90 +1,112 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Mentor1 from "../Assets/mentor1.png";
 import Mentor2 from "../Assets/mentor2.png";
 import Mentor3 from "../Assets/mentor3.png";
+import { apiGetAllUsers, apiAssignUsers } from "@/app/Services/users.service";
 
 interface AssignMenteesModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (selectedMentees: any[]) => void;
+  onSuccess: (message: string) => void;
+  onError: (message: string) => void;
   mentor?: {
     name: string;
-    id: number;
+    id: string;
+    assignedIds?: string[];
   } | null;
 }
 
 interface Person {
-  id: number;
+  id: string;
+  firstName: string;
+  lastName: string;
   name: string;
+  email: string;
+  role: string;
+  status: string;
+  profilePicture?: string;
   img: any;
 }
-
-const AVAILABLE_PEOPLE: Person[] = [
-  {
-    id: 1,
-    name: "John Ross",
-    img: Mentor1,
-  },
-  {
-    id: 2,
-    name: "John Ross",
-    img: Mentor2,
-  },
-  {
-    id: 3,
-    name: "John Ross",
-    img: Mentor3,
-  },
-  {
-    id: 4,
-    name: "John Ross",
-    img: Mentor1,
-  },
-  {
-    id: 5,
-    name: "John Ross",
-    img: Mentor2,
-  },
-  {
-    id: 6,
-    name: "John Ross",
-    img: Mentor3,
-  },
-  {
-    id: 7,
-    name: "John Ross",
-    img: Mentor1,
-  },
-  {
-    id: 8,
-    name: "John Ross",
-    img: Mentor2,
-  },
-  {
-    id: 9,
-    name: "John Ross",
-    img: Mentor3,
-  },
-];
 
 export default function AssignMenteesModal({
   isOpen,
   onClose,
-  onConfirm,
+  onSuccess,
+  onError,
   mentor,
 }: AssignMenteesModalProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [selectedPeople, setSelectedPeople] = useState<number[]>([]);
+  const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
+  const [availablePeople, setAvailablePeople] = useState<Person[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [assigning, setAssigning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredPeople = AVAILABLE_PEOPLE.filter((person) =>
-    person.name.toLowerCase().includes(query.toLowerCase())
-  );
+  const defaultImages = [Mentor1, Mentor2, Mentor3];
 
-  const handlePersonSelect = (personId: number) => {
+  useEffect(() => {
+    if (isOpen) {
+      fetchAvailableUsers();
+      setSelectedPeople([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, mentor?.id, mentor?.assignedIds]);
+
+  const fetchAvailableUsers = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await apiGetAllUsers({
+        role: "pastor",
+        roleMatch: "mixed",
+        limit: 9999, // Get all users without pagination
+      });
+
+      const users = response.data.data.users;
+
+      // Filter out users that are already assigned to this mentor
+      const assignedIds = mentor?.assignedIds || [];
+      const filteredUsers = users.filter((user: any) => {
+        const userId = user.id || user._id;
+        return !assignedIds.includes(userId);
+      });
+
+      // Transform users to Person format
+      const people: Person[] = filteredUsers.map((user: any, index: number) => ({
+        id: user.id || user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        name: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        profilePicture: user.profilePicture,
+        img: user.profilePicture || defaultImages[index % defaultImages.length],
+      }));
+
+      setAvailablePeople(people);
+    } catch (err) {
+      console.error("Error fetching users:", err);
+      setError("Failed to load available users");
+      setAvailablePeople([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredPeople = availablePeople.filter((person) => {
+    const searchQuery = query.toLowerCase();
+    return (
+      person.name.toLowerCase().includes(searchQuery) ||
+      person.email.toLowerCase().includes(searchQuery)
+    );
+  });
+
+  const handlePersonSelect = (personId: string) => {
     setSelectedPeople((prev) =>
       prev.includes(personId)
         ? prev.filter((id) => id !== personId)
@@ -92,13 +114,27 @@ export default function AssignMenteesModal({
     );
   };
 
-  const handleConfirm = () => {
-    const selectedPeopleData = AVAILABLE_PEOPLE.filter((person) =>
-      selectedPeople.includes(person.id)
-    );
-    onConfirm(selectedPeopleData);
-    setSelectedPeople([]);
-    router.push("/director/pastor-assignments/survey");
+  const handleConfirm = async () => {
+    if (!mentor?.id || selectedPeople.length === 0) return;
+
+    setAssigning(true);
+    try {
+      const response = await apiAssignUsers(mentor.id, selectedPeople);
+
+      if (response.data.success) {
+        onSuccess(response.data.message || `Successfully assigned ${selectedPeople.length} mentee${selectedPeople.length > 1 ? 's' : ''}`);
+        setSelectedPeople([]);
+        onClose();
+      } else {
+        onError("Failed to assign mentees");
+      }
+    } catch (err: any) {
+      console.error("Error assigning users:", err);
+      const errorMessage = err.response?.data?.message || "Failed to assign mentees. Please try again.";
+      onError(errorMessage);
+    } finally {
+      setAssigning(false);
+    }
   };
 
   const getSelectedSummary = () => {
@@ -120,7 +156,12 @@ export default function AssignMenteesModal({
       <div className="bg-white rounded-xl max-w-md w-full shadow-2xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-[20px] font-bold text-gray-900">Assigned to</h2>
+          <div>
+            <h2 className="text-[20px] font-bold text-gray-900">Assign New Mentee</h2>
+            {mentor && (
+              <p className="text-[13px] text-gray-500 mt-1">Assign to {mentor.name}</p>
+            )}
+          </div>
           <button
             onClick={onClose}
             className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition"
@@ -136,45 +177,109 @@ export default function AssignMenteesModal({
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search"
+                placeholder="Search by name or email..."
                 className="w-full px-4 py-2.5 pl-10 rounded-lg border border-gray-300 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
             </div>
           </div>
 
-          {/* People List */}
-          <div className="space-y-2">
-            {filteredPeople.map((person) => (
-              <div
-                key={person.id}
-                onClick={() => handlePersonSelect(person.id)}
-                className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 transition-all"
-              >
-                <div
-                  className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                    selectedPeople.includes(person.id)
-                      ? "border-blue-500 bg-blue-500"
-                      : "border-gray-300"
-                  }`}
-                >
-                  {selectedPeople.includes(person.id) && (
-                    <i className="fa-solid fa-check text-white text-[10px]"></i>
-                  )}
-                </div>
-                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
-                  <Image
-                    src={person.img}
-                    alt={person.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <span className="text-[15px] font-medium text-gray-900">
-                  {person.name}
-                </span>
+          {/* Loading State */}
+          {loading && (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#2E3B8E] mb-3"></div>
+                <p className="text-gray-600 text-[14px]">Loading users...</p>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && !loading && (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <i className="fa-solid fa-circle-exclamation text-red-500 text-4xl mb-3"></i>
+                <p className="text-gray-900 font-medium text-[15px] mb-1">{error}</p>
+                <button
+                  onClick={fetchAvailableUsers}
+                  className="text-[#2E3B8E] text-[14px] font-medium hover:underline"
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!loading && !error && availablePeople.length === 0 && (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <i className="fa-solid fa-users text-gray-300 text-5xl mb-3"></i>
+                <p className="text-gray-900 font-medium text-[15px] mb-1">No available users</p>
+                <p className="text-gray-500 text-[13px]">
+                  All users are already assigned or no users found
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* People List */}
+          {!loading && !error && filteredPeople.length > 0 && (
+            <div className="space-y-2">
+              {filteredPeople.map((person) => (
+                <div
+                  key={person.id}
+                  onClick={() => handlePersonSelect(person.id)}
+                  className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 transition-all border border-gray-100"
+                >
+                  <div
+                    className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                      selectedPeople.includes(person.id)
+                        ? "border-blue-500 bg-blue-500"
+                        : "border-gray-300"
+                    }`}
+                  >
+                    {selectedPeople.includes(person.id) && (
+                      <i className="fa-solid fa-check text-white text-[10px]"></i>
+                    )}
+                  </div>
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                    <Image
+                      src={person.img}
+                      alt={person.name}
+                      width={40}
+                      height={40}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <p className="text-[15px] font-semibold text-gray-900 truncate">
+                        {person.name}
+                      </p>
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-medium">
+                        {person.role}
+                      </span>
+                    </div>
+                    <p className="text-[12px] text-gray-500 truncate">{person.email}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* No Search Results */}
+          {!loading && !error && availablePeople.length > 0 && filteredPeople.length === 0 && (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <i className="fa-solid fa-search text-gray-300 text-4xl mb-3"></i>
+                <p className="text-gray-900 font-medium text-[15px] mb-1">No results found</p>
+                <p className="text-gray-500 text-[13px]">
+                  Try searching with a different name or email
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
@@ -188,10 +293,17 @@ export default function AssignMenteesModal({
           </div>
           <button
             onClick={handleConfirm}
-            disabled={selectedPeople.length === 0}
-            className="px-6 py-2.5 bg-[#2E3B8E] text-white rounded-lg text-[14px] font-semibold hover:bg-[#1F2A6E] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={selectedPeople.length === 0 || assigning}
+            className="px-6 py-2.5 bg-[#2E3B8E] text-white rounded-lg text-[14px] font-semibold hover:bg-[#1F2A6E] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            Assign
+            {assigning ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>Assigning...</span>
+              </>
+            ) : (
+              <span>Assign</span>
+            )}
           </button>
         </div>
       </div>
