@@ -10,6 +10,7 @@ import Card3 from "../../Assets/card3.png";
 import Card4 from "../../Assets/card4.png";
 import Card5 from "../../Assets/card5.png";
 import Card6 from "../../Assets/card6.png";
+import { createMedia } from "@/app/Services/media.service";
 
 interface Video {
   id: number;
@@ -129,7 +130,7 @@ export default function VideosPage() {
     setIsSelectMode(false);
     setShowDeleteModal(false);
     setShowDeleteToast(true);
-    
+
     // Hide toast after 3 seconds
     setTimeout(() => {
       setShowDeleteToast(false);
@@ -142,24 +143,62 @@ export default function VideosPage() {
     }
   };
 
-  const handleSubmit = () => {
-    if (editingVideoId) {
-      // Handle video update
-      console.log("Updating video:", editingVideoId, videoForm);
-      setShowEditVideoModal(false);
-      setEditingVideoId(null);
-    } else {
-      // Handle video upload
-      console.log("Uploading video:", videoForm);
-      setShowAddVideoModal(false);
+  // const handleSubmit = () => {
+  //   if (editingVideoId) {
+  //     // Handle video update
+  //     console.log("Updating video:", editingVideoId, videoForm);
+  //     setShowEditVideoModal(false);
+  //     setEditingVideoId(null);
+  //   } else {
+  //     // Handle video upload
+  //     console.log("Uploading video:", videoForm);
+  //     setShowAddVideoModal(false);
+  //   }
+  //   setVideoForm({
+  //     heading: "",
+  //     subHeading: "",
+  //     description: "",
+  //     videoFile: null,
+  //   });
+  // };
+
+  const handleSubmit = async () => {
+    if (!videoForm.heading.trim()) {
+      alert("Heading is required");
+      return;
     }
-    setVideoForm({
-      heading: "",
-      subHeading: "",
-      description: "",
-      videoFile: null,
-    });
+
+    if (!videoForm.videoFile) {
+      alert("Please upload a video file");
+      return;
+    }
+
+    try {
+      await createMedia({
+        heading: videoForm.heading,
+        subheading: videoForm.subHeading,
+        description: videoForm.description,
+        defaultType: "video",
+        files: [videoForm.videoFile],
+      });
+
+      setShowAddVideoModal(false);
+
+      setVideoForm({
+        heading: "",
+        subHeading: "",
+        description: "",
+        videoFile: null,
+      });
+
+      // TODO (next step): refetch media list
+      console.log("Video uploaded successfully");
+    } catch (error) {
+      console.error("Upload failed", error);
+      alert("Failed to upload video");
+    }
   };
+
 
   const handleMenuToggle = (videoId: number, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -239,11 +278,10 @@ export default function VideosPage() {
                   <button
                     onClick={handleDeleteClick}
                     disabled={selectedVideos.length === 0}
-                    className={`text-sm font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm ${
-                      selectedVideos.length === 0
+                    className={`text-sm font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm ${selectedVideos.length === 0
                         ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                         : "bg-red-600 text-white hover:bg-red-700"
-                    }`}
+                      }`}
                   >
                     Delete
                   </button>

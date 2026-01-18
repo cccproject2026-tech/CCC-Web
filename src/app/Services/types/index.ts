@@ -221,3 +221,13 @@ export type MicroGrantResponse = {
     updatedAt: string;
   };
 };
+
+export interface Media {
+  _id: string;
+  heading: string;
+  subheading?: string;
+  description?: string;
+  url: string;
+  type: "video" | "image";
+  createdAt: string;
+}
