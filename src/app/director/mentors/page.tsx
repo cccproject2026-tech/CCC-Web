@@ -476,7 +476,7 @@ export default function MyMentorsPage() {
         handleRemoveMentee(mentor);
         break;
       case "Edit Profile":
-        router.push(`/director/mentors/profile/edit`);
+        router.push(`/director/mentors/profile/edit?id=${mentor.id}`);
         setOpenMenuId(null);
         break;
       default:

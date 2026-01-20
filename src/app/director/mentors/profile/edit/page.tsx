@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import AppHeader from "@/app/Components/Header/AppHeader";
 import AppHero from "@/app/Components/Hero/AppHero";
@@ -13,43 +13,52 @@ import ProfileForm, {
 } from "@/app/Components/ProfileForm";
 import MentorBg from "@/app/Assets/mentor-bg.png";
 import Mentor1 from "@/app/Assets/mentor1.png";
+import { getUserById, updateUserById } from "@/app/Services/mentors.service";
 
 export default function EditMentorProfilePage() {
   const router = useRouter();
 
+  const searchParams = useSearchParams();
+  const mentorId = searchParams.get("id");
   // Seed data – replace with real fetch later
   const [personal, setPersonal] = useState<PersonalInfo>({
-    firstName: "John",
-    lastName: "Rose",
-    phoneNumber: "09878564398",
-    email: "johnrose@gmail.com",
+    firstName: "",
+    lastName: "",
+    phoneNumber: "",
+    email: "",
   });
+
   const [church1, setChurch1] = useState<ChurchInfo>({
-    name: "Loma Linda University Church, CA",
-    phone: "09878564398",
-    website: "johnross@gmail.com",
-    address: "Loma Linda University Church,CA",
-    city: "Oakland",
-    state: "North American",
-    zipCode: "000000",
-    country: "USA",
+    name: "",
+    phone: "",
+    website: "",
+    address: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    country: "",
   });
+
   const [church2, setChurch2] = useState<ChurchInfo>({
-    name: "Loma Linda University Church, CA",
-    phone: "09878564398",
-    website: "johnross@gmail.com",
-    address: "Loma Linda University Church,CA",
-    city: "Oakland",
-    state: "North American",
-    zipCode: "000000",
-    country: "USA",
+    name: "",
+    phone: "",
+    website: "",
+    address: "",
+    city: "",
+    state: "",
+    zipCode: "",
+    country: "",
   });
+
   const [other, setOther] = useState<OtherInfo>({
-    title: "Field Mentor",
-    yearsInMinistry: "11",
-    conference: "Oakland",
-    communityServiceProjects: "11",
+    title: "",
+    yearsInMinistry: "",
+    conference: "",
+    communityServiceProjects: "",
   });
+
+  const [loading, setLoading] = useState(true);
+
   const [interests, setInterests] = useState<string>("");
   const [comments, setComments] = useState<string>("");
 
@@ -80,18 +89,149 @@ export default function EditMentorProfilePage() {
     { id: "n3", name: "My Educational 1.pdf", size: "20 Oct 2024 · 9:41 am" },
   ]);
 
-  const handleSave = () => {
-    setShowSaveConfirm(false);
-    setToast("Changes Saved Successfully");
-    setTimeout(() => {
-      setToast(null);
-      router.push(`/director/mentors/profile`);
-    }, 1200);
+  const buildUpdatePayload = () => {
+    return {
+      firstName: personal.firstName,
+      lastName: personal.lastName,
+      phoneNumber: personal.phoneNumber,
+      email: personal.email,
+
+      title: other.title,
+      yearsInMinistry: other.yearsInMinistry,
+      conference: other.conference,
+      currentCommunityProjects: other.communityServiceProjects,
+
+      interests: interests
+        ? interests.split(",").map(i => i.trim()).filter(Boolean)
+        : [],
+
+      comments,
+
+      interest: {
+        churchDetails: [
+          {
+            churchName: church1.name,
+            churchPhone: church1.phone,
+            churchWebsite: church1.website,
+            churchAddress: church1.address,
+            city: church1.city,
+            state: church1.state,
+            zipCode: church1.zipCode,
+            country: church1.country,
+          },
+          {
+            churchName: church2.name,
+            churchPhone: church2.phone,
+            churchWebsite: church2.website,
+            churchAddress: church2.address,
+            city: church2.city,
+            state: church2.state,
+            zipCode: church2.zipCode,
+            country: church2.country,
+          },
+        ].filter(
+          c =>
+            c.churchName ||
+            c.churchPhone ||
+            c.churchWebsite ||
+            c.churchAddress
+        ),
+      },
+    };
+  };
+
+  useEffect(() => {
+    if (!mentorId) return;
+
+    const fetchUser = async () => {
+      try {
+        setLoading(true);
+
+        const res = await getUserById(mentorId);
+        const user = res.data.data;
+        setPersonal({
+          firstName: user.firstName ?? "",
+          lastName: user.lastName ?? "",
+          phoneNumber: user.phoneNumber ?? "",
+          email: user.email ?? "",
+        });
+
+        const churchOne = user.interest?.churchDetails?.[0] ?? {};
+        const churchTwo = user.interest?.churchDetails?.[1] ?? {};
+        setChurch1({
+          name: churchOne.churchName ?? "",
+          phone: churchOne.churchPhone ?? "",
+          website: churchOne.churchWebsite ?? "",
+          address: churchOne.churchAddress ?? "",
+          city: churchOne.city ?? "",
+          state: churchOne.state ?? "",
+          zipCode: churchOne.zipCode ?? "",
+          country: churchOne.country ?? "",
+        });
+
+        setChurch2({
+          name: churchTwo.churchName ?? "",
+          phone: churchTwo.churchPhone ?? "",
+          website: churchTwo.churchWebsite ?? "",
+          address: churchTwo.churchAddress ?? "",
+          city: churchTwo.city ?? "",
+          state: churchTwo.state ?? "",
+          zipCode: churchTwo.zipCode ?? "",
+          country: churchTwo.country ?? "",
+        });
+
+        setOther({
+          title: user.title ?? "",
+          yearsInMinistry: user.yearsInMinistry ?? "",
+          conference: user.conference ?? "",
+          communityServiceProjects: user.currentCommunityProjects ?? "",
+        });
+
+        setInterests(
+          Array.isArray(user.interests)
+            ? user.interests.join(", ")
+            : user.interests ?? ""
+        );
+
+        setComments(user.comments ?? "");
+
+      } catch (err) {
+        console.error("Failed to fetch user", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, [mentorId]);
+
+  const handleSave = async () => {
+    try {
+      setShowSaveConfirm(false);
+      setLoading(true);
+
+      const payload = buildUpdatePayload();
+
+      await updateUserById(mentorId!, payload);
+
+      setToast("Changes Saved Successfully");
+
+      setTimeout(() => {
+        setToast(null);
+        router.push(`/director/mentors/profile?id=${mentorId}`);
+      }, 1200);
+
+    } catch (err) {
+      console.error("Update failed", err);
+      setToast("Failed to save changes");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCancel = () => {
     setShowCancelConfirm(false);
-    router.push(`/director/mentors/profile`);
+    router.push(`/director/mentors/profile?id=${mentorId}`);
   };
 
   const handleDownload = (name: string) => {
@@ -106,6 +246,14 @@ export default function EditMentorProfilePage() {
     setToast("Documents Deleted");
     setTimeout(() => setToast(null), 1200);
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <p className="text-white text-lg">Loading mentor details...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">

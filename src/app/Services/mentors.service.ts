@@ -1,3 +1,4 @@
+import api from "./apiClient";
 import axiosInstance from "./config/axios-instance";
 import { MentorPastor } from "./types";
 import { apiGetAllUsers } from "./users.service";
@@ -51,4 +52,12 @@ export const apiGetMentees = (params?: {
     success: boolean;
     data: { mentees: MentorPastor[]; total: number };
   }>(`/home/mentees${queryString ? `?${queryString}` : ''}`);
+};
+
+export const getUserById = (id: string) => {
+  return api.get(`/users/${id}`);
+};
+
+export const updateUserById = (id: string, payload: any) => {
+  return api.patch(`/users/${id}`, payload);
 };
