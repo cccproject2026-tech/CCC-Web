@@ -1,107 +1,142 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppHero from "@/app/Components/Hero/AppHero";
 import AppFooter from "@/app/Components/AppFooter";
 import MentorBg from "../../Assets/mentor-bg.png";
+import { apiGetAllInterests } from "@/app/Services/interests.service";
+import { Interest, InterestStatus } from "@/app/Services/types";
+
+// export interface Interest {
+//   _id: string;
+//   firstName: string;
+//   lastName: string;
+//   email: string;
+//   phoneNumber?: string;
+//   title?: string;
+//   status: InterestStatus;
+//   churchDetails: any[];
+//   createdAt: string;
+//   updatedAt: string;
+//   user?: {
+//     _id: string;
+//     role: string;
+//     isEmailVerified: boolean;
+//     roleId: string;
+//   };
+// }
 
 export default function InterestReceivedPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("new");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedState, setSelectedState] = useState("state");
-  const [selectedPastors, setSelectedPastors] = useState([]);
+  const [activeTab, setActiveTab] = useState<InterestStatus>("new");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedState, setSelectedState] = useState<string>("state");
+  const [selectedPastors, setSelectedPastors] = useState<string[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [interests, setInterests] = useState<Interest[]>([]);
 
-  // Dummy data for interests
-  const interests = [
-    {
-      id: 1,
-      name: "Robert Fox",
-      role: "Pastor",
-      status: "new",
-      timestamp: "09:43 AM",
-      date: "15 Nov 2024",
-    },
-    {
-      id: 2,
-      name: "Robert Fox",
-      role: "Pastor",
-      status: "new",
-      timestamp: "09:43 AM",
-      date: "15 Nov 2024",
-    },
-    {
-      id: 3,
-      name: "Robert Fox",
-      role: "Pastor",
-      status: "pending",
-      timestamp: null,
-      date: "15 Nov 2024",
-    },
-    {
-      id: 4,
-      name: "Robert Fox",
-      role: "Pastor",
-      status: "new",
-      timestamp: null,
-      date: "15 Nov 2024",
-    },
-    {
-      id: 5,
-      name: "Robert Fox",
-      role: "Pastor",
-      status: "new",
-      timestamp: null,
-      date: "15 Nov 2024",
-    },
-    {
-      id: 6,
-      name: "Robert Fox",
-      role: "Pastor",
-      status: "accepted",
-      timestamp: null,
-      date: "15 Nov 2024",
-    },
-    {
-      id: 7,
-      name: "Robert Fox",
-      role: "Pastor",
-      status: "new",
-      timestamp: null,
-      date: "15 Nov 2024",
-    },
-    {
-      id: 8,
-      name: "Robert Fox",
-      role: "Pastor",
-      status: "pending",
-      timestamp: null,
-      date: "15 Nov 2024",
-    },
-  ];
+  const newCount = interests.filter(i => i.status === "new").length;
+  const pendingCount = interests.filter(i => i.status === "pending").length;
 
-  // Filter interests based on active tab
-  const filteredInterests = interests.filter((interest) => {
-    if (activeTab === "all") return true;
-    return interest.status === activeTab;
-  });
 
-  // Filter by search query
-  const searchedInterests = filteredInterests.filter((interest) =>
-    interest.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // // Dummy data for interests
+  // const interests = [
+  //   {
+  //     id: 1,
+  //     name: "Robert Fox",
+  //     role: "Pastor",
+  //     status: "new",
+  //     timestamp: "09:43 AM",
+  //     date: "15 Nov 2024",
+  //   },
+  //   {
+  //     id: 2,
+  //     name: "Robert Fox",
+  //     role: "Pastor",
+  //     status: "new",
+  //     timestamp: "09:43 AM",
+  //     date: "15 Nov 2024",
+  //   },
+  //   {
+  //     id: 3,
+  //     name: "Robert Fox",
+  //     role: "Pastor",
+  //     status: "pending",
+  //     timestamp: null,
+  //     date: "15 Nov 2024",
+  //   },
+  //   {
+  //     id: 4,
+  //     name: "Robert Fox",
+  //     role: "Pastor",
+  //     status: "new",
+  //     timestamp: null,
+  //     date: "15 Nov 2024",
+  //   },
+  //   {
+  //     id: 5,
+  //     name: "Robert Fox",
+  //     role: "Pastor",
+  //     status: "new",
+  //     timestamp: null,
+  //     date: "15 Nov 2024",
+  //   },
+  //   {
+  //     id: 6,
+  //     name: "Robert Fox",
+  //     role: "Pastor",
+  //     status: "accepted",
+  //     timestamp: null,
+  //     date: "15 Nov 2024",
+  //   },
+  //   {
+  //     id: 7,
+  //     name: "Robert Fox",
+  //     role: "Pastor",
+  //     status: "new",
+  //     timestamp: null,
+  //     date: "15 Nov 2024",
+  //   },
+  //   {
+  //     id: 8,
+  //     name: "Robert Fox",
+  //     role: "Pastor",
+  //     status: "pending",
+  //     timestamp: null,
+  //     date: "15 Nov 2024",
+  //   },
+  // ];
 
-  // Count interests by status
-  const newCount = interests.filter((i) => i.status === "new").length;
-  const pendingCount = interests.filter((i) => i.status === "pending").length;
-
-  const handleToggleSelect = (pastorId) => {
-    if (selectedPastors.includes(pastorId)) {
-      setSelectedPastors(selectedPastors.filter((id) => id !== pastorId));
-    } else {
-      setSelectedPastors([...selectedPastors, pastorId]);
-    }
+  const handleToggleSelect = (id: string) => {
+    setSelectedPastors(prev =>
+      prev.includes(id)
+        ? prev.filter(pid => pid !== id)
+        : [...prev, id]
+    );
   };
+
+  useEffect(() => {
+    const fetchInterests = async () => {
+      try {
+        setLoading(true);
+
+        const res = await apiGetAllInterests({
+          search: searchQuery || undefined,
+          status: activeTab,
+        });
+
+        setInterests(res.data.data);
+      } catch (error) {
+        console.error("Failed to fetch interests", error);
+        setInterests([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInterests();
+  }, [searchQuery, activeTab]);
+
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
@@ -131,20 +166,18 @@ export default function InterestReceivedPage() {
               <div className="flex gap-3">
                 <button
                   onClick={() => setActiveTab("new")}
-                  className={`relative px-6 py-3 rounded-full font-semibold text-[14px] transition-all ${
-                    activeTab === "new"
-                      ? "bg-[#2E3B8E] text-white"
-                      : "bg-white text-gray-700 border border-gray-300"
-                  }`}
+                  className={`relative px-6 py-3 rounded-full font-semibold text-[14px] transition-all ${activeTab === "new"
+                    ? "bg-[#2E3B8E] text-white"
+                    : "bg-white text-gray-700 border border-gray-300"
+                    }`}
                 >
                   New
                   {newCount > 0 && (
                     <span
-                      className={`absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-bold ${
-                        activeTab === "new"
-                          ? "bg-white text-[#2E3B8E]"
-                          : "bg-[#FFD700] text-[#2E3B8E]"
-                      }`}
+                      className={`absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-bold ${activeTab === "new"
+                        ? "bg-white text-[#2E3B8E]"
+                        : "bg-[#FFD700] text-[#2E3B8E]"
+                        }`}
                     >
                       {newCount}
                     </span>
@@ -152,20 +185,18 @@ export default function InterestReceivedPage() {
                 </button>
                 <button
                   onClick={() => setActiveTab("pending")}
-                  className={`relative px-6 py-3 rounded-full font-semibold text-[14px] transition-all ${
-                    activeTab === "pending"
-                      ? "bg-[#2E3B8E] text-white"
-                      : "bg-white text-gray-700 border border-gray-300"
-                  }`}
+                  className={`relative px-6 py-3 rounded-full font-semibold text-[14px] transition-all ${activeTab === "pending"
+                    ? "bg-[#2E3B8E] text-white"
+                    : "bg-white text-gray-700 border border-gray-300"
+                    }`}
                 >
                   Pending
                   {pendingCount > 0 && (
                     <span
-                      className={`absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-bold ${
-                        activeTab === "pending"
-                          ? "bg-white text-[#2E3B8E]"
-                          : "bg-[#FFD700] text-[#2E3B8E]"
-                      }`}
+                      className={`absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-bold ${activeTab === "pending"
+                        ? "bg-white text-[#2E3B8E]"
+                        : "bg-[#FFD700] text-[#2E3B8E]"
+                        }`}
                     >
                       {pendingCount}
                     </span>
@@ -173,11 +204,10 @@ export default function InterestReceivedPage() {
                 </button>
                 <button
                   onClick={() => setActiveTab("accepted")}
-                  className={`px-6 py-3 rounded-full font-semibold text-[14px] transition-all ${
-                    activeTab === "accepted"
-                      ? "bg-[#2E3B8E] text-white"
-                      : "bg-white text-gray-700 border border-gray-300"
-                  }`}
+                  className={`px-6 py-3 rounded-full font-semibold text-[14px] transition-all ${activeTab === "accepted"
+                    ? "bg-[#2E3B8E] text-white"
+                    : "bg-white text-gray-700 border border-gray-300"
+                    }`}
                 >
                   Accepted
                 </button>
@@ -229,17 +259,17 @@ export default function InterestReceivedPage() {
 
           {/* Interest Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {searchedInterests.map((interest) => (
+            {interests.map((interest) => (
               <div
-                key={interest.id}
+                key={interest._id}
                 className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all relative"
               >
                 {/* Checkbox */}
                 <div className="absolute top-4 right-4">
                   <input
                     type="checkbox"
-                    checked={selectedPastors.includes(interest.id)}
-                    onChange={() => handleToggleSelect(interest.id)}
+                    checked={selectedPastors.includes(interest._id)}
+                    onChange={() => handleToggleSelect(interest._id)}
                     className="w-5 h-5 cursor-pointer accent-[#2E3B8E]"
                   />
                 </div>
@@ -250,16 +280,23 @@ export default function InterestReceivedPage() {
                     <i className="fa-solid fa-user text-blue-600 text-2xl"></i>
                   </div>
                   <span className="text-[13px] text-gray-500 font-medium">
-                    {interest.timestamp || interest.date}
+                    {new Date(interest.createdAt).toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
                   </span>
+
                 </div>
 
                 {/* Name and Role */}
                 <div className="mb-4">
                   <h3 className="text-[17px] font-bold text-gray-900 mb-1">
-                    {interest.name}
+                    {interest.firstName} {interest.lastName}
                   </h3>
-                  <p className="text-[14px] text-gray-600">{interest.role}</p>
+                  <p className="text-[14px] text-gray-600">
+                    {interest.title ?? "—"}
+                  </p>
                 </div>
 
                 {/* Contact Icons and View Button */}
@@ -298,7 +335,7 @@ export default function InterestReceivedPage() {
                   {/* View Button */}
                   <button
                     onClick={() =>
-                      router.push(`/director/interest-list/${interest.id}`)
+                      router.push(`/director/interest-list/${interest._id}`)
                     }
                     className="px-4 py-2.5 bg-[#2E3B8E] text-white rounded-lg text-[14px] font-semibold hover:bg-[#1F2A6E] transition-all whitespace-nowrap"
                   >
@@ -310,7 +347,7 @@ export default function InterestReceivedPage() {
           </div>
 
           {/* Empty State */}
-          {searchedInterests.length === 0 && (
+          {interests.length === 0 && (
             <div className="text-center py-12">
               <i className="fa-solid fa-search text-gray-300 text-6xl mb-4"></i>
               <p className="text-gray-500 text-[16px]">No interests found</p>

@@ -231,3 +231,35 @@ export interface Media {
   type: "video" | "image";
   createdAt: string;
 }
+
+export type InterestStatus = "new" | "pending" | "accepted";
+
+export interface ChurchDetails {
+  churchName?: string;
+  churchPhone?: string;
+  churchWebsite?: string;
+  churchAddress?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  country?: string;
+}
+
+export interface Interest {
+  id: string;                 // backend maps _id → id
+  profileInfo?: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+  email: string;
+  profilePicture?: string;
+  churchDetails?: ChurchDetails[];
+  title?: string;
+  conference?: string;
+  yearsInMinistry?: string;
+  currentCommunityProjects?: string;
+  interests?: string[];
+  comments?: string;
+  userId?: string;
+  status: InterestStatus;
+}

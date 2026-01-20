@@ -16,3 +16,12 @@ export const apiGetInterestById = (id: string) => {
 export const apiGetInterestByEmail = (email: string) => {
   return axiosInstance.get<{ success: boolean; data: Interest }>(`/interests/by-email/${email}`);
 };
+
+export const apiUpdateInterestStatus = (
+  id: string,
+  status: "accepted" | "rejected"
+) => {
+  return axiosInstance.patch(`/interests/request/${id}`, {
+    status,
+  });
+};

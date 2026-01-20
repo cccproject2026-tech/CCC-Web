@@ -1,10 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import AppFooter from "@/app/Components/AppFooter";
 import MentorBg from "../../../Assets/mentor-bg.png";
 import Mentor1 from "../../../Assets/mentor1.png";
 import Image from "next/image";
+import { apiGetInterestById, apiUpdateInterestStatus } from "@/app/Services/interests.service";
+import { Interest } from "@/app/Services/types";
 
 export default function InterestDetailPage() {
   const router = useRouter();
@@ -16,31 +18,52 @@ export default function InterestDetailPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [toast, setToast] = useState(null);
 
+  const [interestData, setInterestData] = useState<Interest | null>(null);
+  const [loading, setLoading] = useState(true);
+
   // Mock data for the specific interest/pastor
-  const interestData = {
-    id: slug,
-    name: "Robert Fox",
-    role: "Pastor",
-    email: "robert.fox@email.com",
-    phone: "+1 (555) 123-4567",
-    church: "Grace Community Church",
-    location: "New York, NY",
-    status: "new",
-    timestamp: "09:43 AM",
-    date: "15 Nov 2024",
-    image: Mentor1,
-    bio: "Experienced pastor with over 15 years of ministry experience. Passionate about community outreach and church growth.",
-    interests: [
-      "Community Engagement",
-      "Church Growth",
-      "Leadership Development",
-      "Pastoral Care",
-    ],
-    experience: "15+ years",
-    education: "Master of Divinity, Seminary University",
-    languages: ["English", "Spanish"],
-    availability: "Monday - Friday, 9 AM - 5 PM EST",
-  };
+  // const interestData = {
+  //   id: slug,
+  //   name: "Robert Fox",
+  //   role: "Pastor",
+  //   email: "robert.fox@email.com",
+  //   phone: "+1 (555) 123-4567",
+  //   church: "Grace Community Church",
+  //   location: "New York, NY",
+  //   status: "new",
+  //   timestamp: "09:43 AM",
+  //   date: "15 Nov 2024",
+  //   image: Mentor1,
+  //   bio: "Experienced pastor with over 15 years of ministry experience. Passionate about community outreach and church growth.",
+  //   interests: [
+  //     "Community Engagement",
+  //     "Church Growth",
+  //     "Leadership Development",
+  //     "Pastoral Care",
+  //   ],
+  //   experience: "15+ years",
+  //   education: "Master of Divinity, Seminary University",
+  //   languages: ["English", "Spanish"],
+  //   availability: "Monday - Friday, 9 AM - 5 PM EST",
+  // };
+
+  useEffect(() => {
+    if (!slug) return;
+
+    const fetchInterest = async () => {
+      try {
+        setLoading(true);
+        const res = await apiGetInterestById(slug as string);
+        setInterestData(res.data.data);
+      } catch (err) {
+        console.error("Failed to fetch interest", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInterest();
+  }, [slug]);
 
   const handleAssign = () => {
     setShowAssignModal(false);
@@ -48,17 +71,67 @@ export default function InterestDetailPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleReject = () => {
-    setShowRejectModal(false);
-    setToast("Interest rejected");
-    setTimeout(() => setToast(null), 3000);
+  const handleReject = async () => {
+    if (!interestData) return;
+
+    try {
+      await apiUpdateInterestStatus(interestData?.userId, "rejected");
+
+      setInterestData({
+        ...interestData,
+        status: "rejected",
+      });
+
+      setToast("Interest rejected successfully");
+      setShowRejectModal(false);
+
+      setTimeout(() => {
+        router.back();
+      }, 1200);
+    } catch (error) {
+      console.error("Failed to reject interest", error);
+      setToast("Failed to reject interest");
+    } finally {
+      setTimeout(() => setToast(null), 3000);
+    }
   };
 
-  const handleAccept = () => {
-    setToast("Interest accepted successfully");
-    setTimeout(() => setToast(null), 3000);
-    L;
+
+  const handleAccept = async () => {
+    if (!interestData) return;
+
+    try {
+      console.log(interestData)
+      await apiUpdateInterestStatus(interestData?.userId, "accepted");
+
+      setInterestData({
+        ...interestData,
+        status: "accepted",
+      });
+
+      setToast("Interest accepted successfully");
+
+      setTimeout(() => {
+        router.back(); 
+      }, 1200);
+
+    } catch (error) {
+      console.error("Failed to accept interest", error);
+      setToast("Failed to accept interest");
+    } finally {
+      setTimeout(() => setToast(null), 3000);
+    }
   };
+
+  const church = interestData?.churchDetails?.[0];
+
+  if (loading || !interestData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white">
+        Loading interest details...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
@@ -89,8 +162,8 @@ export default function InterestDetailPage() {
                 <div className="flex justify-center mb-6">
                   <div className="relative w-32 h-32 rounded-full overflow-hidden">
                     <Image
-                      src={interestData.image}
-                      alt={interestData.name}
+                      src={interestData.profilePicture || Mentor1}
+                      alt={`${interestData.firstName} ${interestData.lastName}`}
                       className="w-full h-full object-cover"
                     />
                   </div>
@@ -99,19 +172,18 @@ export default function InterestDetailPage() {
                 {/* Name and Role */}
                 <div className="text-center mb-6">
                   <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                    {interestData.name}
+                    {interestData.firstName} {interestData.lastName}
                   </h2>
                   <p className="text-lg text-gray-600 mb-2">
-                    {interestData.role}
+                    {interestData.title}
                   </p>
                   <span
-                    className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${
-                      interestData.status === "new"
-                        ? "bg-green-100 text-green-700"
-                        : interestData.status === "pending"
+                    className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${interestData.status === "new"
+                      ? "bg-green-100 text-green-700"
+                      : interestData.status === "pending"
                         ? "bg-yellow-100 text-yellow-700"
                         : "bg-blue-100 text-blue-700"
-                    }`}
+                      }`}
                   >
                     {interestData.status.charAt(0).toUpperCase() +
                       interestData.status.slice(1)}
@@ -126,18 +198,25 @@ export default function InterestDetailPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <i className="fa-solid fa-phone text-[#2E3B8E]"></i>
-                    <span className="text-gray-700">{interestData.phone}</span>
+                    <span className="text-gray-700">{interestData.phoneNumber}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <i className="fa-solid fa-church text-[#2E3B8E]"></i>
-                    <span className="text-gray-700">{interestData.church}</span>
+                    <span className="text-gray-700">
+                      {church?.churchName ?? "—"}
+                    </span>
+                    <span className="text-gray-700">
+                      {church
+                        ? `${church.city ?? ""}${church.city && church.state ? ", " : ""}${church.state ?? ""}${church.country ? `, ${church.country}` : ""}`
+                        : "—"}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-3">
+                  {/* <div className="flex items-center gap-3">
                     <i className="fa-solid fa-location-dot text-[#2E3B8E]"></i>
                     <span className="text-gray-700">
                       {interestData.location}
                     </span>
-                  </div>
+                  </div> */}
                 </div>
 
                 {/* Action Buttons */}
@@ -171,31 +250,28 @@ export default function InterestDetailPage() {
                 <div className="flex border-b">
                   <button
                     onClick={() => setActiveTab("details")}
-                    className={`px-6 py-4 font-semibold text-sm transition-all ${
-                      activeTab === "details"
-                        ? "text-[#2E3B8E] border-b-2 border-[#2E3B8E]"
-                        : "text-gray-600 hover:text-gray-800"
-                    }`}
+                    className={`px-6 py-4 font-semibold text-sm transition-all ${activeTab === "details"
+                      ? "text-[#2E3B8E] border-b-2 border-[#2E3B8E]"
+                      : "text-gray-600 hover:text-gray-800"
+                      }`}
                   >
                     Details
                   </button>
                   <button
                     onClick={() => setActiveTab("interests")}
-                    className={`px-6 py-4 font-semibold text-sm transition-all ${
-                      activeTab === "interests"
-                        ? "text-[#2E3B8E] border-b-2 border-[#2E3B8E]"
-                        : "text-gray-600 hover:text-gray-800"
-                    }`}
+                    className={`px-6 py-4 font-semibold text-sm transition-all ${activeTab === "interests"
+                      ? "text-[#2E3B8E] border-b-2 border-[#2E3B8E]"
+                      : "text-gray-600 hover:text-gray-800"
+                      }`}
                   >
                     Interests & Goals
                   </button>
                   <button
                     onClick={() => setActiveTab("history")}
-                    className={`px-6 py-4 font-semibold text-sm transition-all ${
-                      activeTab === "history"
-                        ? "text-[#2E3B8E] border-b-2 border-[#2E3B8E]"
-                        : "text-gray-600 hover:text-gray-800"
-                    }`}
+                    className={`px-6 py-4 font-semibold text-sm transition-all ${activeTab === "history"
+                      ? "text-[#2E3B8E] border-b-2 border-[#2E3B8E]"
+                      : "text-gray-600 hover:text-gray-800"
+                      }`}
                   >
                     History
                   </button>
@@ -226,14 +302,14 @@ export default function InterestDetailPage() {
                               {interestData.education}
                             </p>
                           </div>
-                          <div>
+                          {/* <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">
                               Languages
                             </label>
                             <p className="text-gray-800">
                               {interestData.languages.join(", ")}
                             </p>
-                          </div>
+                          </div> */}
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">
                               Availability
@@ -322,7 +398,7 @@ export default function InterestDetailPage() {
                                 Interest Submitted
                               </p>
                               <p className="text-sm text-gray-600">
-                                {interestData.date} at {interestData.timestamp}
+                                {new Date(interestData.createdAt).toLocaleDateString()}
                               </p>
                             </div>
                           </div>
