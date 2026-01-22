@@ -1,5 +1,5 @@
 import axiosInstance from "./config/axios-instance";
-import { User, CreateUserDto } from "./types";
+import { User, CreateUserDto, InviteFieldMentorPayload } from "./types";
 import { buildQueryString } from "./utils/queryBuilder";
 
 export const apiCreateUser = (data: CreateUserDto) => {
@@ -39,4 +39,19 @@ export const apiAssignUsers = (userId: string, assignedIds: string[]) => {
     `/users/${userId}/assign`,
     { assignedId: assignedIds }
   );
+};
+
+export const apiCreateDirector = (payload: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+}) => {
+  return axiosInstance.post("/super-admin/directors", payload);
+};
+
+export const apiInviteFieldMentor = (
+  payload: InviteFieldMentorPayload
+) => {
+  return axiosInstance.post("/users/invite-field-mentor", payload);
 };

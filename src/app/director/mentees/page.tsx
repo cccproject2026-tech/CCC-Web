@@ -1,7 +1,7 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/Header/AppHeader";
+
 import AppHero from "@/app/Components/Hero/AppHero";
 import AppFooter from "@/app/Components/AppFooter";
 import PersonListCard from "@/app/Components/PersonListCard";
@@ -10,13 +10,17 @@ import FeaturedAvatars, {
 } from "@/app/Components/FeaturedAvatars";
 import AssignMentorModal from "@/app/Components/AssignMentorModal";
 import RemoveMentorModal from "@/app/Components/RemoveMentorModal";
+
 import MentorBg from "../../Assets/mentor-bg.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
 
+import { apiGetAllUsers } from "@/app/Services/users.service";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
+
 interface Mentee {
-  id: number;
+  id: string;
   name: string;
   description: string;
   img: any;
@@ -25,65 +29,21 @@ interface Mentee {
   phase?: string;
 }
 
-const MENTEES: Mentee[] = [
-  {
-    id: 1,
-    name: "John Doe",
-    description:
-      "Sub text area write something here. That you can read more about him",
-    img: Mentor1,
-    status: "active",
-    progress: 100,
-    phase: "Community Revitalization and Multiplication",
-  },
-  {
-    id: 2,
-    name: "John Doe",
-    description:
-      "Sub text area write something here. That you can read more about him",
-    img: Mentor2,
-    status: "active",
-    progress: 70,
-    phase: "Church Empowerment",
-  },
-  {
-    id: 3,
-    name: "John Doe",
-    description:
-      "Sub text area write something here. That you can read more about him",
-    img: Mentor3,
-    status: "active",
-    progress: 70,
-    phase: "Self Revitalization",
-  },
-  {
-    id: 4,
-    name: "John Doe",
-    description:
-      "Sub text area write something here. That you can read more about him",
-    img: Mentor1,
-    status: "completed",
-    progress: 100,
-  },
-  {
-    id: 5,
-    name: "John Doe",
-    description:
-      "Sub text area write something here. That you can read more about him",
-    img: Mentor2,
-    status: "completed",
-    progress: 100,
-  },
-];
+const IMAGE_POOL = [Mentor1, Mentor2, Mentor3];
 
-const FEATURED = [
-  { id: 1, name: "Jacob Jones", img: Mentor1 },
-  { id: 2, name: "John Doe", img: Mentor2 },
-  { id: 3, name: "Robert Fox", img: Mentor3 },
-  { id: 4, name: "Jacob Jones", img: Mentor1 },
-  { id: 5, name: "Robert Fox", img: Mentor3 },
-  { id: 6, name: "John Doe", img: Mentor2 },
-];
+const mapUserToMentee = (user: any, index: number): Mentee => ({
+  id: user.id,
+  name: `${user.firstName} ${user.lastName}`,
+  description: `${user.role} enrolled in mentoring program`,
+  img: user.profilePicture || IMAGE_POOL[index % IMAGE_POOL.length],
+  status: user.hasCompleted 
+    ? "completed"
+    : user.status === "pending"
+      ? "pending"
+      : "active",
+  progress: user.progressPercentage ?? 0,
+  phase: user.currentPhase ?? undefined,
+});
 
 const AVAILABLE_MENTORS = [
   {
@@ -138,85 +98,137 @@ const AVAILABLE_MENTORS = [
 
 export default function MenteesPage() {
   const router = useRouter();
+
+  const [mentees, setMentees] = useState<Mentee[]>([]);
   const [activeTab, setActiveTab] = useState<"all" | "active" | "completed">(
     "active"
   );
-  const [sortBy, setSortBy] = useState<string>("Phase");
+  const [sortBy, setSortBy] = useState("Phase");
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
-  const [selectedMentee, setSelectedMentee] = useState<number | null>(null);
+  const [selectedMentee, setSelectedMentee] = useState<string | null>(null);
 
-  const featuredItems: FeaturedAvatarItem[] = FEATURED.map((m) => ({
-    id: m.id,
-    name: m.name,
-    img: m.img,
-  }));
+  useEffect(() => {
+    const fetchMentees = async () => {
+      try {
+        const res = await apiGetAllUsers({
+          role: "pastor",
+          roleMatch: "mixed",
+          search: query || undefined,
+        });
+        console.log(res.data.data.users)
+        setMentees(
+          res.data.data.users.map((u: any, i: number) =>
+            mapUserToMentee(u, i)
+          )
+        );
+      } catch (err) {
+        console.error(err);
+        setMentees([]);
+      }
+    };
 
-  const data = useMemo(() => {
-    let filtered = MENTEES.filter((m) => {
+    fetchMentees();
+  }, [query]);
+
+  useEffect(() => {
+    if (!mentees.length) return;
+
+    const hydrateProgress = async () => {
+      const results = await Promise.allSettled(
+        mentees.map((m) =>
+          apiGetUserProgress(m.id).then((res) => ({
+            userId: m.id,
+            progress: res.data.data?.overallProgress ?? 0,
+            completed: res.data.data?.overallCompleted ?? false,
+          }))
+        )
+      );
+
+      setMentees((prev) =>
+        prev.map((m) => {
+          const match = results.find(
+            (r) =>
+              r.status === "fulfilled" && r.value.userId === m.id
+          ) as PromiseFulfilledResult<any> | undefined;
+
+          if (!match) return m;
+
+          return {
+            ...m,
+            progress: match.value.progress,
+            status: match.value.completed ? "completed" : m.status,
+          };
+        })
+      );
+    };
+
+    hydrateProgress();
+  }, [mentees.length]);
+
+  const filteredMentees = useMemo(() => {
+    return mentees.filter((m) => {
       const matchesTab = activeTab === "all" || m.status === activeTab;
-      const matchesSearch = m.name.toLowerCase().includes(query.toLowerCase());
+      const matchesSearch = m.name
+        .toLowerCase()
+        .includes(query.toLowerCase());
       return matchesTab && matchesSearch;
     });
-    return filtered;
-  }, [activeTab, query]);
+  }, [mentees, activeTab, query]);
 
-  const handleTrackProgress = (id: number) => {
+  const featuredItems: FeaturedAvatarItem[] = useMemo(
+    () =>
+      mentees.slice(0, 6).map((m) => ({
+        id: m.id,
+        name: m.name,
+        img: m.img,
+      })),
+    [mentees]
+  );
+
+  const handleTrackProgress = () => {
     setToast("Track Progress...");
     setTimeout(() => setToast(null), 2000);
   };
 
-  const handleMarkComplete = (id: number) => {
+  const handleMarkComplete = () => {
     setToast("Marked as Complete");
     setTimeout(() => setToast(null), 2000);
   };
 
-  // Options menu items for mentee cards
-  const getMenteeOptions = (menteeId: number) => [
+  const getMenteeOptions = (menteeId: string) => [
     {
       icon: "fa-solid fa-route",
       label: "Revitalization Roadmap",
       color: "text-blue-600",
-      onClick: () => {
-        setToast("Opening Roadmap...");
-        setTimeout(() => setToast(null), 2000);
-      },
+      onClick: () => setToast("Opening Roadmap..."),
     },
     {
       icon: "fa-solid fa-clipboard-check",
       label: "Assessments",
       color: "text-purple-600",
-      onClick: () => {
-        setToast("Opening Assessments...");
-        setTimeout(() => setToast(null), 2000);
-      },
+      onClick: () => setToast("Opening Assessments..."),
     },
     {
       icon: "fa-solid fa-file-lines",
       label: "Assignment",
       color: "text-blue-500",
-      onClick: () => {
-        setToast("Opening Assignments...");
-        setTimeout(() => setToast(null), 2000);
-      },
+      onClick: () => setToast("Opening Assignments..."),
     },
     {
       icon: "fa-regular fa-note-sticky",
       label: "Mentor Notes",
       color: "text-orange-500",
-      onClick: () => {
-        setToast("Opening Notes...");
-        setTimeout(() => setToast(null), 2000);
-      },
+      onClick: () => setToast("Opening Notes..."),
     },
     {
       icon: "fa-solid fa-chart-line",
       label: "Track Progress",
       color: "text-red-500",
-      onClick: () => handleTrackProgress(menteeId),
+      onClick: handleTrackProgress,
     },
     {
       icon: "fa-solid fa-user-plus",
@@ -236,30 +248,19 @@ export default function MenteesPage() {
         setShowRemoveModal(true);
       },
     },
-    {
-      icon: "fa-regular fa-calendar",
-      label: "Schedule a Meeting",
-      color: "text-indigo-600",
-      onClick: () => {
-        setToast("Scheduling Meeting...");
-        setTimeout(() => setToast(null), 2000);
-      },
-    },
   ];
 
+  const activeCount = mentees.filter((m) => m.status === "active").length;
   const sortOptions = ["Phase", "Name A-Z", "Name Z-A", "Progress"];
-  const activeCount = MENTEES.filter((m) => m.status === "active").length;
-  const completedCount = MENTEES.filter((m) => m.status === "completed").length;
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
       <AppHero title="Mentees" backgroundImageUrl={MentorBg.src} />
 
-      {/* Search and Featured Avatars Section */}
+      {/* Search + Featured */}
       <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-6 md:py-8">
         <div className="max-w-[1400px] mx-auto">
-          {/* Search Bar and View Toggle */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6 md:mb-8">
+          <div className="flex flex-col sm:flex-row justify-between gap-4 mb-6 md:mb-8">
             <div className="w-full sm:max-w-[420px]">
               <div className="relative">
                 <input
@@ -271,50 +272,42 @@ export default function MenteesPage() {
                 <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
               </div>
             </div>
-            <div className="flex gap-2 justify-end">
+            <div className="flex gap-2">
               <button
                 onClick={() => router.push("/director/mentees/location")}
-                className="w-11 h-11 rounded-lg flex items-center justify-center shadow-sm transition-all bg-white text-[#2E3B8E]"
-                aria-label="Location view"
+                className="w-11 h-11 rounded-lg bg-white text-[#2E3B8E]"
               >
-                <i className="fa-solid fa-location-dot text-base"></i>
+                <i className="fa-solid fa-location-dot"></i>
               </button>
-              <button
-                className="w-11 h-11 rounded-lg flex items-center justify-center shadow-sm transition-all bg-white text-[#2E3B8E]"
-                aria-label="List view"
-              >
-                <i className="fa-solid fa-list text-base"></i>
+              <button className="w-11 h-11 rounded-lg bg-white text-[#2E3B8E]">
+                <i className="fa-solid fa-list"></i>
               </button>
             </div>
           </div>
 
-          {/* Featured Avatars - Horizontal Scroll */}
           <FeaturedAvatars items={featuredItems} showDivider className="mb-2" />
         </div>
       </section>
 
-      {/* Filters and Sort Section */}
       <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 pb-6 md:pb-8 pt-4">
         <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 items-stretch lg:items-center justify-between">
           {/* Filter Tabs */}
           <div className="flex gap-1.5 sm:gap-2 bg-white rounded-xl p-1.5 shadow-sm overflow-x-auto scrollbar-hide">
             <button
               onClick={() => setActiveTab("all")}
-              className={`px-5 sm:px-7 py-2.5 rounded-lg text-[13px] sm:text-[14px] font-semibold transition-all duration-200 whitespace-nowrap ${
-                activeTab === "all"
-                  ? "bg-[#2E3B8E] text-white shadow-sm"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
+              className={`px-5 sm:px-7 py-2.5 rounded-lg text-[13px] sm:text-[14px] font-semibold transition-all duration-200 whitespace-nowrap ${activeTab === "all"
+                ? "bg-[#2E3B8E] text-white shadow-sm"
+                : "text-gray-600 hover:text-gray-800"
+                }`}
             >
               All
             </button>
             <button
               onClick={() => setActiveTab("active")}
-              className={`px-5 sm:px-7 py-2.5 rounded-lg text-[13px] sm:text-[14px] font-semibold transition-all duration-200 whitespace-nowrap flex items-center gap-2 ${
-                activeTab === "active"
-                  ? "bg-[#2E3B8E] text-white shadow-sm"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
+              className={`px-5 sm:px-7 py-2.5 rounded-lg text-[13px] sm:text-[14px] font-semibold transition-all duration-200 whitespace-nowrap flex items-center gap-2 ${activeTab === "active"
+                ? "bg-[#2E3B8E] text-white shadow-sm"
+                : "text-gray-600 hover:text-gray-800"
+                }`}
             >
               <span>In-Progress</span>
               {activeTab === "active" && activeCount > 0 && (
@@ -325,11 +318,10 @@ export default function MenteesPage() {
             </button>
             <button
               onClick={() => setActiveTab("completed")}
-              className={`px-5 sm:px-7 py-2.5 rounded-lg text-[13px] sm:text-[14px] font-semibold transition-all duration-200 whitespace-nowrap ${
-                activeTab === "completed"
-                  ? "bg-[#2E3B8E] text-white shadow-sm"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
+              className={`px-5 sm:px-7 py-2.5 rounded-lg text-[13px] sm:text-[14px] font-semibold transition-all duration-200 whitespace-nowrap ${activeTab === "completed"
+                ? "bg-[#2E3B8E] text-white shadow-sm"
+                : "text-gray-600 hover:text-gray-800"
+                }`}
             >
               Completed
             </button>
@@ -358,18 +350,16 @@ export default function MenteesPage() {
                         setSortBy(option);
                         setShowSortMenu(false);
                       }}
-                      className={`w-full text-left px-4 py-2.5 rounded-lg text-[13px] sm:text-[14px] transition-all flex items-center gap-3 ${
-                        sortBy === option
-                          ? "bg-green-50 text-green-700 font-semibold"
-                          : "text-gray-700 hover:bg-gray-50"
-                      }`}
+                      className={`w-full text-left px-4 py-2.5 rounded-lg text-[13px] sm:text-[14px] transition-all flex items-center gap-3 ${sortBy === option
+                        ? "bg-green-50 text-green-700 font-semibold"
+                        : "text-gray-700 hover:bg-gray-50"
+                        }`}
                     >
                       <span
-                        className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                          sortBy === option
-                            ? "border-green-500 bg-green-500"
-                            : "border-gray-300"
-                        }`}
+                        className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center flex-shrink-0 ${sortBy === option
+                          ? "border-green-500 bg-green-500"
+                          : "border-gray-300"
+                          }`}
                       >
                         {sortBy === option && (
                           <i className="fa-solid fa-check text-white text-[9px]"></i>
@@ -385,87 +375,44 @@ export default function MenteesPage() {
         </div>
       </section>
 
-      {/* Cards Grid */}
+      {/* Cards */}
       <section className="px-4 sm:px-6 md:px-12 lg:px-20 py-6 md:py-8">
-        <div className="max-w-[1400px] mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
-            {data.map((mentee) => (
-              <PersonListCard
-                key={mentee.id}
-                id={mentee.id}
-                name={mentee.name}
-                description={mentee.description}
-                image={mentee.img}
-                profileLink={`/director/mentees/profile`}
-                progress={
-                  mentee.phase && mentee.progress !== undefined
-                    ? {
-                        phase: mentee.phase,
-                        value: mentee.progress,
-                      }
-                    : undefined
-                }
-                optionsMenu={getMenteeOptions(mentee.id)}
-                actionButton={
-                  activeTab === "active" && mentee.progress === 100
-                    ? {
-                        text: "Mark as Complete",
-                        onClick: () => handleMarkComplete(mentee.id),
-                      }
-                    : activeTab === "completed"
-                    ? {
-                        text: "Issue Certificate",
-                        onClick: () => handleTrackProgress(mentee.id),
-                      }
-                    : undefined
-                }
-              />
-            ))}
-          </div>
+        <div className="max-w-[1400px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+          {filteredMentees.map((m) => (
+            <PersonListCard
+              key={m.id}
+              id={m.id}
+              name={m.name}
+              description={m.description}
+              image={m.img}
+              profileLink={`/director/mentees/profile?id=${m.id}`}
+              progress={
+                m.progress !== undefined
+                  ? { phase: m.phase, value: m.progress }
+                  : undefined
+              }
+              optionsMenu={getMenteeOptions(m.id)}
+              actionButton={
+                activeTab === "active" && m.progress === 100
+                  ? { text: "Mark as Complete", onClick: handleMarkComplete }
+                  : undefined
+              }
+            />
+          ))}
         </div>
       </section>
 
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed top-6 right-6 z-[100] animate-fade-in">
-          <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3 border border-gray-100">
-            <i className="fa-solid fa-circle-check text-green-500 text-xl"></i>
-            <span className="text-[#2E3B8E] font-semibold text-[15px]">
-              {toast}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Click outside to close menus */}
-      {showSortMenu && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setShowSortMenu(false)}
-        ></div>
-      )}
-
-      {/* Assign Mentor Modal */}
       <AssignMentorModal
         isOpen={showAssignModal}
         onClose={() => setShowAssignModal(false)}
-        onConfirm={(selectedMentors) => {
-          setShowAssignModal(false);
-          setToast(`${selectedMentors.length} Mentor(s) Assigned Successfully`);
-          setTimeout(() => setToast(null), 3000);
-        }}
+        onConfirm={() => setShowAssignModal(false)}
         mentors={AVAILABLE_MENTORS}
       />
 
-      {/* Remove Mentor Modal */}
       <RemoveMentorModal
         isOpen={showRemoveModal}
         onClose={() => setShowRemoveModal(false)}
-        onConfirm={(selectedMentors) => {
-          setShowRemoveModal(false);
-          setToast(`${selectedMentors.length} Mentor(s) Removed Successfully`);
-          setTimeout(() => setToast(null), 3000);
-        }}
+        onConfirm={() => setShowRemoveModal(false)}
         mentors={AVAILABLE_MENTORS}
       />
 

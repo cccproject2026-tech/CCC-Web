@@ -471,12 +471,12 @@ export default function DirectorHome() {
                   required
                   className="w-full px-4 py-3 rounded-md bg-white/10 border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50"
                 >
-                  <option value="">Select Title</option>
-                  <option value="pastor">Pastor</option>
-                  <option value="lay leader">Lay Leader</option>
-                  <option value="seminarian">Seminarian</option>
-                  <option value="mentor">Mentor</option>
-                  <option value="field-mentor">Field Mentor</option>
+                  <option className="text-black" value="">Select Title</option>
+                  <option className="text-black" value="pastor">Pastor</option>
+                  <option className="text-black" value="lay leader">Lay Leader</option>
+                  <option className="text-black" value="seminarian">Seminarian</option>
+                  <option className="text-black" value="mentor">Mentor</option>
+                  <option className="text-black" value="field-mentor">Field Mentor</option>
                 </select>
               </div>
 

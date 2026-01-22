@@ -112,7 +112,7 @@ export default function InterestDetailPage() {
       setToast("Interest accepted successfully");
 
       setTimeout(() => {
-        router.back(); 
+        router.back();
       }, 1200);
 
     } catch (error) {

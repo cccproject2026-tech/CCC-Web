@@ -71,6 +71,9 @@ export interface User {
   status: string;
   profilePicture?: string;
   assignedId?: string[];
+  phoneNumber?: string;
+  interest?: any;
+  uploadedDocuments?: any
 }
 
 export interface MentorPastor {
@@ -89,6 +92,11 @@ export interface CreateUserDto {
   lastName: string;
   email: string;
   role: string;
+}
+
+export interface InviteFieldMentorPayload {
+  email: string;
+  invitedBy: string;
 }
 
 // ===========================

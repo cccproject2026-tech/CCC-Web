@@ -9,10 +9,10 @@ export interface PersonalInfo {
 }
 
 export interface ChurchInfo {
-  name?: string;
-  phone?: string;
-  website?: string;
-  address?: string;
+  churchName?: string;
+  churchPhone?: string;
+  churchWebsite?: string;
+  churchAddress?: string;
   city?: string;
   state?: string;
   zipCode?: string;
@@ -294,7 +294,7 @@ function renderChurchGrid(
         </label>
         <input
           type="text"
-          value={church.name || ""}
+          value={church.churchName || ""}
           readOnly={!editable}
           onChange={(e) => onChange?.({ ...church, name: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
@@ -306,7 +306,7 @@ function renderChurchGrid(
         </label>
         <input
           type="text"
-          value={church.phone || ""}
+          value={church.churchPhone || ""}
           readOnly={!editable}
           onChange={(e) => onChange?.({ ...church, phone: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
@@ -318,7 +318,7 @@ function renderChurchGrid(
         </label>
         <input
           type="text"
-          value={church.website || ""}
+          value={church.churchWebsite || ""}
           readOnly={!editable}
           onChange={(e) => onChange?.({ ...church, website: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
@@ -330,7 +330,7 @@ function renderChurchGrid(
         </label>
         <input
           type="text"
-          value={church.address || ""}
+          value={church.churchAddress || ""}
           readOnly={!editable}
           onChange={(e) => onChange?.({ ...church, address: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
