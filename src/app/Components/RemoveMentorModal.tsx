@@ -118,7 +118,9 @@ export default function RemoveMentorModal({
                     <Image
                       src={mentor.img}
                       alt={mentor.name}
-                      className="w-full h-full object-cover"
+                      fill
+                      sizes="48px"
+                      className="object-cover"
                     />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -154,14 +156,13 @@ export default function RemoveMentorModal({
             <p className="text-[13px] text-gray-600">
               {selectedMentors.length > 0
                 ? `${filteredMentors
-                    .filter((m) => selectedMentors.includes(m.id))
-                    .map((m) => m.name)
-                    .slice(0, 3)
-                    .join(", ")}${
-                    selectedMentors.length > 3
-                      ? ` and ${selectedMentors.length - 3} Others`
-                      : ""
-                  }`
+                  .filter((m) => selectedMentors.includes(m.id))
+                  .map((m) => m.name)
+                  .slice(0, 3)
+                  .join(", ")}${selectedMentors.length > 3
+                  ? ` and ${selectedMentors.length - 3} Others`
+                  : ""
+                }`
                 : "No mentors selected"}
             </p>
             <button

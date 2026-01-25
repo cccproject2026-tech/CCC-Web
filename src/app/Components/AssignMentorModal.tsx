@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Image from "next/image";
 
-interface Mentor {
+export interface Mentor {
   id: number;
   name: string;
   role: string;
@@ -31,7 +31,7 @@ export default function AssignMentorModal({
   const [selectedMentors, setSelectedMentors] = useState<number[]>([]);
 
   if (!isOpen) return null;
-
+  console.log(mentors)
   const filteredMentors = mentors.filter((m) =>
     m.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -84,31 +84,28 @@ export default function AssignMentorModal({
             <div className="flex gap-2 bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setActiveTab("All")}
-                className={`px-4 py-2 rounded-md text-[13px] font-semibold transition ${
-                  activeTab === "All"
+                className={`px-4 py-2 rounded-md text-[13px] font-semibold transition ${activeTab === "All"
                     ? "bg-white text-gray-900 shadow-sm"
                     : "text-gray-600 hover:text-gray-900"
-                }`}
+                  }`}
               >
                 All
               </button>
               <button
                 onClick={() => setActiveTab("Mentors")}
-                className={`px-4 py-2 rounded-md text-[13px] font-semibold transition ${
-                  activeTab === "Mentors"
+                className={`px-4 py-2 rounded-md text-[13px] font-semibold transition ${activeTab === "Mentors"
                     ? "bg-white text-gray-900 shadow-sm"
                     : "text-gray-600 hover:text-gray-900"
-                }`}
+                  }`}
               >
                 Mentors
               </button>
               <button
                 onClick={() => setActiveTab("Field Mentor")}
-                className={`px-4 py-2 rounded-md text-[13px] font-semibold transition ${
-                  activeTab === "Field Mentor"
+                className={`px-4 py-2 rounded-md text-[13px] font-semibold transition ${activeTab === "Field Mentor"
                     ? "bg-white text-gray-900 shadow-sm"
                     : "text-gray-600 hover:text-gray-900"
-                }`}
+                  }`}
               >
                 Field Mentor
               </button>
@@ -153,7 +150,9 @@ export default function AssignMentorModal({
                     <Image
                       src={mentor.img}
                       alt={mentor.name}
-                      className="w-full h-full object-cover"
+                      fill
+                      sizes="48px"
+                      className="object-cover"
                     />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -189,14 +188,13 @@ export default function AssignMentorModal({
             <p className="text-[13px] text-gray-600">
               {selectedMentors.length > 0
                 ? `${filteredMentors
-                    .filter((m) => selectedMentors.includes(m.id))
-                    .map((m) => m.name)
-                    .slice(0, 3)
-                    .join(", ")}${
-                    selectedMentors.length > 3
-                      ? ` and ${selectedMentors.length - 3} Others`
-                      : ""
-                  }`
+                  .filter((m) => selectedMentors.includes(m.id))
+                  .map((m) => m.name)
+                  .slice(0, 3)
+                  .join(", ")}${selectedMentors.length > 3
+                  ? ` and ${selectedMentors.length - 3} Others`
+                  : ""
+                }`
                 : "No mentors selected"}
             </p>
             <button

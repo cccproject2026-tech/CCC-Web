@@ -8,7 +8,7 @@ import PersonListCard from "@/app/Components/PersonListCard";
 import FeaturedAvatars, {
   FeaturedAvatarItem,
 } from "@/app/Components/FeaturedAvatars";
-import AssignMentorModal from "@/app/Components/AssignMentorModal";
+import AssignMentorModal, { Mentor } from "@/app/Components/AssignMentorModal";
 import RemoveMentorModal from "@/app/Components/RemoveMentorModal";
 
 import MentorBg from "../../Assets/mentor-bg.png";
@@ -16,7 +16,11 @@ import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
 
-import { apiGetAllUsers } from "@/app/Services/users.service";
+import {
+  apiAssignUsers,
+  apiGetAllUsers,
+  apiGetAssignedUsers,
+} from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 
 interface Mentee {
@@ -27,74 +31,27 @@ interface Mentee {
   status: "active" | "completed" | "pending";
   progress?: number;
   phase?: string;
+  assignedId: string[];
+  assignedLoaded: boolean;
 }
 
 const IMAGE_POOL = [Mentor1, Mentor2, Mentor3];
 
 const mapUserToMentee = (user: any, index: number): Mentee => ({
-  id: user.id,
+  id: user.id ?? user._id,
   name: `${user.firstName} ${user.lastName}`,
   description: `${user.role} enrolled in mentoring program`,
   img: user.profilePicture || IMAGE_POOL[index % IMAGE_POOL.length],
-  status: user.hasCompleted 
+  status: user.hasCompleted
     ? "completed"
     : user.status === "pending"
       ? "pending"
       : "active",
   progress: user.progressPercentage ?? 0,
   phase: user.currentPhase ?? undefined,
+  assignedId: [],
+  assignedLoaded: false,
 });
-
-const AVAILABLE_MENTORS = [
-  {
-    id: 1,
-    name: "Robert Fox",
-    role: "Pastor",
-    menteeCount: 0,
-    img: Mentor1,
-    loginDate: "Not Started yet",
-  },
-  {
-    id: 2,
-    name: "Robert Fox",
-    role: "Pastor",
-    menteeCount: 2,
-    img: Mentor2,
-    loginDate: "Not Started yet",
-  },
-  {
-    id: 3,
-    name: "Robert Fox",
-    role: "Pastor",
-    menteeCount: 2,
-    img: Mentor3,
-    loginDate: "15 Nov 2024",
-  },
-  {
-    id: 4,
-    name: "Robert Fox",
-    role: "Pastor",
-    menteeCount: 2,
-    img: Mentor1,
-    loginDate: "15 Nov 2024",
-  },
-  {
-    id: 5,
-    name: "Robert Fox",
-    role: "Pastor",
-    menteeCount: 2,
-    img: Mentor2,
-    loginDate: "15 Nov 2024",
-  },
-  {
-    id: 6,
-    name: "Robert Fox",
-    role: "Pastor",
-    menteeCount: 2,
-    img: Mentor3,
-    loginDate: "15 Nov 2024",
-  },
-];
 
 export default function MenteesPage() {
   const router = useRouter();
@@ -110,29 +67,47 @@ export default function MenteesPage() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [selectedMentee, setSelectedMentee] = useState<string | null>(null);
+  const [mentors, setMentors] = useState<Mentor[]>([]);
+
+  /* ---------------- LOAD ASSIGNED USERS ---------------- */
+
+  const loadAssignedUsers = async (menteeId: string) => {
+    const res = await apiGetAssignedUsers(menteeId);
+
+    const assignedIds = res.data.data.map(
+      (u: any) => u.id ?? u._id
+    );
+
+    setMentees((prev) =>
+      prev.map((m) =>
+        m.id === menteeId
+          ? { ...m, assignedId: assignedIds, assignedLoaded: true }
+          : m
+      )
+    );
+  };
+
+  /* ---------------- FETCH MENTEES ---------------- */
 
   useEffect(() => {
     const fetchMentees = async () => {
-      try {
-        const res = await apiGetAllUsers({
-          role: "pastor",
-          roleMatch: "mixed",
-          search: query || undefined,
-        });
-        console.log(res.data.data.users)
-        setMentees(
-          res.data.data.users.map((u: any, i: number) =>
-            mapUserToMentee(u, i)
-          )
-        );
-      } catch (err) {
-        console.error(err);
-        setMentees([]);
-      }
+      const res = await apiGetAllUsers({
+        role: "pastor",
+        roleMatch: "mixed",
+        search: query || undefined,
+      });
+
+      setMentees(
+        res.data.data.users.map((u: any, i: number) =>
+          mapUserToMentee(u, i)
+        )
+      );
     };
 
     fetchMentees();
   }, [query]);
+
+  /* ---------------- PROGRESS ---------------- */
 
   useEffect(() => {
     if (!mentees.length) return;
@@ -151,8 +126,7 @@ export default function MenteesPage() {
       setMentees((prev) =>
         prev.map((m) => {
           const match = results.find(
-            (r) =>
-              r.status === "fulfilled" && r.value.userId === m.id
+            (r) => r.status === "fulfilled" && r.value.userId === m.id
           ) as PromiseFulfilledResult<any> | undefined;
 
           if (!match) return m;
@@ -168,6 +142,95 @@ export default function MenteesPage() {
 
     hydrateProgress();
   }, [mentees.length]);
+
+  /* ---------------- FETCH MENTORS ---------------- */
+
+  useEffect(() => {
+    const fetchMentors = async () => {
+      const res = await apiGetAllUsers({
+        role: "mentor",
+        roleMatch: "exact",
+      });
+
+      setMentors(
+        res.data.data.users.map((u: any, i: number): Mentor => ({
+          id: u.id ?? u._id,
+          name: `${u.firstName} ${u.lastName}`,
+          role: u.role,
+          menteeCount: u.assignedId?.length ?? 0,
+          img: u.profilePicture || IMAGE_POOL[i % IMAGE_POOL.length],
+          loginDate: u.lastLogin
+            ? new Date(u.lastLogin).toLocaleDateString()
+            : "Not Started yet",
+        }))
+      );
+    };
+
+    fetchMentors();
+  }, []);
+
+  /* ---------------- ASSIGN ---------------- */
+
+  const handleAssignMentors = async (newMentorIds: string[]) => {
+    if (!selectedMentee) return;
+
+    const mentee = mentees.find((m) => m.id === selectedMentee);
+    if (!mentee) return;
+
+    const merged = Array.from(
+      new Set([...mentee.assignedId, ...newMentorIds])
+    );
+
+    await apiAssignUsers(selectedMentee, merged);
+
+    setMentees((prev) =>
+      prev.map((m) =>
+        m.id === selectedMentee
+          ? { ...m, assignedId: merged }
+          : m
+      )
+    );
+
+    setShowAssignModal(false);
+    setToast("Mentors assigned successfully");
+  };
+
+  /* ---------------- REMOVE ---------------- */
+
+  const handleRemoveMentors = async (mentorIdsToRemove: string[]) => {
+    if (!selectedMentee) return;
+
+    const mentee = mentees.find((m) => m.id === selectedMentee);
+    if (!mentee?.assignedLoaded) return;
+
+    const updated = mentee.assignedId.filter(
+      (id) => !mentorIdsToRemove.includes(id)
+    );
+
+    await apiAssignUsers(selectedMentee, updated);
+
+    setMentees((prev) =>
+      prev.map((m) =>
+        m.id === selectedMentee
+          ? { ...m, assignedId: updated }
+          : m
+      )
+    );
+
+    setShowRemoveModal(false);
+    setToast("Mentors removed successfully");
+  };
+
+  /* ---------------- DERIVED ---------------- */
+
+  const assignedMentors = useMemo(() => {
+    if (!selectedMentee) return [];
+    const mentee = mentees.find((m) => m.id === selectedMentee);
+    if (!mentee?.assignedLoaded) return [];
+    return mentors.filter((mentor) =>
+      mentee.assignedId.includes(mentor.id)
+    );
+  }, [selectedMentee, mentees, mentors]);
 
   const filteredMentees = useMemo(() => {
     return mentees.filter((m) => {
@@ -189,16 +252,6 @@ export default function MenteesPage() {
     [mentees]
   );
 
-  const handleTrackProgress = () => {
-    setToast("Track Progress...");
-    setTimeout(() => setToast(null), 2000);
-  };
-
-  const handleMarkComplete = () => {
-    setToast("Marked as Complete");
-    setTimeout(() => setToast(null), 2000);
-  };
-
   const getMenteeOptions = (menteeId: string) => [
     {
       icon: "fa-solid fa-route",
@@ -213,23 +266,17 @@ export default function MenteesPage() {
       onClick: () => setToast("Opening Assessments..."),
     },
     {
-      icon: "fa-solid fa-file-lines",
-      label: "Assignment",
-      color: "text-blue-500",
-      onClick: () => setToast("Opening Assignments..."),
-    },
-    {
       icon: "fa-regular fa-note-sticky",
       label: "Mentor Notes",
       color: "text-orange-500",
       onClick: () => setToast("Opening Notes..."),
     },
-    {
-      icon: "fa-solid fa-chart-line",
-      label: "Track Progress",
-      color: "text-red-500",
-      onClick: handleTrackProgress,
-    },
+    // {
+    //   icon: "fa-solid fa-chart-line",
+    //   label: "Track Progress",
+    //   color: "text-red-500",
+    //   onClick: handleTrackProgress,
+    // },
     {
       icon: "fa-solid fa-user-plus",
       label: "Assign New Mentor",
@@ -243,8 +290,9 @@ export default function MenteesPage() {
       icon: "fa-solid fa-user-minus",
       label: "Remove a Mentor",
       color: "text-red-600",
-      onClick: () => {
+      onClick: async () => {
         setSelectedMentee(menteeId);
+        await loadAssignedUsers(menteeId);
         setShowRemoveModal(true);
       },
     },
@@ -405,15 +453,15 @@ export default function MenteesPage() {
       <AssignMentorModal
         isOpen={showAssignModal}
         onClose={() => setShowAssignModal(false)}
-        onConfirm={() => setShowAssignModal(false)}
-        mentors={AVAILABLE_MENTORS}
+        onConfirm={handleAssignMentors}
+        mentors={mentors}
       />
 
       <RemoveMentorModal
         isOpen={showRemoveModal}
         onClose={() => setShowRemoveModal(false)}
-        onConfirm={() => setShowRemoveModal(false)}
-        mentors={AVAILABLE_MENTORS}
+        onConfirm={handleRemoveMentors}
+        mentors={assignedMentors}
       />
 
       <AppFooter />
