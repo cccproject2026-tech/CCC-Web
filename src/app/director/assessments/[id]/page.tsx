@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
-import { apiGetAssessmentById } from "@/app/Services/assessment.service";
+import { apiGetAssessmentById, apiUpdateInstructions, apiUpdateSections } from "@/app/Services/assessment.service";
 
 interface Recommendation {
-  id: number;
+  id: string;
   text: string;
   selected: boolean;
 }
@@ -24,7 +24,7 @@ interface Layer {
 }
 
 interface Section {
-  id: number;
+  id: string;
   name: string;
   description: string;
   layers: Layer[];
@@ -70,11 +70,24 @@ export const mapAssessmentFromApi = (data: any) => ({
   })),
 });
 
+const buildSectionsPayload = (sections: Section[]) => {
+  return sections.map(section => ({
+    title: section.name,
+    description: section.description,
+    layers: section.layers.map(layer => ({
+      title: layer.name,
+      choices: layer.choices.map(c => ({ text: c.text })),
+      recommendations: layer.recommendations.map(r => r.text),
+    })),
+  }));
+};
+
+
 export default function ViewEditAssessmentPage() {
   const router = useRouter();
   const params = useParams();
   const [toast, setToast] = useState<string | null>(null);
-  const [selectedSection, setSelectedSection] = useState<number>(1);
+  const [selectedSection, setSelectedSection] = useState<string>("");
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedChoices, setSelectedChoices] = useState<number[]>([]);
   const [assessment, setAssessment] = useState<any>(null);
@@ -85,14 +98,15 @@ export default function ViewEditAssessmentPage() {
   const [showRecommendationsModal, setShowRecommendationsModal] =
     useState(false);
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
-  const [currentLayerId, setCurrentLayerId] = useState<number | null>(null);
+  const [currentLayerId, setCurrentLayerId] = useState<string | null>(null);
   const [recSelectionMode, setRecSelectionMode] = useState(false);
-  const [selectedRecs, setSelectedRecs] = useState<number[]>([]);
+  const [selectedRecs, setSelectedRecs] = useState<string[]>([]);
 
   // Form state for Add Section
   const [newSectionName, setNewSectionName] = useState("");
   const [newSectionGuidelines, setNewSectionGuidelines] = useState("");
   const [newSectionLayers, setNewSectionLayers] = useState(2);
+  const [newChoiceText, setNewChoiceText] = useState("");
 
   // Instructions state
   const [instructions, setInstructions] = useState([]);
@@ -125,6 +139,36 @@ export default function ViewEditAssessmentPage() {
     fetchAssessment();
   }, [params?.id]);
 
+  const handleAddChoice = (sectionId: string, layerId: string) => {
+    if (!newChoiceText.trim()) return;
+
+    setSections(prev =>
+      prev.map(section =>
+        section.id !== sectionId
+          ? section
+          : {
+            ...section,
+            layers: section.layers.map(layer =>
+              layer.id !== layerId
+                ? layer
+                : {
+                  ...layer,
+                  choices: [
+                    ...layer.choices,
+                    {
+                      id: crypto.randomUUID(),
+                      text: newChoiceText,
+                    },
+                  ],
+                }
+            ),
+          }
+      )
+    );
+
+    setNewChoiceText("");
+  };
+
   const showToast = (message: string) => {
     setToast(message);
     setTimeout(() => setToast(null), 3000);
@@ -144,7 +188,7 @@ export default function ViewEditAssessmentPage() {
     setIsSelectionMode(false);
   };
 
-  const handleSelectRec = (recId: number) => {
+  const handleSelectRec = (recId: string) => {
     if (selectedRecs.includes(recId)) {
       setSelectedRecs(selectedRecs.filter((id) => id !== recId));
     } else {
@@ -183,16 +227,32 @@ export default function ViewEditAssessmentPage() {
     setShowInstructionsModal(false);
   };
 
-  const handleSaveInstructions = () => {
-    showToast("Survey Edited Successfully");
-    setShowInstructionsModal(false);
+  const handleSaveInstructions = async () => {
+    try {
+      await apiUpdateInstructions(
+        assessment.id,
+        instructions.filter(i => i.checked).map(i => i.text)
+      );
+
+      showToast("Survey Edited Successfully");
+      setShowInstructionsModal(false);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  const handleSaveChanges = () => {
-    showToast("Survey Edited Successfully");
-    setTimeout(() => {
+  const handleSaveChanges = async () => {
+    try {
+      await apiUpdateSections(
+        assessment.id,
+        buildSectionsPayload(sections)
+      );
+
+      showToast("Survey Edited Successfully");
       router.push("/director/assessments");
-    }, 2000);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const selectedSectionData = sections.find((s) => s.id === selectedSection);

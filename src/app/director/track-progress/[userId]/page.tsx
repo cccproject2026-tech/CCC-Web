@@ -20,6 +20,8 @@ import Card1 from "../../../Assets/card1.png";
 import Card2 from "../../../Assets/card2.png";
 import Card3 from "../../../Assets/card3.png";
 import Card4 from "../../../Assets/card4.png";
+import { apiAddFinalComment, apiGetUserProgress } from "@/app/Services/progress.service";
+import { apiGetUserById } from "@/app/Services/users.service";
 
 // Register Chart.js components
 ChartJS.register(
@@ -65,6 +67,7 @@ function RoadmapProgressCard({
         return "bg-gray-100 text-gray-700";
     }
   };
+
 
   return (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden flex">
@@ -197,36 +200,67 @@ function SurveyProgressCard({
 }
 
 export default function IndividualProgressPage() {
+  const { userId } = useParams<{ userId: string }>();
   const params = useParams();
-  const [userName, setUserName] = useState("John Doe");
   const [isFinalCommentsModalOpen, setIsFinalCommentsModalOpen] = useState(false);
   const [finalComments, setFinalComments] = useState("");
   const [hasComments, setHasComments] = useState(false);
   const [roadmapFilter, setRoadmapFilter] = useState<"All" | "Completed" | "Remaining">("All");
   const [surveyFilter, setSurveyFilter] = useState<"All" | "Completed" | "Remaining">("All");
-  const [isCompleted, setIsCompleted] = useState(false); // Track if user has completed course
+  const [progressData, setProgressData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const userName = user
+    ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim()
+    : "—";
+  const isCompleted = progressData?.overallCompleted ?? false;
+  const [directorId, setDirectorId] = useState<string>("");
 
   useEffect(() => {
-    // Map slug to user name and completion status
-    const slugToData: {
-      [key: string]: { name: string; isCompleted: boolean };
-    } = {
-      "john-doe": { name: "John Doe", isCompleted: true },
-      "robert-fox": { name: "Robert Fox", isCompleted: false },
-      "peter-smith": { name: "Peter Smith", isCompleted: false },
-    };
-    if (params?.slug && typeof params.slug === "string") {
-      const data = slugToData[params.slug] || { name: "John Doe", isCompleted: false };
-      setUserName(data.name);
-      setIsCompleted(data.isCompleted);
-    }
-  }, [params]);
+    const storedUserId = localStorage.getItem("userId");
+    setDirectorId(storedUserId as string);
+  }, []);
 
-  const handleSubmitComments = () => {
-    if (finalComments.trim()) {
+  useEffect(() => {
+    if (!userId) return;
+    Promise.all([
+      apiGetUserById(userId),
+      apiGetUserProgress(userId),
+    ])
+      .then(([userRes, progressRes]) => {
+        setUser(userRes.data.data);
+        setProgressData(progressRes.data.data);
+      })
+      .finally(() => setLoading(false));
+  }, [userId]);
+
+  useEffect(() => {
+    if (progressData?.finalComments?.length) {
       setHasComments(true);
-      // Keep modal open to show the "Mark Programme as Completed" button
-      // Here you would typically save the comments to your backend
+      setFinalComments(progressData.finalComments[0].comment);
+    }
+  }, [progressData]);
+
+  const handleSubmitComments = async () => {
+    if (!finalComments.trim()) return;
+
+
+    try {
+      await apiAddFinalComment({
+        userId,
+        commentorId: directorId,
+        comment: finalComments,
+      });
+
+
+      // Fetch latest progress after save
+      const progressRes = await apiGetUserProgress(userId);
+      setProgressData(progressRes.data.data);
+
+
+      setHasComments(true);
+    } catch (error) {
+      console.error("Failed to add final comment", error);
     }
   };
 
@@ -236,139 +270,45 @@ export default function IndividualProgressPage() {
     // Here you would typically update the status in your backend
   };
 
-  // Roadmap cards data - different based on user
-  const roadmapCards = userName === "John Doe"
-    ? [
-        {
-          id: 1,
-          image: Card1,
-          title: "Jump-start",
-          description: "Join a two-day group revitalization session hosted by CCC",
-          status: "Completed" as const,
-          completedDate: "20 Oct 2024",
-        },
-        {
-          id: 2,
-          image: Card2,
-          title: "Self Revitalization Phase",
-          description: "Interested in receiving mentoring in community engagement",
-          status: "Completed" as const,
-          completedDate: "20 Oct 2024",
-        },
-        {
-          id: 3,
-          image: Card3,
-          title: "Church Empowerment Phase",
-          description: "Interested in receiving mentoring in community engagement",
-          status: "Completed" as const,
-          completedDate: "20 Oct 2024",
-        },
-        {
-          id: 4,
-          image: Card4,
-          title: "Community Revitalization and Multiplication Phase",
-          description: "Interested in receiving mentoring in community engagement",
-          status: "Completed" as const,
-          completedDate: "20 Oct 2024",
-        },
-      ]
-    : [
-        {
-          id: 1,
-          image: Card1,
-          title: "Jump-start",
-          description: "Join a two-day group revitalization session hosted by CCC",
-          status: "Completed" as const,
-          completedDate: "20 Oct 2024",
-        },
-        {
-          id: 2,
-          image: Card2,
-          title: "Self Revitalization Phase",
-          description: "Interested in receiving mentoring in community engagement",
-          status: "Over Due" as const,
-          tasksCompleted: "06/08",
-          completionTime: "Months 1-2",
-        },
-        {
-          id: 3,
-          image: Card3,
-          title: "Church Empowerment Phase",
-          description: "Interested in receiving mentoring in community engagement",
-          status: "In-progress" as const,
-          tasksCompleted: "12/18",
-          completionTime: "Months 3-9",
-        },
-        {
-          id: 4,
-          image: Card4,
-          title: "Community Revitalization and Multiplication Phase",
-          description: "Interested in receiving mentoring in community engagement",
-          status: "Not Started" as const,
-          completionTime: "Months 10-12",
-        },
-      ];
+  const roadmapCards =
+    progressData?.roadmaps.map((rm: any) => ({
+      id: rm.roadMapId,
+      image: Card1, // static until backend provides images
+      title: "Roadmap",
+      description: "Revitalization Roadmap",
+      status:
+        rm.status === "completed"
+          ? "Completed"
+          : rm.status === "in_progress"
+            ? "In-progress"
+            : "Not Started",
+      tasksCompleted:
+        rm.totalSteps > 0
+          ? `${rm.completedSteps}/${rm.totalSteps}`
+          : undefined,
+    })) ?? [];
 
-  // Survey cards data
-  const surveyCards = userName === "John Doe"
-    ? [
-        {
-          id: 1,
-          image: Card1,
-          title: "Church Assessment Evaluation(CMA)",
-          description: "Interested in receiving mentoring in community engagement",
-          status: "Completed" as const,
-          submittedDate: "20 Oct 2024",
-        },
-        {
-          id: 2,
-          image: Card2,
-          title: "Church Assessment Evaluation(CMA)",
-          description: "Interested in receiving mentoring in community engagement",
-          status: "Completed" as const,
-          submittedDate: "20 Oct 2024",
-        },
-      ]
-    : [
-        {
-          id: 1,
-          image: Card1,
-          title: "Church Assessment Evaluation(CMA)",
-          description: "Interested in receiving mentoring in community engagement",
-          status: "Remaining" as const,
-          dueDate: "20 Oct 2024",
-        },
-      ];
+  const surveyCards =
+    progressData?.assessments.map((as: any) => ({
+      id: as.assessmentId,
+      image: Card2,
+      title: "Assessment",
+      description: "Assessment Progress",
+      status: as.status === "completed" ? "Completed" : "Remaining",
+      submittedDate: as.status === "completed" ? "Submitted" : undefined,
+      dueDate: as.status !== "completed" ? "Pending" : undefined,
+    })) ?? [];
 
-  // Calculate progress based on completion status and roadmap cards
-  const calculateProgress = () => {
-    if (isCompleted) {
-      return { completed: 100, remaining: 0, roadmap: 5, assessments: 3 };
-    } else {
-      // Calculate based on roadmap cards status
-      const completedCount = roadmapCards.filter(c => c.status === "Completed").length;
-      const totalCount = roadmapCards.length;
-      const completedPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-      
-      // For roadmap: 1 completed out of 4 = 25%, but showing 3/5 based on progress
-      // For assessments: showing 2/3 based on progress
-      return {
-        completed: Math.round(completedPercent),
-        remaining: Math.round(100 - completedPercent),
-        roadmap: 3, // 3 out of 5 completed
-        assessments: 2, // 2 out of 3 completed
-      };
-    }
+  const progress = {
+    completed: progressData?.overallProgress ?? 0,
+    remaining: 100 - (progressData?.overallProgress ?? 0),
   };
-
-  const progress = calculateProgress();
 
   // Donut Chart Data
   const donutChartData = {
     labels: ["Completed", "Remaining"],
     datasets: [
       {
-        label: "Overall Progress",
         data: [progress.completed, progress.remaining],
         backgroundColor: ["#5B7FDB", "#FFD84E"],
         borderWidth: 0,
@@ -392,18 +332,24 @@ export default function IndividualProgressPage() {
 
   // Bar Chart Data
   const barChartData = {
-    labels: ["Roadmap", "Assessments"],
+    labels: ["Roadmaps", "Assessments"],
     datasets: [
       {
         label: "Total",
-        data: [5, 3],
-        backgroundColor: "#5B7FDB", // Medium blue
+        data: [
+          progressData?.totalRoadmaps ?? 0,
+          progressData?.totalAssessments ?? 0,
+        ],
+        backgroundColor: "#5B7FDB",
         borderRadius: 4,
       },
       {
         label: "Completed",
-        data: [progress.roadmap, progress.assessments],
-        backgroundColor: "#5BC0DE", // Light blue/cyan
+        data: [
+          progressData?.completedRoadmaps ?? 0,
+          progressData?.completedAssessments ?? 0,
+        ],
+        backgroundColor: "#5BC0DE",
         borderRadius: 4,
       },
     ],
@@ -584,16 +530,16 @@ export default function IndividualProgressPage() {
                               const y = bar.y;
                               const barWidth = bar.width;
                               const barHeight = bar.height;
-                              
+
                               // Calculate percentage
                               const percentage = Math.round((progress.roadmap / 5) * 100);
-                              
+
                               // Calculate badge dimensions
                               const badgeWidth = 40;
                               const badgeHeight = 20;
                               const badgeX = x - badgeWidth / 2;
                               const badgeY = y - barHeight - badgeHeight - 5;
-                              
+
                               ctx.save();
                               // Draw rounded rectangle background
                               ctx.fillStyle = "#5BC0DE";
@@ -610,7 +556,7 @@ export default function IndividualProgressPage() {
                               ctx.quadraticCurveTo(badgeX, badgeY, badgeX + radius, badgeY);
                               ctx.closePath();
                               ctx.fill();
-                              
+
                               // Draw white text
                               ctx.fillStyle = "#FFFFFF";
                               ctx.font = "bold 12px sans-serif";
@@ -639,31 +585,28 @@ export default function IndividualProgressPage() {
               <div className="flex items-center gap-0 bg-white rounded-lg p-1 shadow-sm">
                 <button
                   onClick={() => setRoadmapFilter("All")}
-                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${
-                    roadmapFilter === "All"
-                      ? "bg-[#1E366F] text-white"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
+                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${roadmapFilter === "All"
+                    ? "bg-[#1E366F] text-white"
+                    : "text-gray-700 hover:bg-gray-50"
+                    }`}
                 >
                   All
                 </button>
                 <button
                   onClick={() => setRoadmapFilter("Completed")}
-                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${
-                    roadmapFilter === "Completed"
-                      ? "bg-[#1E366F] text-white"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
+                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${roadmapFilter === "Completed"
+                    ? "bg-[#1E366F] text-white"
+                    : "text-gray-700 hover:bg-gray-50"
+                    }`}
                 >
                   Completed
                 </button>
                 <button
                   onClick={() => setRoadmapFilter("Remaining")}
-                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${
-                    roadmapFilter === "Remaining"
-                      ? "bg-[#1E366F] text-white"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
+                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${roadmapFilter === "Remaining"
+                    ? "bg-[#1E366F] text-white"
+                    : "text-gray-700 hover:bg-gray-50"
+                    }`}
                 >
                   Remaining
                 </button>
@@ -695,31 +638,28 @@ export default function IndividualProgressPage() {
               <div className="flex items-center gap-0 bg-white rounded-lg p-1 shadow-sm">
                 <button
                   onClick={() => setSurveyFilter("All")}
-                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${
-                    surveyFilter === "All"
-                      ? "bg-[#1E366F] text-white"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
+                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${surveyFilter === "All"
+                    ? "bg-[#1E366F] text-white"
+                    : "text-gray-700 hover:bg-gray-50"
+                    }`}
                 >
                   All
                 </button>
                 <button
                   onClick={() => setSurveyFilter("Completed")}
-                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${
-                    surveyFilter === "Completed"
-                      ? "bg-[#1E366F] text-white"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
+                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${surveyFilter === "Completed"
+                    ? "bg-[#1E366F] text-white"
+                    : "text-gray-700 hover:bg-gray-50"
+                    }`}
                 >
                   Completed
                 </button>
                 <button
                   onClick={() => setSurveyFilter("Remaining")}
-                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${
-                    surveyFilter === "Remaining"
-                      ? "bg-[#1E366F] text-white"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
+                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${surveyFilter === "Remaining"
+                    ? "bg-[#1E366F] text-white"
+                    : "text-gray-700 hover:bg-gray-50"
+                    }`}
                 >
                   Remaining
                 </button>
@@ -770,9 +710,8 @@ export default function IndividualProgressPage() {
                 onChange={(e) => !hasComments && setFinalComments(e.target.value)}
                 placeholder={hasComments ? "" : "Write the Comments here..."}
                 readOnly={hasComments}
-                className={`w-full h-64 px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1E366F] focus:border-transparent resize-none ${
-                  hasComments ? "bg-gray-50 cursor-not-allowed" : ""
-                }`}
+                className={`w-full h-64 px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1E366F] focus:border-transparent resize-none ${hasComments ? "bg-gray-50 cursor-not-allowed" : ""
+                  }`}
               />
             </div>
 

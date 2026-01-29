@@ -20,3 +20,23 @@ export const apiGetAssessmentById = (id: string) => {
     }
     return axiosInstance.get(`/assessment/${id}`);
 };
+
+export const apiUpdateInstructions = (
+    assessmentId: string,
+    instructions: string[]
+) => {
+    return axiosInstance.patch(
+        `/assessment/${assessmentId}/instructions`,
+        { instructions }
+    );
+};
+
+export const apiUpdateSections = (
+    assessmentId: string,
+    sections: any[]
+) => {
+    return axiosInstance.patch(
+        `/assessment/${assessmentId}/sections`,
+        { sections }
+    );
+};
