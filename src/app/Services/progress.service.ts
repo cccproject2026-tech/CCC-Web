@@ -68,8 +68,8 @@ export const apiAssignRoadmap = (data: {
  * Assign assessment to user
  */
 export const apiAssignAssessment = (data: {
-  userId: string;
-  assessmentId: string;
+  userIds: string[];
+  assessmentIds: string[];
 }) => {
   return axiosInstance.post<{ success: boolean; data: ProgressResponseDto }>(
     `/progress/assign-assessment`,

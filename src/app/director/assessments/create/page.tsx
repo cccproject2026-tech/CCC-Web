@@ -5,6 +5,7 @@ import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import AppHero from "@/app/Components/Hero/AppHero";
 import AssessmentBg from "../../../Assets/assessment-bg.png";
+import { apiCreateAssessment } from "@/app/Services/assessment.service";
 
 export default function CreateAssessmentPage() {
   const router = useRouter();
@@ -28,6 +29,25 @@ export default function CreateAssessmentPage() {
       ],
     },
   ]);
+
+  const buildCreateAssessmentPayload = () => {
+    return {
+      name: assessmentName,
+      description,
+      instructions: instructions.filter(i => i.trim() !== ""),
+      type: "CMA", // or "PMP" – must come from UI later
+      sections: sections.map((section, sectionIdx) => ({
+        title: section.name,
+        description: section.guidelines,
+        layers: section.layers.map((layer, layerIdx) => ({
+          title: `Layer ${layerIdx + 1}`,
+          choices: layer.choices
+            .filter(c => c.trim() !== "")
+            .map(choice => ({ text: choice })),
+        })),
+      })),
+    };
+  };
 
   const showToast = (message: string) => {
     setToast(message);
@@ -116,11 +136,23 @@ export default function CreateAssessmentPage() {
     setSections(updated);
   };
 
-  const handleCreateSurvey = () => {
-    showToast("Survey Created Successfully");
-    setTimeout(() => {
-      router.push("/director/assessments");
-    }, 2000);
+  const handleCreateSurvey = async () => {
+    try {
+      const payload = buildCreateAssessmentPayload();
+
+      await apiCreateAssessment(payload);
+
+      showToast("Survey Created Successfully");
+
+      setTimeout(() => {
+        router.push("/director/assessments");
+      }, 2000);
+    } catch (err: any) {
+      console.error(err);
+      showToast(
+        err?.response?.data?.message || "Failed to create assessment"
+      );
+    }
   };
 
   const handleCancel = () => {

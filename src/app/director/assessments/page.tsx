@@ -9,73 +9,103 @@ import AssessmentBg from "../../Assets/assessment-bg.png";
 import Thumb1 from "../../Assets/thumb1.png";
 import Thumb2 from "../../Assets/thumb2.png";
 import Mentor1 from "../../Assets/mentor1.png";
+import { User } from "@/app/Services/types";
+import { apiDeleteAssessments, apiGetAssessments } from "@/app/Services/assessment.service";
+import { apiGetAllUsers } from "@/app/Services/users.service";
+import { apiAssignAssessment } from "@/app/Services/progress.service";
+
+const mapUserToAssignUser = (user: any) => ({
+  id: user.id ?? user._id,
+  name: `${user.firstName} ${user.lastName}`,
+  role: user.role,
+  avatar: user.profilePicture || Mentor1,
+});
 
 export default function AssessmentsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedAssessments, setSelectedAssessments] = useState<number[]>([]);
+  const [selectedAssessments, setSelectedAssessments] = useState<string[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showOptionsMenu, setShowOptionsMenu] = useState<number | null>(null);
-  const [selectedUsers, setSelectedUsers] = useState<number[]>([]);
+  const [showOptionsMenu, setShowOptionsMenu] = useState<string | null>(null);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [assessments, setAssessments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [loadingAssessments, setLoadingAssessments] = useState(true);
+  const [assigning, setAssigning] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  const assessments = [
-    {
-      id: 1,
-      title: "Church Assessment Evaluation(CMA)",
-      description:
-        "This Survey is about Lorem ipsum dolor sit amet, consectetur",
-      image: Thumb1,
-    },
-    {
-      id: 2,
-      title: "Pastoral Ministry Profile (PMP)",
-      description:
-        "This Survey is about Lorem ipsum dolor sit amet, consectetur",
-      image: Thumb2,
-    },
-    {
-      id: 3,
-      title: "Pastoral Ministry Profile (PMP)",
-      description:
-        "This Survey is about Lorem ipsum dolor sit amet, consectetur",
-      image: Thumb1,
-    },
-    {
-      id: 4,
-      title: "Pastoral Ministry Profile (PMP)",
-      description:
-        "This Survey is about Lorem ipsum dolor sit amet, consectetur",
-      image: Thumb2,
-    },
-  ];
+  useEffect(() => {
+    const fetchAssessments = async () => {
+      try {
+        setLoadingAssessments(true);
 
-  const users = [
-    { id: 1, name: "John Ross", role: "Pastor" },
-    { id: 2, name: "John Ross", role: "Pastor" },
-    { id: 3, name: "John Ross", role: "Pastor" },
-    { id: 4, name: "John Ross", role: "Pastor" },
-    { id: 5, name: "John Ross", role: "Pastor" },
-    { id: 6, name: "John Ross", role: "Pastor" },
-    { id: 7, name: "John Ross", role: "Pastor" },
-  ];
+        const res = await apiGetAssessments({
+          search: searchQuery || undefined,
+        });
 
-  const handleSelectAssessment = (id: number) => {
-    if (selectedAssessments.includes(id)) {
-      setSelectedAssessments(selectedAssessments.filter((aid) => aid !== id));
-    } else {
-      setSelectedAssessments([...selectedAssessments, id]);
-    }
+        const mapped: any[] = res.data.map((item: any) => ({
+          id: item._id,
+          title: item.name,
+          description: item.description,
+          image: item.bannerImage || Thumb1,
+          type: item.type,
+        }));
+
+        setAssessments(mapped);
+      } catch (error) {
+        console.error("Failed to fetch assessments", error);
+        setAssessments([]);
+      } finally {
+        setLoadingAssessments(false);
+      }
+    };
+
+    fetchAssessments();
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (!showAssignModal) return;
+
+    const fetchPastors = async () => {
+      try {
+        const res = await apiGetAllUsers({
+          role: "pastor",
+          roleMatch: "mixed",
+          search: userSearch || undefined,
+          page: 1,
+          limit: 20,
+        });
+
+        setUsers(
+          res.data.data.users.map(mapUserToAssignUser)
+        );
+      } catch (err) {
+        console.error("Failed to fetch pastors", err);
+        setUsers([]);
+      }
+    };
+
+    fetchPastors();
+  }, [showAssignModal, userSearch]);
+
+
+  const handleSelectAssessment = (id: string) => {
+    setSelectedAssessments((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
   const handleSelectAll = () => {
-    if (selectedAssessments.length === assessments.length) {
-      setSelectedAssessments([]);
-    } else {
-      setSelectedAssessments(assessments.map((a) => a.id));
-    }
+    setSelectedAssessments(
+      selectedAssessments.length === assessments.length
+        ? []
+        : assessments.map((a) => a.id)
+    );
   };
 
   const handleSelectMode = () => {
@@ -88,22 +118,62 @@ export default function AssessmentsPage() {
     setSelectedAssessments([]);
   };
 
-  const handleAssign = () => {
-    setShowAssignModal(false);
-    setToast("Assigned Survey Successfully");
-    setTimeout(() => setToast(null), 3000);
-    setSelectedUsers([]);
+  const handleAssign = async () => {
+    if (!selectedUsers.length || !selectedAssessments.length) {
+      setToast("Select at least one user and one assessment");
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await apiAssignAssessment({
+        userIds: selectedUsers,
+        assessmentIds: selectedAssessments,
+      });
+
+      setShowAssignModal(false);
+      setIsSelectionMode(false);
+      setSelectedUsers([]);
+      setSelectedAssessments([]);
+
+      setToast("Assessment assigned successfully");
+    } catch (error) {
+      console.error("Assignment failed", error);
+      setToast("Failed to assign assessment");
+    } finally {
+      setLoading(false);
+      setTimeout(() => setToast(null), 3000);
+    }
   };
 
-  const handleDelete = () => {
-    setShowDeleteModal(false);
-    setToast(`${selectedAssessments.length} Items Deleted`);
-    setTimeout(() => setToast(null), 3000);
-    setIsSelectionMode(false);
-    setSelectedAssessments([]);
+
+  const handleDelete = async () => {
+    if (!selectedAssessments.length) return;
+
+    try {
+      setLoading(true);
+
+      await apiDeleteAssessments(selectedAssessments);
+
+      setAssessments(prev =>
+        prev.filter(a => !selectedAssessments.includes(a.id))
+      );
+
+      setToast(`${selectedAssessments.length} assessment(s) deleted`);
+      setShowDeleteModal(false);
+      setIsSelectionMode(false);
+      setSelectedAssessments([]);
+    } catch (err) {
+      console.error(err);
+      setToast('Failed to delete assessments');
+    } finally {
+      setLoading(false);
+      setTimeout(() => setToast(null), 3000);
+    }
   };
 
-  const handleUserToggle = (userId: number) => {
+  const handleUserToggle = (userId: string) => {
     if (selectedUsers.includes(userId)) {
       setSelectedUsers(selectedUsers.filter((id) => id !== userId));
     } else {
@@ -225,111 +295,118 @@ export default function AssessmentsPage() {
           )}
 
           {/* Assessments Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredAssessments.map((assessment) => (
-              <div
-                key={assessment.id}
-                className={`bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all relative ${
-                  selectedAssessments.includes(assessment.id)
+          {loadingAssessments ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-10 h-10 border-4 border-white/40 border-t-white rounded-full animate-spin" />
+                <p className="text-white font-semibold">Loading assessments...</p>
+              </div>
+            </div>
+          ) : filteredAssessments.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {filteredAssessments.map((assessment) => (
+                <div
+                  key={assessment.id}
+                  className={`bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all relative ${selectedAssessments.includes(assessment.id)
                     ? "ring-2 ring-[#2E3B8E]"
                     : ""
-                }`}
-              >
-                {/* Checkbox for selection mode */}
-                {isSelectionMode && (
-                  <div className="absolute top-4 left-4 z-10">
-                    <input
-                      type="checkbox"
-                      checked={selectedAssessments.includes(assessment.id)}
-                      onChange={() => handleSelectAssessment(assessment.id)}
-                      className="w-5 h-5 text-[#2E3B8E] rounded focus:ring-2 focus:ring-[#2E3B8E] cursor-pointer"
-                    />
-                  </div>
-                )}
+                    }`}
+                >
+                  {/* Checkbox for selection mode */}
+                  {isSelectionMode && (
+                    <div className="absolute top-4 left-4 z-10">
+                      <input
+                        type="checkbox"
+                        checked={selectedAssessments.includes(assessment.id)}
+                        onChange={() => handleSelectAssessment(assessment.id)}
+                        className="w-5 h-5 text-[#2E3B8E] rounded focus:ring-2 focus:ring-[#2E3B8E] cursor-pointer"
+                      />
+                    </div>
+                  )}
 
-                {/* Three dots menu */}
-                {!isSelectionMode && (
-                  <div className="absolute top-4 right-4 z-[60] options-menu-container">
-                    <button
-                      onClick={() =>
-                        setShowOptionsMenu(
-                          showOptionsMenu === assessment.id
-                            ? null
-                            : assessment.id
-                        )
-                      }
-                      className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-lg"
-                    >
-                      <i className="fa-solid fa-ellipsis-vertical"></i>
-                    </button>
-                    {showOptionsMenu === assessment.id && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-[200] animate-slide-down">
-                        <button
-                          onClick={() => {
-                            setShowAssignModal(true);
-                            setShowOptionsMenu(null);
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-gray-50 text-gray-700"
-                        >
-                          <i className="fa-solid fa-user-plus text-[#2E3B8E]"></i>
-                          Assign to
-                        </button>
-                        <button className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-gray-50 text-gray-700">
-                          <i className="fa-solid fa-pen text-blue-600"></i>
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSelectedAssessments([assessment.id]);
-                            setShowDeleteModal(true);
-                            setShowOptionsMenu(null);
-                          }}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-gray-50 text-red-600"
-                        >
-                          <i className="fa-solid fa-trash"></i>
-                          Delete
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  {/* Three dots menu */}
+                  {!isSelectionMode && (
+                    <div className="absolute top-4 right-4 z-[60] options-menu-container">
+                      <button
+                        onClick={() =>
+                          setShowOptionsMenu(
+                            showOptionsMenu === assessment.id
+                              ? null
+                              : assessment.id
+                          )
+                        }
+                        className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-lg"
+                      >
+                        <i className="fa-solid fa-ellipsis-vertical"></i>
+                      </button>
+                      {showOptionsMenu === assessment.id && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-[200] animate-slide-down">
+                          <button
+                            onClick={() => {
+                              setShowAssignModal(true);
+                              setShowOptionsMenu(null);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-gray-50 text-gray-700"
+                          >
+                            <i className="fa-solid fa-user-plus text-[#2E3B8E]"></i>
+                            Assign to
+                          </button>
+                          <button className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-gray-50 text-gray-700">
+                            <i className="fa-solid fa-pen text-blue-600"></i>
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedAssessments([assessment.id]);
+                              setShowDeleteModal(true);
+                              setShowOptionsMenu(null);
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-gray-50 text-red-600"
+                          >
+                            <i className="fa-solid fa-trash"></i>
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                <div className="flex gap-4 p-6">
-                  {/* Assessment Image */}
-                  <div className="w-32 h-32 flex-shrink-0 rounded-lg overflow-hidden">
-                    <Image
-                      src={assessment.image}
-                      alt={assessment.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-
-                  {/* Assessment Info */}
-                  <div className="flex-1 flex flex-col justify-between">
-                    <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-2">
-                        {assessment.title}
-                      </h3>
-                      <p className="text-sm text-gray-600">
-                        {assessment.description}
-                      </p>
+                  <div className="flex gap-4 p-6">
+                    {/* Assessment Image */}
+                    <div className="w-32 h-32 flex-shrink-0 rounded-lg overflow-hidden relative">
+                      <Image
+                        src={assessment.image || Thumb1}
+                        alt={assessment.title}
+                        fill
+                        className="object-cover"
+                      />
                     </div>
 
-                    <button
-                      onClick={() =>
-                        router.push(`/director/assessments/${assessment.id}`)
-                      }
-                      className="self-end px-6 py-2 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E] transition text-sm mt-4"
-                    >
-                      View
-                    </button>
+                    {/* Assessment Info */}
+                    <div className="flex-1 flex flex-col justify-between">
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">
+                          {assessment.title}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          {assessment.description}
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() =>
+                          router.push(`/director/assessments/${assessment.id}`)
+                        }
+                        className="self-end px-6 py-2 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E] transition text-sm mt-4"
+                      >
+                        View
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          {filteredAssessments.length === 0 && (
+              ))}
+            </div>
+          ) : (
             <div className="text-center py-12">
               <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <i className="fa-regular fa-folder-open text-white text-4xl"></i>

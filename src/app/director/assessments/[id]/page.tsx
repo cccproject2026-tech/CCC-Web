@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
+import { apiGetAssessmentById } from "@/app/Services/assessment.service";
 
 interface Recommendation {
   id: number;
@@ -10,10 +11,15 @@ interface Recommendation {
   selected: boolean;
 }
 
+interface Choice {
+  id: string;
+  text: string;
+}
+
 interface Layer {
-  id: number;
+  id: string;
   name: string;
-  choices: string[];
+  choices: Choice[];
   recommendations: Recommendation[];
 }
 
@@ -24,6 +30,46 @@ interface Section {
   layers: Layer[];
 }
 
+export const mapAssessmentFromApi = (data: any) => ({
+  id: data._id,
+  name: data.name,
+  description: data.description,
+  bannerImage: data.bannerImage,
+  type: data.type,
+
+  instructions: (data.instructions ?? []).map((text: string, idx: number) => ({
+    id: `inst-${idx}`,
+    text,
+    checked: true,
+  })),
+
+  sections: (data.sections ?? []).map((section: any) => ({
+    id: section._id,
+    name: section.title,
+    description: section.description,
+
+    layers: (section.layers ?? []).map((layer: any) => ({
+      id: layer._id,
+      name: layer.title,
+
+      // 🔑 CRITICAL FIX
+      choices: (layer.choices ?? []).map((c: any) => ({
+        id: c._id,
+        text: c.text,
+      })),
+
+      // 🔑 recommendations are STRINGS in DTO
+      recommendations: (layer.recommendations ?? []).map(
+        (text: string, idx: number) => ({
+          id: `${layer._id}-rec-${idx}`,
+          text,
+          selected: false,
+        })
+      ),
+    })),
+  })),
+});
+
 export default function ViewEditAssessmentPage() {
   const router = useRouter();
   const params = useParams();
@@ -31,6 +77,7 @@ export default function ViewEditAssessmentPage() {
   const [selectedSection, setSelectedSection] = useState<number>(1);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedChoices, setSelectedChoices] = useState<number[]>([]);
+  const [assessment, setAssessment] = useState<any>(null);
 
   // Modals
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);
@@ -48,185 +95,35 @@ export default function ViewEditAssessmentPage() {
   const [newSectionLayers, setNewSectionLayers] = useState(2);
 
   // Instructions state
-  const [instructions, setInstructions] = useState([
-    {
-      id: 1,
-      text: "Please complete the survey in a single session without taking breaks.",
-      checked: true,
-    },
-    {
-      id: 2,
-      text: "If there is a power outage or loss of internet connection, the survey will restart from the beginning.",
-      checked: false,
-    },
-    {
-      id: 3,
-      text: "You will not be able to return to previous sections.",
-      checked: false,
-    },
-    {
-      id: 4,
-      text: "This survey consists of 5 sections to complete.",
-      checked: false,
-    },
-    {
-      id: 5,
-      text: "The survey should take approximately 45 minutes to complete.",
-      checked: false,
-    },
-  ]);
+  const [instructions, setInstructions] = useState([]);
 
-  const [sections, setSections] = useState<Section[]>([
-    {
-      id: 1,
-      name: "Congregational Well being",
-      description: "(biopsychosocial (BPS)/financial/spiritual filter)",
-      layers: [
-        {
-          id: 1,
-          name: "Layer 1",
-          choices: [
-            "CMA is not embodied in the life of the church",
-            "Church does not fully understanding the CMA approach in relationship to evangelism",
-            "Congregation has a good grasp but has not fully implemented practices of CMA",
-            "The church is fully committed to and practices the CMA approach",
-          ],
-          recommendations: [
-            { id: 1, text: "Schedule 1-on-1 with a mentor", selected: false },
-            {
-              id: 2,
-              text: "Take trauma survey (via Claripoint)",
-              selected: false,
-            },
-            {
-              id: 3,
-              text: "Identify areas of stress/anxiety",
-              selected: false,
-            },
-            { id: 4, text: "Family Wellbeing survey", selected: false },
-            {
-              id: 5,
-              text: "Collaborate on a healing plan",
-              selected: false,
-            },
-            {
-              id: 6,
-              text: "Collaborate on a physical Exercise plan",
-              selected: false,
-            },
-            { id: 7, text: "Establish a prayer", selected: false },
-            { id: 8, text: "Covenant/partnership", selected: false },
-            { id: 9, text: "Finalize a growth plan", selected: false },
-          ],
-        },
-        {
-          id: 2,
-          name: "Layer 2",
-          choices: [
-            "Little variety in methods of evangelism over the last twenty years",
-            "There is no connection between evangelism efforts and the community engagement",
-            "The church sees CE as a transformative form of evangelism rather than a transactional activity",
-            "The church has a clear plan for further growth and transformative development",
-          ],
-          recommendations: [],
-        },
-        {
-          id: 3,
-          name: "Layer 3",
-          choices: [
-            "Serving the community is not considered to be the focus of the church's life and ministries",
-            "Only a few members see the vitality of the service to the community as an integral part of evangelistic foci",
-            "The church members share a vision of embodying CMA as the future of church",
-            "The church is networked with other congregations, which embody the CMA as its primary guiding principle",
-          ],
-          recommendations: [],
-        },
-        {
-          id: 4,
-          name: "Layer 4",
-          choices: [
-            "The church has no functional awareness of the surrounding community's needs",
-            "The church has only observed some of the community's needs",
-            "The church has surveyed the community, assessing its needs and aspirations",
-            "The church has a practical CE plan for serving its community",
-          ],
-          recommendations: [],
-        },
-      ],
-    },
-    {
-      id: 2,
-      name: "Leadership (Elders, CB, etc.) Style",
-      description: "",
-      layers: [
-        {
-          id: 1,
-          name: "Layer 1",
-          choices: [
-            "Little variety in methods of evangelism over the last twenty years",
-            "There is no connection between evangelism efforts and the community engagement",
-            "The church sees CE as a transformative form of evangelism rather than a transactional activity",
-            "The church has a clear plan for further growth and transformative development",
-          ],
-          recommendations: [],
-        },
-      ],
-    },
-    {
-      id: 3,
-      name: "Community Engagement History",
-      description: "",
-      layers: [
-        {
-          id: 1,
-          name: "Layer 1",
-          choices: [
-            "Serving the community is not considered to be the focus of the church's life and ministries",
-            "Only a few members see the vitality of the service to the community as an integral part of evangelistic foci",
-            "The church members share a vision of embodying CMA as the future of church",
-            "The church is networked with other congregations, which embody the CMA as its primary guiding principle",
-          ],
-          recommendations: [],
-        },
-      ],
-    },
-    {
-      id: 4,
-      name: "Pastoral Leadership",
-      description: "",
-      layers: [
-        {
-          id: 1,
-          name: "Layer 1",
-          choices: [
-            "The church has no functional awareness of the surrounding community's needs",
-            "The church has only observed some of the community's needs",
-            "The church has surveyed the community, assessing its needs and aspirations",
-            "The church has a practical CE plan for serving its community",
-          ],
-          recommendations: [],
-        },
-      ],
-    },
-    {
-      id: 5,
-      name: "Christ's Method Alone (CMA) and Cycle of Evangelism",
-      description: "",
-      layers: [
-        {
-          id: 1,
-          name: "Layer 1",
-          choices: [
-            "The church has no functional awareness of the surrounding community's needs",
-            "The church has only observed some of the community's needs",
-            "The church has surveyed the community, assessing its needs and aspirations",
-            "The church has a practical CE plan for serving its community",
-          ],
-          recommendations: [],
-        },
-      ],
-    },
-  ]);
+  const [sections, setSections] = useState<Section[]>([]);
+
+  useEffect(() => {
+    if (!params?.id) return;
+
+    const fetchAssessment = async () => {
+      try {
+        const res = await apiGetAssessmentById(params.id as string);
+
+        console.log("ASSESSMENT API RESPONSE 👉", res.data);
+
+        const mapped = mapAssessmentFromApi(res.data);
+
+        setAssessment(mapped);
+        setSections(mapped.sections);
+        setInstructions(mapped.instructions);
+
+        if (mapped.sections.length > 0) {
+          setSelectedSection(mapped.sections[0].id);
+        }
+      } catch (error) {
+        console.error("Failed to fetch assessment", error);
+      }
+    };
+
+    fetchAssessment();
+  }, [params?.id]);
 
   const showToast = (message: string) => {
     setToast(message);
@@ -330,19 +227,17 @@ export default function ViewEditAssessmentPage() {
               <div
                 key={section.id}
                 onClick={() => setSelectedSection(section.id)}
-                className={`p-4 rounded-xl cursor-pointer transition-all border-2 ${
-                  selectedSection === section.id
-                    ? "bg-[#1F2A6E] text-white border-[#1F2A6E]"
-                    : "bg-white text-gray-900 border-white hover:border-gray-200"
-                }`}
+                className={`p-4 rounded-xl cursor-pointer transition-all border-2 ${selectedSection === section.id
+                  ? "bg-[#1F2A6E] text-white border-[#1F2A6E]"
+                  : "bg-white text-gray-900 border-white hover:border-gray-200"
+                  }`}
               >
                 <div className="mb-2">
                   <span
-                    className={`text-xs font-bold px-2 py-1 rounded ${
-                      selectedSection === section.id
-                        ? "bg-[#2876AC] text-white"
-                        : "bg-[#2876AC] text-white"
-                    }`}
+                    className={`text-xs font-bold px-2 py-1 rounded ${selectedSection === section.id
+                      ? "bg-[#2876AC] text-white"
+                      : "bg-[#2876AC] text-white"
+                      }`}
                   >
                     Section {index + 1}
                   </span>
@@ -402,11 +297,10 @@ export default function ViewEditAssessmentPage() {
                       <button
                         onClick={handleDeleteSelected}
                         disabled={selectedChoices.length === 0}
-                        className={`px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 ${
-                          selectedChoices.length > 0
-                            ? "bg-white text-red-600 hover:bg-red-50"
-                            : "bg-white/20 text-white/50 cursor-not-allowed"
-                        }`}
+                        className={`px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 ${selectedChoices.length > 0
+                          ? "bg-white text-red-600 hover:bg-red-50"
+                          : "bg-white/20 text-white/50 cursor-not-allowed"
+                          }`}
                       >
                         <i className="fa-solid fa-trash"></i>
                         Delete
@@ -451,17 +345,15 @@ export default function ViewEditAssessmentPage() {
                         {layer.choices.map((choice, choiceIdx) => (
                           <div
                             key={choiceIdx}
-                            className={`bg-[#4A6FA5] border rounded-lg p-3 text-white flex items-center gap-3 transition-all ${
-                              selectedChoices.includes(
-                                layerIdx * 10 + choiceIdx
-                              )
-                                ? "border-white ring-2 ring-white"
-                                : "border-[#5A7FB5]"
-                            } ${
-                              isSelectionMode
+                            className={`bg-[#4A6FA5] border rounded-lg p-3 text-white flex items-center gap-3 transition-all ${selectedChoices.includes(
+                              layerIdx * 10 + choiceIdx
+                            )
+                              ? "border-white ring-2 ring-white"
+                              : "border-[#5A7FB5]"
+                              } ${isSelectionMode
                                 ? "cursor-pointer hover:border-white"
                                 : ""
-                            }`}
+                              }`}
                             onClick={() =>
                               isSelectionMode &&
                               handleSelectChoice(layerIdx * 10 + choiceIdx)
@@ -482,7 +374,7 @@ export default function ViewEditAssessmentPage() {
                             <span className="text-sm font-semibold">
                               {choiceIdx + 1}.
                             </span>
-                            <span className="text-sm flex-1">{choice}</span>
+                            <span className="text-sm flex-1">{choice.text}</span>
                           </div>
                         ))}
                       </div>
@@ -653,11 +545,10 @@ export default function ViewEditAssessmentPage() {
               <button
                 onClick={handleAddSection}
                 disabled={!newSectionName}
-                className={`flex-1 px-6 py-3 rounded-lg font-semibold ${
-                  newSectionName
-                    ? "bg-[#2E3B8E] text-white hover:bg-[#1F2A6E]"
-                    : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                }`}
+                className={`flex-1 px-6 py-3 rounded-lg font-semibold ${newSectionName
+                  ? "bg-[#2E3B8E] text-white hover:bg-[#1F2A6E]"
+                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  }`}
               >
                 Create Section
               </button>
@@ -779,11 +670,10 @@ export default function ViewEditAssessmentPage() {
                     <button
                       onClick={handleDeleteRecs}
                       disabled={selectedRecs.length === 0}
-                      className={`px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 ${
-                        selectedRecs.length > 0
-                          ? "bg-white text-red-600 hover:bg-red-50"
-                          : "bg-white/20 text-white/50 cursor-not-allowed"
-                      }`}
+                      className={`px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 ${selectedRecs.length > 0
+                        ? "bg-white text-red-600 hover:bg-red-50"
+                        : "bg-white/20 text-white/50 cursor-not-allowed"
+                        }`}
                     >
                       <i className="fa-solid fa-trash"></i>
                       Delete
@@ -796,15 +686,13 @@ export default function ViewEditAssessmentPage() {
                 {currentLayer.recommendations.map((rec) => (
                   <div
                     key={rec.id}
-                    className={`bg-[#4A6FA5] border rounded-lg p-3 text-white flex items-center gap-3 transition-all ${
-                      selectedRecs.includes(rec.id)
-                        ? "border-white ring-2 ring-white"
-                        : "border-white/30"
-                    } ${
-                      recSelectionMode
+                    className={`bg-[#4A6FA5] border rounded-lg p-3 text-white flex items-center gap-3 transition-all ${selectedRecs.includes(rec.id)
+                      ? "border-white ring-2 ring-white"
+                      : "border-white/30"
+                      } ${recSelectionMode
                         ? "cursor-pointer hover:border-white"
                         : ""
-                    }`}
+                      }`}
                     onClick={() => recSelectionMode && handleSelectRec(rec.id)}
                   >
                     {recSelectionMode ? (
