@@ -23,7 +23,7 @@ import {
 } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 
-interface Mentee {
+export interface Mentee {
   id: string;
   name: string;
   description: string;

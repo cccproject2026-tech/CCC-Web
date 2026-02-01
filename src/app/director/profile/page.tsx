@@ -1,10 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import DocumentsModal from "@/app/Components/DocumentsModal";
 import UserProfile from "../../Assets/user-profile.png";
+import { apiGetUserById, apiUpdateUserById } from "@/app/Services/users.service";
+import { apiGetInterestByEmail, apiUpdateInterestById } from "@/app/Services/interests.service";
 
 interface Church {
   id: string;
@@ -26,58 +28,106 @@ interface Document {
 }
 
 export default function DirectorProfilePage() {
+  const [userId, setUserId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showDocuments, setShowDocuments] = useState(false);
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [interestId, setInterestId] = useState<string | null>(null);
 
   // Profile Data
   const [profile, setProfile] = useState({
-    firstName: "John",
-    lastName: "Rose",
-    phone: "09878564398",
-    email: "johnross@gmail.com",
-    profileInfo:
-      "Lorem ipsum dolor sit amet, consectetur adipiscing eip ex ea commodo consequat. Duis",
-    title: "Field Mentor",
-    yearsInMinistry: "11",
-    conference: "Okhland",
+
   });
 
   const [churches, setChurches] = useState<Church[]>([
-    {
-      id: "1",
-      name: "Loma Linda University Church, CA",
-      phone: "09878564398",
-      website: "johnross@gmail.com",
-      address: "Loma Linda University Church,CA",
-      city: "Okhland",
-      state: "North American",
-      zipCode: "000000",
-      country: "USA",
-    },
   ]);
 
   const [documents, setDocuments] = useState<Document[]>([
-    {
-      id: "1",
-      name: "My Documents 1.pdf",
-      date: "15 Oct 2024",
-      time: "9 :41 am",
-    },
-    {
-      id: "2",
-      name: "My Educational Documents 1.pdf",
-      date: "12 Oct 2024",
-      time: "9 :41 am",
-    },
-    {
-      id: "3",
-      name: "My Documents 1.pdf",
-      date: "11 Oct 2024",
-      time: "9 :41 am",
-    },
   ]);
+  const MIN_CHURCHES = 1;
+
+  useEffect(() => {
+    const id = localStorage.getItem("userId");
+
+    if (!id) {
+      console.error("User not logged in");
+      return;
+    }
+
+    setUserId(id);
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchUserAndInterest = async () => {
+      try {
+        // 1️⃣ Fetch user
+        const userRes = await apiGetUserById(userId);
+        const user = userRes.data.data;
+
+        setProfile({
+          firstName: user.firstName ?? "",
+          lastName: user.lastName ?? "",
+          phone: user.phoneNumber ?? "",
+          email: user.email ?? "",
+          profileInfo: user.bio ?? "",
+          title: user.title ?? "",
+          yearsInMinistry: user.yearsInMinistry ?? "",
+          conference: user.conference ?? "",
+        });
+
+        // 2️⃣ Fetch interest using email
+        if (!user.email) {
+          setChurches([]);
+          return;
+        }
+
+        const interestRes = await apiGetInterestByEmail(user.email);
+        const interest = interestRes.data.data;
+        setInterestId(interest.id);
+        const churchDetails = interest?.churchDetails ?? [];
+
+        // 3️⃣ Map church details
+        const normalizedChurches: Church[] = churchDetails.map(
+          (c: any, index: number) => ({
+            id: `${index}`,
+            name: c.churchName ?? "",
+            phone: c.churchPhone ?? "",
+            website: c.churchWebsite ?? "",
+            address: c.churchAddress ?? "",
+            city: c.city ?? "",
+            state: c.state ?? "",
+            zipCode: c.zipCode ?? "",
+            country: c.country ?? "",
+          })
+        );
+
+        // ⛔️ DO NOT REMOVE INPUTS — ensure minimum blocks
+        while (normalizedChurches.length < MIN_CHURCHES) {
+          normalizedChurches.push({
+            id: `empty-${normalizedChurches.length}`,
+            name: "",
+            phone: "",
+            website: "",
+            address: "",
+            city: "",
+            state: "",
+            zipCode: "",
+            country: "",
+          });
+        }
+
+        setChurches(normalizedChurches);
+      } catch (err) {
+        console.error("Failed to fetch user or interest", err);
+        setChurches([]);
+      }
+    };
+
+    fetchUserAndInterest();
+  }, [userId]);
 
   const handleAddChurch = () => {
     const newChurch: Church = {
@@ -98,11 +148,45 @@ export default function DirectorProfilePage() {
     setChurches(churches.filter((church) => church.id !== id));
   };
 
-  const handleSave = () => {
-    setShowSaveConfirm(false);
-    setShowSuccessMessage(true);
-    setIsEditing(false);
-    setTimeout(() => setShowSuccessMessage(false), 3000);
+  const handleSave = async () => {
+    if (!userId) return;
+
+    try {
+      // 1️⃣ Update USER (personal info only)
+      await apiUpdateUserById(userId, {
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        phoneNumber: profile.phone,
+        title: profile.title,
+        yearsInMinistry: profile.yearsInMinistry,
+        conference: profile.conference,
+        bio: profile.profileInfo,
+      });
+
+      // 2️⃣ Update INTEREST (church details)
+      if (interestId) {
+        await apiUpdateInterestById(interestId, {
+          churchDetails: churches.map((c) => ({
+            churchName: c.name,
+            churchPhone: c.phone,
+            churchWebsite: c.website,
+            churchAddress: c.address,
+            city: c.city,
+            state: c.state,
+            zipCode: c.zipCode,
+            country: c.country,
+          })),
+        });
+      }
+
+      setShowSaveConfirm(false);
+      setShowSuccessMessage(true);
+      setIsEditing(false);
+      setTimeout(() => setShowSuccessMessage(false), 3000);
+
+    } catch (err) {
+      console.error("Update failed", err);
+    }
   };
 
   const handleDeleteDocument = (id: string) => {

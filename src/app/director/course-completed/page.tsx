@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import AppHeader from "@/app/Components/Header/AppHeader";
@@ -9,6 +9,8 @@ import AppHero from "@/app/Components/Hero/AppHero";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
+import { Mentee } from "../mentees/page";
+import { apiGetAllUsers } from "@/app/Services/users.service";
 
 interface Person {
   id: number;
@@ -26,180 +28,122 @@ type SortOption = {
   label: string;
 };
 
-const PEOPLE: Person[] = [
-  {
-    id: 1,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor1,
-    isNew: true,
-    status: "completed",
-    response: null,
-    invitationDate: null,
-  },
-  {
-    id: 2,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor2,
-    status: "completed",
-    response: null,
-    invitationDate: null,
-  },
-  {
-    id: 3,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor3,
-    status: "completed",
-    response: null,
-    invitationDate: null,
-  },
-  {
-    id: 4,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor1,
-    status: "completed",
-    response: null,
-    invitationDate: null,
-  },
-  {
-    id: 5,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor2,
-    status: "completed",
-    response: null,
-    invitationDate: null,
-  },
-  {
-    id: 6,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor3,
-    status: "completed",
-    response: null,
-    invitationDate: null,
-  },
-  {
-    id: 7,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor1,
-    status: "certificate_issued",
-    response: null,
-    invitationDate: null,
-  },
-  {
-    id: 8,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor2,
-    status: "certificate_issued",
-    response: null,
-    invitationDate: null,
-  },
-  {
-    id: 9,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor3,
-    status: "certificate_issued",
-    response: null,
-    invitationDate: null,
-  },
-  {
-    id: 10,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor1,
-    status: "certificate_issued",
-    response: null,
-    invitationDate: null,
-  },
-  {
-    id: 11,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor2,
-    status: "certificate_issued",
-    response: null,
-    invitationDate: null,
-  },
-  {
-    id: 12,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor3,
-    status: "certificate_issued",
-    response: null,
-    invitationDate: null,
-  },
-  {
-    id: 13,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor1,
-    status: "invited",
-    response: "Waiting",
-    invitationDate: "10 Nov 2024",
-  },
-  {
-    id: 14,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor2,
-    status: "invited",
-    response: "Not Interested",
-    invitationDate: "10 Nov 2024",
-  },
-  {
-    id: 15,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor3,
-    status: "invited",
-    response: "Accepted",
-    invitationDate: "10 Nov 2024",
-  },
-  {
-    id: 16,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor1,
-    status: "invited",
-    response: "Accepted",
-    invitationDate: "10 Nov 2024",
-  },
-  {
-    id: 17,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor2,
-    status: "invited",
-    response: "Accepted",
-    invitationDate: "10 Nov 2024",
-  },
-  {
-    id: 18,
-    name: "John Doe",
-    role: "Mentee",
-    img: Mentor3,
-    status: "invited",
-    response: "Accepted",
-    invitationDate: "10 Nov 2024",
-  },
-];
+interface CourseUser {
+  id: string;
+  name: string;
+  img: any;
+  createdAt: string;
+  status: "completed" | "certificate_issued" | "invited";
+  invitationDate?: string;
+  response?: "Accepted" | "Waiting" | "Not Interested";
+}
 
 export default function CourseCompletedPage() {
+  const [users, setUsers] = useState<CourseUser[]>([]);
+  const [loading, setLoading] = useState(false);
+
   const [activeTab, setActiveTab] = useState<
     "completed" | "certificate_issued" | "invited"
   >("completed");
-  const [sortBy, setSortBy] = useState<string>("latest_completed");
+
+  const [sortBy, setSortBy] = useState("latest_completed");
   const [query, setQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [showSortMenu, setShowSortMenu] = useState(false);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoading(true);
+      try {
+        const res = await apiGetAllUsers({
+          role: "pastor",
+          search: query || undefined,
+        });
+
+        const mapped: CourseUser[] = res.data.data.users
+          .map((u: any, i: number) => {
+            let status: CourseUser["status"] | null = null;
+
+            if (u.fieldMentorInvitation) status = "invited";
+            else if (u.hasIssuedCertificate) status = "certificate_issued";
+            else if (u.hasCompleted) status = "completed";
+
+            if (!status) return null;
+
+            return {
+              id: u.id ?? u._id,
+              name: `${u.firstName} ${u.lastName}`,
+              img: u.profilePicture || [Mentor1, Mentor2, Mentor3][i % 3],
+              createdAt: u.createdAt,
+              status,
+              invitationDate: u.fieldMentorInvitation?.invitedAt
+                ? new Date(u.fieldMentorInvitation.invitedAt).toLocaleDateString()
+                : undefined,
+              response: u.fieldMentorInvitation ? "Waiting" : undefined,
+            };
+          })
+          .filter(Boolean);
+
+        setUsers(mapped as CourseUser[]);
+      } catch (e) {
+        console.error("Failed to fetch users", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, [query]);
+
+  const data = useMemo(() => {
+    return users.filter(
+      (u) =>
+        u.status === activeTab &&
+        u.name.toLowerCase().includes(query.toLowerCase())
+    );
+  }, [users, activeTab, query]);
+
+  const completedCount = users.filter(
+    (u) => u.status === "completed"
+  ).length;
+
+  const issuedCount = users.filter(
+    (u) => u.status === "certificate_issued"
+  ).length;
+
+  const invitedCount = users.filter(
+    (u) => u.status === "invited"
+  ).length;
+
+  const finalData = useMemo(() => {
+    const list = [...data];
+
+    if (sortBy === "latest_completed" || sortBy === "latest_issued") {
+      return list.sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() -
+          new Date(a.createdAt).getTime()
+      );
+    }
+
+    if (sortBy === "oldest_completed" || sortBy === "oldest_issued") {
+      return list.sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() -
+          new Date(b.createdAt).getTime()
+      );
+    }
+
+    if (sortBy === "accepted") {
+      return list.filter((u) => u.response === "Accepted");
+    }
+
+    if (sortBy === "waiting") {
+      return list.filter((u) => u.response === "Waiting");
+    }
+
+    return list;
+  }, [data, sortBy]);
 
   // Sort options based on active tab
   const getSortOptions = (): SortOption[] => {
@@ -245,20 +189,20 @@ export default function CourseCompletedPage() {
     }
   };
 
-  const data = useMemo(() => {
-    const filtered = PEOPLE.filter((p) => {
-      if (activeTab === "completed") return p.status === "completed";
-      if (activeTab === "certificate_issued")
-        return p.status === "certificate_issued";
-      return p.status === "invited";
-    }).filter((p) => p.name.toLowerCase().includes(query.toLowerCase()));
+  // const data = useMemo(() => {
+  //   const filtered = PEOPLE.filter((p) => {
+  //     if (activeTab === "completed") return p.status === "completed";
+  //     if (activeTab === "certificate_issued")
+  //       return p.status === "certificate_issued";
+  //     return p.status === "invited";
+  //   }).filter((p) => p.name.toLowerCase().includes(query.toLowerCase()));
 
-    // Basic client-side sort mock
-    return filtered;
-  }, [activeTab, query]);
+  //   // Basic client-side sort mock
+  //   return filtered;
+  // }, [activeTab, query]);
 
   // Get counts for each tab
-  const completedCount = PEOPLE.filter((p) => p.status === "completed").length;
+  // const completedCount = PEOPLE.filter((p) => p.status === "completed").length;
 
   const handleIssueCertificate = (id: number) => {
     setToast("Certificate Issued Successfully");
@@ -308,11 +252,10 @@ export default function CourseCompletedPage() {
             <div className="flex gap-2 bg-white rounded-xl p-2 shadow-lg">
               <button
                 onClick={() => handleTabChange("completed")}
-                className={`px-6 py-3 rounded-lg text-[14px] font-semibold transition-all duration-200 whitespace-nowrap flex items-center gap-2 ${
-                  activeTab === "completed"
-                    ? "bg-[#2E3B8E] text-white shadow-md"
-                    : "text-gray-600 hover:text-gray-800"
-                }`}
+                className={`px-6 py-3 rounded-lg text-[14px] font-semibold transition-all duration-200 whitespace-nowrap flex items-center gap-2 ${activeTab === "completed"
+                  ? "bg-[#2E3B8E] text-white shadow-md"
+                  : "text-gray-600 hover:text-gray-800"
+                  }`}
               >
                 <span>Completed</span>
                 {activeTab === "completed" && completedCount > 0 && (
@@ -323,21 +266,19 @@ export default function CourseCompletedPage() {
               </button>
               <button
                 onClick={() => handleTabChange("certificate_issued")}
-                className={`px-6 py-3 rounded-lg text-[14px] font-semibold transition-all duration-200 whitespace-nowrap ${
-                  activeTab === "certificate_issued"
-                    ? "bg-[#2E3B8E] text-white shadow-md"
-                    : "text-gray-600 hover:text-gray-800"
-                }`}
+                className={`px-6 py-3 rounded-lg text-[14px] font-semibold transition-all duration-200 whitespace-nowrap ${activeTab === "certificate_issued"
+                  ? "bg-[#2E3B8E] text-white shadow-md"
+                  : "text-gray-600 hover:text-gray-800"
+                  }`}
               >
                 Certificate Issued
               </button>
               <button
                 onClick={() => handleTabChange("invited")}
-                className={`px-6 py-3 rounded-lg text-[14px] font-semibold transition-all duration-200 whitespace-nowrap ${
-                  activeTab === "invited"
-                    ? "bg-[#2E3B8E] text-white shadow-md"
-                    : "text-gray-600 hover:text-gray-800"
-                }`}
+                className={`px-6 py-3 rounded-lg text-[14px] font-semibold transition-all duration-200 whitespace-nowrap ${activeTab === "invited"
+                  ? "bg-[#2E3B8E] text-white shadow-md"
+                  : "text-gray-600 hover:text-gray-800"
+                  }`}
               >
                 Invited as Field Mentor
               </button>
@@ -367,18 +308,16 @@ export default function CourseCompletedPage() {
                           setSortBy(option.value);
                           setShowSortMenu(false);
                         }}
-                        className={`w-full text-left px-4 py-2.5 rounded-lg text-[14px] transition-all flex items-center gap-2 ${
-                          sortBy === option.value
-                            ? "bg-green-50 text-green-700 font-semibold"
-                            : "text-gray-700 hover:bg-gray-50"
-                        }`}
+                        className={`w-full text-left px-4 py-2.5 rounded-lg text-[14px] transition-all flex items-center gap-2 ${sortBy === option.value
+                          ? "bg-green-50 text-green-700 font-semibold"
+                          : "text-gray-700 hover:bg-gray-50"
+                          }`}
                       >
                         <span
-                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                            sortBy === option.value
-                              ? "border-green-500 bg-green-500"
-                              : "border-gray-300"
-                          }`}
+                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${sortBy === option.value
+                            ? "border-green-500 bg-green-500"
+                            : "border-gray-300"
+                            }`}
                         >
                           {sortBy === option.value && (
                             <i className="fa-solid fa-check text-white text-[8px]"></i>
@@ -398,14 +337,14 @@ export default function CourseCompletedPage() {
       {/* Cards Grid */}
       <section className="px-6 md:px-12 lg:px-20 py-10 bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[1400px] mx-auto">
-          {data.map((p) => (
+          {finalData.map((p) => (
             <div
               key={p.id}
               className="bg-white rounded-xl p-5 flex gap-5 items-start shadow-lg hover:shadow-xl transition-all"
             >
               {/* Image with relative positioning for "New" badge - Clickable */}
               <Link
-                href="/director/mentees/profile"
+                href={`/director/mentees/profile?id=${p.id}`}
                 className="relative w-[120px] h-[120px] overflow-hidden rounded-xl bg-gray-100 flex-shrink-0 cursor-pointer"
               >
                 <Image
@@ -424,7 +363,7 @@ export default function CourseCompletedPage() {
               <div className="flex-1 flex flex-col justify-between min-h-[120px]">
                 <div>
                   <Link
-                    href="/director/mentees/profile"
+                    href="/director/mentees/profile?id=${p.id}"
                     className="flex items-center gap-2 mb-1 hover:opacity-80 transition-opacity"
                   >
                     <h3 className="font-bold text-[#1A2E7A] text-[16px]">
@@ -448,13 +387,12 @@ export default function CourseCompletedPage() {
                       <p className="flex items-center gap-2">
                         <span className="font-semibold">Response :</span>
                         <span
-                          className={`px-2 py-1 rounded-md text-white text-[11px] font-semibold ${
-                            p.response === "Accepted"
-                              ? "bg-green-500"
-                              : p.response === "Waiting"
+                          className={`px-2 py-1 rounded-md text-white text-[11px] font-semibold ${p.response === "Accepted"
+                            ? "bg-green-500"
+                            : p.response === "Waiting"
                               ? "bg-gray-400"
                               : "bg-red-500"
-                          }`}
+                            }`}
                         >
                           {p.response}
                         </span>

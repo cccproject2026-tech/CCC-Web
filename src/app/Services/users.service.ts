@@ -55,3 +55,32 @@ export const apiInviteFieldMentor = (
 ) => {
   return axiosInstance.post("/users/invite-field-mentor", payload);
 };
+
+export const apiUpdateUserById = (
+  userId: string,
+  payload: {
+    firstName?: string;
+    lastName?: string;
+    phoneNumber?: string;
+    title?: string;
+    yearsInMinistry?: string;
+    conference?: string;
+    bio?: string;
+    churchDetails?: {
+      churchName: string;
+      churchPhone: string;
+      churchWebsite: string;
+      churchAddress: string;
+      city: string;
+      state: string;
+      zipCode: string;
+      country: string;
+    }[];
+  }
+) => {
+  return axiosInstance.patch<{
+    success: boolean;
+    data: User;
+    message?: string;
+  }>(`/users/${userId}`, payload);
+};

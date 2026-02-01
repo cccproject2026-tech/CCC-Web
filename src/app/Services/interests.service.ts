@@ -25,3 +25,24 @@ export const apiUpdateInterestStatus = (
     status,
   });
 };
+
+export const apiUpdateInterestById = (
+  id: string,
+  payload: {
+    churchDetails: {
+      churchName: string;
+      churchPhone: string;
+      churchWebsite: string;
+      churchAddress: string;
+      city: string;
+      state: string;
+      zipCode: string;
+      country: string;
+    }[];
+  }
+) => {
+  return axiosInstance.patch<{ success: boolean; data: Interest }>(
+    `/interests/${id}`,
+    payload
+  );
+};
