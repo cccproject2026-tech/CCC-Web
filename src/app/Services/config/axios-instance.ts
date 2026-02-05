@@ -1,18 +1,56 @@
+// import axios from "axios";
+
+// const axiosInstance = axios.create({
+//   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL, 
+//   timeout: 10000,
+//   headers: {
+//     "Content-Type": "application/json",
+//   },
+// });
+
+// // Request interceptor
+// axiosInstance.interceptors.request.use(
+//   (config) => {
+//     if (typeof window !== 'undefined') {
+//       const token = localStorage.getItem('authToken');
+//       if (token) {
+//         config.headers.Authorization = `Bearer ${token}`;
+//       }
+//     }
+//     return config;
+//   },
+//   (error) => Promise.reject(error)
+// );
+
+// // 🚨 Response Interceptor — handle errors
+// axiosInstance.interceptors.response.use(
+//   (response) => response,
+//   (error) => {
+//     // console.error("API Error:", error.response?.data || error.message);
+//     return Promise.reject(error);
+//   }
+// );
+
+// export default axiosInstance;
+
+
 import axios from "axios";
 
 const axiosInstance = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL, 
+  baseURL: process.env.NEXT_PUBLIC_API_URL,   // ✅ Use this as per your requirement
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",
   },
 });
 
-// Request interceptor
+// --------------------------------------------------
+// REQUEST INTERCEPTOR (Attach Token)
+// --------------------------------------------------
 axiosInstance.interceptors.request.use(
   (config) => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('authToken');
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("accessToken");  // ✅ same as api.js
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -22,10 +60,13 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// 🚨 Response Interceptor — handle errors
+// --------------------------------------------------
+// RESPONSE INTERCEPTOR (Handle API Errors)
+// --------------------------------------------------
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
+    // optional log:
     // console.error("API Error:", error.response?.data || error.message);
     return Promise.reject(error);
   }

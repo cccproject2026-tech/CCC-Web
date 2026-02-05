@@ -27,7 +27,7 @@ export default function LoginPage() {
     try {
       setIsLoading(true);
 
-      const res = await fetch("http://13.221.25.133/api/v1/auth/login", {
+      const res = await fetch("https://app.wisdomtooth.tech/api/v1/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

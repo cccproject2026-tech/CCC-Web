@@ -27,7 +27,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { getSingleUser } from "../Services/pastor.service";
+import { getNotifications, getSingleUser } from "../Services/pastor.service";
 
 function PastorHeaderComponent({ showFullHeader = false }) {
   const pathname = usePathname();
@@ -38,6 +38,8 @@ function PastorHeaderComponent({ showFullHeader = false }) {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isClient, setIsClient] = useState(false);
    const [profile, setProfile] = useState<any>(null);
+   const [notificationList, setNotificationList] = useState([]);
+const [notificationCount, setNotificationCount] = useState(0);
 
   useEffect(() => {
     setIsClient(true);
@@ -103,32 +105,6 @@ function PastorHeaderComponent({ showFullHeader = false }) {
     { name: "Appointments", path: "/pastor/Appointments" },
   ];
 
-  const notifications = [
-    {
-      title: "NEW ROADMAP COURSES",
-      desc: "Interested in receiving mentoring in community engagement",
-      time: "9:43 am",
-      icon: <Clipboard size={20} className="text-[#2679FF]" />,
-    },
-    {
-      title: "NEW NOTES ADDED",
-      desc: "Interested in receiving mentoring in community engagement",
-      time: "9:43 am",
-      icon: <FileText size={20} className="text-[#28B463]" />,
-    },
-    {
-      title: "ASSIGNMENTS DUE TODAY",
-      desc: "Interested in receiving mentoring in community engagement",
-      time: "9:43 am",
-      icon: <FileWarning size={20} className="text-[#F1C40F]" />,
-    },
-    {
-      title: "YOUR PROFILE IS INCOMPLETE",
-      desc: "Interested in receiving mentoring in community engagement",
-      time: "9:43 am",
-      icon: <UserRound size={20} className="text-[#E74C3C]" />,
-    },
-  ];
 
   const profileMenu = [
     { icon: <User size={18} />, label: "Profile" },
@@ -161,6 +137,29 @@ function PastorHeaderComponent({ showFullHeader = false }) {
       active: false,
     },
   ];
+
+  useEffect(() => {
+  const storedUser = typeof window !== "undefined"
+    ? JSON.parse(localStorage.getItem("user") || "{}")
+    : {};
+
+  const userId = storedUser?.id;
+  if (!userId) return;
+
+  async function fetchNotifications() {
+    try {
+      const res = await getNotifications(userId);
+      const list = res.data?.data?.notifications || [];
+
+      setNotificationList(list);
+      setNotificationCount(list.length);
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+    }
+  }
+
+  fetchNotifications();
+}, []);
 
   return (
     <header className="flex items-center justify-between px-4 md:px-6 lg:px-10 py-3 bg-[#1A2E7A] text-white shadow-md relative z-40 font-[Albert_Sans]">
@@ -215,25 +214,24 @@ function PastorHeaderComponent({ showFullHeader = false }) {
 
             {/* 🔔 Notification Dropdown */}
             <div className="relative">
-              <button
-                onClick={() => {
-                  setShowNotifications((prev) => !prev);
-                  setShowProfileMenu(false);
-                  setShowSettingsMenu(false);
-                }}
-                className="relative hover:opacity-80 transition cursor-pointer"
-                suppressHydrationWarning
-              >
-                <Image
-                  src={NotificationIcon}
-                  alt="Notification"
-                  width={20}
-                  height={20}
-                />
-                <span className="absolute -top-1 -right-1 bg-[#FFD700] text-[#1A2E7A] text-[10px] font-bold rounded-full w-[14px] h-[14px] flex items-center justify-center">
-                  4
-                </span>
-              </button>
+         <button
+  onClick={() => {
+    setShowNotifications(!showNotifications);
+    setShowProfileMenu(false);
+    setShowSettingsMenu(false);
+  }}
+  className="relative hover:opacity-80 transition cursor-pointer"
+>
+  <Image src={NotificationIcon} alt="Notification" width={20} height={20} />
+
+  {/* 🔥 Dynamic Count */}
+  {notificationCount > 0 && (
+    <span className="absolute -top-1 -right-1 bg-[#FFD700] text-[#1A2E7A] text-[10px] font-bold rounded-full w-[16px] h-[16px] flex items-center justify-center">
+      {notificationCount}
+    </span>
+  )}
+</button>
+
 
               {/* Notification Dropdown */}
               {showNotifications && (
@@ -247,7 +245,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
                       Notifications
                     </h2>
                     <a
-                      href="#"
+                      href="/pastor/notifications"
                       className="text-[#1A2E7A] text-[14px] font-medium hover:underline"
                     >
                       View All
@@ -255,32 +253,46 @@ function PastorHeaderComponent({ showFullHeader = false }) {
                   </div>
 
                   {/* Notifications List */}
-                  <div className="p-2 space-y-2">
-                    {notifications.map((note, i) => (
-                      <div
-                        key={i}
-                        className="flex items-start justify-between bg-[#F5F7FA] rounded-xl p-3"
-                      >
-                        <div className="flex items-start gap-3 w-full">
-                          {note.icon}
-                          <div className="flex flex-col w-full">
-                            <div className="flex justify-between">
-                              <h3 className="font-semibold text-[14px] text-[#000000]">
-                                {note.title}
-                              </h3>
-                              <div className="w-[8px] h-[8px] rounded-full bg-[#FFD700] mt-[2px]"></div>
-                            </div>
-                            <p className="text-[#7A7A7A] text-[13px] leading-snug">
-                              {note.desc}
-                            </p>
-                            <p className="text-[#9A9A9A] text-[12px] text-right mt-1">
-                              {note.time}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                <div className="p-2 space-y-2">
+
+  {notificationList.slice(0, 4).map((note, i) => (
+    <div
+      key={i}
+      className="flex items-start justify-between bg-[#F5F7FA] rounded-xl p-3"
+    >
+      <div className="flex items-start gap-3 w-full">
+
+        {/* Icon based on module type */}
+        <div className="w-6 h-6 flex items-center justify-center">
+          {note.module === "microgrant" && (
+            <Clipboard size={20} className="text-[#2679FF]" />
+          )}
+        </div>
+
+        <div className="flex flex-col w-full">
+          <div className="flex justify-between">
+            <h3 className="font-semibold text-[14px] text-[#000000]">
+              {note.name}
+            </h3>
+
+            {/* Yellow Dot */}
+            <div className="w-[8px] h-[8px] rounded-full bg-[#FFD700] mt-[2px]"></div>
+          </div>
+
+          <p className="text-[#7A7A7A] text-[13px] leading-snug">
+            {note.details}
+          </p>
+
+          <p className="text-[#9A9A9A] text-[12px] text-right mt-1">
+            Just now
+          </p>
+        </div>
+      </div>
+    </div>
+  ))}
+
+</div>
+
                 </div>
               )}
             </div>

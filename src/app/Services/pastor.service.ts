@@ -39,3 +39,11 @@ export const updateAppointment = (appointmentId: string, data: any) => {
 export const cancelAppointment = (appointmentId: string) => {
   return api.patch(`/appointments/${appointmentId}/cancel`);
 };
+
+export const getNotifications = (userId: string) => {
+  return api.get(`/home/notifications?userId=${userId}`);
+};
+
+export const updateUser = (userId: string, payload: any) => {
+  return api.patch(`/users/${userId}`, payload);
+};
