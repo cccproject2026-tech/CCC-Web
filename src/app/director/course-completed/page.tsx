@@ -337,6 +337,22 @@ export default function CourseCompletedPage() {
       {/* Cards Grid */}
       <section className="px-6 md:px-12 lg:px-20 py-10 bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[1400px] mx-auto">
+          {finalData.length === 0 && !loading && (
+            <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
+              <h3 className="text-xl font-semibold text-white mb-2">
+                No users found
+              </h3>
+              <p className="text-white/80 text-sm max-w-md">
+                {activeTab === "completed" &&
+                  "No pastors have completed the course yet."}
+                {activeTab === "certificate_issued" &&
+                  "No certificates have been issued yet."}
+                {activeTab === "invited" &&
+                  "No field mentor invitations have been sent yet."}
+              </p>
+            </div>
+          )}
+
           {finalData.map((p) => (
             <div
               key={p.id}

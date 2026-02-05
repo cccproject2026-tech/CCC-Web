@@ -2,11 +2,11 @@ import { axiosInstance } from "./api";
 import api from "./apiClient";
 
 export const getAllMedia = () => {
-    return api.get("/media");
+    return api.get("/home/media");
 };
 
 export const getMediaByType = (type: "video" | "image") => {
-    return api.get("/media", {
+    return api.get("/home/media", {
         params: { type },
     });
 };
@@ -50,15 +50,15 @@ export const updateMedia = (mediaId: string, data: {
     subheading?: string;
     description?: string;
 }) => {
-    return axiosInstance.patch(`/media/${mediaId}`, data);
+    return axiosInstance.patch(`/home/media/${mediaId}`, data);
 };
 
 export const deleteMedia = (mediaId: string) => {
-    return axiosInstance.delete(`/media/${mediaId}`);
+    return axiosInstance.delete(`/home/media/${mediaId}`);
 };
 
 export const deleteMultipleMedia = (mediaIds: string[]) => {
-    return axiosInstance.post("/media/bulk-delete", {
+    return axiosInstance.post("/home/media/bulk-delete", {
         mediaIds,
     });
 };

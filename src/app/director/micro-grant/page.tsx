@@ -133,7 +133,7 @@ const Page: React.FC = () => {
           </div>
 
           {filteredCards.map((app) => {
-            console.log("MicroGrantCard userId:", app.userId?._id);
+            console.log("MicroGrantCard userId:", app);
 
             return (
               <MicroGrantCard

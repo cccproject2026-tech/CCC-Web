@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import AppHero from "@/app/Components/Hero/AppHero";
 import AppFooter from "@/app/Components/AppFooter";
@@ -10,10 +10,10 @@ import Card3 from "../../Assets/card3.png";
 import Card4 from "../../Assets/card4.png";
 import Card5 from "../../Assets/card5.png";
 import Card6 from "../../Assets/card6.png";
-import { createMedia } from "@/app/Services/media.service";
+import { createMedia, getAllMedia } from "@/app/Services/media.service";
 
 interface Video {
-  id: number;
+  _id: string;
   heading: string;
   subHeading: string;
   description: string;
@@ -38,56 +38,72 @@ export default function VideosPage() {
     videoFile: null as File | null,
   });
 
-  const videos: Video[] = [
-    {
-      id: 1,
-      heading: "Introduction",
-      subHeading: "Center for Community Change",
-      description: "Interested in receiving mentoring in community engagement",
-      thumbnail: Card1,
-      date: "20 Oct 2024",
-    },
-    {
-      id: 2,
-      heading: "Introduction",
-      subHeading: "Center for Community Change",
-      description: "Interested in receiving mentoring in community engagement",
-      thumbnail: Card2,
-      date: "20 Oct 2024",
-    },
-    {
-      id: 3,
-      heading: "Introduction",
-      subHeading: "Center for Community Change",
-      description: "Interested in receiving mentoring in community engagement",
-      thumbnail: Card3,
-      date: "20 Oct 2024",
-    },
-    {
-      id: 4,
-      heading: "Introduction",
-      subHeading: "Center for Community Change",
-      description: "Interested in receiving mentoring in community engagement",
-      thumbnail: Card4,
-      date: "20 Oct 2024",
-    },
-    {
-      id: 5,
-      heading: "Introduction",
-      subHeading: "Center for Community Change",
-      description: "Interested in receiving mentoring in community engagement",
-      thumbnail: Card5,
-      date: "20 Oct 2024",
-    },
-    {
-      id: 6,
-      heading: "Introduction",
-      subHeading: "Center for Community Change",
-      description: "Interested in receiving mentoring in community engagement",
-      thumbnail: Card6,
-      date: "20 Oct 2024",
-    },
-  ];
+  // const videos: Video[] = [
+  //   {
+  //     id: 1,
+  //     heading: "Introduction",
+  //     subHeading: "Center for Community Change",
+  //     description: "Interested in receiving mentoring in community engagement",
+  //     thumbnail: Card1,
+  //     date: "20 Oct 2024",
+  //   },
+  //   {
+  //     id: 2,
+  //     heading: "Introduction",
+  //     subHeading: "Center for Community Change",
+  //     description: "Interested in receiving mentoring in community engagement",
+  //     thumbnail: Card2,
+  //     date: "20 Oct 2024",
+  //   },
+  //   {
+  //     id: 3,
+  //     heading: "Introduction",
+  //     subHeading: "Center for Community Change",
+  //     description: "Interested in receiving mentoring in community engagement",
+  //     thumbnail: Card3,
+  //     date: "20 Oct 2024",
+  //   },
+  //   {
+  //     id: 4,
+  //     heading: "Introduction",
+  //     subHeading: "Center for Community Change",
+  //     description: "Interested in receiving mentoring in community engagement",
+  //     thumbnail: Card4,
+  //     date: "20 Oct 2024",
+  //   },
+  //   {
+  //     id: 5,
+  //     heading: "Introduction",
+  //     subHeading: "Center for Community Change",
+  //     description: "Interested in receiving mentoring in community engagement",
+  //     thumbnail: Card5,
+  //     date: "20 Oct 2024",
+  //   },
+  //   {
+  //     id: 6,
+  //     heading: "Introduction",
+  //     subHeading: "Center for Community Change",
+  //     description: "Interested in receiving mentoring in community engagement",
+  //     thumbnail: Card6,
+  //     date: "20 Oct 2024",
+  //   },
+  // ];
+
+  const [videos, setVideos] = useState<Video[]>([]);
+
+
+  useEffect(() => {
+    const fetchVideos = async () => {
+      try {
+        const res = await getAllMedia();
+        setVideos(res.data?.data || []);
+      } catch (err) {
+        console.error("Failed to load videos", err);
+      }
+    };
+
+    fetchVideos();
+  }, []);
 
   const handleSelectMode = () => {
     setIsSelectMode(true);
@@ -99,7 +115,7 @@ export default function VideosPage() {
     setSelectedVideos([]);
   };
 
-  const handleSelectVideo = (id: number) => {
+  const handleSelectVideo = (id: string) => {
     if (selectedVideos.includes(id)) {
       setSelectedVideos(selectedVideos.filter((v) => v !== id));
     } else {
@@ -279,8 +295,8 @@ export default function VideosPage() {
                     onClick={handleDeleteClick}
                     disabled={selectedVideos.length === 0}
                     className={`text-sm font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm ${selectedVideos.length === 0
-                        ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                        : "bg-red-600 text-white hover:bg-red-700"
+                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                      : "bg-red-600 text-white hover:bg-red-700"
                       }`}
                   >
                     Delete
@@ -311,17 +327,25 @@ export default function VideosPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {videos.map((video) => (
               <div
-                key={video.id}
+                key={video._id}
                 className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all"
               >
                 {/* Thumbnail with Play Button */}
                 <div className="relative aspect-video bg-gray-200">
-                  <Image
+                  {/* <Image
                     src={video.thumbnail}
                     alt={video.subHeading}
                     fill
                     className="object-cover"
-                  />
+                  /> */}
+                  {video.mediaFiles?.[0]?.url ? (
+                    <video
+                      src={video.mediaFiles[0].url}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gray-300" />
+                  )}
                   {/* Play Button Overlay */}
                   <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                     <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all cursor-pointer">
@@ -338,10 +362,10 @@ export default function VideosPage() {
                       className="absolute top-2 left-2 cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleSelectVideo(video.id);
+                        handleSelectVideo(video._id);
                       }}
                     >
-                      {selectedVideos.includes(video.id) ? (
+                      {selectedVideos.includes(video._id) ? (
                         <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center shadow-md">
                           <i className="fa-solid fa-check text-white text-xs"></i>
                         </div>
@@ -355,18 +379,18 @@ export default function VideosPage() {
                     <div className="absolute top-2 right-2">
                       <div className="relative">
                         <button
-                          onClick={(e) => handleMenuToggle(video.id, e)}
+                          onClick={(e) => handleMenuToggle(video._id, e)}
                           className="w-8 h-8 bg-white rounded-md flex items-center justify-center hover:bg-gray-100 transition-all shadow-sm"
                         >
                           <i className="fa-solid fa-ellipsis-vertical text-blue-600 text-xs"></i>
                         </button>
                         {/* Dropdown Menu */}
-                        {openMenuId === video.id && (
+                        {openMenuId === video._id && (
                           <div className="absolute top-10 right-0 bg-white rounded-lg shadow-xl py-2 min-w-[140px] z-50 border border-gray-200">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleEdit(video.id);
+                                handleEdit(video._id);
                               }}
                               className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
                             >
@@ -376,7 +400,7 @@ export default function VideosPage() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDelete(video.id);
+                                handleDelete(video._id);
                               }}
                               className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
                             >
