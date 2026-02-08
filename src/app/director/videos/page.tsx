@@ -10,24 +10,24 @@ import Card3 from "../../Assets/card3.png";
 import Card4 from "../../Assets/card4.png";
 import Card5 from "../../Assets/card5.png";
 import Card6 from "../../Assets/card6.png";
-import { createMedia, getAllMedia } from "@/app/Services/media.service";
+import { createMedia, deleteMedia, getAllMedia, updateMedia } from "@/app/Services/media.service";
 
 interface Video {
   _id: string;
   heading: string;
-  subHeading: string;
-  description: string;
-  thumbnail: any;
-  date: string;
+  subheading?: string;
+  description?: string;
+  mediaFiles?: { url: string }[];
+  createdAt?: string;
 }
 
 export default function VideosPage() {
   const [showAddVideoModal, setShowAddVideoModal] = useState(false);
   const [showEditVideoModal, setShowEditVideoModal] = useState(false);
-  const [editingVideoId, setEditingVideoId] = useState<number | null>(null);
+  const [editingVideoId, setEditingVideoId] = useState<string | null>(null);
   const [isSelectMode, setIsSelectMode] = useState(false);
-  const [selectedVideos, setSelectedVideos] = useState<number[]>([]);
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [selectedVideos, setSelectedVideos] = useState<string[]>([]);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
   const [deleteCount, setDeleteCount] = useState(0);
@@ -97,6 +97,7 @@ export default function VideosPage() {
       try {
         const res = await getAllMedia();
         setVideos(res.data?.data || []);
+        console.log(res.data.data)
       } catch (err) {
         console.error("Failed to load videos", err);
       }
@@ -127,7 +128,7 @@ export default function VideosPage() {
     if (selectedVideos.length === videos.length) {
       setSelectedVideos([]);
     } else {
-      setSelectedVideos(videos.map((v) => v.id));
+      setSelectedVideos(videos.map((v) => v._id));
     }
   };
 
@@ -184,22 +185,44 @@ export default function VideosPage() {
       return;
     }
 
-    if (!videoForm.videoFile) {
-      alert("Please upload a video file");
-      return;
-    }
-
     try {
-      await createMedia({
-        heading: videoForm.heading,
-        subheading: videoForm.subHeading,
-        description: videoForm.description,
-        defaultType: "video",
-        files: [videoForm.videoFile],
-      });
+      // ---------- EDIT MODE ----------
+      if (editingVideoId) {
+        const payload: any = {
+          heading: videoForm.heading,
+          subheading: videoForm.subHeading,
+          description: videoForm.description,
+        };
 
-      setShowAddVideoModal(false);
+        // only attach file if user selected new one
+        if (videoForm.videoFile) {
+          payload.files = [videoForm.videoFile];
+        }
 
+        await updateMedia(editingVideoId, payload);
+
+        setShowEditVideoModal(false);
+      }
+
+      // ---------- ADD MODE ----------
+      else {
+        if (!videoForm.videoFile) {
+          alert("Please upload a video file");
+          return;
+        }
+
+        await createMedia({
+          heading: videoForm.heading,
+          subheading: videoForm.subHeading,
+          description: videoForm.description,
+          defaultType: "video",
+          files: [videoForm.videoFile],
+        });
+
+        setShowAddVideoModal(false);
+      }
+
+      // ---------- RESET ----------
       setVideoForm({
         heading: "",
         subHeading: "",
@@ -207,39 +230,56 @@ export default function VideosPage() {
         videoFile: null,
       });
 
-      // TODO (next step): refetch media list
-      console.log("Video uploaded successfully");
+      setEditingVideoId(null);
+
+      // refresh list
+      const res = await getAllMedia();
+      setVideos(res.data?.data || []);
     } catch (error) {
-      console.error("Upload failed", error);
-      alert("Failed to upload video");
+      console.error("Save failed", error);
+      alert("Something went wrong");
     }
   };
 
-
-  const handleMenuToggle = (videoId: number, e: React.MouseEvent) => {
+  const handleMenuToggle = (videoId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setOpenMenuId(openMenuId === videoId ? null : videoId);
   };
 
-  const handleEdit = (videoId: number) => {
-    const video = videos.find((v) => v.id === videoId);
+  const handleEdit = (videoId: string) => {
+    const video = videos.find((v) => v._id === videoId);
+    console.log(video)
     if (video) {
       setEditingVideoId(videoId);
+
       setVideoForm({
         heading: video.heading,
-        subHeading: video.subHeading,
-        description: video.description,
-        videoFile: null, // Keep existing video, don't reset file
+        subHeading: video.subheading ?? "",
+        description: video.description ?? "",
+        videoFile: null,
+        existingVideoUrl: video.mediaFiles?.[0]?.url ?? null,
       });
+
       setShowEditVideoModal(true);
     }
+
     setOpenMenuId(null);
   };
 
-  const handleDelete = (videoId: number) => {
-    console.log("Delete video:", videoId);
+
+  const handleDelete = async (videoId: string) => {
+    try {
+      await deleteMedia(videoId);
+
+      setVideos((prev) => prev.filter((v) => v._id !== videoId));
+
+      console.log("Deleted successfully");
+    } catch (err) {
+      console.error("Delete failed", err);
+      alert("Failed to delete video");
+    }
+
     setOpenMenuId(null);
-    // Add delete functionality here
   };
 
   // Close menu when clicking outside
