@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Framelogo1 from "../Assets/Frame-logo-1.png";
 import Connecticon from "../Assets/Connect-icon.png";
 import NotificationIcon from "../Assets/notification.png";
@@ -26,6 +26,7 @@ import {
 
 export default function MentorHeader({ showFullHeader = false }) {
   const pathname = usePathname();
+  const router = useRouter();
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -56,7 +57,7 @@ export default function MentorHeader({ showFullHeader = false }) {
     { name: "Assessments", path: "/mentor/MentorAssessments" },
     { name: "Track Progress", path: "/mentor/MentorProgress" },
     { name: "Appointments", path: "/mentor/home" },
-     { name: "Schedule", path: "/mentor/home" },
+    { name: "Schedule", path: "/mentor/home" },
   ];
 
   const notifications = [
@@ -87,17 +88,17 @@ export default function MentorHeader({ showFullHeader = false }) {
   ];
 
   const profileMenu = [
-    { icon: <User size={18} />, label: "Profile" },
-    { icon: <Award size={18} />, label: "Certificates" },
-    { icon: <File size={18} />, label: "Assignments" },
-    { icon: <Trophy size={18} />, label: "Micro Grand" },
-    { icon: <FolderOpen size={18} />, label: "Documents" },
+    { icon: <User size={18} />, label: "Profile", path: "/mentor/profile" },
+    { icon: <Award size={18} />, label: "Certificates", path: "/mentor/certificates" },
+    { icon: <File size={18} />, label: "Assignments", path: "/mentor/assignments" },
+    { icon: <Trophy size={18} />, label: "Micro Grand", path: "/mentor/micro-grant" },
+    { icon: <FolderOpen size={18} />, label: "Documents", path: "/mentor/documents" },
     {
       icon: <Settings size={18} />,
       label: "Settings",
-      subMenu: true, // special case
+      subMenu: true,
     },
-    { icon: <LogOut size={18} />, label: "Log out" },
+    { icon: <LogOut size={18} />, label: "Log out", action: "logout" },
   ];
 
   const settingsSubMenu = [
@@ -115,25 +116,24 @@ export default function MentorHeader({ showFullHeader = false }) {
 
       {/* ✅ Middle Nav Links */}
       {showFullHeader && (
-  <nav className="hidden lg:flex items-center gap-6">
-    {navLinks.map((link, index) => {
-      const isActive = pathname === link.path;
-      return (
-        <a
-          key={index}
-          href={link.path}
-          className={`text-sm cursor-pointer transition-all duration-200 ${
-            isActive
-              ? "font-semibold text-white"
-              : "text-white/80 hover:text-white"
-          }`}
-        >
-          {link.name}
-        </a>
-      );
-    })}
-  </nav>
-)}
+        <nav className="hidden lg:flex items-center gap-6">
+          {navLinks.map((link, index) => {
+            const isActive = pathname === link.path;
+            return (
+              <a
+                key={index}
+                href={link.path}
+                className={`text-sm cursor-pointer transition-all duration-200 ${isActive
+                  ? "font-semibold text-white"
+                  : "text-white/80 hover:text-white"
+                  }`}
+              >
+                {link.name}
+              </a>
+            );
+          })}
+        </nav>
+      )}
 
 
       {/* ✅ Right Icons */}
@@ -257,13 +257,30 @@ export default function MentorHeader({ showFullHeader = false }) {
                           onClick={() => {
                             if (item.subMenu) {
                               setShowSettingsMenu((prev) => !prev);
+                              return;
+                            }
+
+                            // 2️⃣ Handle logout action
+                            if (item.action === "logout") {
+                              console.log("Logging out...");
+
+                              // example logout flow
+                              localStorage.removeItem("token");
+                              router.push("/login");
+
+                              return;
+                            }
+
+                            // 3️⃣ Navigate to page
+                            if (item.path) {
+                              router.push(item.path);
+                              setShowProfileMenu(false); // close dropdown after navigation
                             }
                           }}
-                          className={`flex items-center gap-3 px-5 py-2 hover:bg-[#F5F7FA] transition text-[#0033A0] w-full text-left ${
-                            item.subMenu && showSettingsMenu
-                              ? "bg-[#F5F7FA]"
-                              : ""
-                          }`}
+                          className={`flex items-center gap-3 px-5 py-2 hover:bg-[#F5F7FA] transition text-[#0033A0] w-full text-left ${item.subMenu && showSettingsMenu
+                            ? "bg-[#F5F7FA]"
+                            : ""
+                            }`}
                         >
                           <span className="text-[#0033A0]">{item.icon}</span>
                           <span className="text-[15px] font-medium">
@@ -281,11 +298,10 @@ export default function MentorHeader({ showFullHeader = false }) {
                                 <button
                                   key={j}
                                   disabled={!sub.active}
-                                  className={`flex items-center gap-3 px-5 py-2 text-[15px] font-medium ${
-                                    sub.active
-                                      ? "hover:bg-[#F5F7FA] text-[#0033A0]"
-                                      : "text-gray-400 cursor-not-allowed"
-                                  }`}
+                                  className={`flex items-center gap-3 px-5 py-2 text-[15px] font-medium ${sub.active
+                                    ? "hover:bg-[#F5F7FA] text-[#0033A0]"
+                                    : "text-gray-400 cursor-not-allowed"
+                                    }`}
                                 >
                                   {sub.icon}
                                   <span>{sub.label}</span>
