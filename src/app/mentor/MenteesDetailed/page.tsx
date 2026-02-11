@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "@/app/Assets/mentees-hero.png";
@@ -10,41 +10,114 @@ import Mentor2 from "@/app/Assets/mentor2.png";
 import Mentor3 from "@/app/Assets/mentor3.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
+import { apiGetAssignedUsers } from "@/app/Services/users.service";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
+const IMAGE_POOL = [Mentor1, Mentor2, Mentor3];
 
 export default function MyMenteesPage() {
   const [filter, setFilter] = useState("In-Progress");
   const [sortBy, setSortBy] = useState("Phase");
   const [isMapView, setIsMapView] = useState(false); // 👈 toggle map mode
 
-  const mentees = [
-    {
-      id: 1,
-      name: "John Doe",
-      role: "Pastor",
-      desc: "Sub text area write something here. That you can read more about him",
-      progress: 100,
-      phase: "Community Revitalization and Multiplication",
-      img: Mentor1,
-    },
-    {
-      id: 2,
-      name: "John Doe",
-      role: "Layleader",
-      desc: "Sub text area write something here. That you can read more about him",
-      progress: 70,
-      phase: "Self Revitalization",
-      img: Mentor2,
-    },
-    {
-      id: 3,
-      name: "John Doe",
-      role: "Seminarist",
-      desc: "Sub text area write something here. That you can read more about him",
-      progress: 70,
-      phase: "Church Empowerment",
-      img: Mentor3,
-    },
-  ];
+  const [mentees, setMentees] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMyMentees = async () => {
+      try {
+        const storedUser = JSON.parse(localStorage.getItem("user") || "null");
+        if (!storedUser?.id) return;
+
+        // 1️⃣ get assigned mentees
+        const res = await apiGetAssignedUsers(storedUser.id);
+
+        const menteeUsers = res.data.data;
+        // 2️⃣ map to UI model
+        const mapped = menteeUsers.map((u: any, i: number) => ({
+          id: u.id ?? u._id,
+          name: `${u.firstName} ${u.lastName}`,
+          role: u.role,
+          desc: "Assigned mentee in mentoring program",
+          img: u.profilePicture || IMAGE_POOL[i % IMAGE_POOL.length],
+          progress: 0,
+          phase: undefined,
+        }));
+
+        setMentees(mapped);
+      } catch (err) {
+        console.error("Failed to load mentees", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMyMentees();
+  }, []);
+
+  useEffect(() => {
+    if (!mentees.length) return;
+
+    const hydrateProgress = async () => {
+      const results = await Promise.allSettled(
+        mentees.map((m) =>
+          apiGetUserProgress(m.id).then((res) => ({
+            userId: m.id,
+            progress: res.data.data?.overallProgress ?? 0,
+            phase: res.data.data?.currentPhase,
+            completed: res.data.data?.overallCompleted ?? false,
+          }))
+        )
+      );
+
+      setMentees((prev) =>
+        prev.map((m) => {
+          const match = results.find(
+            (r) => r.status === "fulfilled" && r.value.userId === m.id
+          ) as PromiseFulfilledResult<any> | undefined;
+
+          if (!match) return m;
+
+          return {
+            ...m,
+            progress: match.value.progress,
+            phase: match.value.phase,
+          };
+        })
+      );
+    };
+
+    hydrateProgress();
+  }, [mentees.length]);
+
+  const processedMentees = useMemo(() => {
+    let list = [...mentees];
+
+    if (filter !== "All") {
+      list = list.filter((m) => {
+        if (filter === "Completed") return m.progress === 100;
+
+        if (filter === "In-Progress") return m.progress < 100;
+
+        return true;
+      });
+    }
+
+    if (sortBy === "Name") {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+    }
+
+    if (sortBy === "Progress") {
+      list = [...list].sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0));
+    }
+
+    if (sortBy === "Phase") {
+      list = [...list].sort((a, b) =>
+        (a.phase || "").localeCompare(b.phase || "")
+      );
+    }
+
+    return list;
+  }, [mentees, filter, sortBy]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white">
@@ -79,9 +152,8 @@ export default function MyMenteesPage() {
               {/* Location Toggle */}
               <button
                 onClick={() => setIsMapView(true)}
-                className={`bg-white rounded-lg w-9 h-9 flex items-center justify-center shadow-sm transition hover:bg-gray-50 ${
-                  isMapView ? "ring-2 ring-[#FFD84E]" : ""
-                }`}
+                className={`bg-white rounded-lg w-9 h-9 flex items-center justify-center shadow-sm transition hover:bg-gray-50 ${isMapView ? "ring-2 ring-[#FFD84E]" : ""
+                  }`}
               >
                 <i className="fa-solid fa-location-dot text-[#103C8C]"></i>
               </button>
@@ -89,9 +161,8 @@ export default function MyMenteesPage() {
               {/* Grid View */}
               <button
                 onClick={() => setIsMapView(false)}
-                className={`bg-white rounded-lg w-9 h-9 flex items-center justify-center shadow-sm transition hover:bg-gray-50 ${
-                  !isMapView ? "ring-2 ring-[#FFD84E]" : ""
-                }`}
+                className={`bg-white rounded-lg w-9 h-9 flex items-center justify-center shadow-sm transition hover:bg-gray-50 ${!isMapView ? "ring-2 ring-[#FFD84E]" : ""
+                  }`}
               >
                 <i className="fa-solid fa-grip text-[#103C8C]"></i>
               </button>
@@ -103,21 +174,31 @@ export default function MyMenteesPage() {
             </div>
           </div>
 
-          {/* 🧑‍🤝‍🧑 MENTEE AVATARS */}
+          {loading && (
+            <div className="text-center py-20 text-white/80">
+              Loading mentees...
+            </div>
+          )}
+
           <div className="flex items-center gap-6 mb-10 overflow-x-auto pb-2">
-            {[Mentor1, Mentor2, Mentor3, Mentor1, Mentor2].map((img, i) => (
-              <div key={i} className="flex flex-col items-center">
+            {mentees.slice(0, 6).map((mentee) => (
+              <div key={mentee.id} className="flex flex-col items-center min-w-[80px]">
                 <div className="relative">
                   <Image
-                    src={img}
-                    alt="Mentee"
+                    src={mentee.img || Mentor1} // fallback image
+                    alt={mentee.name}
                     width={70}
                     height={70}
-                    className="rounded-full border-4 border-[#9D8CFF] shadow-md"
+                    className="rounded-full border-4 border-[#9D8CFF] shadow-md object-cover"
                   />
-                  <div className="absolute -bottom-1 right-0 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
+
+                  {/* online indicator (optional logic later) */}
+                  <div className="absolute -bottom-1 right-0 w-3 h-3 bg-green-400 rounded-full border-2 border-white" />
                 </div>
-                <p className="text-sm mt-2">John Doe</p>
+
+                <p className="text-sm mt-2 text-center truncate w-[80px]">
+                  {mentee.name}
+                </p>
               </div>
             ))}
           </div>
@@ -153,11 +234,10 @@ export default function MyMenteesPage() {
                     <button
                       key={tab}
                       onClick={() => setFilter(tab)}
-                      className={`px-6 py-[8px] text-sm font-medium transition-all duration-200 ${
-                        filter === tab
-                          ? "bg-[#103C8C] text-white"
-                          : "text-gray-600 hover:text-[#103C8C]"
-                      }`}
+                      className={`px-6 py-[8px] text-sm font-medium transition-all duration-200 ${filter === tab
+                        ? "bg-[#103C8C] text-white"
+                        : "text-gray-600 hover:text-[#103C8C]"
+                        }`}
                     >
                       {tab}
                     </button>
@@ -178,10 +258,14 @@ export default function MyMenteesPage() {
                   </select>
                 </div>
               </div>
-
+              {!loading && processedMentees.length === 0 && (
+                <div className="text-center py-20 text-white/80">
+                  No mentees found in this category.
+                </div>
+              )}
               {/* GRID OF CARDS */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {mentees.map((mentee, i) => (
+                {processedMentees.map((mentee, i) => (
                   <div
                     key={i}
                     className="bg-white rounded-xl text-[#0B1C58] p-4 shadow-md hover:shadow-lg transition-all duration-200 relative"
