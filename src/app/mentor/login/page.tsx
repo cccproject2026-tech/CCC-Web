@@ -51,7 +51,7 @@ export default function LoginPage() {
       // save tokens / user – you can later move this to a context or Zustand store
       if (accessToken) localStorage.setItem("accessToken", accessToken);
       if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
-      if (user) localStorage.setItem("user", JSON.stringify(user));
+      if (user) localStorage.setItem("mentor", JSON.stringify(user));
 
       // redirect – adjust based on role/status if needed
       router.push("/mentor/profile-incomplete");

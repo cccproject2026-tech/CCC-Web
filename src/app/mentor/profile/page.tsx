@@ -5,11 +5,11 @@ import ProfilePic from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { apiGetUserById, apiUpdateUserById } from "@/app/Services/users.service";
-import { getGreeting } from "@/app/Services/utils/greeting";
+import { getGreeting } from "@/app/Services/utils/helpers";
 
 const storedUser =
   typeof window !== "undefined"
-    ? JSON.parse(localStorage.getItem("user") || "null")
+    ? JSON.parse(localStorage.getItem("mentor") || "null")
     : null;
 
 const userId = storedUser?.id;
@@ -82,7 +82,7 @@ export default function MentorProfile() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const storedUser = JSON.parse(localStorage.getItem("user") || "null");
+        const storedUser = JSON.parse(localStorage.getItem("mentor") || "null");
         if (!storedUser?.id) return;
 
         const res = await apiGetUserById(userId);

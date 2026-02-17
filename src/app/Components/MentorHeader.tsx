@@ -23,16 +23,37 @@ import {
   BellOff,
   UserX,
 } from "lucide-react";
+import { apiGetUserById } from "../Services/users.service";
+import { getGreeting } from "../Services/utils/helpers";
 
 export default function MentorHeader({ showFullHeader = false }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [user, setUser] = useState<any>(null);
 
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const mentorId = localStorage.getItem("userId");
+
+    if (!mentorId) return;
+
+    const fetchUser = async () => {
+      try {
+        const res = await apiGetUserById(mentorId);
+        setUser(res.data?.data || null);
+      } catch (err) {
+        console.error("Failed to fetch mentor profile:", err);
+        setUser(null);
+      }
+    };
+
+    fetchUser();
+  }, []);
 
   // ✅ Close dropdowns on outside click
   useEffect(() => {
@@ -232,12 +253,14 @@ export default function MentorHeader({ showFullHeader = false }) {
                 className="flex items-center gap-2 bg-[#223C8C] px-3 py-1 rounded-full hover:opacity-90 transition cursor-pointer"
               >
                 <div className="text-right text-[11px] leading-tight">
-                  <p className="text-white/80">Good Morning</p>
-                  <p className="text-white font-medium">John Ross</p>
+                  <p className="text-white/80">{getGreeting()}</p>
+                  <p className="text-white font-medium">
+                    {user ? `${user.firstName} ${user.lastName}` : "Loading..."}
+                  </p>
                 </div>
                 <Image
-                  src={UserProfile}
-                  alt="User"
+                  src={user?.profilePicture || UserProfile}
+                  alt={user?.firstName}
                   width={30}
                   height={30}
                   className="rounded-full border border-white/40"

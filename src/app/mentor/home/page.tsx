@@ -18,14 +18,63 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { useRouter } from "next/navigation";
-import { apiGetMentors } from "@/app/Services/api";
+import { apiGetMentorAppointments, apiGetMentors } from "@/app/Services/api";
 import MentorHeader from "@/app/Components/MentorHeader";
+import { getPastorMedia } from "@/app/Services/pastor.service";
+import { getGreeting } from "@/app/Services/utils/helpers";
+
+const storedUser =
+  typeof window !== "undefined"
+    ? JSON.parse(localStorage.getItem("mentor") || "null")
+    : null;
+
+const userId = storedUser?.id;
+
+const getMediaThumbnail = (item: any) => {
+  console.log(item)
+  const url = item?.mediaFiles?.[0]?.thumbnail;
+
+  if (url && url.trim() !== "") {
+    return url;
+  }
+
+  return Book;
+};
+
+const isToday = (dateString: string) => {
+  const today = new Date();
+  const date = new Date(dateString);
+
+  return (
+    date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear()
+  );
+};
 
 export default function home() {
   const router = useRouter();
   const [mentors, setMentors] = useState<any[]>([]);
+  const [user, setUser] = useState<any>(null);
 
   const [loading, setLoading] = useState(true);
+  const [mediaList, setMediaList] = useState([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(true);
+
+
+  useEffect(() => {
+    async function fetchMedia() {
+      try {
+        const res = await getPastorMedia();
+        setMediaList(res.data?.data || []);
+      } catch (err) {
+        console.error("Error fetching media:", err);
+      }
+    }
+
+    fetchMedia();
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -34,8 +83,9 @@ export default function home() {
 
         try {
           const mentorsRes = await apiGetMentors();
-          setMentors(mentorsRes.data.data.mentors || []);
-          console.log("Mentors loaded:", mentorsRes.data.data.mentors);
+          console.log(mentorsRes.data.mentors)
+          setMentors(mentorsRes.data.mentors || []);
+          console.log("Mentors loaded:", mentorsRes.data.mentors);
         } catch (error) {
           console.log("Mentors API not available, using fallback");
           setMentors([]);
@@ -49,6 +99,32 @@ export default function home() {
 
     fetchData();
   }, []);
+
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      try {
+        if (!userId) return;
+
+        setAppointmentsLoading(true);
+
+        const res = await apiGetMentorAppointments(userId, true);
+        console.log(res.data)
+        const allAppointments = res.data?.data || [];
+        const todaysAppointments = allAppointments.filter((a: any) =>
+          isToday(a.meetingDate)
+        );
+
+        setAppointments(todaysAppointments);
+      } catch (err) {
+        console.error("Failed to load appointments:", err);
+        setAppointments([]);
+      } finally {
+        setAppointmentsLoading(false);
+      }
+    };
+
+    fetchAppointments();
+  }, [userId]);
 
   if (loading) {
     return (
@@ -95,7 +171,7 @@ export default function home() {
 
           {/* USER CARD */}
           <div className="flex flex-col items-center sm:items-end">
-            <p className="text-white/90 text-sm mb-2">Good Morning</p>
+            <p className="text-white/90 text-sm mb-2">{getGreeting()}</p>
             <div
               className="bg-white/15 backdrop-blur-md border border-white/30 rounded-md p-4 w-[280px] shadow-lg"
               onClick={() => router.push(`/pastor/profile`)}
@@ -110,7 +186,9 @@ export default function home() {
                 />
                 <div className="flex flex-col items-start">
                   <p className="text-xs text-white font-semibold">
-                    John Ross, Welcome Aboard!
+                    {storedUser
+                      ? `${storedUser.firstName ?? ""} ${storedUser.lastName ?? ""}, Welcome Aboard!`
+                      : "Welcome Aboard!"}
                   </p>
                   <div className="w-[120px] h-2 bg-white/30 rounded-full mt-1">
                     <div className="h-2 bg-[#00B3FF] rounded-full w-[70%]" />
@@ -155,26 +233,44 @@ export default function home() {
               1024: { slidesPerView: 3 },
             }}
           >
-            {[1, 2, 3, 4].map((i) => (
-              <SwiperSlide key={i}>
+            {mediaList.map((item) => (
+              <SwiperSlide key={item._id}>
                 <div className="bg-white text-black rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300">
-                  <Image
-                    src={Book}
-                    alt="Course Thumbnail"
-                    className="w-full h-[180px] object-cover"
-                  />
+
+                  {/* IMAGE */}
+                  <div className="relative">
+                    <Image
+                      src={getMediaThumbnail(item)}
+                      alt={item.heading || "Media thumbnail"}
+                      width={400}
+                      height={200}
+                      className="w-full h-[160px] sm:h-[180px] object-cover"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <button className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center hover:scale-110 transition">
+                        <i className="fa-solid fa-play text-[#103C8C] text-sm"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* TEXT CONTENT */}
                   <div className="p-4">
                     <p className="text-xs text-[#103C8C] font-semibold mb-1">
-                      Introduction
+                      {item.subheading || "Introduction"}
                     </p>
+
                     <h4 className="text-sm font-semibold mb-1">
-                      Center for Community Change
+                      {item.heading}
                     </h4>
+
                     <p className="text-xs text-gray-600 mb-3 leading-snug">
-                      Interested in receiving mentoring in community engagement
+                      {item.description}
                     </p>
+
+                    {/* You don’t have duration in API, so show created date OR static */}
                     <div className="flex justify-between items-center text-xs text-gray-400">
-                      <span>18:00 Min</span>
+                      <span>{new Date(item.createdAt).toLocaleDateString()}</span>
+
                       <button className="border border-[#103C8C] text-[#103C8C] p-[6px] rounded-md hover:bg-[#103C8C] hover:text-white transition">
                         <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                       </button>
@@ -203,73 +299,88 @@ export default function home() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 relative z-10">
-          {[
-            { icon: DuoIcon, mode: "Duo" },
-            { icon: MeetIcon, mode: "Google Meet" },
-          ].map((appt, i) => (
-            <div
-              key={i}
-              className="bg-[#14517d] rounded-2xl p-4 sm:p-6 flex flex-col sm:flex-row gap-4 sm:gap-5 items-center shadow-lg border border-[#0B1C58]/40"
-            >
-              <div className="bg-white rounded-xl flex items-center justify-center w-[100px] h-[100px] sm:w-[150px] sm:h-[150px] shrink-0">
-                <Image
-                  src={appt.icon}
-                  alt="App Icon"
-                  className="w-[50px] h-[50px] sm:w-[65px] sm:h-[65px]"
-                />
-              </div>
-
-              <div className="flex flex-col text-white w-full text-center sm:text-left">
-                <div className="flex items-center gap-3 mb-3">
-                  <Image
-                    src={UserProfile}
-                    alt="User"
-                    width={36}
-                    height={36}
-                    className="rounded-full border border-white/40"
-                  />
-                  <div>
-                    <h4 className="text-white font-semibold text-sm">
-                      John Ross
-                    </h4>
-                    <p className="text-white/70 text-xs">
-                      {i === 0 ? "Mentor" : "Field Mentor"}
-                    </p>
+          {appointmentsLoading ? (
+            <p className="text-gray-500">Loading appointments...</p>
+          ) : appointments.length === 0 ? (
+            <p className="text-gray-500">No appointments scheduled for today</p>
+          ) : (
+            appointments.slice(0, 2).map((appt, i) => {
+              const meetingDate = new Date(appt.meetingDate);
+              return (
+                <div
+                  key={appt._id || i}
+                  className="bg-[#14517d] rounded-2xl p-4 sm:p-6 flex flex-col sm:flex-row gap-4 sm:gap-5 items-center shadow-lg border border-[#0B1C58]/40"
+                >
+                  {/* ICON SECTION — UNCHANGED */}
+                  <div className="bg-white rounded-xl flex items-center justify-center w-[100px] h-[100px] sm:w-[150px] sm:h-[150px] shrink-0">
+                    <Image
+                      src={i % 2 === 0 ? DuoIcon : MeetIcon}
+                      alt="App Icon"
+                      className="w-[50px] h-[50px] sm:w-[65px] sm:h-[65px]"
+                    />
                   </div>
-                </div>
 
-                <div className="flex flex-wrap gap-2 mb-3 text-xs">
-                  <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-[3px] flex items-center gap-2">
-                    <i className="fa-regular fa-calendar text-[#E3D247]"></i>
-                    <span>Date : 04 Aug 24</span>
-                  </div>
-                  <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-[3px] flex items-center gap-2">
-                    <i className="fa-regular fa-clock text-[#24E0C2]"></i>
-                    <span>Time : 11:30 hrs EST</span>
-                  </div>
-                </div>
+                  {/* TEXT DATA — NOW DYNAMIC */}
+                  <div className="flex flex-col text-white w-full text-center sm:text-left">
+                    <div className="flex items-center gap-3 mb-3">
+                      <Image
+                        src={appt.mentor?.profilePicture || UserProfile}
+                        alt="User"
+                        width={36}
+                        height={36}
+                        className="rounded-full border border-white/40"
+                      />
+                      <div>
+                        <h4 className="text-white font-semibold text-sm">
+                          {appt.mentor?.firstName} {appt.mentor?.lastName}
+                        </h4>
+                        <p className="text-white/70 text-xs">
+                          {appt.mentor?.role || "Mentor"}
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="flex justify-between items-end">
-                  <div>
-                    <p className="text-xs mb-2">
-                      Mode :{" "}
-                      <span className="underline underline-offset-2 text-[#B8D4FF]">
-                        {appt.mode}
-                      </span>
-                    </p>
-                    <div className="flex gap-4 text-white text-sm">
-                      <i className="fa-solid fa-phone"></i>
-                      <i className="fa-regular fa-comment"></i>
-                      <i className="fa-brands fa-whatsapp"></i>
+                    <div className="flex flex-wrap gap-2 mb-3 text-xs">
+                      <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-[3px] flex items-center gap-2">
+                        <i className="fa-regular fa-calendar text-[#E3D247]"></i>
+                        <span>Date : {meetingDate.toLocaleDateString()}</span>
+                      </div>
+                      <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-[3px] flex items-center gap-2">
+                        <i className="fa-regular fa-clock text-[#24E0C2]"></i>
+                        <span>
+                          Time :{" "}
+                          {meetingDate.toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-end">
+                      <div>
+                        <p className="text-xs mb-2">
+                          Mode :{" "}
+                          <span className="underline underline-offset-2 text-[#B8D4FF]">
+                            {appt.platform}
+                          </span>
+                        </p>
+                        <div className="flex gap-4 text-white text-sm">
+                          <i className="fa-solid fa-phone"></i>
+                          <i className="fa-regular fa-comment"></i>
+                          <i className="fa-brands fa-whatsapp"></i>
+                        </div>
+                      </div>
+
+                      <button className="bg-[#0B1C58] hover:bg-[#122D80] px-6 py-[6px] rounded-md text-sm">
+                        Details
+                      </button>
                     </div>
                   </div>
-                  <button className="bg-[#0B1C58] hover:bg-[#122D80] px-6 py-[6px] rounded-md text-sm">
-                    Details
-                  </button>
                 </div>
-              </div>
-            </div>
-          ))}
+              );
+            })
+          )}
         </div>
       </section>
 
@@ -277,16 +388,15 @@ export default function home() {
       <section className="py-16 px-4 md:px-20 bg-[#196394]">
         <div className="bg-white rounded-2xl p-8 shadow-md max-w-5xl mx-auto">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <h3 className="text-lg font-semibold">Today’s Roadmap List</h3>
+            <h3 className="text-lg font-semibold text-[#0B1C58]">Today’s Roadmap List</h3>
             <div className="flex bg-[#F1F4F9] rounded-md overflow-hidden w-full sm:w-auto">
               {["All", "Roadmap", "Survey"].map((tab, index) => (
                 <button
                   key={tab}
-                  className={`px-3 sm:px-4 py-[6px] text-sm font-medium flex-1 sm:flex-none ${
-                    index === 0
-                      ? "bg-[#0B1C58] text-white"
-                      : "text-gray-500 hover:text-[#0B1C58]"
-                  }`}
+                  className={`px-3 sm:px-4 py-[6px] text-sm font-medium flex-1 sm:flex-none ${index === 0
+                    ? "bg-[#0B1C58] text-white"
+                    : "text-gray-500 hover:text-[#0B1C58]"
+                    }`}
                 >
                   {tab}
                 </button>
@@ -385,6 +495,7 @@ export default function home() {
           <a
             href="#"
             className="text-[#103C8C] text-sm font-medium hover:underline hover:text-[#0D2E6E]"
+            onClick={() => router.push(`/mentor/MenteesDetailed`)}
           >
             See all
           </a>
@@ -394,15 +505,15 @@ export default function home() {
           {(mentors.length > 0
             ? mentors
             : [
-                { firstName: "John", lastName: "Doe", role: "Field Mentor" },
-                { firstName: "Jane", lastName: "Smith", role: "Senior Mentor" },
-                { firstName: "Mike", lastName: "Johnson", role: "Lead Mentor" },
-                {
-                  firstName: "Sarah",
-                  lastName: "Wilson",
-                  role: "Field Mentor",
-                },
-              ]
+              { firstName: "John", lastName: "Doe", role: "Field Mentor" },
+              { firstName: "Jane", lastName: "Smith", role: "Senior Mentor" },
+              { firstName: "Mike", lastName: "Johnson", role: "Lead Mentor" },
+              {
+                firstName: "Sarah",
+                lastName: "Wilson",
+                role: "Field Mentor",
+              },
+            ]
           )
             .slice(0, 4)
             .map((mentor, i) => (
@@ -411,7 +522,7 @@ export default function home() {
                 className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 p-3"
               >
                 <div
-                  className="relative"
+                  className="relative w-full h-[180px]"
                   onClick={() => router.push(`/pastor/Mymentors`)}
                 >
                   <Image
@@ -420,11 +531,9 @@ export default function home() {
                       [Mentor1, Mentor2, Mentor3][i % 3]
                     }
                     alt="Mentor"
-                    className="w-full h-[180px] object-cover"
+                    fill
+                    className="object-cover rounded-lg"
                   />
-                  <button className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center bg-white/80 rounded-full text-[#0B1C58] hover:bg-white shadow">
-                    <i className="fa-solid fa-ellipsis-vertical text-sm"></i>
-                  </button>
                 </div>
 
                 <div className="p-4">

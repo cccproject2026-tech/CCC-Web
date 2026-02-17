@@ -25,7 +25,7 @@ export default function MyMenteesPage() {
   useEffect(() => {
     const fetchMyMentees = async () => {
       try {
-        const storedUser = JSON.parse(localStorage.getItem("user") || "null");
+        const storedUser = JSON.parse(localStorage.getItem("mentor") || "null");
         if (!storedUser?.id) return;
 
         // 1️⃣ get assigned mentees
@@ -174,12 +174,6 @@ export default function MyMenteesPage() {
             </div>
           </div>
 
-          {loading && (
-            <div className="text-center py-20 text-white/80">
-              Loading mentees...
-            </div>
-          )}
-
           <div className="flex items-center gap-6 mb-10 overflow-x-auto pb-2">
             {mentees.slice(0, 6).map((mentee) => (
               <div key={mentee.id} className="flex flex-col items-center min-w-[80px]">
@@ -258,6 +252,12 @@ export default function MyMenteesPage() {
                   </select>
                 </div>
               </div>
+              {loading && (
+                <div className="text-center py-20 text-white/80">
+                  Loading mentees...
+                </div>
+              )}
+
               {!loading && processedMentees.length === 0 && (
                 <div className="text-center py-20 text-white/80">
                   No mentees found in this category.

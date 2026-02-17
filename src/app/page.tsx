@@ -18,7 +18,7 @@ export default function LandingPage() {
       name: "Mentor",
       desc: "View the Mentor tools including mentee tracking, meetings, and analytics.",
       color: "from-[#007B8C] to-[#005A70]",
-      path: "/mentor/home",
+      path: "/pastor/splash",
     },
     {
       name: "Director",
