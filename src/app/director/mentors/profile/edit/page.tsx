@@ -1,8 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import AppHeader from "@/app/Components/Header/AppHeader";
 import AppHero from "@/app/Components/Hero/AppHero";
 import AppFooter from "@/app/Components/AppFooter";
 import ConfirmModal from "@/app/Components/ConfirmModal";
@@ -15,7 +14,7 @@ import MentorBg from "@/app/Assets/mentor-bg.png";
 import Mentor1 from "@/app/Assets/mentor1.png";
 import { getUserById, updateUserById } from "@/app/Services/mentors.service";
 
-export default function EditMentorProfilePage() {
+function EditMentorProfileContent() {
   const router = useRouter();
 
   const searchParams = useSearchParams();
@@ -29,10 +28,10 @@ export default function EditMentorProfilePage() {
   });
 
   const [church1, setChurch1] = useState<ChurchInfo>({
-    name: "",
-    phone: "",
-    website: "",
-    address: "",
+    churchName: "",
+    churchPhone: "",
+    churchWebsite: "",
+    churchAddress: "",
     city: "",
     state: "",
     zipCode: "",
@@ -40,10 +39,10 @@ export default function EditMentorProfilePage() {
   });
 
   const [church2, setChurch2] = useState<ChurchInfo>({
-    name: "",
-    phone: "",
-    website: "",
-    address: "",
+    churchName: "",
+    churchPhone: "",
+    churchWebsite: "",
+    churchAddress: "",
     city: "",
     state: "",
     zipCode: "",
@@ -110,20 +109,20 @@ export default function EditMentorProfilePage() {
       interest: {
         churchDetails: [
           {
-            churchName: church1.name,
-            churchPhone: church1.phone,
-            churchWebsite: church1.website,
-            churchAddress: church1.address,
+            churchName: church1.churchName,
+            churchPhone: church1.churchPhone,
+            churchWebsite: church1.churchWebsite,
+            churchAddress: church1.churchAddress,
             city: church1.city,
             state: church1.state,
             zipCode: church1.zipCode,
             country: church1.country,
           },
           {
-            churchName: church2.name,
-            churchPhone: church2.phone,
-            churchWebsite: church2.website,
-            churchAddress: church2.address,
+            churchName: church2.churchName,
+            churchPhone: church2.churchPhone,
+            churchWebsite: church2.churchWebsite,
+            churchAddress: church2.churchAddress,
             city: church2.city,
             state: church2.state,
             zipCode: church2.zipCode,
@@ -159,10 +158,10 @@ export default function EditMentorProfilePage() {
         const churchOne = user.interest?.churchDetails?.[0] ?? {};
         const churchTwo = user.interest?.churchDetails?.[1] ?? {};
         setChurch1({
-          name: churchOne.churchName ?? "",
-          phone: churchOne.churchPhone ?? "",
-          website: churchOne.churchWebsite ?? "",
-          address: churchOne.churchAddress ?? "",
+          churchName: churchOne.churchName ?? "",
+          churchPhone: churchOne.churchPhone ?? "",
+          churchWebsite: churchOne.churchWebsite ?? "",
+          churchAddress: churchOne.churchAddress ?? "",
           city: churchOne.city ?? "",
           state: churchOne.state ?? "",
           zipCode: churchOne.zipCode ?? "",
@@ -170,10 +169,10 @@ export default function EditMentorProfilePage() {
         });
 
         setChurch2({
-          name: churchTwo.churchName ?? "",
-          phone: churchTwo.churchPhone ?? "",
-          website: churchTwo.churchWebsite ?? "",
-          address: churchTwo.churchAddress ?? "",
+          churchName: churchTwo.churchName ?? "",
+          churchPhone: churchTwo.churchPhone ?? "",
+          churchWebsite: churchTwo.churchWebsite ?? "",
+          churchAddress: churchTwo.churchAddress ?? "",
           city: churchTwo.city ?? "",
           state: churchTwo.state ?? "",
           zipCode: churchTwo.zipCode ?? "",
@@ -234,7 +233,7 @@ export default function EditMentorProfilePage() {
     router.push(`/director/mentors/profile?id=${mentorId}`);
   };
 
-  const handleDownload = (name: string) => {
+  const handleDownload = (_name: string) => {
     setToast("Document Downloaded Successfully");
     setTimeout(() => setToast(null), 1200);
   };
@@ -512,5 +511,13 @@ export default function EditMentorProfilePage() {
 
       <AppFooter />
     </div>
+  );
+}
+
+export default function EditMentorProfilePage() {
+  return (
+    <Suspense>
+      <EditMentorProfileContent />
+    </Suspense>
   );
 }
