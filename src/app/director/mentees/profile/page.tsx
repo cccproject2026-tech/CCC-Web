@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import AppFooter from "@/app/Components/AppFooter";
@@ -36,7 +36,7 @@ const deriveInviteState = (user: any): InviteState => {
   return "invited";
 };
 
-export default function MenteeProfilePage() {
+function MenteeProfileContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const menteeId = searchParams.get("id");
@@ -331,5 +331,13 @@ export default function MenteeProfilePage() {
 
       <AppFooter />
     </div>
+  );
+}
+
+export default function MenteeProfilePage() {
+  return (
+    <Suspense>
+      <MenteeProfileContent />
+    </Suspense>
   );
 }
