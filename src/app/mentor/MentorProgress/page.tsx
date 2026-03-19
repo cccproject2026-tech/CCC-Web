@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
@@ -10,22 +10,165 @@ import card1 from "@/app/Assets/card1.png";
 import card2 from "@/app/Assets/card2.png";
 import card3 from "@/app/Assets/card3.png";
 import MentorHeader from "@/app/Components/MentorHeader";
+import { useSearchParams } from "next/navigation";
+import { apiAddFinalComment, apiGetUserProgress } from "@/app/Services/progress.service";
+import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
+import { apiGetAssessmentById } from "@/app/Services/assessment.service";
 
 export default function PastorProgressPage() {
-  const [filter, setFilter] = useState("Remaining");
+  const [roadmapFilter, setRoadmapFilter] = useState("All");
+  const [surveyFilter, setSurveyFilter] = useState("All");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [comment, setComment] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
-  const [isCompleted, setIsCompleted] = useState(false); // ✅ after marking complete
   const [activeTab, setActiveTab] = useState("comments"); // ✅ for tab switching
+  const [progress, setProgress] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const searchParams = useSearchParams();
+  const userId = searchParams.get("userId");
+  const [roadmaps, setRoadmaps] = useState<any[]>([]);
+  const [assessments, setAssessments] = useState<any[]>([]);
+  const isCompleted = progress?.finalComments?.length > 0;
 
-  // ✅ Handle completion
-  const handleMarkComplete = () => {
-    setIsDrawerOpen(false);
-    setShowSuccess(true);
-    setIsCompleted(true);
-    setTimeout(() => setShowSuccess(false), 3000);
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchProgress = async () => {
+      try {
+        const res = await apiGetUserProgress(userId);
+        setProgress(res.data?.data);
+      } catch (err) {
+        console.error("Failed to fetch progress", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProgress();
+  }, [userId]);
+
+
+  useEffect(() => {
+    if (!progress?.roadmaps?.length) return;
+
+    const hydrateRoadmaps = async () => {
+      try {
+        const results = await Promise.allSettled(
+          progress.roadmaps.map(async (r: any) => {
+            const res = await apiGetRoadmapById(r.roadMapId);
+            const roadmap = res.data?.data;
+            const percent = r.progressPercentage ?? 0;
+            return {
+              ...r,
+              title: roadmap?.name,
+              description: roadmap?.description,
+              timeline: roadmap?.timeline,
+              percent
+            };
+          })
+        );
+        const valid = results
+          .filter((r) => r.status === "fulfilled")
+          .map((r: any) => r.value);
+
+        setRoadmaps(valid);
+      } catch (err) {
+        console.error("Failed to load roadmap details", err);
+      }
+    };
+
+    hydrateRoadmaps();
+  }, [progress]);
+
+
+  useEffect(() => {
+    console.log(progress)
+    if (!progress?.assessments?.length) return; const hydrateAssessments = async () => {
+      try {
+        const results = await Promise.allSettled(
+          progress.assessments.map(async (a: any) => {
+            const res = await apiGetAssessmentById(a.assessmentId);
+
+            console.log("Assessment API response:", res.data);
+
+            const assessment = res.data;
+
+            return {
+              ...a,
+              title: assessment?.name,
+              description: assessment?.description,
+              bannerImage: assessment?.bannerImage,
+              type: assessment?.type,
+              totalSections: assessment?.sections?.length || 0,
+              dueDate: a.dueDate,
+              status: a.status,
+            };
+          })
+        );
+        const valid = results
+          .filter((r) => r.status === "fulfilled")
+          .map((r: any) => r.value);
+
+        setAssessments(valid);
+      } catch (err) {
+        console.error("Failed to load assessments", err);
+      }
+    };
+
+    hydrateAssessments();
+  }, [progress]);
+
+  const getStatusColor = (status: string) => {
+    if (status === "completed")
+      return "bg-[#DCFCE7] text-[#15803D] border-[#86EFAC]";
+    if (status === "in_progress")
+      return "bg-[#FEF3C7] text-[#92400E] border-[#FCD34D]";
+    return "bg-[#EFF6FF] text-[#1E40AF] border-[#BFDBFE]";
   };
+
+  const handleMarkComplete = async () => {
+    try {
+
+      const mentor = JSON.parse(localStorage.getItem("mentor") || "{}");
+
+      await apiAddFinalComment({
+        userId: userId as string,
+        commentorId: mentor.id,
+        comment: comment,
+      });
+
+      const res = await apiGetUserProgress(userId as string);
+      setProgress(res.data.data);
+
+      setIsDrawerOpen(false);
+      setShowSuccess(true);
+
+      setTimeout(() => setShowSuccess(false), 3000);
+
+    } catch (err) {
+      console.error("Failed to submit final comment", err);
+    }
+  };
+
+  const filteredRoadmaps = roadmaps.filter((r) => {
+    if (roadmapFilter === "Completed") return r.status === "completed";
+    if (roadmapFilter === "Remaining") return r.status !== "completed";
+    return true;
+  });
+
+  const filteredAssessments = assessments.filter((a) => {
+    if (surveyFilter === "Completed") return a.status === "completed";
+    if (surveyFilter === "Remaining") return a.status !== "completed";
+    return true;
+  });
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white">
+        Loading progress...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white">
@@ -48,7 +191,9 @@ export default function PastorProgressPage() {
         <section className="grid grid-cols-1 md:grid-cols-2 gap-8 px-4 md:px-16 py-12 bg-[#176192]">
           {/* Overall Progress */}
           <div className="bg-white rounded-xl shadow-sm p-8">
-            <h3 className="text-lg font-semibold mb-4">Overall Progress</h3>
+            <h3 className="text-lg font-semibold mb-4">
+              Overall Progress: {progress?.overallProgress ?? 0}%
+            </h3>
             <div className="flex justify-center">
               <Image
                 src={overall}
@@ -106,12 +251,11 @@ export default function PastorProgressPage() {
               {["All", "Completed", "Remaining"].map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => setFilter(tab)}
-                  className={`px-5 py-2 text-sm font-medium transition-all ${
-                    filter === tab
-                      ? "bg-[#103C8C] text-white"
-                      : "text-gray-600 hover:text-[#103C8C]"
-                  }`}
+                  onClick={() => setRoadmapFilter(tab)}
+                  className={`px-5 py-2 text-sm font-medium transition-all ${roadmapFilter === tab
+                    ? "bg-[#103C8C] text-white"
+                    : "text-gray-600 hover:text-[#103C8C]"
+                    }`}
                 >
                   {tab}
                 </button>
@@ -120,53 +264,35 @@ export default function PastorProgressPage() {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-8">
-            <RoadmapCard
-              img={card1}
-              title="Self Revitalization Phase"
-              desc="Interested in receiving mentoring in community engagement"
-              status="Due"
-              statusColor="bg-[#FFF0F0] text-[#B91C1C] border-[#FCA5A5]"
-              progress={75}
-              completed="06/08"
-              time="Months 1 – 2"
-            />
-            <RoadmapCard
-              img={card2}
-              title="Church Empowerment Phase"
-              desc="Interested in receiving mentoring in community engagement"
-              status="In-progress"
-              statusColor="bg-[#FEF3C7] text-[#92400E] border-[#FCD34D]"
-              progress={65}
-              completed="12/18"
-              time="Months 3 – 9"
-            />
-            <RoadmapCard
-              img={card3}
-              title="Community Revitalization and Multiplication Phase"
-              desc="Interested in receiving mentoring in community engagement"
-              status="Not Started"
-              statusColor="bg-[#EFF6FF] text-[#1E40AF] border-[#BFDBFE]"
-              progress={35}
-              completed="05/12"
-              time="Months 10 – 12"
-            />
+            {filteredRoadmaps.map((r: any) => (
+              <RoadmapCard
+                key={r.roadMapId}
+                img={card1}
+                title={r.title || "Roadmap"}
+                desc={r.description || ""}
+                progress={r.percent}
+                completed={`${r.completedSteps}/${r.totalSteps}`}
+                status={r.status}
+                statusColor={getStatusColor(r.status)}
+                time={r.timeline || ""}
+              />
+            ))}
           </div>
         </section>
 
         {/* 🟪 SURVEY PROGRESS */}
-        <section className="px-4 md:px-16 pb-12 bg-gradient-to-b from-[#0D3C78] to-[#0B2A55] pt-8 text-white">
+        <section className="px-4 md:px-16 pb-12 bg-gradient-to-b from-[#0D3C78] to-[#0B2A55] pt-15 text-white">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <h2 className="text-xl font-semibold">Survey Progress</h2>
             <div className="flex bg-white rounded-lg shadow overflow-hidden">
               {["All", "Completed", "Remaining"].map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => setFilter(tab)}
-                  className={`px-5 py-2 text-sm font-medium transition-all ${
-                    filter === tab
-                      ? "bg-[#103C8C] text-white"
-                      : "text-gray-500 hover:text-[#103C8C]"
-                  }`}
+                  onClick={() => setSurveyFilter(tab)}
+                  className={`px-5 py-2 text-sm font-medium transition-all ${surveyFilter === tab
+                    ? "bg-[#103C8C] text-white"
+                    : "text-gray-500 hover:text-[#103C8C]"
+                    }`}
                 >
                   {tab}
                 </button>
@@ -174,33 +300,13 @@ export default function PastorProgressPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl overflow-hidden shadow-sm max-w-xl">
-            <div className="flex">
-              <div className="w-1/3">
-                <Image
-                  src={card1}
-                  alt="Survey"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="flex-1 p-5 text-[#0B1C58]">
-                <h4 className="text-[15px] font-semibold mb-1">
-                  Church Assessment Evaluation (CMA)
-                </h4>
-                <p className="text-[13px] text-[#6B7280] mb-3">
-                  Interested in receiving mentoring in community engagement
-                </p>
-                <p className="text-[12px] text-[#6B7280] mb-1">Due</p>
-                <p className="text-[13px] text-[#0B1C58] font-semibold mb-4">
-                  20 Oct 2024
-                </p>
-                <div className="flex justify-end">
-                  <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[12px] px-6 py-[6px] rounded-md font-medium">
-                    View
-                  </button>
-                </div>
-              </div>
-            </div>
+          <div className="grid md:grid-cols-2 gap-8">
+            {filteredAssessments.map((a: any) => (
+              <AssessmentCard
+                key={a.assessmentId}
+                assessment={a}
+              />
+            ))}
           </div>
         </section>
 
@@ -220,7 +326,7 @@ export default function PastorProgressPage() {
                       ? "Final Comments & Summary"
                       : "Final Comments"}
                   </h2>
-                  <p className="text-sm text-gray-500 mt-1">Pr. John Doe</p>
+                  <p className="text-sm text-gray-500 mt-1">{progress?.user?.firstName} {progress?.user?.lastName}</p>
                 </div>
                 <button
                   onClick={() => setIsDrawerOpen(false)}
@@ -237,11 +343,10 @@ export default function PastorProgressPage() {
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className={`flex-1 py-3 text-sm font-medium capitalize ${
-                        activeTab === tab
-                          ? "border-b-2 border-[#103C8C] text-[#103C8C]"
-                          : "text-gray-500 hover:text-[#103C8C]"
-                      }`}
+                      className={`flex-1 py-3 text-sm font-medium capitalize ${activeTab === tab
+                        ? "border-b-2 border-[#103C8C] text-[#103C8C]"
+                        : "text-gray-500 hover:text-[#103C8C]"
+                        }`}
                     >
                       {tab === "comments"
                         ? "Final Comments"
@@ -253,14 +358,32 @@ export default function PastorProgressPage() {
 
               {/* Body */}
               <div className="p-6">
-                {activeTab === "comments" && (
+                {!isCompleted ? (
                   <textarea
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     placeholder="Write the Comments here..."
-                    disabled={isCompleted}
-                    className="w-full h-[260px] border border-gray-300 rounded-md p-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#103C8C] disabled:bg-gray-100"
+                    className="w-full h-[260px] border border-gray-300 rounded-md p-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#103C8C]"
                   />
+                ) : (
+                  <div className="space-y-3 max-h-[260px] overflow-y-auto">
+
+                    {progress?.finalComments?.map((c: any) => (
+                      <div
+                        key={c._id}
+                        className="border rounded-md p-3 bg-gray-50"
+                      >
+                        <p className="text-sm text-gray-800">
+                          {c.comment}
+                        </p>
+
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          {new Date(c.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                    ))}
+
+                  </div>
                 )}
 
                 {isCompleted && activeTab === "summary" && (
@@ -363,6 +486,66 @@ function RoadmapCard({
               View
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function AssessmentCard({ assessment }: any) {
+  const isCompleted = assessment.status === "completed";
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all p-4 h-[200px]">
+      <div className="flex h-full gap-4">
+
+        {/* Image */}
+        <div className="relative w-[160px] h-full rounded-xl overflow-hidden flex-shrink-0">
+          <Image
+            src={assessment.bannerImage || card1}
+            alt={assessment.title || "Assessment"}
+            fill
+            className="object-cover"
+          />
+        </div>
+
+        {/* Content */}
+        <div className="flex flex-col justify-between flex-1">
+
+          {/* Top */}
+          <div>
+            <h4 className="text-[15px] font-bold text-black mb-1 line-clamp-1">
+              {assessment.title || "Assessment"}
+            </h4>
+
+            <p className="text-[13px] text-[#6B7280] mb-2 line-clamp-2">
+              {assessment.description || ""}
+            </p>
+
+            <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[12px] px-4 py-[5px] rounded-md font-medium">
+              Customized Development Plans
+            </button>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-between text-[12px] text-[#6B7280]">
+
+            {isCompleted ? (
+              <span className="font-bold text-black">
+                Submited On
+              </span>
+            ) : (
+              <>
+                <span className="font-bold text-black">Due Date</span>
+                <span className="font-semibold text-[#0B1C58]">
+                  {assessment.dueDate || "-"}
+                </span>
+              </>
+            )}
+
+          </div>
+
         </div>
       </div>
     </div>

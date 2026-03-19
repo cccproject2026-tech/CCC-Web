@@ -14,6 +14,12 @@ export const apiGetAppointments = (params?: {
   );
 };
 
+export const apiGetWeeklyAvailability = (mentorId: string, date: string) => {
+  return axiosInstance.get(
+    `/appointments/availability/${mentorId}/week?date=${date}`
+  );
+};
+
 export const apiGetTodaysAppointments = () => {
   return apiGetAppointments({ futureOnly: true, status: 'scheduled' });
 };
@@ -24,4 +30,8 @@ export const apiGetUserAppointments = (userId: string, futureOnly = true) => {
 
 export const apiGetMentorAppointments = (mentorId: string, futureOnly = true) => {
   return apiGetAppointments({ mentorId, futureOnly });
+};
+
+export const apiCreateAvailability = (data: any) => {
+  return axiosInstance.post(`/appointments/availability`, data);
 };

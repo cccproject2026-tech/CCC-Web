@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import Image, { StaticImageData } from "next/image";
+import Image from "next/image";
 import Link from "next/link";
 
 interface PersonListCardProps {
@@ -8,7 +8,7 @@ interface PersonListCardProps {
   name: string;
   role?: string;
   description: string;
-  image: StaticImageData;
+  image: string;
   isNew?: boolean;
   badge?: {
     text: string;
@@ -62,7 +62,13 @@ export default function PersonListCard({
         href={profileLink}
         className="relative w-[120px] h-[120px] overflow-hidden rounded-xl bg-gray-100 flex-shrink-0 cursor-pointer"
       >
-        <Image src={image} alt={name} className="w-full h-full object-cover" />
+        <Image
+          src={image}
+          alt={name}
+          fill
+          className="object-cover"
+        />
+
         {isNew && (
           <span className="absolute top-2 left-2 px-2.5 py-1 bg-yellow-400 text-gray-900 rounded-md text-[11px] font-bold shadow-sm">
             New
@@ -168,13 +174,12 @@ export default function PersonListCard({
               <p className="flex items-center gap-2">
                 <span className="font-semibold">Response :</span>
                 <span
-                  className={`px-2 py-1 rounded-md text-white text-[11px] font-semibold ${
-                    invitationInfo.response === "Accepted"
-                      ? "bg-green-500"
-                      : invitationInfo.response === "Waiting"
+                  className={`px-2 py-1 rounded-md text-white text-[11px] font-semibold ${invitationInfo.response === "Accepted"
+                    ? "bg-green-500"
+                    : invitationInfo.response === "Waiting"
                       ? "bg-gray-400"
                       : "bg-red-500"
-                  }`}
+                    }`}
                 >
                   {invitationInfo.response}
                 </span>

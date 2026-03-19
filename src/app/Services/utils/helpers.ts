@@ -8,3 +8,52 @@ export const getGreeting = () => {
     if (hour < 21) return "Good Evening";
     return "Good Night";
 };
+
+export const generateTimeOptions = () => {
+    const options: { time: string; period: string; label: string }[] = [];
+
+    for (let h = 0; h < 24; h++) {
+        for (let m = 0; m < 60; m += 30) {
+            const hour12 = h % 12 === 0 ? 12 : h % 12;
+            const period = h < 12 ? "AM" : "PM";
+
+            const time = `${hour12}:${m === 0 ? "00" : m}`;
+            const label = `${hour12}:${m === 0 ? "00" : m} ${period}`;
+
+            options.push({
+                time,
+                period,
+                label,
+            });
+        }
+    }
+
+    return options;
+};
+
+export const timeOptions = generateTimeOptions();
+
+export const convertToMinutes = (time: string, period: string) => {
+    let [h, m] = time.split(":").map(Number);
+
+    if (period === "PM" && h !== 12) h += 12;
+    if (period === "AM" && h === 12) h = 0;
+
+    return h * 60 + m;
+};
+
+export const isOverlapping = (
+    slots: any[],
+    newStart: number,
+    newEnd: number,
+    currentIndex?: number
+) => {
+    return slots.some((slot, index) => {
+        if (index === currentIndex) return false;
+
+        const start = convertToMinutes(slot.startTime, slot.startPeriod);
+        const end = convertToMinutes(slot.endTime, slot.endPeriod);
+
+        return newStart < end && newEnd > start;
+    });
+};

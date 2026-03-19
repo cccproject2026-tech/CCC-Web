@@ -44,7 +44,7 @@ export default function ProfileIncomplete() {
   // 🔹 Load user from localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("user");
+      const stored = localStorage.getItem("mentor");
       if (stored) {
         try {
           const parsed: User = JSON.parse(stored);
@@ -181,7 +181,7 @@ export default function ProfileIncomplete() {
   const displayName =
     user?.firstName || user?.lastName
       ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim()
-      : "John Ross";
+      : "";
 
   return (
     <div className="min-h-screen flex flex-col">

@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "@/app/Assets/progress-bg.png";
@@ -8,50 +8,62 @@ import PastorImg from "@/app/Assets/mentor1.png"; // 👤 example pastor image
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { useRouter } from "next/navigation";
 import MentorHeader from "@/app/Components/MentorHeader";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
+import { apiGetAssignedUsers } from "@/app/Services/users.service";
 
 export default function TrackProgressPage() {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const router = useRouter();
 
-  const pastors = [
-    {
-      id: 1,
-      name: "John Doe",
-      desc: "Sub text area write something here. That you can read more about him",
-      progress: 100,
-    },
-    {
-      id: 2,
-      name: "John Doe",
-      desc: "Sub text area write something here. That you can read more about him",
-      progress: 70,
-    },
-    {
-      id: 3,
-      name: "John Doe",
-      desc: "Sub text area write something here. That you can read more about him",
-      progress: 80,
-    },
-    {
-      id: 4,
-      name: "John Doe",
-      desc: "Sub text area write something here. That you can read more about him",
-      progress: 90,
-    },
-    {
-      id: 5,
-      name: "John Doe",
-      desc: "Sub text area write something here. That you can read more about him",
-      progress: 90,
-    },
-    {
-      id: 6,
-      name: "John Doe",
-      desc: "Sub text area write something here. That you can read more about him",
-      progress: 100,
-    },
-  ];
+  const [pastors, setPastors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPastors = async () => {
+      try {
+        const mentor = JSON.parse(localStorage.getItem("mentor") || "null");
+        if (!mentor?.id) return;
+
+        // 1️⃣ get assigned users
+        const res = await apiGetAssignedUsers(mentor.id);
+        const users = res.data?.data || [];
+
+        // 2️⃣ fetch progress for each
+        const results = await Promise.all(
+          users.map(async (u: any) => {
+            try {
+              const progressRes = await apiGetUserProgress(u._id);
+
+              return {
+                id: u._id,
+                name: `${u.firstName} ${u.lastName}`,
+                desc: u.profileInfo || "Assigned pastor",
+                img: u.profilePicture || PastorImg,
+                progress: progressRes.data?.data?.overallProgress ?? 0,
+              };
+            } catch {
+              return {
+                id: u._id,
+                name: `${u.firstName} ${u.lastName}`,
+                desc: u.profileInfo || "Assigned pastor",
+                img: u.profilePicture || PastorImg,
+                progress: 0,
+              };
+            }
+          })
+        );
+
+        setPastors(results);
+      } catch (err) {
+        console.error("Failed to load pastors", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPastors();
+  }, []);
 
   const filtered = pastors.filter((p) => {
     if (filter === "In-Progress") return p.progress < 100;
@@ -103,11 +115,10 @@ export default function TrackProgressPage() {
                   key={tab}
                   onClick={() => setFilter(tab)}
                   className={`px-8 py-[8px] text-sm font-medium transition-all duration-200 rounded-md
-          ${
-            filter === tab
-              ? "bg-[#103C8C] text-white shadow-sm"
-              : "text-gray-700 hover:text-[#103C8C]"
-          }`}
+          ${filter === tab
+                      ? "bg-[#103C8C] text-white shadow-sm"
+                      : "text-gray-700 hover:text-[#103C8C]"
+                    }`}
                 >
                   {tab}
                 </button>
@@ -119,18 +130,21 @@ export default function TrackProgressPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {visible.map((pastor, index) => (
               <div
-                key={index}
+                key={pastor.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/mentor/MentorProgress?userId=${pastor.id}`);
+                }}
                 className="bg-white rounded-xl text-[#0B1C58] p-5 flex flex-col sm:flex-row items-center gap-4 sm:gap-6 shadow-md hover:shadow-lg transition-all duration-200"
               >
                 {/* LEFT: IMAGE */}
                 <Image
-                  src={PastorImg}
+                  src={pastor.img}
                   alt={pastor.name}
                   width={120}
                   height={120}
                   className="rounded-md object-cover sm:w-[150px] sm:h-[150px]"
                 />
-
                 {/* RIGHT: DETAILS */}
                 <div className="flex-1">
                   <h4 className="text-[16px] font-semibold">{pastor.name}</h4>
@@ -162,7 +176,7 @@ export default function TrackProgressPage() {
                       ) : pastor.progress >= 90 ? (
                         <button
                           className="bg-[#103C8C] text-white text-[12px] font-medium px-4 py-[4px] rounded-md hover:bg-[#0B2F6A] transition"
-                          onClick={() => router.push("/mentor/MentorProgress")}
+                          onClick={() => router.push(`/mentor/MentorProgress?userId=${pastor.id}`)}
                         >
                           Mark as Complete
                         </button>

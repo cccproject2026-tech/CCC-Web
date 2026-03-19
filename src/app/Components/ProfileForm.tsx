@@ -6,6 +6,7 @@ export interface PersonalInfo {
   lastName?: string;
   phoneNumber?: string;
   email?: string;
+  profilePic?: any;
 }
 
 export interface ChurchInfo {

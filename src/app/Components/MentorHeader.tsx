@@ -38,9 +38,11 @@ export default function MentorHeader({ showFullHeader = false }) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const mentorId = localStorage.getItem("userId");
+    const mentorData = localStorage.getItem("mentor");
+    if (!mentorData) return;
 
-    if (!mentorId) return;
+    const mentor = JSON.parse(mentorData);
+    const mentorId = mentor.id;
 
     const fetchUser = async () => {
       try {
@@ -55,7 +57,6 @@ export default function MentorHeader({ showFullHeader = false }) {
     fetchUser();
   }, []);
 
-  // ✅ Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -76,9 +77,9 @@ export default function MentorHeader({ showFullHeader = false }) {
     { name: "My Mentees", path: "/mentor/MenteesDetailed" },
     { name: "Revitalization Roadmap", path: "/mentor/RevitalizationRoadmap" },
     { name: "Assessments", path: "/mentor/MentorAssessments" },
-    { name: "Track Progress", path: "/mentor/MentorProgress" },
-    { name: "Appointments", path: "/mentor/home" },
-    { name: "Schedule", path: "/mentor/home" },
+    { name: "Track Progress", path: "/mentor/TrackProgress" },
+    { name: "Appointments", path: "/mentor/MentorSchedule" },
+    { name: "Schedule", path: "/mentor/MentorSchedule" },
   ];
 
   const notifications = [
@@ -260,7 +261,7 @@ export default function MentorHeader({ showFullHeader = false }) {
                 </div>
                 <Image
                   src={user?.profilePicture || UserProfile}
-                  alt={user?.firstName}
+                  alt={user ? `${user.firstName} profile` : "User profile"}
                   width={30}
                   height={30}
                   className="rounded-full border border-white/40"

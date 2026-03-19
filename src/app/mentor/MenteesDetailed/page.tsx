@@ -12,6 +12,7 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
+import { useRouter } from "next/navigation";
 const IMAGE_POOL = [Mentor1, Mentor2, Mentor3];
 
 export default function MyMenteesPage() {
@@ -21,6 +22,8 @@ export default function MyMenteesPage() {
 
   const [mentees, setMentees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const router = useRouter()
 
   useEffect(() => {
     const fetchMyMentees = async () => {
@@ -267,8 +270,9 @@ export default function MyMenteesPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {processedMentees.map((mentee, i) => (
                   <div
-                    key={i}
-                    className="bg-white rounded-xl text-[#0B1C58] p-4 shadow-md hover:shadow-lg transition-all duration-200 relative"
+                    key={mentee.id}
+                    onClick={() => router.push(`/mentor/MenteesDetailed/profile?id=${mentee.id}`)}
+                    className="bg-white rounded-xl text-[#0B1C58] p-4 shadow-md hover:shadow-lg transition-all duration-200 relative cursor-pointer"
                   >
                     {/* HEADER */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-3">

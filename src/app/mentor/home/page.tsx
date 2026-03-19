@@ -491,7 +491,7 @@ export default function home() {
       {/* 👥 MY MENTORS */}
       <section className="py-16 px-4 md:px-20 bg-[#F2F6FC]">
         <div className="flex justify-between items-center mb-8">
-          <h2 className="text-[22px] font-semibold text-[#000]">My Mentors</h2>
+          <h2 className="text-[22px] font-semibold text-[#000]">Reminders</h2>
           <a
             href="#"
             className="text-[#103C8C] text-sm font-medium hover:underline hover:text-[#0D2E6E]"
