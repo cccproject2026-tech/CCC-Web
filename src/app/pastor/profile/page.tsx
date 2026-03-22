@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useState, useEffect } from "react";
+import { getCookie } from "@/app/utils/cookies";
 import PastorHeader from "@/app/Components/PastorHeader";
 import ProfilePic from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -16,9 +17,7 @@ export default function PastorProfile() {
   // -------------------------
   useEffect(() => {
     const storedUser =
-      typeof window !== "undefined"
-        ? JSON.parse(localStorage.getItem("user") || "{}")
-        : {};
+      JSON.parse(getCookie("user") || "{}");
 
     const userId = storedUser?.id;
     if (!userId) return;

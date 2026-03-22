@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { apiGetAssignedUsers, apiGetMentorByEmail, apiCreateAppointment } from "@/app/Services/api";
+import { getCookie } from "@/app/utils/cookies";
 import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
@@ -63,8 +65,6 @@ function Scheduler({ mentorId }: { mentorId: string }) {
     }
 
     try {
-      const token = localStorage.getItem("token");
-
       const payload = {
         userId,
         mentorId,
@@ -74,16 +74,8 @@ function Scheduler({ mentorId }: { mentorId: string }) {
         notes,
       };
 
-      const res = await fetch("http://13.221.25.133/api/v1/appointments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const json = await res.json();
+      const response = await apiCreateAppointment(payload);
+      const json = response.data;
 
       if (json.success) {
         alert("Appointment Successfully Scheduled!");
@@ -214,24 +206,20 @@ export default function Mymentors() {
   const [filteredMentors, setFilteredMentors] = useState<Mentor[]>([]);
   const [searchText, setSearchText] = useState("");
 
-  /* FETCH ALL MENTORS */
+  /* FETCH ASSIGNED MENTORS */
   useEffect(() => {
     const fetchMentors = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const user = JSON.parse(getCookie("user") || "{}");
+        const userId = user?.id || user?._id;
+        if (!userId) return;
 
-        const res = await fetch("http://13.221.25.133/api/v1/home/mentors", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const json = await res.json();
-
-        if (json.success) {
-          setMentors(json.data.mentors);
-          setFilteredMentors(json.data.mentors);
-        }
+        const response = await apiGetAssignedUsers(userId);
+        const assigned = response.data.data || [];
+        setMentors(assigned);
+        setFilteredMentors(assigned);
       } catch (err) {
-        console.error("Error fetching mentors:", err);
+        console.error("Error fetching assigned mentors:", err);
       }
     };
 
@@ -241,16 +229,8 @@ export default function Mymentors() {
   /* FETCH SINGLE MENTOR */
   const fetchSingleMentor = async (email: string) => {
     try {
-      const token = localStorage.getItem("token");
-
-      const res = await fetch(
-        `http://13.221.25.133/api/v1/home/mentor/${email}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      const json = await res.json();
+      const response = await apiGetMentorByEmail(email);
+      const json = response.data;
 
       if (json.success) {
         setSelectedMentor(json.data);

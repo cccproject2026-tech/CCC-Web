@@ -61,3 +61,11 @@ export const getUserById = (id: string) => {
 export const updateUserById = (id: string, payload: any) => {
   return api.patch(`/users/${id}`, payload);
 };
+
+export const apiGetMentorList = () => {
+  return axiosInstance.get<{ success: boolean; message?: string; data: { mentors: MentorPastor[] } }>("/home/mentors");
+};
+
+export const apiGetMentorByEmail = (email: string) => {
+  return axiosInstance.get<{ success: boolean; data: MentorPastor }>(`/home/mentor/${email}`);
+};

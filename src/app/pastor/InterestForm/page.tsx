@@ -5,6 +5,8 @@ import Image from "next/image";
 import Gears from "@/app/Assets/gear-form.png";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { useRouter } from "next/navigation";
+import { apiCreateInterest } from "@/app/Services/api";
+import { setCookie } from "@/app/utils/cookies";
 
 export default function InterestForm() {
   const router = useRouter();
@@ -74,23 +76,17 @@ export default function InterestForm() {
     try {
       setIsSubmitting(true);
 
-      const res = await fetch("http://13.221.25.133/api/v1/interests", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      const response = await apiCreateInterest(payload);
+      const json = response.data;
 
-      const json = await res.json();
-
-      if (!res.ok || !json.success) {
+      if (!json.success) {
         setErrorMsg(json.message || "Failed to submit interest form.");
         return;
       }
 
       setSuccessMsg(json.message || "Interest form submitted successfully.");
       setShowInterests(true); // ✅ show checkboxes only after successful API
+      setCookie("interestEmail", email);
       // if you want to reset form:
       // form.reset();
     } catch (error) {
@@ -256,9 +252,12 @@ export default function InterestForm() {
                   <option value="" disabled>
                     Title
                   </option>
-                  <option value="Senior Pastor">Senior Pastor</option>
-                  <option value="Associate Pastor">Associate Pastor</option>
-                  {/* add more titles if needed */}
+                  <option value="Pastor">Pastor</option>
+                  <option value="Lay Leader">Lay Leader</option>
+                  <option value="Seminarian">Seminarian</option>
+                  <option value="Mentor">Mentor</option>
+                  <option value="Field Mentor">Field Mentor</option>
+                  <option value="Director">Director</option>
                 </select>
                 <input
                   name="yearsInMinistry"

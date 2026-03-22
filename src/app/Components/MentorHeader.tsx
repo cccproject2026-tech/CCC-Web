@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
+import { getCookie, removeCookie } from "@/app/utils/cookies";
 import { usePathname, useRouter } from "next/navigation";
 import Framelogo1 from "../Assets/Frame-logo-1.png";
 import Connecticon from "../Assets/Connect-icon.png";
@@ -38,7 +39,7 @@ export default function MentorHeader({ showFullHeader = false }) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const mentorData = localStorage.getItem("mentor");
+    const mentorData = getCookie("mentor");
     if (!mentorData) return;
 
     const mentor = JSON.parse(mentorData);
@@ -289,7 +290,7 @@ export default function MentorHeader({ showFullHeader = false }) {
                               console.log("Logging out...");
 
                               // example logout flow
-                              localStorage.removeItem("token");
+                              removeCookie("token");
                               router.push("/login");
 
                               return;

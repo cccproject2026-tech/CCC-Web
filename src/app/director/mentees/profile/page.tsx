@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState, Suspense } from "react";
+import { getCookie } from "@/app/utils/cookies";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import AppFooter from "@/app/Components/AppFooter";
@@ -149,7 +150,7 @@ function MenteeProfileContent() {
           disabled: false,
           onClick: async () => {
             try {
-              const invitedBy = localStorage.getItem("userId");
+              const invitedBy = getCookie("userId");
 
               if (!invitedBy || !personal.email) {
                 setToast("Unable to send invitation");

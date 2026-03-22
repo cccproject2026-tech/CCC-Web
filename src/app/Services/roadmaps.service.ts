@@ -5,6 +5,10 @@ export const apiGetRoadmaps = (queryParams = '') => {
   return axiosInstance.get(`/roadmaps${queryParams}`);
 };
 
+export const apiGetRoadmapsByUser = (userId: string) => {
+  return axiosInstance.get(`/roadmaps/user/${userId}`);
+};
+
 export const apiGetRoadmapById = (id: string) => {
   return axiosInstance.get(`/roadmaps/${id}`);
 };

@@ -12,9 +12,8 @@ import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
 import Card1 from "../../Assets/card1.png";
-import Card2 from "../../Assets/card2.png";
-import Card3 from "../../Assets/card3.png";
-import Card4 from "../../Assets/card4.png";
+import { apiGetRoadmaps } from "@/app/Services/api";
+
 
 export default function RevitalizationRoadmapPage() {
   const router = useRouter();
@@ -29,41 +28,34 @@ export default function RevitalizationRoadmapPage() {
     state: true,
     conference: true,
   });
+  const [roadmapLibrary, setRoadmapLibrary] = useState([]);
+  const [loadingRoadmaps, setLoadingRoadmaps] = useState(false);
 
   const sortPopupRef = useRef(null);
   const filterPopupRef = useRef(null);
 
-  // Roadmap Library Data
-  const roadmapLibrary = [
-    {
-      id: 1,
-      title: "Jump-start",
-      description: "Interested in receiving mentoring in community engagement",
-      completionTime: "Months 1 - 2",
-      img: Card1,
-    },
-    {
-      id: 2,
-      title: "Self Revitalization Phase",
-      description: "Interested in receiving mentoring in community engagement",
-      completionTime: "Months 1 - 2",
-      img: Card2,
-    },
-    {
-      id: 3,
-      title: "Church Empowerment Phase",
-      description: "Interested in receiving mentoring in community engagement",
-      completionTime: "Months 1 - 2",
-      img: Card3,
-    },
-    {
-      id: 4,
-      title: "Community Revitalization and Multiplication Phase",
-      description: "Interested in receiving mentoring in community engagement",
-      completionTime: "Months 1 - 2",
-      img: Card4,
-    },
-  ];
+  useEffect(() => {
+    const fetchRoadmaps = async () => {
+      try {
+        setLoadingRoadmaps(true);
+        const res = await apiGetRoadmaps();
+        const data = res.data?.data || [];
+        const mapped = data.map((item) => ({
+          id: item._id,
+          title: item.name,
+          description: item.description || item.roadMapDetails || "No description",
+          completionTime: item.duration || "N/A",
+          img: item.imageUrl || Card1,
+        }));
+        setRoadmapLibrary(mapped);
+      } catch (err) {
+        console.error("Error fetching roadmaps:", err);
+      } finally {
+        setLoadingRoadmaps(false);
+      }
+    };
+    fetchRoadmaps();
+  }, []);
 
   // Mentors Data
   const mentors = [
@@ -320,16 +312,33 @@ export default function RevitalizationRoadmapPage() {
 
           {/* Content Based on Active Tab */}
           {activeTab === "roadmap-library" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 ">
-              {roadmapLibrary.map((roadmap) => (
-                <RoadmapCard
-                  key={roadmap.id}
-                  img={roadmap.img}
-                  title={roadmap.title}
-                  description={roadmap.description}
-                  completionTime={roadmap.completionTime}
-                />
-              ))}
+            <div>
+              {loadingRoadmaps ? (
+                <div className="flex justify-center py-12">
+                  <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {roadmapLibrary
+                    .filter((r) =>
+                      r.title.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .map((roadmap) => (
+                      <RoadmapCard
+                        key={roadmap.id}
+                        img={roadmap.img}
+                        title={roadmap.title}
+                        description={roadmap.description}
+                        completionTime={roadmap.completionTime}
+                      />
+                    ))}
+                  {roadmapLibrary.filter((r) =>
+                    r.title.toLowerCase().includes(searchQuery.toLowerCase())
+                  ).length === 0 && (
+                    <p className="text-white/70 col-span-2">No roadmaps found.</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

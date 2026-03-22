@@ -2,6 +2,20 @@ import axiosInstance from "./config/axios-instance";
 import { Interest } from "./types";
 import { buildQueryString } from "./utils/queryBuilder";
 
+export const apiCreateInterest = (payload: {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  comments?: string;
+  interests?: string[];
+}) => {
+  return axiosInstance.post<{ success: boolean; message?: string; data?: any }>(
+    "/interests",
+    payload
+  );
+};
+
 export const apiGetAllInterests = (params?: { search?: string; status?: string }) => {
   const queryString = buildQueryString(params);
   return axiosInstance.get<{ success: boolean; data: Interest[] }>(

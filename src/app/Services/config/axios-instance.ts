@@ -35,6 +35,7 @@
 
 
 import axios from "axios";
+import { getCookie } from "@/app/utils/cookies";
 
 const axiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_BASE_URL,   // ✅ Use this as per your requirement
@@ -49,11 +50,9 @@ const axiosInstance = axios.create({
 // --------------------------------------------------
 axiosInstance.interceptors.request.use(
   (config) => {
-    if (typeof window !== "undefined") {
-      const token = localStorage.getItem("accessToken");  // ✅ same as api.js
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+    const token = getCookie("accessToken");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },

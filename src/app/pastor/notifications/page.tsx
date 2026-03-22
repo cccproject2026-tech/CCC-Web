@@ -4,6 +4,7 @@ import PastorHeader from "@/app/Components/PastorHeader";
 import { useState, useEffect } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { getNotifications } from "@/app/Services/pastor.service";
+import { getCookie } from "@/app/utils/cookies";
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
@@ -21,7 +22,7 @@ export default function NotificationsPage() {
   useEffect(() => {
     async function loadNotifications() {
       try {
-        const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+        const storedUser = JSON.parse(getCookie("user") || "{}");
         const userId = storedUser?.id;
         if (!userId) return;
 

@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
+import { getCookie } from "@/app/utils/cookies";
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Framelogo1 from "../Assets/Frame-logo-1.png";
@@ -47,9 +48,7 @@ const [notificationCount, setNotificationCount] = useState(0);
 
     useEffect(() => {
     // Read user info from localStorage
-    const storedUser = typeof window !== "undefined"
-      ? JSON.parse(localStorage.getItem("user") || "{}")
-      : {};
+    const storedUser = JSON.parse(getCookie("user") || "{}");
 
     const userId = storedUser?.id;
 
@@ -139,9 +138,7 @@ const [notificationCount, setNotificationCount] = useState(0);
   ];
 
   useEffect(() => {
-  const storedUser = typeof window !== "undefined"
-    ? JSON.parse(localStorage.getItem("user") || "{}")
-    : {};
+  const storedUser = JSON.parse(getCookie("user") || "{}");
 
   const userId = storedUser?.id;
   if (!userId) return;

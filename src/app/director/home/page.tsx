@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { setCookie } from "@/app/utils/cookies";
 import Image from "next/image";
 import AppHeader from "@/app/Components/Header/AppHeader";
 import DirectorFooter from "@/app/Components/AppFooter";
@@ -29,8 +31,9 @@ import {
 } from "@/app/Services/api";
 
 export default function DirectorHome() {
+  const router = useRouter();
   // Test userId for fetching user details (will come from login response)
-  const TEST_USER_ID = "6955249e3ee2d415cd24373b";
+  const TEST_USER_ID = "699feb343ef7ed6efc40a945";
 
   const [activeTab, setActiveTab] = useState<"mentors" | "pastors">("mentors");
   const [fullName, setFullName] = useState("");
@@ -82,7 +85,7 @@ export default function DirectorHome() {
   useEffect(() => {
     const fetchAllData = async () => {
       const results = await Promise.allSettled([
-        apiGetTodaysAppointments(),
+        apiGetTodaysAppointments(TEST_USER_ID),
         apiGetAllInterests({ status: 'new' }),
         apiGetMentors({ limit: 4, roleMatch: "mixed" }),
         apiGetPastors({ limit: 4, roleMatch: "mixed" }),
@@ -142,8 +145,8 @@ export default function DirectorHome() {
       if (results[5].status === 'fulfilled' && results[5].value) {
         setUser(results[5].value.data.data || null);
         // Store userId in localStorage
-        if (typeof window !== 'undefined' && TEST_USER_ID) {
-          localStorage.setItem('userId', TEST_USER_ID);
+        if (TEST_USER_ID) {
+          setCookie('userId', TEST_USER_ID);
         }
       } else if (results[5].status === 'rejected') {
         console.error('Error fetching user details:', results[5].reason);
@@ -369,7 +372,10 @@ export default function DirectorHome() {
               Review the details of the newly submitted interest and take the
               next steps to guide and support the process effectively.
             </p>
-            <button className="bg-white text-[#2876AC] px-8 py-3 rounded-md font-semibold hover:bg-gray-100 transition">
+            <button
+              onClick={() => router.push("/director/interest-list")}
+              className="bg-white text-[#2876AC] px-8 py-3 rounded-md font-semibold hover:bg-gray-100 transition"
+            >
               See All
             </button>
           </div>
@@ -408,7 +414,10 @@ export default function DirectorHome() {
                     <button className="hover:opacity-80">
                       <i className="fa-solid fa-phone text-[#2E3B8E] text-lg"></i>
                     </button>
-                    <button className="bg-[#2E3B8E] text-white px-4 sm:px-6 py-2 rounded-md font-medium hover:bg-[#1F2A6E] transition w-full sm:w-auto">
+                    <button
+                      onClick={() => router.push(`/director/interest-list/${interest.id || interest._id}`)}
+                      className="bg-[#2E3B8E] text-white px-4 sm:px-6 py-2 rounded-md font-medium hover:bg-[#1F2A6E] transition w-full sm:w-auto"
+                    >
                       View
                     </button>
                   </div>

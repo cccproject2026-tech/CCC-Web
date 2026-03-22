@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { getCookie, setCookie } from "@/app/utils/cookies";
 import Image, { StaticImageData } from "next/image";
 import ProfileLogo from "../../Assets/profile.png";
 import EditLogo from "../../Assets/Edit.png";
 import { useRouter } from "next/navigation";
+import { apiUploadProfilePicture, apiUploadDocument } from "@/app/Services/api";
 import MentorHeader from "@/app/Components/MentorHeader";
 
 type User = {
@@ -44,7 +46,7 @@ export default function ProfileIncomplete() {
   // 🔹 Load user from localStorage on mount
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("mentor");
+      const stored = getCookie("mentor");
       if (stored) {
         try {
           const parsed: User = JSON.parse(stored);
@@ -80,17 +82,10 @@ export default function ProfileIncomplete() {
       setIsProfileUploading(true);
       setProfileErrorMsg(null);
 
-      const res = await fetch(
-        `http://13.221.25.133/api/v1/users/${user.id}/profile-picture`,
-        {
-          method: "PATCH",
-          body: formData,
-        }
-      );
+      const response = await apiUploadProfilePicture(user.id, formData);
+      const json = response.data;
 
-      const json = await res.json();
-
-      if (!res.ok || !json.success) {
+      if (!json.success) {
         setProfileErrorMsg(
           json.message || "Failed to upload profile picture."
         );
@@ -105,7 +100,7 @@ export default function ProfileIncomplete() {
         const updatedUser: User = { ...user, profilePicture: newUrl };
         setUser(updatedUser);
         if (typeof window !== "undefined") {
-          localStorage.setItem("user", JSON.stringify(updatedUser));
+          setCookie("user", JSON.stringify(updatedUser));
         }
       }
     } catch (err) {
@@ -141,17 +136,10 @@ export default function ProfileIncomplete() {
       setIsDocUploading(true);
       setDocErrorMsg(null);
 
-      const res = await fetch(
-        `http://13.221.25.133/api/v1/users/${user.id}/documents`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
+      const response = await apiUploadDocument(user.id, formData);
+      const json = response.data;
 
-      const json = await res.json();
-
-      if (!res.ok || !json.success) {
+      if (!json.success) {
         setDocErrorMsg(json.message || "Failed to upload document.");
         return;
       }

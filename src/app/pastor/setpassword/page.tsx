@@ -1,10 +1,12 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import CCCLogo from "../../Assets/CCCLogo.png";
 import PastorHeader from "@/app/Components/PastorHeader";
 import AndrewsLogo from "../../Assets/andrews-logo.png";
 import { useRouter } from "next/navigation";
+import { apiSetPassword } from "@/app/Services/api";
+import { getCookie } from "@/app/utils/cookies";
 
 export default function SetPasswordPage() {
   const router = useRouter();
@@ -18,6 +20,13 @@ export default function SetPasswordPage() {
     password: "",
     confirmPassword: "",
   });
+
+  useEffect(() => {
+    const email = getCookie("interestEmail");
+    if (email) {
+      setFormData((prev) => ({ ...prev, email }));
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -44,25 +53,10 @@ export default function SetPasswordPage() {
     try {
       setLoading(true);
 
-      const res = await fetch(
-        "http://13.221.25.133/api/v1/auth/set-password",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            password,
-            confirmPassword,
-          }),
-        }
-      );
+      const response = await apiSetPassword(email, password, confirmPassword);
+      const data = response.data;
 
-      const data = await res.json();
-
-      if (!res.ok || !data?.success) {
-        // Backend might send custom message
+      if (!data?.success) {
         setError(data?.message || "Failed to set password. Please try again.");
         return;
       }
@@ -112,8 +106,9 @@ export default function SetPasswordPage() {
               <input
                 type="email"
                 placeholder="Username (Auto generated) Email ID"
-                className="w-full rounded-md px-4 py-2 text-sm bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white"
+                className="w-full rounded-md px-4 py-2 text-sm bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white read-only:opacity-70 read-only:cursor-not-allowed"
                 value={formData.email}
+                readOnly={!!formData.email}
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, email: e.target.value }))
                 }

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
+import { getCookie } from "@/app/utils/cookies";
 import PastorHeader from "@/app/Components/PastorHeader";
 import ExploreCCCCard from "@/app/Components/ExploreCCCCard";
 import HeroBg from "../../Assets/hero-bg.png";
@@ -19,6 +20,7 @@ import "swiper/css/pagination";
 import PastorFooter from "@/app/Components/PastorFooter";
 import { useRouter } from "next/navigation";
 import { getPastorMedia, getUserAppointments } from "@/app/Services/pastor.service";
+import { apiGetAssignedUsers, apiGetRoadmapsByUser } from "@/app/Services/api";
 
 type Mentor = {
   id: string;
@@ -60,24 +62,12 @@ useEffect(() => {
         setLoadingMentors(true);
         setMentorsError(null);
 
-        const token = localStorage.getItem("accessToken"); // 🔐 change if you use a different key
-        if (!token) {
-          throw new Error("Authentication token not found");
-        }
+        const user = JSON.parse(getCookie("user") || "{}");
+        const userId = user?.id || user?._id;
+        if (!userId) return;
 
-        const res = await fetch("http://13.221.25.133/api/v1/home/mentors", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const json = await res.json();
-
-        if (!res.ok || !json?.success) {
-          throw new Error(json?.message || "Failed to load mentors");
-        }
-
-        setMentors(json.data?.mentors || []);
+        const response = await apiGetAssignedUsers(userId);
+        setMentors((response.data?.data || []) as unknown as Mentor[]);
       } catch (err: any) {
         console.error("Error fetching mentors", err);
         setMentorsError(err?.message || "Unable to fetch mentors");
@@ -89,18 +79,14 @@ useEffect(() => {
     fetchMentors();
   }, []);
 
-const storedUser = typeof window !== "undefined"
-  ? JSON.parse(localStorage.getItem("user") || "{}")
-  : {};
+const storedUser = JSON.parse(getCookie("user") || "{}");
 
 const userId = storedUser?.id || "";
 
 
 
   useEffect(() => {
-  const storedUser = typeof window !== "undefined"
-    ? JSON.parse(localStorage.getItem("user") || "{}")
-    : {};
+  const storedUser = JSON.parse(getCookie("user") || "{}");
 
   const userId = storedUser?.id || "";
 
@@ -117,6 +103,42 @@ const userId = storedUser?.id || "";
 
   fetchAppointments();
 }, []);
+
+  const [roadmaps, setRoadmaps] = useState<any[]>([]);
+  const [roadmapTab, setRoadmapTab] = useState("All");
+
+  useEffect(() => {
+    const fetchRoadmaps = async () => {
+      try {
+        const user = JSON.parse(getCookie("user") || "{}");
+        const uid = user?.id || user?._id;
+        if (!uid) return;
+        const res = await apiGetRoadmapsByUser(uid);
+        const data = res.data?.data || [];
+        const mapped = data.map((item: any) => ({
+          id: item._id,
+          title: item.name,
+          status:
+            item.status?.toLowerCase() === "in progress"
+              ? "In Progress"
+              : item.status?.toLowerCase() === "completed"
+              ? "Completed"
+              : item.status?.toLowerCase() === "due"
+              ? "Due"
+              : "Remaining",
+        }));
+        setRoadmaps(mapped);
+      } catch (err) {
+        console.error("Error fetching roadmaps:", err);
+      }
+    };
+    fetchRoadmaps();
+  }, []);
+
+  const filteredRoadmaps =
+    roadmapTab === "All"
+      ? roadmaps
+      : roadmaps.filter((r) => r.status === roadmapTab);
 
  const [currentTime, setCurrentTime] = useState("");
 
@@ -424,6 +446,79 @@ const userId = storedUser?.id || "";
   </div>
 </section>
 
+
+      {/* TODAY'S ROADMAP LIST */}
+      <section className="bg-[#1C578E] py-10 px-4 sm:px-8 lg:px-20">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+          <h2 className="text-xl sm:text-[22px] font-semibold text-white">
+            Today&apos;s Roadmap List
+          </h2>
+          <button
+            className="text-white/70 text-sm font-medium hover:text-white"
+            onClick={() => router.push("/pastor/revitalization-roadmap")}
+          >
+            See all
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
+          {["All", "Remaining", "In Progress", "Due"].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setRoadmapTab(tab)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                roadmapTab === tab
+                  ? "bg-white text-[#1C578E]"
+                  : "bg-white/20 text-white hover:bg-white/30"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {/* List */}
+        <div className="flex flex-col gap-3">
+          {filteredRoadmaps.length === 0 && (
+            <p className="text-white/60 text-sm">No roadmaps found.</p>
+          )}
+          {filteredRoadmaps.map((roadmap) => (
+            <div
+              key={roadmap.id}
+              className="flex items-center justify-between bg-white/10 hover:bg-white/15 transition rounded-xl px-5 py-4"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-9 h-9 flex items-center justify-center bg-white/20 rounded-lg shrink-0">
+                  <i className="fa-regular fa-file-lines text-white text-sm"></i>
+                </div>
+                <span className="text-white text-sm font-medium">
+                  {roadmap.title}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span
+                  className={`text-xs font-medium px-3 py-[3px] rounded-full ${
+                    roadmap.status === "Due"
+                      ? "bg-red-100 text-red-600"
+                      : roadmap.status === "In Progress"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-200 text-gray-600"
+                  }`}
+                >
+                  {roadmap.status}
+                </span>
+                <button
+                  onClick={() => router.push(`/pastor/roadmap-detail/${roadmap.id}`)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition"
+                >
+                  <i className="fa-solid fa-arrow-right text-xs"></i>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       {/* EXPLORE CCC */}
       <section className="py-14 sm:py-20 px-4 sm:px-8 lg:px-20 bg-gradient-to-b from-[#E8F1FA] to-[#F7FAFF]">

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { getCookie } from "@/app/utils/cookies";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { Doughnut, Bar } from "react-chartjs-2";
@@ -217,7 +218,7 @@ export default function IndividualProgressPage() {
   const [directorId, setDirectorId] = useState<string>("");
 
   useEffect(() => {
-    const storedUserId = localStorage.getItem("userId");
+    const storedUserId = getCookie("userId");
     setDirectorId(storedUserId as string);
   }, []);
 

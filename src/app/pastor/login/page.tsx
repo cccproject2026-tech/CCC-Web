@@ -2,6 +2,8 @@
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiLogin } from "@/app/Services/api";
+import { setCookie } from "@/app/utils/cookies";
 
 import CCCLogo from "../../Assets/CCCLogo.png";
 import PastorHeader from "@/app/Components/PastorHeader";
@@ -27,21 +29,10 @@ export default function LoginPage() {
     try {
       setIsLoading(true);
 
-      const res = await fetch("https://app.wisdomtooth.tech/api/v1/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email,       // must match API spec
-          password,    // must match API spec
-        }),
-      });
+      const response = await apiLogin(email, password);
+      const json = response.data;
 
-      const json = await res.json();
-
-      if (!res.ok || !json.success) {
-        // API returns { success: false, message: "..." } on failure
+      if (!json.success) {
         setErrorMsg(json.message || "Login failed. Please try again.");
         return;
       }
@@ -49,9 +40,9 @@ export default function LoginPage() {
       const { accessToken, refreshToken, user } = json.data || {};
 
       // save tokens / user – you can later move this to a context or Zustand store
-      if (accessToken) localStorage.setItem("accessToken", accessToken);
-      if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
-      if (user) localStorage.setItem("user", JSON.stringify(user));
+      if (accessToken) setCookie("accessToken", accessToken);
+      if (refreshToken) setCookie("refreshToken", refreshToken);
+      if (user) setCookie("user", JSON.stringify(user));
 
       // redirect – adjust based on role/status if needed
       router.push("/pastor/profile-incomplete");

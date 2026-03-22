@@ -56,6 +56,22 @@ export const apiInviteFieldMentor = (
   return axiosInstance.post("/users/invite-field-mentor", payload);
 };
 
+export const apiUploadProfilePicture = (userId: string, formData: FormData) => {
+  return axiosInstance.patch<{ success: boolean; data?: { profilePicture: string }; message?: string }>(
+    `/users/${userId}/profile-picture`,
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+};
+
+export const apiUploadDocument = (userId: string, formData: FormData) => {
+  return axiosInstance.post<{ success: boolean; message?: string }>(
+    `/users/${userId}/documents`,
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } }
+  );
+};
+
 export const apiUpdateUserById = (
   userId: string,
   payload: {

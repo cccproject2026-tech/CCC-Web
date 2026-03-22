@@ -7,7 +7,8 @@ import PastorFooter from "@/app/Components/PastorFooter";
 import PhaseImg from "@/app/Assets/phase-img.png";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import { apiGetRoadmaps } from "../../Services/api";
+import { apiGetRoadmapsByUser } from "../../Services/api";
+import { getCookie } from "@/app/utils/cookies";
 
 interface Phase {
   id: string;
@@ -34,7 +35,10 @@ export default function RevitalizationRoadmap() {
     const fetchRoadmaps = async () => {
       try {
         setLoading(true);
-        const res = await apiGetRoadmaps();
+        const user = JSON.parse(getCookie("user") || "{}");
+        const userId = user?.id || user?._id;
+        if (!userId) return;
+        const res = await apiGetRoadmapsByUser(userId);
         const data = res.data?.data || [];
 
         const mappedPhases = data.map((item: any) => {

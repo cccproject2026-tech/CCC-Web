@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { getCookie } from "@/app/utils/cookies";
 import Image from "next/image";
 import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
@@ -48,7 +49,7 @@ export default function DirectorProfilePage() {
   const MIN_CHURCHES = 1;
 
   useEffect(() => {
-    const id = localStorage.getItem("userId");
+    const id = getCookie("userId");
 
     if (!id) {
       console.error("User not logged in");

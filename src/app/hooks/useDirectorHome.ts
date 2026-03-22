@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { setCookie } from '@/app/utils/cookies';
 import {
   apiGetTodaysAppointments,
   apiGetUserAppointments,
@@ -269,9 +270,7 @@ export const useUserDetails = (userId: string): UseUserDetailsReturn => {
       setUser(response.data.data || null);
 
       // Store userId in localStorage
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('userId', userId);
-      }
+      setCookie('userId', userId);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Failed to fetch user details');
       console.error('Error fetching user details:', err);

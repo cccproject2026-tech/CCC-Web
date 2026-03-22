@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { apiSetPassword } from "@/app/Services/api";
 import Image from "next/image";
 import CCCLogo from "../../Assets/CCCLogo.png";
 import PastorHeader from "@/app/Components/PastorHeader";
@@ -36,24 +37,10 @@ export default function ResetPasswordPage() {
     try {
       setIsSubmitting(true);
 
-      const res = await fetch(
-        "http://13.221.25.133/api/v1/auth/set-password",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            email,
-            password,
-            confirmPassword,
-          }),
-        }
-      );
+      const response = await apiSetPassword(email, password, confirmPassword);
+      const json = response.data;
 
-      const json = await res.json();
-
-      if (!res.ok || !json.success) {
+      if (!json.success) {
         setErrorMsg(json.message || "Failed to reset password.");
         return;
       }

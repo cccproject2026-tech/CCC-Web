@@ -20,8 +20,8 @@ export const apiGetWeeklyAvailability = (mentorId: string, date: string) => {
   );
 };
 
-export const apiGetTodaysAppointments = () => {
-  return apiGetAppointments({ futureOnly: true, status: 'scheduled' });
+export const apiGetTodaysAppointments = (userId?: string) => {
+  return apiGetAppointments({ futureOnly: true, status: 'scheduled', ...(userId ? { userId } : {}) });
 };
 
 export const apiGetUserAppointments = (userId: string, futureOnly = true) => {
@@ -30,6 +30,19 @@ export const apiGetUserAppointments = (userId: string, futureOnly = true) => {
 
 export const apiGetMentorAppointments = (mentorId: string, futureOnly = true) => {
   return apiGetAppointments({ mentorId, futureOnly });
+};
+
+export const apiCreateAppointment = (payload: {
+  mentorId: string;
+  meetingDate: string;
+  platform: string;
+  meetingLink?: string;
+  notes?: string;
+}) => {
+  return axiosInstance.post<{ success: boolean; message?: string; data?: any }>(
+    "/appointments",
+    payload
+  );
 };
 
 export const apiCreateAvailability = (data: any) => {

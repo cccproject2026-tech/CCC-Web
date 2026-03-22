@@ -4,16 +4,24 @@
 // Export all types
 export * from './types';
 
+// Export auth services
+export {
+  apiLogin,
+  apiSetPassword,
+} from './auth.service';
+
 // Export appointment services
 export {
   apiGetAppointments,
   apiGetTodaysAppointments,
   apiGetUserAppointments,
   apiGetMentorAppointments,
+  apiCreateAppointment,
 } from './appointments.service';
 
 // Export interest services
 export {
+  apiCreateInterest,
   apiGetAllInterests,
   apiGetInterestById,
   apiGetInterestByEmail,
@@ -24,6 +32,9 @@ export {
   apiCreateUser,
   apiGetUserById,
   apiGetAllUsers,
+  apiUploadProfilePicture,
+  apiUploadDocument,
+  apiGetAssignedUsers,
 } from './users.service';
 
 // Export mentor/pastor services
@@ -31,11 +42,14 @@ export {
   apiGetMentors,
   apiGetPastors,
   apiGetMentees,
+  apiGetMentorList,
+  apiGetMentorByEmail,
 } from './mentors.service';
 
 // Export roadmap services
 export {
   apiGetRoadmaps,
+  apiGetRoadmapsByUser,
   apiGetRoadmapById,
   apiUpdateRoadmapData,
   apiUploadRoadmapFile,
