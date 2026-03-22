@@ -38,15 +38,15 @@ function PastorHeaderComponent({ showFullHeader = false }) {
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isClient, setIsClient] = useState(false);
-   const [profile, setProfile] = useState<any>(null);
-   const [notificationList, setNotificationList] = useState([]);
-const [notificationCount, setNotificationCount] = useState(0);
+  const [profile, setProfile] = useState<any>(null);
+  const [notificationList, setNotificationList] = useState([]);
+  const [notificationCount, setNotificationCount] = useState(0);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-    useEffect(() => {
+  useEffect(() => {
     // Read user info from localStorage
     const storedUser = JSON.parse(getCookie("user") || "{}");
 
@@ -99,7 +99,7 @@ const [notificationCount, setNotificationCount] = useState(0);
     { name: "Home", path: "/pastor/home" },
     { name: "My Mentors", path: "/pastor/Mymentors" },
     { name: "Revitalization Roadmap", path: "/pastor/revitalization-roadmap" },
-    { name: "Assessments", path: "/pastor/assessments" },
+    { name: "Assessments", path: "/pastor/Assessments" },
     { name: "Progress", path: "/pastor/Myprogress" },
     { name: "Appointments", path: "/pastor/Appointments" },
   ];
@@ -138,25 +138,25 @@ const [notificationCount, setNotificationCount] = useState(0);
   ];
 
   useEffect(() => {
-  const storedUser = JSON.parse(getCookie("user") || "{}");
+    const storedUser = JSON.parse(getCookie("user") || "{}");
 
-  const userId = storedUser?.id;
-  if (!userId) return;
+    const userId = storedUser?.id;
+    if (!userId) return;
 
-  async function fetchNotifications() {
-    try {
-      const res = await getNotifications(userId);
-      const list = res.data?.data?.notifications || [];
+    async function fetchNotifications() {
+      try {
+        const res = await getNotifications(userId);
+        const list = res.data?.data?.notifications || [];
 
-      setNotificationList(list);
-      setNotificationCount(list.length);
-    } catch (err) {
-      console.error("Error fetching notifications:", err);
+        setNotificationList(list);
+        setNotificationCount(list.length);
+      } catch (err) {
+        console.error("Error fetching notifications:", err);
+      }
     }
-  }
 
-  fetchNotifications();
-}, []);
+    fetchNotifications();
+  }, []);
 
   return (
     <header className="flex items-center justify-between px-4 md:px-6 lg:px-10 py-3 bg-[#1A2E7A] text-white shadow-md relative z-40 font-[Albert_Sans]">
@@ -174,11 +174,10 @@ const [notificationCount, setNotificationCount] = useState(0);
               <a
                 key={index}
                 href={link.path}
-                className={`text-sm cursor-pointer transition-all duration-200 ${
-                  isActive
-                    ? "font-semibold text-white"
-                    : "text-white/80 hover:text-white"
-                }`}
+                className={`text-sm cursor-pointer transition-all duration-200 ${isActive
+                  ? "font-semibold text-white"
+                  : "text-white/80 hover:text-white"
+                  }`}
               >
                 {link.name}
               </a>
@@ -211,23 +210,23 @@ const [notificationCount, setNotificationCount] = useState(0);
 
             {/* 🔔 Notification Dropdown */}
             <div className="relative">
-         <button
-  onClick={() => {
-    setShowNotifications(!showNotifications);
-    setShowProfileMenu(false);
-    setShowSettingsMenu(false);
-  }}
-  className="relative hover:opacity-80 transition cursor-pointer"
->
-  <Image src={NotificationIcon} alt="Notification" width={20} height={20} />
+              <button
+                onClick={() => {
+                  setShowNotifications(!showNotifications);
+                  setShowProfileMenu(false);
+                  setShowSettingsMenu(false);
+                }}
+                className="relative hover:opacity-80 transition cursor-pointer"
+              >
+                <Image src={NotificationIcon} alt="Notification" width={20} height={20} />
 
-  {/* 🔥 Dynamic Count */}
-  {notificationCount > 0 && (
-    <span className="absolute -top-1 -right-1 bg-[#FFD700] text-[#1A2E7A] text-[10px] font-bold rounded-full w-[16px] h-[16px] flex items-center justify-center">
-      {notificationCount}
-    </span>
-  )}
-</button>
+                {/* 🔥 Dynamic Count */}
+                {notificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-[#FFD700] text-[#1A2E7A] text-[10px] font-bold rounded-full w-[16px] h-[16px] flex items-center justify-center">
+                    {notificationCount}
+                  </span>
+                )}
+              </button>
 
 
               {/* Notification Dropdown */}
@@ -250,45 +249,45 @@ const [notificationCount, setNotificationCount] = useState(0);
                   </div>
 
                   {/* Notifications List */}
-                <div className="p-2 space-y-2">
+                  <div className="p-2 space-y-2">
 
-  {notificationList.slice(0, 4).map((note, i) => (
-    <div
-      key={i}
-      className="flex items-start justify-between bg-[#F5F7FA] rounded-xl p-3"
-    >
-      <div className="flex items-start gap-3 w-full">
+                    {notificationList.slice(0, 4).map((note, i) => (
+                      <div
+                        key={i}
+                        className="flex items-start justify-between bg-[#F5F7FA] rounded-xl p-3"
+                      >
+                        <div className="flex items-start gap-3 w-full">
 
-        {/* Icon based on module type */}
-        <div className="w-6 h-6 flex items-center justify-center">
-          {note.module === "microgrant" && (
-            <Clipboard size={20} className="text-[#2679FF]" />
-          )}
-        </div>
+                          {/* Icon based on module type */}
+                          <div className="w-6 h-6 flex items-center justify-center">
+                            {note.module === "microgrant" && (
+                              <Clipboard size={20} className="text-[#2679FF]" />
+                            )}
+                          </div>
 
-        <div className="flex flex-col w-full">
-          <div className="flex justify-between">
-            <h3 className="font-semibold text-[14px] text-[#000000]">
-              {note.name}
-            </h3>
+                          <div className="flex flex-col w-full">
+                            <div className="flex justify-between">
+                              <h3 className="font-semibold text-[14px] text-[#000000]">
+                                {note.name}
+                              </h3>
 
-            {/* Yellow Dot */}
-            <div className="w-[8px] h-[8px] rounded-full bg-[#FFD700] mt-[2px]"></div>
-          </div>
+                              {/* Yellow Dot */}
+                              <div className="w-[8px] h-[8px] rounded-full bg-[#FFD700] mt-[2px]"></div>
+                            </div>
 
-          <p className="text-[#7A7A7A] text-[13px] leading-snug">
-            {note.details}
-          </p>
+                            <p className="text-[#7A7A7A] text-[13px] leading-snug">
+                              {note.details}
+                            </p>
 
-          <p className="text-[#9A9A9A] text-[12px] text-right mt-1">
-            Just now
-          </p>
-        </div>
-      </div>
-    </div>
-  ))}
+                            <p className="text-[#9A9A9A] text-[12px] text-right mt-1">
+                              Just now
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
 
-</div>
+                  </div>
 
                 </div>
               )}
@@ -313,12 +312,12 @@ const [notificationCount, setNotificationCount] = useState(0);
                 <div className="hidden md:block text-right text-[11px] leading-tight">
                   <p className="text-white/80">Good Morning</p>
                   <p className="text-white font-medium">
-  {profile ? `${profile.firstName} ${profile.lastName}` : "..."}
-</p>
+                    {profile ? `${profile.firstName} ${profile.lastName}` : "..."}
+                  </p>
 
                 </div>
                 <Image
-                 src={profile?.profilePicture || UserProfile}
+                  src={profile?.profilePicture || UserProfile}
                   alt="User"
                   width={30}
                   height={30}
@@ -341,11 +340,10 @@ const [notificationCount, setNotificationCount] = useState(0);
                               setShowSettingsMenu((prev) => !prev);
                             }
                           }}
-                          className={`flex items-center gap-3 px-5 py-2 hover:bg-[#F5F7FA] transition text-[#0033A0] w-full text-left ${
-                            item.subMenu && showSettingsMenu
-                              ? "bg-[#F5F7FA]"
-                              : ""
-                          }`}
+                          className={`flex items-center gap-3 px-5 py-2 hover:bg-[#F5F7FA] transition text-[#0033A0] w-full text-left ${item.subMenu && showSettingsMenu
+                            ? "bg-[#F5F7FA]"
+                            : ""
+                            }`}
                           suppressHydrationWarning
                         >
                           <span className="text-[#0033A0]">{item.icon}</span>
@@ -364,11 +362,10 @@ const [notificationCount, setNotificationCount] = useState(0);
                                 <button
                                   key={j}
                                   disabled={!sub.active}
-                                  className={`flex items-center gap-3 px-5 py-2 text-[15px] font-medium ${
-                                    sub.active
-                                      ? "hover:bg-[#F5F7FA] text-[#0033A0]"
-                                      : "text-gray-400 cursor-not-allowed"
-                                  }`}
+                                  className={`flex items-center gap-3 px-5 py-2 text-[15px] font-medium ${sub.active
+                                    ? "hover:bg-[#F5F7FA] text-[#0033A0]"
+                                    : "text-gray-400 cursor-not-allowed"
+                                    }`}
                                   suppressHydrationWarning
                                 >
                                   {sub.icon}
@@ -406,11 +403,10 @@ const [notificationCount, setNotificationCount] = useState(0);
                     router.push(link.path);
                     setShowMobileMenu(false);
                   }}
-                  className={`px-4 py-3 text-sm transition-all duration-200 border-b border-white/5 last:border-b-0 text-left w-full cursor-pointer ${
-                    isActive
-                      ? "font-semibold text-white bg-white/10"
-                      : "text-white/80 hover:text-white hover:bg-white/5"
-                  }`}
+                  className={`px-4 py-3 text-sm transition-all duration-200 border-b border-white/5 last:border-b-0 text-left w-full cursor-pointer ${isActive
+                    ? "font-semibold text-white bg-white/10"
+                    : "text-white/80 hover:text-white hover:bg-white/5"
+                    }`}
                   suppressHydrationWarning
                 >
                   {link.name}
@@ -440,11 +436,11 @@ const [notificationCount, setNotificationCount] = useState(0);
 
       {/* Notification Popup */}
       {showMobileMenu && (
-      <NotificationPopup
-        isOpen={showNotifications}
-        onClose={() => setShowNotifications(false)}
-      />
-)}
+        <NotificationPopup
+          isOpen={showNotifications}
+          onClose={() => setShowNotifications(false)}
+        />
+      )}
     </header>
   );
 }

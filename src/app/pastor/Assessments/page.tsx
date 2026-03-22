@@ -205,7 +205,7 @@ export default function PastorAssessments() {
                   {/* BUTTON */}
                   <div className="flex justify-end mt-3">
                     <button
-                      onClick={() => router.push("/pastor/assessments/details")}
+                      onClick={() => router.push("/pastor/Assessments/details")}
                       className={`${
                         item.status === "Completed"
                           ? "bg-[#103C8C]"
