@@ -523,7 +523,7 @@ export default function home() {
               >
                 <div
                   className="relative w-full h-[180px]"
-                  onClick={() => router.push(`/pastor/Mymentors`)}
+                  onClick={() => router.push(`/mentor/Mymentors`)}
                 >
                   <Image
                     src={

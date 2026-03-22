@@ -77,14 +77,18 @@ export default function RoadmapHomeCard({
   return (
     <div
       onClick={handleCardClick}
-      className={`bg-white rounded-2xl shadow-[0_2px_6px_rgba(0,0,0,0.05)] border border-[#E5EAF1] flex overflow-hidden hover:shadow-md transition-all ${
-        onCardClick ? "cursor-pointer" : ""
-      }`}
+      className={`bg-white rounded-2xl shadow-[0_2px_6px_rgba(0,0,0,0.05)] border border-[#E5EAF1] flex overflow-hidden hover:shadow-md transition-all ${onCardClick ? "cursor-pointer" : ""
+        }`}
     >
       {/* Left Image Section - 40-45% width */}
       <div className="relative w-[42%] shrink-0">
         <div className="relative h-full min-h-[220px] rounded-l-2xl overflow-hidden">
-          <Image src={img} alt={title} fill className="object-cover" />
+          <Image
+            src={img || "/images/roadmap-placeholder.png"}
+            alt={title}
+            fill
+            className="object-cover"
+          />
           {/* Checkmark overlay for completed status - centered */}
           {showCheckmark && (
             <div className="absolute inset-0 flex items-center justify-center z-10">

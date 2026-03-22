@@ -366,7 +366,7 @@ export default function PastorProgressPage() {
                     className="w-full h-[260px] border border-gray-300 rounded-md p-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#103C8C]"
                   />
                 ) : (
-                  <div className="space-y-3 max-h-[260px] overflow-y-auto">
+                  <div className="space-y-3 max-h-[260px] oveyrflow-y-auto">
 
                     {progress?.finalComments?.map((c: any) => (
                       <div
