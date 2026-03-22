@@ -38,3 +38,7 @@ export const apiGetQueries = (roadmapId: string, userId: string) => {
 export const apiReplyToQuery = (roadmapId: string, queryId: string, data: { repliedAnswer: string; repliedMentorId: string }) => {
   return axiosInstance.patch(`/roadmaps/${roadmapId}/queries/${queryId}/reply`, data);
 };
+
+export const apiGetUserRoadmaps = (userId: string) => {
+  return axiosInstance.get(`/roadmaps/user/${userId}`);
+};
