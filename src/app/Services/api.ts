@@ -1,66 +1,124 @@
-//api.ts
-// Central export file for all API services
+// api.ts — central export file for all API services and types
 
-// Export all types
+// ─── All types (re-exported from module type files via types/index.ts) ────────
 export * from './types';
 
-// Export auth services
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 export {
   apiLogin,
+  apiSendOtp,
+  apiVerifyOtp,
   apiSetPassword,
+  apiForgotPassword,
+  apiResetPassword,
+  apiRefreshToken,
+  apiLogout,
 } from './auth.service';
 
-// Export appointment services
+// ─── Appointments ─────────────────────────────────────────────────────────────
 export {
   apiGetAppointments,
   apiGetTodaysAppointments,
   apiGetUserAppointments,
   apiGetMentorAppointments,
+  apiGetUserSchedule,
+  apiGetMentorSchedule,
   apiCreateAppointment,
+  apiUpdateAppointment,
+  apiRescheduleAppointment,
+  apiCancelAppointment,
+  apiCreateAvailability,
+  apiGetAvailability,
+  apiGetWeeklyAvailability,
+  apiGetMonthlyAvailability,
 } from './appointments.service';
 
-// Export interest services
+// ─── Interests ────────────────────────────────────────────────────────────────
 export {
   apiCreateInterest,
   apiGetAllInterests,
+  apiGetInterestMetadata,
+  apiGetInterestFormFields,
+  apiGetDynamicFields,
+  apiAddDynamicField,
+  apiRemoveDynamicField,
+  apiReplaceDynamicFields,
+  apiReorderDynamicFields,
+  apiUpdateDynamicField,
+  apiGetInterestsByStatus,
+  apiUpdateInterestStatus,
   apiGetInterestById,
   apiGetInterestByEmail,
+  apiUpdateInterestByEmail,
+  apiUpdateInterestById,
 } from './interests.service';
 
-// Export user services
+// ─── Users ────────────────────────────────────────────────────────────────────
 export {
   apiCreateUser,
-  apiGetUserById,
   apiGetAllUsers,
+  apiCheckUserStatus,
+  apiGetUserById,
+  apiUpdateUserById,
+  apiDeleteUser,
+  apiMarkUserCompleted,
+  apiIssueCertificate,
+  apiAssignUsers,
+  apiRemoveAssignedUsers,
+  apiGetAssignedUsers,
   apiUploadProfilePicture,
   apiUploadDocument,
-  apiGetAssignedUsers,
+  apiGetDocuments,
+  apiDeleteDocument,
+  apiGetNotes,
+  apiAddNote,
+  apiUpdateNote,
+  apiDeleteNote,
+  apiInviteFieldMentor,
+  apiAcceptInvitation,
 } from './users.service';
 
-// Export mentor/pastor services
+// ─── Mentors / Home ───────────────────────────────────────────────────────────
 export {
   apiGetMentors,
   apiGetPastors,
-  apiGetMentees,
+  apiGetFieldMentors,
   apiGetMentorList,
   apiGetMentorByEmail,
+  apiGetMenteeList,
+  apiGetMenteeByEmail,
 } from './mentors.service';
 
-// Export roadmap services
+// ─── Roadmaps ─────────────────────────────────────────────────────────────────
 export {
   apiGetRoadmaps,
   apiGetRoadmapsByUser,
   apiGetRoadmapById,
-  apiUpdateRoadmapData,
-  apiUploadRoadmapFile,
+  apiCreateRoadmap,
+  apiUpdateRoadmap,
+  apiDeleteRoadmap,
+  apiAddNestedRoadmapItem,
+  apiUpdateNestedRoadmapItem,
   apiAddComment,
   apiGetComments,
   apiAddQuery,
   apiGetQueries,
   apiReplyToQuery,
+  apiGetExtras,
+  apiSaveExtras,
+  apiUpdateExtras,
+  apiDeleteExtras,
+  apiUploadExtrasDocuments,
+  apiGetExtrasDocuments,
+  apiDeleteExtrasDocumentBatch,
+  apiDeleteExtrasDocumentFile,
+  // Legacy aliases
+  apiUpdateRoadmapData,
+  apiGetUserRoadmaps,
+  apiUploadRoadmapFile,
 } from './roadmaps.service';
 
-// Export progress services
+// ─── Progress ─────────────────────────────────────────────────────────────────
 export {
   apiGetDirectorOverview,
   apiGetOverallProgress,
@@ -75,5 +133,50 @@ export {
   apiDeleteFinalComment,
 } from './progress.service';
 
-// Re-export axios instance for direct usage if needed
+// ─── Assessments ─────────────────────────────────────────────────────────────
+export {
+  apiCreateAssessment,
+  apiGetAssessments,
+  apiGetAssessmentById,
+  apiDeleteAssessments,
+  apiUpdateInstructions,
+  apiUpdateSections,
+  apiUploadAssessmentBanner,
+  apiSubmitSectionAnswers,
+  apiSubmitPreSurvey,
+  apiSendSectionRecommendations,
+  apiGetSectionRecommendations,
+} from './assessment.service';
+
+// ─── Media ────────────────────────────────────────────────────────────────────
+export {
+  getAllMedia,
+  getMediaByType,
+  getMediaById,
+  createMedia,
+  updateMedia,
+  deleteMedia,
+  deleteMultipleMedia,
+} from './media.service';
+
+// ─── MicroGrant ───────────────────────────────────────────────────────────────
+export {
+  getMicroGrantForm,
+  createOrUpdateMicroGrantForm,
+  getAllMicroGrand,
+  getMicroGrantByUserId,
+  applyMicroGrant,
+  updateMicroGrantStatus,
+} from './microGrand.service';
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+export {
+  getNotification,
+  addNotification,
+  deleteUserNotification,
+  deleteRoleNotification,
+  saveDeviceToken,
+} from './notification.service';
+
+// ─── Axios instance (direct usage if needed) ─────────────────────────────────
 export { default as axiosInstance } from './config/axios-instance';

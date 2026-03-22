@@ -1,102 +1,131 @@
 import axiosInstance from "./config/axios-instance";
-import { User, CreateUserDto, InviteFieldMentorPayload } from "./types";
-import { buildQueryString } from "./utils/queryBuilder";
+import type {
+  UserResponse,
+  CreateUserPayload,
+  UpdateUserPayload,
+  AssignUsersPayload,
+  RemoveUsersPayload,
+  InviteFieldMentorPayload,
+  AcceptInvitationPayload,
+  GetUsersParams,
+  GetUsersResponse,
+  CreateNotePayload,
+  UpdateNotePayload,
+  Note,
+  UploadedDocument,
+} from "./types/users.types";
 
-export const apiCreateUser = (data: CreateUserDto) => {
-  return axiosInstance.post<{ success: boolean; data: User }>(`/users`, data);
-};
+// POST /users
+export const apiCreateUser = (payload: CreateUserPayload) =>
+  axiosInstance.post<{ success: boolean; data: UserResponse }>("/users", payload);
 
-export const apiGetUserById = (userId: string) => {
-  return axiosInstance.get<{ success: boolean; data: User }>(`/users/${userId}`);
-};
+// GET /users?role=&status=&page=&limit=&search=&roleMatch=
+export const apiGetAllUsers = (params?: GetUsersParams) =>
+  axiosInstance.get<{ success: boolean; data: GetUsersResponse }>("/users", { params });
 
-export const apiGetAllUsers = (params?: {
-  role?: string;
-  status?: string;
-  page?: number;
-  limit?: number;
-  search?: string;
-  roleMatch?: 'exact' | 'mixed';
-}) => {
-  const queryString = buildQueryString(params);
-  return axiosInstance.get<{
-    success: boolean;
-    data: {
-      users: User[];
-      total: number;
-      page: number;
-      totalPages: number;
-    };
-  }>(`/users${queryString}`);
-};
+// GET /users/check-status/:id
+export const apiCheckUserStatus = (id: string) =>
+  axiosInstance.get<{ success: boolean; data: { status: string } }>(`/users/check-status/${id}`);
 
-export const apiGetAssignedUsers = (userId: string) => {
-  return axiosInstance.get<{ success: boolean; data: any[] }>(`/users/${userId}/assigned`);
-};
+// GET /users/:id
+export const apiGetUserById = (userId: string) =>
+  axiosInstance.get<{ success: boolean; data: UserResponse }>(`/users/${userId}`);
 
-export const apiAssignUsers = (userId: string, assignedIds: string[]) => {
-  return axiosInstance.post<{ success: boolean; message: string; data: any }>(
-    `/users/${userId}/assign`,
-    { assignedId: assignedIds }
+// PATCH /users/:id
+export const apiUpdateUserById = (userId: string, payload: UpdateUserPayload) =>
+  axiosInstance.patch<{ success: boolean; data: UserResponse; message?: string }>(
+    `/users/${userId}`,
+    payload,
   );
-};
 
-export const apiCreateDirector = (payload: {
-  firstName: string;
-  lastName: string;
-  email: string;
-  password: string;
-}) => {
-  return axiosInstance.post("/super-admin/directors", payload);
-};
+// DELETE /users/:id
+export const apiDeleteUser = (userId: string) =>
+  axiosInstance.delete<{ success: boolean; message: string }>(`/users/${userId}`);
 
-export const apiInviteFieldMentor = (
-  payload: InviteFieldMentorPayload
-) => {
-  return axiosInstance.post("/users/invite-field-mentor", payload);
-};
+// PATCH /users/:userId/mark-completed
+export const apiMarkUserCompleted = (userId: string) =>
+  axiosInstance.patch<{ success: boolean; data: UserResponse }>(`/users/${userId}/mark-completed`);
 
-export const apiUploadProfilePicture = (userId: string, formData: FormData) => {
-  return axiosInstance.patch<{ success: boolean; data?: { profilePicture: string }; message?: string }>(
+// POST /users/:id/issue-certificate
+export const apiIssueCertificate = (userId: string) =>
+  axiosInstance.post<{ success: boolean; message: string }>(`/users/${userId}/issue-certificate`);
+
+// ─── Assign / Remove ──────────────────────────────────────────────────────────
+
+// POST /users/:userId/assign  body: { assignedId: string[] }
+export const apiAssignUsers = (userId: string, assignedIds: string[]) =>
+  axiosInstance.post<{ success: boolean; message: string; data: UserResponse }>(
+    `/users/${userId}/assign`,
+    { assignedId: assignedIds } as AssignUsersPayload,
+  );
+
+// PATCH /users/:userId/remove  body: { assignedId: string[] }
+export const apiRemoveAssignedUsers = (userId: string, assignedIds: string[]) =>
+  axiosInstance.patch<{ success: boolean; message: string; data: UserResponse }>(
+    `/users/${userId}/remove`,
+    { assignedId: assignedIds } as RemoveUsersPayload,
+  );
+
+// GET /users/:userId/assigned
+export const apiGetAssignedUsers = (userId: string) =>
+  axiosInstance.get<{ success: boolean; data: UserResponse[] }>(`/users/${userId}/assigned`);
+
+// ─── Profile Picture & Documents ─────────────────────────────────────────────
+
+// PATCH /users/:id/profile-picture  (multipart/form-data, field: image)
+export const apiUploadProfilePicture = (userId: string, formData: FormData) =>
+  axiosInstance.patch<{ success: boolean; data?: { profilePicture: string }; message?: string }>(
     `/users/${userId}/profile-picture`,
     formData,
-    { headers: { "Content-Type": "multipart/form-data" } }
+    { headers: { "Content-Type": "multipart/form-data" } },
   );
-};
 
-export const apiUploadDocument = (userId: string, formData: FormData) => {
-  return axiosInstance.post<{ success: boolean; message?: string }>(
+// POST /users/:id/documents  (multipart/form-data)
+export const apiUploadDocument = (userId: string, formData: FormData) =>
+  axiosInstance.post<{ success: boolean; message?: string }>(
     `/users/${userId}/documents`,
     formData,
-    { headers: { "Content-Type": "multipart/form-data" } }
+    { headers: { "Content-Type": "multipart/form-data" } },
   );
-};
 
-export const apiUpdateUserById = (
-  userId: string,
-  payload: {
-    firstName?: string;
-    lastName?: string;
-    phoneNumber?: string;
-    title?: string;
-    yearsInMinistry?: string;
-    conference?: string;
-    bio?: string;
-    churchDetails?: {
-      churchName: string;
-      churchPhone: string;
-      churchWebsite: string;
-      churchAddress: string;
-      city: string;
-      state: string;
-      zipCode: string;
-      country: string;
-    }[];
-  }
-) => {
-  return axiosInstance.patch<{
-    success: boolean;
-    data: User;
-    message?: string;
-  }>(`/users/${userId}`, payload);
-};
+// GET /users/:id/documents
+export const apiGetDocuments = (userId: string) =>
+  axiosInstance.get<{ success: boolean; data: UploadedDocument[] }>(`/users/${userId}/documents`);
+
+// DELETE /users/:id/documents?fileUrl=
+export const apiDeleteDocument = (userId: string, fileUrl: string) =>
+  axiosInstance.delete<{ success: boolean; message: string }>(
+    `/users/${userId}/documents`,
+    { params: { fileUrl } },
+  );
+
+// ─── Notes ────────────────────────────────────────────────────────────────────
+
+// GET /users/:id/notes
+export const apiGetNotes = (userId: string) =>
+  axiosInstance.get<{ success: boolean; data: Note[] }>(`/users/${userId}/notes`);
+
+// POST /users/:id/notes
+export const apiAddNote = (userId: string, payload: CreateNotePayload) =>
+  axiosInstance.post<{ success: boolean; data: Note }>(`/users/${userId}/notes`, payload);
+
+// PATCH /users/:id/notes/:noteId
+export const apiUpdateNote = (userId: string, noteId: string, payload: UpdateNotePayload) =>
+  axiosInstance.patch<{ success: boolean; data: Note }>(
+    `/users/${userId}/notes/${noteId}`,
+    payload,
+  );
+
+// DELETE /users/:id/notes/:noteId
+export const apiDeleteNote = (userId: string, noteId: string) =>
+  axiosInstance.delete<{ success: boolean; message: string }>(`/users/${userId}/notes/${noteId}`);
+
+// ─── Invitations ─────────────────────────────────────────────────────────────
+
+// POST /users/invite-field-mentor
+export const apiInviteFieldMentor = (payload: InviteFieldMentorPayload) =>
+  axiosInstance.post<{ success: boolean; message: string }>("/users/invite-field-mentor", payload);
+
+// POST /users/accept-invitation
+export const apiAcceptInvitation = (payload: AcceptInvitationPayload) =>
+  axiosInstance.post<{ success: boolean; message: string }>("/users/accept-invitation", payload);

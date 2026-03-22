@@ -1,64 +1,49 @@
-import { axiosInstance } from "./api";
-import api from "./apiClient";
+import axiosInstance from "./config/axios-instance";
+import type {
+  MediaResponse,
+  MediaType,
+  CreateMediaPayload,
+  UpdateMediaPayload,
+} from "./types/home.types";
 
-export const getAllMedia = () => {
-    return api.get("/home/media");
+// GET /home/media?type=
+export const getAllMedia = (type?: MediaType) =>
+  axiosInstance.get<{ success: boolean; data: MediaResponse[] }>(
+    "/home/media",
+    { params: type ? { type } : undefined },
+  );
+
+// GET /home/media?type=video|image
+export const getMediaByType = (type: MediaType) =>
+  axiosInstance.get<{ success: boolean; data: MediaResponse[] }>("/home/media", { params: { type } });
+
+// GET /home/media/:id
+export const getMediaById = (id: string) =>
+  axiosInstance.get<{ success: boolean; data: MediaResponse }>(`/home/media/${id}`);
+
+// POST /home/media  (multipart/form-data, field: files[])
+export const createMedia = (payload: CreateMediaPayload) => {
+  const formData = new FormData();
+  formData.append("heading", payload.heading);
+  if (payload.subheading) formData.append("subheading", payload.subheading);
+  if (payload.description) formData.append("description", payload.description);
+  if (payload.defaultType) formData.append("defaultType", payload.defaultType);
+  payload.files.forEach((file) => formData.append("files", file));
+  return axiosInstance.post<{ success: boolean; data: MediaResponse }>(
+    "/home/media",
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } },
+  );
 };
 
-export const getMediaByType = (type: "video" | "image") => {
-    return api.get("/home/media", {
-        params: { type },
-    });
-};
+// PATCH /home/media/:id
+export const updateMedia = (mediaId: string, payload: UpdateMediaPayload) =>
+  axiosInstance.patch<{ success: boolean; data: MediaResponse }>(`/home/media/${mediaId}`, payload);
 
-export const createMedia = (payload: {
-    heading: string;
-    subheading?: string;
-    description?: string;
-    defaultType?: "video" | "image";
-    files: File[];
-}) => {
-    const formData = new FormData();
+// DELETE /home/media/:id
+export const deleteMedia = (mediaId: string) =>
+  axiosInstance.delete<{ success: boolean; message: string }>(`/home/media/${mediaId}`);
 
-    formData.append("heading", payload.heading);
-
-    if (payload.subheading) {
-        formData.append("subheading", payload.subheading);
-    }
-
-    if (payload.description) {
-        formData.append("description", payload.description);
-    }
-
-    if (payload.defaultType) {
-        formData.append("defaultType", payload.defaultType);
-    }
-
-    payload.files.forEach((file) => {
-        formData.append("files", file);
-    });
-
-    return axiosInstance.post("/home/media", formData, {
-        headers: {
-            "Content-Type": "multipart/form-data",
-        },
-    });
-};
-
-export const updateMedia = (mediaId: string, data: {
-    heading?: string;
-    subheading?: string;
-    description?: string;
-}) => {
-    return axiosInstance.patch(`/home/media/${mediaId}`, data);
-};
-
-export const deleteMedia = (mediaId: string) => {
-    return axiosInstance.delete(`/home/media/${mediaId}`);
-};
-
-export const deleteMultipleMedia = (mediaIds: string[]) => {
-    return axiosInstance.post("/home/media/bulk-delete", {
-        mediaIds,
-    });
-};
+// POST /home/media/bulk-delete  body: { mediaIds }
+export const deleteMultipleMedia = (mediaIds: string[]) =>
+  axiosInstance.post<{ success: boolean; message: string }>("/home/media/bulk-delete", { mediaIds });

@@ -1,48 +1,254 @@
 import axiosInstance from "./config/axios-instance";
-import { Comment, Query } from "./types";
+import type {
+  CreateRoadMapPayload,
+  UpdateRoadMapPayload,
+  UpdateNestedRoadMapItemPayload,
+  NestedRoadMapItem,
+  AddCommentPayload,
+  CreateQueryPayload,
+  ReplyQueryPayload,
+  CreateExtrasPayload,
+  UpdateExtrasPayload,
+} from "./types/roadmaps.types";
 
-export const apiGetRoadmaps = (queryParams = '') => {
-  return axiosInstance.get(`/roadmaps${queryParams}`);
+// Re-export all roadmap types so consumers can import from this file or from api.ts
+export type {
+  RoadmapStatus,
+  ExtraType,
+  ExtraItem,
+  TextFieldExtra,
+  TextAreaExtra,
+  TextDisplayExtra,
+  CheckboxExtra,
+  UploadExtra,
+  DatePickerExtra,
+  AssessmentExtra,
+  SignatureExtra,
+  SectionExtra,
+  NestedRoadMapItem,
+  CreateRoadMapPayload,
+  UpdateRoadMapPayload,
+  UpdateNestedRoadMapItemPayload,
+  RoadMapResponse,
+  AddCommentPayload,
+  CommentItem,
+  CommentsThread,
+  PopulatedUser,
+  CreateQueryPayload,
+  ReplyQueryPayload,
+  QueryItem,
+  QueriesThread,
+  CreateExtrasPayload,
+  UpdateExtrasPayload,
+  FileData,
+  ExtrasDocument,
+  ExtrasResponse,
+} from "./types/roadmaps.types";
+
+// ─── Roadmap CRUD ─────────────────────────────────────────────────────────────
+
+// GET /roadmaps?status=all&search=
+export const apiGetRoadmaps = (status = 'all', search = '') =>
+  axiosInstance.get(`/roadmaps`, { params: { status, search } });
+
+// GET /roadmaps/user/:userId
+export const apiGetRoadmapsByUser = (userId: string) =>
+  axiosInstance.get(`/roadmaps/user/${userId}`);
+
+// GET /roadmaps/:id
+export const apiGetRoadmapById = (id: string) =>
+  axiosInstance.get(`/roadmaps/${id}`);
+
+// POST /roadmaps  (multipart/form-data when image provided)
+export const apiCreateRoadmap = (payload: CreateRoadMapPayload, image?: File) => {
+  if (image) {
+    const formData = new FormData();
+    formData.append('image', image);
+    Object.entries(payload).forEach(([key, val]) => {
+      if (val !== undefined) {
+        formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
+      }
+    });
+    return axiosInstance.post('/roadmaps', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  }
+  return axiosInstance.post('/roadmaps', payload);
 };
 
-export const apiGetRoadmapsByUser = (userId: string) => {
-  return axiosInstance.get(`/roadmaps/user/${userId}`);
+// PATCH /roadmaps/:id  (multipart/form-data when image provided)
+export const apiUpdateRoadmap = (id: string, payload: UpdateRoadMapPayload, image?: File) => {
+  if (image) {
+    const formData = new FormData();
+    formData.append('image', image);
+    Object.entries(payload).forEach(([key, val]) => {
+      if (val !== undefined) {
+        formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
+      }
+    });
+    return axiosInstance.patch(`/roadmaps/${id}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  }
+  return axiosInstance.patch(`/roadmaps/${id}`, payload);
 };
 
-export const apiGetRoadmapById = (id: string) => {
-  return axiosInstance.get(`/roadmaps/${id}`);
+// DELETE /roadmaps/:id
+export const apiDeleteRoadmap = (id: string) =>
+  axiosInstance.delete(`/roadmaps/${id}`);
+
+// ─── Nested RoadMap Items ─────────────────────────────────────────────────────
+
+// POST /roadmaps/:roadMapId/nested  (multipart/form-data when image provided)
+export const apiAddNestedRoadmapItem = (roadMapId: string, payload: NestedRoadMapItem, image?: File) => {
+  if (image) {
+    const formData = new FormData();
+    formData.append('image', image);
+    Object.entries(payload).forEach(([key, val]) => {
+      if (val !== undefined) {
+        formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
+      }
+    });
+    return axiosInstance.post(`/roadmaps/${roadMapId}/nested`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  }
+  return axiosInstance.post(`/roadmaps/${roadMapId}/nested`, payload);
 };
 
-export const apiUpdateRoadmapData = (id: string, data: any) => {
-  return axiosInstance.patch(`/roadmaps/${id}`, data);
+// PATCH /roadmaps/:roadMapId/nested/:nestedItemId  (multipart/form-data when image provided)
+export const apiUpdateNestedRoadmapItem = (
+  roadMapId: string,
+  nestedItemId: string,
+  payload: UpdateNestedRoadMapItemPayload,
+  image?: File,
+) => {
+  if (image) {
+    const formData = new FormData();
+    formData.append('image', image);
+    Object.entries(payload).forEach(([key, val]) => {
+      if (val !== undefined) {
+        formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
+      }
+    });
+    return axiosInstance.patch(`/roadmaps/${roadMapId}/nested/${nestedItemId}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  }
+  return axiosInstance.patch(`/roadmaps/${roadMapId}/nested/${nestedItemId}`, payload);
 };
 
-export const apiUploadRoadmapFile = (id: string, formData: FormData) => {
-  return axiosInstance.post(`/roadmaps/${id}/upload`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+// ─── Comments ────────────────────────────────────────────────────────────────
+
+// POST /roadmaps/:roadMapId/comments  body: { text, userId, mentorId }
+export const apiAddComment = (roadMapId: string, payload: AddCommentPayload) =>
+  axiosInstance.post(`/roadmaps/${roadMapId}/comments`, payload);
+
+// GET /roadmaps/:roadMapId/comments?userId=
+export const apiGetComments = (roadMapId: string, userId: string) =>
+  axiosInstance.get(`/roadmaps/${roadMapId}/comments`, { params: { userId } });
+
+// ─── Queries ─────────────────────────────────────────────────────────────────
+
+// POST /roadmaps/:roadMapId/queries  body: { actualQueryText, userId }
+export const apiAddQuery = (roadMapId: string, payload: CreateQueryPayload) =>
+  axiosInstance.post(`/roadmaps/${roadMapId}/queries`, payload);
+
+// GET /roadmaps/:roadMapId/queries?userId=&status=
+export const apiGetQueries = (roadMapId: string, userId: string, status?: string) =>
+  axiosInstance.get(`/roadmaps/${roadMapId}/queries`, {
+    params: { userId, ...(status && { status }) },
+  });
+
+// PATCH /roadmaps/:roadMapId/queries/:queryItemId/reply  body: { repliedAnswer, repliedMentorId }
+export const apiReplyToQuery = (roadMapId: string, queryItemId: string, payload: ReplyQueryPayload) =>
+  axiosInstance.patch(`/roadmaps/${roadMapId}/queries/${queryItemId}/reply`, payload);
+
+// ─── Extras ──────────────────────────────────────────────────────────────────
+
+// GET /roadmaps/:roadMapId/extras?userId=&nestedRoadMapItemId=
+export const apiGetExtras = (roadMapId: string, userId: string, nestedRoadMapItemId?: string) =>
+  axiosInstance.get(`/roadmaps/${roadMapId}/extras`, {
+    params: { userId, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
+  });
+
+// POST /roadmaps/:roadMapId/extras  body: { userId, nestedRoadMapItemId?, extras? }
+export const apiSaveExtras = (roadMapId: string, payload: CreateExtrasPayload) =>
+  axiosInstance.post(`/roadmaps/${roadMapId}/extras`, payload);
+
+// PATCH /roadmaps/:roadMapId/extras?userId=&nestedRoadMapItemId=  body: { extras? }
+export const apiUpdateExtras = (
+  roadMapId: string,
+  userId: string,
+  payload: UpdateExtrasPayload,
+  nestedRoadMapItemId?: string,
+) =>
+  axiosInstance.patch(`/roadmaps/${roadMapId}/extras`, payload, {
+    params: { userId, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
+  });
+
+// DELETE /roadmaps/:roadMapId/extras?userId=&nestedRoadMapItemId=
+export const apiDeleteExtras = (roadMapId: string, userId: string, nestedRoadMapItemId?: string) =>
+  axiosInstance.delete(`/roadmaps/${roadMapId}/extras`, {
+    params: { userId, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
+  });
+
+// ─── Extras Documents ────────────────────────────────────────────────────────
+
+// POST /roadmaps/:roadMapId/extras/documents?userId=&nestedRoadMapItemId=&name=  (multipart, up to 10 files)
+export const apiUploadExtrasDocuments = (
+  roadMapId: string,
+  userId: string,
+  files: File[],
+  nestedRoadMapItemId?: string,
+  name?: string,
+) => {
+  const formData = new FormData();
+  files.forEach((file) => formData.append('files', file));
+  return axiosInstance.post(`/roadmaps/${roadMapId}/extras/documents`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    params: {
+      userId,
+      ...(nestedRoadMapItemId && { nestedRoadMapItemId }),
+      ...(name && { name }),
+    },
   });
 };
 
-export const apiAddComment = (roadmapId: string, data: { text: string; userId: string; mentorId: string }) => {
-  return axiosInstance.post(`/roadmaps/${roadmapId}/comments`, data);
-};
+// GET /roadmaps/:roadMapId/extras/documents?userId=&nestedRoadMapItemId=
+export const apiGetExtrasDocuments = (roadMapId: string, userId: string, nestedRoadMapItemId?: string) =>
+  axiosInstance.get(`/roadmaps/${roadMapId}/extras/documents`, {
+    params: { userId, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
+  });
 
-export const apiGetComments = (roadmapId: string, userId: string) => {
-  return axiosInstance.get(`/roadmaps/${roadmapId}/comments?userId=${userId}`);
-};
+// DELETE /roadmaps/:roadMapId/extras/documents?userId=&uploadBatchId=&nestedRoadMapItemId=
+export const apiDeleteExtrasDocumentBatch = (
+  roadMapId: string,
+  userId: string,
+  uploadBatchId: string,
+  nestedRoadMapItemId?: string,
+) =>
+  axiosInstance.delete(`/roadmaps/${roadMapId}/extras/documents`, {
+    params: { userId, uploadBatchId, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
+  });
 
-export const apiAddQuery = (roadmapId: string, data: { actualQueryText: string; userId: string }) => {
-  return axiosInstance.post(`/roadmaps/${roadmapId}/queries`, data);
-};
+// DELETE /roadmaps/:roadMapId/extras/documents/file?userId=&uploadBatchId=&fileUrl=&nestedRoadMapItemId=
+export const apiDeleteExtrasDocumentFile = (
+  roadMapId: string,
+  userId: string,
+  uploadBatchId: string,
+  fileUrl: string,
+  nestedRoadMapItemId?: string,
+) =>
+  axiosInstance.delete(`/roadmaps/${roadMapId}/extras/documents/file`, {
+    params: { userId, uploadBatchId, fileUrl, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
+  });
 
-export const apiGetQueries = (roadmapId: string, userId: string) => {
-  return axiosInstance.get(`/roadmaps/${roadmapId}/queries?userId=${userId}`);
-};
-
-export const apiReplyToQuery = (roadmapId: string, queryId: string, data: { repliedAnswer: string; repliedMentorId: string }) => {
-  return axiosInstance.patch(`/roadmaps/${roadmapId}/queries/${queryId}/reply`, data);
-};
-
-export const apiGetUserRoadmaps = (userId: string) => {
-  return axiosInstance.get(`/roadmaps/user/${userId}`);
-};
+// ─── Legacy aliases ───────────────────────────────────────────────────────────
+/** @deprecated use apiUpdateRoadmap */
+export const apiUpdateRoadmapData = apiUpdateRoadmap;
+/** @deprecated use apiGetRoadmapsByUser */
+export const apiGetUserRoadmaps = apiGetRoadmapsByUser;
+/** @deprecated use apiUploadExtrasDocuments — /roadmaps/:id/upload does not exist in backend */
+export const apiUploadRoadmapFile = (id: string, formData: FormData) =>
+  apiUploadExtrasDocuments(id, '', []); // stub — callers should migrate to apiUploadExtrasDocuments

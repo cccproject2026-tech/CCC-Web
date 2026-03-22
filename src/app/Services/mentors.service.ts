@@ -1,71 +1,54 @@
-import api from "./apiClient";
 import axiosInstance from "./config/axios-instance";
-import { MentorPastor } from "./types";
+import type { UserResponse, GetUsersParams } from "./types/users.types";
+import type { MentorResponse, GetMentorsParams, GetMenteesParams } from "./types/home.types";
 import { apiGetAllUsers } from "./users.service";
 
-export const apiGetMentors = (params?: {
-  page?: number;
-  limit?: number;
-  role?: string;
-  search?: string;
-  roleMatch?: 'exact' | 'mixed';
-}) => {
-  return apiGetAllUsers({
-    ...params,
-    role: params?.role || 'mentor',
-    roleMatch: params?.roleMatch,
-  }).then(response => ({
-    ...response,
-    data: {
-      mentors: response.data.data.users,
-      total: response.data.data.total,
-    }
-  }));
-};
+// ─── /users shortcuts by role ─────────────────────────────────────────────────
 
-export const apiGetPastors = (params?: {
-  page?: number;
-  limit?: number;
-  roleMatch?: 'exact' | 'mixed';
-}) => {
-  return apiGetAllUsers({
-    ...params,
-    role: 'pastor',
-    roleMatch: params?.roleMatch,
-  });
-};
+// GET /users?role=mentor&...
+export const apiGetMentors = (params?: GetUsersParams) =>
+  apiGetAllUsers({ ...params, role: params?.role || 'mentor' });
 
-export const apiGetMentees = (params?: {
-  page?: number;
-  limit?: number;
-  phase?: string;
-  country?: string;
-}) => {
-  const queryParams = new URLSearchParams();
-  if (params?.page) queryParams.append('page', params.page.toString());
-  if (params?.limit) queryParams.append('limit', params.limit.toString());
-  if (params?.phase) queryParams.append('phase', params.phase);
-  if (params?.country) queryParams.append('country', params.country);
+// GET /users?role=pastor&...
+export const apiGetPastors = (params?: GetUsersParams) =>
+  apiGetAllUsers({ ...params, role: 'pastor' });
 
-  const queryString = queryParams.toString();
-  return axiosInstance.get<{
-    success: boolean;
-    data: { mentees: MentorPastor[]; total: number };
-  }>(`/home/mentees${queryString ? `?${queryString}` : ''}`);
-};
+// GET /users?role=field-mentor&...
+export const apiGetFieldMentors = (params?: GetUsersParams) =>
+  apiGetAllUsers({ ...params, role: 'field-mentor' });
 
-export const getUserById = (id: string) => {
-  return api.get(`/users/${id}`);
-};
+// ─── /home endpoints ──────────────────────────────────────────────────────────
 
-export const updateUserById = (id: string, payload: any) => {
-  return api.patch(`/users/${id}`, payload);
-};
+// GET /home/mentors?page=&limit=&search=&country=&state=&conference=
+export const apiGetMentorList = (params?: GetMentorsParams) =>
+  axiosInstance.get<{ success: boolean; data: { mentors: MentorResponse[]; total?: number } }>(
+    "/home/mentors",
+    { params },
+  );
 
-export const apiGetMentorList = () => {
-  return axiosInstance.get<{ success: boolean; message?: string; data: { mentors: MentorPastor[] } }>("/home/mentors");
-};
+// GET /home/mentor/:email
+export const apiGetMentorByEmail = (email: string) =>
+  axiosInstance.get<{ success: boolean; data: MentorResponse }>(`/home/mentor/${email}`);
 
-export const apiGetMentorByEmail = (email: string) => {
-  return axiosInstance.get<{ success: boolean; data: MentorPastor }>(`/home/mentor/${email}`);
-};
+// GET /home/mentees?page=&limit=&phase=&country=&search=
+export const apiGetMenteeList = (params?: GetMenteesParams) =>
+  axiosInstance.get<{ success: boolean; data: { mentees: UserResponse[]; total?: number } }>(
+    "/home/mentees",
+    { params },
+  );
+
+// GET /home/mentee/:email
+export const apiGetMenteeByEmail = (email: string) =>
+  axiosInstance.get<{ success: boolean; data: UserResponse }>(`/home/mentee/${email}`);
+
+// ─── Legacy helpers (kept for backwards compatibility) ────────────────────────
+/** @deprecated use apiGetUserById from users.service */
+export const getUserById = (id: string) =>
+  axiosInstance.get<{ success: boolean; data: UserResponse }>(`/users/${id}`);
+
+/** @deprecated use apiUpdateUserById from users.service */
+export const updateUserById = (id: string, payload: any) =>
+  axiosInstance.patch<{ success: boolean; data: UserResponse }>(`/users/${id}`, payload);
+
+/** @deprecated use apiGetMenteeList */
+export const apiGetMentees = (params?: GetMenteesParams) => apiGetMenteeList(params);

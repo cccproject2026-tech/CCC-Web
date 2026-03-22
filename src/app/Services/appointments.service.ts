@@ -1,50 +1,87 @@
 import axiosInstance from "./config/axios-instance";
-import { Appointment } from "./types";
-import { buildQueryString } from "./utils/queryBuilder";
+import type {
+  AppointmentResponse,
+  CreateAppointmentPayload,
+  UpdateAppointmentPayload,
+  CancelAppointmentPayload,
+  RescheduleAppointmentPayload,
+  AvailabilityPayload,
+  GetAppointmentsParams,
+} from "./types/appointments.types";
 
-export const apiGetAppointments = (params?: {
-  userId?: string;
-  mentorId?: string;
-  status?: string;
-  futureOnly?: boolean;
-}) => {
-  const queryString = buildQueryString(params);
-  return axiosInstance.get<{ success: boolean; data: Appointment[] }>(
-    `/appointments/upcoming${queryString}`
+// GET /appointments/upcoming?userId=&mentorId=&status=&futureOnly=
+export const apiGetAppointments = (params?: GetAppointmentsParams) =>
+  axiosInstance.get<{ success: boolean; data: AppointmentResponse[] }>(
+    "/appointments/upcoming",
+    { params },
   );
-};
 
-export const apiGetWeeklyAvailability = (mentorId: string, date: string) => {
-  return axiosInstance.get(
-    `/appointments/availability/${mentorId}/week?date=${date}`
+// Convenience: today's upcoming scheduled appointments
+export const apiGetTodaysAppointments = (userId?: string) =>
+  apiGetAppointments({ futureOnly: true, status: 'scheduled', ...(userId ? { userId } : {}) });
+
+// Convenience: all upcoming for a user
+export const apiGetUserAppointments = (userId: string, futureOnly = true) =>
+  apiGetAppointments({ userId, futureOnly });
+
+// Convenience: all upcoming for a mentor
+export const apiGetMentorAppointments = (mentorId: string, futureOnly = true) =>
+  apiGetAppointments({ mentorId, futureOnly });
+
+// GET /appointments/user/:userId  — user's full schedule
+export const apiGetUserSchedule = (userId: string) =>
+  axiosInstance.get<{ success: boolean; data: AppointmentResponse[] }>(
+    `/appointments/user/${userId}`,
   );
-};
 
-export const apiGetTodaysAppointments = (userId?: string) => {
-  return apiGetAppointments({ futureOnly: true, status: 'scheduled', ...(userId ? { userId } : {}) });
-};
+// GET /appointments/mentor/:userId  — mentor's full schedule
+export const apiGetMentorSchedule = (mentorId: string) =>
+  axiosInstance.get<{ success: boolean; data: AppointmentResponse[] }>(
+    `/appointments/mentor/${mentorId}`,
+  );
 
-export const apiGetUserAppointments = (userId: string, futureOnly = true) => {
-  return apiGetAppointments({ userId, futureOnly });
-};
-
-export const apiGetMentorAppointments = (mentorId: string, futureOnly = true) => {
-  return apiGetAppointments({ mentorId, futureOnly });
-};
-
-export const apiCreateAppointment = (payload: {
-  mentorId: string;
-  meetingDate: string;
-  platform: string;
-  meetingLink?: string;
-  notes?: string;
-}) => {
-  return axiosInstance.post<{ success: boolean; message?: string; data?: any }>(
+// POST /appointments
+export const apiCreateAppointment = (payload: CreateAppointmentPayload) =>
+  axiosInstance.post<{ success: boolean; message?: string; data: AppointmentResponse }>(
     "/appointments",
-    payload
+    payload,
   );
-};
 
-export const apiCreateAvailability = (data: any) => {
-  return axiosInstance.post(`/appointments/availability`, data);
-};
+// PATCH /appointments/:id
+export const apiUpdateAppointment = (id: string, payload: UpdateAppointmentPayload) =>
+  axiosInstance.patch<{ success: boolean; data: AppointmentResponse }>(
+    `/appointments/${id}`,
+    payload,
+  );
+
+// PATCH /appointments/:id/reschedule
+export const apiRescheduleAppointment = (id: string, payload: RescheduleAppointmentPayload) =>
+  axiosInstance.patch<{ success: boolean; data: AppointmentResponse }>(
+    `/appointments/${id}/reschedule`,
+    payload,
+  );
+
+// PATCH /appointments/:id/cancel
+export const apiCancelAppointment = (id: string, payload?: CancelAppointmentPayload) =>
+  axiosInstance.patch<{ success: boolean; data: AppointmentResponse }>(
+    `/appointments/${id}/cancel`,
+    payload,
+  );
+
+// ─── Availability ─────────────────────────────────────────────────────────────
+
+// POST /appointments/availability
+export const apiCreateAvailability = (payload: AvailabilityPayload) =>
+  axiosInstance.post("/appointments/availability", payload);
+
+// GET /appointments/availability/:mentorId
+export const apiGetAvailability = (mentorId: string) =>
+  axiosInstance.get(`/appointments/availability/${mentorId}`);
+
+// GET /appointments/availability/:mentorId/week?date=
+export const apiGetWeeklyAvailability = (mentorId: string, date: string) =>
+  axiosInstance.get(`/appointments/availability/${mentorId}/week`, { params: { date } });
+
+// GET /appointments/availability/:mentorId/month?date=
+export const apiGetMonthlyAvailability = (mentorId: string, date: string) =>
+  axiosInstance.get(`/appointments/availability/${mentorId}/month`, { params: { date } });

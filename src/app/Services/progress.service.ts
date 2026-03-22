@@ -1,160 +1,92 @@
 import axiosInstance from "./config/axios-instance";
-import {
-  DirectorOverviewDto,
-  UserOverallProgressDto,
-  ProgressResponseDto,
-} from "./types";
-import { buildQueryString } from "./utils/queryBuilder";
+import type {
+  DirectorOverview,
+  UserOverallProgress,
+  ProgressResponse,
+  FinalComment,
+  AssignRoadmapPayload,
+  AssignAssessmentPayload,
+  UpdateRoadmapProgressPayload,
+  UpdateAssessmentProgressPayload,
+  AddFinalCommentPayload,
+  UpdateFinalCommentPayload,
+  DeleteFinalCommentPayload,
+  GetDirectorOverviewParams,
+} from "./types/progress.types";
 
-// ===========================
-// PROGRESS APIs
-// ===========================
-
-/**
- * Get director overview with stats and monthly completion data
- * @param period - 'yearly' | 'monthly' | 'weekly' (default: 'yearly')
- * @param year - Year number (default: current year)
- * @param includeUsers - Include user details in response (default: false)
- */
-export const apiGetDirectorOverview = (params?: {
-  period?: string;
-  year?: number;
-  includeUsers?: boolean;
-}) => {
-  const queryString = buildQueryString(params);
-  return axiosInstance.get<{ success: boolean; data: DirectorOverviewDto }>(
-    `/progress/overview/director${queryString}`
+// GET /progress/overview/director?period=&year=&includeUsers=
+export const apiGetDirectorOverview = (params?: GetDirectorOverviewParams) =>
+  axiosInstance.get<{ success: boolean; data: DirectorOverview }>(
+    "/progress/overview/director",
+    { params },
   );
-};
 
-/**
- * Get overall progress for users by roles
- * @param roles - Array of role strings or comma-separated string (default: all roles)
- */
+// GET /progress/overview/all?roles=
 export const apiGetOverallProgress = (roles?: string | string[]) => {
-  const roleString = Array.isArray(roles) ? roles.join(",") : roles;
-  const queryString = buildQueryString(roleString ? { roles: roleString } : undefined);
-  return axiosInstance.get<{
-    success: boolean;
-    data: UserOverallProgressDto[];
-  }>(`/progress/overview/all${queryString}`);
-};
-
-/**
- * Get progress for a specific user
- * @param userId - User ID
- */
-export const apiGetUserProgress = (userId: string) => {
-  return axiosInstance.get<{
-    success: boolean;
-    data: ProgressResponseDto | null;
-  }>(`/progress/${userId}`);
-};
-
-/**
- * Assign roadmap(s) to user(s)
- */
-export const apiAssignRoadmap = (data: {
-  userIds: string[];
-  roadMapIds: string[];
-}) => {
-  return axiosInstance.post<{
-    success: boolean;
-    data: ProgressResponseDto[];
-  }>(`/progress/assign-roadmap`, data);
-};
-
-/**
- * Assign assessment to user
- */
-export const apiAssignAssessment = (data: {
-  userIds: string[];
-  assessmentIds: string[];
-}) => {
-  return axiosInstance.post<{ success: boolean; data: ProgressResponseDto }>(
-    `/progress/assign-assessment`,
-    data
+  const rolesParam = Array.isArray(roles) ? roles.join(",") : roles;
+  return axiosInstance.get<{ success: boolean; data: UserOverallProgress[] }>(
+    "/progress/overview/all",
+    { params: rolesParam ? { roles: rolesParam } : undefined },
   );
 };
 
-/**
- * Update roadmap progress
- */
-export const apiUpdateRoadmapProgress = (data: {
-  userId: string;
-  roadMapId: string;
-  nestedRoadmapId?: string;
-  completedSteps?: number;
-  status?: string;
-}) => {
-  return axiosInstance.patch<{ success: boolean; data: ProgressResponseDto }>(
-    `/progress/roadmap/update`,
-    data
+// GET /progress/:userId
+export const apiGetUserProgress = (userId: string) =>
+  axiosInstance.get<{ success: boolean; data: ProgressResponse | null }>(
+    `/progress/${userId}`,
   );
-};
 
-/**
- * Update assessment progress
- */
-export const apiUpdateAssessmentProgress = (data: {
-  userId: string;
-  assessmentId: string;
-  completedSections?: number;
-  status?: string;
-}) => {
-  return axiosInstance.patch<{ success: boolean; data: ProgressResponseDto }>(
-    `/progress/assessment/update`,
-    data
+// POST /progress/assign-roadmap  body: { userIds, roadMapIds }
+export const apiAssignRoadmap = (payload: AssignRoadmapPayload) =>
+  axiosInstance.post<{ success: boolean; data: ProgressResponse[] }>(
+    "/progress/assign-roadmap",
+    payload,
   );
-};
 
-/**
- * Add final comment
- */
-export const apiAddFinalComment = (data: {
-  userId: string;
-  commentorId: string;
-  comment: string;
-}) => {
-  return axiosInstance.post<{ success: boolean; data: ProgressResponseDto }>(
-    `/progress/final-comments`,
-    data
+// POST /progress/assign-assessment  body: { userIds, assessmentIds }
+export const apiAssignAssessment = (payload: AssignAssessmentPayload) =>
+  axiosInstance.post<{ success: boolean; data: ProgressResponse }>(
+    "/progress/assign-assessment",
+    payload,
   );
-};
 
-/**
- * Get final comments for a user
- */
-export const apiGetFinalComments = (userId: string) => {
-  return axiosInstance.get<{
-    success: boolean;
-    data: ProgressResponseDto["finalComments"];
-  }>(`/progress/${userId}/final-comments`);
-};
-
-/**
- * Update final comment
- */
-export const apiUpdateFinalComment = (data: {
-  userId: string;
-  commentId: string;
-  comment: string;
-}) => {
-  return axiosInstance.patch<{ success: boolean; data: ProgressResponseDto }>(
-    `/progress/final-comments`,
-    data
+// PATCH /progress/roadmap/update
+export const apiUpdateRoadmapProgress = (payload: UpdateRoadmapProgressPayload) =>
+  axiosInstance.patch<{ success: boolean; data: ProgressResponse }>(
+    "/progress/roadmap/update",
+    payload,
   );
-};
 
-/**
- * Delete final comment
- */
-export const apiDeleteFinalComment = (data: {
-  userId: string;
-  commentId: string;
-}) => {
-  return axiosInstance.delete<{ success: boolean; data: ProgressResponseDto }>(
-    `/progress/final-comments`,
-    { data }
+// PATCH /progress/assessment/update
+export const apiUpdateAssessmentProgress = (payload: UpdateAssessmentProgressPayload) =>
+  axiosInstance.patch<{ success: boolean; data: ProgressResponse }>(
+    "/progress/assessment/update",
+    payload,
   );
-};
+
+// POST /progress/final-comments  body: { userId, commentorId, comment }
+export const apiAddFinalComment = (payload: AddFinalCommentPayload) =>
+  axiosInstance.post<{ success: boolean; data: ProgressResponse }>(
+    "/progress/final-comments",
+    payload,
+  );
+
+// GET /progress/:userId/final-comments
+export const apiGetFinalComments = (userId: string) =>
+  axiosInstance.get<{ success: boolean; data: FinalComment[] }>(
+    `/progress/${userId}/final-comments`,
+  );
+
+// PATCH /progress/final-comments  body: { userId, commentId, comment }
+export const apiUpdateFinalComment = (payload: UpdateFinalCommentPayload) =>
+  axiosInstance.patch<{ success: boolean; data: ProgressResponse }>(
+    "/progress/final-comments",
+    payload,
+  );
+
+// DELETE /progress/final-comments  body: { userId, commentId }
+export const apiDeleteFinalComment = (payload: DeleteFinalCommentPayload) =>
+  axiosInstance.delete<{ success: boolean; data: ProgressResponse }>(
+    "/progress/final-comments",
+    { data: payload },
+  );

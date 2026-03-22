@@ -24,7 +24,7 @@ export const getMentors = () => {
   return api.get("/home/mentors");
 };
 
-export const scheduleAppointment = (payload) => {
+export const scheduleAppointment = (payload: any) => {
   return api.post("/appointments", payload);
 };
 
