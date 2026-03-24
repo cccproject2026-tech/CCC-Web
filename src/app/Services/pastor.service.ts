@@ -1,13 +1,12 @@
 import api from "./apiClient";
 
 export const getPastorMedia = async () => {
-  return api.get("/home/media");  // Base URL auto-attached from env
+  return api.get("/home/media");
 };
 
 export const getUserAppointments = (userId: string) => {
   return api.get(`/appointments/user/${userId}`);
 };
-
 
 export const getSingleUser = (userId: string) => {
   return api.get(`/users/${userId}`);
@@ -18,7 +17,6 @@ export const getUpcomingAppointments = (userId: string) => {
     params: { userId }
   });
 };
-
 
 export const getMentors = () => {
   return api.get("/home/mentors");
@@ -46,4 +44,20 @@ export const getNotifications = (userId: string) => {
 
 export const updateUser = (userId: string, payload: any) => {
   return api.patch(`/users/${userId}`, payload);
+};
+
+export const updateInterestByEmail = (email: string, payload: any) => {
+  return api.patch(`/interests/by-email/${email}`, payload);
+};
+
+export const uploadDocument = (userId: string, file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return api.post(`/users/${userId}/documents`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
+
+export const getUserDocuments = (userId: string) => {
+  return api.get(`/users/${userId}/documents`);
 };

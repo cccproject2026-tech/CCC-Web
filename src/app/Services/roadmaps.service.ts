@@ -99,6 +99,10 @@ export const apiDeleteRoadmap = (id: string) =>
 
 // ─── Nested RoadMap Items ─────────────────────────────────────────────────────
 
+// GET /roadmaps/:roadMapId/nested/:nestedItemId
+export const apiGetNestedRoadmapItem = (roadMapId: string, nestedItemId: string) =>
+  axiosInstance.get<{ success: boolean; data: any }>(`/roadmaps/${roadMapId}/nested/${nestedItemId}`);
+
 // POST /roadmaps/:roadMapId/nested  (multipart/form-data when image provided)
 export const apiAddNestedRoadmapItem = (roadMapId: string, payload: NestedRoadMapItem, image?: File) => {
   if (image) {

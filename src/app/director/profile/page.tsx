@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { getCookie } from "@/app/utils/cookies";
 import Image from "next/image";
-import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import DocumentsModal from "@/app/Components/DocumentsModal";
 import UserProfile from "../../Assets/user-profile.png";
@@ -21,11 +20,15 @@ interface Church {
   country: string;
 }
 
-interface Document {
-  id: string;
-  name: string;
-  date: string;
-  time: string;
+interface ProfileData {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  email: string;
+  profileInfo: string;
+  title: string;
+  yearsInMinistry: string;
+  conference: string;
 }
 
 export default function DirectorProfilePage() {
@@ -37,15 +40,20 @@ export default function DirectorProfilePage() {
   const [interestId, setInterestId] = useState<string | null>(null);
 
   // Profile Data
-  const [profile, setProfile] = useState({
-
+  const [profile, setProfile] = useState<ProfileData>({
+    firstName: "",
+    lastName: "",
+    phone: "",
+    email: "",
+    profileInfo: "",
+    title: "",
+    yearsInMinistry: "",
+    conference: "",
   });
 
   const [churches, setChurches] = useState<Church[]>([
   ]);
 
-  const [documents, setDocuments] = useState<Document[]>([
-  ]);
   const MIN_CHURCHES = 1;
 
   useEffect(() => {
@@ -87,7 +95,7 @@ export default function DirectorProfilePage() {
 
         const interestRes = await apiGetInterestByEmail(user.email);
         const interest = interestRes.data.data;
-        setInterestId(interest.id);
+        setInterestId(interest._id);
         const churchDetails = interest?.churchDetails ?? [];
 
         // 3️⃣ Map church details
@@ -190,14 +198,6 @@ export default function DirectorProfilePage() {
     }
   };
 
-  const handleDeleteDocument = (id: string) => {
-    setDocuments(documents.filter((doc) => doc.id !== id));
-  };
-
-  const handleUploadDocument = () => {
-    console.log("Upload document");
-    // Implement file upload logic
-  };
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#2876AC] via-[#3A8EC4] to-[#4A9FD4]">
@@ -259,9 +259,7 @@ export default function DirectorProfilePage() {
                   <i className="fa-regular fa-file-lines"></i>
                   <span>Documents</span>
                 </div>
-                <span className="w-6 h-6 bg-[#2E3B8E] text-white rounded-full flex items-center justify-center text-xs">
-                  {documents.length}
-                </span>
+                <i className="fa-solid fa-chevron-right text-xs"></i>
               </button>
             </div>
           </div>
@@ -616,13 +614,13 @@ export default function DirectorProfilePage() {
       </div>
 
       {/* Documents Modal */}
-      <DocumentsModal
-        isOpen={showDocuments}
-        onClose={() => setShowDocuments(false)}
-        documents={documents}
-        onDelete={handleDeleteDocument}
-        onUpload={handleUploadDocument}
-      />
+      {userId && (
+        <DocumentsModal
+          isOpen={showDocuments}
+          onClose={() => setShowDocuments(false)}
+          userId={userId}
+        />
+      )}
 
       {/* Save Confirmation Modal */}
       {showSaveConfirm && (

@@ -1,56 +1,113 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { apiGetDocuments, apiUploadDocument } from "@/app/Services/users.service";
+import { type UploadedDocument } from "@/app/Services/types/users.types";
 
-interface Document {
-  id: string;
-  name: string;
-  date: string;
-  time: string;
+interface PendingFile {
+  file: File;
+  status: "pending" | "uploading" | "done" | "failed";
 }
 
 interface DocumentsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  documents: Document[];
-  onDelete: (id: string) => void;
-  onUpload: () => void;
+  userId: string;
 }
 
-export default function DocumentsModal({
-  isOpen,
-  onClose,
-  documents,
-  onDelete,
-  onUpload,
-}: DocumentsModalProps) {
-  const [activeTab, setActiveTab] = useState<"my-documents" | "mentees">(
-    "my-documents"
-  );
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
+export default function DocumentsModal({ isOpen, onClose, userId }: DocumentsModalProps) {
+  const [uploadedDocs, setUploadedDocs] = useState<UploadedDocument[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (isOpen && userId) {
+      fetchDocs();
+    }
+    if (!isOpen) {
+      setPendingFiles([]);
+    }
+  }, [isOpen, userId]);
 
-  const handleDeleteClick = (id: string) => {
-    setDeleteDocId(id);
-    setShowDeleteConfirm(true);
-  };
-
-  const handleConfirmDelete = () => {
-    if (deleteDocId) {
-      onDelete(deleteDocId);
-      setShowDeleteConfirm(false);
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 2000);
+  const fetchDocs = async () => {
+    try {
+      const res = await apiGetDocuments(userId);
+      setUploadedDocs(res.data.data ?? []);
+    } catch (err) {
+      console.error("Failed to fetch documents", err);
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    const newPending: PendingFile[] = files.map((f) => ({ file: f, status: "pending" }));
+    setPendingFiles((prev) => [...prev, ...newPending]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleUpload = async () => {
+    if (pendingFiles.every((f) => f.status === "done")) return;
+    setIsUploading(true);
+
+    for (let i = 0; i < pendingFiles.length; i++) {
+      if (pendingFiles[i].status !== "pending") continue;
+
+      setPendingFiles((prev) =>
+        prev.map((f, idx) => (idx === i ? { ...f, status: "uploading" } : f))
+      );
+
+      try {
+        const formData = new FormData();
+        formData.append("file", pendingFiles[i].file);
+        await apiUploadDocument(userId, formData);
+
+        setPendingFiles((prev) =>
+          prev.map((f, idx) => (idx === i ? { ...f, status: "done" } : f))
+        );
+      } catch {
+        setPendingFiles((prev) =>
+          prev.map((f, idx) => (idx === i ? { ...f, status: "failed" } : f))
+        );
+      }
+    }
+
+    setIsUploading(false);
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 2500);
+    fetchDocs();
+  };
+
+  const getDisplayName = (doc: UploadedDocument) => {
+    if (doc.fileName) return doc.fileName;
+    try {
+      return decodeURIComponent(doc.fileUrl.split("/").pop() ?? doc.fileUrl);
+    } catch {
+      return doc.fileUrl;
+    }
+  };
+
+  const statusBadge = (status: PendingFile["status"]) => {
+    const map: Record<PendingFile["status"], { label: string; cls: string }> = {
+      pending: { label: "Pending", cls: "bg-yellow-100 text-yellow-700" },
+      uploading: { label: "Uploading…", cls: "bg-blue-100 text-blue-700" },
+      done: { label: "Done", cls: "bg-green-100 text-green-700" },
+      failed: { label: "Failed", cls: "bg-red-100 text-red-700" },
+    };
+    const { label, cls } = map[status];
+    return (
+      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cls}`}>{label}</span>
+    );
+  };
+
+  if (!isOpen) return null;
+
+  const hasPending = pendingFiles.some((f) => f.status === "pending");
+
   return (
     <>
-      {/* Main Modal */}
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl">
+        <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col">
           {/* Header */}
           <div className="flex justify-between items-center p-6 border-b">
             <h2 className="text-2xl font-bold text-gray-900">Documents</h2>
@@ -62,129 +119,109 @@ export default function DocumentsModal({
             </button>
           </div>
 
-          {/* Tabs and Upload */}
-          <div className="flex justify-between items-center px-6 py-4 bg-gray-50">
-            <div className="flex gap-2 bg-white p-1 rounded-xl border border-gray-200">
+          {/* Action bar */}
+          <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-b">
+            <span className="text-sm font-semibold text-gray-600">
+              {uploadedDocs.length} uploaded · {pendingFiles.length} queued
+            </span>
+            <div className="flex gap-2">
               <button
-                onClick={() => setActiveTab("my-documents")}
-                className={`px-6 py-2 rounded-lg font-semibold text-sm transition ${
-                  activeTab === "my-documents"
-                    ? "bg-[#2E3B8E] text-white"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-4 py-2 border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg font-semibold text-sm hover:bg-[#2E3B8E] hover:text-white transition"
               >
-                My Documents
+                <i className="fa-solid fa-plus"></i>
+                Add Files
               </button>
-              <button
-                onClick={() => setActiveTab("mentees")}
-                className={`px-6 py-2 rounded-lg font-semibold text-sm transition ${
-                  activeTab === "mentees"
-                    ? "bg-[#2E3B8E] text-white"
-                    : "text-gray-600 hover:bg-gray-100"
-                }`}
-              >
-                Mentees
-              </button>
+              {pendingFiles.length > 0 && (
+                <button
+                  onClick={handleUpload}
+                  disabled={isUploading || !hasPending}
+                  className="flex items-center gap-2 px-4 py-2 bg-[#2E3B8E] text-white rounded-lg font-semibold text-sm hover:bg-[#1F2A6E] transition disabled:opacity-60"
+                >
+                  <i className="fa-solid fa-upload"></i>
+                  {isUploading ? "Uploading…" : "Upload"}
+                </button>
+              )}
             </div>
-
-            <button
-              onClick={onUpload}
-              className="flex items-center gap-2 px-4 py-2 border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg font-semibold hover:bg-[#2E3B8E] hover:text-white transition"
-            >
-              <i className="fa-solid fa-paperclip"></i>
-              Upload
-            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={handleFileSelect}
+            />
           </div>
 
-          {/* Documents List */}
-          <div className="p-6 max-h-[500px] overflow-y-auto">
-            {activeTab === "my-documents" ? (
-              <div className="space-y-4">
-                {documents.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:shadow-md transition"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 flex items-center justify-center bg-red-50 rounded-lg">
-                        <i className="fa-regular fa-file-pdf text-2xl text-red-500"></i>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-900">
-                          {doc.name}
-                        </h4>
-                        <p className="text-sm text-gray-500">
-                          {doc.date} {doc.time}
-                        </p>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => handleDeleteClick(doc.id)}
-                      className="w-10 h-10 flex items-center justify-center hover:bg-red-50 rounded-lg transition group"
-                    >
-                      <i className="fa-regular fa-trash-can text-lg text-gray-400 group-hover:text-red-500"></i>
-                    </button>
+          {/* Body */}
+          <div className="p-6 overflow-y-auto flex-1 space-y-3">
+            {/* Pending files */}
+            {pendingFiles.map((pf, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between p-4 border border-gray-200 rounded-xl"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 flex items-center justify-center bg-blue-50 rounded-lg">
+                    <i className="fa-regular fa-file text-xl text-blue-500"></i>
                   </div>
-                ))}
-
-                {documents.length === 0 && (
-                  <div className="text-center py-12 text-gray-400">
-                    <i className="fa-regular fa-folder-open text-6xl mb-4"></i>
-                    <p>No documents uploaded yet</p>
-                  </div>
-                )}
+                  <span className="text-sm font-medium text-gray-800 max-w-[300px] truncate">
+                    {pf.file.name}
+                  </span>
+                </div>
+                {statusBadge(pf.status)}
               </div>
-            ) : (
+            ))}
+
+            {/* Uploaded docs */}
+            {uploadedDocs.map((doc, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:shadow-sm transition"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 flex items-center justify-center bg-red-50 rounded-lg">
+                    <i className="fa-regular fa-file-pdf text-xl text-red-500"></i>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800 max-w-[320px] truncate">
+                      {getDisplayName(doc)}
+                    </p>
+                    {doc.uploadedAt && (
+                      <p className="text-xs text-gray-400">
+                        {new Date(doc.uploadedAt).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <a
+                  href={doc.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-9 h-9 flex items-center justify-center hover:bg-gray-100 rounded-lg transition"
+                  title="View"
+                >
+                  <i className="fa-solid fa-arrow-up-right-from-square text-gray-400 text-sm"></i>
+                </a>
+              </div>
+            ))}
+
+            {uploadedDocs.length === 0 && pendingFiles.length === 0 && (
               <div className="text-center py-12 text-gray-400">
-                <i className="fa-regular fa-folder-open text-6xl mb-4"></i>
-                <p>No mentee documents available</p>
+                <i className="fa-regular fa-folder-open text-6xl mb-4 block"></i>
+                <p>No documents yet. Click &quot;Add Files&quot; to get started.</p>
               </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
-            <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
-                <i className="fa-regular fa-trash-can text-3xl text-red-500"></i>
-              </div>
-            </div>
-            <h3 className="text-xl font-bold text-center text-[#2E3B8E] mb-6">
-              Are you sure want to delete File ?
-            </h3>
-            <div className="flex gap-4">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50 transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmDelete}
-                className="flex-1 px-6 py-3 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E] transition"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Success Message */}
       {showSuccess && (
-        <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-[70] animate-slide-down">
+        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[70]">
           <div className="bg-white rounded-xl px-6 py-4 shadow-2xl border-2 border-green-500 flex items-center gap-3">
             <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
               <i className="fa-solid fa-check text-white text-sm"></i>
             </div>
-            <span className="text-[#2E3B8E] font-semibold">
-              Documents Deleted
-            </span>
+            <span className="text-[#2E3B8E] font-semibold">Documents Uploaded</span>
           </div>
         </div>
       )}

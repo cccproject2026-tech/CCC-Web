@@ -97,6 +97,7 @@ export {
   apiCreateRoadmap,
   apiUpdateRoadmap,
   apiDeleteRoadmap,
+  apiGetNestedRoadmapItem,
   apiAddNestedRoadmapItem,
   apiUpdateNestedRoadmapItem,
   apiAddComment,

@@ -3,7 +3,7 @@ import { useState } from "react";
 import Image from "next/image";
 
 export interface Mentor {
-  id: number;
+  id: string;
   name: string;
   role: string;
   menteeCount: number;
@@ -14,7 +14,7 @@ export interface Mentor {
 interface AssignMentorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (selectedMentors: number[]) => void;
+  onConfirm: (selectedMentors: string[]) => void;
   mentors: Mentor[];
 }
 
@@ -28,7 +28,7 @@ export default function AssignMentorModal({
   const [activeTab, setActiveTab] = useState("Mentors");
   const [sortBy, setSortBy] = useState("Latest Join");
   const [showFilter, setShowFilter] = useState(false);
-  const [selectedMentors, setSelectedMentors] = useState<number[]>([]);
+  const [selectedMentors, setSelectedMentors] = useState<string[]>([]);
 
   if (!isOpen) return null;
   console.log(mentors)
@@ -36,7 +36,7 @@ export default function AssignMentorModal({
     m.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const toggleMentor = (id: number) => {
+  const toggleMentor = (id: string) => {
     setSelectedMentors((prev) =>
       prev.includes(id) ? prev.filter((mid) => mid !== id) : [...prev, id]
     );

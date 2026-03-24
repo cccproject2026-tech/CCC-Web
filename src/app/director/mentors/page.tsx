@@ -351,6 +351,10 @@ export default function MyMentorsPage() {
   const [allMentors, setAllMentors] = useState<Mentor[]>([]);
   const [loading, setLoading] = useState(true);
   const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 20;
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -359,6 +363,11 @@ export default function MyMentorsPage() {
 
     return () => clearTimeout(timer);
   }, [query]);
+
+  // Reset to page 1 when filter/search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFilter, debouncedQuery]);
 
   useEffect(() => {
     const fetchMentors = async () => {
@@ -383,11 +392,14 @@ export default function MyMentorsPage() {
           role,
           roleMatch,
           search: debouncedQuery || undefined,
+          page: currentPage,
+          limit: PAGE_SIZE,
         });
 
-        const users = response.data.data.users;
-        const mentors = users.map(convertUserToMentor);
-        setAllMentors(mentors);
+        const { users, total, totalPages: tp } = response.data.data;
+        setAllMentors(users.map(convertUserToMentor));
+        setTotalCount(total);
+        setTotalPages(tp);
       } catch (error) {
         console.error("Error fetching mentors:", error);
         setAllMentors([]);
@@ -397,7 +409,7 @@ export default function MyMentorsPage() {
     };
 
     fetchMentors();
-  }, [activeFilter, debouncedQuery]);
+  }, [activeFilter, debouncedQuery, currentPage]);
 
   const featuredMentors = useMemo(() => allMentors.slice(0, 6), [allMentors]);
   const featuredItems: FeaturedAvatarItem[] = useMemo(
@@ -656,6 +668,57 @@ export default function MyMentorsPage() {
               ))}
             </div>
           )}
+
+          {/* Pagination */}
+          {!loading && totalPages > 1 && (
+            <div className="flex items-center justify-between mt-8">
+              <p className="text-white/70 text-sm">
+                Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="w-9 h-9 rounded-lg bg-white text-[#2E3B8E] flex items-center justify-center disabled:opacity-40 hover:bg-gray-100 transition"
+                >
+                  <i className="fa-solid fa-chevron-left text-xs"></i>
+                </button>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                  .reduce<(number | "...")[]>((acc, p, idx, arr) => {
+                    if (idx > 0 && (p as number) - (arr[idx - 1] as number) > 1) acc.push("...");
+                    acc.push(p);
+                    return acc;
+                  }, [])
+                  .map((item, idx) =>
+                    item === "..." ? (
+                      <span key={`ellipsis-${idx}`} className="text-white/60 px-1">…</span>
+                    ) : (
+                      <button
+                        key={item}
+                        onClick={() => setCurrentPage(item as number)}
+                        className={`w-9 h-9 rounded-lg text-sm font-semibold transition ${
+                          currentPage === item
+                            ? "bg-[#2E3B8E] text-white shadow"
+                            : "bg-white text-[#2E3B8E] hover:bg-gray-100"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    )
+                  )}
+
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="w-9 h-9 rounded-lg bg-white text-[#2E3B8E] flex items-center justify-center disabled:opacity-40 hover:bg-gray-100 transition"
+                >
+                  <i className="fa-solid fa-chevron-right text-xs"></i>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -682,28 +745,20 @@ export default function MyMentorsPage() {
             try {
               let role: string;
               let roleMatch: 'exact' | 'mixed' | undefined;
-
-              if (activeFilter === "All") {
-                role = "mentor";
-                roleMatch = "mixed";
-              } else if (activeFilter === "Mentors") {
-                role = "mentor";
-              } else if (activeFilter === "Field Mentor") {
-                role = "field mentor";
-              } else {
-                role = "mentor";
-                roleMatch = "mixed";
-              }
+              if (activeFilter === "All") { role = "mentor"; roleMatch = "mixed"; }
+              else if (activeFilter === "Field Mentor") { role = "field mentor"; }
+              else { role = "mentor"; }
 
               const response = await apiGetAllUsers({
-                role,
-                roleMatch,
+                role, roleMatch,
                 search: debouncedQuery || undefined,
+                page: currentPage,
+                limit: PAGE_SIZE,
               });
-
-              const users = response.data.data.users;
-              const mentors = users.map(convertUserToMentor);
-              setAllMentors(mentors);
+              const { users, total, totalPages: tp } = response.data.data;
+              setAllMentors(users.map(convertUserToMentor));
+              setTotalCount(total);
+              setTotalPages(tp);
             } catch (error) {
               console.error("Error refreshing mentors:", error);
             }

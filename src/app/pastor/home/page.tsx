@@ -112,6 +112,7 @@ useEffect(() => {
         const mapped = data.map((item: any) => ({
           id: item._id,
           title: item.name,
+          hasNested: Array.isArray(item.roadmaps) && item.roadmaps.length > 0,
           status:
             item.status?.toLowerCase() === "in progress"
               ? "In Progress"
@@ -344,12 +345,12 @@ useEffect(() => {
       Upcoming Appointments
     </h2>
 
-    <a
-      href="#"
+    <button
       className="text-[#103C8C] text-sm font-medium hover:underline hover:text-[#0D2E6E]"
+      onClick={() => router.push("/pastor/Appointments")}
     >
       See all
-    </a>
+    </button>
   </div>
 
   {/* GRID */}
@@ -503,7 +504,13 @@ useEffect(() => {
                   {roadmap.status}
                 </span>
                 <button
-                  onClick={() => router.push(`/pastor/roadmap-detail/${roadmap.id}`)}
+                  onClick={() =>
+                    router.push(
+                      roadmap.hasNested
+                        ? `/pastor/SelfRevitalizationPhasePage?id=${roadmap.id}`
+                        : `/pastor/jumpstart?id=${roadmap.id}`
+                    )
+                  }
                   className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition"
                 >
                   <i className="fa-solid fa-arrow-right text-xs"></i>
@@ -525,27 +532,25 @@ useEffect(() => {
             title="Appointments"
             description="Schedule and manage appointments with ease for personalized guidance."
             icon="fa-regular fa-calendar-check"
-            onMoreClick={() => console.log("Navigate to Appointments")}
+            onMoreClick={() => router.push("/pastor/Appointments")}
           />
           <ExploreCCCCard
             title="Progress"
             description="Track your growth and celebrate milestones in your journey."
             icon="fa-solid fa-chart-simple"
-            onMoreClick={() => console.log("Navigate to Progress")}
+            onMoreClick={() => router.push("/pastor/Myprogress")}
           />
           <ExploreCCCCard
             title="Surveys"
             description="Share feedback and insights through quick, easy surveys."
             icon="fa-regular fa-clipboard"
-            onMoreClick={() => console.log("Navigate to Surveys")}
+            onMoreClick={() => router.push("/pastor/Assessments")}
           />
           <ExploreCCCCard
             title="Revitalization Roadmap"
             description="Share feedback and insights through quick, easy surveys."
             icon="fa-solid fa-pen-clip"
-            onMoreClick={() =>
-              console.log("Navigate to Revitalization Roadmap")
-            }
+            onMoreClick={() => router.push("/pastor/revitalization-roadmap")}
           />
         </div>
       </section>

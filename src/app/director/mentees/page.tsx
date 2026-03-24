@@ -57,6 +57,10 @@ export default function MenteesPage() {
   const router = useRouter();
 
   const [mentees, setMentees] = useState<Mentee[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 20;
   const [activeTab, setActiveTab] = useState<"all" | "active" | "completed">(
     "active"
   );
@@ -89,58 +93,61 @@ export default function MenteesPage() {
 
   /* ---------------- FETCH MENTEES ---------------- */
 
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [query]);
+
   useEffect(() => {
     const fetchMentees = async () => {
       const res = await apiGetAllUsers({
         role: "pastor",
         roleMatch: "mixed",
         search: query || undefined,
+        page: currentPage,
+        limit: PAGE_SIZE,
       });
 
-      setMentees(
-        res.data.data.users.map((u: any, i: number) =>
-          mapUserToMentee(u, i)
-        )
-      );
+      const { users, total, totalPages: tp } = res.data.data;
+      setMentees(users.map((u: any, i: number) => mapUserToMentee(u, i)));
+      setTotalCount(total);
+      setTotalPages(tp);
     };
 
     fetchMentees();
-  }, [query]);
+  }, [query, currentPage]);
 
   /* ---------------- PROGRESS ---------------- */
 
   useEffect(() => {
     if (!mentees.length) return;
 
+    let cancelled = false;
+
     const hydrateProgress = async () => {
-      const results = await Promise.allSettled(
-        mentees.map((m) =>
-          apiGetUserProgress(m.id).then((res) => ({
-            userId: m.id,
-            progress: res.data.data?.overallProgress ?? 0,
-            completed: res.data.data?.overallCompleted ?? false,
-          }))
-        )
-      );
-
-      setMentees((prev) =>
-        prev.map((m) => {
-          const match = results.find(
-            (r) => r.status === "fulfilled" && r.value.userId === m.id
-          ) as PromiseFulfilledResult<any> | undefined;
-
-          if (!match) return m;
-
-          return {
-            ...m,
-            progress: match.value.progress,
-            status: match.value.completed ? "completed" : m.status,
-          };
-        })
-      );
+      for (const m of mentees) {
+        if (cancelled) break;
+        try {
+          const res = await apiGetUserProgress(m.id);
+          const progress = res.data.data?.overallProgress ?? 0;
+          const completed = res.data.data?.overallCompleted ?? false;
+          setMentees((prev) =>
+            prev.map((item) =>
+              item.id === m.id
+                ? { ...item, progress, status: completed ? "completed" : item.status }
+                : item
+            )
+          );
+        } catch {
+          // skip failed individual progress fetch
+        }
+        // small delay to avoid throttling
+        await new Promise((r) => setTimeout(r, 150));
+      }
     };
 
     hydrateProgress();
+    return () => { cancelled = true; };
   }, [mentees.length]);
 
   /* ---------------- FETCH MENTORS ---------------- */
@@ -194,6 +201,10 @@ export default function MenteesPage() {
     setShowAssignModal(false);
     setToast("Mentors assigned successfully");
   };
+
+  /* ---------------- MARK COMPLETE ---------------- */
+
+  const handleMarkComplete = () => setToast("Marked as complete");
 
   /* ---------------- REMOVE ---------------- */
 
@@ -425,7 +436,8 @@ export default function MenteesPage() {
 
       {/* Cards */}
       <section className="px-4 sm:px-6 md:px-12 lg:px-20 py-6 md:py-8">
-        <div className="max-w-[1400px] mx-auto grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
+        <div className="max-w-[1400px] mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
           {filteredMentees.map((m) => (
             <PersonListCard
               key={m.id}
@@ -447,6 +459,58 @@ export default function MenteesPage() {
               }
             />
           ))}
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between mt-8">
+            <p className="text-white/70 text-sm">
+              Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, totalCount)} of {totalCount}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="w-9 h-9 rounded-lg bg-white text-[#2E3B8E] flex items-center justify-center disabled:opacity-40 hover:bg-gray-100 transition"
+              >
+                <i className="fa-solid fa-chevron-left text-xs"></i>
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .reduce<(number | "...")[]>((acc, p, idx, arr) => {
+                  if (idx > 0 && (p as number) - (arr[idx - 1] as number) > 1) acc.push("...");
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((item, idx) =>
+                  item === "..." ? (
+                    <span key={`ellipsis-${idx}`} className="text-white/60 px-1">…</span>
+                  ) : (
+                    <button
+                      key={item}
+                      onClick={() => setCurrentPage(item as number)}
+                      className={`w-9 h-9 rounded-lg text-sm font-semibold transition ${
+                        currentPage === item
+                          ? "bg-[#2E3B8E] text-white shadow"
+                          : "bg-white text-[#2E3B8E] hover:bg-gray-100"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
+
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="w-9 h-9 rounded-lg bg-white text-[#2E3B8E] flex items-center justify-center disabled:opacity-40 hover:bg-gray-100 transition"
+              >
+                <i className="fa-solid fa-chevron-right text-xs"></i>
+              </button>
+            </div>
+          </div>
+        )}
         </div>
       </section>
 

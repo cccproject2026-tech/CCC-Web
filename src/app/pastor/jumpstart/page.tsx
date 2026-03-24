@@ -5,17 +5,24 @@ import { useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "@/app/Assets/jumpstart-hero.png";
-import User1 from "@/app/Assets/user-profile.png";
-import User2 from "@/app/Assets/user-profile.png";
+import UserPlaceholder from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import {
   apiGetRoadmapById,
+  apiGetNestedRoadmapItem,
   apiGetExtras,
   apiSaveExtras,
   apiUpdateExtras,
   apiUploadExtrasDocuments,
+  apiGetComments,
+  apiAddQuery,
+  apiGetQueries,
 } from "@/app/Services/api";
 import { getCookie } from "@/app/utils/cookies";
+import type {
+  CommentItem,
+  QueryItem,
+} from "@/app/Services/roadmaps.service";
 
 interface ExtraComponent {
   type:
@@ -39,7 +46,11 @@ interface ExtraComponent {
 
 function JumpStartContent() {
   const searchParams = useSearchParams();
-  const roadmapId = searchParams.get("id");
+  const nestedItemId = searchParams.get("id");
+  const parentRoadmapId = searchParams.get("parentId");
+  // When coming from SelfRevitalizationPhasePage: id=nestedItemId, parentId=parentRoadmapId
+  // For extras/comments/queries the roadmapId is always the parent roadmap ID
+  const roadmapId = parentRoadmapId || nestedItemId;
 
   const [activeTab, setActiveTab] = useState("overview");
   const [queryTab, setQueryTab] = useState("New");
@@ -51,6 +62,17 @@ function JumpStartContent() {
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Comments
+  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+
+  // Queries
+  const [queries, setQueries] = useState<QueryItem[]>([]);
+  const [queriesLoading, setQueriesLoading] = useState(false);
+  const [newQueryText, setNewQueryText] = useState("");
+  const [querySubmitting, setQuerySubmitting] = useState(false);
+  const [querySuccess, setQuerySuccess] = useState(false);
+
   const userId = (() => {
     try {
       const u = JSON.parse(getCookie("user") || "{}");
@@ -61,12 +83,21 @@ function JumpStartContent() {
   })();
 
   useEffect(() => {
-    if (!roadmapId) return;
+    if (!nestedItemId) return;
     const fetchRoadmap = async () => {
       try {
         setLoading(true);
-        const res = await apiGetRoadmapById(roadmapId);
-        setRoadmap(res.data?.data || res.data);
+        let data: any;
+        if (parentRoadmapId) {
+          // Nested item — use dedicated endpoint
+          const res = await apiGetNestedRoadmapItem(parentRoadmapId, nestedItemId);
+          data = res.data?.data || res.data;
+        } else {
+          // Fallback: top-level roadmap
+          const res = await apiGetRoadmapById(nestedItemId);
+          data = res.data?.data || res.data;
+        }
+        setRoadmap(data);
       } catch (err) {
         console.error("Failed to fetch roadmap", err);
       } finally {
@@ -74,17 +105,16 @@ function JumpStartContent() {
       }
     };
     fetchRoadmap();
-  }, [roadmapId]);
+  }, [nestedItemId, parentRoadmapId]);
 
   // Load saved extras responses for this pastor
   useEffect(() => {
     if (!roadmapId || !userId) return;
     const loadExtras = async () => {
       try {
-        const res = await apiGetExtras(roadmapId, userId);
+        const res = await apiGetExtras(roadmapId, userId, parentRoadmapId ? nestedItemId! : undefined);
         const data = res.data?.data || res.data;
         if (data && data.extras && data.extras.length > 0) {
-          // Flatten saved extras array into formData map
           const saved: Record<string, any> = {};
           data.extras.forEach((item: any) => {
             if (item.key !== undefined) saved[item.key] = item.value;
@@ -93,21 +123,68 @@ function JumpStartContent() {
           setExtrasExist(true);
         }
       } catch {
-        // No saved extras yet — that's fine
+        // No saved extras yet
       }
     };
     loadExtras();
-  }, [roadmapId, userId]);
+  }, [roadmapId, userId, nestedItemId, parentRoadmapId]);
+
+  // Load comments when Comments tab is opened
+  useEffect(() => {
+    if (activeTab !== "comments" || !roadmapId || !userId) return;
+    const fetchComments = async () => {
+      setCommentsLoading(true);
+      try {
+        const res = await apiGetComments(roadmapId, userId);
+        const thread = res.data?.data || res.data;
+        setComments(thread?.comments || []);
+      } catch {
+        setComments([]);
+      } finally {
+        setCommentsLoading(false);
+      }
+    };
+    fetchComments();
+  }, [activeTab, roadmapId, userId]);
+
+  // Load queries when Queries tab is opened or subtab changes
+  // apiGetQueries returns an array of QueriesThread — flatten all queries from all threads
+  useEffect(() => {
+    if (activeTab !== "queries" || !roadmapId || !userId) return;
+    const statusMap: Record<string, string | undefined> = {
+      New: undefined,
+      Answered: "answered",
+      Pending: "pending",
+    };
+    const fetchQueries = async () => {
+      setQueriesLoading(true);
+      try {
+        const res = await apiGetQueries(roadmapId, userId, statusMap[queryTab]);
+        const threads: any[] = res.data?.data || res.data || [];
+        const allQueries = Array.isArray(threads)
+          ? threads.flatMap((t: any) => t?.queries || [])
+          : (threads as any)?.queries || [];
+        setQueries(allQueries);
+      } catch {
+        setQueries([]);
+      } finally {
+        setQueriesLoading(false);
+      }
+    };
+    fetchQueries();
+  }, [activeTab, queryTab, roadmapId, userId]);
 
   const handleInputChange = (key: string, value: any) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
+  const scopedNestedId = parentRoadmapId ? nestedItemId! : undefined;
+
   const handleFileUpload = async (key: string, file: File) => {
     if (!roadmapId || !userId) return;
     try {
       setUploadedFiles((prev) => ({ ...prev, [key]: file }));
-      await apiUploadExtrasDocuments(roadmapId, userId, [file], undefined, key);
+      await apiUploadExtrasDocuments(roadmapId, userId, [file], scopedNestedId, key);
     } catch (err) {
       console.error("Upload error:", err);
     }
@@ -117,15 +194,11 @@ function JumpStartContent() {
     if (!roadmapId || !userId) return;
     setSaving(true);
     try {
-      const extrasArray = Object.entries(formData).map(([key, value]) => ({
-        key,
-        value,
-      }));
-      const payload = { userId, extras: extrasArray };
+      const extrasArray = Object.entries(formData).map(([key, value]) => ({ key, value }));
       if (extrasExist) {
-        await apiUpdateExtras(roadmapId, userId, { extras: extrasArray });
+        await apiUpdateExtras(roadmapId, userId, { extras: extrasArray }, scopedNestedId);
       } else {
-        await apiSaveExtras(roadmapId, payload);
+        await apiSaveExtras(roadmapId, { userId, nestedRoadMapItemId: scopedNestedId, extras: extrasArray });
         setExtrasExist(true);
       }
       setSaveSuccess(true);
@@ -134,6 +207,27 @@ function JumpStartContent() {
       console.error("Save error:", err);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSubmitQuery = async () => {
+    if (!roadmapId || !userId || !newQueryText.trim()) return;
+    setQuerySubmitting(true);
+    try {
+      await apiAddQuery(roadmapId, { actualQueryText: newQueryText.trim(), userId });
+      setNewQueryText("");
+      setQuerySuccess(true);
+      setTimeout(() => setQuerySuccess(false), 3000);
+      // Refresh pending queries list
+      if (queryTab === "Pending") {
+        const res = await apiGetQueries(roadmapId, userId, "pending");
+        const threads: any[] = res.data?.data || res.data || [];
+        setQueries(Array.isArray(threads) ? threads.flatMap((t: any) => t?.queries || []) : []);
+      }
+    } catch (err) {
+      console.error("Submit query error:", err);
+    } finally {
+      setQuerySubmitting(false);
     }
   };
 
@@ -337,6 +431,19 @@ function JumpStartContent() {
     }
   };
 
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return "";
+    try {
+      return new Date(dateStr).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    } catch {
+      return dateStr;
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0F4A85]">
@@ -409,15 +516,13 @@ function JumpStartContent() {
                   </button>
                 </div>
 
-                {/* Description */}
                 {description && (
                   <div className="bg-[#1070A9]/70 rounded-lg p-4 mb-6 border border-[#3B8CC2]">
                     <h3 className="text-sm font-semibold text-white mb-2">Description</h3>
-                    <p className="text-white/90 text-sm leading-relaxed">{description}</p>
+                    <p className="text-white/90 text-sm leading-relaxed whitespace-pre-line">{description}</p>
                   </div>
                 )}
 
-                {/* Extras — rendered by type */}
                 {extras.length > 0 && (
                   <div className="bg-[#1070A9]/70 rounded-lg p-5 mb-6 border border-[#3B8CC2]">
                     <h3 className="text-sm font-semibold text-white mb-4">Tasks</h3>
@@ -425,7 +530,6 @@ function JumpStartContent() {
                       {extras.map((extra, i) => renderExtraComponent(extra, i, "extra"))}
                     </div>
 
-                    {/* Save button */}
                     <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-[#3B8CC2]">
                       {saveSuccess && (
                         <span className="text-green-300 text-sm flex items-center gap-1">
@@ -463,42 +567,79 @@ function JumpStartContent() {
             {activeTab === "comments" && (
               <>
                 <h2 className="text-xl font-semibold mb-6">Comments</h2>
-                <div className="space-y-4">
-                  {[
-                    { name: "John Doe", role: "Mentor", time: "9:41 am", text: "Needs improvement. Refer XYZ document", avatar: User1 },
-                    { name: "Robin Roe", role: "Project Manager", time: "Yesterday", text: "No need to spend time researching this area. Focus on the other sub group.", avatar: User2 },
-                  ].map((c, i) => (
-                    <div key={i} className="bg-white text-gray-800 rounded-lg shadow-sm p-4 flex justify-between items-start">
-                      <div className="flex gap-3">
-                        <Image src={c.avatar} alt={c.name} className="w-10 h-10 rounded-full object-cover" />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-semibold text-sm">{c.name}</h4>
-                            <span className="text-xs text-gray-400">{c.time}</span>
+
+                {commentsLoading ? (
+                  <div className="flex justify-center py-16">
+                    <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : comments.length === 0 ? (
+                  <div className="text-center py-16 text-white/50">
+                    <i className="fa-regular fa-comments text-5xl mb-4 block"></i>
+                    <p>No comments yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {comments.map((c) => {
+                      const mentor = c.mentorId;
+                      const name = mentor
+                        ? `${mentor.firstName} ${mentor.lastName}`
+                        : "Mentor";
+                      const role = mentor?.role || "Mentor";
+                      const avatar = mentor?.profilePicture || null;
+
+                      return (
+                        <div
+                          key={c._id}
+                          className="bg-white text-gray-800 rounded-lg shadow-sm p-4 flex justify-between items-start"
+                        >
+                          <div className="flex gap-3">
+                            {avatar ? (
+                              <img
+                                src={avatar}
+                                alt={name}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <Image
+                                src={UserPlaceholder}
+                                alt={name}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            )}
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-semibold text-sm">{name}</h4>
+                                <span className="text-xs text-gray-400">
+                                  {formatDate(c.addedDate)}
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-500 mb-1 capitalize">{role}</p>
+                              <p className="text-sm">{c.text}</p>
+                            </div>
                           </div>
-                          <p className="text-xs text-gray-500 mb-1">{c.role}</p>
-                          <p className="text-sm">{c.text}</p>
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                            <div className="flex gap-4 text-[#103C8C] text-sm">
+                              <i className="fa-regular fa-envelope cursor-pointer"></i>
+                              <i className="fa-regular fa-comment cursor-pointer"></i>
+                              <i className="fa-solid fa-phone cursor-pointer"></i>
+                              <i className="fa-brands fa-whatsapp cursor-pointer"></i>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                        <div className="flex gap-4 text-[#103C8C] text-sm">
-                          <i className="fa-regular fa-envelope cursor-pointer"></i>
-                          <i className="fa-regular fa-comment cursor-pointer"></i>
-                          <i className="fa-solid fa-phone cursor-pointer"></i>
-                          <i className="fa-brands fa-whatsapp cursor-pointer"></i>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </>
             )}
 
             {/* ── QUERIES ── */}
             {activeTab === "queries" && (
               <>
-                <h2 className="text-[20px] font-semibold mb-4 border-b border-white/30 pb-2">Queries</h2>
+                <h2 className="text-[20px] font-semibold mb-4 border-b border-white/30 pb-2">
+                  Queries
+                </h2>
                 <div className="flex justify-end mb-5">
                   <div className="flex bg-white rounded-lg shadow-sm overflow-hidden">
                     {["New", "Answered", "Pending"].map((tab) => (
@@ -506,7 +647,9 @@ function JumpStartContent() {
                         key={tab}
                         onClick={() => setQueryTab(tab)}
                         className={`px-6 py-[7px] text-sm font-medium transition-all duration-200 ${
-                          queryTab === tab ? "bg-[#103C8C] text-white m-2" : "bg-white text-gray-500 hover:text-[#103C8C]"
+                          queryTab === tab
+                            ? "bg-[#103C8C] text-white m-2"
+                            : "bg-white text-gray-500 hover:text-[#103C8C]"
                         }`}
                       >
                         {tab}
@@ -515,71 +658,120 @@ function JumpStartContent() {
                   </div>
                 </div>
 
+                {/* New Query Form */}
                 {queryTab === "New" && (
                   <div className="rounded-xl p-6">
                     <p className="text-[15px] font-semibold mb-2">Submit your question here.</p>
                     <div className="relative">
                       <textarea
                         placeholder="Write Your Questions..."
+                        value={newQueryText}
+                        onChange={(e) => setNewQueryText(e.target.value)}
+                        maxLength={1500}
                         className="w-full rounded-md bg-transparent border border-[#7FB6EA] text-white text-sm p-3 focus:outline-none focus:ring-1 focus:ring-[#00B3FF] resize-none h-28 mb-2"
                       />
-                      <span className="text-xs text-white/60 absolute bottom-4 right-4">(250 Words)</span>
+                      <span className="text-xs text-white/60 absolute bottom-4 right-4">
+                        {newQueryText.length}/1500
+                      </span>
                     </div>
-                    <div className="flex justify-end mt-4">
-                      <button className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-8 py-[6px] rounded-md border border-[#2C57A6] shadow-sm">
-                        Submit
+                    {querySuccess && (
+                      <p className="text-green-300 text-sm mb-2 flex items-center gap-1">
+                        <i className="fa-solid fa-circle-check"></i> Query submitted successfully!
+                      </p>
+                    )}
+                    <div className="flex justify-end mt-2">
+                      <button
+                        onClick={handleSubmitQuery}
+                        disabled={querySubmitting || !newQueryText.trim()}
+                        className="bg-[#103C8C] hover:bg-[#0B2E72] disabled:opacity-60 transition text-white text-sm font-medium px-8 py-[6px] rounded-md border border-[#2C57A6] shadow-sm"
+                      >
+                        {querySubmitting ? "Submitting..." : "Submit"}
                       </button>
                     </div>
                   </div>
                 )}
 
-                {queryTab === "Answered" && (
-                  <div className="space-y-8 mt-4">
-                    {[1, 2].map((i) => (
-                      <div key={i} className="border-b border-white/20 pb-6">
-                        <div className="flex items-start gap-3 mb-3">
-                          <Image src={User1} alt="User" className="w-8 h-8 rounded-full object-cover" />
-                          <div>
-                            <h4 className="font-semibold text-sm">Me</h4>
-                            <p className="text-xs text-white/70 mb-1">22/09/2024</p>
-                            <p className="text-sm text-white/90">Is it possible for you to get me a letter stating that my volunteering is part of this course?</p>
-                          </div>
-                        </div>
-                        <div className="ml-11 bg-[#325C9C]/50 rounded-lg p-4 w-[90%]">
-                          <div className="flex items-start gap-3">
-                            <Image src={User2} alt="Mentor" className="w-8 h-8 rounded-full object-cover" />
-                            <div>
-                              <h4 className="font-semibold text-sm">John Doe</h4>
-                              <p className="text-xs text-white/70 mb-1">22/09/2024</p>
-                              <p className="text-xs text-white/70 mb-2">Mentor</p>
-                              <p className="text-sm text-white/90">I do not have the authority to do that. Please contact Project Manager</p>
+                {/* Answered / Pending queries list */}
+                {(queryTab === "Answered" || queryTab === "Pending") && (
+                  <>
+                    {queriesLoading ? (
+                      <div className="flex justify-center py-16">
+                        <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                      </div>
+                    ) : queries.length === 0 ? (
+                      <div className="text-center py-16 text-white/50">
+                        <i className="fa-regular fa-circle-question text-5xl mb-4 block"></i>
+                        <p>No {queryTab.toLowerCase()} queries.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-8 mt-4">
+                        {queries.map((q) => (
+                          <div key={q._id} className="border-b border-white/20 pb-6">
+                            {/* Pastor's question */}
+                            <div className="flex items-start gap-3 mb-3">
+                              <Image
+                                src={UserPlaceholder}
+                                alt="Me"
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                              <div>
+                                <h4 className="font-semibold text-sm">Me</h4>
+                                <p className="text-xs text-white/70 mb-1">
+                                  {formatDate(q.createdDate)}
+                                </p>
+                                <p className="text-sm text-white/90">{q.actualQueryText}</p>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
 
-                {queryTab === "Pending" && (
-                  <div className="space-y-8 mt-4">
-                    {[1, 2].map((i) => (
-                      <div key={i} className="border-b border-white/20 pb-6">
-                        <div className="flex items-start gap-3 mb-3">
-                          <Image src={User1} alt="User" className="w-8 h-8 rounded-full object-cover" />
-                          <div>
-                            <h4 className="font-semibold text-sm">Me</h4>
-                            <p className="text-xs text-white/70 mb-1">12/09/2024</p>
-                            <p className="text-sm text-white/90">Is it possible for you to get me a letter stating that my volunteering is part of this course?</p>
+                            {/* Mentor reply (Answered) */}
+                            {q.status === "answered" && q.repliedAnswer ? (
+                              <div className="ml-11 bg-[#325C9C]/50 rounded-lg p-4 w-[90%]">
+                                <div className="flex items-start gap-3">
+                                  {q.repliedMentorId?.profilePicture ? (
+                                    <img
+                                      src={q.repliedMentorId.profilePicture}
+                                      alt="Mentor"
+                                      className="w-8 h-8 rounded-full object-cover"
+                                    />
+                                  ) : (
+                                    <Image
+                                      src={UserPlaceholder}
+                                      alt="Mentor"
+                                      className="w-8 h-8 rounded-full object-cover"
+                                    />
+                                  )}
+                                  <div>
+                                    <h4 className="font-semibold text-sm">
+                                      {q.repliedMentorId
+                                        ? `${q.repliedMentorId.firstName} ${q.repliedMentorId.lastName}`
+                                        : "Mentor"}
+                                    </h4>
+                                    {q.repliedDate && (
+                                      <p className="text-xs text-white/70 mb-1">
+                                        {formatDate(q.repliedDate)}
+                                      </p>
+                                    )}
+                                    {q.repliedMentorId?.role && (
+                                      <p className="text-xs text-white/70 mb-2 capitalize">
+                                        {q.repliedMentorId.role}
+                                      </p>
+                                    )}
+                                    <p className="text-sm text-white/90">{q.repliedAnswer}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              /* Pending — waiting for response */
+                              <div className="ml-11 bg-[#325C9C]/50 rounded-lg p-4 w-[90%] flex items-center gap-2">
+                                <i className="fa-solid fa-spinner animate-spin text-white/70 text-sm"></i>
+                                <p className="text-sm text-white/80">Waiting for response</p>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                        <div className="ml-11 bg-[#325C9C]/50 rounded-lg p-4 w-[90%] flex items-center gap-2">
-                          <i className="fa-solid fa-spinner animate-spin text-white/70 text-sm"></i>
-                          <p className="text-sm text-white/80">Waiting for response</p>
-                        </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    )}
+                  </>
                 )}
               </>
             )}
@@ -594,11 +786,13 @@ function JumpStartContent() {
 
 export default function JumpStartPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-[#0F4A85]">
-        <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#0F4A85]">
+          <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }
+    >
       <JumpStartContent />
     </Suspense>
   );

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ProfilePic from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
+import DocumentsModal from "@/app/Components/DocumentsModal";
 import { apiGetUserById, apiUpdateUserById } from "@/app/Services/users.service";
 import { getGreeting, getMentorFromCookie } from "@/app/Services/utils/helpers";
 
@@ -16,6 +17,7 @@ const userId = storedUser?.id;
 
 export default function MentorProfile() {
   const [isEditing, setIsEditing] = useState(false);
+  const [showDocuments, setShowDocuments] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [greeting, setGreeting] = useState("");
@@ -189,7 +191,10 @@ export default function MentorProfile() {
               className="w-full text-xs text-gray-700 border border-gray-300 rounded-md p-2 resize-none mb-4"
               rows={3}
             />
-            <button className="text-xs font-medium text-[#103C8C] border border-[#DADADA] rounded-md px-3 py-2 flex items-center justify-center gap-2 w-full hover:bg-[#F5F7FB] transition">
+            <button
+              onClick={() => setShowDocuments(true)}
+              className="text-xs font-medium text-[#103C8C] border border-[#DADADA] rounded-md px-3 py-2 flex items-center justify-center gap-2 w-full hover:bg-[#F5F7FB] transition"
+            >
               <i className="fa-solid fa-paperclip text-[#103C8C]"></i> Upload
               documents
             </button>
@@ -381,6 +386,15 @@ export default function MentorProfile() {
           </div>
         </div>
       </main>
+
+      {/* Documents Modal */}
+      {profile?._id && (
+        <DocumentsModal
+          isOpen={showDocuments}
+          onClose={() => setShowDocuments(false)}
+          userId={profile._id}
+        />
+      )}
 
       {/* FORM INPUT STYLE */}
       <style jsx>{`

@@ -180,7 +180,7 @@ function SelfRevitalizationContent() {
                       {/* View Button */}
                       <div className="flex justify-end mt-3">
                         <button
-                          onClick={() => router.push(`/pastor/jumpstart?id=${item._id}`)}
+                          onClick={() => router.push(`/pastor/jumpstart?id=${item._id}&parentId=${roadmapId}`)}
                           className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-[12px] font-medium px-6 py-[6px] rounded-md shadow-sm"
                         >
                           View
