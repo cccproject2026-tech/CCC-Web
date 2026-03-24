@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import headerBg from "../../Assets/CMA-hero-bg.png";
 import { useSearchParams } from "next/navigation";
@@ -10,7 +10,7 @@ import { apiGetUserAnswers } from "@/app/Services/assessment.service";
 import { apiGetAvailability, apiCreateAppointment, apiGetMonthlyAvailability } from "@/app/Services/appointments.service";
 import axiosInstance from "@/app/Services/config/axios-instance";
 
-export default function PastorSurveyCMA() {
+function PastorSurveyCMAContent() {
   const [activeSection, setActiveSection] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const searchParams = useSearchParams();
@@ -896,5 +896,13 @@ export default function PastorSurveyCMA() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function PastorSurveyCMA() {
+  return (
+    <Suspense fallback={<div className="text-white p-10">Loading...</div>}>
+      <PastorSurveyCMAContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import JumpStartHero from "@/app/Components/Hero/JumpStartHero";
 import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
@@ -8,7 +8,7 @@ import SelfRevitalizationHeroBg from "@/app/Assets/self-revitalization-hero.png"
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
 import MentorHeader from "@/app/Components/MentorHeader";
 
-export default function PhasePage() {
+function PhasePageContent() {
 
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -106,5 +106,13 @@ export default function PhasePage() {
             </main>
 
         </div>
+    );
+}
+
+export default function PhasePage() {
+    return (
+        <Suspense fallback={<div className="text-white p-10">Loading...</div>}>
+            <PhasePageContent />
+        </Suspense>
     );
 }

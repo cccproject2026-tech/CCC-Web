@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
@@ -16,7 +16,7 @@ import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
 import { apiGetAssessmentById } from "@/app/Services/assessment.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 
-export default function PastorProgressPage() {
+function PastorProgressPageContent() {
   const [roadmapFilter, setRoadmapFilter] = useState("All");
   const [surveyFilter, setSurveyFilter] = useState("All");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -549,5 +549,13 @@ function AssessmentCard({ assessment }: any) {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PastorProgressPage() {
+  return (
+    <Suspense fallback={<div className="text-white p-10">Loading...</div>}>
+      <PastorProgressPageContent />
+    </Suspense>
   );
 }

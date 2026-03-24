@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import AppHeader from "@/app/Components/Header/AppHeader";
@@ -10,7 +10,7 @@ import { apiAddComment, apiGetComments, apiGetQueries, apiGetRoadmapById, apiRep
 import { apiGetUserById } from "@/app/Services/users.service";
 import MentorHeader from "@/app/Components/MentorHeader";
 
-export default function JumpStartPage() {
+function JumpStartPageContent() {
   const router = useRouter();
   const [notes, setNotes] = useState("");
   const [sessionDate, setSessionDate] = useState("");
@@ -535,5 +535,13 @@ export default function JumpStartPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function JumpStartPage() {
+  return (
+    <Suspense fallback={<div className="text-white p-10">Loading...</div>}>
+      <JumpStartPageContent />
+    </Suspense>
   );
 }

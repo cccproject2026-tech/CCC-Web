@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import JumpStartHero from "@/app/Components/Hero/JumpStartHero";
@@ -16,7 +16,7 @@ import {
 } from "@/app/Services/roadmaps.service";
 import MentorHeader from "@/app/Components/MentorHeader";
 
-export default function TaskPage() {
+function TaskPageContent() {
 
     const searchParams = useSearchParams();
     const taskId = searchParams.get("taskId") as string;
@@ -149,6 +149,7 @@ export default function TaskPage() {
 
 
     if (!task) return <div className="text-white p-10">Loading...</div>;
+
 
 
     return (
@@ -520,4 +521,12 @@ export default function TaskPage() {
 
     );
 
+}
+
+export default function TaskPage() {
+    return (
+        <Suspense fallback={<div className="text-white p-10">Loading...</div>}>
+            <TaskPageContent />
+        </Suspense>
+    );
 }

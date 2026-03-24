@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
@@ -15,7 +15,7 @@ import { apiGetUserRoadmaps } from "@/app/Services/roadmaps.service";
 import { apiGetUserById } from "@/app/Services/users.service";
 import MentorHeader from "@/app/Components/MentorHeader";
 
-export default function RevitalizationRoadmapHome() {
+function RevitalizationRoadmapHomeContent() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [showExpectedOutcomePopup, setShowExpectedOutcomePopup] =
@@ -251,5 +251,13 @@ export default function RevitalizationRoadmapHome() {
 
       <AppFooter />
     </div>
+  );
+}
+
+export default function RevitalizationRoadmapHome() {
+  return (
+    <Suspense fallback={<div className="text-white p-10">Loading...</div>}>
+      <RevitalizationRoadmapHomeContent />
+    </Suspense>
   );
 }
