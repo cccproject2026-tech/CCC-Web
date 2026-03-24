@@ -89,12 +89,14 @@ const MentorGridCard = memo(({
   mentor,
   isMenuOpen,
   onToggleMenu,
-  onMenuAction
+  onMenuAction,
+  onViewProfile,
 }: {
   mentor: Mentor;
   isMenuOpen: boolean;
   onToggleMenu: (mentorId: string) => void;
   onMenuAction: (action: string, mentor: Mentor) => void;
+  onViewProfile: (mentorId: string) => void;
 }) => {
   return (
     <div className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all border border-gray-100">
@@ -192,7 +194,10 @@ const MentorGridCard = memo(({
               <i className="fa-solid fa-phone text-[16px] sm:text-[17px]"></i>
             </button>
           </div>
-          <button className="w-9 h-9 bg-[#2E3B8E] text-white rounded-lg flex items-center justify-center hover:bg-[#3A4BA0] transition-all flex-shrink-0">
+          <button
+            onClick={() => onViewProfile(mentor.id)}
+            className="w-9 h-9 bg-[#2E3B8E] text-white rounded-lg flex items-center justify-center hover:bg-[#3A4BA0] transition-all flex-shrink-0"
+          >
             <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
           </button>
         </div>
@@ -208,12 +213,14 @@ const MentorListCard = memo(({
   mentor,
   isMenuOpen,
   onToggleMenu,
-  onMenuAction
+  onMenuAction,
+  onViewProfile,
 }: {
   mentor: Mentor;
   isMenuOpen: boolean;
   onToggleMenu: (mentorId: string) => void;
   onMenuAction: (action: string, mentor: Mentor) => void;
+  onViewProfile: (mentorId: string) => void;
 }) => {
   return (
     <div className="bg-white rounded-2xl p-4 md:p-5 shadow-md hover:shadow-lg transition-all border border-gray-100">
@@ -306,6 +313,12 @@ const MentorListCard = memo(({
               </div>
             )}
           </div>
+          <button
+            onClick={() => onViewProfile(mentor.id)}
+            className="w-9 h-9 bg-[#2E3B8E] text-white rounded-lg flex items-center justify-center hover:bg-[#3A4BA0] transition-all flex-shrink-0"
+          >
+            <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+          </button>
         </div>
       </div>
     </div>
@@ -625,6 +638,7 @@ export default function MyMentorsPage() {
                   isMenuOpen={openMenuId === mentor.id}
                   onToggleMenu={handleToggleMenu}
                   onMenuAction={handleMenuAction}
+                  onViewProfile={(id) => router.push(`/director/mentors/profile/${id}`)}
                 />
               ))}
             </div>
@@ -637,6 +651,7 @@ export default function MyMentorsPage() {
                   isMenuOpen={openMenuId === mentor.id}
                   onToggleMenu={handleToggleMenu}
                   onMenuAction={handleMenuAction}
+                  onViewProfile={(id) => router.push(`/director/mentors/profile/${id}`)}
                 />
               ))}
             </div>

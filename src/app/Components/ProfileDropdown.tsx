@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { clearAllCookies } from "@/app/utils/cookies";
 
 interface ProfileDropdownProps {
   isOpen: boolean;
@@ -45,8 +46,7 @@ export default function ProfileDropdown({
   };
 
   const handleLogout = () => {
-    // Implement logout logic here
-    console.log("Logging out...");
+    clearAllCookies();
     router.push("/");
     onClose();
   };

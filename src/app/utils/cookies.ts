@@ -32,3 +32,16 @@ export function removeCookie(name: string): void {
   if (typeof document === "undefined") return;
   document.cookie = `${encodeURIComponent(name)}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
 }
+
+/** Remove all app session cookies — call this on logout */
+export function clearAllCookies(): void {
+  const appCookies = [
+    "accessToken",
+    "refreshToken",
+    "user",
+    "mentor",
+    "userId",
+    "interestEmail",
+  ];
+  appCookies.forEach(removeCookie);
+}

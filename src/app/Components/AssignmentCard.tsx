@@ -3,14 +3,14 @@ import { useState } from "react";
 import Image from "next/image";
 
 interface AssignmentCardProps {
-  id: number;
+  id: number | string;
   title: string;
   description: string;
   image: any;
   onView: () => void;
-  onOptionsClick: (id: number) => void;
+  onOptionsClick: (id: number | string) => void;
   isSelected?: boolean;
-  onSelect?: (id: number) => void;
+  onSelect?: (id: number | string) => void;
   showCheckbox?: boolean;
 }
 

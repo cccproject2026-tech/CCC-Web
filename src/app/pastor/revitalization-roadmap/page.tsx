@@ -18,7 +18,7 @@ interface Phase {
   months: string;
   status: string;
   sessionDate?: string;
-  route: string;
+  isPhase: boolean;
   imageUrl: string;
 }
 
@@ -37,9 +37,12 @@ export default function RevitalizationRoadmap() {
         setLoading(true);
         const user = JSON.parse(getCookie("user") || "{}");
         const userId = user?.id || user?._id;
-        if (!userId) return;
+        if (!userId) {
+          setError("User session not found. Please log in again.");
+          return;
+        }
         const res = await apiGetRoadmapsByUser(userId);
-        const data = res.data?.data || [];
+        const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
 
         const mappedPhases = data.map((item: any) => {
           const isValidImageUrl = (url: string) => {
@@ -64,7 +67,7 @@ export default function RevitalizationRoadmap() {
             sessionDate:
               item.extras?.find((ex: any) => ex.name === "Session Date")
                 ?.date || "",
-            route: `/pastor/roadmap-detail/${item._id}`,
+            isPhase: item.type === "Phase" || item.haveNextedRoadMaps === true || (item.roadmaps && item.roadmaps.length > 0),
             imageUrl: isValidImageUrl(item.imageUrl)
               ? item.imageUrl
               : PhaseImg.src,
@@ -252,7 +255,9 @@ export default function RevitalizationRoadmap() {
                   <div className="flex justify-end mt-3 sm:mt-0">
                     <button
                       onClick={() =>
-                        router.push(`/pastor/roadmap-detail/${phase.id}`)
+                        phase.isPhase
+                          ? router.push(`/pastor/SelfRevitalizationPhasePage?id=${phase.id}`)
+                          : router.push(`/pastor/jumpstart?id=${phase.id}`)
                       }
                       className="bg-[#103C8C] text-white text-sm font-medium px-5 py-2 rounded-lg hover:bg-[#0B2E72] transition"
                     >

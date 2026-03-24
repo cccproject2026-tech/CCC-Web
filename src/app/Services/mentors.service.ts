@@ -19,11 +19,11 @@ export const apiGetFieldMentors = (params?: GetUsersParams) =>
 
 // ─── /home endpoints ──────────────────────────────────────────────────────────
 
-// GET /home/mentors?page=&limit=&search=&country=&state=&conference=
+// GET /api/v1/users?role=mentor
 export const apiGetMentorList = (params?: GetMentorsParams) =>
-  axiosInstance.get<{ success: boolean; data: { mentors: MentorResponse[]; total?: number } }>(
-    "/home/mentors",
-    { params },
+  axiosInstance.get<{ success: boolean; data: { users: MentorResponse[]; total?: number } }>(
+    "/users",
+    { params: { ...params, role: "mentor" } },
   );
 
 // GET /home/mentor/:email

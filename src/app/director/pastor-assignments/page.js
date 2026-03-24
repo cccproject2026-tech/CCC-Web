@@ -1,50 +1,20 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AppHero from "@/app/Components/Hero/AppHero";
 import AppFooter from "@/app/Components/AppFooter";
 import AssignmentCard from "@/app/Components/AssignmentCard";
-import AssignMenteesModal from "@/app/Components/AssignMenteesModal";
+import AssignRoadmapModal from "@/app/Components/AssignRoadmapModal";
 import ConfirmModal from "@/app/Components/ConfirmModal";
 import MentorBg from "../../Assets/mentor-bg.png";
-import PhaseImg from "../../Assets/phase-img.png";
 import Card1 from "../../Assets/card1.png";
-import Card2 from "../../Assets/card2.png";
-import Card3 from "../../Assets/card3.png";
-import Card4 from "../../Assets/card4.png";
-
-const ASSIGNMENTS = [
-  {
-    id: 1,
-    title: "Prayer and Visitation Strategy",
-    description: "Finalize the teams vision for the church",
-    image: PhaseImg,
-  },
-  {
-    id: 2,
-    title: "Calendar",
-    description:
-      "Finalize a vision team meeting schedule through the end of the year",
-    image: Card1,
-  },
-  {
-    id: 3,
-    title: "Prayer",
-    description:
-      "Prioritize church prayer times and meet consistently for prayer with your congregation",
-    image: Card2,
-  },
-  {
-    id: 4,
-    title: "Mentoring Conversations",
-    description: "Schedule two mentoring conversations with your mentor",
-    image: Card3,
-  },
-];
+import { apiGetRoadmaps, apiDeleteRoadmap } from "@/app/Services/api";
 
 export default function PastorAssignmentsPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
+  const [roadmaps, setRoadmaps] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
@@ -52,8 +22,32 @@ export default function PastorAssignmentsPage() {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedAssignments, setSelectedAssignments] = useState([]);
 
+  useEffect(() => {
+    fetchRoadmaps();
+  }, []);
+
+  const fetchRoadmaps = async () => {
+    try {
+      setLoading(true);
+      const res = await apiGetRoadmaps();
+      const data = res.data?.data || [];
+      setRoadmaps(
+        data.map((item) => ({
+          id: item._id,
+          title: item.name,
+          description: item.description || item.roadMapDetails || "No description",
+          image: item.imageUrl || Card1,
+        }))
+      );
+    } catch (err) {
+      console.error("Error fetching roadmaps:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleOptionsClick = (id) => {
-    setSelectedAssignment(id);
+    setSelectedAssignment([id]);
     setShowAssignModal(true);
   };
 
@@ -63,38 +57,43 @@ export default function PastorAssignmentsPage() {
     }
   };
 
-  const handleConfirmDelete = () => {
-    setToast(
-      `Deleted ${selectedAssignments.length} assignment${
-        selectedAssignments.length > 1 ? "s" : ""
-      } successfully`
-    );
-    setTimeout(() => setToast(null), 2000);
-    setShowDeleteModal(false);
-    setSelectedAssignments([]);
-    setIsSelectionMode(false);
+  const handleConfirmDelete = async () => {
+    try {
+      await Promise.all(selectedAssignments.map((id) => apiDeleteRoadmap(id)));
+      setRoadmaps((prev) => prev.filter((r) => !selectedAssignments.includes(r.id)));
+      setToast(
+        `Deleted ${selectedAssignments.length} roadmap${selectedAssignments.length > 1 ? "s" : ""} successfully`
+      );
+      setTimeout(() => setToast(null), 2000);
+    } catch (err) {
+      console.error("Error deleting roadmaps:", err);
+    } finally {
+      setShowDeleteModal(false);
+      setSelectedAssignments([]);
+      setIsSelectionMode(false);
+    }
   };
 
-  const handleAssignComplete = (selectedMentees) => {
-    setToast("Assigned Survey Successfully");
+  const handleAssignComplete = () => {
+    setToast("Assigned Successfully");
     setTimeout(() => setToast(null), 2000);
+    setShowAssignModal(false);
     setSelectedAssignments([]);
     setIsSelectionMode(false);
+    fetchRoadmaps();
   };
 
   const toggleSelection = (id) => {
     setSelectedAssignments((prev) =>
-      prev.includes(id)
-        ? prev.filter((assignmentId) => assignmentId !== id)
-        : [...prev, id]
+      prev.includes(id) ? prev.filter((rid) => rid !== id) : [...prev, id]
     );
   };
 
   const selectAll = () => {
-    if (selectedAssignments.length === ASSIGNMENTS.length) {
+    if (selectedAssignments.length === roadmaps.length) {
       setSelectedAssignments([]);
     } else {
-      setSelectedAssignments(ASSIGNMENTS.map((a) => a.id));
+      setSelectedAssignments(roadmaps.map((r) => r.id));
     }
   };
 
@@ -105,20 +104,23 @@ export default function PastorAssignmentsPage() {
 
   const handleAssignedToClick = () => {
     if (selectedAssignments.length > 0) {
+      setSelectedAssignment(selectedAssignments);
       setShowAssignModal(true);
     }
   };
+
+  const filtered = roadmaps.filter((r) =>
+    r.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
       <AppHero title="Roadmap" backgroundImageUrl={MentorBg.src} />
 
-      {/* Content Section */}
       <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-6 md:py-8">
         <div className="max-w-[1400px] mx-auto">
-          {/* Search Bar and Action Buttons - Always Visible */}
+          {/* Search Bar and Action Buttons */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-8">
-            {/* Search Bar */}
             <div className="w-full sm:max-w-[420px]">
               <div className="relative">
                 <input
@@ -132,7 +134,6 @@ export default function PastorAssignmentsPage() {
               </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex gap-3">
               {!isSelectionMode ? (
                 <>
@@ -144,9 +145,7 @@ export default function PastorAssignmentsPage() {
                     <span>Select</span>
                   </button>
                   <button
-                    onClick={() =>
-                      router.push("/director/pastor-assignments/create")
-                    }
+                    onClick={() => router.push("/director/pastor-assignments/create")}
                     className="px-6 py-3 bg-[#2E3B8E] text-white rounded-lg text-[15px] font-semibold shadow-md hover:bg-[#1F2A6E] transition-all flex items-center gap-2"
                   >
                     <i className="fa-solid fa-plus"></i>
@@ -165,14 +164,12 @@ export default function PastorAssignmentsPage() {
             </div>
           </div>
 
-          {/* Selection Mode Bar - Appears below search when items selected */}
+          {/* Selection Mode Bar */}
           {isSelectionMode && selectedAssignments.length > 0 && (
             <div className="bg-white rounded-xl shadow-md p-4 mb-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <span className="text-[15px] font-semibold text-gray-700">
-                  {selectedAssignments.length} Selected Items
-                </span>
-              </div>
+              <span className="text-[15px] font-semibold text-gray-700">
+                {selectedAssignments.length} Selected Items
+              </span>
               <div className="flex items-center gap-3">
                 <button
                   onClick={selectAll}
@@ -196,45 +193,55 @@ export default function PastorAssignmentsPage() {
             </div>
           )}
 
-          {/* Assignment Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {ASSIGNMENTS.map((assignment) => (
-              <AssignmentCard
-                key={assignment.id}
-                id={assignment.id}
-                title={assignment.title}
-                description={assignment.description}
-                image={assignment.image}
-                onView={() => {
-                  router.push(`/director/assignments/${assignment.id}/view`);
-                }}
-                onOptionsClick={handleOptionsClick}
-                isSelected={selectedAssignments.includes(assignment.id)}
-                onSelect={toggleSelection}
-                showCheckbox={isSelectionMode}
-              />
-            ))}
-          </div>
+          {/* Cards Grid */}
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : filtered.length === 0 ? (
+            <p className="text-white/70 text-center py-16">No roadmaps found.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {filtered.map((roadmap) => (
+                <AssignmentCard
+                  key={roadmap.id}
+                  id={roadmap.id}
+                  title={roadmap.title}
+                  description={roadmap.description}
+                  image={roadmap.image}
+                  onView={() => router.push(`/director/pastor-assignments/roadmap/${roadmap.id}`)}
+                  onOptionsClick={handleOptionsClick}
+                  isSelected={selectedAssignments.includes(roadmap.id)}
+                  onSelect={toggleSelection}
+                  showCheckbox={isSelectionMode}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Toast Notification */}
+      {/* Toast */}
       {toast && (
         <div className="fixed top-6 right-6 z-[100] animate-fade-in">
           <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3 border border-gray-100">
             <i className="fa-solid fa-circle-check text-green-500 text-xl"></i>
-            <span className="text-[#2E3B8E] font-semibold text-[15px]">
-              {toast}
-            </span>
+            <span className="text-[#2E3B8E] font-semibold text-[15px]">{toast}</span>
           </div>
         </div>
       )}
 
-      {/* Assign Mentees Modal */}
-      <AssignMenteesModal
+      {/* Assign Roadmap Modal */}
+      <AssignRoadmapModal
         isOpen={showAssignModal}
         onClose={() => setShowAssignModal(false)}
-        onConfirm={handleAssignComplete}
+        roadmapIds={Array.isArray(selectedAssignment) ? selectedAssignment : selectedAssignment ? [selectedAssignment] : []}
+        roadmapName={
+          Array.isArray(selectedAssignment)
+            ? `${selectedAssignment.length} Roadmap${selectedAssignment.length > 1 ? "s" : ""}`
+            : roadmaps.find((r) => r.id === selectedAssignment)?.title || ""
+        }
+        onSuccess={handleAssignComplete}
       />
 
       {/* Delete Confirmation Modal */}
@@ -242,14 +249,8 @@ export default function PastorAssignmentsPage() {
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleConfirmDelete}
-        title={`Delete ${selectedAssignments.length} Assignment${
-          selectedAssignments.length > 1 ? "s" : ""
-        }?`}
-        message={`Are you sure you want to delete ${
-          selectedAssignments.length
-        } assignment${
-          selectedAssignments.length > 1 ? "s" : ""
-        }? This action cannot be undone.`}
+        title={`Delete ${selectedAssignments.length} Roadmap${selectedAssignments.length > 1 ? "s" : ""}?`}
+        message={`Are you sure you want to delete ${selectedAssignments.length} roadmap${selectedAssignments.length > 1 ? "s" : ""}? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
         confirmColor="bg-red-600 hover:bg-red-700"

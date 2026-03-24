@@ -59,8 +59,8 @@ export default function DirectorHome() {
   const fetchMentors = useCallback(async () => {
     try {
       setMentorsLoading(true);
-      const response = await apiGetMentors({ limit: 4 });
-      setMentors(response.data.mentors || []);
+      const response = await apiGetMentors({ limit: 4, roleMatch: "mixed" });
+      setMentors(response.data.data.users || []);
     } catch (error) {
       console.error('Error fetching mentors:', error);
       setMentors([]);
@@ -72,7 +72,7 @@ export default function DirectorHome() {
   const fetchPastors = useCallback(async () => {
     try {
       setPastorsLoading(true);
-      const response = await apiGetPastors({ limit: 4 });
+      const response = await apiGetPastors({ limit: 4, roleMatch: "mixed" });
       setPastors(response.data.data.users || []);
     } catch (error) {
       console.error('Error fetching pastors:', error);
@@ -117,7 +117,7 @@ export default function DirectorHome() {
 
       // Handle mentors
       if (results[2].status === 'fulfilled') {
-        setMentors(results[2].value.data.mentors || []);
+        setMentors(results[2].value.data.data.users || []);
       } else {
         console.error('Error fetching mentors:', results[2].reason);
         setMentors([]);
@@ -540,16 +540,20 @@ export default function DirectorHome() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
               {currentData.map((person) => {
+                const personId = (person as any).id || person._id;
                 const menteeCount = person.assignedId?.length || person.menteeCount || 0;
+                const isMentor = activeTab === "mentors";
                 return (
                   <MentorCard
-                    key={person._id}
+                    key={personId}
                     image={person?.profilePicture ? person.profilePicture : Mentor1}
                     name={`${person.firstName} ${person.lastName}`}
                     role={person.role}
                     menteeCount={menteeCount}
                     onViewDetails={() =>
-                      console.log(`View details for ${person.firstName} ${person.lastName}`)
+                      isMentor
+                        ? router.push(`/director/mentors/profile/${personId}`)
+                        : router.push(`/director/mentees/profile?id=${personId}`)
                     }
                   />
                 );

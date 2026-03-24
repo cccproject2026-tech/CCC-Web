@@ -36,7 +36,7 @@ const mentorImages = [Mentor1, Mentor2, Mentor3];
 export default function PastorDashboard() {
   const router = useRouter();
 
-  const [mediaList, setMediaList] = useState([]);
+  const [mediaList, setMediaList] = useState<any[]>([]);
 
 useEffect(() => {
   async function fetchMedia() {
@@ -55,7 +55,7 @@ useEffect(() => {
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [loadingMentors, setLoadingMentors] = useState(false);
   const [mentorsError, setMentorsError] = useState<string | null>(null);
- const [appointments, setAppointments] = useState([]);
+ const [appointments, setAppointments] = useState<any[]>([]);
   useEffect(() => {
     const fetchMentors = async () => {
       try {
@@ -78,12 +78,6 @@ useEffect(() => {
 
     fetchMentors();
   }, []);
-
-const storedUser = JSON.parse(getCookie("user") || "{}");
-
-const userId = storedUser?.id || "";
-
-
 
   useEffect(() => {
   const storedUser = JSON.parse(getCookie("user") || "{}");
@@ -114,7 +108,7 @@ const userId = storedUser?.id || "";
         const uid = user?.id || user?._id;
         if (!uid) return;
         const res = await apiGetRoadmapsByUser(uid);
-        const data = res.data?.data || [];
+        const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
         const mapped = data.map((item: any) => ({
           id: item._id,
           title: item.name,

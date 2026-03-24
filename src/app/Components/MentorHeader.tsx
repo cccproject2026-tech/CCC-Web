@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
-import { getCookie, removeCookie } from "@/app/utils/cookies";
+import { getCookie, clearAllCookies } from "@/app/utils/cookies";
 import { usePathname, useRouter } from "next/navigation";
 import Framelogo1 from "../Assets/Frame-logo-1.png";
 import Connecticon from "../Assets/Connect-icon.png";
@@ -287,12 +287,8 @@ export default function MentorHeader({ showFullHeader = false }) {
 
                             // 2️⃣ Handle logout action
                             if (item.action === "logout") {
-                              console.log("Logging out...");
-
-                              // example logout flow
-                              removeCookie("token");
+                              clearAllCookies();
                               router.push("/login");
-
                               return;
                             }
 
