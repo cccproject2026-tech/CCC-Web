@@ -19,6 +19,12 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# Build args for NEXT_PUBLIC_ vars (baked in at build time)
+ARG NEXT_PUBLIC_API_BASE_URL
+ARG NEXT_PUBLIC_S3_BUCKET_URL
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_S3_BUCKET_URL=$NEXT_PUBLIC_S3_BUCKET_URL
+
 # Build Next.js
 RUN npm run build
 # Production image, copy all files and run next
