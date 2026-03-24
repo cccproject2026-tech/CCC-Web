@@ -56,9 +56,9 @@ export default function PastorAssessments() {
               : progress?.status === "submitted"
                 ? "Submitted"
                 : "Not Started";
-
+          console.log(item)
           return {
-            id: item.assignmentId,
+            id: item.assessment._id,
             title: item.assessment?.name || "Assessment",
             desc: item.assessment?.description || "",
             status,
@@ -216,19 +216,19 @@ export default function PastorAssessments() {
           {/* 🟩 FLEX CARD LAYOUT */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             {filtered.map((item) => (
-              <div
+              < div
                 key={item.id}
                 className="bg-white rounded-xl shadow-md hover:shadow-lg overflow-hidden flex flex-col md:flex-row transition-all duration-300"
               >
                 {/* LEFT IMAGE */}
-                <div className="relative w-full md:w-[200px] h-[180px] md:h-[200px] flex-shrink-0 m-4 md:m-5">
+                < div className="relative w-full md:w-[200px] h-[180px] md:h-[200px] flex-shrink-0 m-4 md:m-5" >
                   <Image
                     src={item.img}
                     alt={item.title}
                     className="w-full h-full object-cover rounded-lg"
                   />
                   {/* DUE DATE LABEL */}
-                  <div className="absolute bottom-2 left-2 bg-yellow-400 text-black text-xs font-semibold px-2 py-[3px] rounded-md flex items-center gap-1">
+                  < div className="absolute bottom-2 left-2 bg-yellow-400 text-black text-xs font-semibold px-2 py-[3px] rounded-md flex items-center gap-1" >
                     <i className="fa-regular fa-calendar text-xs"></i>
                     {item.date}
                   </div>
@@ -278,23 +278,22 @@ export default function PastorAssessments() {
                   {/* BUTTON */}
                   <div className="flex justify-end mt-3">
                     <button
-                      onClick={() => router.push("/pastor/Assessments/details")}
-                      className={`${item.status === "Completed"
-                        ? "bg-[#103C8C]"
-                        : "bg-[#103C8C]"
-                        } text-white text-xs md:text-sm font-medium px-4 md:px-5 py-2 rounded-lg hover:bg-[#0B2E72] transition`}
-                      suppressHydrationWarning
+                      onClick={() =>
+                        router.push(`/pastor/PastorSurveyCMA?assessmentId=${item.id}`)
+                      }
+                      className="bg-[#103C8C] text-white text-xs md:text-sm font-medium px-4 md:px-5 py-2 rounded-lg hover:bg-[#0B2E72]"
                     >
                       {item.button}
                     </button>
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </main>
+            ))
+            }
+          </div >
+        </div >
+      </main >
 
-    </div>
+    </div >
   );
 }

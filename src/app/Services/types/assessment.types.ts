@@ -102,9 +102,7 @@ export interface SectionAnswer {
 
 export interface SubmitSectionAnswersPayload {
   userId: string;
-  assessmentId: string;
-  sectionId: string;
-  layers: LayerAnswer[];
+  answers: SectionAnswer[];
 }
 
 export interface PreSurveyAnswer {

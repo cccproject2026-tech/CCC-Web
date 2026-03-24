@@ -51,9 +51,17 @@ export const apiUploadAssessmentBanner = (assessmentId: string, file: File) => {
   );
 };
 
-// POST /assessment/:id/submit-section-answers
+// POST /assessment/:id/answers
 export const apiSubmitSectionAnswers = (assessmentId: string, payload: SubmitSectionAnswersPayload) =>
-  axiosInstance.post(`/assessment/${assessmentId}/submit-section-answers`, payload);
+  axiosInstance.post(`/assessment/${assessmentId}/answers`, payload);
+
+// POST /assessment/:id/section/:userId (single section save)
+export const apiSaveSectionAnswers = (
+  assessmentId: string,
+  userId: string,
+  sectionId: string,
+  layers: { layerId: string; selectedChoice: string }[],
+) => axiosInstance.post(`/assessment/${assessmentId}/section/${userId}`, { sectionId, layers });
 
 // POST /assessment/:id/submit-pre-survey
 export const apiSubmitPreSurvey = (assessmentId: string, payload: SubmitPreSurveyPayload) =>
@@ -72,3 +80,7 @@ export const apiGetAssignedAssessments = (userId: string) =>
   axiosInstance.get<{ success: boolean; data: AssessmentResponse[] }>(
     `/assessment/assigned/${userId}`
   );
+
+//  GET /assessment/:assessmentId/answers/:userId
+export const apiGetUserAnswers = (assessmentId: string, userId: string) =>
+  axiosInstance.get(`/assessment/${assessmentId}/answers/${userId}`);
