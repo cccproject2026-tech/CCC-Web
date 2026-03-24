@@ -5,7 +5,7 @@ import ProfilePic from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { apiGetUserById, apiUpdateUserById } from "@/app/Services/users.service";
-import { getGreeting } from "@/app/Services/utils/helpers";
+import { getGreeting, getMentorFromCookie } from "@/app/Services/utils/helpers";
 
 const storedUser =
   typeof window !== "undefined"
@@ -48,6 +48,22 @@ export default function MentorProfile() {
     }));
   };
 
+  const fetchProfile = async () => {
+    try {
+      const mentor = getMentorFromCookie();
+      if (!mentor?.id) return;
+
+      const res = await apiGetUserById(mentor.id);
+
+      setProfile(res.data.data);
+      setForm(res.data.data);
+    } catch (e) {
+      console.error("Failed to fetch profile", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSave = async () => {
     try {
       if (!profile?.id) return;
@@ -66,10 +82,10 @@ export default function MentorProfile() {
       };
 
       const res = await apiUpdateUserById(profile.id, payload);
+      // setProfile(res.data.data);
+      // setForm(res.data.data);
 
-      setProfile(res.data.data);
-      setForm(res.data.data);
-
+      fetchProfile()
       setIsEditing(false);
 
       console.log("Profile updated successfully");
@@ -82,13 +98,14 @@ export default function MentorProfile() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const storedUser = JSON.parse(localStorage.getItem("mentor") || "null");
-        if (!storedUser?.id) return;
+        const mentor = getMentorFromCookie();
 
-        const res = await apiGetUserById(userId);
+        if (!mentor?.id) return;
+
+        const res = await apiGetUserById(mentor.id);
+
         setProfile(res.data.data);
         setForm(res.data.data);
-        console.log(res.data.data)
       } catch (e) {
         console.error("Failed to fetch profile", e);
       } finally {

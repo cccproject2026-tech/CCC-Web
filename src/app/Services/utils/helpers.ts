@@ -1,3 +1,5 @@
+import Cookies from "js-cookie";
+
 export const getGreeting = () => {
     const now = new Date();
 
@@ -56,4 +58,16 @@ export const isOverlapping = (
 
         return newStart < end && newEnd > start;
     });
+};
+
+export const getMentorFromCookie = () => {
+    const cookie = Cookies.get("mentor");
+
+    if (!cookie) return null;
+
+    try {
+        return JSON.parse(decodeURIComponent(cookie));
+    } catch {
+        return null;
+    }
 };

@@ -18,17 +18,28 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import { useRouter } from "next/navigation";
-import { apiGetMentorAppointments, apiGetMentors } from "@/app/Services/api";
+import { apiAssignUsers, apiGetMentorAppointments } from "@/app/Services/api";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { getPastorMedia } from "@/app/Services/pastor.service";
 import { getGreeting } from "@/app/Services/utils/helpers";
+import Cookies from "js-cookie";
+import Link from "next/link";
 
-const storedUser =
-  typeof window !== "undefined"
-    ? JSON.parse(localStorage.getItem("mentor") || "null")
-    : null;
+const getMentorFromCookie = () => {
+  const cookie = Cookies.get("mentor");
+  if (!cookie) return null;
 
-const userId = storedUser?.id;
+  try {
+    return JSON.parse(decodeURIComponent(cookie));
+  } catch {
+    return null;
+  }
+};
+
+const mentor = getMentorFromCookie();
+
+const userId = mentor?.id;
+const assignedIds = mentor?.assignedId || [];
 
 const getMediaThumbnail = (item: any) => {
   console.log(item)
@@ -52,16 +63,50 @@ const isToday = (dateString: string) => {
   );
 };
 
+const exploreCards = [
+  {
+    title: "Mentees",
+    desc: "Schedule and manage appointments with ease for personalized guidance.",
+    icon: "fa-regular fa-calendar-check",
+    route: "/mentor/MenteesDetailed",
+  },
+  {
+    title: "Track Progress",
+    desc: "Track your growth and celebrate milestones in your journey.",
+    icon: "fa-solid fa-chart-simple",
+    route: "/mentor/TrackProgress",
+  },
+  {
+    title: "Schedule",
+    desc: "Share feedback and insights through quick, easy surveys.",
+    icon: "fa-regular fa-clipboard",
+    route: "/mentor/MentorSchedule",
+  },
+  {
+    title: "Revitalization Roadmap",
+    desc: "Plan and execute your development roadmap efficiently.",
+    icon: "fa-solid fa-pen-clip",
+    route: "/mentor/RevitalizationRoadmap",
+  },
+];
+
 export default function home() {
   const router = useRouter();
-  const [mentors, setMentors] = useState<any[]>([]);
+  const [mentees, setMentees] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
-
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
   const [mediaList, setMediaList] = useState([]);
   const [appointments, setAppointments] = useState<any[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(true);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     async function fetchMedia() {
@@ -81,17 +126,16 @@ export default function home() {
       try {
         setLoading(true);
 
-        try {
-          const mentorsRes = await apiGetMentors();
-          console.log(mentorsRes.data.mentors)
-          setMentors(mentorsRes.data.mentors || []);
-          console.log("Mentors loaded:", mentorsRes.data.mentors);
-        } catch (error) {
-          console.log("Mentors API not available, using fallback");
-          setMentors([]);
-        }
+        const mentor = getMentorFromCookie();
+        const userId = mentor?.id;
+
+        if (!userId) return;
+
+        const res = await apiAssignUsers(userId, assignedIds);
+        setMentees(res.data?.data?.assignedId || []);
       } catch (error) {
         console.error("Error fetching mentor home data:", error);
+        setMentees([]);
       } finally {
         setLoading(false);
       }
@@ -126,6 +170,18 @@ export default function home() {
     fetchAppointments();
   }, [userId]);
 
+  const formattedTime = currentTime.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  const formattedDate = currentTime.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -153,9 +209,11 @@ export default function home() {
         <div className="relative z-10 flex justify-center sm:justify-end">
           <div className="text-center sm:text-right">
             <div className="text-2xl sm:text-3xl font-bold tracking-wide">
-              11 : 59 AM
+              {formattedTime}
             </div>
-            <p className="text-sm text-white/80">Tuesday, Sep 23</p>
+            <p className="text-sm text-white/80">
+              {formattedDate}
+            </p>
           </div>
         </div>
 
@@ -186,8 +244,8 @@ export default function home() {
                 />
                 <div className="flex flex-col items-start">
                   <p className="text-xs text-white font-semibold">
-                    {storedUser
-                      ? `${storedUser.firstName ?? ""} ${storedUser.lastName ?? ""}, Welcome Aboard!`
+                    {mentor
+                      ? `${mentor.firstName ?? ""} ${mentor.lastName ?? ""}, Welcome Aboard!`
                       : "Welcome Aboard!"}
                   </p>
                   <div className="w-[120px] h-2 bg-white/30 rounded-full mt-1">
@@ -290,12 +348,13 @@ export default function home() {
           <h2 className="text-[22px] font-semibold text-[#000]">
             Today’s Appointments
           </h2>
-          <a
-            href="#"
-            className="text-[#103C8C] text-sm font-medium hover:underline"
+
+          <Link
+            href="/mentor/MentorSchedule"
+            className="text-[#103C8C] text-sm font-medium hover:underline hover:text-[#0D2E6E]"
           >
             See all
-          </a>
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 relative z-10">
@@ -445,92 +504,73 @@ export default function home() {
         <h2 className="text-[22px] font-semibold text-[#000] mb-10">
           Explore CCC
         </h2>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {[
-            {
-              title: "Mentees",
-              desc: "Schedule and manage appointments with ease for personalized guidance.",
-              icon: "fa-regular fa-calendar-check",
-            },
-            {
-              title: "Track Progress",
-              desc: "Track your growth and celebrate milestones in your journey.",
-              icon: "fa-solid fa-chart-simple",
-            },
-            {
-              title: "Schedule",
-              desc: "Share feedback and insights through quick, easy surveys.",
-              icon: "fa-regular fa-clipboard",
-            },
-            {
-              title: "Revitalization Roadmap",
-              desc: "Plan and execute your development roadmap efficiently.",
-              icon: "fa-solid fa-pen-clip",
-            },
-          ].map((item, i) => (
+          {exploreCards.map((item, i) => (
             <div
               key={i}
-              className="rounded-xl p-6 bg-gradient-to-br from-[#0A3C8C] to-[#052860] text-white flex flex-col justify-between hover:scale-[1.02] transition"
+              onClick={() => router.push(item.route)}
+              className="cursor-pointer rounded-xl p-6 bg-gradient-to-br from-[#0A3C8C] to-[#052860] text-white flex flex-col justify-between hover:scale-[1.02] transition"
             >
               <i className={`${item.icon} text-2xl mb-4`}></i>
+
               <div>
                 <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
                 <p className="text-sm text-white/80">{item.desc}</p>
               </div>
+
               <div className="flex justify-end mt-4">
-                <button className="flex items-center gap-2 text-sm hover:text-[#BFD9FF]">
-                  More{" "}
+                <span className="flex items-center gap-2 text-sm hover:text-[#BFD9FF]">
+                  More
                   <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
-                </button>
+                </span>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* 👥 MY MENTORS */}
+      {/* 👥 MY MENTees */}
       <section className="py-16 px-4 md:px-20 bg-[#F2F6FC]">
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-[22px] font-semibold text-[#000]">Reminders</h2>
-          <a
-            href="#"
+          <Link
+            href="/mentor/MenteesDetailed"
             className="text-[#103C8C] text-sm font-medium hover:underline hover:text-[#0D2E6E]"
-            onClick={() => router.push(`/mentor/MenteesDetailed`)}
           >
             See all
-          </a>
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-          {(mentors.length > 0
-            ? mentors
-            : [
-              { firstName: "John", lastName: "Doe", role: "Field Mentor" },
-              { firstName: "Jane", lastName: "Smith", role: "Senior Mentor" },
-              { firstName: "Mike", lastName: "Johnson", role: "Lead Mentor" },
-              {
-                firstName: "Sarah",
-                lastName: "Wilson",
-                role: "Field Mentor",
-              },
-            ]
-          )
-            .slice(0, 4)
-            .map((mentor, i) => (
+
+          {mentees.length === 0 ? (
+
+            <div className="col-span-full text-center py-10">
+              <p className="text-gray-500 text-sm">
+                No mentees are assigned yet.
+              </p>
+            </div>
+
+          ) : (
+
+            mentees.slice(0, 4).map((mentee, i) => (
               <div
-                key={i}
+                key={mentee._id || i}
                 className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 p-3"
               >
                 <div
-                  className="relative w-full h-[180px]"
-                  onClick={() => router.push(`/mentor/Mymentors`)}
+                  className="relative w-full h-[180px] cursor-pointer"
+                  onClick={() =>
+                    router.push(`/mentor/MenteesDetailed/profile?id=${mentee._id}`)
+                  }
                 >
                   <Image
                     src={
-                      mentor.profilePicture ||
+                      mentee.profilePicture ||
                       [Mentor1, Mentor2, Mentor3][i % 3]
                     }
-                    alt="Mentor"
+                    alt="Mentee"
                     fill
                     className="object-cover rounded-lg"
                   />
@@ -538,9 +578,11 @@ export default function home() {
 
                 <div className="p-4">
                   <h4 className="font-semibold text-gray-900 text-[16px] leading-tight mb-1">
-                    {mentor.firstName} {mentor.lastName}
+                    {mentee.firstName} {mentee.lastName}
                   </h4>
-                  <p className="text-sm text-gray-500">{mentor.role}</p>
+
+                  <p className="text-sm text-gray-500">{mentee.role}</p>
+
                   <p className="text-[13px] text-gray-400 mt-2">
                     Sub text area write something here.
                     <br />
@@ -561,7 +603,10 @@ export default function home() {
                   </div>
                 </div>
               </div>
-            ))}
+            ))
+
+          )}
+
         </div>
       </section>
 

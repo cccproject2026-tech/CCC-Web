@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
@@ -9,66 +9,132 @@ import Card1 from "@/app/Assets/card1.png";
 import Card2 from "@/app/Assets/card2.png";
 import Card3 from "@/app/Assets/card3.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import { getCookie } from "@/app/utils/cookies";
+import { apiGetAssignedAssessments } from "@/app/Services/assessment.service";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
 
 export default function PastorAssessments() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
+  const [assessments, setAssessments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const assessments = [
-    {
-      id: 1,
-      title: "Church Assessment Evaluation (CMA)",
-      desc: "This Survey is about Lorem ipsum dolor sit amet, consectetur",
-      status: "Due",
-      date: "20 Oct 2024",
-      img: Card1,
-      button: "Start Now",
-    },
-    {
-      id: 2,
-      title: "Pastoral Ministry Profile (PMP)",
-      desc: "This Survey is about Lorem ipsum dolor sit amet, consectetur",
-      status: "Not Started",
-      date: "20 Oct 2024",
-      img: Card2,
-      button: "Start Now",
-    },
-    {
-      id: 3,
-      title: "Pastoral Ministry Profile (PMP)",
-      desc: "This Assessment is about Lorem ipsum dolor sit amet, consectetur",
-      status: "Submitted",
-      date: "20 Oct 2024",
-      meeting: "20 January 2025",
-      img: Card3,
-      button: "Meeting Scheduled on 20 January 2025",
-    },
-    {
-      id: 4,
-      title: "Pastoral Ministry Profile (PMP)",
-      desc: "This Survey is about Lorem ipsum dolor sit amet, consectetur",
-      status: "Completed",
-      date: "20 Oct 2024",
-      img: Card3,
-      button: "Customized Development Plans",
-    },
-    {
-      id: 5,
-      title: "Pastoral Ministry Profile (PMP)",
-      desc: "This Survey is about Lorem ipsum dolor sit amet, consectetur",
-      status: "Completed",
-      date: "20 Oct 2024",
-      img: Card3,
-      button: "Customized Development Plans",
-    },
-  ];
+  useEffect(() => {
+    const fetchAssessments = async () => {
+      try {
+        const userCookie = getCookie("user");
+
+        if (!userCookie) {
+          console.error("User cookie not found");
+          return;
+        }
+
+        const user = JSON.parse(userCookie);
+        const userId = user.id;
+
+        const [assessmentRes, progressRes] = await Promise.all([
+          apiGetAssignedAssessments(userId),
+          apiGetUserProgress(userId),
+        ]);
+
+        // assigned assessments
+        const data = assessmentRes.data?.data || [];
+
+        // progress response
+        const progressData = progressRes.data?.data || {};
+        const assessmentProgress = progressData?.assessments || [];
+
+        const mapped = data.map((item: any) => {
+          const progress = assessmentProgress.find(
+            (p: any) => p.assignmentId === item.assignmentId
+          );
+
+          const status =
+            progress?.status === "completed"
+              ? "Completed"
+              : progress?.status === "submitted"
+                ? "Submitted"
+                : "Not Started";
+
+          return {
+            id: item.assignmentId,
+            title: item.assessment?.name || "Assessment",
+            desc: item.assessment?.description || "",
+            status,
+            date: item.dueDate
+              ? new Date(item.dueDate).toLocaleDateString()
+              : "",
+            img: Card1,
+            button: status === "Completed" ? "View Results" : "Start Now",
+          };
+        });
+
+        setAssessments(mapped);
+      } catch (error) {
+        console.error("Failed to fetch assessments", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAssessments();
+  }, []);
+
+  // const assessments = [
+  //   {
+  //     id: 1,
+  //     title: "Church Assessment Evaluation (CMA)",
+  //     desc: "This Survey is about Lorem ipsum dolor sit amet, consectetur",
+  //     status: "Due",
+  //     date: "20 Oct 2024",
+  //     img: Card1,
+  //     button: "Start Now",
+  //   },
+  //   {
+  //     id: 2,
+  //     title: "Pastoral Ministry Profile (PMP)",
+  //     desc: "This Survey is about Lorem ipsum dolor sit amet, consectetur",
+  //     status: "Not Started",
+  //     date: "20 Oct 2024",
+  //     img: Card2,
+  //     button: "Start Now",
+  //   },
+  //   {
+  //     id: 3,
+  //     title: "Pastoral Ministry Profile (PMP)",
+  //     desc: "This Assessment is about Lorem ipsum dolor sit amet, consectetur",
+  //     status: "Submitted",
+  //     date: "20 Oct 2024",
+  //     meeting: "20 January 2025",
+  //     img: Card3,
+  //     button: "Meeting Scheduled on 20 January 2025",
+  //   },
+  //   {
+  //     id: 4,
+  //     title: "Pastoral Ministry Profile (PMP)",
+  //     desc: "This Survey is about Lorem ipsum dolor sit amet, consectetur",
+  //     status: "Completed",
+  //     date: "20 Oct 2024",
+  //     img: Card3,
+  //     button: "Customized Development Plans",
+  //   },
+  //   {
+  //     id: 5,
+  //     title: "Pastoral Ministry Profile (PMP)",
+  //     desc: "This Survey is about Lorem ipsum dolor sit amet, consectetur",
+  //     status: "Completed",
+  //     date: "20 Oct 2024",
+  //     img: Card3,
+  //     button: "Customized Development Plans",
+  //   },
+  // ];
 
   const filtered = assessments.filter((a) =>
     activeTab === "All"
-      ? a.title.toLowerCase().includes(searchTerm.toLowerCase())
+      ? (a.title || "").toLowerCase().includes(searchTerm.toLowerCase())
       : a.status === activeTab &&
-        a.title.toLowerCase().includes(searchTerm.toLowerCase())
+      (a.title || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getStatusColor = (status: string) => {
@@ -85,6 +151,14 @@ export default function PastorAssessments() {
         return "bg-gray-100 text-gray-600";
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen text-white">
+        Loading assessments...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0A3C8C] text-[#0B1C58]">
@@ -126,11 +200,10 @@ export default function PastorAssessments() {
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-3 md:px-5 py-2 text-xs md:text-sm font-medium transition-all whitespace-nowrap ${
-                      activeTab === tab
-                        ? "bg-[#103C8C] text-white"
-                        : "text-gray-600 hover:bg-gray-100"
-                    }`}
+                    className={`px-3 md:px-5 py-2 text-xs md:text-sm font-medium transition-all whitespace-nowrap ${activeTab === tab
+                      ? "bg-[#103C8C] text-white"
+                      : "text-gray-600 hover:bg-gray-100"
+                      }`}
                     suppressHydrationWarning
                   >
                     {tab}
@@ -206,11 +279,10 @@ export default function PastorAssessments() {
                   <div className="flex justify-end mt-3">
                     <button
                       onClick={() => router.push("/pastor/Assessments/details")}
-                      className={`${
-                        item.status === "Completed"
-                          ? "bg-[#103C8C]"
-                          : "bg-[#103C8C]"
-                      } text-white text-xs md:text-sm font-medium px-4 md:px-5 py-2 rounded-lg hover:bg-[#0B2E72] transition`}
+                      className={`${item.status === "Completed"
+                        ? "bg-[#103C8C]"
+                        : "bg-[#103C8C]"
+                        } text-white text-xs md:text-sm font-medium px-4 md:px-5 py-2 rounded-lg hover:bg-[#0B2E72] transition`}
                       suppressHydrationWarning
                     >
                       {item.button}

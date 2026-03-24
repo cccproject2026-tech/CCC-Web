@@ -14,6 +14,7 @@ import { useSearchParams } from "next/navigation";
 import { apiAddFinalComment, apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
 import { apiGetAssessmentById } from "@/app/Services/assessment.service";
+import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 
 export default function PastorProgressPage() {
   const [roadmapFilter, setRoadmapFilter] = useState("All");
@@ -128,8 +129,8 @@ export default function PastorProgressPage() {
 
   const handleMarkComplete = async () => {
     try {
-
-      const mentor = JSON.parse(localStorage.getItem("mentor") || "{}");
+      const mentor = getMentorFromCookie();
+      if (!mentor?.id) return;
 
       await apiAddFinalComment({
         userId: userId as string,
@@ -144,7 +145,6 @@ export default function PastorProgressPage() {
       setShowSuccess(true);
 
       setTimeout(() => setShowSuccess(false), 3000);
-
     } catch (err) {
       console.error("Failed to submit final comment", err);
     }

@@ -1,8 +1,6 @@
 "use client";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "@/app/Assets/mentees-hero.png";
 import MapImg from "@/app/Assets/map-view.png"; // 🗺️ your static map image
 import Mentor1 from "@/app/Assets/mentor1.png";
@@ -13,6 +11,7 @@ import MentorHeader from "@/app/Components/MentorHeader";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { useRouter } from "next/navigation";
+import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 const IMAGE_POOL = [Mentor1, Mentor2, Mentor3];
 
 export default function MyMenteesPage() {
@@ -28,14 +27,14 @@ export default function MyMenteesPage() {
   useEffect(() => {
     const fetchMyMentees = async () => {
       try {
-        const storedUser = JSON.parse(localStorage.getItem("mentor") || "null");
-        if (!storedUser?.id) return;
+        const mentor = getMentorFromCookie();
 
-        // 1️⃣ get assigned mentees
-        const res = await apiGetAssignedUsers(storedUser.id);
+        if (!mentor?.id) return;
+
+        const res = await apiGetAssignedUsers(mentor.id);
 
         const menteeUsers = res.data.data;
-        // 2️⃣ map to UI model
+
         const mapped = menteeUsers.map((u: any, i: number) => ({
           id: u.id ?? u._id,
           name: `${u.firstName} ${u.lastName}`,

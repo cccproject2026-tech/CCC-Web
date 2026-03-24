@@ -8,13 +8,7 @@ import { apiGetUserById, apiUpdateUserById } from "@/app/Services/users.service"
 import { getGreeting } from "@/app/Services/utils/helpers";
 import AppHero from "@/app/Components/Hero/AppHero";
 import MentorBg from "@/app/Assets/mentor-bg.png";
-
-const storedUser =
-  typeof window !== "undefined"
-    ? JSON.parse(localStorage.getItem("mentor") || "null")
-    : null;
-
-const userId = storedUser?.id;
+import { useSearchParams } from "next/navigation";
 
 export default function MentorProfile() {
   const [isEditing, setIsEditing] = useState(false);
@@ -22,6 +16,8 @@ export default function MentorProfile() {
   const [loading, setLoading] = useState(true);
   const [greeting, setGreeting] = useState("");
   const [form, setForm] = useState<any>(null);
+  const searchParams = useSearchParams();
+  const userId = searchParams.get("id");
 
   useEffect(() => {
     setGreeting(getGreeting());
@@ -67,7 +63,7 @@ export default function MentorProfile() {
         churchDetails: form?.interest?.churchDetails || [],
       };
 
-      const res = await apiUpdateUserById(profile.id, payload);
+      const res = await apiUpdateUserById(userId as string, payload);
 
       setProfile(res.data.data);
       setForm(res.data.data);
@@ -84,13 +80,13 @@ export default function MentorProfile() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const storedUser = JSON.parse(localStorage.getItem("mentor") || "null");
-        if (!storedUser?.id) return;
+        if (!userId) return;
 
         const res = await apiGetUserById(userId);
+
         setProfile(res.data.data);
         setForm(res.data.data);
-        console.log(res.data.data)
+
       } catch (e) {
         console.error("Failed to fetch profile", e);
       } finally {
@@ -99,7 +95,7 @@ export default function MentorProfile() {
     };
 
     fetchProfile();
-  }, []);
+  }, [userId]);
 
   const handleChange = (key: string, value: string) => {
     setForm((prev: any) => ({
@@ -143,7 +139,7 @@ export default function MentorProfile() {
         title={`${profile.firstName} ${profile.lastName}`}
         backgroundImageUrl={MentorBg.src}
         breadcrumbItems={[
-          { label: "Mentees", href: "/director/mentees" },
+          { label: "Mentees", href: "/mentor/MenteesDetailed" },
           { label: `${profile.firstName} ${profile.lastName}` },
         ]}
       />

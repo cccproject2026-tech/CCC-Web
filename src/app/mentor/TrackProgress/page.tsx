@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
+import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 
 export default function TrackProgressPage() {
   const [filter, setFilter] = useState("All");
@@ -22,14 +23,12 @@ export default function TrackProgressPage() {
   useEffect(() => {
     const fetchPastors = async () => {
       try {
-        const mentor = JSON.parse(localStorage.getItem("mentor") || "null");
+        const mentor = getMentorFromCookie();
         if (!mentor?.id) return;
 
-        // 1️⃣ get assigned users
         const res = await apiGetAssignedUsers(mentor.id);
         const users = res.data?.data || [];
 
-        // 2️⃣ fetch progress for each
         const results = await Promise.all(
           users.map(async (u: any) => {
             try {

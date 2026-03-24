@@ -11,7 +11,7 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { Appointment } from "@/app/Services/types";
 import { apiCreateAvailability, apiGetMentorAppointments, apiGetWeeklyAvailability } from "@/app/Services/appointments.service";
-import { convertToMinutes, isOverlapping, timeOptions } from "@/app/Services/utils/helpers";
+import { convertToMinutes, getMentorFromCookie, isOverlapping, timeOptions } from "@/app/Services/utils/helpers";
 
 export default function MentorSchedule() {
   const [activeTab, setActiveTab] = useState<
@@ -62,10 +62,9 @@ export default function MentorSchedule() {
   });
 
   useEffect(() => {
-    const mentorData = localStorage.getItem("mentor");
+    const mentor = getMentorFromCookie();
 
-    if (mentorData) {
-      const mentor = JSON.parse(mentorData);
+    if (mentor?.id) {
       setMentorId(mentor.id);
     }
   }, []);

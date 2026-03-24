@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
-import HeroBg from "../../Assets/jumpstart-hero.png";
+import HeroBg from "../../../Assets/jumpstart-hero.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 export default function CMAAssessment() {
@@ -68,20 +68,18 @@ export default function CMAAssessment() {
               <button
                 key={item.key}
                 onClick={() => setActiveTab(item.key)}
-                className={`flex justify-between items-center px-4 py-3 rounded-md text-sm font-medium transition-all ${
-                  activeTab === item.key
+                className={`flex justify-between items-center px-4 py-3 rounded-md text-sm font-medium transition-all ${activeTab === item.key
                     ? "bg-[#103C8C] text-white shadow-sm"
                     : "bg-[#F8FAFF] text-gray-600 hover:bg-[#E9EEFF]"
-                }`}
+                  }`}
               >
                 {item.label}
                 {item.count && (
                   <span
-                    className={`text-xs font-semibold rounded-full px-2 py-[1px] ${
-                      activeTab === item.key
+                    className={`text-xs font-semibold rounded-full px-2 py-[1px] ${activeTab === item.key
                         ? "bg-white/20 text-white"
                         : "bg-white border border-[#D0DAF9] text-[#103C8C]"
-                    }`}
+                      }`}
                   >
                     {item.count}
                   </span>
@@ -267,7 +265,7 @@ export default function CMAAssessment() {
         </div>
       )}
 
-  
+
     </div>
   );
 }

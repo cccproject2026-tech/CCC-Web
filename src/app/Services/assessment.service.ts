@@ -66,3 +66,9 @@ export const apiSendSectionRecommendations = (assessmentId: string, payload: Sen
 // GET /assessment/:id/recommendations
 export const apiGetSectionRecommendations = (assessmentId: string, userId: string) =>
   axiosInstance.get(`/assessment/${assessmentId}/recommendations`, { params: { userId } });
+
+// GET /assessment/assigned/:userId
+export const apiGetAssignedAssessments = (userId: string) =>
+  axiosInstance.get<{ success: boolean; data: AssessmentResponse[] }>(
+    `/assessment/assigned/${userId}`
+  );

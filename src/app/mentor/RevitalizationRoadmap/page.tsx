@@ -13,6 +13,7 @@ import Mentor1 from "@/app/Assets/mentor1.png";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetRoadmaps } from "@/app/Services/roadmaps.service";
+import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 
 type Mentee = {
   _id: string;
@@ -40,10 +41,9 @@ export default function RevitalizationRoadmapPage() {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const mentorStr = localStorage.getItem("mentor");
-        if (!mentorStr) throw new Error("Mentor missing in localStorage");
+        const mentor = getMentorFromCookie();
 
-        const mentor = JSON.parse(mentorStr);
+        if (!mentor?.id) return;
 
         const usersRes = await apiGetAssignedUsers(mentor.id);
         const users = usersRes.data.data || [];
@@ -52,6 +52,7 @@ export default function RevitalizationRoadmapPage() {
           users.map(async (u: any) => {
             try {
               const p = await apiGetUserProgress(u._id);
+
               return {
                 userId: u._id,
                 progress: p.data.data?.overallProgress ?? 0,
@@ -146,8 +147,8 @@ export default function RevitalizationRoadmapPage() {
               <button
                 onClick={() => setActiveTab("Pastor")}
                 className={`px-6 py-[8px] text-sm ${activeTab === "Pastor"
-                    ? "bg-[#103C8C] text-white"
-                    : "text-gray-600"
+                  ? "bg-[#103C8C] text-white"
+                  : "text-gray-600"
                   }`}
               >
                 Pastor’s Roadmaps
@@ -156,8 +157,8 @@ export default function RevitalizationRoadmapPage() {
               <button
                 onClick={() => setActiveTab("Library")}
                 className={`px-6 py-[8px] text-sm ${activeTab === "Library"
-                    ? "bg-[#103C8C] text-white"
-                    : "text-gray-600"
+                  ? "bg-[#103C8C] text-white"
+                  : "text-gray-600"
                   }`}
               >
                 Roadmap Library
