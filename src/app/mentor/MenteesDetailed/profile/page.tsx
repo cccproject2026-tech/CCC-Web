@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import ProfilePic from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
@@ -10,7 +10,7 @@ import AppHero from "@/app/Components/Hero/AppHero";
 import MentorBg from "@/app/Assets/mentor-bg.png";
 import { useSearchParams } from "next/navigation";
 
-export default function MentorProfile() {
+function MentorProfileContent() {
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -380,5 +380,13 @@ export default function MentorProfile() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function MentorProfile() {
+  return (
+    <Suspense fallback={<div className="text-white p-10">Loading...</div>}>
+      <MentorProfileContent />
+    </Suspense>
   );
 }
