@@ -1,6 +1,5 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import AppFooter from "@/app/Components/AppFooter";
 import RoadmapCard from "@/app/Components/RoadmapCard";
@@ -12,12 +11,14 @@ import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
 import Card1 from "../../Assets/card1.png";
-import { apiGetRoadmaps } from "@/app/Services/api";
+import { apiGetRoadmaps, apiGetMentorList, apiGetOverallProgress, apiDeleteRoadmap } from "@/app/Services/api";
+import CreateRoadmapModal from "@/app/Components/CreateRoadmapModal";
 
 
 export default function RevitalizationRoadmapPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("roadmap-library");
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("least-mentees");
   const [filterCount, setFilterCount] = useState(3);
@@ -30,6 +31,44 @@ export default function RevitalizationRoadmapPage() {
   });
   const [roadmapLibrary, setRoadmapLibrary] = useState([]);
   const [loadingRoadmaps, setLoadingRoadmaps] = useState(false);
+  const [mentorsList, setMentorsList] = useState([]);
+  const [loadingMentors, setLoadingMentors] = useState(false);
+  const [pastorProgressList, setPastorProgressList] = useState([]);
+  const [loadingPastors, setLoadingPastors] = useState(false);
+
+  useEffect(() => {
+    if (activeTab !== "mentors" || mentorsList.length > 0) return;
+    const fetchMentors = async () => {
+      try {
+        setLoadingMentors(true);
+        const res = await apiGetMentorList();
+        const data = res.data?.data?.users || res.data?.data?.mentors || [];
+        setMentorsList(data);
+      } catch (err) {
+        console.error("Error fetching mentors:", err);
+      } finally {
+        setLoadingMentors(false);
+      }
+    };
+    fetchMentors();
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab !== "pastor-roadmaps" || pastorProgressList.length > 0) return;
+    const fetchPastors = async () => {
+      try {
+        setLoadingPastors(true);
+        const res = await apiGetOverallProgress("pastor");
+        const data = res.data?.data || [];
+        setPastorProgressList(data);
+      } catch (err) {
+        console.error("Error fetching pastor progress:", err);
+      } finally {
+        setLoadingPastors(false);
+      }
+    };
+    fetchPastors();
+  }, [activeTab]);
 
   const sortPopupRef = useRef(null);
   const filterPopupRef = useRef(null);
@@ -57,122 +96,6 @@ export default function RevitalizationRoadmapPage() {
     fetchRoadmaps();
   }, []);
 
-  // Mentors Data
-  const mentors = [
-    { id: 1, name: "Jacob Jones", image: Mentor1 },
-    { id: 2, name: "John Doe", image: Mentor2 },
-    { id: 3, name: "Robert Fox", image: Mentor3 },
-    { id: 4, name: "Jacob Jones", image: Mentor1 },
-    { id: 5, name: "Robert Fox", image: Mentor3 },
-    { id: 6, name: "John Doe", image: Mentor2 },
-  ];
-
-  const mentorCards = [
-    {
-      id: 1,
-      name: "John Doe",
-      role: "Mentor",
-      menteeCount: 5,
-      image: Mentor1,
-      description: "Sub text area write something here. That you can read more",
-    },
-    {
-      id: 2,
-      name: "John Doe",
-      role: "Mentor",
-      menteeCount: 6,
-      image: Mentor2,
-      description: "Sub text area write something here. That you can read more",
-    },
-    {
-      id: 3,
-      name: "John Doe",
-      role: "Mentor",
-      menteeCount: 3,
-      image: Mentor3,
-      description: "Sub text area write something here. That you can read more",
-    },
-    {
-      id: 4,
-      name: "John Doe",
-      role: "Mentor",
-      menteeCount: 4,
-      image: Mentor1,
-      description: "Sub text area write something here. That you can read more",
-    },
-    {
-      id: 5,
-      name: "John Doe",
-      role: "Mentor",
-      menteeCount: 2,
-      image: Mentor2,
-      description: "Sub text area write something here. That you can read more",
-    },
-    {
-      id: 6,
-      name: "John Doe",
-      role: "Mentor",
-      menteeCount: 7,
-      image: Mentor3,
-      description: "Sub text area write something here. That you can read more",
-    },
-    {
-      id: 7,
-      name: "John Doe",
-      role: "Mentor",
-      menteeCount: 1,
-      image: Mentor1,
-      description: "Sub text area write something here. That you can read more",
-    },
-    {
-      id: 8,
-      name: "John Doe",
-      role: "Mentor",
-      menteeCount: 8,
-      image: Mentor2,
-      description: "Sub text area write something here. That you can read more",
-    },
-  ];
-
-  // Pastor Roadmaps Data
-  const pastorRoadmaps = [
-    {
-      id: 1,
-      name: "John Doe",
-      phase: "Community Revitalization and Multiplication",
-      progress: 100,
-      image: Mentor1,
-      description:
-        "Sub text area write something here. That you can read more about him.",
-    },
-    {
-      id: 2,
-      name: "John Doe",
-      phase: "Church Empowerment",
-      progress: 70,
-      image: Mentor2,
-      description:
-        "Sub text area write something here. That you can read more about him.",
-    },
-    {
-      id: 3,
-      name: "John Doe",
-      phase: "Self Revitalization",
-      progress: 70,
-      image: Mentor3,
-      description:
-        "Sub text area write something here. That you can read more about him.",
-    },
-    {
-      id: 4,
-      name: "John Doe",
-      phase: "Self Revitalization",
-      progress: 70,
-      image: Mentor1,
-      description:
-        "Sub text area write something here. That you can read more about him.",
-    },
-  ];
 
   // Close popups when clicking outside
   useEffect(() => {
@@ -215,6 +138,15 @@ export default function RevitalizationRoadmapPage() {
   const handleClearSort = () => {
     setSortBy("least-mentees");
     setShowSortPopup(false);
+  };
+
+  const handleDeleteRoadmap = async (id) => {
+    try {
+      await apiDeleteRoadmap(id);
+      setRoadmapLibrary((prev) => prev.filter((r) => r.id !== id));
+    } catch (err) {
+      console.error("Error deleting roadmap:", err);
+    }
   };
 
   const handleClearFilter = () => {
@@ -298,9 +230,14 @@ export default function RevitalizationRoadmapPage() {
                   Pastor's Roadmaps
                 </button>
                 <button
-                  onClick={() =>
-                    router.push("/director/revitalization-roadmap/home")
-                  }
+                  onClick={() => router.push("/director/pastor-assignments")}
+                  className="px-6 py-3 bg-white text-[#2E3B8E] border border-[#2E3B8E] rounded-lg font-semibold text-[14px] hover:bg-blue-50 transition-all flex items-center gap-2"
+                >
+                  <i className="fa-solid fa-share-nodes"></i>
+                  Assign
+                </button>
+                <button
+                  onClick={() => setShowCreateModal(true)}
                   className="px-6 py-3 bg-[#2E3B8E] text-white rounded-lg font-semibold text-[14px] hover:bg-[#1F2A6E] transition-all flex items-center gap-2"
                 >
                   <i className="fa-solid fa-plus"></i>
@@ -326,10 +263,13 @@ export default function RevitalizationRoadmapPage() {
                     .map((roadmap) => (
                       <RoadmapCard
                         key={roadmap.id}
+                        id={roadmap.id}
                         img={roadmap.img}
                         title={roadmap.title}
                         description={roadmap.description}
                         completionTime={roadmap.completionTime}
+                        onEdit={() => {}}
+                        onDelete={() => handleDeleteRoadmap(roadmap.id)}
                       />
                     ))}
                   {roadmapLibrary.filter((r) =>
@@ -344,13 +284,22 @@ export default function RevitalizationRoadmapPage() {
 
           {activeTab === "mentors" && (
             <div>
+              {loadingMentors ? (
+                <div className="flex justify-center py-12">
+                  <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : (
+              <>
               {/* Mentor Avatars */}
               <FeaturedAvatars
-                items={mentors.map((mentor) => ({
-                  id: mentor.id,
-                  name: mentor.name,
-                  img: mentor.image,
-                }))}
+                items={mentorsList.map((mentor, idx) => {
+                  const defaultImages = [Mentor1, Mentor2, Mentor3];
+                  return {
+                    id: mentor._id || mentor.id,
+                    name: `${mentor.firstName} ${mentor.lastName}`,
+                    img: mentor.profilePicture || defaultImages[idx % defaultImages.length],
+                  };
+                })}
                 gapClass="gap-4"
                 nameClass="text-sm text-white"
                 className="mb-6"
@@ -521,37 +470,58 @@ export default function RevitalizationRoadmapPage() {
 
               {/* Mentor Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {mentorCards.map((mentor) => (
-                  <MentorCard
-                    key={mentor.id}
-                    image={mentor.image}
-                    name={mentor.name}
-                    role={mentor.role}
-                    menteeCount={mentor.menteeCount}
-                    onViewDetails={() => {
-                      // Handle view details action
-                      console.log(`View details for ${mentor.name}`);
-                    }}
-                  />
-                ))}
+                {mentorsList
+                  .filter((m) =>
+                    `${m.firstName} ${m.lastName}`
+                      .toLowerCase()
+                      .includes(searchQuery.toLowerCase())
+                  )
+                  .sort((a, b) => {
+                    const aC = a.assignedId?.length || 0;
+                    const bC = b.assignedId?.length || 0;
+                    return sortBy === "most-mentees" ? bC - aC : aC - bC;
+                  })
+                  .map((mentor, idx) => {
+                    const defaultImages = [Mentor1, Mentor2, Mentor3];
+                    const fallback = defaultImages[idx % defaultImages.length];
+                    return (
+                    <MentorCard
+                      key={mentor._id || mentor.id}
+                      image={mentor.profilePicture || fallback}
+                      name={`${mentor.firstName} ${mentor.lastName}`}
+                      role={mentor.role || "Mentor"}
+                      menteeCount={mentor.assignedId?.length || 0}
+                      onViewDetails={() => router.push(`/director/mentors/profile/${mentor._id || mentor.id}`)}
+                    />
+                  );})
+                }
+                {mentorsList.length === 0 && (
+                  <p className="text-white/70 col-span-4">No mentors found.</p>
+                )}
               </div>
+              </>
+              )}
             </div>
           )}
 
           {activeTab === "pastor-roadmaps" && (
             <div>
+              {loadingPastors ? (
+                <div className="flex justify-center py-12">
+                  <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : (
+              <>
               {/* Featured Avatars */}
               <FeaturedAvatars
-                items={pastorRoadmaps
-                  .map((pastor) => ({
-                    id: pastor.id,
-                    name: pastor.name,
-                    img: pastor.image,
-                  }))
-                  .filter(
-                    (pastor, index, self) =>
-                      index === self.findIndex((p) => p.name === pastor.name)
-                  )}
+                items={pastorProgressList.map((pastor, idx) => {
+                  const defaultImages = [Mentor1, Mentor2, Mentor3];
+                  return {
+                    id: pastor.userId,
+                    name: `${pastor.firstName} ${pastor.lastName}`,
+                    img: pastor.profilePicture || defaultImages[idx % defaultImages.length],
+                  };
+                })}
                 gapClass="gap-4"
                 nameClass="text-sm text-white"
                 className="mb-6"
@@ -561,79 +531,8 @@ export default function RevitalizationRoadmapPage() {
               {/* Horizontal Line */}
               <div className="h-px bg-white/30 mb-6"></div>
 
-              {/* Sort and Filter */}
-              <div className="flex justify-between items-center mb-6">
-                <div
-                  className="flex items-center gap-4 relative"
-                  ref={sortPopupRef}
-                >
-                  <button
-                    onClick={() => setShowSortPopup(!showSortPopup)}
-                    className="bg-white border-2 border-gray-200 rounded-lg px-4 py-2 text-gray-700 font-semibold text-[14px] focus:outline-none focus:border-[#2E3B8E] hover:bg-gray-50 transition-all flex items-center gap-2"
-                  >
-                    <span>
-                      {sortBy === "least-mentees"
-                        ? "Least Mentees"
-                        : "Most Mentees"}
-                    </span>
-                    <i className="fa-solid fa-chevron-down text-gray-600 text-xs"></i>
-                  </button>
-
-                  {/* Sort Popup */}
-                  {showSortPopup && (
-                    <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-4 min-w-[250px] z-50">
-                      <h3 className="text-[14px] font-bold text-gray-900 mb-3">
-                        Sort Mentees popup 15
-                      </h3>
-
-                      {/* Radio Options */}
-                      <div className="space-y-3 mb-4">
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="sort"
-                            value="least-mentees"
-                            checked={sortBy === "least-mentees"}
-                            onChange={(e) => {
-                              setSortBy(e.target.value);
-                              setShowSortPopup(false);
-                            }}
-                            className="w-4 h-4 text-[#2E3B8E] focus:ring-[#2E3B8E]"
-                          />
-                          <span className="text-[14px] text-gray-700">
-                            Least number of Mentees
-                          </span>
-                        </label>
-
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="sort"
-                            value="most-mentees"
-                            checked={sortBy === "most-mentees"}
-                            onChange={(e) => {
-                              setSortBy(e.target.value);
-                              setShowSortPopup(false);
-                            }}
-                            className="w-4 h-4 text-[#2E3B8E] focus:ring-[#2E3B8E]"
-                          />
-                          <span className="text-[14px] text-gray-700">
-                            Most number of Mentees
-                          </span>
-                        </label>
-                      </div>
-
-                      {/* Clear Sort Button */}
-                      <button
-                        onClick={handleClearSort}
-                        className="text-[#2E3B8E] text-[14px] font-semibold hover:underline"
-                      >
-                        Clear Sort
-                      </button>
-                    </div>
-                  )}
-                </div>
-
+              {/* Filter */}
+              <div className="flex justify-end items-center mb-6">
                 <div className="relative" ref={filterPopupRef}>
                   <button
                     onClick={() => setShowFilterPopup(!showFilterPopup)}
@@ -725,26 +624,61 @@ export default function RevitalizationRoadmapPage() {
 
               {/* Pastor Cards Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {pastorRoadmaps.map((pastor) => (
-                  <PastorCard
-                    key={pastor.id}
-                    image={pastor.image}
-                    name={pastor.name}
-                    description={pastor.description}
-                    phase={pastor.phase}
-                    progress={pastor.progress}
-                    onViewDetails={() => {
-                      // Handle view details action
-                      console.log(`View details for ${pastor.name}`);
-                    }}
-                  />
-                ))}
+                {pastorProgressList
+                  .filter((p) =>
+                    `${p.firstName} ${p.lastName}`
+                      .toLowerCase()
+                      .includes(searchQuery.toLowerCase())
+                  )
+                  .map((pastor, idx) => {
+                    const defaultImages = [Mentor1, Mentor2, Mentor3];
+                    const fallback = defaultImages[idx % defaultImages.length];
+                    return (
+                      <PastorCard
+                        key={pastor.userId}
+                        image={pastor.profilePicture || fallback}
+                        name={`${pastor.firstName} ${pastor.lastName}`}
+                        description={`${pastor.completedRoadmaps || 0}/${pastor.totalRoadmaps || 0} roadmaps completed`}
+                        phase="Roadmap Progress"
+                        progress={pastor.overallRoadmapProgress || 0}
+                        onViewDetails={() => {
+                          router.push("/director/revitalization-roadmap/home");
+                        }}
+                      />
+                    );
+                  })}
+                {pastorProgressList.length === 0 && (
+                  <p className="text-white/70 col-span-2">No pastor progress found.</p>
+                )}
               </div>
+              </>
+              )}
             </div>
           )}
         </div>
       </main>
 
+      <CreateRoadmapModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSuccess={() => {
+          // re-fetch roadmaps if on roadmap-library tab
+          if (activeTab === "roadmap-library") {
+            setRoadmapLibrary([]);
+            setLoadingRoadmaps(true);
+            apiGetRoadmaps().then((res) => {
+              const data = res.data?.data || [];
+              setRoadmapLibrary(data.map((item) => ({
+                id: item._id,
+                title: item.name,
+                description: item.description || item.roadMapDetails || "No description",
+                completionTime: item.duration || "N/A",
+                img: item.imageUrl || Card1,
+              })));
+            }).catch(() => {}).finally(() => setLoadingRoadmaps(false));
+          }
+        }}
+      />
       <AppFooter />
     </div>
   );

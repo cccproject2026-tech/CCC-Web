@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
-import { getCookie } from "@/app/utils/cookies";
+import { getCookie, clearAllCookies } from "@/app/utils/cookies";
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Framelogo1 from "../Assets/Frame-logo-1.png";
@@ -337,6 +337,11 @@ const [notificationCount, setNotificationCount] = useState(0);
                       <div key={i} className="relative">
                         <button
                           onClick={() => {
+                            if (item.label === "Log out") {
+                              clearAllCookies();
+                              router.push("/pastor/login");
+                              return;
+                            }
                             if (item.subMenu) {
                               setShowSettingsMenu((prev) => !prev);
                             }

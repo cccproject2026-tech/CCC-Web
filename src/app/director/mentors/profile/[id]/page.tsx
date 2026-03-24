@@ -1,55 +1,73 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import AppHero from "@/app/Components/Hero/AppHero";
-import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
 import ConfirmModal from "@/app/Components/ConfirmModal";
 import MentorBg from "@/app/Assets/mentor-bg.png";
 import Mentor1 from "@/app/Assets/mentor1.png";
 import ProfileForm from "@/app/Components/ProfileForm";
+import { apiGetUserById } from "@/app/Services/users.service";
 
 export default function MentorProfilePage() {
   const router = useRouter();
+  const { id } = useParams<{ id: string }>();
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const mentorData = {
-    firstName: "John",
-    lastName: "Doe",
-    role: "Senior Field Mentor",
-    phoneNumber: "09878564398",
-    email: "johndoe@gmail.com",
-    progress: 100,
-    specialization: "Church Revitalization",
-    experience: 15,
-    totalMentees: 5,
-    activeMentees: 3,
-    completedMentees: 2,
-    church1: {
-      name: "Grace Community Church, CA",
-      phone: "09878564398",
-      website: "gracechurch.com",
-      address: "123 Grace Street, CA",
-      city: "Oakland",
-      state: "California",
-      zipCode: "94601",
-      country: "USA",
-    },
+  // Profile state populated from API
+  const [mentorData, setMentorData] = useState({
+    firstName: "",
+    lastName: "",
+    role: "",
+    phoneNumber: "",
+    email: "",
+    profilePicture: null as string | null,
+    totalMentees: 0,
     otherInfo: {
-      title: "Senior Pastor",
-      yearsInMinistry: "15",
-      conference: "Oakland",
-      certifications: "Leadership Development, Church Growth",
-      expertise:
-        "Church Revitalization, Community Engagement, Leadership Training",
-      bio: "Dedicated mentor with 15 years of experience in pastoral ministry and church leadership. Passionate about helping pastors grow and develop their ministries through strategic guidance and support.",
+      title: "",
+      yearsInMinistry: "",
+      conference: "",
+      bio: "",
     },
-  };
+  });
+
+  useEffect(() => {
+    if (!id) return;
+    const fetchProfile = async () => {
+      try {
+        setLoading(true);
+        const res = await apiGetUserById(id);
+        const user = res.data.data;
+        const interest = user?.interest;
+        setMentorData({
+          firstName: user.firstName ?? "",
+          lastName: user.lastName ?? "",
+          role: user.role ?? "",
+          phoneNumber: user.phoneNumber ?? "",
+          email: user.email ?? "",
+          profilePicture: user.profilePicture ?? null,
+          totalMentees: user.assignedId?.length ?? 0,
+          otherInfo: {
+            title: interest?.title ?? "",
+            yearsInMinistry: interest?.yearsInMinistry ?? "",
+            conference: interest?.conference ?? "",
+            bio: interest?.comments ?? "",
+          },
+        });
+      } catch (err) {
+        console.error("Failed to fetch mentor profile", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProfile();
+  }, [id]);
 
   const optionsMenuItems = [
     {
@@ -98,14 +116,28 @@ export default function MentorProfilePage() {
     }, 2000);
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
+        <AppHero title="Mentor Profile" backgroundImageUrl={MentorBg.src} />
+        <div className="flex justify-center items-center py-32">
+          <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+        </div>
+        <AppFooter />
+      </div>
+    );
+  }
+
+  const fullName = `${mentorData.firstName} ${mentorData.lastName}`.trim();
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
       <AppHero
-        title={`${mentorData.firstName} ${mentorData.lastName}`}
+        title={fullName || "Mentor Profile"}
         backgroundImageUrl={MentorBg.src}
         breadcrumbItems={[
           { label: "Mentors", href: "/director/mentors" },
-          { label: `${mentorData.firstName} ${mentorData.lastName}` },
+          { label: fullName },
         ]}
       />
 
@@ -119,20 +151,22 @@ export default function MentorProfilePage() {
               <div className="flex flex-col items-center mb-6">
                 <div className="w-[140px] h-[140px] rounded-full overflow-hidden bg-gray-100 mb-4">
                   <Image
-                    src={Mentor1}
-                    alt={mentorData.firstName}
+                    src={mentorData.profilePicture || Mentor1}
+                    alt={fullName}
+                    width={140}
+                    height={140}
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <h3 className="text-[18px] font-bold text-[#1A2E7A] text-center">
-                  {mentorData.firstName} {mentorData.lastName}
+                  {fullName}
                 </h3>
                 <p className="text-[13px] text-gray-500 mb-1">
                   {mentorData.role}
                 </p>
                 <div className="flex items-center gap-1 text-[12px] text-gray-400">
                   <i className="fa-solid fa-award text-yellow-500"></i>
-                  <span>{mentorData.experience} years experience</span>
+                  <span className="capitalize">{mentorData.role}</span>
                 </div>
               </div>
 
@@ -154,46 +188,22 @@ export default function MentorProfilePage() {
 
               {/* Stats */}
               <div className="mb-6 pb-6 border-b border-gray-200 space-y-4">
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-[13px] text-gray-600 font-semibold">
-                      Total Mentees
-                    </span>
-                    <span className="text-[16px] text-gray-900 font-bold">
-                      {mentorData.totalMentees}
-                    </span>
-                  </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-[13px] text-gray-600 font-semibold">Total Mentees</span>
+                  <span className="text-[16px] text-gray-900 font-bold">{mentorData.totalMentees}</span>
                 </div>
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-[13px] text-gray-600 font-semibold">
-                      Active
-                    </span>
-                    <span className="text-[16px] text-green-600 font-bold">
-                      {mentorData.activeMentees}
-                    </span>
+                {mentorData.otherInfo.conference && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[13px] text-gray-600 font-semibold">Conference</span>
+                    <span className="text-[13px] text-gray-800 font-medium">{mentorData.otherInfo.conference}</span>
                   </div>
-                </div>
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-[13px] text-gray-600 font-semibold">
-                      Completed
-                    </span>
-                    <span className="text-[16px] text-blue-600 font-bold">
-                      {mentorData.completedMentees}
-                    </span>
+                )}
+                {mentorData.otherInfo.yearsInMinistry && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[13px] text-gray-600 font-semibold">Years in Ministry</span>
+                    <span className="text-[13px] text-gray-800 font-medium">{mentorData.otherInfo.yearsInMinistry}</span>
                   </div>
-                </div>
-              </div>
-
-              {/* Specialization */}
-              <div className="mb-6 pb-6 border-b border-gray-200">
-                <h4 className="text-[13px] font-semibold text-gray-600 mb-3">
-                  Specialization
-                </h4>
-                <p className="text-[13px] text-gray-700 font-medium">
-                  {mentorData.specialization}
-                </p>
+                )}
               </div>
 
               {/* Bio */}
