@@ -85,6 +85,7 @@ export interface AcceptInvitationPayload {
 export interface GetUsersParams {
   role?: UserRole | string;
   status?: UserStatus | string;
+  hasCompleted?: boolean;
   page?: number;
   limit?: number;
   search?: string;

@@ -60,7 +60,7 @@ export default function MenteesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const PAGE_SIZE = 20;
+  const PAGE_SIZE = 10;
   const [activeTab, setActiveTab] = useState<"all" | "active" | "completed">(
     "active"
   );
@@ -93,21 +93,29 @@ export default function MenteesPage() {
 
   /* ---------------- FETCH MENTEES ---------------- */
 
-  // Reset to page 1 when search changes
+  // Reset to page 1 when search or tab changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [query]);
+  }, [query, activeTab]);
 
   useEffect(() => {
     const fetchMentees = async () => {
-      const res = await apiGetAllUsers({
+      const params: any = {
         role: "pastor",
         roleMatch: "mixed",
         search: query || undefined,
         page: currentPage,
         limit: PAGE_SIZE,
-      });
+      };
 
+      if (activeTab === "active") {
+        params.hasCompleted = false;
+        params.status = "accepted";
+      } else if (activeTab === "completed") {
+        params.hasCompleted = true;
+      }
+
+      const res = await apiGetAllUsers(params);
       const { users, total, totalPages: tp } = res.data.data;
       setMentees(users.map((u: any, i: number) => mapUserToMentee(u, i)));
       setTotalCount(total);
@@ -115,9 +123,12 @@ export default function MenteesPage() {
     };
 
     fetchMentees();
-  }, [query, currentPage]);
+  }, [query, currentPage, activeTab]);
 
   /* ---------------- PROGRESS ---------------- */
+
+  // Stable key: changes whenever the set of users on the current page changes
+  const menteeIdsKey = mentees.map((m) => m.id).join(",");
 
   useEffect(() => {
     if (!mentees.length) return;
@@ -125,7 +136,9 @@ export default function MenteesPage() {
     let cancelled = false;
 
     const hydrateProgress = async () => {
-      for (const m of mentees) {
+      // snapshot the current page's users so page changes mid-fetch stop cleanly
+      const currentMentees = mentees.slice();
+      for (const m of currentMentees) {
         if (cancelled) break;
         try {
           const res = await apiGetUserProgress(m.id);
@@ -141,14 +154,14 @@ export default function MenteesPage() {
         } catch {
           // skip failed individual progress fetch
         }
-        // small delay to avoid throttling
         await new Promise((r) => setTimeout(r, 150));
       }
     };
 
     hydrateProgress();
     return () => { cancelled = true; };
-  }, [mentees.length]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menteeIdsKey]);
 
   /* ---------------- FETCH MENTORS ---------------- */
 
@@ -243,15 +256,7 @@ export default function MenteesPage() {
     );
   }, [selectedMentee, mentees, mentors]);
 
-  const filteredMentees = useMemo(() => {
-    return mentees.filter((m) => {
-      const matchesTab = activeTab === "all" || m.status === activeTab;
-      const matchesSearch = m.name
-        .toLowerCase()
-        .includes(query.toLowerCase());
-      return matchesTab && matchesSearch;
-    });
-  }, [mentees, activeTab, query]);
+  const filteredMentees = mentees;
 
   const featuredItems: FeaturedAvatarItem[] = useMemo(
     () =>

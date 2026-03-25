@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 interface PersonListCardProps {
-  id: number;
+  id: string;
   name: string;
   role?: string;
   description: string;
@@ -26,7 +26,7 @@ interface PersonListCardProps {
   menteeCount?: number;
   // Progress info for mentees
   progress?: {
-    phase: string;
+    phase?: string;
     value: number;
   };
   // Options menu items

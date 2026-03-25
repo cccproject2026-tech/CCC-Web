@@ -3,7 +3,7 @@ import { useState } from "react";
 import Image from "next/image";
 
 interface Mentor {
-  id: number;
+  id: string;
   name: string;
   role: string;
   menteeCount: number;
@@ -14,7 +14,7 @@ interface Mentor {
 interface RemoveMentorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (selectedMentors: number[]) => void;
+  onConfirm: (selectedMentors: string[]) => void;
   mentors: Mentor[];
 }
 
@@ -27,7 +27,7 @@ export default function RemoveMentorModal({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("Latest Join");
   const [showFilter, setShowFilter] = useState(false);
-  const [selectedMentors, setSelectedMentors] = useState<number[]>([]);
+  const [selectedMentors, setSelectedMentors] = useState<string[]>([]);
 
   if (!isOpen) return null;
 
@@ -35,7 +35,7 @@ export default function RemoveMentorModal({
     m.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const toggleMentor = (id: number) => {
+  const toggleMentor = (id: string) => {
     setSelectedMentors((prev) =>
       prev.includes(id) ? prev.filter((mid) => mid !== id) : [...prev, id]
     );
