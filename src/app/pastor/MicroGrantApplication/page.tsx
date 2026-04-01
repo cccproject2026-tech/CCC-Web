@@ -2,18 +2,21 @@
 import { useState } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import HeroBg from "@/app/Assets/jumpstart-hero.png";
+import PastorHeader from "@/app/Components/PastorHeader";
+import PastorFooter from "@/app/Components/PastorFooter";
 
 export default function MicroGrantApplicationPage() {
   const [activeTab, setActiveTab] = useState("Cover Sheet");
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white">
+    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_20%_10%,rgba(141,211,243,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] text-white">
+      <PastorHeader showFullHeader={true} />
       {/* 🟣 HERO SECTION */}
       <section
         className="relative h-[300px] bg-cover bg-center flex flex-col justify-end"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-black/60"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_12%,rgba(141,211,243,0.2),transparent_35%),linear-gradient(180deg,rgba(4,31,53,0.74)_0%,rgba(6,41,70,0.9)_100%)]"></div>
 
         <div className="relative z-10 px-16 pb-10">
           <h1 className="text-3xl font-semibold mb-3">
@@ -27,10 +30,10 @@ export default function MicroGrantApplicationPage() {
       </section>
 
       {/* 🟦 MAIN CONTENT */}
-      <main className="flex-1 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] px-16 py-12">
+      <main className="flex-1 bg-transparent px-4 py-12 md:px-8 lg:px-16">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row gap-10">
           {/* LEFT SIDEBAR with VERTICAL STEPPER */}
-          <aside className="relative w-full lg:w-[280px]">
+          <aside className="relative w-full rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-4 lg:w-[300px]">
             <div className="absolute left-[22px] top-[45px] bottom-[45px] w-[3px] h-[40px] bg-[#41B36E]"></div>
             <div className="flex flex-col gap-3 relative z-10">
               {["Cover Sheet", "Reporting Procedures"].map((tab, index) => (
@@ -39,8 +42,8 @@ export default function MicroGrantApplicationPage() {
                   onClick={() => setActiveTab(tab)}
                   className={`flex items-center gap-4 cursor-pointer rounded-lg px-4 py-3 transition-all ${
                     activeTab === tab
-                      ? "bg-[#103C8C] text-white"
-                      : "bg-white text-[#0B1C58] hover:bg-[#EEF3FF]"
+                      ? "bg-[#8ec5eb]/20 text-white border border-[#8ec5eb]/40"
+                      : "bg-white/5 text-[#d9ebf8] border border-white/10 hover:bg-white/10"
                   }`}
                 >
                   {/* Stepper Circle */}
@@ -48,7 +51,7 @@ export default function MicroGrantApplicationPage() {
                     className={`w-7 h-7 flex items-center justify-center rounded-full border-2 ${
                       activeTab === tab
                         ? "bg-[#41B36E] border-[#3A9F62] text-white"
-                        : "bg-white border-[#3A9F62] text-[#3A9F62]"
+                        : "bg-transparent border-[#8ec5eb]/70 text-[#8ec5eb]"
                     } text-sm font-semibold`}
                   >
                     {index + 1}
@@ -61,7 +64,7 @@ export default function MicroGrantApplicationPage() {
                         className={`text-xs ${
                           activeTab === tab
                             ? "text-white/80"
-                            : "text-[#6B7280]"
+                            : "text-[#cde2f2]"
                         }`}
                       >
                         Please answer the questions succinctly following prompts
@@ -74,7 +77,7 @@ export default function MicroGrantApplicationPage() {
           </aside>
 
           {/* RIGHT PANEL CONTENT */}
-          <section className="flex-1 bg-transparent text-white">
+          <section className="flex-1 rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-6 text-white md:p-8">
             {activeTab === "Cover Sheet" && (
               <form className="space-y-6">
                 {[
@@ -95,7 +98,7 @@ export default function MicroGrantApplicationPage() {
                     <input
                       type="text"
                       placeholder="Your Answer"
-                      className="bg-transparent border border-[#5A8DCB] rounded-md px-4 py-2 text-sm text-white placeholder:text-white/60 focus:ring-2 focus:ring-[#FFD84E] outline-none"
+                      className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:ring-2 focus:ring-[#8ec5eb]"
                     />
                   </div>
                 ))}
@@ -106,13 +109,13 @@ export default function MicroGrantApplicationPage() {
                     Please upload here any supporting documents or media (photos,
                     videos, publications, etc.)
                   </label>
-                  <div className="border-2 border-dashed border-[#5A8DCB] rounded-lg p-6 flex flex-col items-center justify-center text-white/70 text-sm hover:bg-[#0E3D74]/50 transition">
-                    <i className="fa-solid fa-cloud-arrow-up text-2xl mb-3 text-[#FFD84E]"></i>
+                  <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/20 bg-white/5 p-6 text-sm text-[#d9ebf8] transition hover:bg-white/10">
+                    <i className="fa-solid fa-cloud-arrow-up mb-3 text-2xl text-[#8ec5eb]"></i>
                     <p className="mb-1">
                       Drag & Drop or <span className="underline">Click here</span>{" "}
                       to choose file
                     </p>
-                    <p className="text-xs text-white/50">
+                    <p className="text-xs text-[#cde2f2]">
                       Upload up to 5 supported files. Max 10 MB per file.
                     </p>
                   </div>
@@ -122,14 +125,14 @@ export default function MicroGrantApplicationPage() {
                 <div className="flex justify-between items-center pt-8">
                   <button
                     type="button"
-                    className="bg-white text-[#103C8C] text-sm font-medium px-6 py-2 rounded-md shadow-sm hover:bg-[#F3F5FF] transition"
+                    className="rounded-xl border border-white/30 px-6 py-2 text-sm font-medium text-[#d9ebf8] transition hover:bg-white/10"
                   >
                     Clear Form
                   </button>
                   <button
                     type="button"
                     onClick={() => setActiveTab("Reporting Procedures")}
-                    className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm font-medium px-8 py-2 rounded-md shadow-md transition"
+                    className="rounded-xl bg-[#8ec5eb] px-8 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
                   >
                     Next
                   </button>
@@ -184,7 +187,7 @@ export default function MicroGrantApplicationPage() {
                     <input
                       type="text"
                       placeholder="Type here..."
-                      className="bg-transparent border border-[#5A8DCB] rounded-md px-4 py-2 text-sm text-white placeholder:text-white/60 focus:ring-2 focus:ring-[#FFD84E] outline-none"
+                      className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:ring-2 focus:ring-[#8ec5eb]"
                     />
                   </div>
                 </div>
@@ -194,14 +197,14 @@ export default function MicroGrantApplicationPage() {
                   <button
                     type="button"
                     onClick={() => setActiveTab("Cover Sheet")}
-                    className="border border-[#A6B8E8] text-white/90 text-sm font-medium px-6 py-2 rounded-md hover:bg-white/10 transition"
+                    className="rounded-xl border border-white/30 px-6 py-2 text-sm font-medium text-white/90 transition hover:bg-white/10"
                   >
                     Back
                   </button>
 
                   <button
                     type="submit"
-                    className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm font-medium px-8 py-2 rounded-md shadow-md transition"
+                    className="rounded-xl bg-[#8ec5eb] px-8 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
                   >
                     Submit
                   </button>
@@ -211,6 +214,7 @@ export default function MicroGrantApplicationPage() {
           </section>
         </div>
       </main>
+      <PastorFooter />
     </div>
   );
 }

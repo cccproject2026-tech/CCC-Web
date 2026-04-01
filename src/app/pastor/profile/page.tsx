@@ -5,6 +5,7 @@ import { getCookie } from "@/app/utils/cookies";
 import PastorHeader from "@/app/Components/PastorHeader";
 import ProfilePic from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import PastorFooter from "@/app/Components/PastorFooter";
 import {
   getSingleUser,
   updateUser,
@@ -251,38 +252,38 @@ export default function PastorProfile() {
 
   if (!profile) {
     return (
-      <div className="text-center text-white p-10">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_20%_12%,rgba(141,211,243,0.18),transparent_38%),linear-gradient(180deg,#041f35_0%,#062946_100%)] text-center text-white">
         <PastorHeader showFullHeader={true} />
-        Loading...
+        <div className="p-10">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#103C8C] to-[#1A4B9A] text-white">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_12%,rgba(141,211,243,0.18),transparent_38%),linear-gradient(180deg,#041f35_0%,#062946_100%)] text-white">
       <PastorHeader showFullHeader={true} />
 
-      <main className="px-10 py-8 flex justify-center">
+      <main className="px-4 py-10 md:px-8 lg:px-16 flex justify-center">
         <div className="flex flex-col md:flex-row gap-8 w-full max-w-7xl">
 
           {/* LEFT PROFILE CARD */}
-          <div className="bg-white rounded-xl shadow-md p-5 text-center w-full md:w-[280px] flex-shrink-0">
+          <div className="w-full flex-shrink-0 rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-6 text-center shadow-[0_18px_40px_rgba(2,20,38,0.35)] md:w-[320px]">
             <Image
               src={profile.profilePicture || ProfilePic}
               alt="Profile"
-              width={85}
-              height={85}
-              className="rounded-full mx-auto mb-3"
+              width={104}
+              height={104}
+              className="mx-auto mb-4 rounded-full border-2 border-[#8ec5eb]/55 object-cover shadow-[0_10px_24px_rgba(2,20,38,0.35)]"
             />
-            <p className="text-gray-400 text-xs mb-1">Good Morning</p>
-            <h3 className="text-gray-900 font-semibold text-base">
+            <p className="mb-1 text-sm text-[#cde2f2]">Good Morning</p>
+            <h3 className="text-[33px] font-semibold leading-tight text-white">
               {profile.firstName} {profile.lastName}
             </h3>
-            <p className="text-gray-500 text-xs mb-3 capitalize">{profile.role}</p>
+            <p className="mb-4 text-base capitalize text-[#cde2f2]">{profile.role}</p>
 
-            <div className="border-t border-gray-200 my-3"></div>
+            <div className="my-3 border-t border-white/15"></div>
 
-            <p className="text-left text-gray-400 text-xs font-medium mb-1">
+            <p className="mb-2 text-left text-sm font-semibold text-[#d9ebf8]">
               Profile Information
             </p>
             <textarea
@@ -290,31 +291,31 @@ export default function PastorProfile() {
               value={form.profileInfo || ""}
               onChange={(e) => handleChange("profileInfo", e.target.value)}
               placeholder="No profile information added."
-              className={`w-full text-xs text-gray-700 border rounded-md p-2 resize-none mb-4 ${
+              className={`mb-5 w-full resize-none rounded-xl border px-3 py-3 text-sm leading-relaxed ${
                 isEditing
-                  ? "border-[#103C8C] focus:outline-none focus:ring-1 focus:ring-[#103C8C] bg-white"
-                  : "border-gray-300 bg-gray-50 cursor-default"
+                  ? "border-[#8ec5eb] bg-white/10 text-white placeholder:text-[#cde2f2] focus:outline-none focus:ring-1 focus:ring-[#8ec5eb]"
+                  : "cursor-default border-white/20 bg-[#0a3d66]/90 text-[#e4f1fb]"
               }`}
-              rows={3}
+              rows={4}
             />
 
             <button
               onClick={openDocsModal}
-              className="text-xs font-medium text-[#103C8C] border border-[#DADADA] rounded-md px-3 py-2 w-full hover:bg-[#F5F7FB] transition flex items-center justify-center gap-2"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#8ec5eb]/45 bg-[#0b3558]/55 px-4 py-3 text-base font-semibold text-[#d9ebf8] transition hover:border-[#8ec5eb]/70 hover:bg-[#0d426d]"
             >
-              <i className="fa-solid fa-paperclip text-[#103C8C]"></i>
+              <i className="fa-solid fa-paperclip text-[#8ec5eb] text-lg"></i>
               Upload documents
             </button>
           </div>
 
           {/* RIGHT FORM */}
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-md p-8 flex-1 border border-white/20">
+          <div className="flex-1 rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-8 shadow-[0_18px_40px_rgba(2,20,38,0.35)] backdrop-blur-sm">
             <div className="flex justify-between items-center mb-6">
               <h2 className="font-semibold text-lg">Personal Information</h2>
               {!isEditing ? (
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="text-sm border border-white px-4 py-1 rounded-md hover:bg-white hover:text-[#103C8C] transition"
+                  className="rounded-xl border border-white/30 px-4 py-1 text-sm hover:bg-white/10 transition"
                 >
                   Edit Profile
                 </button>
@@ -322,13 +323,13 @@ export default function PastorProfile() {
                 <div className="flex gap-3">
                   <button
                     onClick={handleCancel}
-                    className="text-sm bg-white/20 px-4 py-1 rounded-md hover:bg-white/30 transition"
+                    className="rounded-xl bg-white/20 px-4 py-1 text-sm hover:bg-white/30 transition"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSave}
-                    className="text-sm bg-white text-[#103C8C] font-medium px-4 py-1 rounded-md hover:bg-white/90 transition"
+                    className="rounded-xl bg-[#8ec5eb] px-4 py-1 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
                   >
                     Save Changes
                   </button>
@@ -342,7 +343,7 @@ export default function PastorProfile() {
               <input type="email" className="form-input" placeholder="Email" readOnly value={form.email} />
               <input type="text" className="form-input" placeholder="Phone Number" readOnly={!isEditing} value={form.phoneNumber} onChange={(e) => handleChange("phoneNumber", e.target.value)} />
 
-              <h3 className="col-span-2 text-white font-semibold mt-6">Current Church – Information</h3>
+              <h3 className="col-span-2 mt-6 font-semibold text-white">Current Church - Information</h3>
               {(["churchName", "churchPhone", "churchWebsite", "churchAddress", "city", "state", "zipCode", "country"] as const).map((field) => (
                 <input key={field} type="text" className="form-input" placeholder={field} readOnly={!isEditing} value={form[field]} onChange={(e) => handleChange(field, e.target.value)} />
               ))}
@@ -363,13 +364,13 @@ export default function PastorProfile() {
       {showDocsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/60" onClick={closeDocsModal} />
+          <div className="absolute inset-0 bg-[rgba(2,16,30,0.76)] backdrop-blur-sm" onClick={closeDocsModal} />
 
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col z-10">
+          <div className="relative z-10 flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl border border-white/20 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] text-white shadow-2xl">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h3 className="text-gray-900 font-semibold text-base">Documents</h3>
-              <button onClick={closeDocsModal} className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition">
+            <div className="flex items-center justify-between border-b border-white/15 px-6 py-4">
+              <h3 className="text-base font-semibold text-white">Documents</h3>
+              <button onClick={closeDocsModal} className="flex h-7 w-7 items-center justify-center rounded-full text-white/70 transition hover:bg-white/10 hover:text-white">
                 <i className="fa-solid fa-xmark text-sm"></i>
               </button>
             </div>
@@ -378,22 +379,22 @@ export default function PastorProfile() {
 
               {/* Uploaded documents */}
               <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#cde2f2]">
                   Uploaded Documents ({existingDocs.length})
                 </p>
 
                 {loadingDocs ? (
-                  <p className="text-sm text-gray-400">Loading...</p>
+                  <p className="text-sm text-[#cde2f2]">Loading...</p>
                 ) : existingDocs.length === 0 ? (
-                  <p className="text-sm text-gray-400">No documents uploaded yet.</p>
+                  <p className="text-sm text-[#cde2f2]">No documents uploaded yet.</p>
                 ) : (
                   <div className="space-y-2">
                     {existingDocs.map((doc, i) => (
-                      <div key={i} className="flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
+                      <div key={i} className="flex items-center gap-3 rounded-lg border border-white/15 bg-white/5 px-3 py-2.5">
                         <i className={`fa-solid ${getFileIcon(doc.fileType)} text-lg w-5 text-center`}></i>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-800 font-medium truncate">{doc.fileName}</p>
-                          <p className="text-xs text-gray-400">
+                          <p className="truncate text-sm font-medium text-white">{doc.fileName}</p>
+                          <p className="text-xs text-[#cde2f2]">
                             {formatFileSize(doc.fileSize)} · {new Date(doc.uploadedAt).toLocaleDateString()}
                           </p>
                         </div>
@@ -401,7 +402,7 @@ export default function PastorProfile() {
                           href={doc.fileUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-[#103C8C] hover:text-[#0D2E6E] text-xs"
+                          className="text-xs text-[#8ec5eb] hover:text-white"
                         >
                           <i className="fa-solid fa-arrow-up-right-from-square"></i>
                         </a>
@@ -414,38 +415,38 @@ export default function PastorProfile() {
               {/* Pending files to upload */}
               {pendingFiles.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-[#cde2f2]">
                     Ready to Upload ({pendingFiles.filter(f => f.status === "pending").length} pending)
                   </p>
                   <div className="space-y-2">
                     {pendingFiles.map((pf, i) => (
-                      <div key={i} className="flex items-center gap-3 bg-blue-50 rounded-lg px-3 py-2.5 border border-blue-100">
+                      <div key={i} className="flex items-center gap-3 rounded-lg border border-white/15 bg-white/5 px-3 py-2.5">
                         <i className={`fa-solid ${getFileIcon(pf.file.type)} text-lg w-5 text-center`}></i>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-800 font-medium truncate">{pf.file.name}</p>
-                          <p className="text-xs text-gray-400">{formatFileSize(pf.file.size)}</p>
+                          <p className="truncate text-sm font-medium text-white">{pf.file.name}</p>
+                          <p className="text-xs text-[#cde2f2]">{formatFileSize(pf.file.size)}</p>
                         </div>
                         {/* Status badge */}
                         {pf.status === "pending" && (
-                          <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Pending</span>
+                          <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs text-white/80">Pending</span>
                         )}
                         {pf.status === "uploading" && (
-                          <span className="text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="flex items-center gap-1 rounded-full bg-[#8ec5eb]/20 px-2 py-0.5 text-xs text-[#cde2f2]">
                             <i className="fa-solid fa-spinner fa-spin text-[10px]"></i> Uploading
                           </span>
                         )}
                         {pf.status === "success" && (
-                          <span className="text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="flex items-center gap-1 rounded-full bg-[#3DBE72]/25 px-2 py-0.5 text-xs text-[#9ef0be]">
                             <i className="fa-solid fa-check text-[10px]"></i> Done
                           </span>
                         )}
                         {pf.status === "error" && (
-                          <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full" title={pf.error}>
+                          <span className="rounded-full bg-[#d95d5d]/25 px-2 py-0.5 text-xs text-[#ffb2b2]" title={pf.error}>
                             <i className="fa-solid fa-xmark text-[10px]"></i> Failed
                           </span>
                         )}
                         {pf.status === "pending" && (
-                          <button onClick={() => removePending(i)} className="text-gray-400 hover:text-red-500 transition ml-1">
+                          <button onClick={() => removePending(i)} className="ml-1 text-white/60 transition hover:text-[#ffb2b2]">
                             <i className="fa-solid fa-trash text-xs"></i>
                           </button>
                         )}
@@ -457,7 +458,7 @@ export default function PastorProfile() {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 border-t border-white/15 px-6 py-4">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -468,7 +469,7 @@ export default function PastorProfile() {
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="text-sm text-[#103C8C] border border-[#103C8C] px-4 py-2 rounded-lg hover:bg-[#103C8C] hover:text-white transition flex items-center gap-2"
+                className="flex items-center gap-2 rounded-xl border border-white/30 px-4 py-2 text-sm text-[#d9ebf8] transition hover:bg-white/10"
               >
                 <i className="fa-solid fa-plus text-xs"></i> Add Files
               </button>
@@ -476,7 +477,7 @@ export default function PastorProfile() {
               <button
                 onClick={handleUploadAll}
                 disabled={pendingFiles.filter(f => f.status === "pending").length === 0}
-                className="text-sm bg-[#103C8C] text-white px-5 py-2 rounded-lg hover:bg-[#0D2E6E] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="flex items-center gap-2 rounded-xl bg-[#8ec5eb] px-5 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <i className="fa-solid fa-cloud-arrow-up text-xs"></i>
                 Upload {pendingFiles.filter(f => f.status === "pending").length > 0
@@ -487,10 +488,11 @@ export default function PastorProfile() {
           </div>
         </div>
       )}
+      <PastorFooter />
 
       <style jsx>{`
         .form-input {
-          @apply border border-gray-300 bg-white/20 text-white rounded-md px-3 py-2 text-sm placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-[#00D1B2];
+          @apply rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder-[#cde2f2] focus:outline-none focus:ring-2 focus:ring-[#8ec5eb];
         }
       `}</style>
     </div>

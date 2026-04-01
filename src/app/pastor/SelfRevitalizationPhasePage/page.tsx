@@ -50,22 +50,22 @@ function SelfRevitalizationContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0F4A85]">
-        <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[#062946]">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F4A85]">
+    <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">
       <PastorHeader showFullHeader={true} />
 
       {/* HERO SECTION */}
       <section
-        className="relative h-[320px] bg-cover bg-center text-white flex flex-col justify-end px-20 pb-10"
+        className="relative flex h-[320px] flex-col justify-end bg-cover bg-center px-6 pb-10 text-white md:px-12 lg:px-20"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-black/50"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]"></div>
         <div className="relative z-10">
           <p className="text-xs text-white/80 mb-2">
             Revitalization Roadmap &gt;{" "}
@@ -86,38 +86,38 @@ function SelfRevitalizationContent() {
       </section>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 px-16 py-10 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white">
+      <main className="flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-10 md:px-10 lg:px-16">
         <div className="max-w-7xl mx-auto">
 
           {/* Search & Filter Row */}
           <div className="flex justify-between items-center mb-8">
-            <div className="flex items-center w-[40%] bg-white rounded-md overflow-hidden shadow-sm">
-              <i className="fa-solid fa-magnifying-glass text-gray-400 px-3"></i>
+            <div className="flex items-center w-[40%] rounded-xl border border-white/20 bg-white/10 overflow-hidden shadow-sm backdrop-blur">
+              <i className="fa-solid fa-magnifying-glass text-[#cde2f2] px-3"></i>
               <input
                 type="text"
                 placeholder="Search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full px-3 py-2 text-sm text-gray-600 focus:outline-none"
+                className="w-full bg-transparent px-3 py-2 text-sm text-white placeholder:text-[#cde2f2] focus:outline-none"
               />
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="flex bg-white rounded-lg shadow-sm overflow-hidden p-1">
+              <div className="flex rounded-xl border border-white/20 bg-white/10 shadow-sm overflow-hidden p-1 backdrop-blur">
                 {["All", "Due", "Not Started", "Completed"].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setFilter(tab)}
                     className={`relative px-5 py-[7px] text-sm font-medium transition-all duration-200 ${
-                      filter === tab ? "bg-[#103C8C] text-white" : "text-gray-500 hover:text-[#103C8C]"
+                      filter === tab ? "bg-white text-[#0f4a76]" : "text-[#d9ebf8] hover:bg-white/15"
                     }`}
                   >
                     {tab}
                   </button>
                 ))}
               </div>
-              <button className="bg-white rounded-lg w-8 h-10 flex items-center justify-center shadow-sm hover:bg-gray-50">
-                <i className="fa-solid fa-ellipsis-vertical text-[#103C8C]"></i>
+              <button className="h-10 w-8 flex items-center justify-center rounded-lg border border-white/20 bg-white/10 shadow-sm hover:bg-white/15">
+                <i className="fa-solid fa-ellipsis-vertical text-[#d9ebf8]"></i>
               </button>
             </div>
           </div>
@@ -136,7 +136,7 @@ function SelfRevitalizationContent() {
                 return (
                   <div
                     key={item._id || index}
-                    className="bg-white rounded-2xl shadow-[0_2px_6px_rgba(0,0,0,0.05)] border border-[#E5EAF1] flex overflow-hidden hover:shadow-md transition-all"
+                    className="flex overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] shadow-[0_2px_6px_rgba(0,0,0,0.05)] transition-all hover:shadow-md"
                   >
                     {/* Left Image */}
                     <div className="relative w-[42%] h-[200px] shrink-0 m-3">
@@ -149,30 +149,30 @@ function SelfRevitalizationContent() {
                     </div>
 
                     {/* Right Content */}
-                    <div className="flex flex-col justify-between w-[58%] px-5 py-4 text-[#0B1C58]">
+                    <div className="flex w-[58%] flex-col justify-between px-5 py-4 text-white">
                       <div>
                         <h3 className="text-[15px] font-semibold leading-snug mb-[6px]">
                           {item.name}
                         </h3>
-                        <p className="text-[13px] text-[#6B7280] leading-snug mb-[8px]">
+                        <p className="mb-[8px] text-[13px] leading-snug text-[#cde2f2]">
                           {item.description || item.roadMapDetails || ""}
                         </p>
 
                         <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <span className="text-[12px] text-[#6B7280] font-medium">Status</span>
+                          <span className="text-[12px] font-medium text-[#d9ebf8]">Status</span>
                           <span className={`text-[11px] px-2 py-[3px] rounded-full font-medium border ${
                             status === "Completed"
-                              ? "bg-[#E0EDFF] text-[#103C8C] border-[#C3D4FF]"
-                              : "bg-[#EFF6FF] text-[#6B7280] border-[#E5E7EB]"
+                              ? "bg-[#d8fff2] text-[#00A878] border-transparent"
+                              : "bg-[#e6edff] text-[#1e40af] border-transparent"
                           }`}>
                             {status}
                           </span>
                         </div>
 
                         {item.duration && (
-                          <p className="text-[12px] text-[#6B7280] mt-2">
+                          <p className="mt-2 text-[12px] text-[#d9ebf8]">
                             Completion Time{" "}
-                            <span className="font-semibold text-[#0B1C58]">{item.duration}</span>
+                            <span className="font-semibold text-white">{item.duration}</span>
                           </p>
                         )}
                       </div>
@@ -181,7 +181,7 @@ function SelfRevitalizationContent() {
                       <div className="flex justify-end mt-3">
                         <button
                           onClick={() => router.push(`/pastor/jumpstart?id=${item._id}&parentId=${roadmapId}`)}
-                          className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-[12px] font-medium px-6 py-[6px] rounded-md shadow-sm"
+                          className="rounded-md bg-white px-6 py-[6px] text-[12px] font-semibold text-[#0f4a76] shadow-sm transition hover:bg-[#e7f1fa]"
                         >
                           View
                         </button>
@@ -204,8 +204,8 @@ export default function SelfRevitalizationPhasePage() {
 
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-[#0F4A85]">
-        <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[#062946]">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent"></div>
       </div>
     }>
       <SelfRevitalizationContent />

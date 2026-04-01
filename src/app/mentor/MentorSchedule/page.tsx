@@ -10,8 +10,9 @@ import UserProfile from "../../Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { Appointment } from "@/app/Services/types";
-import { apiCreateAvailability, apiGetMentorAppointments, apiGetWeeklyAvailability } from "@/app/Services/appointments.service";
+import { apiCreateAppointment, apiCreateAvailability, apiGetMentorAppointments, apiGetWeeklyAvailability } from "@/app/Services/appointments.service";
 import { convertToMinutes, getMentorFromCookie, isOverlapping, timeOptions } from "@/app/Services/utils/helpers";
+import { apiGetAssignedUsers } from "@/app/Services/api";
 
 export default function MentorSchedule() {
   const [activeTab, setActiveTab] = useState<
@@ -24,6 +25,11 @@ export default function MentorSchedule() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [mentorId, setMentorId] = useState<string | null>(null);
+  const [pastors, setPastors] = useState<any[]>([]);
+  const [selectedPastor, setSelectedPastor] = useState<any | null>(null);
+  const [meetingDate, setMeetingDate] = useState("");
+  const [selectedSlot, setSelectedSlot] = useState("");
+  const [selectedPlatform, setSelectedPlatform] = useState("zoom");
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const [weekStart, setWeekStart] = useState(new Date());
@@ -84,6 +90,21 @@ export default function MentorSchedule() {
     };
 
     fetchAppointments();
+  }, [mentorId]);
+
+  useEffect(() => {
+    if (!mentorId) return;
+    const fetchAssignedPastors = async () => {
+      try {
+        const res = await apiGetAssignedUsers(mentorId);
+        const list = Array.isArray(res.data?.data) ? res.data.data : [];
+        setPastors(list);
+      } catch (err) {
+        console.error("Failed to fetch assigned pastors", err);
+        setPastors([]);
+      }
+    };
+    fetchAssignedPastors();
   }, [mentorId]);
 
   useEffect(() => {
@@ -180,6 +201,57 @@ export default function MentorSchedule() {
     } catch (error) {
       console.error(error);
       setToastMessage("Failed to update availability");
+    }
+
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const toIsoFromDateAndSlot = (dateStr: string, slot: string) => {
+    // Example slot: "09:00 am - 10:00 am"
+    const [start] = slot.split(" - ");
+    const [time, period] = start.split(" ");
+    const [h, m] = time.split(":").map(Number);
+    let hours = h;
+    if (period.toLowerCase() === "pm" && hours !== 12) hours += 12;
+    if (period.toLowerCase() === "am" && hours === 12) hours = 0;
+    const date = new Date(dateStr);
+    date.setHours(hours, m, 0, 0);
+    return date.toISOString();
+  };
+
+  const handleCreateAppointment = async () => {
+    if (!mentorId) return;
+    if (!selectedPastor?._id && !selectedPastor?.id) {
+      setToastMessage("Please select a pastor");
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+    if (!meetingDate || !selectedSlot) {
+      setToastMessage("Please select date and time");
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+
+    try {
+      await apiCreateAppointment({
+        userId: selectedPastor._id || selectedPastor.id,
+        mentorId,
+        meetingDate: toIsoFromDateAndSlot(meetingDate, selectedSlot),
+        platform: selectedPlatform,
+        notes: "Scheduled by mentor",
+      });
+
+      const refresh = await apiGetMentorAppointments(mentorId);
+      setAppointments(refresh.data?.data || []);
+      setIsDrawerOpen(false);
+      setDrawerStep(1);
+      setSelectedPastor(null);
+      setMeetingDate("");
+      setSelectedSlot("");
+      setToastMessage("Appointment created successfully");
+    } catch (error) {
+      console.error("Failed to create appointment", error);
+      setToastMessage("Failed to create appointment");
     }
 
     setTimeout(() => setToastMessage(null), 3000);
@@ -675,23 +747,38 @@ export default function MentorSchedule() {
 
                 {/* List */}
                 <div className="flex flex-col gap-3 overflow-y-auto max-h-[380px]">
-                  {Array(6)
-                    .fill(0)
-                    .map((_, i) => (
+                  {pastors.length === 0 && (
+                    <p className="text-sm text-gray-500 px-2 py-4">No assigned pastors found.</p>
+                  )}
+                  {pastors.map((pastor: any) => {
+                    const pastorId = pastor._id || pastor.id;
+                    const isSelected = (selectedPastor?._id || selectedPastor?.id) === pastorId;
+                    return (
                       <div
-                        key={i}
-                        className="flex items-center gap-4 border border-gray-200 rounded-md px-4 py-2 hover:bg-[#F5F8FF] cursor-pointer"
+                        key={pastorId}
+                        onClick={() => setSelectedPastor(pastor)}
+                        className={`flex items-center justify-between gap-4 rounded-md border px-4 py-2 cursor-pointer transition ${
+                          isSelected
+                            ? "border-[#103C8C] bg-[#F3F6FF]"
+                            : "border-gray-200 hover:bg-[#F5F8FF]"
+                        }`}
                       >
-                        <Image
-                          src={UserProfile}
-                          alt="User"
-                          width={36}
-                          height={36}
-                          className="rounded-full"
-                        />
-                        <span className="font-medium text-sm">John Ross</span>
+                        <div className="flex items-center gap-3">
+                          <Image
+                            src={pastor.profilePicture || UserProfile}
+                            alt="User"
+                            width={36}
+                            height={36}
+                            className="rounded-full"
+                          />
+                          <span className="font-medium text-sm">
+                            {pastor.firstName} {pastor.lastName}
+                          </span>
+                        </div>
+                        <input type="radio" checked={isSelected} readOnly className="accent-[#103C8C]" />
                       </div>
-                    ))}
+                    );
+                  })}
                 </div>
 
                 {/* Buttons */}
@@ -703,7 +790,14 @@ export default function MentorSchedule() {
                     Cancel
                   </button>
                   <button
-                    onClick={() => setDrawerStep(2)}
+                    onClick={() => {
+                      if (!selectedPastor) {
+                        setToastMessage("Please select a pastor first");
+                        setTimeout(() => setToastMessage(null), 3000);
+                        return;
+                      }
+                      setDrawerStep(2);
+                    }}
                     className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm font-medium px-8 py-[6px] rounded-md"
                   >
                     Next
@@ -730,43 +824,75 @@ export default function MentorSchedule() {
 
                 {/* Calendar */}
                 <div className="bg-[#0C4A85] text-white rounded-xl p-5 mb-6 text-center">
-                  <p className="text-sm mb-2 text-white/70">August 2024</p>
-                  <div className="grid grid-cols-7 gap-2 text-[13px]">
-                    {Array.from({ length: 31 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className={`py-1 rounded-md ${i + 1 === 4
-                          ? "bg-[#00B3FF] text-white font-bold"
-                          : "text-white/80 hover:bg-[#00B3FF]/40 cursor-pointer"
-                          }`}
-                      >
-                        {i + 1}
-                      </div>
-                    ))}
-                  </div>
+                  <p className="text-sm mb-2 text-white/70">Select Date</p>
+                  <input
+                    type="date"
+                    value={meetingDate}
+                    onChange={(e) => setMeetingDate(e.target.value)}
+                    className="w-full rounded-md border border-white/30 bg-transparent px-3 py-2 text-sm text-white"
+                  />
                 </div>
 
                 {/* Times */}
                 <div className="grid grid-cols-2 gap-3 mb-6">
-                  <button className="border border-[#103C8C] text-[#103C8C] text-sm font-medium px-3 py-2 rounded-md hover:bg-[#F5F8FF]">
+                  <button
+                    onClick={() => setSelectedSlot("09:00 am - 10:00 am")}
+                    className={`border text-sm font-medium px-3 py-2 rounded-md ${
+                      selectedSlot === "09:00 am - 10:00 am"
+                        ? "bg-[#103C8C] text-white border-[#103C8C]"
+                        : "border-[#103C8C] text-[#103C8C] hover:bg-[#F5F8FF]"
+                    }`}
+                  >
                     09:00 am - 10:00 am
                   </button>
-                  <button className="border border-[#103C8C] text-[#103C8C] text-sm font-medium px-3 py-2 rounded-md hover:bg-[#F5F8FF]">
+                  <button
+                    onClick={() => setSelectedSlot("11:00 am - 12:00 pm")}
+                    className={`border text-sm font-medium px-3 py-2 rounded-md ${
+                      selectedSlot === "11:00 am - 12:00 pm"
+                        ? "bg-[#103C8C] text-white border-[#103C8C]"
+                        : "border-[#103C8C] text-[#103C8C] hover:bg-[#F5F8FF]"
+                    }`}
+                  >
                     11:00 am - 12:00 pm
                   </button>
-                  <button className="border border-[#103C8C] text-[#103C8C] text-sm font-medium px-3 py-2 rounded-md hover:bg-[#F5F8FF]">
+                  <button
+                    onClick={() => setSelectedSlot("01:00 pm - 02:00 pm")}
+                    className={`border text-sm font-medium px-3 py-2 rounded-md ${
+                      selectedSlot === "01:00 pm - 02:00 pm"
+                        ? "bg-[#103C8C] text-white border-[#103C8C]"
+                        : "border-[#103C8C] text-[#103C8C] hover:bg-[#F5F8FF]"
+                    }`}
+                  >
                     01:00 pm - 02:00 pm
                   </button>
-                  <button className="border border-[#103C8C] text-[#103C8C] text-sm font-medium px-3 py-2 rounded-md hover:bg-[#F5F8FF]">
+                  <button
+                    onClick={() => setSelectedSlot("03:00 pm - 04:00 pm")}
+                    className={`border text-sm font-medium px-3 py-2 rounded-md ${
+                      selectedSlot === "03:00 pm - 04:00 pm"
+                        ? "bg-[#103C8C] text-white border-[#103C8C]"
+                        : "border-[#103C8C] text-[#103C8C] hover:bg-[#F5F8FF]"
+                    }`}
+                  >
                     03:00 pm - 04:00 pm
                   </button>
-                  <button className="border border-[#103C8C] text-[#103C8C] text-sm font-medium px-3 py-2 rounded-md hover:bg-[#F5F8FF]">
+                  <button
+                    onClick={() => setSelectedSlot("05:00 pm - 06:00 pm")}
+                    className={`border text-sm font-medium px-3 py-2 rounded-md ${
+                      selectedSlot === "05:00 pm - 06:00 pm"
+                        ? "bg-[#103C8C] text-white border-[#103C8C]"
+                        : "border-[#103C8C] text-[#103C8C] hover:bg-[#F5F8FF]"
+                    }`}
+                  >
                     05:00 pm - 06:00 pm
                   </button>
                 </div>
 
                 {/* Preferred meeting option */}
-                <select className="w-full border border-[#D1D5DB] text-sm rounded-md px-3 py-2 text-[#0B1C58] mb-8">
+                <select
+                  value={selectedPlatform}
+                  onChange={(e) => setSelectedPlatform(e.target.value)}
+                  className="w-full border border-[#D1D5DB] text-sm rounded-md px-3 py-2 text-[#0B1C58] mb-8"
+                >
                   <option>Preferred meeting option</option>
                   <option>Zoom</option>
                   <option>Google Meet</option>
@@ -782,12 +908,7 @@ export default function MentorSchedule() {
                     Cancel
                   </button>
                   <button
-                    onClick={() => {
-                      setIsDrawerOpen(false);
-                      setDrawerStep(1);
-                      setToastMessage("Meeting scheduled successfully");
-                      setTimeout(() => setToastMessage(null), 3000);
-                    }}
+                    onClick={handleCreateAppointment}
                     className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm font-medium px-8 py-[6px] rounded-md"
                   >
                     Schedule

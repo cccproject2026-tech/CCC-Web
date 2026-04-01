@@ -1,13 +1,14 @@
 "use client";
 import Image from "next/image";
+import Link from "next/link";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import Logo from "../Assets/Frame-logo-1.png";
 
 export default function AppFooter() {
   return (
-    <footer className="relative bg-[#2E3B8E] text-white px-20 py-14 overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute right-0 top-0 w-[480px] h-full opacity-[0.08] bg-[url('/Assets/flame-shape.svg')] bg-no-repeat bg-right bg-contain"></div>
+    <footer className="relative overflow-hidden bg-[#0b3558] px-4 py-12 text-white sm:px-8 lg:px-20">
+      <div className="pointer-events-none absolute -right-24 -top-16 h-72 w-72 rounded-full bg-[#8ec5eb]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -left-24 bottom-0 h-64 w-64 rounded-full bg-[#8ec5eb]/10 blur-3xl" />
 
       {/* Main Footer Content */}
       <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12">
@@ -26,49 +27,49 @@ export default function AppFooter() {
           <h3 className="font-semibold text-[15px] mb-4">Quick Links</h3>
           <ul className="space-y-2 text-sm text-white/80">
             <li>
-              <a href="#" className="hover:text-white">
+              <Link href="/director/home" className="hover:text-white">
                 Home
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="#" className="hover:text-white">
+              <Link href="/director/mentors" className="hover:text-white">
                 Mentors
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="#" className="hover:text-white">
+              <Link href="/director/mentees" className="hover:text-white">
                 Pastors
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="#" className="hover:text-white">
+              <Link href="/director/revitalization-roadmap" className="hover:text-white">
                 Revitalization Roadmap
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="#" className="hover:text-white">
+              <Link href="/director/assessments" className="hover:text-white">
                 Assessments
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="#" className="hover:text-white">
+              <Link href="/director/track-progress" className="hover:text-white">
                 Track Progress
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="#" className="hover:text-white">
+              <Link href="/director/assignments" className="hover:text-white">
                 Assignments
-              </a>
+              </Link>
             </li>
             <li>
-              <a href="#" className="hover:text-white">
-                Certificates
-              </a>
-            </li>
-            <li>
-              <a href="#" className="hover:text-white">
+              <Link href="/director/schedule" className="hover:text-white">
                 Schedule
-              </a>
+              </Link>
+            </li>
+            <li>
+              <Link href="/director/notifications" className="hover:text-white">
+                Certificates
+              </Link>
             </li>
           </ul>
         </div>
@@ -118,14 +119,14 @@ export default function AppFooter() {
       {/* Bottom Footer */}
       <div className="relative z-10 flex flex-col sm:flex-row justify-between items-center text-sm text-white/70">
         <div className="flex gap-6 mb-3 sm:mb-0">
-          <a href="#" className="hover:text-white">
+          <Link href="/director/home" className="hover:text-white">
             Terms of Use
-          </a>
-          <a href="#" className="hover:text-white">
+          </Link>
+          <Link href="/director/home" className="hover:text-white">
             Privacy policy
-          </a>
+          </Link>
         </div>
-        <p>© 2024 2024 Wisdom Tooth Technologies All Rights Reserved</p>
+        <p>© 2024 Wisdom Tooth Technologies. All Rights Reserved.</p>
       </div>
     </footer>
   );

@@ -15,8 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 const albertSans = Albert_Sans({
+  variable: "--font-albert-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"], // adjust weights as needed
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -32,7 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${albertSans.className} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${albertSans.variable} ${albertSans.className} antialiased`}
       >
         {children}
       </body>

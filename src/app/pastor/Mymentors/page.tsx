@@ -90,14 +90,14 @@ function Scheduler({ mentorId }: { mentorId: string }) {
 
   return (
     <div className="mt-6">
-      <p className="text-sm font-medium flex items-center gap-2 text-gray-700">
-        <i className="fa-regular fa-calendar text-[#103C8C]"></i>
+      <p className="text-sm font-medium flex items-center gap-2 text-[#d9ebf8]">
+        <i className="fa-regular fa-calendar text-[#8ec5eb]"></i>
         Schedule a Meeting
       </p>
 
-      <div className="border rounded-xl p-5 mt-3 bg-white shadow-sm">
+      <div className="border border-white/20 rounded-xl p-5 mt-3 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] shadow-sm">
         {/* CALENDAR */}
-        <p className="text-xs text-gray-500 mb-2">Select Available Date</p>
+        <p className="text-xs text-[#cde2f2] mb-2">Select Available Date</p>
 
         <div className="bg-[#103C8C] text-white rounded-lg overflow-hidden shadow">
           <div className="flex justify-between items-center px-4 py-3 bg-[#0D3170]">
@@ -135,7 +135,7 @@ function Scheduler({ mentorId }: { mentorId: string }) {
         </div>
 
         {/* TIME SLOTS */}
-        <p className="text-xs text-gray-500 mt-4 mb-2">Select a Time</p>
+        <p className="text-xs text-[#cde2f2] mt-4 mb-2">Select a Time</p>
 
         <div className="grid grid-cols-2 gap-3">
           {timeSlots.map((slot) => (
@@ -145,7 +145,7 @@ function Scheduler({ mentorId }: { mentorId: string }) {
               className={`border text-xs py-2 rounded-md transition ${
                 selectedSlot === slot
                   ? "bg-[#103C8C] text-white border-[#103C8C]"
-                  : "border-[#103C8C] text-[#103C8C] hover:bg-[#103C8C] hover:text-white"
+                  : "border-white/40 text-white hover:bg-white/15 hover:text-white"
               }`}
             >
               {slot}
@@ -154,13 +154,13 @@ function Scheduler({ mentorId }: { mentorId: string }) {
         </div>
 
         {/* PLATFORM */}
-        <p className="text-xs text-gray-500 mt-4 mb-2">
+        <p className="text-xs text-[#cde2f2] mt-4 mb-2">
           Preferred Meeting Option
         </p>
         <select
           value={platform}
           onChange={(e) => setPlatform(e.target.value)}
-          className="w-full border rounded-md px-3 py-2 text-sm text-gray-600"
+          className="w-full border border-white/25 rounded-md px-3 py-2 text-sm bg-white/10 text-white"
         >
           <option value="zoom">Zoom Meeting</option>
           <option value="google">Google Meet</option>
@@ -169,18 +169,18 @@ function Scheduler({ mentorId }: { mentorId: string }) {
         </select>
 
         {/* NOTES */}
-        <p className="text-xs text-gray-500 mt-4 mb-1">Notes</p>
+        <p className="text-xs text-[#cde2f2] mt-4 mb-1">Notes</p>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="w-full border rounded-md p-2 text-sm"
+          className="w-full border border-white/25 bg-white/10 text-white rounded-md p-2 text-sm"
           rows={3}
           placeholder="Add a note..."
         />
 
         {/* BUTTONS */}
         <div className="flex justify-between mt-6">
-          <button className="px-4 py-2 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-100 text-sm">
+          <button className="px-4 py-2 rounded-md border border-white/35 text-[#cde2f2] hover:bg-white/10 text-sm">
             Cancel
           </button>
 
@@ -205,6 +205,12 @@ export default function Mymentors() {
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [filteredMentors, setFilteredMentors] = useState<Mentor[]>([]);
   const [searchText, setSearchText] = useState("");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setTimeout(() => setToastMessage(null), 1800);
+  };
 
   /* FETCH ASSIGNED MENTORS */
   useEffect(() => {
@@ -212,14 +218,27 @@ export default function Mymentors() {
       try {
         const user = JSON.parse(getCookie("user") || "{}");
         const userId = user?.id || user?._id;
-        if (!userId) return;
+        if (!userId) {
+          showToast("User session not found. Please log in again.");
+          return;
+        }
 
         const response = await apiGetAssignedUsers(userId);
-        const assigned = response.data.data || [];
+        const assigned = (response.data?.data || []).map((mentor: any) => ({
+          _id: mentor._id || mentor.id || "",
+          firstName: mentor.firstName || "",
+          lastName: mentor.lastName || "",
+          role: mentor.role || "Mentor",
+          email: mentor.email || "",
+          profileInfo: mentor.profileInfo || "",
+        }));
         setMentors(assigned);
         setFilteredMentors(assigned);
       } catch (err) {
         console.error("Error fetching assigned mentors:", err);
+        setMentors([]);
+        setFilteredMentors([]);
+        showToast("Unable to fetch mentors from API.");
       }
     };
 
@@ -228,6 +247,7 @@ export default function Mymentors() {
 
   /* FETCH SINGLE MENTOR */
   const fetchSingleMentor = async (email: string) => {
+    showToast("Opening mentor details...");
     try {
       const response = await apiGetMentorByEmail(email);
       const json = response.data;
@@ -258,25 +278,35 @@ export default function Mymentors() {
   }, [searchText, mentors]);
 
   return (
-    <div className="min-h-screen flex flex-col relative">
+    <div className="min-h-screen flex flex-col relative bg-[#062946] text-white font-[Albert_Sans]">
       <PastorHeader showFullHeader={true} />
 
       {/* HERO */}
       <section
-        className="relative bg-cover bg-center text-white h-[250px] md:h-[300px] flex items-end pb-12 px-6 md:px-16"
+        className="relative bg-cover bg-center text-white h-[260px] md:h-[320px] flex items-end pb-12 px-6 md:px-16"
         style={{ backgroundImage: `url(${MentorBg.src})` }}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-[#001845]/70 via-[#0B2E72]/60 to-[#1A4A9A]/90"></div>
-        <h1 className="relative z-10 text-3xl font-semibold">My Mentors</h1>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.12),transparent_38%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]"></div>
+        <div className="relative z-10">
+          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
+            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
+            Leadership Support Network
+          </p>
+          <h1 className="mt-3 text-3xl font-semibold md:text-4xl">My Mentors</h1>
+          <p className="mt-2 max-w-xl text-sm text-[#d9ebf8] md:text-base">
+            Connect, learn, and schedule personalized sessions with your assigned mentors.
+          </p>
+        </div>
       </section>
 
       {/* CONTENT */}
-      <main className="flex-1 bg-[#1c578e] px-6 md:px-16 py-10 relative z-10">
+      <main className="flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-6 md:px-16 py-10 relative z-10">
         <div className="max-w-6xl mx-auto">
           {/* SEARCH */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-            <div className="flex items-center bg-white rounded-lg px-4 py-2 shadow w-full max-w-md">
-              <i className="fa-solid fa-magnifying-glass text-gray-400 mr-3"></i>
+          <div className="rounded-2xl border border-white/15 bg-white/5 p-4 mb-6 backdrop-blur">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center bg-white/10 border border-white/20 rounded-lg px-4 py-2 shadow w-full max-w-md">
+              <i className="fa-solid fa-magnifying-glass text-[#cde2f2] mr-3"></i>
               <input
                 value={searchText}
                 onChange={(e) =>
@@ -293,23 +323,24 @@ export default function Mymentors() {
                   )
                 }
                 placeholder="Search"
-                className="flex-1 text-sm outline-none text-gray-700"
+                className="flex-1 text-sm outline-none bg-transparent text-white placeholder:text-[#cde2f2]"
               />
             </div>
 
             {/* TOGGLE BUTTON */}
             <button
               onClick={() => setIsListView(!isListView)}
-              className="w-10 h-10 bg-white rounded-lg shadow flex items-center justify-center"
+              className="w-10 h-10 bg-white/10 border border-white/20 rounded-lg shadow flex items-center justify-center hover:bg-white/20 transition"
             >
               <i
                 className={`${
                   isListView
-                    ? "fa-solid fa-border-all text-[#0B2E72]"
-                    : "fa-solid fa-list text-[#0B2E72]"
+                    ? "fa-solid fa-border-all text-[#8ec5eb]"
+                    : "fa-solid fa-list text-[#8ec5eb]"
                 } text-lg`}
               ></i>
             </button>
+          </div>
           </div>
 
           {/* AVATAR ROW */}
@@ -322,11 +353,11 @@ export default function Mymentors() {
                   key={mentor._id}
                   className="flex flex-col items-center shrink-0"
                 >
-                  <div className="w-[70px] h-[70px]">
+                  <div className="w-[72px] h-[72px] p-[2px] rounded-full bg-[linear-gradient(145deg,#8ec5eb,#9c7cff)]">
                     <Image
                       src={img}
                       alt={mentor.firstName}
-                      className="rounded-full w-full h-full object-cover border-2 border-[#9C7CFF]"
+                      className="rounded-full w-full h-full object-cover border border-[#0b3558]"
                     />
                   </div>
                   <p className="text-xs text-white mt-2 whitespace-nowrap">
@@ -359,7 +390,7 @@ export default function Mymentors() {
                 <div
                   key={mentor._id}
                   onClick={() => fetchSingleMentor(mentor.email)}
-                  className="cursor-pointer bg-white rounded-xl p-4 shadow flex items-center gap-4 hover:shadow-lg transition"
+                  className="cursor-pointer bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] border border-white/15 rounded-xl p-4 shadow flex items-center gap-4 hover:shadow-lg hover:border-[#8ec5eb66] transition"
                 >
                   <Image
                     src={img}
@@ -368,22 +399,22 @@ export default function Mymentors() {
                   />
 
                   <div className="flex-1">
-                    <h4 className="font-semibold text-gray-900">
+                    <h4 className="font-semibold text-white">
                       {mentor.firstName} {mentor.lastName}
                     </h4>
-                    <p className="text-sm text-gray-500">{mentor.role}</p>
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-sm text-[#b7d2e6]">{mentor.role}</p>
+                    <p className="text-xs text-[#cde2f2] mt-1">
                       Sub text area write something here.
                     </p>
                   </div>
 
-                  <div className="flex gap-4 text-[#103C8C] text-sm">
+                  <div className="flex gap-4 text-[#8ec5eb] text-sm">
                     <i className="fa-regular fa-envelope"></i>
                     <i className="fa-regular fa-comment"></i>
                     <i className="fa-solid fa-phone"></i>
                     <i className="fa-brands fa-whatsapp"></i>
 
-                    <button className="w-7 h-7 border border-[#103C8C]/40 rounded flex items-center justify-center hover:bg-[#103C8C] hover:text-white">
+                    <button className="w-7 h-7 border border-white/35 rounded flex items-center justify-center hover:bg-white/15 hover:text-white">
                       <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
                     </button>
                   </div>
@@ -395,7 +426,7 @@ export default function Mymentors() {
                 <div
                   key={mentor._id}
                   onClick={() => fetchSingleMentor(mentor.email)}
-                  className="cursor-pointer bg-white rounded-xl shadow hover:shadow-lg transition flex flex-col"
+                  className="cursor-pointer bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] border border-white/15 rounded-xl shadow hover:shadow-lg hover:-translate-y-0.5 hover:border-[#8ec5eb66] transition-all duration-300 flex flex-col"
                 >
                   <div className="w-full h-[170px] overflow-hidden rounded-t-xl">
                     <Image
@@ -406,27 +437,27 @@ export default function Mymentors() {
                   </div>
 
                   <div className="p-4 flex flex-col justify-between min-h-[160px]">
-                    <h4 className="font-semibold text-gray-900">
+                    <h4 className="font-semibold text-white">
                       {mentor.firstName} {mentor.lastName}
                     </h4>
 
-                    <p className="text-sm text-gray-500">{mentor.role}</p>
+                    <p className="text-sm text-[#b7d2e6]">{mentor.role}</p>
 
-                    <p className="text-xs text-gray-400 mt-2">
+                    <p className="text-xs text-[#cde2f2] mt-2">
                       Sub text area write something here.
                       <br />
                       That you can read more
                     </p>
 
                     <div className="flex justify-between items-center mt-4">
-                      <div className="flex gap-4 text-[#103C8C] text-sm">
+                      <div className="flex gap-4 text-[#8ec5eb] text-sm">
                         <i className="fa-regular fa-envelope"></i>
                         <i className="fa-regular fa-comment"></i>
                         <i className="fa-solid fa-phone"></i>
                         <i className="fa-brands fa-whatsapp"></i>
                       </div>
 
-                      <button className="w-8 h-8 border border-[#103C8C]/40 rounded flex items-center justify-center hover:bg-[#103C8C] hover:text-white transition">
+                      <button className="w-8 h-8 border border-white/35 rounded flex items-center justify-center hover:bg-white/15 hover:text-white transition">
                         <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
                       </button>
                     </div>
@@ -440,16 +471,16 @@ export default function Mymentors() {
 
       {/* SIDEBAR */}
       {selectedMentor && (
-        <div className="fixed top-0 right-0 w-full md:w-[420px] h-full bg-white shadow-xl z-50 overflow-y-auto">
-          <div className="flex justify-between items-center p-4 border-b">
-            <h3 className="text-lg font-semibold text-[#103C8C]">
+        <div className="fixed top-0 right-0 w-full md:w-[420px] h-full bg-[linear-gradient(180deg,#0a3558_0%,#0d3d63_100%)] border-l border-white/20 shadow-xl z-50 overflow-y-auto text-white">
+          <div className="flex justify-between items-center p-4 border-b border-white/20">
+            <h3 className="text-lg font-semibold text-white">
               Mentor Profile
             </h3>
             <button
               onClick={() => setSelectedMentor(null)}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200"
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/15"
             >
-              <i className="fa-solid fa-xmark text-gray-600"></i>
+              <i className="fa-solid fa-xmark text-white/80"></i>
             </button>
           </div>
 
@@ -464,22 +495,22 @@ export default function Mymentors() {
               />
 
               <div className="text-center">
-                <h4 className="text-xl font-semibold text-gray-900">
+                <h4 className="text-xl font-semibold text-white">
                   {selectedMentor.firstName} {selectedMentor.lastName}
                 </h4>
-                <p className="text-gray-500 capitalize">
+                <p className="text-[#cde2f2] capitalize">
                   {selectedMentor.role}
                 </p>
               </div>
             </div>
 
             {/* PROFILE INFO */}
-            <p className="text-sm font-medium text-gray-700 mb-2">
+            <p className="text-sm font-medium text-[#d9ebf8] mb-2">
               Profile Information
             </p>
 
             <textarea
-              className="w-full border rounded-md p-3 text-sm text-gray-700"
+              className="w-full border border-white/25 bg-white/10 rounded-md p-3 text-sm text-white"
               rows={4}
               value={selectedMentor.profileInfo || ""}
               readOnly
@@ -488,6 +519,11 @@ export default function Mymentors() {
             {/* SCHEDULER */}
             <Scheduler mentorId={selectedMentor._id} />
           </div>
+        </div>
+      )}
+      {toastMessage && (
+        <div className="fixed left-1/2 top-20 z-[70] -translate-x-1/2 rounded-lg border border-white/20 bg-[#0a3558] px-4 py-3 text-sm text-white shadow-[0_12px_28px_rgba(2,20,38,0.45)]">
+          {toastMessage}
         </div>
       )}
     </div>

@@ -55,7 +55,7 @@ export default function PastorSurveyPMPPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] flex flex-col text-white relative transition-all duration-300">
+    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_20%_18%,rgba(86,162,214,0.22),transparent_42%),linear-gradient(180deg,#0a2f4d_0%,#09233b_100%)] text-white relative transition-all duration-300">
       {/* MAIN CONTENT */}
       <main className="flex flex-1 flex-col sm:flex-row px-4 sm:px-8 md:px-12 py-5 sm:py-8 md:py-10 gap-5 sm:gap-8 md:gap-10">
         {/* LEFT TIMELINE */}
@@ -325,12 +325,12 @@ export default function PastorSurveyPMPPage() {
 
       {/* ✅ SUCCESS POPUP */}
       {showSuccess && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white rounded-xl shadow-lg px-8 py-6 flex items-center gap-3 animate-fadeIn">
-            <div className="bg-[#4ADE80] rounded-full p-2 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
+          <div className="flex items-center gap-3 rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-8 py-6 shadow-[0_24px_70px_rgba(2,20,38,0.55)] animate-fadeIn">
+            <div className="flex items-center justify-center rounded-full bg-[#4ADE80] p-2">
               <i className="fa-solid fa-check text-white text-lg"></i>
             </div>
-            <h3 className="text-[#165A92] font-semibold text-lg">
+            <h3 className="text-white font-semibold text-lg">
               Survey Uploaded Successfully
             </h3>
           </div>
@@ -339,15 +339,15 @@ export default function PastorSurveyPMPPage() {
 
       {/* ✅ MEETING POPUP */}
       {showMeeting && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white rounded-xl shadow-lg w-[90%] max-w-[500px] text-center p-6 sm:p-8 animate-fadeIn">
-            <p className="text-[#0B1C58] text-sm sm:text-[15px] font-medium leading-relaxed mb-4 sm:mb-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
+          <div className="w-[90%] max-w-[500px] rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] p-6 text-center shadow-[0_24px_70px_rgba(2,20,38,0.55)] sm:p-8 animate-fadeIn">
+            <p className="mb-4 text-sm font-medium leading-relaxed text-white sm:mb-6 sm:text-[15px]">
               On completion of the PMP and CMA assessment tools please schedule
               a meeting with your mentor.
             </p>
             <button
               onClick={handleScheduleClick}
-              className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-xs sm:text-sm font-medium px-5 sm:px-6 py-2 rounded-md shadow-sm"
+              className="rounded-xl bg-[#8ec5eb] px-5 py-2 text-xs font-semibold text-[#0b3558] shadow-sm transition hover:bg-[#a9d5f2] sm:px-6 sm:text-sm"
             >
               Schedule Meeting
             </button>
@@ -375,12 +375,12 @@ export default function PastorSurveyPMPPage() {
 
       {/* ✅ CONFIRM POPUP */}
       {showConfirmPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50 animate-fadeIn">
-          <div className="bg-white rounded-xl shadow-lg px-10 py-6 flex items-center gap-3">
-            <div className="bg-[#4ADE80] rounded-full p-2 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm animate-fadeIn">
+          <div className="flex items-center gap-3 rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-10 py-6 shadow-[0_24px_70px_rgba(2,20,38,0.55)]">
+            <div className="flex items-center justify-center rounded-full bg-[#4ADE80] p-2">
               <i className="fa-solid fa-check text-white text-lg"></i>
             </div>
-            <h3 className="text-[#165A92] font-semibold text-lg">
+            <h3 className="text-white font-semibold text-lg">
               New Appointment has been Scheduled
             </h3>
           </div>
@@ -425,15 +425,15 @@ function MentorSidebar({
   handleMentorNext: () => void;
 }) {
   return (
-    <div className="fixed right-0 top-0 w-full sm:w-[400px] h-full bg-white shadow-2xl z-50 animate-slideIn flex flex-col">
-      <div className="p-4 sm:p-6 border-b">
-        <h2 className="text-[#0B1C58] text-lg sm:text-xl font-semibold">
+    <div className="fixed right-0 top-0 z-50 flex h-full w-full flex-col bg-[linear-gradient(180deg,#0d3e66_0%,#0a3457_100%)] text-white shadow-2xl animate-slideIn sm:w-[400px]">
+      <div className="border-b border-white/15 p-4 sm:p-6">
+        <h2 className="text-lg sm:text-xl font-semibold">
           Choose Mentor for the Meeting
         </h2>
         <input
           type="text"
           placeholder="Search"
-          className="w-full mt-4 p-2 border border-gray-300 rounded-md focus:outline-none"
+          className="mt-4 w-full rounded-xl border border-white/20 bg-white/5 p-2 text-white placeholder:text-[#cbe6f9] focus:outline-none"
         />
       </div>
 
@@ -443,8 +443,8 @@ function MentorSidebar({
             key={i}
             className={`flex items-center gap-3 p-3 border rounded-md cursor-pointer transition-all ${
               selectedMentor === `Mentor ${i}`
-                ? "border-[#103C8C] bg-[#F5F8FF]"
-                : "border-gray-200 hover:bg-gray-50"
+                ? "border-[#8ec5eb] bg-[#8ec5eb]/15"
+                : "border-white/15 bg-white/5 hover:bg-white/10"
             }`}
           >
             <input
@@ -458,8 +458,8 @@ function MentorSidebar({
               className="w-10 h-10 rounded-full"
             />
             <div>
-              <p className="text-[#0B1C58] font-medium">John Ross</p>
-              <p className="text-gray-500 text-sm">
+              <p className="font-medium text-white">John Ross</p>
+              <p className="text-sm text-[#cbe6f9]">
                 {i % 2 === 0 ? "Mentor" : "Field Mentor"}
               </p>
             </div>
@@ -467,14 +467,14 @@ function MentorSidebar({
         ))}
       </div>
 
-      <div className="p-3 sm:p-4 border-t">
+      <div className="border-t border-white/15 p-3 sm:p-4">
         <button
           onClick={handleMentorNext}
           disabled={!selectedMentor}
           className={`w-full py-2 rounded-md text-white font-medium ${
             selectedMentor
-              ? "bg-[#103C8C] hover:bg-[#0B2E72]"
-              : "bg-gray-400 cursor-not-allowed"
+              ? "bg-[#8ec5eb] text-[#0b3558] hover:bg-[#a9d5f2]"
+              : "bg-white/20 text-white/60 cursor-not-allowed"
           }`}
         >
           Next
@@ -495,23 +495,23 @@ function ScheduleSidebar({
   setShowMentorSidebar: (value: boolean) => void;
 }) {
   return (
-    <div className="fixed right-0 top-0 w-full sm:w-[400px] h-full bg-white shadow-2xl z-50 animate-slideIn flex flex-col">
-      <div className="p-6 border-b flex items-center gap-3">
-        <i className="fa-regular fa-calendar text-[#103C8C] text-lg"></i>
-        <h2 className="text-[#0B1C58] text-xl font-semibold">
+    <div className="fixed right-0 top-0 z-50 flex h-full w-full flex-col bg-[linear-gradient(180deg,#0d3e66_0%,#0a3457_100%)] text-white shadow-2xl animate-slideIn sm:w-[400px]">
+      <div className="flex items-center gap-3 border-b border-white/15 p-6">
+        <i className="fa-regular fa-calendar text-[#8ec5eb] text-lg"></i>
+        <h2 className="text-xl font-semibold">
           Schedule a Meeting
         </h2>
       </div>
 
       <div className="p-4 sm:p-5 overflow-y-auto flex-1">
-        <p className="text-[#0B1C58] text-sm font-medium mb-2">
+        <p className="mb-2 text-sm font-medium text-white">
           Select Available Date
         </p>
-        <div className="bg-[#0D3971]/10 rounded-lg p-4 text-center text-[#0B1C58] font-semibold mb-6">
+        <div className="mb-6 rounded-xl border border-white/20 bg-white/5 p-4 text-center font-semibold text-[#d8ecfa]">
           August 2024 (Static Calendar Placeholder)
         </div>
 
-        <p className="text-[#0B1C58] text-sm font-medium mb-2">Select a Time</p>
+        <p className="mb-2 text-sm font-medium text-white">Select a Time</p>
         <div className="grid grid-cols-2 gap-3 mb-6">
           {[
             "09:00 am - 10:00 am",
@@ -522,33 +522,33 @@ function ScheduleSidebar({
           ].map((t, i) => (
             <button
               key={i}
-              className="border border-gray-300 rounded-md py-2 hover:bg-[#103C8C] hover:text-white transition-all text-sm"
+              className="rounded-xl border border-white/20 bg-white/5 py-2 text-sm text-[#d8ecfa] transition-all hover:bg-white/10"
             >
               {t}
             </button>
           ))}
         </div>
 
-        <select className="w-full border border-gray-300 rounded-md p-2 text-gray-600">
+        <select className="w-full rounded-xl border border-white/20 bg-white/5 p-2 text-white">
           <option>Preferred meeting option</option>
           <option>Online</option>
           <option>Offline</option>
         </select>
       </div>
 
-      <div className="p-3 sm:p-4 border-t flex justify-between gap-3">
+      <div className="flex justify-between gap-3 border-t border-white/15 p-3 sm:p-4">
         <button
           onClick={() => {
             setShowScheduleSidebar(false);
             setShowMentorSidebar(true);
           }}
-          className="flex-1 border border-gray-400 text-[#0B1C58] py-2 rounded-md hover:bg-gray-50"
+          className="flex-1 rounded-xl border border-white/30 py-2 text-[#d8ecfa] transition hover:bg-white/10"
         >
           Back
         </button>
         <button
           onClick={handleFinalSchedule}
-          className="flex-1 bg-[#103C8C] hover:bg-[#0B2E72] text-white py-2 rounded-md"
+          className="flex-1 rounded-xl bg-[#8ec5eb] py-2 font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
         >
           Schedule
         </button>

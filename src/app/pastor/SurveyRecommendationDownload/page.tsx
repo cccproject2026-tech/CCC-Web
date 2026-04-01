@@ -30,15 +30,15 @@ export default function SurveyRecommendationDownload() {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F5F7FB] text-[#0B1C58]">
+    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_20%_18%,rgba(86,162,214,0.22),transparent_42%),linear-gradient(180deg,#0a2f4d_0%,#09233b_100%)] text-white">
       <PastorHeader showFullHeader={true} />
 
       {/* PAGE HEADER ACTIONS */}
       <div className="flex justify-between items-center px-16 pt-8">
-        <button className="text-[#103C8C] font-medium text-sm flex items-center gap-2 hover:underline">
+        <button className="text-[#cbe6f9] font-medium text-sm flex items-center gap-2 hover:text-white">
           <i className="fa-solid fa-arrow-left"></i> Back
         </button>
-        <button className="bg-[#103C8C] text-white text-sm font-medium px-5 py-2 rounded-md shadow hover:bg-[#0B2E72]">
+        <button className="rounded-xl bg-[#8ec5eb] px-5 py-2 text-sm font-semibold text-[#0b3558] shadow-[0_12px_30px_rgba(2,20,38,0.35)] transition hover:bg-[#a9d5f2]">
           <i className="fa-solid fa-download mr-2"></i> Download
         </button>
       </div>

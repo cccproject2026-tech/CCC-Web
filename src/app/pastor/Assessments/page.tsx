@@ -161,7 +161,7 @@ export default function PastorAssessments() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0A3C8C] text-[#0B1C58]">
+    <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">
       <PastorHeader showFullHeader={true} />
 
       {/* 🟣 HERO SECTION */}
@@ -169,40 +169,49 @@ export default function PastorAssessments() {
         className="relative h-[200px] md:h-[250px] flex items-end justify-start px-4 md:px-8 lg:px-16 pb-8 md:pb-12 bg-cover bg-center"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-[#09256F]/70 via-[#0E2F8A]/40 to-[#133A9E]/90"></div>
-        <h1 className="relative z-10 text-2xl md:text-4xl font-semibold text-white mb-1">
-          Assessments
-        </h1>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]"></div>
+        <div className="relative z-10">
+          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
+            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
+            Leadership Support Network
+          </p>
+          <h1 className="mt-3 text-2xl font-semibold text-white md:text-4xl">
+            Assessments
+          </h1>
+          <p className="mt-2 max-w-xl text-sm text-[#d9ebf8] md:text-base">
+            Complete assigned assessments and monitor your submission status.
+          </p>
+        </div>
       </section>
 
       {/* 🟦 MAIN CONTENT */}
-      <main className="flex-1 bg-[#EEF3FF] pt-8 md:pt-16 pb-12 md:pb-20 px-4 md:px-10 lg:px-20">
+      <main className="relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 pb-12 pt-8 md:px-10 md:pb-20 md:pt-16 lg:px-20">
         <div className="max-w-7xl mx-auto">
           {/* 🔍 Search + Tabs */}
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 mb-8 md:mb-10">
             {/* Search Box */}
             <div className="relative w-full lg:w-[350px]">
-              <i className="fa-solid fa-magnifying-glass text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2 text-sm"></i>
+              <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[#cde2f2]"></i>
               <input
                 type="text"
                 placeholder="Search"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-white border border-gray-200 rounded-md pl-10 pr-4 py-2 text-sm text-gray-600 shadow-sm outline-none focus:ring-2 focus:ring-[#103C8C]"
+                className="w-full rounded-xl border border-white/20 bg-white/10 py-2 pl-10 pr-4 text-sm text-white shadow-sm outline-none backdrop-blur placeholder:text-[#cde2f2] focus:ring-2 focus:ring-[#8ec5eb]"
                 suppressHydrationWarning
               />
             </div>
 
             {/* Tabs */}
-            <div className="flex bg-white rounded-lg shadow-sm overflow-x-auto">
+            <div className="flex overflow-x-auto rounded-xl border border-white/20 bg-white/10 shadow-sm backdrop-blur">
               {["All", "Due", "Not Started", "Completed", "Submitted"].map(
                 (tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
                     className={`px-3 md:px-5 py-2 text-xs md:text-sm font-medium transition-all whitespace-nowrap ${activeTab === tab
-                      ? "bg-[#103C8C] text-white"
-                      : "text-gray-600 hover:bg-gray-100"
+                      ? "bg-white text-[#0f4a76]"
+                      : "text-[#d9ebf8] hover:bg-white/15"
                       }`}
                     suppressHydrationWarning
                   >
@@ -218,7 +227,7 @@ export default function PastorAssessments() {
             {filtered.map((item) => (
               < div
                 key={item.id}
-                className="bg-white rounded-xl shadow-md hover:shadow-lg overflow-hidden flex flex-col md:flex-row transition-all duration-300"
+                className="flex flex-col overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg md:flex-row"
               >
                 {/* LEFT IMAGE */}
                 < div className="relative w-full md:w-[200px] h-[180px] md:h-[200px] flex-shrink-0 m-4 md:m-5" >
@@ -228,7 +237,7 @@ export default function PastorAssessments() {
                     className="w-full h-full object-cover rounded-lg"
                   />
                   {/* DUE DATE LABEL */}
-                  < div className="absolute bottom-2 left-2 bg-yellow-400 text-black text-xs font-semibold px-2 py-[3px] rounded-md flex items-center gap-1" >
+                  < div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-md bg-[#fff6d8] px-2 py-[3px] text-xs font-semibold text-[#d38a00]" >
                     <i className="fa-regular fa-calendar text-xs"></i>
                     {item.date}
                   </div>
@@ -237,14 +246,14 @@ export default function PastorAssessments() {
                 {/* RIGHT CONTENT */}
                 <div className="flex flex-col justify-between flex-1 p-4 md:p-5">
                   <div>
-                    <h3 className="font-semibold text-gray-900 text-[15px] md:text-[17px] leading-tight mb-1">
+                    <h3 className="mb-1 text-[15px] font-semibold leading-tight text-white md:text-[17px]">
                       {item.title}
                     </h3>
-                    <p className="text-sm text-gray-600 mb-3">{item.desc}</p>
+                    <p className="mb-3 text-sm text-[#cde2f2]">{item.desc}</p>
 
                     {/* STATUS */}
                     <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs text-gray-500 font-medium">
+                      <span className="text-xs font-medium text-[#d9ebf8]">
                         Status
                       </span>
                       <span
@@ -259,17 +268,17 @@ export default function PastorAssessments() {
                     {/* Extra Info based on status */}
                     {item.status === "Submitted" && (
                       <>
-                        <p className="text-xs text-gray-600 mb-2">
+                        <p className="mb-2 text-xs text-[#d9ebf8]">
                           Submitted on : {item.date}
                         </p>
-                        <p className="bg-[#E0EAFF] text-[#1D4ED8] text-xs px-3 py-2 rounded-md inline-block font-medium">
+                        <p className="inline-block rounded-md bg-white/15 px-3 py-2 text-xs font-medium text-[#d9ebf8]">
                           Meeting Scheduled on {item.meeting}
                         </p>
                       </>
                     )}
 
                     {item.status === "Completed" && (
-                      <p className="text-xs text-gray-600 mt-2">
+                      <p className="mt-2 text-xs text-[#d9ebf8]">
                         Completed on : {item.date}
                       </p>
                     )}
@@ -281,7 +290,7 @@ export default function PastorAssessments() {
                       onClick={() =>
                         router.push(`/pastor/PastorSurveyCMA?assessmentId=${item.id}`)
                       }
-                      className="bg-[#103C8C] text-white text-xs md:text-sm font-medium px-4 md:px-5 py-2 rounded-lg hover:bg-[#0B2E72]"
+                      className="rounded-lg bg-white px-4 py-2 text-xs font-semibold text-[#0f4a76] hover:bg-[#e7f1fa] md:px-5 md:text-sm"
                     >
                       {item.button}
                     </button>

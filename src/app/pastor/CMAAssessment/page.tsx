@@ -159,9 +159,9 @@ export default function CMAAssessment() {
 
       {/* INSTRUCTION POPUP */}
       {showInstructionPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white rounded-lg shadow-lg w-[90%] sm:w-[600px] overflow-hidden animate-fadein">
-            <div className="bg-[#08929C] px-6 py-4 flex justify-between items-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
+          <div className="w-[90%] overflow-hidden rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] shadow-[0_24px_70px_rgba(2,20,38,0.55)] sm:w-[600px] animate-fadein">
+            <div className="flex items-center justify-between border-b border-white/15 bg-[#0b3558]/60 px-6 py-4">
               <h3 className="text-white text-lg font-semibold">
                 Church Assessment Evaluation (CMA)
               </h3>
@@ -173,10 +173,10 @@ export default function CMAAssessment() {
               </button>
             </div>
             <div className="p-6">
-              <p className="text-sm font-semibold mb-3 text-gray-800">
+              <p className="mb-3 text-sm font-semibold text-white">
                 Assessment Guidelines
               </p>
-              <div className="border border-gray-300 rounded-lg p-4 text-sm text-gray-700 space-y-2">
+              <div className="space-y-2 rounded-xl border border-white/20 bg-white/5 p-4 text-sm text-[#d8ecfa]">
                 <ul className="list-disc list-inside space-y-1">
                   <li>Please complete the Assessment in a single session without taking breaks.</li>
                   <li>If there is a power outage or internet loss, the Assessment will restart from the beginning.</li>
@@ -188,7 +188,7 @@ export default function CMAAssessment() {
               <div className="flex justify-end mt-6">
                 <button
                   onClick={handleStartNow}
-                  className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm font-medium px-6 py-2 rounded-md"
+                  className="rounded-xl bg-[#8ec5eb] px-6 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
                 >
                   Start Now
                 </button>
@@ -200,9 +200,9 @@ export default function CMAAssessment() {
 
       {/* QUESTION POPUP */}
       {showQuestionPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white rounded-lg shadow-lg w-[90%] sm:w-[600px] overflow-hidden animate-fadein">
-            <div className="bg-[#08929C] px-6 py-4 flex justify-between items-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
+          <div className="w-[90%] overflow-hidden rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] shadow-[0_24px_70px_rgba(2,20,38,0.55)] sm:w-[600px] animate-fadein">
+            <div className="flex items-center justify-between border-b border-white/15 bg-[#0b3558]/60 px-6 py-4">
               <h3 className="text-white text-lg font-semibold">
                 Church Assessment Evaluation (CMA)
               </h3>
@@ -213,7 +213,7 @@ export default function CMAAssessment() {
                 ×
               </button>
             </div>
-            <div className="p-6 text-gray-800">
+            <div className="p-6 text-white">
               <p className="font-semibold mb-4 text-sm">
                 Please Answer the Questions:
               </p>
@@ -221,29 +221,29 @@ export default function CMAAssessment() {
                 <input
                   type="text"
                   placeholder="What is your current church membership?"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none"
+                  className="w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-[#cbe6f9] focus:outline-none"
                 />
                 <input
                   type="text"
                   placeholder="How many active members do you have currently?"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none"
+                  className="w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-[#cbe6f9] focus:outline-none"
                 />
                 <input
                   type="text"
                   placeholder="How many baptisms in the last two years?"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none"
+                  className="w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-[#cbe6f9] focus:outline-none"
                 />
               </div>
               <div className="flex justify-end gap-3 mt-6">
                 <button
                   onClick={() => setShowQuestionPopup(false)}
-                  className="border border-gray-300 text-gray-600 text-sm px-6 py-2 rounded-md"
+                  className="rounded-xl border border-white/30 px-6 py-2 text-sm text-[#d8ecfa] transition hover:bg-white/10"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSubmitAnswers}
-                  className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm font-medium px-6 py-2 rounded-md"
+                  className="rounded-xl bg-[#8ec5eb] px-6 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
                 >
                   Submit
                 </button>
@@ -255,9 +255,9 @@ export default function CMAAssessment() {
 
       {/* SUCCESS POPUP */}
       {showSuccessPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white text-[#0F4A85] px-8 py-5 rounded-xl shadow-lg flex items-center gap-3 fade-in">
-            <div className="bg-[#3DBE72] text-white w-6 h-6 flex items-center justify-center rounded-full">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
+          <div className="fade-in flex items-center gap-3 rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-8 py-5 text-white shadow-[0_24px_70px_rgba(2,20,38,0.55)]">
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#3DBE72] text-white">
               <i className="fa-solid fa-check text-xs"></i>
             </div>
             <p className="font-medium text-[15px]">

@@ -10,15 +10,15 @@ export default function MentoringRoadmapPage() {
   const [activeTab, setActiveTab] = useState("overview");
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F4A85]">
+    <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">
       <PastorHeader showFullHeader={true} />
 
       {/* HERO SECTION */}
       <section
-        className="relative h-[320px] bg-cover bg-center text-white flex flex-col justify-end px-20 pb-10"
+        className="relative flex h-[320px] flex-col justify-end bg-cover bg-center px-6 pb-10 text-white md:px-12 lg:px-20"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-black/50"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]"></div>
         {/* <p className="text-xs text-white/80 absolute mt-10">
             Revitalization Roadmap &gt; Self Revitalization Phase &gt;{" "}
             <span className="text-white font-medium">
@@ -38,11 +38,11 @@ export default function MentoringRoadmapPage() {
       </section>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white pb-24">
+      <main className="flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-12 pb-24 md:px-10 lg:px-16">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-10">
 
           {/* LEFT PANEL */}
-          <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 w-full h-fit">
+          <div className="h-fit w-full rounded-xl border border-white/20 bg-white/10 p-4 shadow-md backdrop-blur flex flex-col gap-2">
             {[
               { key: "overview", label: "Over View" },
               { key: "comments", label: "Comments", count: 2 },
@@ -53,8 +53,8 @@ export default function MentoringRoadmapPage() {
                 onClick={() => setActiveTab(item.key)}
                 className={`flex justify-between items-center px-4 py-3 rounded-md text-sm font-medium transition-all ${
                   activeTab === item.key
-                    ? "bg-[#103C8C] text-white shadow-sm"
-                    : "bg-[#F8FAFF] text-gray-600 hover:bg-[#E9EEFF]"
+                    ? "bg-white text-[#0f4a76] shadow-sm"
+                    : "bg-transparent text-[#d9ebf8] hover:bg-white/15"
                 }`}
               >
                 {item.label}
@@ -63,7 +63,7 @@ export default function MentoringRoadmapPage() {
                     className={`text-xs font-semibold rounded-full px-2 py-[1px] ${
                       activeTab === item.key
                         ? "bg-white/20 text-white"
-                        : "bg-white border border-[#D0DAF9] text-[#103C8C]"
+                        : "border border-white/20 bg-white/10 text-white"
                     }`}
                   >
                     {item.count}
@@ -80,7 +80,7 @@ export default function MentoringRoadmapPage() {
               <>
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-xl font-semibold">Over View</h2>
-                  <button className="bg-white rounded-md w-8 h-8 flex items-center justify-center text-[#103C8C] hover:bg-gray-100">
+                  <button className="flex h-8 w-8 items-center justify-center rounded-md border border-white/20 bg-white/10 text-[#d9ebf8] hover:bg-white/15">
                     <i className="fa-solid fa-ellipsis-vertical"></i>
                   </button>
                 </div>
@@ -123,7 +123,7 @@ export default function MentoringRoadmapPage() {
                     </span>
                   </label>
                
-                    <button className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-6 py-2 rounded-md shadow-md absolute mt-25 ml-170">
+                    <button className="absolute ml-170 mt-25 rounded-md bg-white px-6 py-2 text-sm font-semibold text-[#0f4a76] shadow-md transition hover:bg-[#e7f1fa]">
                     Signature Required here
                   </button>
                 </div>

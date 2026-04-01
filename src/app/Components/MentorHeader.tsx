@@ -3,6 +3,7 @@ import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import { getCookie, clearAllCookies } from "@/app/utils/cookies";
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import Framelogo1 from "../Assets/Frame-logo-1.png";
 import Connecticon from "../Assets/Connect-icon.png";
 import NotificationIcon from "../Assets/notification.png";
@@ -26,6 +27,7 @@ import {
 } from "lucide-react";
 import { apiGetUserById } from "../Services/users.service";
 import { getGreeting } from "../Services/utils/helpers";
+import { getNotification, apiGetRoadmaps, apiGetAssessments, apiGetAllUsers } from "../Services/api";
 
 export default function MentorHeader({ showFullHeader = false }) {
   const pathname = usePathname();
@@ -35,6 +37,15 @@ export default function MentorHeader({ showFullHeader = false }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [notificationList, setNotificationList] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<{
+    roadmaps: any[];
+    assessments: any[];
+    mentees: any[];
+  }>({ roadmaps: [], assessments: [], mentees: [] });
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -83,32 +94,62 @@ export default function MentorHeader({ showFullHeader = false }) {
     { name: "Schedule", path: "/mentor/MentorSchedule" },
   ];
 
-  const notifications = [
-    {
-      title: "NEW ROADMAP COURSES",
-      desc: "Interested in receiving mentoring in community engagement",
-      time: "9:43 am",
-      icon: <Clipboard size={20} className="text-[#2679FF]" />,
-    },
-    {
-      title: "NEW NOTES ADDED",
-      desc: "Interested in receiving mentoring in community engagement",
-      time: "9:43 am",
-      icon: <FileText size={20} className="text-[#28B463]" />,
-    },
-    {
-      title: "ASSIGNMENTS DUE TODAY",
-      desc: "Interested in receiving mentoring in community engagement",
-      time: "9:43 am",
-      icon: <FileWarning size={20} className="text-[#F1C40F]" />,
-    },
-    {
-      title: "YOUR PROFILE IS INCOMPLETE",
-      desc: "Interested in receiving mentoring in community engagement",
-      time: "9:43 am",
-      icon: <UserRound size={20} className="text-[#E74C3C]" />,
-    },
-  ];
+  useEffect(() => {
+    const mentorData = getCookie("mentor");
+    if (!mentorData) return;
+    const mentor = JSON.parse(mentorData);
+    const mentorId = mentor?.id || mentor?._id;
+    if (!mentorId) return;
+
+    const fetchNotifications = async () => {
+      try {
+        const res = await getNotification(mentorId);
+        const list = res.data?.data?.notifications || [];
+        setNotificationList(list);
+      } catch (error) {
+        console.error("Failed to fetch mentor notifications:", error);
+        setNotificationList([]);
+      }
+    };
+
+    fetchNotifications();
+  }, []);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!query) {
+      setSearchResults({ roadmaps: [], assessments: [], mentees: [] });
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setSearchLoading(true);
+        const [roadmapsRes, assessmentsRes, menteesRes] = await Promise.all([
+          apiGetRoadmaps("all", query),
+          apiGetAssessments({ search: query }),
+          apiGetAllUsers({ search: query, roleMatch: "pastor", limit: 5 }),
+        ]);
+
+        const roadmaps = Array.isArray(roadmapsRes.data?.data) ? roadmapsRes.data.data : [];
+        const assessments = Array.isArray(assessmentsRes.data?.data) ? assessmentsRes.data.data : [];
+        const mentees = Array.isArray(menteesRes.data?.data?.users)
+          ? menteesRes.data.data.users
+          : Array.isArray(menteesRes.data?.data)
+            ? menteesRes.data.data
+            : [];
+
+        setSearchResults({ roadmaps, assessments, mentees });
+      } catch (error) {
+        console.error("Mentor global search failed:", error);
+        setSearchResults({ roadmaps: [], assessments: [], mentees: [] });
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const profileMenu = [
     { icon: <User size={18} />, label: "Profile", path: "/mentor/profile" },
@@ -131,7 +172,7 @@ export default function MentorHeader({ showFullHeader = false }) {
   ];
 
   return (
-    <header className="flex items-center justify-between px-10 py-3 bg-[#1A2E7A] text-white shadow-md relative z-50 font-[Albert_Sans]">
+    <header className="relative z-50 flex items-center justify-between bg-[#0b3558] px-4 py-3 text-white shadow-[0_6px_18px_rgba(2,20,38,0.35)] md:px-6 lg:px-10 font-[Albert_Sans]">
       {/* ✅ Left Logo */}
       <div className="flex items-center gap-3">
         <Image src={Framelogo1} alt="Logo" width={26} height={26} />
@@ -160,13 +201,63 @@ export default function MentorHeader({ showFullHeader = false }) {
 
 
       {/* ✅ Right Icons */}
-      <div className="flex items-center gap-5 relative" ref={dropdownRef}>
+      <div className="relative flex items-center gap-3 md:gap-5" ref={dropdownRef}>
         {showFullHeader && (
           <>
             {/* 🔍 Search */}
-            <button className="hover:opacity-80 transition">
+            <button
+              onClick={() => {
+                setShowSearch((prev) => !prev);
+                setShowNotifications(false);
+                setShowProfileMenu(false);
+                setShowSettingsMenu(false);
+              }}
+              className="hidden h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15 md:flex"
+            >
               <Image src={SearchIcon} alt="Search" width={18} height={18} />
             </button>
+
+            {showSearch && (
+              <div className="absolute right-[160px] top-12 z-[60] w-[420px] rounded-2xl border border-white/20 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] p-3 shadow-2xl">
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search roadmaps, assessments, pastors..."
+                  className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/70 outline-none"
+                />
+                <div className="mt-3 max-h-[360px] space-y-3 overflow-auto pr-1">
+                  {searchLoading && <p className="text-xs text-white/80">Searching...</p>}
+                  {!searchLoading && searchQuery.trim() && (
+                    <>
+                      <div>
+                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#cde2f2]">Roadmaps</p>
+                        {searchResults.roadmaps.slice(0, 4).map((item: any) => (
+                          <Link key={item._id || item.id} href="/mentor/RevitalizationRoadmap" className="mb-1 block rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15">
+                            {item.name || item.title || "Untitled roadmap"}
+                          </Link>
+                        ))}
+                      </div>
+                      <div>
+                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#cde2f2]">Assessments</p>
+                        {searchResults.assessments.slice(0, 4).map((item: any) => (
+                          <Link key={item._id || item.id} href="/mentor/MentorAssessments" className="mb-1 block rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15">
+                            {item.name || item.title || "Untitled assessment"}
+                          </Link>
+                        ))}
+                      </div>
+                      <div>
+                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#cde2f2]">Pastors</p>
+                        {searchResults.mentees.slice(0, 4).map((item: any) => (
+                          <Link key={item._id || item.id} href="/mentor/MenteesDetailed" className="mb-1 block rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15">
+                            {`${item.firstName || ""} ${item.lastName || ""}`.trim() || item.name || "Pastor"}
+                          </Link>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* 🔔 Notification Dropdown */}
             <div className="relative">
@@ -176,7 +267,7 @@ export default function MentorHeader({ showFullHeader = false }) {
                   setShowProfileMenu(false);
                   setShowSettingsMenu(false);
                 }}
-                className="relative hover:opacity-80 transition cursor-pointer"
+                className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15 cursor-pointer"
               >
                 <Image
                   src={NotificationIcon}
@@ -184,9 +275,11 @@ export default function MentorHeader({ showFullHeader = false }) {
                   width={20}
                   height={20}
                 />
-                <span className="absolute -top-1 -right-1 bg-[#FFD700] text-[#1A2E7A] text-[10px] font-bold rounded-full w-[14px] h-[14px] flex items-center justify-center">
-                  4
-                </span>
+                {notificationList.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-[#FFD700] text-[#1A2E7A] text-[10px] font-bold rounded-full w-[14px] h-[14px] flex items-center justify-center">
+                    {notificationList.length}
+                  </span>
+                )}
               </button>
 
               {/* Notification Dropdown */}
@@ -201,7 +294,7 @@ export default function MentorHeader({ showFullHeader = false }) {
                       Notifications
                     </h2>
                     <a
-                      href="#"
+                      href="/mentor/notifications"
                       className="text-[#1A2E7A] text-[14px] font-medium hover:underline"
                     >
                       View All
@@ -210,25 +303,25 @@ export default function MentorHeader({ showFullHeader = false }) {
 
                   {/* Notifications List */}
                   <div className="p-2 space-y-2">
-                    {notifications.map((note, i) => (
+                    {notificationList.slice(0, 4).map((note, i) => (
                       <div
                         key={i}
                         className="flex items-start justify-between bg-[#F5F7FA] rounded-xl p-3"
                       >
                         <div className="flex items-start gap-3 w-full">
-                          {note.icon}
+                          <Clipboard size={20} className="text-[#2679FF]" />
                           <div className="flex flex-col w-full">
                             <div className="flex justify-between">
                               <h3 className="font-semibold text-[14px] text-[#000000]">
-                                {note.title}
+                                {note.name || "Notification"}
                               </h3>
                               <div className="w-[8px] h-[8px] rounded-full bg-[#FFD700] mt-[2px]"></div>
                             </div>
                             <p className="text-[#7A7A7A] text-[13px] leading-snug">
-                              {note.desc}
+                              {note.details || note.description || ""}
                             </p>
                             <p className="text-[#9A9A9A] text-[12px] text-right mt-1">
-                              {note.time}
+                              {note?.createdAt ? new Date(note.createdAt).toLocaleString() : ""}
                             </p>
                           </div>
                         </div>
@@ -240,7 +333,7 @@ export default function MentorHeader({ showFullHeader = false }) {
             </div>
 
             {/* 🔗 Connect */}
-            <button className="hover:opacity-80 transition">
+            <button className="hidden h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15 md:flex">
               <Image src={Connecticon} alt="Connect" width={22} height={22} />
             </button>
 
@@ -252,7 +345,7 @@ export default function MentorHeader({ showFullHeader = false }) {
                   setShowNotifications(false);
                   setShowSettingsMenu(false);
                 }}
-                className="flex items-center gap-2 bg-[#223C8C] px-3 py-1 rounded-full hover:opacity-90 transition cursor-pointer"
+                className="flex items-center gap-2 rounded-full border border-[#8ec5eb]/40 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-2 py-1 transition hover:bg-[linear-gradient(180deg,#145787_0%,#0f4a76_100%)] cursor-pointer md:px-3"
               >
                 <div className="text-right text-[11px] leading-tight">
                   <p className="text-white/80">{getGreeting()}</p>

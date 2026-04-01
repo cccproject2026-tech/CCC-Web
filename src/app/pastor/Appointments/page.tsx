@@ -378,7 +378,7 @@ const handleCancelAppointment = async () => {
 
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F5F7FB] text-[#0B1C58] relative overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden bg-[#062946] text-white font-[Albert_Sans]">
       <PastorHeader showFullHeader={true} />
 
       {/* HERO SECTION */}
@@ -386,23 +386,30 @@ const handleCancelAppointment = async () => {
         className="relative bg-cover bg-center h-[200px] md:h-[260px] flex flex-col justify-center px-4 md:px-8 lg:px-20 text-white"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0A3C8C]/90 to-[#052860]/70"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]"></div>
         <div className="relative z-10">
-          <h1 className="text-2xl md:text-4xl font-semibold tracking-wide">
+          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
+            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
+            Leadership Support Network
+          </p>
+          <h1 className="mt-3 text-2xl font-semibold tracking-wide md:text-4xl">
             Appointments
           </h1>
+          <p className="mt-2 max-w-xl text-sm text-[#d9ebf8] md:text-base">
+            Manage your scheduled sessions and upcoming mentor meetings.
+          </p>
         </div>
       </section>
 
   {/* MAIN SECTION */}
-<main className="px-4 md:px-8 lg:px-20 py-8 md:py-12 bg-[#176192]">
+<main className="relative z-10 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-8 md:px-8 md:py-12 lg:px-20">
 
   {/* SEARCH + NEW MEETING BUTTON */}
   <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-8 md:mb-10">
     <input
       type="text"
       placeholder="Enter a date (dd-mm-yyyy)"
-      className="w-full md:w-[320px] border bg-[white] border-[#DDE2EB] rounded-md px-4 py-2 text-sm text-gray-600 shadow-sm focus:outline-none focus:border-[#103C8C]"
+      className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm text-white shadow-sm backdrop-blur placeholder:text-[#cde2f2] focus:outline-none focus:border-[#8ec5eb] md:w-[320px]"
     />
 
     <button
@@ -410,7 +417,7 @@ const handleCancelAppointment = async () => {
         setDrawerOpen(true);
         setDrawerStep("mentor");
       }}
-      className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-4 py-2 rounded-md shadow-sm flex items-center justify-center gap-2"
+      className="flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-[#0f4a76] shadow-sm transition hover:bg-[#e7f1fa]"
     >
       <i className="fa-solid fa-plus text-xs"></i> New Meeting
     </button>
@@ -420,13 +427,13 @@ const handleCancelAppointment = async () => {
   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
 
     {/* LEFT — MONTHLY CALENDAR */}
-    <div className="bg-[#0C4A85] rounded-2xl p-4 md:p-6 text-white shadow-md">
+    <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-4 text-white shadow-md md:p-6">
       <h3 className="text-sm md:text-[15px] font-medium mb-4 flex items-center gap-2">
         <i className="fa-regular fa-calendar"></i> Monthly Meeting Calendar
       </h3>
 
       {/* Calendar Box */}
-      <div className="bg-[#103C8C] rounded-xl p-4 md:p-5 text-center">
+      <div className="rounded-xl border border-white/15 bg-white/10 p-4 text-center backdrop-blur md:p-5">
 
         {/* Calendar Header */}
         <div className="flex justify-between items-center mb-3">
@@ -483,7 +490,7 @@ const handleCancelAppointment = async () => {
 
     {/* RIGHT — TODAY'S APPOINTMENTS */}
     <div>
-      <h3 className="text-sm md:text-[15px] font-semibold mb-4 text-white">
+      <h3 className="mb-4 text-sm font-semibold text-white md:text-[15px]">
         You have {appointmentsToday.length} Appointments Today
       </h3>
 
@@ -512,10 +519,10 @@ const handleCancelAppointment = async () => {
           return (
             <div
               key={appt.id}
-              className="bg-white rounded-xl p-4 md:p-5 shadow-sm border border-[#E5E7EB] flex flex-col md:flex-row items-start md:items-center gap-5 relative"
+              className="relative flex flex-col items-start gap-5 rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-4 shadow-sm md:flex-row md:items-center md:p-5"
             >
               {/* Icon */}
-              <div className="bg-[#F3F6FB] w-[80px] md:w-[100px] h-[80px] md:h-[100px] rounded-xl flex items-center justify-center">
+              <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl bg-white/90 md:h-[100px] md:w-[100px]">
                 <Image src={icon} alt="mode" className="w-[45px] md:w-[55px]" />
               </div>
 
@@ -532,42 +539,42 @@ const handleCancelAppointment = async () => {
                     className="rounded-full"
                   />
                   <div>
-                    <h4 className="font-semibold text-[#0B1C58] text-sm">
+                    <h4 className="text-sm font-semibold text-white">
                       {mentor?.firstName} {mentor?.lastName}
                     </h4>
-                    <p className="text-[11px] text-gray-500">Mentor</p>
+                    <p className="text-[11px] text-[#cde2f2]">Mentor</p>
                   </div>
                 </div>
 
                 {/* Date/Time */}
                 <div className="flex flex-wrap gap-2 mb-2">
-                  <div className="flex items-center gap-2 bg-[#E8EFFB] px-3 py-[4px] rounded-md text-[11px] text-[#103C8C] font-medium">
+                  <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 py-[4px] text-[11px] font-medium text-[#d9ebf8]">
                     <i className="fa-regular fa-calendar"></i>
                     Date: {dateStr}
                   </div>
 
-                  <div className="flex items-center gap-2 bg-[#E8EFFB] px-3 py-[4px] rounded-md text-[11px] text-[#103C8C] font-medium">
+                  <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 py-[4px] text-[11px] font-medium text-[#d9ebf8]">
                     <i className="fa-regular fa-clock"></i>
                     Time: {timeStr}
                   </div>
                 </div>
 
                 {/* Mode */}
-                <p className="text-[11px] text-[#6B7280] mb-3">
+                <p className="mb-3 text-[11px] text-[#d9ebf8]">
                   Mode:
-                  <span className="text-[#103C8C] font-semibold"> {appt.platform}</span>
+                  <span className="font-semibold text-[#8ec5eb]"> {appt.platform}</span>
                 </p>
 
                 {/* Actions row */}
                 <div className="flex justify-between items-center">
 
-                  <div className="flex gap-4 text-[#103C8C] text-sm">
+                  <div className="flex gap-4 text-sm text-[#8ec5eb]">
                     <i className="fa-solid fa-phone cursor-pointer"></i>
                     <i className="fa-regular fa-comment cursor-pointer"></i>
                     <i className="fa-brands fa-whatsapp cursor-pointer"></i>
                   </div>
 
-                  <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white px-5 py-[6px] rounded-md text-sm">
+                  <button className="rounded-md bg-white px-5 py-[6px] text-sm font-semibold text-[#0f4a76] hover:bg-[#e7f1fa]">
                     Details
                   </button>
                 </div>
@@ -577,7 +584,7 @@ const handleCancelAppointment = async () => {
               <div className="absolute top-3 right-3">
                 <button
                   onClick={() => setMenuOpenId(menuOpenId === appt.id ? null : appt.id)}
-                  className="text-gray-600 hover:text-black"
+                  className="text-[#d9ebf8] hover:text-white"
                 >
                   <i className="fa-solid fa-ellipsis-vertical"></i>
                 </button>
@@ -792,8 +799,8 @@ const handleCancelAppointment = async () => {
 
     {/* NEXT APPOINTMENT SECTION */}
 {/* NEXT APPOINTMENT SECTION */}
-<div className="mt-12 md:mt-16 px-4 md:px-8 lg:px-20 py-8 md:py-12">
-  <h2 className="text-base md:text-[18px] font-semibold mb-4 md:mb-6">
+<div className="mt-12 px-4 py-8 md:mt-16 md:px-8 md:py-12 lg:px-20">
+  <h2 className="mb-4 text-base font-semibold text-white md:mb-6 md:text-[18px]">
     Next Appointment
   </h2>
 

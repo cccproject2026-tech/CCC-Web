@@ -1,17 +1,23 @@
 "use client";
 import Image from "next/image";
+import Link from "next/link";
 import { isAxiosError } from "axios";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiLogin } from "@/app/Services/api";
 import { setCookie } from "@/app/utils/cookies";
 
-import PastorHeader from "@/app/Components/PastorHeader";
+import Framelogo1 from "@/app/Assets/Frame-logo-1.png";
 import AndrewsLogo from "../../Assets/andrews-logo.png";
 
 const ENABLE_TEMP_LOGIN_BYPASS = false;
 
-export default function LoginPage() {
+function userIdFromLoginUser(user: Record<string, unknown>): string | null {
+  const id = user._id ?? user.id;
+  return typeof id === "string" ? id : null;
+}
+
+export default function DirectorLoginPage() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -30,18 +36,19 @@ export default function LoginPage() {
     setErrorMsg(null);
 
     if (ENABLE_TEMP_LOGIN_BYPASS) {
-      const mockPastorUser = {
-        id: "temp-pastor-user",
-        firstName: "Pastor",
+      const mockDirectorUser = {
+        _id: "temp-director-user",
+        firstName: "Director",
         lastName: "Demo",
-        email: email || "pastor.demo@ccc.local",
-        role: "pastor",
+        email: email || "director.demo@ccc.local",
+        role: "director",
       };
       setCookie("accessToken", "temp-access-token");
       setCookie("refreshToken", "temp-refresh-token");
-      setCookie("user", JSON.stringify(mockPastorUser));
+      setCookie("user", JSON.stringify(mockDirectorUser));
+      setCookie("userId", mockDirectorUser._id);
       showToast("Login successful. Redirecting...");
-      setTimeout(() => router.push("/pastor/profile-incomplete"), 350);
+      setTimeout(() => router.push("/director/home"), 350);
       return;
     }
 
@@ -63,14 +70,29 @@ export default function LoginPage() {
 
       const { accessToken, refreshToken, user } = json.data || {};
 
-      // save tokens / user – you can later move this to a context or Zustand store
+      if (user) {
+        const roleRaw = (user as { role?: string }).role;
+        if (roleRaw != null && String(roleRaw).trim() !== "") {
+          const role = String(roleRaw).toLowerCase();
+          if (role !== "director") {
+            setErrorMsg(
+              "This account is not a director account. Use the pastor or mentor sign-in page instead.",
+            );
+            return;
+          }
+        }
+      }
+
       if (accessToken) setCookie("accessToken", accessToken);
       if (refreshToken) setCookie("refreshToken", refreshToken);
-      if (user) setCookie("user", JSON.stringify(user));
+      if (user) {
+        setCookie("user", JSON.stringify(user));
+        const uid = userIdFromLoginUser(user as Record<string, unknown>);
+        if (uid) setCookie("userId", uid);
+      }
 
-      // redirect – adjust based on role/status if needed
       showToast("Login successful. Redirecting...");
-      setTimeout(() => router.push("/pastor/profile-incomplete"), 350);
+      setTimeout(() => router.push("/director/home"), 350);
     } catch (err) {
       if (isAxiosError(err)) {
         const status = err.response?.status;
@@ -92,43 +114,45 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#062946] text-white font-[Albert_Sans]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.22),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.12),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)]" />
-      <PastorHeader />
+      <header className="relative z-10 flex items-center justify-between border-b border-white/10 bg-[#0b3558]/95 px-4 py-3 sm:px-6 lg:px-10 backdrop-blur-sm">
+        <Link href="/" className="flex items-center gap-2.5 text-white/95 transition hover:text-white">
+          <Image src={Framelogo1} alt="CCC" width={26} height={26} />
+          <span className="hidden text-sm font-medium sm:inline">Center for Community Change</span>
+        </Link>
+        <Link href="/" className="text-sm text-[#cde2f2] transition hover:text-white">
+          Back to home
+        </Link>
+      </header>
 
       <section className="relative z-10 flex flex-col md:flex-row min-h-[calc(100vh-64px)]">
-        {/* LEFT INFO SECTION */}
         <div className="w-full md:w-1/2 flex flex-col items-center justify-center p-6 sm:p-8">
           <div className="w-full max-w-[500px] rounded-3xl border border-white/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.12)_0%,rgba(255,255,255,0.05)_100%)] p-7 shadow-[0_24px_52px_rgba(3,24,43,0.35)] backdrop-blur">
             <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-[#8ec5eb]">
-              <i className="fa-solid fa-handshake-angle text-xl" />
+              <i className="fa-solid fa-chart-line text-xl" />
             </div>
-            <h3 className="text-3xl font-semibold text-white">Welcome Back</h3>
+            <h3 className="text-3xl font-semibold text-white">Director Portal</h3>
             <p className="mt-3 text-sm leading-7 text-[#cde2f2]">
-              Continue your leadership journey with mentoring support, practical tools, and guided community impact.
+              Sign in to oversee mentors and mentees, track progress, and manage programs from one place.
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-xl border border-white/15 bg-[#0a3558] p-3">
-                <p className="text-[#8ec5eb] font-semibold">Guidance</p>
-                <p className="text-[#d9ebf8]">Mentor-led steps</p>
+                <p className="text-[#8ec5eb] font-semibold">Oversight</p>
+                <p className="text-[#d9ebf8]">Network-wide view</p>
               </div>
               <div className="rounded-xl border border-white/15 bg-[#0a3558] p-3">
-                <p className="text-[#8ec5eb] font-semibold">Growth</p>
-                <p className="text-[#d9ebf8]">Track your progress</p>
+                <p className="text-[#8ec5eb] font-semibold">Programs</p>
+                <p className="text-[#d9ebf8]">Courses & interests</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* RIGHT LOGIN SECTION */}
         <div className="w-full md:w-1/2 bg-[linear-gradient(180deg,rgba(10,53,88,0.8)_0%,rgba(8,43,71,0.85)_100%)] border-l border-white/10 flex flex-col items-center justify-center px-6 sm:px-8 py-10 md:py-12 relative min-h-[540px]">
-          {/* HEADER */}
           <div className="text-left w-full max-w-[420px] mb-4 sm:mb-6">
-            <h1 className="text-white text-2xl sm:text-3xl font-semibold tracking-tight">
-              Login
-            </h1>
-            <p className="mt-1 text-sm text-[#cde2f2]">Welcome back. Continue your journey.</p>
+            <h1 className="text-white text-2xl sm:text-3xl font-semibold tracking-tight">Director login</h1>
+            <p className="mt-1 text-sm text-[#cde2f2]">Use your director credentials to continue.</p>
           </div>
 
-          {/* FORM */}
           <div className="w-full max-w-[420px] rounded-2xl border border-white/20 bg-white/5 p-5 backdrop-blur">
             <form className="flex flex-col gap-3 sm:gap-4" onSubmit={handleLogin}>
               <input
@@ -148,9 +172,7 @@ export default function LoginPage() {
               />
 
               {errorMsg && (
-                <p className="text-red-200 text-xs sm:text-sm mt-1">
-                  {errorMsg}
-                </p>
+                <p className="text-red-200 text-xs sm:text-sm mt-1">{errorMsg}</p>
               )}
 
               <button
@@ -164,25 +186,11 @@ export default function LoginPage() {
 
             <div className="text-right mt-2">
               <a
-                href="resetpassword"
+                href="/pastor/resetpassword"
                 className="text-[12px] sm:text-[13px] text-[#cde2f2] hover:text-white transition"
               >
                 Forgot Password ?
               </a>
-            </div>
-
-            {/* NEW USER BUTTON */}
-            <div className="flex mt-5 sm:mt-6">
-              <button
-                className="w-full bg-[#0f4a76] text-white py-2 px-6 sm:px-12 rounded-lg text-xs sm:text-sm font-medium flex items-center justify-between hover:bg-[#0c3f66] transition cursor-pointer"
-                onClick={() => router.push(`/pastor/InterestForm`)}
-              >
-                <span className="flex items-center gap-1">
-                  New User <span>»</span>
-                </span>
-                <span className="hidden sm:flex">Submit Interest</span>
-                <span className="sm:hidden">Submit Interest</span>
-              </button>
             </div>
           </div>
 

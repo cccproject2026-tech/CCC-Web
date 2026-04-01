@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
-import Gears from "@/app/Assets/gear-form.png";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { useRouter } from "next/navigation";
 import { apiCreateInterest } from "@/app/Services/api";
@@ -15,6 +13,7 @@ export default function InterestForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const interests = [
     "I would like to find out more about the Center for Community Change",
@@ -85,6 +84,8 @@ export default function InterestForm() {
       }
 
       setSuccessMsg(json.message || "Interest form submitted successfully.");
+      setToastMessage("Interest submitted successfully.");
+      setTimeout(() => setToastMessage(null), 2000);
       setShowInterests(true); // ✅ show checkboxes only after successful API
       setCookie("interestEmail", email);
       // if you want to reset form:
@@ -105,25 +106,43 @@ export default function InterestForm() {
   };
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-[#224b8a] to-[#224b8a] text-white flex flex-col relative">
+    <main className="min-h-screen bg-[#062946] text-white flex flex-col relative font-[Albert_Sans]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),radial-gradient(circle_at_48%_56%,rgba(111,178,246,0.12),transparent_42%),radial-gradient(circle_at_90%_80%,rgba(8,52,85,0.4),transparent_40%),linear-gradient(180deg,#041f35_0%,#062946_100%)]" />
       <PastorHeader />
 
-      <section className="flex flex-col lg:flex-row w-full flex-1">
-        {/* LEFT IMAGE SECTION */}
-        <div className="lg:w-1/2">
-          <Image
-            src={Gears}
-            alt="Gears"
-            className="w-[600px] h-auto object-contain"
-          />
+      <section className="relative z-10 flex flex-col lg:flex-row w-full flex-1 lg:items-center">
+        {/* LEFT INFO SECTION */}
+        <div className="lg:w-1/2 flex flex-col items-center justify-center px-6 pb-4 pt-8 lg:px-8 lg:py-10">
+          <div className="w-full max-w-[760px] rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.03)_100%)] p-6 shadow-[0_24px_55px_rgba(3,24,43,0.38)]">
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-[#8ec5eb]">
+              <i className="fa-solid fa-compass text-xl" />
+            </div>
+            <h3 className="text-3xl font-semibold text-white">Your Ministry Story Matters</h3>
+            <p className="mt-3 text-sm leading-7 text-[#cde2f2]">
+              Share your ministry context so we can connect you with the right support, mentoring, and resources.
+            </p>
+            <div className="mt-6 space-y-3">
+              <div className="rounded-xl border border-white/15 bg-[#0a3558] p-4">
+                <p className="text-[#8ec5eb] font-semibold">Step 1</p>
+                <p className="text-[#d9ebf8]">Add your personal and church information</p>
+              </div>
+              <div className="rounded-xl border border-white/15 bg-[#0a3558] p-4">
+                <p className="text-[#8ec5eb] font-semibold">Step 2</p>
+                <p className="text-[#d9ebf8]">Submit your interest and wait for follow-up</p>
+              </div>
+            </div>
+          </div>
+          <p className="mt-3 text-sm text-[#cde2f2]">Community transformation starts with your story.</p>
         </div>
 
         {/* RIGHT FORM SECTION */}
-        <div className="w-full lg:w-1/2 bg-gradient-to-b from-[#224b8a] to-[#224b8a] px-10 py-10">
+        <div className="w-full lg:w-1/2 px-6 py-8 sm:px-10 sm:py-10">
+          <div className="rounded-2xl border border-white/20 bg-[rgba(10,53,88,0.5)] p-6 shadow-[0_20px_50px_rgba(2,20,38,0.42)] backdrop-blur">
           <div className="text-center mb-8">
-            <h2 className="inline-block text-white font-semibold px-10">
+            <h2 className="inline-block text-white text-2xl font-semibold px-10">
               Interest Form
             </h2>
+            <p className="mt-1 text-sm text-[#cde2f2]">Tell us a little about you and your ministry.</p>
           </div>
 
           {/* messages */}
@@ -231,9 +250,9 @@ export default function InterestForm() {
               </div>
 
               <div className="flex justify-end mt-3">
-                <button
+              <button
                   type="button"
-                  className="bg-white/10 hover:bg-white/20 text-white text-sm px-4 py-2 rounded-md border border-white/30 transition"
+                className="bg-white/10 hover:bg-white/20 text-white text-sm px-4 py-2 rounded-md border border-white/30 transition"
                 >
                   + Add More Church
                 </button>
@@ -303,23 +322,23 @@ export default function InterestForm() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-white text-[#0E59A6] font-semibold px-10 py-2 rounded-md hover:bg-[#DCEBFF] transition disabled:opacity-60"
+                className="bg-white text-[#0f4a76] font-semibold px-10 py-2.5 rounded-lg hover:bg-[#e7f1fa] transition disabled:opacity-60"
               >
-                {isSubmitting ? "Submitting..." : "Submit"}
+                {isSubmitting ? "Submitting..." : "Submit Interest"}
               </button>
             </div>
           </form>
 
           {/* ✅ CHECKBOXES APPEAR BELOW FORM AFTER SUCCESSFUL SUBMIT */}
           {showInterests && (
-            <div className="mt-8 bg-white text-[#0E59A6] rounded-lg p-6 shadow-md">
+            <div className="mt-8 rounded-lg border border-white/20 bg-[#0a3558] text-white p-6 shadow-md">
               <h3 className="text-sm font-semibold mb-4">Interests</h3>
               <div className="flex flex-col gap-3">
                 {interests.map((item, i) => (
                   <label key={i} className="flex items-center gap-2">
                     <input
                       type="checkbox"
-                      className="accent-[#0E59A6] w-4 h-4"
+                      className="accent-[#47c0ff] w-4 h-4"
                       onChange={i === 0 ? handleFirstCheckbox : undefined}
                     />
                     <span>{item}</span>
@@ -328,15 +347,16 @@ export default function InterestForm() {
               </div>
             </div>
           )}
+          </div>
         </div>
       </section>
 
       {/* ✅ POPUP MODAL */}
       {showPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white text-center rounded-xl p-8 w-[320px] shadow-lg">
+        <div className="fixed inset-0 flex items-center justify-center bg-black/55 z-50">
+          <div className="bg-[#0a3558] border border-white/15 text-center rounded-xl p-8 w-[320px] shadow-[0_20px_50px_rgba(3,24,43,0.5)]">
             <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center">
+              <div className="w-16 h-16 bg-[#24b47e] rounded-full flex items-center justify-center">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   className="h-8 w-8 text-white"
@@ -351,19 +371,24 @@ export default function InterestForm() {
                 </svg>
               </div>
             </div>
-            <h2 className="text-[#0E59A6] text-lg font-semibold">
+            <h2 className="text-white text-lg font-semibold">
               Interest Submitted !
             </h2>
-            <p className="text-[#0E59A6] text-sm mt-1 mb-5">
+            <p className="text-[#cde2f2] text-sm mt-1 mb-5">
               Please wait for approval
             </p>
             <button
               onClick={() => router.push("/pastor/Thankyou")}
-              className="border border-[#0E59A6] text-[#0E59A6] px-6 py-1.5 rounded-md hover:bg-[#E6F0FF] font-semibold"
+              className="border border-white/40 text-white px-6 py-1.5 rounded-md hover:bg-white/10 font-semibold"
             >
               Close
             </button>
           </div>
+        </div>
+      )}
+      {toastMessage && (
+        <div className="fixed left-1/2 top-20 z-[70] -translate-x-1/2 rounded-lg border border-white/20 bg-[#0a3558] px-4 py-3 text-sm text-white shadow-[0_12px_28px_rgba(2,20,38,0.45)]">
+          {toastMessage}
         </div>
       )}
     </main>

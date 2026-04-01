@@ -41,6 +41,10 @@ const MENTOR_USER_TYPES = [
 
 export default function WaitingForApproval() {
   const router = useRouter();
+  const scrollToVideos = () => {
+    const el = document.getElementById("videos-section");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   // Step 1: Full-screen modal (Pastor vs Mentor)
   const [isMainModalOpen, setIsMainModalOpen] = useState(false);
@@ -160,7 +164,12 @@ export default function WaitingForApproval() {
           // open full-screen popup in login mode
           onClick: () => openMainModal("login"),
         }}
+        tertiaryBtn={{
+          label: "Learn more about CCC",
+          onClick: scrollToVideos,
+        }}
         showContactBox={true}
+        theme="dark"
       />
 
       <WhatWeDoSection />
@@ -176,24 +185,24 @@ export default function WaitingForApproval() {
             className={`relative w-full h-full flex items-center justify-center px-4 sm:px-8 transform transition-all duration-300 ease-out
               ${animateMainModal ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}
           >
-            <div className="max-w-5xl w-full bg-white rounded-3xl shadow-2xl p-6 sm:p-10">
+            <div className="max-w-5xl w-full bg-[linear-gradient(180deg,#0a3558_0%,#0d3d63_100%)] rounded-3xl shadow-2xl p-6 sm:p-10 border border-white/20 text-white">
               {/* Close button */}
               <button
                 onClick={closeMainModal}
-                className="absolute right-6 top-6 text-gray-400 hover:text-gray-600 transition"
+                className="absolute right-6 top-6 text-white/70 hover:text-white transition"
                 aria-label="Close"
               >
                 ✕
               </button>
 
               <div className="text-center mb-8">
-                <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900">
+                <h2 className="text-2xl sm:text-3xl font-semibold text-white">
                   How would you like to continue?
                 </h2>
-                <p className="mt-2 text-sm sm:text-base text-gray-500">
+                <p className="mt-2 text-sm sm:text-base text-[#cde2f2]">
                   Choose whether you’re using the platform as a Pastor or as a
                   Mentor. We’ll continue with{" "}
-                  <span className="font-semibold text-indigo-600">
+                  <span className="font-semibold text-[#f5cc76]">
                     {getAuthLabel() || "your selected option"}
                   </span>{" "}
                   on the next step.
@@ -205,27 +214,27 @@ export default function WaitingForApproval() {
                 <button
                   type="button"
                   onClick={() => handleModuleClick("pastor")}
-                  className="text-left rounded-2xl border border-gray-200 bg-gradient-to-b from-white to-indigo-50/40 p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                  className="text-left rounded-2xl border border-white/15 bg-[#0a3558] p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-[#8ec5eb] focus:ring-offset-2 focus:ring-offset-[#0d3d63]"
                 >
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    <h3 className="text-xl font-semibold text-white mb-2">
                       Pastor
                     </h3>
-                    <p className="text-sm text-gray-600 mb-4">
+                    <p className="text-sm text-[#d2e6f5] mb-4">
                       For pastors and church leaders seeking mentoring, support,
                       and community.
                     </p>
-                    <div className="text-xs text-gray-500 mb-4">
-                      <span className="font-semibold text-gray-700">
+                    <div className="text-xs text-[#cde2f2] mb-4">
+                      <span className="font-semibold text-white">
                         Available users:
                       </span>{" "}
                       Pastor, Lay Leader, Seminarian
                     </div>
                   </div>
 
-                  <div className="mt-4 flex items-center justify-between text-xs text-indigo-700">
+                  <div className="mt-4 flex items-center justify-between text-xs text-[#8ec5eb]">
                     <span>Continue as Pastor flow</span>
-                    <span className="inline-flex items-center gap-1 text-[11px] bg-white/70 px-2 py-1 rounded-full">
+                    <span className="inline-flex items-center gap-1 text-[11px] bg-white/15 text-white px-2 py-1 rounded-full">
                       {getAuthLabel()} &rarr;
                     </span>
                   </div>
@@ -235,34 +244,34 @@ export default function WaitingForApproval() {
                 <button
                   type="button"
                   onClick={() => handleModuleClick("mentor")}
-                  className="text-left rounded-2xl border border-gray-200 bg-gradient-to-b from-white to-emerald-50/40 p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                  className="text-left rounded-2xl border border-white/15 bg-[#0a3558] p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-[#8ec5eb] focus:ring-offset-2 focus:ring-offset-[#0d3d63]"
                 >
                   <div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    <h3 className="text-xl font-semibold text-white mb-2">
                       Mentor
                     </h3>
-                    <p className="text-sm text-gray-600 mb-4">
+                    <p className="text-sm text-[#d2e6f5] mb-4">
                       For mentors and field mentors supporting pastors and
                       leaders.
                     </p>
-                    <div className="text-xs text-gray-500 mb-4">
-                      <span className="font-semibold text-gray-700">
+                    <div className="text-xs text-[#cde2f2] mb-4">
+                      <span className="font-semibold text-white">
                         Available users:
                       </span>{" "}
                       Mentor, Field Mentor
                     </div>
                   </div>
 
-                  <div className="mt-4 flex items-center justify-between text-xs text-emerald-700">
+                  <div className="mt-4 flex items-center justify-between text-xs text-[#8ec5eb]">
                     <span>Continue as Mentor flow</span>
-                    <span className="inline-flex items-center gap-1 text-[11px] bg-white/70 px-2 py-1 rounded-full">
+                    <span className="inline-flex items-center gap-1 text-[11px] bg-white/15 text-white px-2 py-1 rounded-full">
                       {getAuthLabel()} &rarr;
                     </span>
                   </div>
                 </button>
               </div>
 
-              <p className="mt-6 text-[11px] text-center text-gray-400">
+              <p className="mt-6 text-[11px] text-center text-[#cde2f2]">
                 You can switch between Pastor and Mentor flows later if your
                 responsibilities change.
               </p>
@@ -279,25 +288,25 @@ export default function WaitingForApproval() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`relative w-full max-w-md mx-4 rounded-2xl bg-white shadow-2xl p-6 sm:p-8 transform transition-all duration-300 ease-out
+            className={`relative w-full max-w-md mx-4 rounded-2xl bg-[linear-gradient(180deg,#0a3558_0%,#0d3d63_100%)] shadow-2xl p-6 sm:p-8 border border-white/20 text-white transform transition-all duration-300 ease-out
               ${animateRoleModal ? "opacity-100 scale-100" : "opacity-0 scale-95"}`}
           >
             {/* Close button */}
             <button
               onClick={closeRoleModal}
-              className="absolute right-4 top-4 text-gray-400 hover:text-gray-600 transition"
+              className="absolute right-4 top-4 text-white/70 hover:text-white transition"
               aria-label="Close"
             >
               ✕
             </button>
 
-            <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-1 text-center">
+            <h2 className="text-xl sm:text-2xl font-semibold text-white mb-1 text-center">
               Who are you?
             </h2>
-            <p className="text-xs text-indigo-600 font-medium text-center mb-1">
+            <p className="text-xs text-[#f5cc76] font-medium text-center mb-1">
               {getModuleTitle()} &middot; {getAuthLabel()}
             </p>
-            <p className="text-sm text-gray-500 mb-6 text-center">
+            <p className="text-sm text-[#cde2f2] mb-6 text-center">
               Choose the option that best describes your role. We’ll personalize
               the next page for you.
             </p>
@@ -307,17 +316,17 @@ export default function WaitingForApproval() {
                 <button
                   key={type.key}
                   onClick={() => handleSelectUserType(type.key)}
-                  className="w-full text-left rounded-xl border border-gray-200 px-4 py-3 sm:px-5 sm:py-4 bg-white hover:bg-indigo-50 hover:border-indigo-300 transition flex items-start gap-3 group"
+                  className="w-full text-left rounded-xl border border-white/20 px-4 py-3 sm:px-5 sm:py-4 bg-[#0a3558] hover:bg-[#10466f] transition flex items-start gap-3 group"
                 >
-                  <div className="mt-1 h-2 w-2 rounded-full bg-indigo-500 group-hover:scale-125 transition-transform" />
+                  <div className="mt-1 h-2 w-2 rounded-full bg-[#f5cc76] group-hover:scale-125 transition-transform" />
                   <div>
-                    <div className="font-semibold text-gray-900 flex items-center gap-2">
+                    <div className="font-semibold text-white flex items-center gap-2">
                       {type.label}
-                      <span className="text-xs text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full group-hover:bg-indigo-100">
+                      <span className="text-xs text-[#f5cc76] bg-[#f5cc7622] px-2 py-0.5 rounded-full group-hover:bg-[#f5cc7633]">
                         Select
                       </span>
                     </div>
-                    <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                    <p className="text-xs sm:text-sm text-[#cde2f2] mt-1">
                       {type.description}
                     </p>
                   </div>
@@ -325,7 +334,7 @@ export default function WaitingForApproval() {
               ))}
             </div>
 
-            <p className="mt-5 text-[11px] text-center text-gray-400">
+            <p className="mt-5 text-[11px] text-center text-[#cde2f2]">
               You can always update your role later in your profile settings.
             </p>
           </div>

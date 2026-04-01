@@ -100,7 +100,7 @@ export default function ProfileIncomplete() {
         const updatedUser: User = { ...user, profilePicture: newUrl };
         setUser(updatedUser);
         if (typeof window !== "undefined") {
-          setCookie("user", JSON.stringify(updatedUser));
+          setCookie("mentor", JSON.stringify(updatedUser));
         }
       }
     } catch (err) {
@@ -172,19 +172,20 @@ export default function ProfileIncomplete() {
       : "";
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),radial-gradient(circle_at_48%_56%,rgba(111,178,246,0.12),transparent_42%),radial-gradient(circle_at_90%_80%,rgba(8,52,85,0.4),transparent_40%),linear-gradient(180deg,#041f35_0%,#062946_100%)]" />
       <MentorHeader />
 
-      <div className="flex-grow bg-gradient-to-b from-[#103C8C] to-[#1B4C9E] flex items-center justify-center px-4">
-        <div className="bg-white rounded-xl shadow-lg px-10 py-8 text-center relative w-full max-w-sm">
+      <div className="relative z-10 flex-grow flex items-center justify-center px-4 py-8">
+        <div className="rounded-3xl border border-white/20 bg-[linear-gradient(180deg,rgba(10,53,88,0.85)_0%,rgba(8,43,71,0.92)_100%)] shadow-[0_24px_56px_rgba(2,20,38,0.48)] px-8 py-7 text-center relative w-full max-w-md backdrop-blur">
           {/* Banner */}
-          <div className="absolute top-3 left-4 bg-[#FFFBEA] text-[#9A8700] text-xs px-3 py-1 rounded-full border border-[#E9C700]/30">
+          <div className="absolute top-4 left-4 bg-[#f5cc7624] text-[#f5cc76] text-xs px-3 py-1 rounded-full border border-[#f5cc7645]">
             Your profile is incomplete.
           </div>
 
           {/* Skip button */}
           <button
-            className="absolute top-3 right-4 text-xs text-gray-600 bg-gray-100 px-3 py-[2px] rounded-full hover:bg-gray-200 transition"
+            className="absolute top-4 right-4 text-xs text-[#cde2f2] bg-white/10 px-3 py-[2px] rounded-full border border-white/15 hover:bg-white/20 transition"
             onClick={() => router.push(`/mentor/home`)}
           >
             Skip <span className="ml-1">{">"}</span>
@@ -198,13 +199,13 @@ export default function ProfileIncomplete() {
                 alt="Profile Avatar"
                 width={100}
                 height={100}
-                className="w-[100px] h-[100px] object-cover rounded-full border border-[#E5E7EB]"
+                className="w-[104px] h-[104px] object-cover rounded-full border-2 border-white/60 bg-white"
               />
 
               <button
                 type="button"
                 onClick={handleEditClick}
-                className="absolute bottom-2 right-2 w-6 h-6 rounded-full bg-[#103C8C] text-white flex items-center justify-center text-[10px] border-2 border-white shadow-md hover:bg-[#1B4C9E] transition"
+                className="absolute bottom-2 right-2 w-7 h-7 rounded-full bg-[#0f4a76] text-white flex items-center justify-center text-[10px] border-2 border-white shadow-md hover:bg-[#145c93] transition"
                 title="Edit Profile"
               >
                 <Image
@@ -226,13 +227,13 @@ export default function ProfileIncomplete() {
           </div>
 
           {/* Name */}
-          <h2 className="text-lg font-semibold text-gray-800 mb-2">
+          <h2 className="text-xl font-semibold text-white mb-2">
             {displayName}
           </h2>
 
           {/* Profile upload status / error */}
           {isProfileUploading && (
-            <p className="text-xs text-gray-500 mb-2">
+            <p className="text-xs text-[#cde2f2] mb-2">
               Uploading profile picture...
             </p>
           )}
@@ -244,7 +245,7 @@ export default function ProfileIncomplete() {
           <button
             type="button"
             onClick={handleUploadDocsClick}
-            className="flex items-center justify-center gap-2 mx-auto border border-[#103C8C] text-[#103C8C] text-sm font-medium px-4 py-[6px] rounded-md hover:bg-[#103C8C] hover:text-white transition"
+            className="flex items-center justify-center gap-2 mx-auto border border-white/30 bg-white text-[#0f4a76] text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#e7f1fa] transition"
           >
             <i className="fa-solid fa-paperclip text-xs"></i>
             Upload documents
@@ -260,7 +261,7 @@ export default function ProfileIncomplete() {
 
           {/* Document upload status / error */}
           {isDocUploading && (
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs text-[#cde2f2] mt-2">
               Uploading document...
             </p>
           )}
@@ -271,13 +272,13 @@ export default function ProfileIncomplete() {
           {/* Uploaded documents list */}
           {documents.length > 0 && (
             <div className="mt-3 text-left">
-              <p className="text-xs font-medium text-gray-700 mb-1">
+              <p className="text-xs font-medium text-[#d9ebf8] mb-1">
                 Uploaded documents:
               </p>
-              <ul className="text-xs text-gray-600 space-y-1">
+              <ul className="text-xs text-[#cde2f2] space-y-1">
                 {documents.map((doc, index) => (
                   <li key={`${doc.fileUrl}-${index}`} className="flex items-center gap-2">
-                    <i className="fa-regular fa-file text-[10px] text-[#103C8C]" />
+                    <i className="fa-regular fa-file text-[10px] text-[#8ec5eb]" />
                     <a
                       href={doc.fileUrl}
                       target="_blank"

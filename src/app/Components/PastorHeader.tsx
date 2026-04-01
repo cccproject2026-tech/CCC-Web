@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { getCookie, clearAllCookies } from "@/app/utils/cookies";
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import Framelogo1 from "../Assets/Frame-logo-1.png";
 import Connecticon from "../Assets/Connect-icon.png";
 import NotificationIcon from "../Assets/notification.png";
@@ -29,6 +30,7 @@ import {
   X,
 } from "lucide-react";
 import { getNotifications, getSingleUser } from "../Services/pastor.service";
+import { apiGetRoadmaps, apiGetAssessments, apiGetAllUsers } from "../Services/api";
 
 function PastorHeaderComponent({ showFullHeader = false }) {
   const pathname = usePathname();
@@ -36,6 +38,14 @@ function PastorHeaderComponent({ showFullHeader = false }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<{
+    roadmaps: any[];
+    assessments: any[];
+    mentors: any[];
+  }>({ roadmaps: [], assessments: [], mentors: [] });
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [profile, setProfile] = useState<any>(null);
@@ -106,16 +116,12 @@ function PastorHeaderComponent({ showFullHeader = false }) {
 
 
   const profileMenu = [
-    { icon: <User size={18} />, label: "Profile" },
-    { icon: <Award size={18} />, label: "Certificates" },
-    { icon: <File size={18} />, label: "Assignments" },
-    { icon: <Trophy size={18} />, label: "Micro Grand" },
-    { icon: <FolderOpen size={18} />, label: "Documents" },
-    {
-      icon: <Settings size={18} />,
-      label: "Settings",
-      subMenu: true, // special case
-    },
+    { icon: <User size={18} />, label: "Profile", path: "/pastor/profile" },
+    { icon: <Award size={18} />, label: "Certificates", path: "/pastor/Certificates" },
+    { icon: <File size={18} />, label: "Assignments", path: "/pastor/Assignments" },
+    { icon: <Trophy size={18} />, label: "Micro Grant", path: "/pastor/MicroGrantApplication" },
+    { icon: <FolderOpen size={18} />, label: "Documents", path: "/pastor/Documents" },
+    { icon: <Settings size={18} />, label: "Settings", path: "/pastor/Settings" },
     { icon: <LogOut size={18} />, label: "Log out" },
   ];
 
@@ -158,8 +164,48 @@ function PastorHeaderComponent({ showFullHeader = false }) {
     fetchNotifications();
   }, []);
 
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!query) {
+      setSearchResults({ roadmaps: [], assessments: [], mentors: [] });
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setSearchLoading(true);
+        const [roadmapsRes, assessmentsRes, mentorsRes] = await Promise.all([
+          apiGetRoadmaps("all", query),
+          apiGetAssessments({ search: query }),
+          apiGetAllUsers({ search: query, roleMatch: "mentor", limit: 5 }),
+        ]);
+
+        const roadmaps = Array.isArray(roadmapsRes.data?.data)
+          ? roadmapsRes.data.data
+          : [];
+        const assessments = Array.isArray(assessmentsRes.data?.data)
+          ? assessmentsRes.data.data
+          : [];
+        const mentors = Array.isArray(mentorsRes.data?.data?.users)
+          ? mentorsRes.data.data.users
+          : Array.isArray(mentorsRes.data?.data)
+            ? mentorsRes.data.data
+            : [];
+
+        setSearchResults({ roadmaps, assessments, mentors });
+      } catch (error) {
+        console.error("Global search failed:", error);
+        setSearchResults({ roadmaps: [], assessments: [], mentors: [] });
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   return (
-    <header className="flex items-center justify-between px-4 md:px-6 lg:px-10 py-3 bg-[#1A2E7A] text-white shadow-md relative z-40 font-[Albert_Sans]">
+    <header className="relative z-40 flex items-center justify-between bg-[#0b3558] px-4 py-3 text-white shadow-[0_6px_18px_rgba(2,20,38,0.35)] md:px-6 lg:px-10 font-[Albert_Sans]">
       {/* ✅ Left Logo */}
       <div className="flex items-center gap-3">
         <Image src={Framelogo1} alt="Logo" width={26} height={26} />
@@ -187,10 +233,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
       )}
 
       {/* ✅ Right Icons */}
-      <div
-        className="flex items-center gap-3 md:gap-5 relative"
-        ref={dropdownRef}
-      >
+      <div className="relative flex items-center gap-3 md:gap-5" ref={dropdownRef}>
         {/* Mobile Menu Button */}
         {showFullHeader && isClient && (
           <button
@@ -204,9 +247,82 @@ function PastorHeaderComponent({ showFullHeader = false }) {
         {showFullHeader && (
           <>
             {/* 🔍 Search */}
-            <button className="hidden md:block hover:opacity-80 transition">
+            <button
+              onClick={() => {
+                setShowSearch((prev) => !prev);
+                setShowNotifications(false);
+                setShowProfileMenu(false);
+                setShowSettingsMenu(false);
+              }}
+              className="hidden h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15 md:flex"
+            >
               <Image src={SearchIcon} alt="Search" width={18} height={18} />
             </button>
+
+            {showSearch && (
+              <div className="absolute right-[160px] top-12 z-[60] w-[420px] rounded-2xl border border-white/20 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] p-3 shadow-2xl">
+                <input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search roadmaps, assessments, mentors..."
+                  className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/70 outline-none"
+                />
+                <div className="mt-3 max-h-[360px] space-y-3 overflow-auto pr-1">
+                  {searchLoading && (
+                    <p className="text-xs text-white/80">Searching...</p>
+                  )}
+
+                  {!searchLoading && searchQuery.trim() && (
+                    <>
+                      <div>
+                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#cde2f2]">Roadmaps</p>
+                        {searchResults.roadmaps.slice(0, 4).map((item: any) => (
+                          <Link
+                            key={item._id || item.id}
+                            href={`/pastor/SelfRevitalizationPhasePage?id=${item._id || item.id}`}
+                            className="mb-1 block rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
+                          >
+                            {item.name || item.title || "Untitled roadmap"}
+                          </Link>
+                        ))}
+                      </div>
+
+                      <div>
+                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#cde2f2]">Assessments</p>
+                        {searchResults.assessments.slice(0, 4).map((item: any) => (
+                          <Link
+                            key={item._id || item.id}
+                            href="/pastor/Assessments"
+                            className="mb-1 block rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
+                          >
+                            {item.name || item.title || "Untitled assessment"}
+                          </Link>
+                        ))}
+                      </div>
+
+                      <div>
+                        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#cde2f2]">Mentors</p>
+                        {searchResults.mentors.slice(0, 4).map((item: any) => (
+                          <Link
+                            key={item._id || item.id}
+                            href="/pastor/Mymentors"
+                            className="mb-1 block rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
+                          >
+                            {`${item.firstName || ""} ${item.lastName || ""}`.trim() || item.name || "Mentor"}
+                          </Link>
+                        ))}
+                      </div>
+
+                      {searchResults.roadmaps.length === 0 &&
+                        searchResults.assessments.length === 0 &&
+                        searchResults.mentors.length === 0 && (
+                          <p className="text-xs text-white/80">No results found.</p>
+                        )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* 🔔 Notification Dropdown */}
             <div className="relative">
@@ -216,7 +332,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
                   setShowProfileMenu(false);
                   setShowSettingsMenu(false);
                 }}
-                className="relative hover:opacity-80 transition cursor-pointer"
+                className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15 cursor-pointer"
               >
                 <Image src={NotificationIcon} alt="Notification" width={20} height={20} />
 
@@ -280,7 +396,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
                             </p>
 
                             <p className="text-[#9A9A9A] text-[12px] text-right mt-1">
-                              Just now
+                              {note?.createdAt ? new Date(note.createdAt).toLocaleString() : ""}
                             </p>
                           </div>
                         </div>
@@ -294,7 +410,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
             </div>
 
             {/* 🔗 Connect */}
-            <button className="hidden md:block hover:opacity-80 transition">
+            <button className="hidden h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15 md:flex">
               <Image src={Connecticon} alt="Connect" width={22} height={22} />
             </button>
 
@@ -306,7 +422,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
                   setShowNotifications(false);
                   setShowSettingsMenu(false);
                 }}
-                className="flex items-center gap-2 bg-[#223C8C] px-2 md:px-3 py-1 rounded-full hover:opacity-90 transition cursor-pointer"
+                className="flex items-center gap-2 rounded-full border border-[#8ec5eb]/40 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-2 py-1 transition hover:bg-[linear-gradient(180deg,#145787_0%,#0f4a76_100%)] cursor-pointer md:px-3"
                 suppressHydrationWarning
               >
                 <div className="hidden md:block text-right text-[11px] leading-tight">
@@ -341,14 +457,13 @@ function PastorHeaderComponent({ showFullHeader = false }) {
                               router.push("/pastor/login");
                               return;
                             }
-                            if (item.subMenu) {
-                              setShowSettingsMenu((prev) => !prev);
+                            if (item.path) {
+                              router.push(item.path);
+                              setShowProfileMenu(false);
+                              setShowSettingsMenu(false);
                             }
                           }}
-                          className={`flex items-center gap-3 px-5 py-2 hover:bg-[#F5F7FA] transition text-[#0033A0] w-full text-left ${item.subMenu && showSettingsMenu
-                            ? "bg-[#F5F7FA]"
-                            : ""
-                            }`}
+                          className="flex w-full items-center gap-3 px-5 py-2 text-left text-[#0033A0] transition hover:bg-[#F5F7FA]"
                           suppressHydrationWarning
                         >
                           <span className="text-[#0033A0]">{item.icon}</span>
@@ -356,30 +471,6 @@ function PastorHeaderComponent({ showFullHeader = false }) {
                             {item.label}
                           </span>
                         </button>
-
-                        {/* ⚙️ Settings Sub-Menu */}
-                        {item.subMenu && showSettingsMenu && (
-                          <div className="absolute -left-[200px] md:-left-[240px] top-0 mt-1 w-[200px] md:w-[230px] bg-white rounded-2xl shadow-lg border border-gray-100 text-[#0033A0]">
-                            {/* <div className="absolute -right-2 top-3 w-4 h-4 bg-white rotate-45 border-l border-t border-gray-100"></div> */}
-
-                            <div className="flex flex-col py-2">
-                              {settingsSubMenu.map((sub, j) => (
-                                <button
-                                  key={j}
-                                  disabled={!sub.active}
-                                  className={`flex items-center gap-3 px-5 py-2 text-[15px] font-medium ${sub.active
-                                    ? "hover:bg-[#F5F7FA] text-[#0033A0]"
-                                    : "text-gray-400 cursor-not-allowed"
-                                    }`}
-                                  suppressHydrationWarning
-                                >
-                                  {sub.icon}
-                                  <span>{sub.label}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -394,7 +485,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
       {showFullHeader && showMobileMenu && (
         <div
           ref={mobileMenuRef}
-          className="lg:hidden absolute top-full left-0 right-0 bg-[#1A2E7A] border-t border-white/10 shadow-lg z-50"
+          className="lg:hidden absolute top-full left-0 right-0 bg-[#0b3558] border-t border-white/10 shadow-lg z-50"
         >
           <nav className="flex flex-col py-2">
             {navLinks.map((link, index) => {

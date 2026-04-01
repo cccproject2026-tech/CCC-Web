@@ -446,8 +446,8 @@ function JumpStartContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0F4A85]">
-        <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[#062946]">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent"></div>
       </div>
     );
   }
@@ -458,15 +458,15 @@ function JumpStartContent() {
   const extras: ExtraComponent[] = roadmap?.extras || [];
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F4A85]">
+    <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">
       <PastorHeader showFullHeader={true} />
 
       {/* HERO SECTION */}
       <section
-        className="relative h-[320px] bg-cover bg-center text-white flex flex-col justify-end px-20 pb-10"
+        className="relative flex h-[320px] flex-col justify-end bg-cover bg-center px-6 pb-10 text-white md:px-12 lg:px-20"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-black/50"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]"></div>
         <div className="relative z-10">
           <p className="text-sm text-white/80 mb-2">
             Revitalization Roadmap &gt;{" "}
@@ -480,11 +480,11 @@ function JumpStartContent() {
       </section>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white">
+      <main className="flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-12 md:px-10 lg:px-16">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-10">
 
           {/* LEFT PANEL */}
-          <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 w-full h-fit">
+          <div className="h-fit w-full rounded-xl border border-white/20 bg-white/10 p-4 shadow-md backdrop-blur flex flex-col gap-2">
             {[
               { key: "overview", label: "Over View" },
               { key: "comments", label: "Comments" },
@@ -495,8 +495,8 @@ function JumpStartContent() {
                 onClick={() => setActiveTab(item.key)}
                 className={`flex justify-between items-center px-4 py-3 rounded-md text-sm font-medium transition-all ${
                   activeTab === item.key
-                    ? "bg-[#103C8C] text-white shadow-sm"
-                    : "bg-[#F8FAFF] text-gray-600 hover:bg-[#E9EEFF]"
+                    ? "bg-white text-[#0f4a76] shadow-sm"
+                    : "bg-transparent text-[#d9ebf8] hover:bg-white/15"
                 }`}
               >
                 {item.label}
@@ -517,20 +517,20 @@ function JumpStartContent() {
                 </div>
 
                 {description && (
-                  <div className="bg-[#1070A9]/70 rounded-lg p-4 mb-6 border border-[#3B8CC2]">
+                  <div className="mb-6 rounded-lg border border-white/20 bg-white/10 p-4">
                     <h3 className="text-sm font-semibold text-white mb-2">Description</h3>
                     <p className="text-white/90 text-sm leading-relaxed whitespace-pre-line">{description}</p>
                   </div>
                 )}
 
                 {extras.length > 0 && (
-                  <div className="bg-[#1070A9]/70 rounded-lg p-5 mb-6 border border-[#3B8CC2]">
+                  <div className="mb-6 rounded-lg border border-white/20 bg-white/10 p-5">
                     <h3 className="text-sm font-semibold text-white mb-4">Tasks</h3>
                     <div>
                       {extras.map((extra, i) => renderExtraComponent(extra, i, "extra"))}
                     </div>
 
-                    <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-[#3B8CC2]">
+                    <div className="mt-4 flex items-center justify-end gap-3 border-t border-white/20 pt-4">
                       {saveSuccess && (
                         <span className="text-green-300 text-sm flex items-center gap-1">
                           <i className="fa-solid fa-circle-check"></i> Saved
@@ -539,7 +539,7 @@ function JumpStartContent() {
                       <button
                         onClick={handleSave}
                         disabled={saving}
-                        className="bg-[#103C8C] hover:bg-[#0B2E72] disabled:opacity-60 transition text-white text-sm font-medium px-6 py-2 rounded-md shadow"
+                        className="rounded-md bg-white px-6 py-2 text-sm font-semibold text-[#0f4a76] shadow transition hover:bg-[#e7f1fa] disabled:opacity-60"
                       >
                         {saving ? "Saving..." : "Save"}
                       </button>
@@ -553,10 +553,10 @@ function JumpStartContent() {
                     <i className="fa-regular fa-calendar text-white/80 text-sm"></i>
                     <input
                       type="date"
-                      className="bg-transparent border border-[#52A1D1] text-sm text-white px-3 py-2 rounded-md focus:outline-none w-[180px]"
+                    className="w-[180px] rounded-md border border-white/25 bg-white/10 px-3 py-2 text-sm text-white focus:outline-none"
                     />
                   </div>
-                  <button className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-6 py-2 rounded-md shadow">
+                  <button className="rounded-md bg-white px-6 py-2 text-sm font-semibold text-[#0f4a76] shadow transition hover:bg-[#e7f1fa]">
                     Mark as Completed
                   </button>
                 </div>
@@ -590,7 +590,7 @@ function JumpStartContent() {
                       return (
                         <div
                           key={c._id}
-                          className="bg-white text-gray-800 rounded-lg shadow-sm p-4 flex justify-between items-start"
+                          className="flex items-start justify-between rounded-lg border border-white/20 bg-white/10 p-4 text-[#d9ebf8] shadow-sm"
                         >
                           <div className="flex gap-3">
                             {avatar ? (
@@ -608,13 +608,13 @@ function JumpStartContent() {
                             )}
                             <div>
                               <div className="flex items-center gap-2">
-                                <h4 className="font-semibold text-sm">{name}</h4>
-                                <span className="text-xs text-gray-400">
+                                <h4 className="text-sm font-semibold text-white">{name}</h4>
+                                <span className="text-xs text-white/60">
                                   {formatDate(c.addedDate)}
                                 </span>
                               </div>
-                              <p className="text-xs text-gray-500 mb-1 capitalize">{role}</p>
-                              <p className="text-sm">{c.text}</p>
+                              <p className="mb-1 text-xs capitalize text-white/70">{role}</p>
+                              <p className="text-sm text-white">{c.text}</p>
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-2">
@@ -641,15 +641,15 @@ function JumpStartContent() {
                   Queries
                 </h2>
                 <div className="flex justify-end mb-5">
-                  <div className="flex bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div className="flex overflow-hidden rounded-lg border border-white/20 bg-white/10 shadow-sm">
                     {["New", "Answered", "Pending"].map((tab) => (
                       <button
                         key={tab}
                         onClick={() => setQueryTab(tab)}
                         className={`px-6 py-[7px] text-sm font-medium transition-all duration-200 ${
                           queryTab === tab
-                            ? "bg-[#103C8C] text-white m-2"
-                            : "bg-white text-gray-500 hover:text-[#103C8C]"
+                            ? "m-2 bg-white text-[#0f4a76]"
+                            : "bg-transparent text-[#d9ebf8] hover:bg-white/15"
                         }`}
                       >
                         {tab}
@@ -683,7 +683,7 @@ function JumpStartContent() {
                       <button
                         onClick={handleSubmitQuery}
                         disabled={querySubmitting || !newQueryText.trim()}
-                        className="bg-[#103C8C] hover:bg-[#0B2E72] disabled:opacity-60 transition text-white text-sm font-medium px-8 py-[6px] rounded-md border border-[#2C57A6] shadow-sm"
+                        className="rounded-md border border-white/20 bg-white px-8 py-[6px] text-sm font-semibold text-[#0f4a76] shadow-sm transition hover:bg-[#e7f1fa] disabled:opacity-60"
                       >
                         {querySubmitting ? "Submitting..." : "Submit"}
                       </button>
@@ -725,7 +725,7 @@ function JumpStartContent() {
 
                             {/* Mentor reply (Answered) */}
                             {q.status === "answered" && q.repliedAnswer ? (
-                              <div className="ml-11 bg-[#325C9C]/50 rounded-lg p-4 w-[90%]">
+                              <div className="ml-11 w-[90%] rounded-lg border border-white/20 bg-white/10 p-4">
                                 <div className="flex items-start gap-3">
                                   {q.repliedMentorId?.profilePicture ? (
                                     <img
@@ -762,7 +762,7 @@ function JumpStartContent() {
                               </div>
                             ) : (
                               /* Pending — waiting for response */
-                              <div className="ml-11 bg-[#325C9C]/50 rounded-lg p-4 w-[90%] flex items-center gap-2">
+                              <div className="ml-11 flex w-[90%] items-center gap-2 rounded-lg border border-white/20 bg-white/10 p-4">
                                 <i className="fa-solid fa-spinner animate-spin text-white/70 text-sm"></i>
                                 <p className="text-sm text-white/80">Waiting for response</p>
                               </div>
@@ -788,8 +788,8 @@ export default function JumpStartPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#0F4A85]">
-          <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+        <div className="min-h-screen flex items-center justify-center bg-[#062946]">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent"></div>
         </div>
       }
     >

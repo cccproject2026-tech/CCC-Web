@@ -87,7 +87,7 @@ export default function AppHeader({ showFullHeader = false }) {
 
   return (
     <>
-      <header className="flex items-center justify-between px-4 sm:px-6 lg:px-10 py-3 bg-[#1A2E7A] text-white shadow-md relative z-50">
+      <header className="flex items-center justify-between px-4 sm:px-6 lg:px-10 py-3 bg-[#0b3558] text-white shadow-md relative z-50">
         {/* Logo */}
         <div className="flex items-center gap-3">
           <Image src={Framelogo1} alt="Logo" width={26} height={26} />
@@ -213,7 +213,7 @@ export default function AppHeader({ showFullHeader = false }) {
 
       {/* Mobile Navigation Menu */}
       {showFullHeader && showMobileMenu && (
-        <div className="lg:hidden bg-[#1A2E7A] border-t border-white/20 fixed top-[60px] left-0 right-0 z-40 shadow-lg">
+        <div className="lg:hidden bg-[#0b3558] border-t border-white/20 fixed top-[60px] left-0 right-0 z-40 shadow-lg">
           <nav className="px-4 py-4 space-y-2">
             {navLinks.map((link, index) => (
               <div key={index}>

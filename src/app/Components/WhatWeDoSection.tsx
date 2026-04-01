@@ -31,13 +31,13 @@ const cards = [
 export default function WhatWeDoSection() {
      const router = useRouter();
   return (
-    <section className="bg-[#103C8C] text-white py-16 px-12 relative overflow-hidden">
+    <section id="videos-section" className="bg-[#062946] text-white py-16 px-12 relative overflow-hidden">
       <div className="max-w-[1300px] mx-auto flex flex-wrap lg:flex-nowrap justify-between items-start lg:items-center gap-10">
         {/* LEFT SIDE — TEXT BLOCK */}
         <div className="min-w-[220px] lg:w-1/4 flex flex-col items-start">
           <h3 className="text-2xl font-semibold mb-2">What we do</h3>
           <p className="text-sm text-gray-300 mb-4">Learn more about CCC</p>
-          <button className="bg-white text-[#103C8C] px-5 py-2 rounded-md font-medium hover:opacity-90 transition">
+          <button className="bg-white text-[#0f4a76] px-5 py-2 rounded-md font-medium hover:opacity-90 transition">
             Show all
           </button>
         </div>
@@ -80,21 +80,21 @@ export default function WhatWeDoSection() {
                       <button className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center hover:scale-110 transition"
                          onClick={() =>router.push(`/pastor/VideoPage`)}
                       >
-                        <i className="fa-solid fa-play text-[#103C8C]"></i>
+                        <i className="fa-solid fa-play text-[#0f4a76]"></i>
                       </button>
                     </div>
                   </div>
 
                 
                   <div className="p-4">
-                    <p className="text-xs text-[#103C8C] font-semibold mb-1">
+                    <p className="text-xs text-[#0f4a76] font-semibold mb-1">
                       Introduction
                     </p>
                     <h4 className="text-sm font-semibold mb-1">{card.title}</h4>
                     <p className="text-xs text-gray-600 mb-3">{card.desc}</p>
                     <div className="flex justify-between items-center text-xs text-gray-400">
                       <span>18:00 Min</span>
-                      <button className="border border-[#103C8C] text-[#103C8C] p-[6px] rounded-md hover:bg-[#103C8C] hover:text-white transition">
+                      <button className="border border-[#0f4a76] text-[#0f4a76] p-[6px] rounded-md hover:bg-[#0f4a76] hover:text-white transition">
                         <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                       </button>
                     </div>

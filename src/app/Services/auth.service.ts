@@ -1,4 +1,6 @@
+import axios from "axios";
 import axiosInstance from "./config/axios-instance";
+import type { AxiosError } from "axios";
 import type {
   LoginResponse,
   SendOtpPayload,
@@ -9,12 +11,64 @@ import type {
   RefreshTokenPayload,
 } from "./types/auth.types";
 
-// POST /auth/login
-export const apiLogin = (email: string, password: string) =>
-  axiosInstance.post<{ success: boolean; data: LoginResponse; message?: string }>(
+// POST login (supports multiple backend route variants)
+export const apiLogin = async (email: string, password: string) => {
+  const payload = { email, password };
+  const directLoginUrl = "https://app.wisdomtooth.tech/api/v1/auth/login";
+  const baseCandidates = [
+    process.env.NEXT_PUBLIC_API_BASE_URL,
+    process.env.NEXT_PUBLIC_BACKEND_URL,
+    "https://api.wisdomtooth.tech",
+    "https://api.wisdomtooth.tech/api",
+    "https://app.wisdomtooth.tech",
+    "https://app.wisdomtooth.tech/api",
+  ].filter(Boolean) as string[];
+
+  const loginPaths = [
     "/auth/login",
-    { email, password },
+    "/login",
+    "/users/login",
+    "/auth/sign-in",
+    "/api/auth/login",
+    "/api/login",
+  ];
+
+  const requestUrls = Array.from(
+    new Set([
+      directLoginUrl,
+      ...loginPaths, // keep relative attempts first (works when proxy is configured)
+      ...baseCandidates.flatMap((base) =>
+        loginPaths.map((path) => `${base.replace(/\/+$/, "")}${path}`),
+      ),
+    ]),
   );
+
+  let lastError: unknown = null;
+
+  for (const url of requestUrls) {
+    try {
+      return await axios.post<{ success: boolean; data: LoginResponse; message?: string }>(
+        url,
+        payload,
+        {
+          timeout: 10000,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+    } catch (error) {
+      const axiosError = error as AxiosError;
+      lastError = error;
+      // If endpoint doesn't exist, try next path. For other errors, stop immediately.
+      if (axiosError.response?.status !== 404) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
+};
 
 // POST /auth/send-otp
 export const apiSendOtp = (payload: SendOtpPayload) =>

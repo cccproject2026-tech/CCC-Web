@@ -1,26 +1,17 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { getCookie } from "@/app/utils/cookies";
 import PastorHeader from "@/app/Components/PastorHeader";
-import ExploreCCCCard from "@/app/Components/ExploreCCCCard";
 import HeroBg from "../../Assets/hero-bg.png";
-import Book from "../../Assets/book.png";
-import DuoIcon from "../../Assets/duo.png";
-import Mentor1 from "../../Assets/mentor1.png";
-import Mentor2 from "../../Assets/mentor2.png";
-import Mentor3 from "../../Assets/mentor3.png";
 import UserProfile from "../../Assets/user-profile.png";
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Pagination } from "swiper/modules";
-import "swiper/css";
-import "swiper/css/navigation";
-import "swiper/css/pagination";
 import PastorFooter from "@/app/Components/PastorFooter";
 import { useRouter } from "next/navigation";
-import { getPastorMedia, getUserAppointments } from "@/app/Services/pastor.service";
+import { getUpcomingAppointments, getUserAppointments } from "@/app/Services/pastor.service";
 import { apiGetAssignedUsers, apiGetRoadmapsByUser } from "@/app/Services/api";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
 
 type Mentor = {
   id: string;
@@ -31,31 +22,13 @@ type Mentor = {
   role: string;
 };
 
-const mentorImages = [Mentor1, Mentor2, Mentor3];
-
 export default function PastorDashboard() {
   const router = useRouter();
-
-  const [mediaList, setMediaList] = useState<any[]>([]);
-
-useEffect(() => {
-  async function fetchMedia() {
-    try {
-      const res = await getPastorMedia();
-      setMediaList(res.data?.data || []);  // Adjust based on API response structure
-    } catch (err) {
-      console.error("Error fetching media:", err);
-    }
-  }
-
-  fetchMedia();
-}, []);
-
 
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [loadingMentors, setLoadingMentors] = useState(false);
   const [mentorsError, setMentorsError] = useState<string | null>(null);
- const [appointments, setAppointments] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
   useEffect(() => {
     const fetchMentors = async () => {
       try {
@@ -64,13 +37,26 @@ useEffect(() => {
 
         const user = JSON.parse(getCookie("user") || "{}");
         const userId = user?.id || user?._id;
-        if (!userId) return;
+        if (!userId) {
+          setMentorsError("User session not found. Please log in again.");
+          return;
+        }
 
         const response = await apiGetAssignedUsers(userId);
-        setMentors((response.data?.data || []) as unknown as Mentor[]);
+        const assigned = (response.data?.data || []) as any[];
+        const normalizedMentors: Mentor[] = assigned.map((mentor) => ({
+          id: mentor.id || mentor._id || "",
+          firstName: mentor.firstName || "",
+          lastName: mentor.lastName || "",
+          email: mentor.email || "",
+          username: mentor.username || "",
+          role: mentor.role || "Mentor",
+        }));
+        setMentors(normalizedMentors);
       } catch (err: any) {
         console.error("Error fetching mentors", err);
-        setMentorsError(err?.message || "Unable to fetch mentors");
+        setMentors([]);
+        setMentorsError(err?.message || "Unable to fetch mentors from API.");
       } finally {
         setLoadingMentors(false);
       }
@@ -82,16 +68,44 @@ useEffect(() => {
   useEffect(() => {
   const storedUser = JSON.parse(getCookie("user") || "{}");
 
-  const userId = storedUser?.id || "";
+  const userId = storedUser?.id || storedUser?._id || "";
 
   if (!userId) return;
 
   async function fetchAppointments() {
     try {
-      const res = await getUserAppointments(userId);
-      setAppointments(res.data?.data || []);
+      let list: any[] = [];
+
+      // Try dedicated upcoming endpoint first.
+      try {
+        const res = await getUpcomingAppointments(userId);
+        const data = res.data?.data;
+        list = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.appointments)
+          ? data.appointments
+          : Array.isArray(data?.upcomingAppointments)
+          ? data.upcomingAppointments
+          : Array.isArray(res.data?.appointments)
+          ? res.data.appointments
+          : [];
+      } catch {
+        // Fall back to user appointments endpoint when upcoming is unavailable.
+        const fallbackRes = await getUserAppointments(userId);
+        const fallbackData = fallbackRes.data?.data;
+        list = Array.isArray(fallbackData)
+          ? fallbackData
+          : Array.isArray(fallbackData?.appointments)
+          ? fallbackData.appointments
+          : Array.isArray(fallbackRes.data?.appointments)
+          ? fallbackRes.data.appointments
+          : [];
+      }
+
+      setAppointments(list);
     } catch (error) {
       console.error("Error fetching appointments:", error);
+      setAppointments([]);
     }
   }
 
@@ -100,6 +114,7 @@ useEffect(() => {
 
   const [roadmaps, setRoadmaps] = useState<any[]>([]);
   const [roadmapTab, setRoadmapTab] = useState("All");
+  const [overallProgress, setOverallProgress] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchRoadmaps = async () => {
@@ -130,12 +145,29 @@ useEffect(() => {
     fetchRoadmaps();
   }, []);
 
+  useEffect(() => {
+    const fetchOverallProgress = async () => {
+      try {
+        const user = JSON.parse(getCookie("user") || "{}");
+        const userId = user?.id || user?._id;
+        if (!userId) return;
+        const res = await apiGetUserProgress(userId);
+        const progress = Number(res.data?.data?.overallProgress ?? 0);
+        setOverallProgress(Number.isFinite(progress) ? progress : 0);
+      } catch (error) {
+        console.error("Error fetching overall progress:", error);
+        setOverallProgress(null);
+      }
+    };
+    fetchOverallProgress();
+  }, []);
+
   const filteredRoadmaps =
     roadmapTab === "All"
       ? roadmaps
       : roadmaps.filter((r) => r.status === roadmapTab);
 
- const [currentTime, setCurrentTime] = useState("");
+  const [currentTime, setCurrentTime] = useState("");
 
   const [currentDate, setCurrentDate] = useState("");
 
@@ -168,474 +200,155 @@ useEffect(() => {
 
     return () => clearInterval(interval);
   }, []);
-  
-
+  const completedCount = roadmaps.filter((item) => item.status === "Completed").length;
+  const progressPercent = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(
+        overallProgress ??
+          (roadmaps.length > 0 ? (completedCount / roadmaps.length) * 100 : 0),
+      ),
+    ),
+  );
+  const nextAppointment = appointments[0];
+  const greetingHour = new Date().getHours();
+  const greeting =
+    greetingHour < 12 ? "Good Morning" : greetingHour < 17 ? "Good Afternoon" : "Good Evening";
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">
       <PastorHeader showFullHeader={true} />
 
-      {/* HERO SECTION */}
       <section
-        className="relative bg-cover bg-top text-white h-[380px] sm:h-[420px] md:h-[450px] flex flex-col justify-between px-4 sm:px-8 lg:px-20 pt-6 pb-10"
+        className="relative overflow-hidden bg-cover bg-top px-4 pb-14 pt-6 sm:px-8 lg:px-20"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-transparent"></div>
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.68)_0%,rgba(6,41,70,0.6)_50%,rgba(6,41,70,1)_100%)]" />
 
-        {/* Time */}
-      <div className="relative z-10 flex justify-end">
-      <div className="text-right">
-        <div className="text-2xl sm:text-3xl lg:text-3xl font-bold tracking-wide">
-          {currentTime}
-        </div>
-        <p className="text-xs sm:text-sm text-white/80">
-          {currentDate}
-        </p>
-      </div>
-    </div>
-
-        {/* Hero Content */}
-        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6 md:gap-0">
-          {/* Left - Heading */}
-          <div className="max-w-2xl">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold leading-snug">
-              Cultivate Spiritual, Professional, Social, And Community–
-              <br className="hidden sm:block" />
-              Engagement Developments
-            </h1>
+        <div className="relative z-10 mx-auto w-full max-w-6xl">
+          <div className="mb-4 flex items-start justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-white/85">{greeting}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl font-bold tracking-wide">{currentTime}</p>
+              <p className="text-xs text-white/80">{currentDate}</p>
+            </div>
           </div>
 
-          {/* Right - Profile Card */}
-          <div className="flex flex-col items-start md:items-end">
-            <p className="text-white/90 text-sm mb-2">Good Morning</p>
-
-            <div
-              className="bg-white/15 backdrop-blur-md border border-white/30 rounded-md p-4 w-full max-w-[280px] shadow-lg cursor-pointer"
-              onClick={() => router.push(`/pastor/profile`)}
-            >
-              <div className="flex items-center gap-3">
-                <Image
-                  src={UserProfile}
-                  alt="User"
-                  width={42}
-                  height={42}
-                  className="rounded-full border border-white/40"
-                />
-                <div className="flex flex-col items-start">
-                  <p className="text-xs text-white font-semibold">
-                    John Ross, Welcome Aboard!
-                  </p>
-                  <div className="w-[120px] h-2 bg-white/30 rounded-full mt-1">
-                    <div className="h-2 bg-[#00B3FF] rounded-full w-[70%]" />
+          <div
+            className="rounded-2xl border border-white/20 bg-[linear-gradient(180deg,rgba(15,74,118,0.55)_0%,rgba(9,49,80,0.72)_100%)] p-4 shadow-[0_20px_50px_rgba(2,20,38,0.4)] backdrop-blur-md"
+            onClick={() => router.push("/pastor/profile")}
+          >
+            <div className="flex items-center gap-3">
+              <Image src={UserProfile} alt="User" width={44} height={44} className="rounded-full border border-white/40" />
+              <div className="flex-1">
+                <p className="text-lg font-semibold">Welcome aboard!</p>
+                <p className="text-xs text-white/80">Progress</p>
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="h-2 flex-1 rounded-full bg-white/25">
+                    <div className="h-2 rounded-full bg-[#8ec5eb]" style={{ width: `${progressPercent}%` }} />
                   </div>
-                  <p className="text-[10px] mt-1 text-white/70">Progress 70%</p>
+                  <span className="text-sm font-semibold">{progressPercent}%</span>
                 </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    router.push("/pastor/Myprogress");
+                  }}
+                  className="mt-2 text-xs font-semibold text-[#8ec5eb] hover:text-white"
+                >
+                  View Progress Tracker
+                </button>
               </div>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* CONTINUE WATCHING */}
-      <section className="py-12 sm:py-16 bg-[#F8FAFF] px-4 sm:px-8 lg:px-16 flex flex-col lg:flex-row items-start justify-between gap-8 lg:gap-10">
-        <div className="lg:w-1/4 w-full flex flex-col justify-center mb-4 lg:mb-0">
-          <h2 className="text-2xl sm:text-3xl font-semibold text-[#000] leading-tight mb-2 sm:mb-4">
-            Continue <br /> Watching{" "}
-            <span className="text-[#103C8C] underline decoration-[#103C8C]/40 decoration-2 underline-offset-4">
-              Course
-            </span>
-          </h2>
-        </div>
-
-        <div className="lg:w-3/4 w-full relative">
-     {mediaList.length > 0 ? (
-  <Swiper
-    modules={[Navigation, Pagination]}
-    spaceBetween={16}
-    slidesPerView={3}
-    pagination={{
-      clickable: true,
-      el: ".swiper-pagination-custom",
-    }}
-    navigation={{
-      nextEl: ".next-btn",
-      prevEl: ".prev-btn",
-    }}
-    loop={true}
-    className="pb-12"
-    breakpoints={{
-      0: { slidesPerView: 1 },
-      640: { slidesPerView: 1.3 },
-      768: { slidesPerView: 2 },
-      1024: { slidesPerView: 3 },
-    }}
-  >
-    {mediaList.map((item) => (
-      <SwiperSlide key={item._id}>
-        <div className="bg-white text-black rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300">
-
-          {/* IMAGE */}
-          <div className="relative">
-            <Image
-              src={item.mediaFiles?.[0]?.url || Book}
-              alt={item.heading}
-              width={400}
-              height={200}
-              className="w-full h-[160px] sm:h-[180px] object-cover"
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <button className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center hover:scale-110 transition">
-                <i className="fa-solid fa-play text-[#103C8C] text-sm"></i>
-              </button>
+          <div className="mt-6 space-y-5">
+            <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] p-5 backdrop-blur-md">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
+                  <i className="fa-solid fa-filter text-[#8ec5eb]" />
+                </div>
+                <h3 className="text-2xl font-semibold">Things to Focus On</h3>
+              </div>
+              <p className="text-sm text-[#cde2f2]">Here are the most important things you should focus on today.</p>
+              <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <Link href="/pastor/Appointments" className="rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10">
+                  <p className="text-xs text-[#cde2f2]">Today&apos;s Meetings</p>
+                </Link>
+                <Link href="/pastor/revitalization-roadmap?tab=In%20Progress" className="rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10">
+                  <p className="text-xs text-[#cde2f2]">In Progress Roadmaps</p>
+                </Link>
+                <Link href="/pastor/Assessments?tab=In%20Progress" className="rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10">
+                  <p className="text-xs text-[#cde2f2]">In Progress Assessments</p>
+                </Link>
+                <Link href="/pastor/Mymentors" className="rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10">
+                  <p className="text-xs text-[#cde2f2]">Mentor Comments</p>
+                </Link>
+              </div>
             </div>
-          </div>
 
-          {/* TEXT CONTENT */}
-          <div className="p-4">
-            <p className="text-xs text-[#103C8C] font-semibold mb-1">
-              {item.subheading || "Introduction"}
-            </p>
-
-            <h4 className="text-sm font-semibold mb-1">
-              {item.heading}
-            </h4>
-
-            <p className="text-xs text-gray-600 mb-3 leading-snug">
-              {item.description}
-            </p>
-
-            {/* You don’t have duration in API, so show created date OR static */}
-            <div className="flex justify-between items-center text-xs text-gray-400">
-              <span>{new Date(item.createdAt).toLocaleDateString()}</span>
-
-              <button className="border border-[#103C8C] text-[#103C8C] p-[6px] rounded-md hover:bg-[#103C8C] hover:text-white transition">
-                <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      </SwiperSlide>
-    ))}
-  </Swiper>
-) : (
-  <p className="text-center text-gray-500">No media found</p>
-)}
-
-
-
-          <div className="swiper-pagination-custom flex justify-center gap-2 absolute -bottom-2 left-1/2 transform -translate-x-1/2 z-10"></div>
-
-          {/* navigation buttons */}
-          <div className="absolute top-1/2 -translate-y-1/2 right-2 sm:right-0 flex gap-3 z-10 mt-48">
-            <button className="prev-btn w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-md border border-gray-300 bg-white hover:bg-[#103C8C] hover:text-white transition">
-              <i className="fa-solid fa-angle-left text-sm"></i>
-            </button>
-            <button className="next-btn w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-md border border-gray-300 bg-white hover:bg-[#103C8C] hover:text-white transition">
-              <i className="fa-solid fa-angle-right text-sm"></i>
-            </button>
-          </div>
-        </div>
-      </section>
-
-   {/* UPCOMING APPOINTMENTS */}
-<section className="relative bg-white py-12 sm:py-16 px-4 sm:px-8 lg:px-20 overflow-hidden">
-
-  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
-    <h2 className="text-xl sm:text-[22px] font-semibold text-[#000]">
-      Upcoming Appointments
-    </h2>
-
-    <button
-      className="text-[#103C8C] text-sm font-medium hover:underline hover:text-[#0D2E6E]"
-      onClick={() => router.push("/pastor/Appointments")}
-    >
-      See all
-    </button>
-  </div>
-
-  {/* GRID */}
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
-
-    {appointments.length === 0 && (
-      <p className="text-gray-500">No upcoming appointments</p>
-    )}
-
-    {appointments.map((appt) => {
-      const date = new Date(appt.meetingDate);
-      const formattedDate = date.toLocaleDateString();
-      const formattedTime = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-      return (
-        <div
-          key={appt.id}
-          className="bg-[#14517d] rounded-2xl p-5 sm:p-6 flex flex-col sm:flex-row gap-5 items-center sm:items-stretch shadow-lg border border-[#0B1C58]/40"
-        >
-          {/* LEFT — ICON */}
-          <div className="bg-white rounded-xl flex items-center justify-center w-[140px] h-[140px] sm:w-[150px] sm:h-[150px] shrink-0 relative">
-            <Image
-              src={appt.mentor?.profilePicture || DuoIcon}
-              alt="Mentor"
-              width={120}
-              height={120}
-              className="rounded-lg object-cover"
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <button
-                className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/90 flex items-center justify-center hover:scale-110 transition"
-                onClick={() => window.open(appt.meetingLink, "_blank")}
-              >
-                <i className="fa-solid fa-video text-[#103C8C] text-sm"></i>
-              </button>
-            </div>
-          </div>
-
-          {/* RIGHT — CONTENT */}
-          <div className="flex flex-col gap-4 w-full">
-
-            {/* Appointment Card */}
-            <div className="bg-[#F8FBFF] border border-[#E3E8F0] rounded-lg px-4 sm:px-5 py-3 hover:shadow-sm transition">
-              
-              <div className="flex justify-between items-start md:items-center gap-3">
-
-                <div className="flex flex-col gap-[2px]">
-                  <span className="text-sm text-gray-800 font-medium">
-                    Meeting with {appt.mentor?.firstName} {appt.mentor?.lastName}
-                  </span>
-
-                  <p className="text-xs text-gray-600">
-                    {appt.notes}
-                  </p>
-
-                  <p className="text-xs text-gray-600">
-                    {formattedDate} • {formattedTime}
+            <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] p-5 backdrop-blur-md">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-2xl font-semibold">Need a Help?</h3>
+                  <p className="text-sm text-[#cde2f2]">
+                    {nextAppointment
+                      ? `Next: ${new Date(nextAppointment.meetingDate).toLocaleString()}`
+                      : "We've got simple steps to help you move forward."}
                   </p>
                 </div>
-
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`text-[11px] px-3 py-[2px] rounded-full font-medium ${
-                      appt.status === "scheduled"
-                        ? "bg-[#D8FFF2] text-[#00A878]"
-                        : appt.status === "pending"
-                        ? "bg-[#FFF6D8] text-[#D38A00]"
-                        : "bg-[#F3F3FF] text-[#5A5ADA]"
-                    }`}
-                  >
-                    {appt.status}
-                  </span>
-
-                  <button
-                    className="w-8 h-8 flex items-center justify-center border border-[#103C8C]/30 text-[#103C8C] rounded-md hover:bg-[#103C8C] hover:text-white transition"
-                    onClick={() => window.open(appt.meetingLink, "_blank")}
-                  >
-                    <i className="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                <div className="flex gap-3">
+                  <button onClick={() => router.push("/pastor/Appointments")} className="rounded-xl border border-white/30 bg-white/10 px-5 py-2 text-sm font-semibold hover:bg-white/15">
+                    <i className="fa-regular fa-circle-question mr-2" />
+                    Help
+                  </button>
+                  <button onClick={() => router.push("/pastor/Mymentors")} className="rounded-xl border border-white/30 bg-white/10 px-5 py-2 text-sm font-semibold hover:bg-white/15">
+                    <i className="fa-solid fa-phone mr-2" />
+                    Call Mentor
                   </button>
                 </div>
               </div>
             </div>
 
-          </div>
-        </div>
-      );
-    })}
-  </div>
-</section>
-
-
-      {/* TODAY'S ROADMAP LIST */}
-      <section className="bg-[#1C578E] py-10 px-4 sm:px-8 lg:px-20">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-          <h2 className="text-xl sm:text-[22px] font-semibold text-white">
-            Today&apos;s Roadmap List
-          </h2>
-          <button
-            className="text-white/70 text-sm font-medium hover:text-white"
-            onClick={() => router.push("/pastor/revitalization-roadmap")}
-          >
-            See all
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex items-center gap-2 mb-6 flex-wrap">
-          {["All", "Remaining", "In Progress", "Due"].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setRoadmapTab(tab)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                roadmapTab === tab
-                  ? "bg-white text-[#1C578E]"
-                  : "bg-white/20 text-white hover:bg-white/30"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        {/* List */}
-        <div className="flex flex-col gap-3">
-          {filteredRoadmaps.length === 0 && (
-            <p className="text-white/60 text-sm">No roadmaps found.</p>
-          )}
-          {filteredRoadmaps.map((roadmap) => (
-            <div
-              key={roadmap.id}
-              className="flex items-center justify-between bg-white/10 hover:bg-white/15 transition rounded-xl px-5 py-4"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-9 h-9 flex items-center justify-center bg-white/20 rounded-lg shrink-0">
-                  <i className="fa-regular fa-file-lines text-white text-sm"></i>
+            <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] p-5 backdrop-blur-md">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
+                  <i className="fa-regular fa-compass text-[#8ec5eb]" />
                 </div>
-                <span className="text-white text-sm font-medium">
-                  {roadmap.title}
-                </span>
+                <h3 className="text-2xl font-semibold">Quick Links</h3>
               </div>
-              <div className="flex items-center gap-3">
-                <span
-                  className={`text-xs font-medium px-3 py-[3px] rounded-full ${
-                    roadmap.status === "Due"
-                      ? "bg-red-100 text-red-600"
-                      : roadmap.status === "In Progress"
-                      ? "bg-green-100 text-green-700"
-                      : "bg-gray-200 text-gray-600"
-                  }`}
-                >
-                  {roadmap.status}
-                </span>
-                <button
-                  onClick={() =>
-                    router.push(
-                      roadmap.hasNested
-                        ? `/pastor/SelfRevitalizationPhasePage?id=${roadmap.id}`
-                        : `/pastor/jumpstart?id=${roadmap.id}`
-                    )
-                  }
-                  className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition"
-                >
-                  <i className="fa-solid fa-arrow-right text-xs"></i>
-                </button>
+              <p className="text-sm text-[#cde2f2]">Roadmap, mentors, progress, and notes.</p>
+              <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <Link href="/pastor/revitalization-roadmap" className="rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10">
+                  <p className="text-sm font-medium">Roadmap Phases</p>
+                </Link>
+                <Link href="/pastor/Mymentors" className="rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10">
+                  <p className="text-sm font-medium">My Mentors</p>
+                </Link>
+                <Link href="/pastor/Myprogress" className="rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10">
+                  <p className="text-sm font-medium">Progress Tracker</p>
+                </Link>
+                <Link href="/pastor/Assessments" className="rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10">
+                  <p className="text-sm font-medium">Assessments</p>
+                </Link>
               </div>
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* EXPLORE CCC */}
-      <section className="py-14 sm:py-20 px-4 sm:px-8 lg:px-20 bg-gradient-to-b from-[#E8F1FA] to-[#F7FAFF]">
-        <h2 className="text-2xl sm:text-[32px] font-bold text-[#000] mb-8 sm:mb-10">
-          Explore CCC
-        </h2>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-          <ExploreCCCCard
-            title="Appointments"
-            description="Schedule and manage appointments with ease for personalized guidance."
-            icon="fa-regular fa-calendar-check"
-            onMoreClick={() => router.push("/pastor/Appointments")}
-          />
-          <ExploreCCCCard
-            title="Progress"
-            description="Track your growth and celebrate milestones in your journey."
-            icon="fa-solid fa-chart-simple"
-            onMoreClick={() => router.push("/pastor/Myprogress")}
-          />
-          <ExploreCCCCard
-            title="Surveys"
-            description="Share feedback and insights through quick, easy surveys."
-            icon="fa-regular fa-clipboard"
-            onMoreClick={() => router.push("/pastor/Assessments")}
-          />
-          <ExploreCCCCard
-            title="Revitalization Roadmap"
-            description="Share feedback and insights through quick, easy surveys."
-            icon="fa-solid fa-pen-clip"
-            onMoreClick={() => router.push("/pastor/revitalization-roadmap")}
-          />
-        </div>
-      </section>
-
-      {/* MY MENTORS */}
-      <section className="py-12 sm:py-16 px-4 sm:px-8 lg:px-20 bg-[#F2F6FC]">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-8">
-          <h2 className="text-xl sm:text-[22px] font-semibold text-[#000]">
-            My Mentors
-          </h2>
-          <button
-            className="text-[#103C8C] text-sm font-medium hover:underline hover:text-[#0D2E6E]"
-            onClick={() => router.push("/pastor/Mymentors")}
-          >
-            See all
-          </button>
-        </div>
-
-        {loadingMentors && (
-          <p className="text-sm text-gray-500">Loading mentors...</p>
-        )}
-
-        {mentorsError && !loadingMentors && (
-          <p className="text-sm text-red-500">{mentorsError}</p>
-        )}
-
-        {!loadingMentors && !mentorsError && mentors.length === 0 && (
-          <p className="text-sm text-gray-500">No mentors assigned yet.</p>
-        )}
-
-        {!loadingMentors && !mentorsError && mentors.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-            {mentors.map((mentor, i) => {
-              const img = mentorImages[i % mentorImages.length];
-
-              return (
-                <div
-                  key={mentor.id}
-                  className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 p-3"
-                >
-                  <div
-                    className="relative cursor-pointer"
-                    onClick={() => router.push(`/pastor/Mymentors`)}
-                  >
-                    <Image
-                      src={img}
-                      alt={`${mentor.firstName} ${mentor.lastName}`}
-                      className="w-full h-[180px] object-cover"
-                    />
-                    <button className="absolute top-3 right-3 w-7 h-7 flex items-center justify-center bg-white/80 rounded-full text-[#0B1C58] hover:bg-white shadow">
-                      <i className="fa-solid fa-ellipsis-vertical text-sm"></i>
-                    </button>
-                  </div>
-
-                  <div className="p-3 sm:p-4">
-                    <h4 className="font-semibold text-gray-900 text-[15px] sm:text-[16px] leading-tight mb-1">
-                      {mentor.firstName} {mentor.lastName}
-                    </h4>
-                    <p className="text-sm text-gray-500 capitalize">
-                      {mentor.role || "Mentor"}
-                    </p>
-                    <p className="text-[13px] text-gray-400 mt-2">
-                      {mentor.email}
-                      <br />
-                      Sub text area write something here.
-                    </p>
-
-                    <div className="flex justify-between items-center mt-4 sm:mt-5">
-                      <div className="flex gap-3 sm:gap-4 text-[#103C8C] text-[14px]">
-                        <i className="fa-regular fa-envelope cursor-pointer hover:text-[#0B1C58]"></i>
-                        <i className="fa-regular fa-comment cursor-pointer hover:text-[#0B1C58]"></i>
-                        <i className="fa-solid fa-phone cursor-pointer hover:text-[#0B1C58]"></i>
-                        <i className="fa-brands fa-whatsapp cursor-pointer hover:text-[#0B1C58]"></i>
-                      </div>
-
-                      <button className="w-8 h-8 flex items-center justify-center rounded-md border border-[#103C8C]/30 text-[#103C8C] hover:bg-[#103C8C] hover:text-white transition">
-                        <i className="fa-solid fa-arrow-up-right-from-square text-[11px]"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
           </div>
-        )}
+
+          {(loadingMentors || mentorsError || filteredRoadmaps.length === 0) && (
+            <div className="mt-5 text-xs text-[#cde2f2]">
+              {loadingMentors
+                ? "Loading dashboard data..."
+                : mentorsError
+                ? mentorsError
+                : "No roadmap data yet."}
+            </div>
+          )}
+        </div>
       </section>
 
       <PastorFooter />

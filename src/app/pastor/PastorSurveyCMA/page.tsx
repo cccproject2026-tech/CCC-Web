@@ -727,24 +727,24 @@ function PastorSurveyCMAContent() {
 
       {/* ✅ New Popups & Side Drawer */}
       {showSubmitPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white text-[#0F1E44] px-10 py-6 rounded-xl shadow-lg flex items-center gap-3">
-            <i className="fa-solid fa-circle-check text-green-500 text-2xl"></i>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
+          <div className="flex items-center gap-3 rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-10 py-6 text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)]">
+            <i className="fa-solid fa-circle-check text-[#7be495] text-2xl"></i>
             <p className="font-medium">Survey Submitted Successfully</p>
           </div>
         </div>
       )}
 
       {showSchedulePrompt && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
-          <div className="bg-white text-[#0F1E44] px-10 py-8 rounded-xl text-center w-[480px] shadow-lg">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
+          <div className="w-[480px] rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-10 py-8 text-center text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)]">
             <p className="font-semibold text-lg mb-4">
               On completion of the PMP and CMA assessment tools please schedule
               a meeting with your mentor.
             </p>
             <button
               onClick={handleScheduleMeeting}
-              className="bg-[#103C8C] text-white text-sm font-medium px-8 py-2 rounded-md hover:bg-[#0B2E72]"
+              className="rounded-xl bg-[#8ec5eb] px-8 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
             >
               Schedule Meeting
             </button>
@@ -753,20 +753,20 @@ function PastorSurveyCMAContent() {
       )}
 
       {showMentorSidebar && (
-        <div className="fixed inset-0 flex justify-end bg-black/40 z-50">
-          <div className="bg-white text-[#0F1E44] w-[480px] h-full p-8 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex justify-end bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
+          <div className="h-full w-[480px] overflow-y-auto border-l border-white/15 bg-[linear-gradient(180deg,#0d3e66_0%,#0a3457_100%)] p-8 text-white shadow-[-20px_0_50px_rgba(2,20,38,0.55)]">
             {mentorStep === 1 ? (
               <>
                 <h2 className="text-xl font-semibold mb-6">
                   Choose Mentor for the Meeting
                 </h2>
                 {mentors.length === 0 ? (
-                  <p className="text-gray-500">No mentors assigned.</p>
+                  <p className="text-[#cbe6f9]">No mentors assigned.</p>
                 ) : (
                   mentors.map((mentor) => (
                     <div
                       key={mentor._id || mentor.id}
-                      className="flex items-center justify-between border border-gray-200 rounded-md p-3 mb-3 cursor-pointer hover:bg-gray-50"
+                      className="mb-3 flex cursor-pointer items-center justify-between rounded-xl border border-white/15 bg-white/5 p-3 transition hover:bg-white/10"
                     >
                       <div className="flex items-center gap-3">
                         <img
@@ -776,7 +776,7 @@ function PastorSurveyCMAContent() {
                         />
                         <div>
                           <p className="font-medium text-sm">{mentor.name || `${mentor.firstName || ''} ${mentor.lastName || ''}`.trim()}</p>
-                          <p className="text-xs text-gray-500">Mentor</p>
+                          <p className="text-xs text-[#cbe6f9]">Mentor</p>
                         </div>
                       </div>
                       <input
@@ -792,7 +792,7 @@ function PastorSurveyCMAContent() {
                   <button
                     onClick={() => setMentorStep(2)}
                     disabled={!selectedMentor || mentors.length === 0}
-                    className={`px-6 py-2 rounded-md ${selectedMentor && mentors.length > 0 ? "bg-[#103C8C] text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}
+                    className={`rounded-xl px-6 py-2 text-sm font-semibold ${selectedMentor && mentors.length > 0 ? "bg-[#8ec5eb] text-[#0b3558] hover:bg-[#a9d5f2]" : "cursor-not-allowed bg-white/20 text-white/60"}`}
                   >
                     Next
                   </button>
@@ -804,7 +804,7 @@ function PastorSurveyCMAContent() {
                   Schedule a Meeting
                 </h2>
                 {selectedMentor && (
-                  <p className="text-sm text-gray-600 mb-4">
+                  <p className="mb-4 text-sm text-[#cbe6f9]">
                     Scheduling meeting with {mentors.find(m => (m._id || m.id) === selectedMentor)?.name || mentors.find(m => (m._id || m.id) === selectedMentor)?.firstName + " " + mentors.find(m => (m._id || m.id) === selectedMentor)?.lastName || "Selected Mentor"}
                   </p>
                 )}
@@ -829,7 +829,7 @@ function PastorSurveyCMAContent() {
                         }
                       }
                     }}
-                    className="border border-gray-300 rounded-md p-2 w-full"
+                    className="w-full rounded-xl border border-white/20 bg-white/5 p-2 text-white outline-none focus:border-[#8ec5eb]"
                   />
                 </div>
                 <div className="mb-6">
@@ -839,14 +839,14 @@ function PastorSurveyCMAContent() {
                       <button
                         key={i}
                         onClick={() => setSelectedTime(t)}
-                        className={`border border-gray-300 rounded-md py-2 text-sm ${selectedTime === t ? 'bg-blue-100' : 'hover:bg-gray-100'}`}
+                        className={`rounded-xl border py-2 text-sm transition ${selectedTime === t ? "border-[#8ec5eb] bg-[#8ec5eb]/20 text-white" : "border-white/20 bg-white/5 text-[#d8ecfa] hover:bg-white/10"}`}
                       >
                         {t}
                       </button>
                     ))}
                   </div>
                   {selectedDate && availableTimes.length === 0 && (
-                    <p className="text-sm text-gray-500 mt-2">No available times for this date.</p>
+                    <p className="mt-2 text-sm text-[#cbe6f9]">No available times for this date.</p>
                   )}
                 </div>
                 <div className="flex justify-between">
@@ -857,14 +857,14 @@ function PastorSurveyCMAContent() {
                       setSelectedTime("");
                       setAvailableTimes([]);
                     }}
-                    className="border border-gray-300 px-5 py-2 rounded-md"
+                    className="rounded-xl border border-white/30 px-5 py-2 text-[#d8ecfa] transition hover:bg-white/10"
                   >
                     Back
                   </button>
                   <button
                     onClick={handleFinalSchedule}
                     disabled={!selectedDate || !selectedTime}
-                    className={`px-6 py-2 rounded-md ${selectedDate && selectedTime ? "bg-[#103C8C] text-white" : "bg-gray-300 text-gray-500 cursor-not-allowed"}`}
+                    className={`rounded-xl px-6 py-2 text-sm font-semibold ${selectedDate && selectedTime ? "bg-[#8ec5eb] text-[#0b3558] hover:bg-[#a9d5f2]" : "cursor-not-allowed bg-white/20 text-white/60"}`}
                   >
                     Schedule
                   </button>
@@ -876,9 +876,9 @@ function PastorSurveyCMAContent() {
       )}
 
       {showFinalPopup && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-[60]">
-          <div className="bg-white text-[#0F1E44] px-10 py-6 rounded-xl shadow-lg flex items-center gap-3">
-            <i className="fa-solid fa-circle-check text-green-500 text-2xl"></i>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
+          <div className="flex items-center gap-3 rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-10 py-6 text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)]">
+            <i className="fa-solid fa-circle-check text-[#7be495] text-2xl"></i>
             <p className="font-medium">New Appointment has been Scheduled</p>
           </div>
         </div>
@@ -887,11 +887,11 @@ function PastorSurveyCMAContent() {
       {/* Toast Notification */}
       {toast && (
         <div className="fixed top-8 right-8 z-[70] animate-fade-in">
-          <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3 border border-gray-200">
-            <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center flex-shrink-0">
+          <div className="flex items-center gap-3 rounded-xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-6 py-4 shadow-2xl">
+            <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#d95d5d]">
               <i className="fa-solid fa-exclamation-triangle text-white text-xs"></i>
             </div>
-            <span className="text-[#2E3B8E] font-semibold">{toast}</span>
+            <span className="font-semibold text-white">{toast}</span>
           </div>
         </div>
       )}

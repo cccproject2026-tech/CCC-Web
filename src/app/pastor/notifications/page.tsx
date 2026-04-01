@@ -1,6 +1,6 @@
 "use client";
-import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
+import PastorFooter from "@/app/Components/PastorFooter";
 import { useState, useEffect } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { getNotifications } from "@/app/Services/pastor.service";
@@ -11,12 +11,12 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
 
   const ICON_MAP: any = {
-    microgrant: { icon: "fa-circle-check", color: "text-green-600" },
-    roadmap: { icon: "fa-map", color: "text-blue-500" },
-    appointment: { icon: "fa-calendar-check", color: "text-yellow-500" },
-    assessment: { icon: "fa-clipboard-check", color: "text-purple-500" },
-    assignment: { icon: "fa-file-alt", color: "text-orange-500" },
-    general: { icon: "fa-bell", color: "text-gray-500" }
+    microgrant: { icon: "fa-circle-check", color: "text-[#9ef0be]" },
+    roadmap: { icon: "fa-map", color: "text-[#8ec5eb]" },
+    appointment: { icon: "fa-calendar-check", color: "text-[#f7d37c]" },
+    assessment: { icon: "fa-clipboard-check", color: "text-[#b9b4ff]" },
+    assignment: { icon: "fa-file-alt", color: "text-[#ffcf9f]" },
+    general: { icon: "fa-bell", color: "text-[#cde2f2]" }
   };
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export default function NotificationsPage() {
           title: n.name,
           desc: n.details,
           module: n.module,
-          time: "Just now",
+          time: n.createdAt ? new Date(n.createdAt).toLocaleString() : "Just now",
           icon: ICON_MAP[n.module]?.icon || "fa-bell",
           color: ICON_MAP[n.module]?.color || "text-gray-500"
         }));
@@ -53,14 +53,21 @@ export default function NotificationsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#0E458A] to-[#1B5FA9]">
+    <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_20%_10%,rgba(141,211,243,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)]">
       <PastorHeader showFullHeader={true} />
 
       <main className="flex-1 px-4 sm:px-10 md:px-20 py-5 sm:py-8 md:py-10 text-white">
         <div className="max-w-5xl mx-auto">
-          <h1 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6 border-b border-white/30 pb-2">
-            Notifications
-          </h1>
+          <div className="mb-6 rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-5 shadow-[0_20px_45px_rgba(2,20,38,0.35)]">
+            <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
+              <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
+              Leadership Support Network
+            </p>
+            <h1 className="mt-3 text-2xl font-semibold">Notifications</h1>
+            <p className="mt-1 text-sm text-[#cde2f2]">
+              Stay up to date with assessments, assignments, appointments, and roadmap activity.
+            </p>
+          </div>
 
           {loading && (
             <p className="text-center text-white/70 py-5">Loading notifications...</p>
@@ -78,29 +85,30 @@ export default function NotificationsPage() {
             {notifications.map((note) => (
               <div
                 key={note.id}
-                className="bg-white text-gray-800 rounded-md shadow-sm border border-gray-200 p-3 sm:p-4 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 sm:gap-0 hover:shadow-md transition"
+                className="rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-3 text-white shadow-sm transition hover:shadow-md sm:flex sm:items-start sm:justify-between sm:gap-0 sm:p-4"
               >
                 {/* Left Section */}
                 <div className="flex items-start gap-3 sm:gap-4">
                   <div
-                    className={`mt-1 text-base sm:text-lg ${note.color} w-7 h-7 flex items-center justify-center bg-gray-100 rounded-full`}
+                    className={`mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-base sm:text-lg ${note.color}`}
                   >
                     <i className={`fa-solid ${note.icon}`}></i>
                   </div>
 
                   <div>
                     <p className="font-semibold text-sm">{note.title}</p>
-                    <p className="text-xs text-gray-500 mt-1">{note.desc}</p>
+                    <p className="mt-1 text-xs text-[#cde2f2]">{note.desc}</p>
                   </div>
                 </div>
 
                 {/* Right Side: Time */}
-                <div className="text-xs text-gray-500 sm:mt-1">{note.time}</div>
+                <div className="text-xs text-[#cde2f2] sm:mt-1">{note.time}</div>
               </div>
             ))}
           </div>
         </div>
       </main>
+      <PastorFooter />
     </div>
   );
 }

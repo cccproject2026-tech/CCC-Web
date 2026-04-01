@@ -121,10 +121,10 @@ export default function PastoralMinistryProfilePage() {
 
       {/* ✅ POPUP MODAL */}
       {showPopup && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white w-[90%] max-w-[600px] rounded-xl shadow-lg overflow-hidden animate-fadeIn">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
+          <div className="w-[90%] max-w-[600px] overflow-hidden rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] shadow-[0_24px_70px_rgba(2,20,38,0.55)] animate-fadeIn">
             {/* Header */}
-            <div className="bg-[#0099A8] px-6 py-4 text-white flex justify-between items-center">
+            <div className="flex items-center justify-between border-b border-white/15 bg-[#0b3558]/60 px-6 py-4 text-white">
               <div>
                 <h3 className="text-lg font-semibold">
                   Pastoral Ministry Profile (PMP)
@@ -142,10 +142,10 @@ export default function PastoralMinistryProfilePage() {
             </div>
 
             {/* Body */}
-            <div className="p-6 text-[#0B1C58]">
+            <div className="p-6 text-white">
               <h4 className="font-semibold mb-3">Assessment Guidelines</h4>
-              <div className="border border-[#D0DAF9] rounded-lg p-4">
-                <ul className="list-disc list-inside space-y-2 text-sm text-[#1E2952]">
+              <div className="rounded-xl border border-white/20 bg-white/5 p-4">
+                <ul className="list-disc list-inside space-y-2 text-sm text-[#d8ecfa]">
                   <li>
                     Please complete the Assessment in a single session without
                     taking breaks.
@@ -169,7 +169,7 @@ export default function PastoralMinistryProfilePage() {
               <div className="flex justify-end mt-6">
                 <button
                  onClick={() =>router.push(`/pastor/PastorSurveyPMPPage`)}
-                  className="bg-[#103C8C] hover:bg-[#0B2E72] text-white font-medium text-sm px-6 py-2 rounded-md transition"
+                  className="rounded-xl bg-[#8ec5eb] px-6 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
                 >
                   Start Now
                 </button>

@@ -26,15 +26,15 @@ export default function WelcomeTeam() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white relative">
+    <div className="relative min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">
       <PastorHeader showFullHeader={true} />
 
       {/* HERO SECTION */}
       <section
-        className="relative h-[320px] bg-cover bg-center text-white flex flex-col justify-end px-20 pb-10"
+        className="relative flex h-[320px] flex-col justify-end bg-cover bg-center px-6 pb-10 text-white md:px-12 lg:px-20"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-black/60"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]"></div>
         <div className="relative z-10">
           <p className="text-xs text-white/80 mb-40">
             Revitalization Roadmap &gt;{" "}
@@ -63,10 +63,10 @@ export default function WelcomeTeam() {
       </section>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 px-16 py-12 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] pb-24 transition-all duration-700 ease-in-out">
+      <main className="flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-12 pb-24 transition-all duration-700 ease-in-out md:px-10 lg:px-16">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-10">
           {/* LEFT PANEL */}
-          <div className="bg-white rounded-xl shadow-md p-4 flex flex-col gap-2 w-full h-fit">
+          <div className="h-fit w-full rounded-xl border border-white/20 bg-white/10 p-4 shadow-md backdrop-blur flex flex-col gap-2">
             {[
               { key: "overview", label: "Over View" },
               { key: "comments", label: "Comments", count: 2 },
