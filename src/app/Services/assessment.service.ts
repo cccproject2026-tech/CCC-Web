@@ -44,6 +44,72 @@ export function parseAssessmentDetailPayload(body: unknown): AssessmentResponse 
   return null;
 }
 
+/**
+ * GET /assessment/assigned/:userId — response may be a raw array or wrapped in `data`,
+ * `data.assignments`, `data.items`, etc.
+ */
+export function parseAssignedAssessmentsListBody(body: unknown): unknown[] {
+  if (Array.isArray(body)) return body;
+  if (body && typeof body === "object") {
+    const o = body as Record<string, unknown>;
+    if (Array.isArray(o.data)) return o.data;
+    if (o.data && typeof o.data === "object") {
+      const d = o.data as Record<string, unknown>;
+      if (Array.isArray(d.assignments)) return d.assignments;
+      if (Array.isArray(d.items)) return d.items;
+      if (Array.isArray(d.rows)) return d.rows;
+    }
+  }
+  return [];
+}
+
+/** One row from assigned list: populated `assessment` or a flat assessment document. */
+export type FlatAssignedAssessmentRow = {
+  assessmentId: string;
+  assignmentId?: string;
+  assessment: Record<string, unknown>;
+  dueDate?: string;
+  meetingDate?: string;
+  updatedAt?: string;
+};
+
+export function flattenAssignedAssessmentRow(item: unknown): FlatAssignedAssessmentRow | null {
+  if (!item || typeof item !== "object") return null;
+  const row = item as Record<string, unknown>;
+  const nested = row.assessment;
+  const hasNested = nested && typeof nested === "object" && !Array.isArray(nested);
+
+  if (hasNested) {
+    const assessment = nested as Record<string, unknown>;
+    const assessmentId = String(assessment._id ?? assessment.id ?? row.assessmentId ?? "").trim();
+    if (!assessmentId) return null;
+    const assignmentId =
+      row._id != null ? String(row._id) : row.assignmentId != null ? String(row.assignmentId) : undefined;
+    return {
+      assessmentId,
+      assignmentId,
+      assessment,
+      dueDate: typeof row.dueDate === "string" ? row.dueDate : undefined,
+      meetingDate: typeof row.meetingDate === "string" ? row.meetingDate : undefined,
+      updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : undefined,
+    };
+  }
+
+  const assessmentId = String(row._id ?? row.id ?? row.assessmentId ?? "").trim();
+  if (!assessmentId) return null;
+  const hasShape = typeof row.name === "string" || Array.isArray(row.sections);
+  if (!hasShape) return null;
+
+  return {
+    assessmentId,
+    assignmentId: row.assignmentId != null ? String(row.assignmentId) : undefined,
+    assessment: row as Record<string, unknown>,
+    dueDate: typeof row.dueDate === "string" ? row.dueDate : undefined,
+    meetingDate: typeof row.meetingDate === "string" ? row.meetingDate : undefined,
+    updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : undefined,
+  };
+}
+
 // POST /assessments
 export const apiCreateAssessment = (payload: CreateAssessmentPayload) =>
   axiosInstance.post<{ success: boolean; data: AssessmentResponse }>("/assessments", payload);

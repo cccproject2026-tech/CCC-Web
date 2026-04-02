@@ -1,43 +1,101 @@
 "use client";
 import { useEffect, useState, Suspense } from "react";
 import Image from "next/image";
-import PastorHeader from "@/app/Components/PastorHeader";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import "@fortawesome/fontawesome-free/css/all.min.css";
+
 import PastorFooter from "@/app/Components/PastorFooter";
-import overall from "@/app/Assets/overall-progress.jpeg";
-import individual from "@/app/Assets/Individual.jpeg";
-import progressBg from "@/app/Assets/progress-bg.png";
-import card1 from "@/app/Assets/card1.png";
-import card2 from "@/app/Assets/card2.png";
-import card3 from "@/app/Assets/card3.png";
 import MentorHeader from "@/app/Components/MentorHeader";
-import { useSearchParams } from "next/navigation";
+import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import { apiAddFinalComment, apiGetUserProgress } from "@/app/Services/progress.service";
+import { apiGetUserById } from "@/app/Services/users.service";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
-import { apiGetAssessmentById } from "@/app/Services/assessment.service";
+import { apiGetAssessmentById, parseAssessmentDetailPayload } from "@/app/Services/assessment.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
+import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
+import {
+  IndividualBreakdownBarChart,
+  OverallProgressDonut,
+  ProgressFilterSegmented,
+  type RoadmapFilterTab,
+  assessmentMatchesFilter,
+  formatRoadmapStatusLabel,
+  progressStatusChipClass,
+  roadmapMatchesFilter,
+} from "@/app/Components/ProgressDashboardShared";
 
 function PastorProgressPageContent() {
-  const [roadmapFilter, setRoadmapFilter] = useState("All");
-  const [surveyFilter, setSurveyFilter] = useState("All");
+  const router = useRouter();
+  const [roadmapFilter, setRoadmapFilter] = useState<RoadmapFilterTab>("All");
+  const [surveyFilter, setSurveyFilter] = useState<RoadmapFilterTab>("All");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [comment, setComment] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState("comments"); // ✅ for tab switching
+  const [activeTab, setActiveTab] = useState("comments");
   const [progress, setProgress] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
   const userId = searchParams.get("userId");
   const [roadmaps, setRoadmaps] = useState<any[]>([]);
   const [assessments, setAssessments] = useState<any[]>([]);
+  const [pastorUser, setPastorUser] = useState<{
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+  } | null>(null);
+  const [userProfileLoaded, setUserProfileLoaded] = useState(false);
   const isCompleted = progress?.finalComments?.length > 0;
 
+  const fromProfile =
+    pastorUser && `${pastorUser.firstName ?? ""} ${pastorUser.lastName ?? ""}`.trim();
+  const fromProgressUser =
+    progress?.user?.firstName || progress?.user?.lastName
+      ? `${progress?.user?.firstName ?? ""} ${progress?.user?.lastName ?? ""}`.trim()
+      : "";
+  const pastorDisplayName =
+    fromProfile ||
+    fromProgressUser ||
+    (userId && !userProfileLoaded ? "Loading…" : "Pastor");
+
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setPastorUser(null);
+      setUserProfileLoaded(true);
+      return;
+    }
+
+    let cancelled = false;
+    setUserProfileLoaded(false);
+    apiGetUserById(userId)
+      .then((res) => {
+        const u = res.data?.data ?? res.data;
+        if (!cancelled && u && typeof u === "object") {
+          setPastorUser(u as { firstName?: string; lastName?: string; email?: string });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPastorUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setUserProfileLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
 
     const fetchProgress = async () => {
       try {
         const res = await apiGetUserProgress(userId);
-        setProgress(res.data?.data);
+        setProgress(unwrapProgressData(res));
       } catch (err) {
         console.error("Failed to fetch progress", err);
       } finally {
@@ -48,7 +106,6 @@ function PastorProgressPageContent() {
     fetchProgress();
   }, [userId]);
 
-
   useEffect(() => {
     if (!progress?.roadmaps?.length) return;
 
@@ -56,21 +113,22 @@ function PastorProgressPageContent() {
       try {
         const results = await Promise.allSettled(
           progress.roadmaps.map(async (r: any) => {
-            const res = await apiGetRoadmapById(r.roadMapId);
+            const rid = r.roadMapId ?? r.roadmapId ?? r._id;
+            const res = await apiGetRoadmapById(rid);
             const roadmap = res.data?.data;
             const percent = r.progressPercentage ?? 0;
             return {
               ...r,
+              roadMapId: rid,
               title: roadmap?.name,
               description: roadmap?.description,
               timeline: roadmap?.timeline,
-              percent
+              imageUrl: roadmap?.imageUrl,
+              percent,
             };
-          })
+          }),
         );
-        const valid = results
-          .filter((r) => r.status === "fulfilled")
-          .map((r: any) => r.value);
+        const valid = results.filter((r) => r.status === "fulfilled").map((r: any) => r.value);
 
         setRoadmaps(valid);
       } catch (err) {
@@ -81,18 +139,14 @@ function PastorProgressPageContent() {
     hydrateRoadmaps();
   }, [progress]);
 
-
   useEffect(() => {
-    console.log(progress)
-    if (!progress?.assessments?.length) return; const hydrateAssessments = async () => {
+    if (!progress?.assessments?.length) return;
+    const hydrateAssessments = async () => {
       try {
         const results = await Promise.allSettled(
           progress.assessments.map(async (a: any) => {
             const res = await apiGetAssessmentById(a.assessmentId);
-
-            console.log("Assessment API response:", res.data);
-
-            const assessment = res.data;
+            const assessment = parseAssessmentDetailPayload(res.data);
 
             return {
               ...a,
@@ -104,11 +158,9 @@ function PastorProgressPageContent() {
               dueDate: a.dueDate,
               status: a.status,
             };
-          })
+          }),
         );
-        const valid = results
-          .filter((r) => r.status === "fulfilled")
-          .map((r: any) => r.value);
+        const valid = results.filter((r) => r.status === "fulfilled").map((r: any) => r.value);
 
         setAssessments(valid);
       } catch (err) {
@@ -118,14 +170,6 @@ function PastorProgressPageContent() {
 
     hydrateAssessments();
   }, [progress]);
-
-  const getStatusColor = (status: string) => {
-    if (status === "completed")
-      return "bg-[#DCFCE7] text-[#15803D] border-[#86EFAC]";
-    if (status === "in_progress")
-      return "bg-[#FEF3C7] text-[#92400E] border-[#FCD34D]";
-    return "bg-[#EFF6FF] text-[#1E40AF] border-[#BFDBFE]";
-  };
 
   const handleMarkComplete = async () => {
     try {
@@ -139,7 +183,7 @@ function PastorProgressPageContent() {
       });
 
       const res = await apiGetUserProgress(userId as string);
-      setProgress(res.data.data);
+      setProgress(unwrapProgressData(res));
 
       setIsDrawerOpen(false);
       setShowSuccess(true);
@@ -150,339 +194,330 @@ function PastorProgressPageContent() {
     }
   };
 
-  const filteredRoadmaps = roadmaps.filter((r) => {
-    if (roadmapFilter === "Completed") return r.status === "completed";
-    if (roadmapFilter === "Remaining") return r.status !== "completed";
-    return true;
-  });
+  const filteredRoadmaps = roadmaps.filter((r) => roadmapMatchesFilter(r, roadmapFilter));
 
-  const filteredAssessments = assessments.filter((a) => {
-    if (surveyFilter === "Completed") return a.status === "completed";
-    if (surveyFilter === "Remaining") return a.status !== "completed";
-    return true;
-  });
+  const filteredAssessments = assessments.filter((a) => assessmentMatchesFilter(a, surveyFilter));
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-white">
-        Loading progress...
+      <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
+        <MentorHeader showFullHeader={true} />
+        <div className="flex flex-1 items-center justify-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0F4A85] text-white">
+    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
       <MentorHeader showFullHeader={true} />
 
-      {/* HERO HEADER */}
-      <section
-        className="relative h-[220px] bg-cover bg-center flex flex-col justify-center px-4 md:px-20"
-        style={{ backgroundImage: `url(${progressBg.src})` }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-[#103D8C]/95 to-[#06285A]/90"></div>
-        <h1 className="relative z-10 text-3xl font-semibold tracking-wide">
-          My Progress
-        </h1>
-      </section>
-
-      {/* MAIN CONTENT */}
-      <main className="flex-1 bg-[#F4F7FC] text-[#0B1C58] relative">
-        {/* 🟦 OVERALL + INDIVIDUAL PROGRESS */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-8 px-4 md:px-16 py-12 bg-[#176192]">
-          {/* Overall Progress */}
-          <div className="bg-white rounded-xl shadow-sm p-8">
-            <h3 className="text-lg font-semibold mb-4">
-              Overall Progress: {progress?.overallProgress ?? 0}%
-            </h3>
-            <div className="flex justify-center">
-              <Image
-                src={overall}
-                alt="Overall Progress"
-                width={480}
-                height={480}
-                className="rounded-lg"
-              />
-            </div>
+      <header className="border-b border-[#8ec5eb]/25 bg-[#062946] px-4 py-5 sm:px-8 md:px-12">
+        <div className="mx-auto flex max-w-7xl flex-col items-center gap-4">
+          <div className="flex w-full items-center gap-3">
+            <Link
+              href="/mentor/TrackProgress"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 text-[#cde2f2] transition hover:border-[#8ec5eb]/40 hover:text-white"
+              aria-label="Back to track progress"
+            >
+              <i className="fa-solid fa-arrow-left" />
+            </Link>
+            <h1 className="text-lg font-bold tracking-tight text-white sm:text-xl">My Progress</h1>
           </div>
-
-          {/* Individual Progress */}
-          <div className="bg-white rounded-xl shadow-sm p-8">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Individual Progress</h3>
-              {/* 🟩 Add / View Final Comments Button */}
-              {!isCompleted ? (
-                <button
-                  onClick={() => setIsDrawerOpen(true)}
-                  className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[12px] px-5 py-[6px] rounded-md font-medium"
-                >
-                  Add Final Comments
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    setIsDrawerOpen(true);
-                    setActiveTab("comments");
-                  }}
-                  className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[12px] px-5 py-[6px] rounded-md font-medium"
-                >
-                  View Final Comments
-                </button>
-              )}
-            </div>
-            <div className="flex justify-center">
-              <Image
-                src={individual}
-                alt="Individual Progress"
-                width={480}
-                height={480}
-                className="rounded-lg"
-              />
-            </div>
+          <div
+            className="rounded-xl px-6 py-2.5 text-center text-sm font-semibold text-white shadow-[0_0_24px_rgba(142,197,235,0.18)]"
+            style={{
+              border: "2px solid transparent",
+              background:
+                "linear-gradient(#062946, #062946) padding-box, linear-gradient(120deg, #a78bfa, #6366f1, #38bdf8, #8ec5eb) border-box",
+              backgroundClip: "padding-box, border-box",
+            }}
+          >
+            {pastorDisplayName}
           </div>
-        </section>
+          {pastorUser?.email ? (
+            <p className="text-center text-xs text-[#8ec5eb]/85">{pastorUser.email}</p>
+          ) : null}
+        </div>
+      </header>
 
-        {/* 🟩 REVITALIZATION ROADMAP PROGRESS */}
-        <section className="px-4 md:px-16 py-10 bg-gradient-to-b from-[#BBD6E9] to-[#E3F1FF]">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <h2 className="text-xl font-semibold">
-              Revitalization Roadmap Progress
-            </h2>
-            <div className="flex bg-white rounded-lg shadow overflow-hidden">
-              {["All", "Completed", "Remaining"].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setRoadmapFilter(tab)}
-                  className={`px-5 py-2 text-sm font-medium transition-all ${roadmapFilter === tab
-                    ? "bg-[#103C8C] text-white"
-                    : "text-gray-600 hover:text-[#103C8C]"
-                    }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-          </div>
+      <main className="relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-8 sm:px-8 md:px-16 md:py-10">
+        <div className="mx-auto max-w-7xl">
+          {!userId && (
+            <p className="mb-8 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
+              Missing <code className="rounded bg-white/10 px-1">userId</code> in the URL. Open a pastor from Track
+              progress first.
+            </p>
+          )}
 
-          <div className="grid lg:grid-cols-2 gap-8">
-            {filteredRoadmaps.map((r: any) => (
-              <RoadmapCard
-                key={r.roadMapId}
-                img={card1}
-                title={r.title || "Roadmap"}
-                desc={r.description || ""}
-                progress={r.percent}
-                completed={`${r.completedSteps}/${r.totalSteps}`}
-                status={r.status}
-                statusColor={getStatusColor(r.status)}
-                time={r.timeline || ""}
-              />
-            ))}
-          </div>
-        </section>
+          {userId && (
+            <>
+              <section className="mb-8 rounded-2xl border border-[#8ec5eb]/40 bg-[#041f35]/60 p-5 shadow-lg backdrop-blur-md sm:p-7">
+                <h2 className="mb-6 text-base font-bold text-white sm:text-lg">
+                  Overall Progress — Roadmap &amp; Assessments
+                </h2>
+                <OverallProgressDonut overallPercent={progress?.overallProgress ?? 0} />
+              </section>
 
-        {/* 🟪 SURVEY PROGRESS */}
-        <section className="px-4 md:px-16 pb-12 bg-gradient-to-b from-[#0D3C78] to-[#0B2A55] pt-15 text-white">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <h2 className="text-xl font-semibold">Survey Progress</h2>
-            <div className="flex bg-white rounded-lg shadow overflow-hidden">
-              {["All", "Completed", "Remaining"].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setSurveyFilter(tab)}
-                  className={`px-5 py-2 text-sm font-medium transition-all ${surveyFilter === tab
-                    ? "bg-[#103C8C] text-white"
-                    : "text-gray-500 hover:text-[#103C8C]"
-                    }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 gap-8">
-            {filteredAssessments.map((a: any) => (
-              <AssessmentCard
-                key={a.assessmentId}
-                assessment={a}
-              />
-            ))}
-          </div>
-        </section>
-
-        {/* 🧩 FINAL COMMENTS DRAWER (ADD + VIEW MODES) */}
-        {isDrawerOpen && (
-          <>
-            <div
-              className="fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40"
-              onClick={() => setIsDrawerOpen(false)}
-            />
-            <div className="fixed top-0 right-0 h-full w-full sm:w-[460px] bg-white text-[#0B1C58] shadow-2xl z-50">
-              {/* Header */}
-              <div className="flex justify-between items-center px-6 py-5 border-b border-gray-200">
-                <div>
-                  <h2 className="text-lg font-semibold">
-                    {isCompleted
-                      ? "Final Comments & Summary"
-                      : "Final Comments"}
+              <section className="mb-10 rounded-2xl border border-[#8ec5eb]/40 bg-[#041f35]/60 p-5 shadow-lg backdrop-blur-md sm:p-7">
+                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <h2 className="text-base font-bold text-white sm:text-lg">
+                    Individual — Roadmap, Assessments
                   </h2>
-                  <p className="text-sm text-gray-500 mt-1">{progress?.user?.firstName} {progress?.user?.lastName}</p>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    {!isCompleted ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsDrawerOpen(true)}
+                        className="rounded-xl bg-[#8ec5eb] px-4 py-2 text-xs font-semibold text-[#062946] transition hover:bg-[#b8daf2]"
+                      >
+                        Add final comments
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsDrawerOpen(true);
+                          setActiveTab("comments");
+                        }}
+                        className="rounded-xl border border-[#8ec5eb]/50 bg-white/10 px-4 py-2 text-xs font-semibold text-[#cde2f2] transition hover:bg-white/15"
+                      >
+                        View final comments
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <button
-                  onClick={() => setIsDrawerOpen(false)}
-                  className="text-gray-400 hover:text-[#103C8C] transition"
-                >
-                  <i className="fa-solid fa-xmark text-xl"></i>
-                </button>
-              </div>
+                <IndividualBreakdownBarChart progress={progress} />
+              </section>
+            </>
+          )}
 
-              {/* Tabs (only after completed) */}
-              {isCompleted && (
-                <div className="flex border-b border-gray-200">
-                  {["comments", "summary"].map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={`flex-1 py-3 text-sm font-medium capitalize ${activeTab === tab
-                        ? "border-b-2 border-[#103C8C] text-[#103C8C]"
-                        : "text-gray-500 hover:text-[#103C8C]"
-                        }`}
-                    >
-                      {tab === "comments"
-                        ? "Final Comments"
-                        : "Programme Summary"}
-                    </button>
+          {/* Roadmaps */}
+          <section className="mb-12">
+            <div className="mb-5 flex flex-col gap-4">
+              <h2 className="text-base font-bold text-white sm:text-lg">Revitalization Roadmap Progress</h2>
+              <ProgressFilterSegmented active={roadmapFilter} setActive={setRoadmapFilter} />
+            </div>
+
+            {filteredRoadmaps.length === 0 ? (
+              <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-[#cde2f2]">
+                No roadmaps to show for this filter.
+              </p>
+            ) : (
+              <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
+                {filteredRoadmaps.map((r: any) => (
+                  <MentorRoadmapProgressCard
+                    key={r.roadMapId}
+                    roadmap={r}
+                    onView={() => {
+                      if (!userId || !r.roadMapId) return;
+                      router.push(
+                        `/mentor/RevitalizationRoadmap/home/jump-start?userId=${encodeURIComponent(userId)}&roadmapId=${encodeURIComponent(r.roadMapId)}`,
+                      );
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Surveys */}
+          <section className="pb-8">
+            <div className="mb-5 flex flex-col gap-4">
+              <h2 className="text-base font-bold text-white sm:text-lg">Survey progress</h2>
+              <ProgressFilterSegmented active={surveyFilter} setActive={setSurveyFilter} />
+            </div>
+
+            {filteredAssessments.length === 0 ? (
+              <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-[#cde2f2]">
+                No surveys to show for this filter.
+              </p>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 md:gap-8">
+                {filteredAssessments.map((a: any) => (
+                  <MentorAssessmentProgressCard
+                    key={a.assessmentId}
+                    assessment={a}
+                    onOpen={() => {
+                      if (!userId || !a.assessmentId) return;
+                      router.push(
+                        `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(a.assessmentId)}&userId=${encodeURIComponent(userId)}&viewOnly=1`,
+                      );
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      </main>
+
+      <PastorFooter />
+
+      {isDrawerOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+            role="presentation"
+            onClick={() => setIsDrawerOpen(false)}
+          />
+          <div className="fixed right-0 top-0 z-50 h-full w-full bg-[#0a3558] text-[#cde2f2] shadow-2xl sm:w-[460px] sm:border-l sm:border-white/10">
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+              <div>
+                <h2 className="text-lg font-semibold text-white">
+                  {isCompleted ? "Final comments & summary" : "Final comments"}
+                </h2>
+                <p className="mt-1 text-sm text-[#8ec5eb]/90">{pastorDisplayName}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDrawerOpen(false)}
+                className="text-[#cde2f2]/70 transition hover:text-white"
+                aria-label="Close"
+              >
+                <i className="fa-solid fa-xmark text-xl" />
+              </button>
+            </div>
+
+            {isCompleted && (
+              <div className="flex border-b border-white/10">
+                {["comments", "summary"].map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveTab(tab)}
+                    className={`flex-1 py-3 text-sm font-medium capitalize transition ${
+                      activeTab === tab
+                        ? "border-b-2 border-[#8ec5eb] text-white"
+                        : "text-[#cde2f2]/80 hover:text-white"
+                    }`}
+                  >
+                    {tab === "comments" ? "Final comments" : "Programme summary"}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="p-6">
+              {!isCompleted ? (
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Write your comments here…"
+                  className="h-[260px] w-full rounded-lg border border-white/15 bg-[#062946]/80 p-3 text-sm text-white placeholder:text-[#8ec5eb]/50 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/40"
+                />
+              ) : (
+                <div className="max-h-[260px] space-y-3 overflow-y-auto">
+                  {progress?.finalComments?.map((c: any) => (
+                    <div key={c._id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                      <p className="text-sm text-[#cde2f2]">{c.comment}</p>
+                      <p className="mt-1 text-[11px] text-[#8ec5eb]/70">
+                        {new Date(c.createdAt).toLocaleString()}
+                      </p>
+                    </div>
                   ))}
                 </div>
               )}
 
-              {/* Body */}
-              <div className="p-6">
-                {!isCompleted ? (
-                  <textarea
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder="Write the Comments here..."
-                    className="w-full h-[260px] border border-gray-300 rounded-md p-3 text-sm focus:outline-none focus:ring-1 focus:ring-[#103C8C]"
-                  />
-                ) : (
-                  <div className="space-y-3 max-h-[260px] oveyrflow-y-auto">
-
-                    {progress?.finalComments?.map((c: any) => (
-                      <div
-                        key={c._id}
-                        className="border rounded-md p-3 bg-gray-50"
-                      >
-                        <p className="text-sm text-gray-800">
-                          {c.comment}
-                        </p>
-
-                        <p className="text-[11px] text-gray-500 mt-1">
-                          {new Date(c.createdAt).toLocaleString()}
-                        </p>
-                      </div>
-                    ))}
-
-                  </div>
-                )}
-
-                {isCompleted && activeTab === "summary" && (
-                  <div className="text-sm text-gray-700">
-                    <p className="mb-2 font-medium">
-                      Programme Completion Summary:
-                    </p>
-                    <p>
-                      The participant has successfully completed all phases of
-                      the Revitalization Programme. Review comments have been
-                      recorded.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* Footer */}
-              {!isCompleted && (
-                <div className="absolute bottom-0 left-0 w-full border-t border-gray-200 bg-white p-5 flex justify-end gap-4">
-                  <button
-                    onClick={() => setIsDrawerOpen(false)}
-                    className="border border-[#103C8C] text-[#103C8C] text-[13px] font-medium px-6 py-[6px] rounded-md hover:bg-[#F5F8FF] transition"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleMarkComplete}
-                    className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[13px] font-medium px-8 py-[6px] rounded-md transition"
-                  >
-                    Mark Programme as Completed
-                  </button>
+              {isCompleted && activeTab === "summary" && (
+                <div className="text-sm text-[#cde2f2]">
+                  <p className="mb-2 font-medium text-white">Programme completion summary</p>
+                  <p>
+                    The participant has completed the recorded phases of the revitalization programme. Final mentor
+                    comments are listed in the other tab.
+                  </p>
                 </div>
               )}
             </div>
-          </>
-        )}
 
-        {/* ✅ SUCCESS POPUP */}
-        {showSuccess && (
-          <div className="fixed inset-0 flex items-center justify-center z-[60]">
-            <div className="bg-white rounded-xl shadow-lg px-8 py-5 flex items-center gap-3">
-              <div className="text-green-600 text-2xl">✔</div>
-              <p className="text-[#0B1C58] font-medium text-[15px]">
-                This programme has been marked as Completed
-              </p>
-            </div>
+            {!isCompleted && (
+              <div className="absolute bottom-0 left-0 flex w-full justify-end gap-3 border-t border-white/10 bg-[#0a3558] p-5">
+                <button
+                  type="button"
+                  onClick={() => setIsDrawerOpen(false)}
+                  className="rounded-lg border border-[#8ec5eb]/50 px-6 py-2 text-[13px] font-medium text-[#cde2f2] transition hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleMarkComplete}
+                  className="rounded-lg bg-[#8ec5eb] px-8 py-2 text-[13px] font-semibold text-[#062946] transition hover:bg-[#b8daf2]"
+                >
+                  Mark programme as completed
+                </button>
+              </div>
+            )}
           </div>
-        )}
-      </main>
+        </>
+      )}
+
+      {showSuccess && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+          <div className="flex items-center gap-3 rounded-xl border border-white/20 bg-[#0a3558] px-8 py-5 shadow-xl">
+            <div className="text-2xl text-emerald-400">✔</div>
+            <p className="text-[15px] font-medium text-white">This programme has been marked as completed.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-/* RoadmapCard unchanged */
-function RoadmapCard({
-  img,
-  title,
-  desc,
-  status,
-  statusColor,
-  progress,
-  completed,
-  time,
-}: any) {
+function MentorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: () => void }) {
+  const title = roadmap.title || "Roadmap";
+  const desc = roadmap.description || "";
+  const progressPct = Number(roadmap.percent ?? 0);
+  const completed = `${roadmap.completedSteps ?? 0}/${roadmap.totalSteps ?? 0}`;
+  const time = roadmap.timeline || "—";
+  const statusLabel = formatRoadmapStatusLabel(roadmap.status);
+  const chip = progressStatusChipClass(roadmap.status);
+  const imgUrl =
+    typeof roadmap.imageUrl === "string" && (roadmap.imageUrl.startsWith("http://") || roadmap.imageUrl.startsWith("https://"))
+      ? roadmap.imageUrl
+      : null;
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden hover:shadow-md transition-all">
-      <div className="flex">
-        <div className="w-1/3">
-          <Image src={img} alt={title} className="w-full h-full object-cover" />
+    <div className="overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(145deg,rgba(255,255,255,0.12)_0%,rgba(6,41,70,0.35)_100%)] shadow-lg backdrop-blur-md transition hover:border-[#8ec5eb]/25">
+      <div className="flex flex-col sm:flex-row">
+        <div className="relative h-44 w-full shrink-0 sm:h-auto sm:w-1/3 sm:min-h-[200px]">
+          {imgUrl ? (
+            <Image
+              src={imgUrl}
+              alt={title}
+              fill
+              className="object-cover"
+              unoptimized
+            />
+          ) : (
+            <ApiImagePlaceholder className="h-full min-h-[176px] w-full sm:min-h-[200px]" />
+          )}
         </div>
-        <div className="flex-1 p-5">
-          <h4 className="text-[15px] font-semibold mb-1">{title}</h4>
-          <p className="text-[13px] text-[#6B7280] mb-3">{desc}</p>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[12px] text-[#6B7280] font-medium">
-              Status
-            </span>
-            <span
-              className={`text-[11px] px-2 py-[3px] rounded-full font-medium border ${statusColor}`}
-            >
-              {status}
-            </span>
+        <div className="flex flex-1 flex-col p-5">
+          <h4 className="mb-1 text-[15px] font-semibold text-white">{title}</h4>
+          <p className="mb-3 line-clamp-2 text-[13px] text-[#cde2f2]/90">{desc || "—"}</p>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="text-[12px] font-medium text-[#8ec5eb]/90">Status</span>
+            <span className={`rounded-full px-2 py-[3px] text-[11px] font-medium ${chip}`}>{statusLabel}</span>
           </div>
-          <p className="text-[12px] text-[#6B7280] mb-1">Task Completed</p>
-          <div className="w-full h-[6px] bg-gray-200 rounded-full mb-1">
+          <p className="mb-1 text-[12px] text-[#8ec5eb]/80">Tasks</p>
+          <div className="mb-1 h-2.5 w-full rounded-full bg-white/10 sm:h-3">
             <div
-              className="h-[6px] bg-[#16A34A] rounded-full transition-all duration-700"
-              style={{ width: `${progress}%` }}
-            ></div>
+              className="h-full rounded-full bg-gradient-to-r from-[#5a9ec9] to-[#8ec5eb] transition-all duration-700"
+              style={{ width: `${Math.min(100, progressPct)}%` }}
+            />
           </div>
-          <p className="text-[12px] text-[#0B1C58] font-medium mb-2">
-            {completed}
+          <p className="mb-2 text-[12px] font-medium text-white">{completed}</p>
+          <p className="text-[12px] text-[#cde2f2]/80">
+            Timeline <span className="font-semibold text-[#8ec5eb]">{time}</span>
           </p>
-          <p className="text-[12px] text-[#6B7280]">
-            Completion Time{" "}
-            <span className="font-semibold text-[#0B1C58]">{time}</span>
-          </p>
-          <div className="flex justify-end mt-4">
-            <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[12px] px-6 py-[6px] rounded-md font-medium">
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={onView}
+              className="rounded-lg bg-[#8ec5eb] px-6 py-2 text-[12px] font-semibold text-[#062946] transition hover:bg-[#b8daf2]"
+            >
               View
             </button>
           </div>
@@ -492,60 +527,75 @@ function RoadmapCard({
   );
 }
 
-
-function AssessmentCard({ assessment }: any) {
-  const isCompleted = assessment.status === "completed";
+function MentorAssessmentProgressCard({ assessment, onOpen }: { assessment: any; onOpen: () => void }) {
+  const isDone = assessment.status === "completed";
+  const banner = assessment.bannerImage;
+  const isHttp =
+    typeof banner === "string" && (banner.startsWith("http://") || banner.startsWith("https://"));
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm hover:shadow-md transition-all p-4 h-[200px]">
-      <div className="flex h-full gap-4">
-
-        {/* Image */}
-        <div className="relative w-[160px] h-full rounded-xl overflow-hidden flex-shrink-0">
+    <div className="flex min-h-[200px] gap-4 rounded-2xl border border-white/15 bg-white/10 p-4 shadow-lg backdrop-blur-md transition hover:border-[#8ec5eb]/25">
+      <div className="relative h-full min-h-[168px] w-[140px] shrink-0 overflow-hidden rounded-xl sm:w-[160px]">
+        {isHttp ? (
           <Image
-            src={assessment.bannerImage || card1}
+            src={banner}
             alt={assessment.title || "Assessment"}
             fill
             className="object-cover"
+            unoptimized
           />
-        </div>
+        ) : (
+          <ApiImagePlaceholder className="h-full min-h-[168px] w-full" />
+        )}
+      </div>
 
-        {/* Content */}
-        <div className="flex flex-col justify-between flex-1">
-
-          {/* Top */}
-          <div>
-            <h4 className="text-[15px] font-bold text-black mb-1 line-clamp-1">
-              {assessment.title || "Assessment"}
-            </h4>
-
-            <p className="text-[13px] text-[#6B7280] mb-2 line-clamp-2">
-              {assessment.description || ""}
-            </p>
-
-            <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-[12px] px-4 py-[5px] rounded-md font-medium">
-              Customized Development Plans
-            </button>
-          </div>
-
-          {/* Footer */}
-          <div className="flex justify-between text-[12px] text-[#6B7280]">
-
-            {isCompleted ? (
-              <span className="font-bold text-black">
-                Submited On
+      <div className="flex min-w-0 flex-1 flex-col justify-between">
+        <div className="min-w-0 flex-1">
+          <h4 className="mb-1 line-clamp-1 text-[15px] font-bold text-white">{assessment.title || "Assessment"}</h4>
+          <p className="mb-2 line-clamp-2 text-[13px] text-[#cde2f2]/90">{assessment.description || ""}</p>
+          <div className="mb-3">
+            <div className="mb-1 flex justify-between text-[11px] text-[#8ec5eb]/80">
+              <span>Sections</span>
+              <span className="tabular-nums text-[#cde2f2]">
+                {assessment.completedSections ?? 0}/{assessment.totalSections ?? 0}
               </span>
-            ) : (
-              <>
-                <span className="font-bold text-black">Due Date</span>
-                <span className="font-semibold text-[#0B1C58]">
-                  {assessment.dueDate || "-"}
-                </span>
-              </>
-            )}
-
+            </div>
+            <div className="h-2 w-full rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#5a9ec9] to-[#8ec5eb] transition-all duration-700"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    assessment.status === "completed"
+                      ? 100
+                      : Number(
+                          assessment.progressPercentage ??
+                            (assessment.totalSections
+                              ? ((assessment.completedSections ?? 0) / Math.max(1, assessment.totalSections)) * 100
+                              : 0),
+                        ),
+                  )}%`,
+                }}
+              />
+            </div>
           </div>
-
+          <button
+            type="button"
+            onClick={onOpen}
+            className="rounded-lg bg-[#8ec5eb]/20 px-4 py-1.5 text-[12px] font-semibold text-[#8ec5eb] transition hover:bg-[#8ec5eb]/30"
+          >
+            Open survey (read-only)
+          </button>
+        </div>
+        <div className="mt-3 flex justify-between text-[12px] text-[#8ec5eb]/80">
+          {isDone ? (
+            <span className="font-semibold text-white">Submitted</span>
+          ) : (
+            <>
+              <span className="font-semibold text-[#cde2f2]">Due date</span>
+              <span className="font-semibold text-[#8ec5eb]">{assessment.dueDate || "—"}</span>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -554,7 +604,14 @@ function AssessmentCard({ assessment }: any) {
 
 export default function PastorProgressPage() {
   return (
-    <Suspense fallback={<div className="text-white p-10">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen flex-col bg-[#062946]">
+          <MentorHeader showFullHeader={true} />
+          <div className="flex flex-1 items-center justify-center text-[#cde2f2]">Loading…</div>
+        </div>
+      }
+    >
       <PastorProgressPageContent />
     </Suspense>
   );

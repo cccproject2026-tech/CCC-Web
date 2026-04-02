@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "../../Assets/appointment-bg.png";
 import DuoIcon from "../../Assets/duo.png";
@@ -10,7 +9,21 @@ import UserProfile from "../../Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { Appointment } from "@/app/Services/types";
-import { apiCreateAppointment, apiCreateAvailability, apiGetMentorAppointments, apiGetWeeklyAvailability } from "@/app/Services/appointments.service";
+import {
+  apiCancelAppointment,
+  apiCreateAppointment,
+  apiCreateAvailability,
+  apiGetMentorAppointments,
+  apiGetWeeklyAvailability,
+} from "@/app/Services/appointments.service";
+import {
+  appointmentEntityId,
+  extractApiErrorMessage,
+  parseSlotStartToIso,
+  slotToHHmm,
+  uiMeetingModeToPlatform,
+  unwrapAppointmentsAxiosData,
+} from "@/app/Services/appointment-utils";
 import { convertToMinutes, getMentorFromCookie, isOverlapping, timeOptions } from "@/app/Services/utils/helpers";
 import { apiGetAssignedUsers } from "@/app/Services/api";
 
@@ -81,9 +94,10 @@ export default function MentorSchedule() {
     const fetchAppointments = async () => {
       try {
         const res = await apiGetMentorAppointments(mentorId);
-        setAppointments(res.data.data);
+        setAppointments(unwrapAppointmentsAxiosData(res));
       } catch (err) {
         console.error("Failed to fetch appointments", err);
+        setAppointments([]);
       } finally {
         setLoading(false);
       }
@@ -118,27 +132,52 @@ export default function MentorSchedule() {
         const date = sunday.toISOString().split("T")[0];
 
         const res = await apiGetWeeklyAvailability(mentorId, date);
-        const data = res.data.data || [];
+        const raw = res.data?.data ?? res.data;
+        const data = Array.isArray(raw) ? raw : [];
 
         setWeeklyAvailability(data);
 
-        const formatted = data.map((d: any) => ({
-          date: d.date,
-          day: d.day,
-          enabled: d.slots.length > 0,
-          slots: d.slots.length
-            ? d.slots
-            : [
-              {
-                startTime: "09:00",
-                startPeriod: "AM",
-                endTime: "05:00",
-                endPeriod: "PM",
-              },
-            ],
-        }));
+        if (data.length === 0) {
+          setAvailability(
+            [0, 1, 2, 3, 4, 5, 6].map((day) => ({
+              date: "",
+              day,
+              enabled: false,
+              slots: [
+                {
+                  startTime: "09:00",
+                  startPeriod: "AM",
+                  endTime: "05:00",
+                  endPeriod: "PM",
+                },
+              ],
+            })),
+          );
+        } else {
+          const formatted = data.map((d: any) => ({
+            date: d.date,
+            day: typeof d.day === "number" ? d.day : Number(d.day) || 0,
+            enabled: Array.isArray(d.slots) && d.slots.length > 0,
+            slots:
+              Array.isArray(d.slots) && d.slots.length > 0
+                ? d.slots.map((s: any) => ({
+                    startTime: s.startTime || s.start?.split(":")?.slice(0, 2).join(":") || "09:00",
+                    startPeriod: s.startPeriod || "AM",
+                    endTime: s.endTime || s.end?.split(":")?.slice(0, 2).join(":") || "05:00",
+                    endPeriod: s.endPeriod || "PM",
+                  }))
+                : [
+                    {
+                      startTime: "09:00",
+                      startPeriod: "AM",
+                      endTime: "05:00",
+                      endPeriod: "PM",
+                    },
+                  ],
+          }));
 
-        setAvailability(formatted);
+          setAvailability(formatted);
+        }
       } catch (err) {
         console.error("Weekly availability error", err);
       }
@@ -158,32 +197,137 @@ export default function MentorSchedule() {
     );
   });
 
-  const handleReschedule = () => {
-    setShowMenu(null);
-    setToastMessage("The Appointment has been Rescheduled");
-    setTimeout(() => setToastMessage(null), 3000);
+  const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
+
+  /** YYYY-MM-DD for each row: use API date when present, else derive from weekStart + day index. */
+  const resolveAvailabilityRowDate = (d: any): string => {
+    const raw = typeof d.date === "string" ? d.date.trim() : "";
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+    const anchor = new Date(weekStart);
+    anchor.setHours(12, 0, 0, 0);
+    const sunday = new Date(anchor);
+    sunday.setDate(anchor.getDate() - anchor.getDay());
+    const di = Number(d.day ?? 0) % 7;
+    const dt = new Date(sunday);
+    dt.setDate(sunday.getDate() + di);
+    const y = dt.getFullYear();
+    const m = String(dt.getMonth() + 1).padStart(2, "0");
+    const day = String(dt.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
   };
 
-  const buildAvailabilityPayload = () => {
-    return {
-      mentorId: mentorId,
-      weeklySlots: availability
-        .filter((d) => d.enabled)
-        .map((d) => ({
-          date: d.date,
-          slots: d.slots
-        })),
+  const period = (p: unknown, fallback: "AM" | "PM"): "AM" | "PM" => {
+    const s = String(p ?? "").trim().toUpperCase();
+    if (s === "PM" || s.startsWith("P")) return "PM";
+    if (s === "AM" || s.startsWith("A")) return "AM";
+    return fallback;
+  };
+
+  /**
+   * Backend shapes differ; try several payloads (date-based like GET /week, then HH:mm, then weekday template).
+   */
+  const buildAvailabilityPayloadVariants = (): Record<string, unknown>[] => {
+    const enabled = availability.filter(
+      (d) => d.enabled && Array.isArray(d.slots) && d.slots.length > 0,
+    );
+    if (!mentorId || enabled.length === 0) return [];
+
+    const baseMeta = {
       meetingDuration: 60,
-      minSchedulingNoticeHours: 2,
-      maxBookingsPerDay: 5
+      bufferTime: 15,
+      advanceNotice: 2,
+      maxBookingsPerDay: 5,
     };
+
+    const dated = enabled.map((d) => ({
+      date: resolveAvailabilityRowDate(d),
+      uiSlots: d.slots || [],
+    }));
+
+    const variants: Record<string, unknown>[] = [];
+
+    // Minimal body (some APIs reject extra fields)
+    variants.push({
+      mentorId,
+      meetingDuration: 60,
+      weeklySlots: dated.map(({ date, uiSlots }) => ({
+        date,
+        slots: uiSlots.map((s: any) => ({
+          startTime: String(s.startTime || "09:00").replace(/\s*(AM|PM)\s*/gi, "").trim() || "09:00",
+          startPeriod: period(s.startPeriod, "AM"),
+          endTime: String(s.endTime || "05:00").replace(/\s*(AM|PM)\s*/gi, "").trim() || "05:00",
+          endPeriod: period(s.endPeriod, "PM"),
+        })),
+      })),
+    });
+
+    variants.push({
+      mentorId,
+      ...baseMeta,
+      weeklySlots: dated.map(({ date, uiSlots }) => ({
+        date,
+        slots: uiSlots.map((s: any) => ({
+          startTime: String(s.startTime || "09:00").replace(/\s*(AM|PM)\s*/gi, "").trim() || "09:00",
+          startPeriod: period(s.startPeriod, "AM"),
+          endTime: String(s.endTime || "05:00").replace(/\s*(AM|PM)\s*/gi, "").trim() || "05:00",
+          endPeriod: period(s.endPeriod, "PM"),
+        })),
+      })),
+    });
+
+    variants.push({
+      mentorId,
+      ...baseMeta,
+      weeklySlots: dated.map(({ date, uiSlots }) => ({
+        date,
+        slots: uiSlots.map((s: any) => ({
+          start: slotToHHmm(s.startTime, s.startPeriod),
+          end: slotToHHmm(s.endTime, s.endPeriod),
+        })),
+      })),
+    });
+
+    variants.push({
+      mentorId,
+      ...baseMeta,
+      weeklySlots: enabled.map((d) => ({
+        day: DAY_NAMES[Number(d.day ?? 0) % 7],
+        isAvailable: true,
+        slots: (d.slots || []).map((s: any) => ({
+          start: slotToHHmm(s.startTime, s.startPeriod),
+          end: slotToHHmm(s.endTime, s.endPeriod),
+        })),
+      })),
+    });
+
+    variants.push({
+      mentorId,
+      meetingDuration: 60,
+      availability: dated.map(({ date, uiSlots }) => ({
+        date,
+        slots: uiSlots.map((s: any) => ({
+          startTime: String(s.startTime || "09:00").replace(/\s*(AM|PM)\s*/gi, "").trim() || "09:00",
+          startPeriod: period(s.startPeriod, "AM"),
+          endTime: String(s.endTime || "05:00").replace(/\s*(AM|PM)\s*/gi, "").trim() || "05:00",
+          endPeriod: period(s.endPeriod, "PM"),
+        })),
+      })),
+    });
+
+    const seen = new Set<string>();
+    return variants.filter((v) => {
+      const k = JSON.stringify(v);
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
   };
 
   const handleSaveAvailability = async () => {
     if (!mentorId) return;
 
     const hasValidSlots = availability.some(
-      (day) => day.enabled && day.slots && day.slots.length > 0
+      (day) => day.enabled && day.slots && day.slots.length > 0,
     );
 
     if (!hasValidSlots) {
@@ -192,31 +336,67 @@ export default function MentorSchedule() {
       return;
     }
 
+    const variants = buildAvailabilityPayloadVariants();
+    let lastError: unknown = null;
+
     try {
-      const payload = buildAvailabilityPayload();
+      for (const body of variants) {
+        try {
+          await apiCreateAvailability(body as any);
+          setToastMessage("Availability updated successfully");
+          lastError = null;
+          break;
+        } catch (e) {
+          lastError = e;
+          console.warn("Availability save attempt failed, trying next shape…", e);
+        }
+      }
 
-      await apiCreateAvailability(payload);
+      if (lastError) {
+        throw lastError;
+      }
 
-      setToastMessage("Availability updated successfully");
+      const sunday = new Date(weekStart);
+      sunday.setDate(sunday.getDate() - sunday.getDay());
+      const date = sunday.toISOString().split("T")[0];
+      const res = await apiGetWeeklyAvailability(mentorId, date);
+      const raw = res.data?.data ?? res.data;
+      const data = Array.isArray(raw) ? raw : [];
+      setWeeklyAvailability(data);
+      if (data.length > 0) {
+        const formatted = data.map((d: any) => ({
+          date: d.date,
+          day: typeof d.day === "number" ? d.day : Number(d.day) || 0,
+          enabled: Array.isArray(d.slots) && d.slots.length > 0,
+          slots:
+            Array.isArray(d.slots) && d.slots.length > 0
+              ? d.slots.map((s: any) => ({
+                  startTime: s.startTime || "09:00",
+                  startPeriod: s.startPeriod || "AM",
+                  endTime: s.endTime || "05:00",
+                  endPeriod: s.endPeriod || "PM",
+                }))
+              : [
+                  {
+                    startTime: "09:00",
+                    startPeriod: "AM",
+                    endTime: "05:00",
+                    endPeriod: "PM",
+                  },
+                ],
+        }));
+        setAvailability(formatted);
+      }
     } catch (error) {
       console.error(error);
-      setToastMessage("Failed to update availability");
+      setToastMessage(extractApiErrorMessage(error));
     }
 
-    setTimeout(() => setToastMessage(null), 3000);
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
   const toIsoFromDateAndSlot = (dateStr: string, slot: string) => {
-    // Example slot: "09:00 am - 10:00 am"
-    const [start] = slot.split(" - ");
-    const [time, period] = start.split(" ");
-    const [h, m] = time.split(":").map(Number);
-    let hours = h;
-    if (period.toLowerCase() === "pm" && hours !== 12) hours += 12;
-    if (period.toLowerCase() === "am" && hours === 12) hours = 0;
-    const date = new Date(dateStr);
-    date.setHours(hours, m, 0, 0);
-    return date.toISOString();
+    return parseSlotStartToIso(dateStr, slot.replace(/\u2013/g, "-"));
   };
 
   const handleCreateAppointment = async () => {
@@ -237,12 +417,12 @@ export default function MentorSchedule() {
         userId: selectedPastor._id || selectedPastor.id,
         mentorId,
         meetingDate: toIsoFromDateAndSlot(meetingDate, selectedSlot),
-        platform: selectedPlatform,
+        platform: uiMeetingModeToPlatform(selectedPlatform),
         notes: "Scheduled by mentor",
       });
 
       const refresh = await apiGetMentorAppointments(mentorId);
-      setAppointments(refresh.data?.data || []);
+      setAppointments(unwrapAppointmentsAxiosData(refresh));
       setIsDrawerOpen(false);
       setDrawerStep(1);
       setSelectedPastor(null);
@@ -254,6 +434,22 @@ export default function MentorSchedule() {
       setToastMessage("Failed to create appointment");
     }
 
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleCancelMentorAppointment = async (appt: Appointment) => {
+    const id = appointmentEntityId(appt);
+    if (!id || !mentorId) return;
+    try {
+      await apiCancelAppointment(id);
+      const refresh = await apiGetMentorAppointments(mentorId);
+      setAppointments(unwrapAppointmentsAxiosData(refresh));
+      setShowMenu(null);
+      setToastMessage("Appointment cancelled");
+    } catch (e) {
+      console.error(e);
+      setToastMessage("Failed to cancel appointment");
+    }
     setTimeout(() => setToastMessage(null), 3000);
   };
 
@@ -391,10 +587,11 @@ export default function MentorSchedule() {
               <div className="flex flex-col gap-6">
                 {todayAppointments.map((appt, index) => {
                   const meetingDate = new Date(appt.meetingDate);
+                  const apptKey = appointmentEntityId(appt) || String(index);
 
                   return (
                     <div
-                      key={appt.id}
+                      key={apptKey}
                       className="bg-white rounded-xl p-5 shadow-sm border border-[#E5E7EB] flex items-center gap-5 relative"
                     >
                       <div className="bg-[#F3F6FB] w-[100px] h-[100px] rounded-xl flex items-center justify-center">
@@ -456,6 +653,7 @@ export default function MentorSchedule() {
 
                           <div className="relative">
                             <button
+                              type="button"
                               onClick={() =>
                                 setShowMenu(showMenu === index ? null : index)
                               }
@@ -465,21 +663,38 @@ export default function MentorSchedule() {
                             </button>
 
                             {showMenu === index && (
-                              <div className="absolute right-0 top-8 bg-white text-[#0B1C58] text-sm rounded-md shadow-md border z-10 w-[200px]">
+                              <div className="absolute right-0 top-8 z-10 w-[200px] rounded-md border bg-white text-sm text-[#0B1C58] shadow-md">
                                 <button
-                                  onClick={handleReschedule}
-                                  className="w-full text-left px-4 py-2 hover:bg-[#F5F8FF]"
+                                  type="button"
+                                  className="w-full px-4 py-2 text-left hover:bg-[#F5F8FF]"
+                                  onClick={() => {
+                                    setShowMenu(null);
+                                    setToastMessage("Use pastor’s calendar or reschedule from their account when supported.");
+                                    setTimeout(() => setToastMessage(null), 4000);
+                                  }}
                                 >
                                   <i className="fa-regular fa-calendar-check mr-2 text-[#103C8C]"></i>
                                   Reschedule Meeting
                                 </button>
 
-                                <button className="w-full text-left px-4 py-2 hover:bg-[#F5F8FF]">
+                                <button
+                                  type="button"
+                                  className="w-full px-4 py-2 text-left hover:bg-[#F5F8FF]"
+                                  onClick={() => handleCancelMentorAppointment(appt)}
+                                >
                                   <i className="fa-regular fa-circle-xmark mr-2 text-[#B91C1C]"></i>
                                   Cancel Meeting
                                 </button>
 
-                                <button className="w-full text-left px-4 py-2 hover:bg-[#F5F8FF]">
+                                <button
+                                  type="button"
+                                  className="w-full px-4 py-2 text-left hover:bg-[#F5F8FF]"
+                                  onClick={() => {
+                                    setShowMenu(null);
+                                    setToastMessage("Open appointment details on web admin or ask pastor to change platform.");
+                                    setTimeout(() => setToastMessage(null), 4000);
+                                  }}
+                                >
                                   <i className="fa-regular fa-clock mr-2 text-[#0B1C58]"></i>
                                   Change Meeting Mode
                                 </button>
@@ -891,12 +1106,12 @@ export default function MentorSchedule() {
                 <select
                   value={selectedPlatform}
                   onChange={(e) => setSelectedPlatform(e.target.value)}
-                  className="w-full border border-[#D1D5DB] text-sm rounded-md px-3 py-2 text-[#0B1C58] mb-8"
+                  className="mb-8 w-full rounded-md border border-[#D1D5DB] px-3 py-2 text-sm text-[#0B1C58]"
                 >
-                  <option>Preferred meeting option</option>
-                  <option>Zoom</option>
-                  <option>Google Meet</option>
-                  <option>Duo</option>
+                  <option value="zoom">Zoom</option>
+                  <option value="google meet">Google Meet</option>
+                  <option value="teams">Microsoft Teams</option>
+                  <option value="phone">Phone</option>
                 </select>
 
                 {/* Buttons */}

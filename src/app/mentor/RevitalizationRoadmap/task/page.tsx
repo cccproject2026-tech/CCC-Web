@@ -40,7 +40,8 @@ function TaskPageContent() {
         const fetchData = async () => {
 
             const res = await apiGetRoadmapById(roadmapId);
-            const phase = res.data.data;
+            const raw = res.data as { data?: unknown };
+            const phase = raw?.data ?? res.data;
 
             const foundTask = phase?.roadmaps?.find(
                 (t: any) => String(t._id) === String(taskId)
@@ -160,7 +161,7 @@ function TaskPageContent() {
                 backgroundImageUrl={JumpStartBg.src}
                 title={task.name}
                 breadcrumbItems={[
-                    { label: "Revitalization Roadmap", href: "/mentor/revitalization-roadmap" },
+                    { label: "Revitalization Roadmap", href: "/mentor/RevitalizationRoadmap" },
                     { label: task.name }
                 ]}
                 heightClasses="h-[260px]"

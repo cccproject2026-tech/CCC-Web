@@ -4,6 +4,22 @@ const nextConfig: NextConfig = {
   /* options here */
   output: "standalone",
 
+  /** App Router paths are case-sensitive in production; normalize legacy lowercase links from breadcrumbs/old bookmarks */
+  async redirects() {
+    return [
+      {
+        source: "/mentor/revitalization-roadmap",
+        destination: "/mentor/RevitalizationRoadmap",
+        permanent: false,
+      },
+      {
+        source: "/mentor/revitalization-roadmap/:path*",
+        destination: "/mentor/RevitalizationRoadmap/:path*",
+        permanent: false,
+      },
+    ];
+  },
+
   /** Proxy API in dev/prod so the browser calls same-origin URLs — avoids CORS blocking localhost → wisdomtooth.tech */
   async rewrites() {
     return [

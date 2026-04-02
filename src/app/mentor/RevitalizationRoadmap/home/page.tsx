@@ -1,25 +1,23 @@
 "use client";
-import { useState, useRef, useEffect, Suspense } from "react";
+import { useState, useRef, useEffect, Suspense, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/Header/AppHeader";
-import AppFooter from "@/app/Components/AppFooter";
-import AppHero from "@/app/Components/Hero/AppHero";
+import Link from "next/link";
+import "@fortawesome/fontawesome-free/css/all.min.css";
+
+import PastorFooter from "@/app/Components/PastorFooter";
 import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
-import Card1 from "@/app/Assets/card1.png";
-import Card2 from "@/app/Assets/card2.png";
-import Card3 from "@/app/Assets/card3.png";
-import Card4 from "@/app/Assets/card4.png";
 import { useSearchParams } from "next/navigation";
 import { apiGetUserRoadmaps } from "@/app/Services/roadmaps.service";
 import { apiGetUserById } from "@/app/Services/users.service";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
+import { unwrapProgressData, resolveMentorUserRoadmapsList } from "@/app/Services/roadmap-assignments";
 import MentorHeader from "@/app/Components/MentorHeader";
 
 function RevitalizationRoadmapHomeContent() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [showExpectedOutcomePopup, setShowExpectedOutcomePopup] =
-    useState(false);
+  const [showExpectedOutcomePopup, setShowExpectedOutcomePopup] = useState(false);
   const [selectedOutcome, setSelectedOutcome] = useState("4");
   const popupRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -28,22 +26,48 @@ function RevitalizationRoadmapHomeContent() {
   const [user, setUser] = useState<any>(null);
   const [roadmaps, setRoadmaps] = useState<any[]>([]);
   const [loadingRoadmaps, setLoadingRoadmaps] = useState(true);
+  const [roadmapsError, setRoadmapsError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setLoadingRoadmaps(false);
+      setRoadmaps([]);
+      setRoadmapsError(null);
+      return;
+    }
 
     const fetchUserRoadmaps = async () => {
       try {
         setLoadingRoadmaps(true);
+        setRoadmapsError(null);
 
-        const res = await apiGetUserRoadmaps(userId);
+        const [res, progressRes] = await Promise.all([
+          apiGetUserRoadmaps(userId),
+          apiGetUserProgress(userId).catch(() => null),
+        ]);
 
-        const data = res.data?.data || res.data || [];
-        console.log(data)
-        setRoadmaps(data);
-
-      } catch (err) {
+        const progress = progressRes ? unwrapProgressData(progressRes) : null;
+        const data = await resolveMentorUserRoadmapsList(res, progress);
+        setRoadmaps(data as any[]);
+      } catch (err: unknown) {
         console.error("Failed to fetch user roadmaps", err);
+        setRoadmaps([]);
+        let msg: string | undefined;
+        if (err && typeof err === "object") {
+          const e = err as { message?: string; response?: { status?: number; data?: unknown } };
+          const d = e.response?.data;
+          if (d && typeof d === "object" && "message" in d) {
+            msg = String((d as { message?: string }).message);
+          }
+          if (!msg && typeof e.message === "string" && !e.message.startsWith("Request failed with status")) {
+            msg = e.message;
+          }
+          const st = e.response?.status;
+          if (!msg && st === 401) msg = "Not signed in or session expired.";
+          if (!msg && st === 403) msg = "You don’t have access to this user’s roadmaps.";
+          if (!msg && st === 404) msg = "Roadmaps endpoint or user was not found.";
+        }
+        setRoadmapsError(msg || "Could not load roadmaps for this user.");
       } finally {
         setLoadingRoadmaps(false);
       }
@@ -70,34 +94,60 @@ function RevitalizationRoadmapHomeContent() {
   const userName = user ? `${user.firstName} ${user.lastName}` : "Loading...";
 
   const formatStatus = (status: string) => {
-    switch (status) {
-      case "not_started":
-        return "Not Started";
-      case "in_progress":
-        return "In-progress";
-      case "completed":
-        return "Completed";
-      default:
-        return "Not Started";
-    }
+    const s = String(status || "")
+      .toLowerCase()
+      .replace(/\s+/g, "_")
+      .replace(/-/g, "_");
+    if (s.includes("complete")) return "Completed";
+    if (s.includes("progress") || s === "due" || s === "assigned") return "In-progress";
+    if (s.includes("over") && s.includes("due")) return "Over Due";
+    if (s.includes("not_started") || s === "notstarted" || s === "") return "Not Started";
+    return "Not Started";
   };
 
+  const roadmapCardStatus = (roadmap: any) => {
+    const p = roadmap?.progress;
+    const raw = p?.status ?? roadmap?.status ?? "";
+    return formatStatus(raw);
+  };
+
+  const roadmapTaskCounts = (roadmap: any) => {
+    const p = roadmap?.progress;
+    const completed = Number(p?.completedSteps ?? 0);
+    const total = Number(p?.totalSteps ?? roadmap?.totalSteps ?? 0);
+    return { completed, total: Math.max(total, completed, 1) };
+  };
+
+  function isHttpUrl(u?: string): boolean {
+    return !!u && (u.startsWith("http://") || u.startsWith("https://"));
+  }
+
+  const filteredRoadmaps = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return roadmaps;
+    return roadmaps.filter((r) => {
+      const blob = `${r.name || ""} ${r.roadMapDetails || r.description || ""}`.toLowerCase();
+      return blob.includes(q);
+    });
+  }, [roadmaps, searchQuery]);
+
   const handleViewClick = (roadmap: any) => {
+    const uid = userId as string;
+    const rid = roadmap._id ?? roadmap.id;
+    if (!rid) return;
 
-    if (roadmap.type === "single") {
+    const type = String(roadmap.type ?? "").toLowerCase();
+    const isPhase =
+      type === "phase" ||
+      roadmap.haveNextedRoadMaps === true ||
+      (Array.isArray(roadmap.roadmaps) && roadmap.roadmaps.length > 0);
 
-      router.push(
-        `/mentor/RevitalizationRoadmap/home/jump-start?userId=${userId}&roadmapId=${roadmap._id}`
-      );
-
-    } else if (roadmap.type === "phase") {
-
-      router.push(
-        `/mentor/RevitalizationRoadmap/phase?userId=${userId}&roadmapId=${roadmap._id}`
-      );
-
+    if (isPhase) {
+      router.push(`/mentor/RevitalizationRoadmap/phase?userId=${uid}&roadmapId=${rid}`);
+      return;
     }
 
+    router.push(`/mentor/RevitalizationRoadmap/home/jump-start?userId=${uid}&roadmapId=${rid}`);
   };
 
   useEffect(() => {
@@ -125,96 +175,101 @@ function RevitalizationRoadmapHomeContent() {
     { id: "4", label: "Expected Outcome - 4 Months", period: "4-months" },
     { id: "6", label: "Expected Outcome - 6 Months", period: "6-months" },
     { id: "9", label: "Expected Outcome - 9 Months", period: "9-months" },
-    {
-      id: "end",
-      label: "Expected Outcome - End of Year",
-      period: "end-of-year",
-    },
+    { id: "end", label: "Expected Outcome - End of Year", period: "end-of-year" },
   ];
 
   const handleOutcomeClick = (outcomeId: string) => {
     setSelectedOutcome(outcomeId);
     const outcome = expectedOutcomes.find((o) => o.id === outcomeId);
     if (outcome) {
-      // Navigate to expected outcome page
-      router.push(
-        `/mentor/RevitalizationRoadmap/home/expected-outcome/${outcome.period}`
-      );
+      router.push(`/mentor/RevitalizationRoadmap/home/expected-outcome/${outcome.period}`);
       setShowExpectedOutcomePopup(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      {/* Hero Section with Breadcrumbs */}
+    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
       <MentorHeader showFullHeader={true} />
-      <AppHero
-        title="Revitalization Roadmap"
-        backgroundImageUrl={HeroBg.src}
-        breadcrumbItems={[
-          {
-            label: "Revitalization Roadmap",
-            href: "/mentor/RevitalizationRoadmap",
-          },
-          { label: userName },
-        ]}
-        heightClasses="h-[240px]"
-      >
-        <p className="text-[18px] md:text-[22px] lg:text-[26px] text-white/90 font-normal mb-2">
-          {userName}
-        </p>
-      </AppHero>
 
-      {/* Main Content */}
-      <main className="flex-1 px-6 md:px-12 lg:px-20 py-10">
-        <div className="max-w-7xl mx-auto">
-          {/* Search Bar Section */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="relative flex-1 max-w-md">
-              <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+      <section
+        className="relative flex min-h-[200px] flex-col justify-end bg-cover bg-bottom px-6 pb-8 pt-8 text-white sm:min-h-[240px] sm:px-10 sm:pb-10 md:px-20 md:pb-12"
+        style={{ backgroundImage: `url(${HeroBg.src})` }}
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]" />
+        <div className="relative z-10 mx-auto w-full max-w-7xl">
+          <nav className="mb-6 text-sm text-[#d9ebf8]">
+            <Link href="/mentor/RevitalizationRoadmap" className="hover:text-white">
+              Revitalization Roadmap
+            </Link>
+            <span className="mx-2 opacity-70">&gt;</span>
+            <span className="font-semibold text-white">{userName}</span>
+          </nav>
+          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
+            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
+            Leadership Support Network
+          </p>
+          <h1 className="mt-4 text-2xl font-semibold sm:text-3xl md:text-4xl">Pastor roadmaps</h1>
+          <p className="mt-2 max-w-2xl text-sm text-[#cde2f2] md:text-base">
+            Review assigned roadmaps and open jump-start or phase flows for this pastor.
+          </p>
+        </div>
+      </section>
+
+      <main className="relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-8 sm:px-8 md:px-16 md:py-10">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="relative flex w-full max-w-md items-center rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 shadow-sm backdrop-blur">
+              <i className="fa-solid fa-magnifying-glass mr-3 shrink-0 text-[#8ec5eb]" />
               <input
-                type="text"
-                placeholder="Search"
+                type="search"
+                placeholder="Search roadmaps…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-white border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#2E3B8E] text-gray-900 placeholder-gray-400"
+                className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-[#cde2f2] outline-none"
+                aria-label="Search roadmaps"
               />
+              {searchQuery.trim() ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="shrink-0 text-white/60 hover:text-white"
+                  aria-label="Clear search"
+                >
+                  <i className="fa-solid fa-xmark text-sm" />
+                </button>
+              ) : null}
             </div>
 
-            {/* Three dots menu - positioned to the right */}
-            <div className="ml-4 relative">
+            <div className="relative shrink-0">
               <button
                 ref={buttonRef}
-                onClick={() =>
-                  setShowExpectedOutcomePopup(!showExpectedOutcomePopup)
-                }
-                className="bg-white  border-2 border-white rounded-lg px-4 py-3 transition-all flex items-center justify-center"
+                type="button"
+                onClick={() => setShowExpectedOutcomePopup(!showExpectedOutcomePopup)}
+                className="flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-[#cde2f2] transition hover:bg-white/15"
+                aria-expanded={showExpectedOutcomePopup}
+                aria-haspopup="true"
               >
-                <i className="fa-solid fa-ellipsis-vertical text-[#1F2A6E] text-lg"></i>
+                <i className="fa-solid fa-ellipsis-vertical text-lg" />
               </button>
 
-              {/* Expected Outcome Popup */}
               {showExpectedOutcomePopup && (
                 <div
                   ref={popupRef}
-                  className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-4 min-w-[280px] z-50"
+                  className="absolute right-0 top-full z-50 mt-2 min-w-[280px] rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.98)_0%,rgba(9,49,80,0.99)_100%)] p-2 shadow-xl backdrop-blur-md"
                 >
                   <div className="space-y-1">
-                    {expectedOutcomes.map((outcome, index) => (
+                    {expectedOutcomes.map((outcome) => (
                       <button
                         key={outcome.id}
+                        type="button"
                         onClick={() => handleOutcomeClick(outcome.id)}
-                        className={`w-full text-nowrap text-left px-4 py-3 rounded-lg text-[14px] font-medium transition-all flex items-center gap-3 ${selectedOutcome === outcome.id
-                          ? "bg-[#E6F3FF] text-[#0066CC]"
-                          : "text-[#214080] hover:bg-gray-50"
-                          }`}
+                        className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium transition ${
+                          selectedOutcome === outcome.id
+                            ? "bg-[#8ec5eb]/20 text-white"
+                            : "text-[#cde2f2] hover:bg-white/10"
+                        }`}
                       >
-                        <i
-                          className={`fa-solid fa-download ${selectedOutcome === outcome.id
-                            ? "text-[#0066CC]"
-                            : "text-[#214080]"
-                            }`}
-                        ></i>
+                        <i className="fa-solid fa-download text-[#8ec5eb]" />
                         <span>{outcome.label}</span>
                       </button>
                     ))}
@@ -224,39 +279,78 @@ function RevitalizationRoadmapHomeContent() {
             </div>
           </div>
 
-          {/* Roadmap Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {loadingRoadmaps && <p className="text-white">Loading roadmaps...</p>}
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
+            {loadingRoadmaps && (
+              <div className="col-span-full flex justify-center py-16">
+                <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+              </div>
+            )}
 
-            {!loadingRoadmaps && roadmaps.map((roadmap) => (
-              <RoadmapHomeCard
-                key={roadmap._id}
-                img={roadmap.imageUrl}
-                title={roadmap.name}
-                description={roadmap.roadMapDetails}
-                status={formatStatus(roadmap.progress?.status)}
-                completionTime={`Months ${roadmap.duration}`}
-                showDateSelector={false}
-                taskCompleted={{
-                  completed: roadmap.progress?.completedSteps || 0,
-                  total: roadmap.progress?.totalSteps || 0,
-                }}
-                onViewClick={() => handleViewClick(roadmap)}
-                onCardClick={() => handleViewClick(roadmap)}
-              />
-            ))}
+            {!userId && !loadingRoadmaps && (
+              <p className="col-span-full text-center text-sm text-[#cde2f2]">
+                Missing <code className="rounded bg-white/10 px-1">userId</code> in the URL. Open a pastor from the Revitalization Roadmap hub first.
+              </p>
+            )}
+
+            {roadmapsError && (
+              <p className="col-span-full rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-center text-sm text-red-100">
+                {roadmapsError}
+              </p>
+            )}
+
+            {!loadingRoadmaps && userId && !roadmapsError && roadmaps.length === 0 && (
+              <p className="col-span-full text-center text-sm text-[#cde2f2]">
+                No roadmaps are assigned to this user yet.
+              </p>
+            )}
+
+            {!loadingRoadmaps &&
+              filteredRoadmaps.map((roadmap) => {
+                const rid = String(roadmap._id ?? roadmap.id ?? "");
+                const { completed, total } = roadmapTaskCounts(roadmap);
+                const cardStatus = roadmapCardStatus(roadmap);
+                const img = isHttpUrl(roadmap.imageUrl) ? roadmap.imageUrl : HeroBg.src;
+                return (
+                  <RoadmapHomeCard
+                    key={rid || roadmap.name}
+                    variant="mentor"
+                    img={img}
+                    title={roadmap.name || "Roadmap"}
+                    description={roadmap.roadMapDetails || roadmap.description || ""}
+                    status={cardStatus}
+                    completionTime={roadmap.duration ? `Months ${roadmap.duration}` : "—"}
+                    showDateSelector={false}
+                    taskCompleted={{
+                      completed,
+                      total,
+                    }}
+                    onViewClick={() => handleViewClick(roadmap)}
+                    onCardClick={() => handleViewClick(roadmap)}
+                  />
+                );
+              })}
+
+            {!loadingRoadmaps && roadmaps.length > 0 && filteredRoadmaps.length === 0 && (
+              <p className="col-span-full text-center text-sm text-[#cde2f2]">No roadmaps match your search.</p>
+            )}
           </div>
         </div>
       </main>
 
-      <AppFooter />
+      <PastorFooter />
     </div>
   );
 }
 
 export default function RevitalizationRoadmapHome() {
   return (
-    <Suspense fallback={<div className="text-white p-10">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#062946] text-[#cde2f2]">
+          Loading…
+        </div>
+      }
+    >
       <RevitalizationRoadmapHomeContent />
     </Suspense>
   );

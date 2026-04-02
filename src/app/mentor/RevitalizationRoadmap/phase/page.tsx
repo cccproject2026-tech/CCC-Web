@@ -28,10 +28,8 @@ function PhasePageContent() {
             try {
 
                 const res = await apiGetRoadmapById(roadmapId);
-
-                const roadmap = res.data?.data;
-
-                console.log("phase:", roadmap);
+                const raw = res.data as { data?: unknown };
+                const roadmap = raw?.data ?? res.data;
 
                 setPhase(roadmap);
                 setTasks(roadmap?.roadmaps || []);

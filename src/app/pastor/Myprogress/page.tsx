@@ -1,439 +1,410 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import "@fortawesome/fontawesome-free/css/all.min.css";
+
 import PastorHeader from "@/app/Components/PastorHeader";
+import PastorFooter from "@/app/Components/PastorFooter";
+import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
+import {
+  IndividualBreakdownBarChart,
+  OverallProgressDonut,
+  ProgressFilterSegmented,
+  type RoadmapFilterTab,
+  assessmentMatchesFilter,
+  formatRoadmapStatusLabel,
+  progressStatusChipClass,
+  roadmapMatchesFilter,
+} from "@/app/Components/ProgressDashboardShared";
 import { getCookie } from "@/app/utils/cookies";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
+import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
+import { apiGetAssessmentById, parseAssessmentDetailPayload } from "@/app/Services/assessment.service";
+import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 
-// Images
-import progressBg from "../../Assets/progress-bg.png";
-import card1 from "../../Assets/card1.png";
-import card2 from "../../Assets/card2.png";
-import card3 from "../../Assets/card3.png";
-
-export default function PastorProgressPage() {
+export default function PastorMyProgressPage() {
   const router = useRouter();
-  const [filter, setFilter] = useState("Remaining");
-  const [overallProgress, setOverallProgress] = useState(0);
-  const [roadmapProgress, setRoadmapProgress] = useState(0);
-  const [assessmentProgress, setAssessmentProgress] = useState(0);
-  const [completedItems, setCompletedItems] = useState(0);
-  const [totalItems, setTotalItems] = useState(0);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState("Pastor");
+  const [email, setEmail] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState<any>(null);
+  const [roadmaps, setRoadmaps] = useState<any[]>([]);
+  const [assessments, setAssessments] = useState<any[]>([]);
+  const [roadmapFilter, setRoadmapFilter] = useState<RoadmapFilterTab>("All");
+  const [surveyFilter, setSurveyFilter] = useState<RoadmapFilterTab>("All");
 
   useEffect(() => {
-    const fetchProgress = async () => {
+    try {
+      const raw = getCookie("user");
+      if (!raw) {
+        setUserId(null);
+        setLoading(false);
+        return;
+      }
+      const user = JSON.parse(raw);
+      const id = user?.id || user?._id;
+      if (!id) {
+        setUserId(null);
+        setLoading(false);
+        return;
+      }
+      setUserId(String(id));
+      const name = `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim();
+      if (name) setDisplayName(name);
+      if (user?.email) setEmail(String(user.email));
+    } catch {
+      setUserId(null);
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const run = async () => {
       try {
-        const userCookie = getCookie("user");
-        if (!userCookie) return;
-        const user = JSON.parse(userCookie);
-        const userId = user?.id || user?._id;
-        if (!userId) return;
-
         const res = await apiGetUserProgress(userId);
-        const data = res.data?.data;
-        if (!data) return;
-
-        setOverallProgress(Number(data.overallProgress || 0));
-        setRoadmapProgress(Number(data.overallRoadmapProgress || 0));
-        setAssessmentProgress(Number(data.overallAssessmentProgress || 0));
-        setCompletedItems(Number(data.completedItems || 0));
-        setTotalItems(Number(data.totalItems || 0));
-      } catch (error) {
-        console.error("Error fetching progress data:", error);
+        setProgress(unwrapProgressData(res));
+      } catch (e) {
+        console.error("Failed to fetch progress", e);
+        setProgress(null);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchProgress();
-  }, []);
+    run();
+  }, [userId]);
 
-  const donut = useMemo(() => {
-    const value = Math.max(0, Math.min(100, overallProgress));
-    const size = 210;
-    const stroke = 16;
-    const radius = (size - stroke) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const offset = circumference - (value / 100) * circumference;
-    return { size, stroke, radius, circumference, offset, value };
-  }, [overallProgress]);
+  useEffect(() => {
+    if (!progress?.roadmaps?.length) return;
 
-  const roadmapCards = [
-    {
-      img: card1,
-      title: "Self Revitalization Phase",
-      completion: "10/12 tasks completed",
-      time: "Completion Time",
-    },
-    {
-      img: card2,
-      title: "Church Empowerment Phase",
-      completion: "14/18 tasks completed",
-      time: "Completion Time",
-    },
-    {
-      img: card3,
-      title: "Community Revitalization and Multiplication Phase",
-      completion: "5/12 tasks completed",
-      time: "Completion Time",
-    },
-  ];
+    const hydrateRoadmaps = async () => {
+      try {
+        const results = await Promise.allSettled(
+          progress.roadmaps.map(async (r: any) => {
+            const rid = r.roadMapId ?? r.roadmapId ?? r._id;
+            const res = await apiGetRoadmapById(rid);
+            const roadmap = res.data?.data;
+            const percent = r.progressPercentage ?? 0;
+            const isPhase =
+              String(roadmap?.type || "").toLowerCase() === "phase" ||
+              roadmap?.haveNextedRoadMaps === true ||
+              (Array.isArray(roadmap?.roadmaps) && roadmap.roadmaps.length > 0);
+            return {
+              ...r,
+              roadMapId: rid,
+              title: roadmap?.name,
+              description: roadmap?.description,
+              timeline: roadmap?.timeline,
+              imageUrl: roadmap?.imageUrl,
+              percent,
+              isPhase,
+            };
+          }),
+        );
+        const valid = results.filter((r) => r.status === "fulfilled").map((r: any) => r.value);
+        setRoadmaps(valid);
+      } catch (err) {
+        console.error("Failed to load roadmap details", err);
+      }
+    };
 
-  const surveyCard = {
-    img: card1,
-    title: "Church Assessment Evaluation (CMA)",
-    due: "Due 02/12/2024",
-  };
+    hydrateRoadmaps();
+  }, [progress]);
+
+  useEffect(() => {
+    if (!progress?.assessments?.length) return;
+    const hydrateAssessments = async () => {
+      try {
+        const results = await Promise.allSettled(
+          progress.assessments.map(async (a: any) => {
+            const res = await apiGetAssessmentById(a.assessmentId);
+            const assessment = parseAssessmentDetailPayload(res.data);
+            return {
+              ...a,
+              title: assessment?.name,
+              description: assessment?.description,
+              bannerImage: assessment?.bannerImage,
+              type: assessment?.type,
+              totalSections: assessment?.sections?.length || 0,
+              dueDate: a.dueDate,
+              status: a.status,
+            };
+          }),
+        );
+        const valid = results.filter((r) => r.status === "fulfilled").map((r: any) => r.value);
+        setAssessments(valid);
+      } catch (err) {
+        console.error("Failed to load assessments", err);
+      }
+    };
+    hydrateAssessments();
+  }, [progress]);
+
+  const filteredRoadmaps = roadmaps.filter((r) => roadmapMatchesFilter(r, roadmapFilter));
+  const filteredAssessments = assessments.filter((a) => assessmentMatchesFilter(a, surveyFilter));
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
+        <PastorHeader showFullHeader={true} />
+        <div className="flex flex-1 items-center justify-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">
+    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
       <PastorHeader showFullHeader={true} />
 
-      {/* HERO */}
-      <section
-        className="relative flex h-[220px] items-end bg-cover bg-center px-4 pb-8 md:h-[280px] md:px-8 lg:px-16"
-        style={{ backgroundImage: `url(${progressBg.src})` }}
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]"></div>
-        <div className="relative z-10">
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
-            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
-            Leadership Growth Insights
-          </p>
-          <h1 className="mt-3 text-2xl font-semibold tracking-wide text-white md:text-4xl">
-            My Progress
-          </h1>
-          <p className="mt-2 max-w-xl text-sm text-[#d9ebf8] md:text-base">
-            Track roadmap completion and assessment progress across your journey.
-          </p>
-        </div>
-      </section>
-
-      {/* CONTENT */}
-      <main className="relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] text-white">
-        {/* --- OVERALL + INDIVIDUAL PROGRESS --- */}
-        <section className="grid grid-cols-1 gap-4 bg-transparent px-4 py-8 md:gap-8 md:px-8 md:py-12 lg:px-16 lg:grid-cols-2">
-          {/* Left Card */}
-          <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-4 shadow-sm md:p-8">
-            <h3 className="mb-4 text-lg font-semibold text-white">Overall Progress</h3>
-            <div className="flex flex-col items-center justify-center">
-              <svg width={donut.size} height={donut.size} className="drop-shadow-[0_10px_28px_rgba(0,0,0,0.35)]">
-                <circle
-                  cx={donut.size / 2}
-                  cy={donut.size / 2}
-                  r={donut.radius}
-                  stroke="rgba(255,255,255,0.18)"
-                  strokeWidth={donut.stroke}
-                  fill="none"
-                />
-                <circle
-                  cx={donut.size / 2}
-                  cy={donut.size / 2}
-                  r={donut.radius}
-                  stroke="#8ec5eb"
-                  strokeWidth={donut.stroke}
-                  fill="none"
-                  strokeDasharray={donut.circumference}
-                  strokeDashoffset={donut.offset}
-                  strokeLinecap="round"
-                  transform={`rotate(-90 ${donut.size / 2} ${donut.size / 2})`}
-                />
-                <text
-                  x="50%"
-                  y="50%"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  fill="white"
-                  fontSize="34"
-                  fontWeight="700"
-                >
-                  {donut.value}%
-                </text>
-              </svg>
-              <p className="mt-3 text-sm text-[#d9ebf8]">
-                {completedItems}/{totalItems || 0} items completed
-              </p>
-            </div>
-          </div>
-
-          {/* Right Card */}
-          <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-4 shadow-sm md:p-8">
-            <h3 className="mb-4 text-lg font-semibold text-white">Individual Progress</h3>
-            <div className="space-y-5">
-              <div>
-                <div className="mb-2 flex items-center justify-between text-sm text-[#d9ebf8]">
-                  <span>Roadmaps</span>
-                  <span className="font-semibold text-white">{Math.round(roadmapProgress)}%</span>
-                </div>
-                <div className="h-2.5 w-full rounded-full bg-white/20">
-                  <div
-                    className="h-2.5 rounded-full bg-[#8ec5eb] transition-all duration-500"
-                    style={{ width: `${Math.max(0, Math.min(100, roadmapProgress))}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between text-sm text-[#d9ebf8]">
-                  <span>Assessments</span>
-                  <span className="font-semibold text-white">{Math.round(assessmentProgress)}%</span>
-                </div>
-                <div className="h-2.5 w-full rounded-full bg-white/20">
-                  <div
-                    className="h-2.5 rounded-full bg-[#f5cc76] transition-all duration-500"
-                    style={{ width: `${Math.max(0, Math.min(100, assessmentProgress))}%` }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="mb-2 flex items-center justify-between text-sm text-[#d9ebf8]">
-                  <span>Total Completion</span>
-                  <span className="font-semibold text-white">{Math.round(overallProgress)}%</span>
-                </div>
-                <div className="h-2.5 w-full rounded-full bg-white/20">
-                  <div
-                    className="h-2.5 rounded-full bg-[#34d399] transition-all duration-500"
-                    style={{ width: `${Math.max(0, Math.min(100, overallProgress))}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* --- ROADMAP PROGRESS --- */}
-      {/* --- ROADMAP PROGRESS --- */}
-<section className="mb-12 bg-transparent px-4 pt-8 md:px-8 lg:px-16">
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-    <h2 className="text-lg md:text-xl font-semibold">Revitalization Roadmap Progress</h2>
-
-    <div className="flex overflow-hidden rounded-xl border border-white/20 bg-white/10 text-sm shadow backdrop-blur">
-      {["All", "Completed", "Remaining"].map((tab) => (
-        <button
-          key={tab}
-          onClick={() => setFilter(tab)}
-          className={`px-3 md:px-5 py-2 text-xs md:text-sm font-medium transition-all ${
-            filter === tab
-              ? "bg-white text-[#0f4a76]"
-              : "text-[#d9ebf8] hover:bg-white/15"
-          }`}
-        >
-          {tab}
-        </button>
-      ))}
-    </div>
-  </div>
-
-  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">
-    {/* CARD 1 */}
-    <div className="overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] shadow-sm transition-all hover:shadow-md">
-      <div className="flex">
-        <div className="w-1/3 sm:w-1/4 md:w-1/3">
-          <Image
-            src={card1}
-            alt="Self Revitalization"
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        <div className="flex-1 p-3 md:p-5">
-          <h4 className="mb-1 text-sm font-semibold text-white md:text-[15px]">
-            Self Revitalization Phase
-          </h4>
-          <p className="mb-3 text-xs text-[#cde2f2] md:text-[13px]">
-            Interested in receiving mentoring in community engagement
-          </p>
-
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[12px] font-medium text-[#d9ebf8]">Status</span>
-            <span className="text-[11px] px-2 py-[3px] rounded-full font-medium border bg-[#FFF0F0] text-[#B91C1C] border-[#FCA5A5]">
-              Due
-            </span>
-          </div>
-
-          {/* Progress bar */}
-          <p className="mb-1 text-[12px] text-[#d9ebf8]">Task Completed</p>
-          <div className="w-full h-[6px] bg-gray-200 rounded-full mb-1">
-            <div className="h-[6px] bg-[#16A34A] rounded-full w-[75%]"></div>
-          </div>
-          <p className="mb-2 text-[12px] font-medium text-white">06/08</p>
-
-          <p className="text-[12px] text-[#d9ebf8]">
-            Completion Time{" "}
-            <span className="font-semibold text-white">Months 1 – 2</span>
-          </p>
-
-          <div className="flex justify-end mt-4">
-            <button
-              onClick={() => router.push("/pastor/SelfRevitalizationPhasePage")}
-              className="rounded-md bg-white px-3 py-[6px] text-[10px] font-semibold text-[#0f4a76] hover:bg-[#e7f1fa] md:px-6 md:text-[12px]"
+      <header className="border-b border-[#8ec5eb]/25 bg-[#062946] px-4 py-5 sm:px-8 md:px-12">
+        <div className="mx-auto flex max-w-7xl flex-col items-center gap-4">
+          <div className="flex w-full items-center gap-3">
+            <Link
+              href="/pastor/home"
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 text-[#cde2f2] transition hover:border-[#8ec5eb]/40 hover:text-white"
+              aria-label="Back to home"
             >
-              View
-            </button>
+              <i className="fa-solid fa-arrow-left" />
+            </Link>
+            <h1 className="text-lg font-bold tracking-tight text-white sm:text-xl">My Progress</h1>
           </div>
-        </div>
-      </div>
-    </div>
-
-    {/* CARD 2 */}
-    <div className="overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] shadow-sm transition-all hover:shadow-md">
-      <div className="flex">
-        <div className="w-1/3 sm:w-1/4 md:w-1/3">
-          <Image
-            src={card2}
-            alt="Church Empowerment Phase"
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        <div className="flex-1 p-3 md:p-5">
-          <h4 className="mb-1 text-sm font-semibold text-white md:text-[15px]">
-            Church Empowerment Phase
-          </h4>
-          <p className="mb-3 text-xs text-[#cde2f2] md:text-[13px]">
-            Interested in receiving mentoring in community engagement
-          </p>
-
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[12px] font-medium text-[#d9ebf8]">Status</span>
-            <span className="text-[11px] px-2 py-[3px] rounded-full font-medium border bg-[#FEF3C7] text-[#92400E] border-[#FCD34D]">
-              In-progress
-            </span>
-          </div>
-
-          <p className="mb-1 text-[12px] text-[#d9ebf8]">Task Completed</p>
-          <div className="w-full h-[6px] bg-gray-200 rounded-full mb-1">
-            <div className="h-[6px] bg-[#F59E0B] rounded-full w-[65%]"></div>
-          </div>
-          <p className="mb-2 text-[12px] font-medium text-white">12/18</p>
-
-          <p className="text-[12px] text-[#d9ebf8]">
-            Completion Time{" "}
-            <span className="font-semibold text-white">Months 3 – 9</span>
-          </p>
-
-          <div className="flex justify-end mt-4">
-            <button
-              onClick={() => router.push("/pastor/ChurchEmpowermentPhase")}
-              className="rounded-md bg-white px-3 py-[6px] text-[10px] font-semibold text-[#0f4a76] hover:bg-[#e7f1fa] md:px-6 md:text-[12px]"
-            >
-              View
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {/* CARD 3 */}
-    <div className="overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] shadow-sm transition-all hover:shadow-md">
-      <div className="flex">
-        <div className="w-1/3 sm:w-1/4 md:w-1/3">
-          <Image
-            src={card3}
-            alt="Community Revitalization"
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        <div className="flex-1 p-3 md:p-5">
-          <h4 className="mb-1 text-sm font-semibold text-white md:text-[15px]">
-            Community Revitalization and Multiplication Phase
-          </h4>
-          <p className="mb-3 text-xs text-[#cde2f2] md:text-[13px]">
-            Interested in receiving mentoring in community engagement
-          </p>
-
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-[12px] font-medium text-[#d9ebf8]">Status</span>
-            <span className="text-[11px] px-2 py-[3px] rounded-full font-medium border bg-[#EFF6FF] text-[#1E40AF] border-[#BFDBFE]">
-              Not Started
-            </span>
-          </div>
-
-          <p className="mb-1 text-[12px] text-[#d9ebf8]">Task Completed</p>
-          <div className="w-full h-[6px] bg-gray-200 rounded-full mb-1">
-            <div className="h-[6px] bg-[#2563EB] rounded-full w-[35%]"></div>
-          </div>
-          <p className="mb-2 text-[12px] font-medium text-white">05/12</p>
-
-          <p className="text-[12px] text-[#d9ebf8]">
-            Completion Time{" "}
-            <span className="font-semibold text-white">Months 10 – 12</span>
-          </p>
-
-          <div className="flex justify-end mt-4">
-            <button
-              onClick={() => router.push("/pastor/CommunityEngagementProject")}
-              className="rounded-md bg-white px-3 py-[6px] text-[10px] font-semibold text-[#0f4a76] hover:bg-[#e7f1fa] md:px-6 md:text-[12px]"
-            >
-              View
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-{/* --- SURVEY PROGRESS --- */}
-<section className="bg-transparent px-4 pb-10 pt-8 md:px-8 lg:px-16">
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 text-white gap-4">
-    <h2 className="text-lg md:text-xl font-semibold">Survey Progress</h2>
-    <div className="flex overflow-hidden rounded-xl border border-white/20 bg-white/10 text-sm shadow backdrop-blur">
-      {["All", "Completed", "Remaining"].map((tab) => (
-        <button
-          key={tab}
-          onClick={() => setFilter(tab)}
-          className={`px-3 md:px-5 py-2 text-xs md:text-sm font-medium transition-all ${
-            filter === tab
-              ? "bg-white text-[#0f4a76]"
-              : "text-[#d9ebf8] hover:bg-white/15"
-          }`}
-        >
-          {tab}
-        </button>
-      ))}
-    </div>
-  </div>
-
-  <div className="max-w-full overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] shadow-sm sm:max-w-xl">
-    <div className="flex">
-      <div className="w-1/3 sm:w-1/4 md:w-1/3">
-        <Image
-          src={card1}
-          alt={surveyCard.title}
-          className="w-full h-full object-cover"
-        />
-      </div>
-
-      <div className="flex-1 p-3 text-white md:p-5">
-        <h4 className="mb-1 text-sm font-semibold md:text-[15px]">
-          {surveyCard.title}
-        </h4>
-        <p className="mb-3 text-xs text-[#cde2f2] md:text-[13px]">
-          Interested in receiving mentoring in community engagement
-        </p>
-        <p className="mb-1 text-[12px] text-[#d9ebf8]">Due</p>
-        <p className="mb-4 text-[13px] font-semibold text-white">
-          20 Oct 2024
-        </p>
-
-        <div className="flex justify-end">
-          <button
-            onClick={() => router.push("/pastor/Assessments")}
-            className="rounded-md bg-white px-3 py-[6px] text-[10px] font-semibold text-[#0f4a76] hover:bg-[#e7f1fa] md:px-6 md:text-[12px]"
+          <div
+            className="rounded-xl px-6 py-2.5 text-center text-sm font-semibold text-white shadow-[0_0_24px_rgba(142,197,235,0.18)]"
+            style={{
+              border: "2px solid transparent",
+              background:
+                "linear-gradient(#062946, #062946) padding-box, linear-gradient(120deg, #a78bfa, #6366f1, #38bdf8, #8ec5eb) border-box",
+              backgroundClip: "padding-box, border-box",
+            }}
           >
-            View
-          </button>
+            {displayName}
+          </div>
+          {email ? <p className="text-center text-xs text-[#8ec5eb]/85">{email}</p> : null}
         </div>
-      </div>
-    </div>
-  </div>
-</section>
+      </header>
 
+      <main className="relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-8 sm:px-8 md:px-16 md:py-10">
+        <div className="mx-auto max-w-7xl">
+          {!userId && (
+            <p className="mb-8 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
+              Please sign in again to view your progress.
+            </p>
+          )}
+
+          {userId && (
+            <>
+              <section className="mb-8 rounded-2xl border border-[#8ec5eb]/40 bg-[#041f35]/60 p-5 shadow-lg backdrop-blur-md sm:p-7">
+                <h2 className="mb-6 text-base font-bold text-white sm:text-lg">
+                  Overall Progress — Roadmap &amp; Assessments
+                </h2>
+                <OverallProgressDonut overallPercent={progress?.overallProgress ?? 0} />
+              </section>
+
+              <section className="mb-10 rounded-2xl border border-[#8ec5eb]/40 bg-[#041f35]/60 p-5 shadow-lg backdrop-blur-md sm:p-7">
+                <h2 className="mb-6 text-base font-bold text-white sm:text-lg">
+                  Individual — Roadmap, Assessments
+                </h2>
+                <IndividualBreakdownBarChart progress={progress} />
+              </section>
+            </>
+          )}
+
+          <section className="mb-12">
+            <div className="mb-5 flex flex-col gap-4">
+              <h2 className="text-base font-bold text-white sm:text-lg">Revitalization Roadmap Progress</h2>
+              <ProgressFilterSegmented active={roadmapFilter} setActive={setRoadmapFilter} />
+            </div>
+            {filteredRoadmaps.length === 0 ? (
+              <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-[#cde2f2]">
+                No roadmaps to show for this filter.
+              </p>
+            ) : (
+              <div className="grid gap-6 lg:grid-cols-2 lg:gap-8">
+                {filteredRoadmaps.map((r: any) => (
+                  <PastorRoadmapProgressCard
+                    key={r.roadMapId}
+                    roadmap={r}
+                    onView={() => {
+                      if (!r.roadMapId) return;
+                      if (r.isPhase) {
+                        router.push(`/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(r.roadMapId)}`);
+                      } else {
+                        router.push(`/pastor/jumpstart?id=${encodeURIComponent(r.roadMapId)}`);
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="pb-8">
+            <div className="mb-5 flex flex-col gap-4">
+              <h2 className="text-base font-bold text-white sm:text-lg">Survey progress</h2>
+              <ProgressFilterSegmented active={surveyFilter} setActive={setSurveyFilter} />
+            </div>
+            {filteredAssessments.length === 0 ? (
+              <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-[#cde2f2]">
+                No surveys to show for this filter.
+              </p>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 md:gap-8">
+                {filteredAssessments.map((a: any) => (
+                  <PastorAssessmentProgressCard
+                    key={a.assessmentId}
+                    assessment={a}
+                    onOpen={() => {
+                      if (!a.assessmentId) return;
+                      router.push(`/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(a.assessmentId)}`);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
       </main>
 
+      <PastorFooter />
+    </div>
+  );
+}
 
+function PastorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: () => void }) {
+  const title = roadmap.title || "Roadmap";
+  const desc = roadmap.description || "";
+  const progressPct = Number(roadmap.percent ?? 0);
+  const completed = `${roadmap.completedSteps ?? 0}/${roadmap.totalSteps ?? 0}`;
+  const time = roadmap.timeline || "—";
+  const statusLabel = formatRoadmapStatusLabel(roadmap.status);
+  const chip = progressStatusChipClass(roadmap.status);
+  const imgUrl =
+    typeof roadmap.imageUrl === "string" && (roadmap.imageUrl.startsWith("http://") || roadmap.imageUrl.startsWith("https://"))
+      ? roadmap.imageUrl
+      : null;
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(145deg,rgba(255,255,255,0.12)_0%,rgba(6,41,70,0.35)_100%)] shadow-lg backdrop-blur-md transition hover:border-[#8ec5eb]/25">
+      <div className="flex flex-col sm:flex-row">
+        <div className="relative h-44 w-full shrink-0 sm:h-auto sm:w-1/3 sm:min-h-[200px]">
+          {imgUrl ? (
+            <Image src={imgUrl} alt={title} fill className="object-cover" unoptimized />
+          ) : (
+            <ApiImagePlaceholder className="h-full min-h-[176px] w-full sm:min-h-[200px]" />
+          )}
+        </div>
+        <div className="flex flex-1 flex-col p-5">
+          <h4 className="mb-1 text-[15px] font-semibold text-white">{title}</h4>
+          <p className="mb-3 line-clamp-2 text-[13px] text-[#cde2f2]/90">{desc || "—"}</p>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="text-[12px] font-medium text-[#8ec5eb]/90">Status</span>
+            <span className={`rounded-full px-2 py-[3px] text-[11px] font-medium ${chip}`}>{statusLabel}</span>
+          </div>
+          <p className="mb-1 text-[12px] text-[#8ec5eb]/80">Tasks</p>
+          <div className="mb-1 h-2.5 w-full rounded-full bg-white/10 sm:h-3">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#5a9ec9] to-[#8ec5eb] transition-all duration-700"
+              style={{ width: `${Math.min(100, progressPct)}%` }}
+            />
+          </div>
+          <p className="mb-2 text-[12px] font-medium text-white">{completed}</p>
+          <p className="text-[12px] text-[#cde2f2]/80">
+            Timeline <span className="font-semibold text-[#8ec5eb]">{time}</span>
+          </p>
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={onView}
+              className="rounded-lg bg-[#8ec5eb] px-6 py-2 text-[12px] font-semibold text-[#062946] transition hover:bg-[#b8daf2]"
+            >
+              View
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PastorAssessmentProgressCard({ assessment, onOpen }: { assessment: any; onOpen: () => void }) {
+  const isDone = assessment.status === "completed";
+  const banner = assessment.bannerImage;
+  const isHttp =
+    typeof banner === "string" && (banner.startsWith("http://") || banner.startsWith("https://"));
+
+  return (
+    <div className="flex min-h-[200px] gap-4 rounded-2xl border border-white/15 bg-white/10 p-4 shadow-lg backdrop-blur-md transition hover:border-[#8ec5eb]/25">
+      <div className="relative h-full min-h-[168px] w-[140px] shrink-0 overflow-hidden rounded-xl sm:w-[160px]">
+        {isHttp ? (
+          <Image
+            src={banner}
+            alt={assessment.title || "Assessment"}
+            fill
+            className="object-cover"
+            unoptimized
+          />
+        ) : (
+          <ApiImagePlaceholder className="h-full min-h-[168px] w-full" />
+        )}
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col justify-between">
+        <div className="min-w-0 flex-1">
+          <h4 className="mb-1 line-clamp-1 text-[15px] font-bold text-white">{assessment.title || "Assessment"}</h4>
+          <p className="mb-2 line-clamp-2 text-[13px] text-[#cde2f2]/90">{assessment.description || ""}</p>
+          <div className="mb-3">
+            <div className="mb-1 flex justify-between text-[11px] text-[#8ec5eb]/80">
+              <span>Sections</span>
+              <span className="tabular-nums text-[#cde2f2]">
+                {assessment.completedSections ?? 0}/{assessment.totalSections ?? 0}
+              </span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#5a9ec9] to-[#8ec5eb] transition-all duration-700"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    assessment.status === "completed"
+                      ? 100
+                      : Number(
+                          assessment.progressPercentage ??
+                            (assessment.totalSections
+                              ? ((assessment.completedSections ?? 0) / Math.max(1, assessment.totalSections)) * 100
+                              : 0),
+                        ),
+                  )}%`,
+                }}
+              />
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onOpen}
+            className="rounded-lg bg-[#8ec5eb]/20 px-4 py-1.5 text-[12px] font-semibold text-[#8ec5eb] transition hover:bg-[#8ec5eb]/30"
+          >
+            {isDone ? "View survey" : "Continue survey"}
+          </button>
+        </div>
+        <div className="mt-3 flex justify-between text-[12px] text-[#8ec5eb]/80">
+          {isDone ? (
+            <span className="font-semibold text-white">Submitted</span>
+          ) : (
+            <>
+              <span className="font-semibold text-[#cde2f2]">Due date</span>
+              <span className="font-semibold text-[#8ec5eb]">{assessment.dueDate || "—"}</span>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

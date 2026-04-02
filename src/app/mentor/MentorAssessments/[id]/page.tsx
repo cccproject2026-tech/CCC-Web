@@ -7,12 +7,16 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "@/app/Assets/assignments-bg.png";
-import Card1 from "@/app/Assets/card1.png";
+import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import { apiGetAssessmentById, parseAssessmentDetailPayload } from "@/app/Services/assessment.service";
 import type { AssessmentResponse } from "@/app/Services/types/assessment.types";
 
 const glassPanel =
   "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] backdrop-blur-md";
+
+function isHttpUrl(u?: string): boolean {
+  return !!u && (u.startsWith("http://") || u.startsWith("https://"));
+}
 
 export default function MentorAssessmentDetailPage() {
   const params = useParams();
@@ -61,7 +65,8 @@ export default function MentorAssessmentDetailPage() {
     };
   }, [id]);
 
-  const bannerSrc = assessment?.bannerImage || Card1;
+  const bannerUrl = assessment?.bannerImage;
+  const hasBanner = isHttpUrl(bannerUrl);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
@@ -103,13 +108,18 @@ export default function MentorAssessmentDetailPage() {
               <div className={`overflow-hidden p-6 sm:p-8 ${glassPanel}`}>
                 <div className="flex flex-col gap-6 sm:flex-row">
                   <div className="relative h-40 w-full shrink-0 overflow-hidden rounded-xl border border-white/20 sm:h-36 sm:w-52">
-                    <Image
-                      src={bannerSrc}
-                      alt={assessment.name || "Assessment"}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 640px) 100vw, 208px"
-                    />
+                    {hasBanner ? (
+                      <Image
+                        src={bannerUrl!}
+                        alt={assessment.name || "Assessment"}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 640px) 100vw, 208px"
+                        unoptimized
+                      />
+                    ) : (
+                      <ApiImagePlaceholder className="absolute inset-0 rounded-xl" />
+                    )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <h2 className="text-xl font-semibold text-white">{assessment.name}</h2>

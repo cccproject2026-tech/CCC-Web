@@ -2,21 +2,31 @@
 import { useEffect, useState, Suspense } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import headerBg from "../../Assets/CMA-hero-bg.png";
-import { useSearchParams } from "next/navigation";
-import { apiGetAssessmentById } from "@/app/Services/assessment.service";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  apiGetAssessmentById,
+  apiGetUserAnswers,
+  parseAssessmentDetailPayload,
+  apiSubmitSectionAnswers,
+} from "@/app/Services/assessment.service";
 import { getCookie } from "@/app/utils/cookies";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
-import { apiGetUserAnswers } from "@/app/Services/assessment.service";
-import { apiGetAvailability, apiCreateAppointment, apiGetMonthlyAvailability } from "@/app/Services/appointments.service";
+import { apiCreateAppointment } from "@/app/Services/appointments.service";
 import axiosInstance from "@/app/Services/config/axios-instance";
 
 function PastorSurveyCMAContent() {
+  const router = useRouter();
   const [activeSection, setActiveSection] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const searchParams = useSearchParams();
   const assessmentId = searchParams.get("assessmentId");
-  // const router = useRouter(); // ✅ Router instance
+  const reviewUserId = (searchParams.get("userId") || "").trim();
+  const viewOnly =
+    searchParams.get("viewOnly") === "1" ||
+    searchParams.get("viewOnly") === "true" ||
+    searchParams.get("mode") === "review";
   const [sections, setSections] = useState<any[]>([]);
+  const [assessmentTitle, setAssessmentTitle] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [mentors, setMentors] = useState<any[]>([]);
   const [selectedMentor, setSelectedMentor] = useState<string>("");
@@ -45,35 +55,50 @@ function PastorSurveyCMAContent() {
       try {
         setLoading(true);
 
-        // Fetch assessment
         const res = await apiGetAssessmentById(assessmentId);
-        setSections(res.data.sections || []);
+        const detail = parseAssessmentDetailPayload(res.data);
+        setSections(detail?.sections || []);
+        setAssessmentTitle((detail?.name as string) || "");
 
-        // Debug: log section structure
-        console.log('Loaded sections:', res.data.sections);
-        res.data.sections?.forEach((section: any, idx: number) => {
-          console.log(`Section ${idx} layers:`, section.layers);
-        });
+        let answersUserId = "";
+        if (viewOnly) {
+          if (!reviewUserId) {
+            setSections([]);
+            setMentors([]);
+            setLoading(false);
+            return;
+          }
+          answersUserId = reviewUserId;
+        } else {
+          const userCookie = getCookie("user");
+          if (userCookie) {
+            const user = JSON.parse(userCookie) as { id?: string; _id?: string };
+            answersUserId = String(user.id || user._id || "");
+            if (answersUserId) {
+              const mentorsRes = await apiGetAssignedUsers(answersUserId);
+              setMentors(mentorsRes.data?.data || []);
+            }
+          }
+        }
 
-        // Fetch assigned mentors
-        const userCookie = getCookie("user");
-        if (userCookie) {
-          const user = JSON.parse(userCookie);
-          const mentorsRes = await apiGetAssignedUsers(user.id);
-          setMentors(mentorsRes.data?.data || []);
-
-          // Fetch user answers
+        if (answersUserId) {
           try {
-            const answersRes = await apiGetUserAnswers(assessmentId, user.id);
-            console.log('User answers response:', answersRes.data);
-            if (answersRes.data?.success && answersRes.data?.data?.sections) {
+            const answersRes = await apiGetUserAnswers(assessmentId, answersUserId);
+            const body = answersRes.data as Record<string, unknown>;
+            const inner = (body?.data as Record<string, unknown>) || body;
+            const sectionsData = inner?.sections as unknown;
+            if (Array.isArray(sectionsData)) {
               const userAnswers: Record<string, string> = {};
-              answersRes.data.data.sections.forEach((section: any, sectionIndex: number) => {
+              sectionsData.forEach((section: any, sectionIndex: number) => {
                 section.layers?.forEach((layer: any, layerIndex: number) => {
-                  if (layer.selectedChoice) {
-                    const layerId = layer.layerId || layer._id || `layer_${sectionIndex}_${layerIndex}`;
-                    userAnswers[layerId] = layer.selectedChoice;
-                    console.log('Pre-selecting answer for layerId:', layerId, 'choice:', layer.selectedChoice);
+                  const sel =
+                    layer.selectedChoice ??
+                    (Array.isArray(layer.selectedValues) ? layer.selectedValues[0] : undefined);
+                  if (sel != null && String(sel) !== "") {
+                    const layerId = String(
+                      layer.layerId || layer._id || `layer_${sectionIndex}_${layerIndex}`,
+                    );
+                    userAnswers[layerId] = String(sel);
                   }
                 });
               });
@@ -81,20 +106,22 @@ function PastorSurveyCMAContent() {
             }
           } catch (err) {
             console.error("Failed to fetch user answers", err);
-            // Leave answers empty if not found
           }
+        } else if (!viewOnly) {
+          setMentors([]);
         }
       } catch (err) {
         console.error(err);
         setSections([]);
         setMentors([]);
+        setAssessmentTitle("");
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [assessmentId]);
+  }, [assessmentId, viewOnly, reviewUserId]);
 
   useEffect(() => {
     if (selectedMentor) {
@@ -138,27 +165,19 @@ function PastorSurveyCMAContent() {
   }, [selectedDate, availability]);
 
   const handleCheck = (layerId: string, choiceId: string) => {
-    console.log('Setting answer for layerId:', layerId, 'choiceId:', choiceId);
-    setAnswers((prev) => {
-      const newAnswers = { ...prev, [layerId]: choiceId };
-      console.log('Updated answers:', newAnswers);
-      return newAnswers;
-    });
+    if (viewOnly) return;
+    setAnswers((prev) => ({ ...prev, [layerId]: choiceId }));
   };
 
   const isSectionComplete = (sectionIndex: number) => {
+    if (viewOnly) return true;
     const section = sections[sectionIndex];
     if (!section?.layers?.length) return true;
 
-    const allComplete = section.layers.every((layer: any, layerIndex: number) => {
+    return section.layers.every((layer: any, layerIndex: number) => {
       const layerId = layer._id || `layer_${sectionIndex}_${layerIndex}`;
-      const hasAnswer = !!answers[layerId];
-      console.log(`Layer ${layerId} (${layer.title || 'no title'}) has answer:`, hasAnswer, 'Answer value:', answers[layerId]);
-      return hasAnswer;
+      return !!answers[layerId];
     });
-
-    console.log(`Section ${sectionIndex} (${section.title || 'no title'}) complete:`, allComplete);
-    return allComplete;
   };
 
   const handleNext = () => {
@@ -179,7 +198,7 @@ function PastorSurveyCMAContent() {
 
   // New Submit Flow
   const handleSubmitSurvey = async () => {
-    // final check all sections complete before submit
+    if (viewOnly) return;
     const allComplete = sections.every((_, idx) => isSectionComplete(idx));
     if (!allComplete) {
       setToast("Please complete all questions in every section before submitting.");
@@ -204,10 +223,13 @@ function PastorSurveyCMAContent() {
   };
 
   const submitAllSectionAnswers = async () => {
+    if (viewOnly) return;
     const userCookie = getCookie("user");
     if (!userCookie || !assessmentId) return;
 
-    const user = JSON.parse(userCookie);
+    const user = JSON.parse(userCookie) as { id?: string; _id?: string };
+    const uid = String(user.id || user._id || "");
+    if (!uid) return;
 
     const formattedAnswers = sections.map((section, sectionIndex) => {
       const sectionId = section._id || section.id;
@@ -230,7 +252,7 @@ function PastorSurveyCMAContent() {
     }
 
     await apiSubmitSectionAnswers(assessmentId, {
-      userId: user.id,
+      userId: uid,
       answers: formattedAnswers,
     });
   };
@@ -271,8 +293,11 @@ function PastorSurveyCMAContent() {
       // Create ISO date string
       const meetingDate = new Date(`${selectedDate}T${hour24.toString().padStart(2, '0')}:${minutes}:00.000Z`);
 
+      const uid = String(user.id || user._id || "");
+      if (!uid) return;
+
       const payload = {
-        userId: user.id,
+        userId: uid,
         mentorId: selectedMentor,
         meetingDate: meetingDate.toISOString(),
         platform: "zoom",
@@ -591,10 +616,12 @@ function PastorSurveyCMAContent() {
         {/* Left text content */}
         <div className="relative z-10 mt-4 sm:mt-7">
           <h2 className="text-xl sm:text-2xl md:text-3xl font-bold">
-            Church Assessment Evaluation (CMA)
+            {assessmentTitle || "Church Assessment Evaluation (CMA)"}
           </h2>
           <p className="text-xs sm:text-sm mt-2 text-white/85 max-w-full sm:max-w-md">
-            This Survey is about Lorem ipsum dolor sit amet, consectetur
+            {viewOnly
+              ? "Read-only review of this pastor’s saved responses."
+              : "Complete each section using the options that best reflect your church."}
           </p>
         </div>
       </header>
@@ -606,20 +633,22 @@ function PastorSurveyCMAContent() {
             Loading assessment...
           </div>
         ) : sections.length === 0 ? (
-          <div className="flex justify-center items-center flex-1 text-white">
-            No sections available.
+          <div className="flex justify-center items-center flex-1 text-white text-center px-4">
+            {viewOnly && !reviewUserId
+              ? "This review link is missing a pastor user id."
+              : "No sections available for this assessment."}
           </div>
         ) : (
           <>
             {/* LEFT PANEL */}
             <aside className="w-full sm:w-[300px] md:w-[340px] bg-white rounded-xl p-4 sm:p-6 shadow-lg h-auto sm:h-[500px] md:h-[550px]">
               <h2 className="text-[#0F1E44] text-base sm:text-lg font-semibold mb-4 sm:mb-6">
-                My Responses
+                {viewOnly ? "Sections" : "My Responses"}
               </h2>
               <div className="flex flex-col gap-3 sm:gap-4">
                 {sections.map((sec, i) => (
                   <div
-                    key={i}
+                    key={sec._id || sec.id || i}
                     onClick={() => setActiveSection(i)}
                     className={`rounded-xl border transition-all cursor-pointer ${activeSection === i
                       ? "bg-[#103C8C] text-white border-[#103C8C]"
@@ -639,7 +668,7 @@ function PastorSurveyCMAContent() {
                           : "text-[#0F1E44]/80"
                           }`}
                       >
-                        {sec.title}
+                        {sec.name || sec.title || `Section ${i + 1}`}
                       </p>
                     </div>
                   </div>
@@ -664,27 +693,35 @@ function PastorSurveyCMAContent() {
                       className="border border-[#5A8DCB] rounded-md p-3 sm:p-4 space-y-2"
                     >
                       <h4 className="font-semibold mb-2 text-sm sm:text-base">
-                        {layer.title || sections[activeSection].title || 'Question'}
+                        {layer.question || layer.title || sections[activeSection].name || sections[activeSection].title || "Question"}
                       </h4>
 
-                      {layer.choices?.map((choice: any) => (
-                        <label key={choice._id} className="flex items-start gap-2 cursor-pointer">
-                          <input
-                            type="radio"
-                            name={layerId}
-                            checked={answers[layerId] === choice._id}
-                            onChange={() => {
-                              console.log('Radio changed for layer:', layerId, 'choice:', choice._id);
-                              handleCheck(layerId, choice._id);
-                            }}
-                            className="accent-[#FFD84E] w-3 h-3 sm:w-4 sm:h-4 mt-[2px]"
-                          />
+                      {layer.choices?.map((choice: any, ci: number) => {
+                        const choiceKey = String(choice._id ?? choice.value ?? choice.label ?? `c_${ci}`);
+                        const choiceLabel = choice.label ?? choice.text ?? String(choice.value ?? "");
+                        const isChecked =
+                          answers[layerId] === choiceKey ||
+                          (choice.value != null && answers[layerId] === String(choice.value)) ||
+                          (choice.label != null && answers[layerId] === String(choice.label));
+                        return (
+                          <label
+                            key={`${layerId}-${choiceKey}-${ci}`}
+                            className={`flex items-start gap-2 ${viewOnly ? "cursor-default" : "cursor-pointer"}`}
+                          >
+                            <input
+                              type="radio"
+                              name={layerId}
+                              readOnly={viewOnly}
+                              disabled={viewOnly}
+                              checked={isChecked}
+                              onChange={() => handleCheck(layerId, choiceKey)}
+                              className="accent-[#FFD84E] w-3 h-3 sm:w-4 sm:h-4 mt-[2px]"
+                            />
 
-                          <span className="text-sm sm:text-base">
-                            {choice.text}
-                          </span>
-                        </label>
-                      ))}
+                            <span className="text-sm sm:text-base">{choiceLabel}</span>
+                          </label>
+                        );
+                      })}
                     </div>
                   );
                 })}
@@ -705,12 +742,23 @@ function PastorSurveyCMAContent() {
                 </button>
 
                 {activeSection === sections.length - 1 ? (
-                  <button
-                    onClick={handleSubmitSurvey}
-                    className="bg-[#103C8C] text-white text-xs sm:text-sm font-medium px-4 sm:px-6 py-2 rounded-md hover:bg-[#0B2E72]"
-                  >
-                    Submit Survey
-                  </button>
+                  viewOnly ? (
+                    <button
+                      type="button"
+                      onClick={() => router.back()}
+                      className="bg-[#103C8C] text-white text-xs sm:text-sm font-medium px-4 sm:px-6 py-2 rounded-md hover:bg-[#0B2E72]"
+                    >
+                      Done
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleSubmitSurvey}
+                      className="bg-[#103C8C] text-white text-xs sm:text-sm font-medium px-4 sm:px-6 py-2 rounded-md hover:bg-[#0B2E72]"
+                    >
+                      Submit Survey
+                    </button>
+                  )
                 ) : (
                   <button
                     onClick={handleNext}

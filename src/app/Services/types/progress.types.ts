@@ -19,6 +19,8 @@ export interface ProgressRoadmap {
 
 export interface ProgressAssessment {
   assessmentId: string;
+  /** Present when progress is tracked per assignment row */
+  assignmentId?: string;
   completedSections: number;
   totalSections: number;
   progressPercentage: number;

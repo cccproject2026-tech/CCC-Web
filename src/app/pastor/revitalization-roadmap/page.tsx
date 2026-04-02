@@ -9,6 +9,7 @@ import HeroBg from "@/app/Assets/roadmap-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { apiGetRoadmapsByUser } from "../../Services/api";
 import { getCookie } from "@/app/utils/cookies";
+import { unwrapRoadmapsList } from "@/app/Services/roadmap-assignments";
 
 interface Phase {
   id: string;
@@ -43,7 +44,7 @@ export default function RevitalizationRoadmap() {
         }
 
         const res = await apiGetRoadmapsByUser(userId);
-        const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+        const data = unwrapRoadmapsList(res);
 
         const mappedPhases = data.map((item: any) => {
           const isValidImageUrl = (url: string) => {

@@ -2,13 +2,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import HeroBg from "@/app/Assets/assignments-bg.png";
-import Card1 from "@/app/Assets/card1.png";
-import Card2 from "@/app/Assets/card2.png";
-import Card3 from "@/app/Assets/card3.png";
-import Card4 from "@/app/Assets/card4.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
+import { ApiAvatarPlaceholder, ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import {
   apiCreateAssessment,
   apiDeleteAssessments,
@@ -19,9 +16,10 @@ import { apiAssignAssessment } from "@/app/Services/progress.service";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 import { useRouter } from "next/navigation";
-import Mentor1 from "@/app/Assets/mentor1.png";
 
-const IMAGE_FALLBACKS = [Card1, Card2, Card3, Card4];
+function isHttpUrl(u?: string): boolean {
+  return !!u && (u.startsWith("http://") || u.startsWith("https://"));
+}
 
 const glassPanel =
   "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] backdrop-blur-md";
@@ -305,7 +303,7 @@ export default function MentorAssessments() {
                   const aid = getAssessmentId(item);
                   return (
                     <div
-                      key={aid || index}
+                      key={aid || `row-${index}`}
                       className={`relative flex overflow-hidden rounded-2xl border transition ${
                         selectedIds.includes(aid)
                           ? "border-[#8ec5eb] ring-2 ring-[#8ec5eb]/40"
@@ -325,13 +323,18 @@ export default function MentorAssessments() {
                       )}
 
                       <div className="m-4 h-[140px] w-[180px] flex-shrink-0 overflow-hidden rounded-xl border border-white/20">
-                        <Image
-                          src={item.bannerImage || IMAGE_FALLBACKS[index % IMAGE_FALLBACKS.length]}
-                          alt={item.name || "Assessment"}
-                          width={180}
-                          height={140}
-                          className="h-full w-full object-cover"
-                        />
+                        {isHttpUrl(item.bannerImage) ? (
+                          <Image
+                            src={item.bannerImage}
+                            alt={item.name || "Assessment"}
+                            width={180}
+                            height={140}
+                            className="h-full w-full object-cover"
+                            unoptimized
+                          />
+                        ) : (
+                          <ApiImagePlaceholder className="h-full w-full rounded-xl" />
+                        )}
                       </div>
 
                       <div className="flex min-w-0 flex-1 flex-col justify-between p-4 pr-3">
@@ -624,7 +627,7 @@ export default function MentorAssessments() {
                 filteredAssignUsers.map((u: any, idx: number) => {
                   const uid = String(u._id ?? u.id ?? "");
                   const name = `${u.firstName || ""} ${u.lastName || ""}`.trim() || "Pastor";
-                  const img = u.profilePicture || Mentor1;
+                  const pic = isHttpUrl(u.profilePicture) ? u.profilePicture : null;
                   return (
                     <label
                       key={uid || idx}
@@ -636,13 +639,21 @@ export default function MentorAssessments() {
                         onChange={() => toggleAssignUser(uid)}
                         className="h-5 w-5 accent-[#8ec5eb]"
                       />
-                      <Image
-                        src={img}
-                        alt=""
-                        width={40}
-                        height={40}
-                        className="h-10 w-10 rounded-full border border-white/20 object-cover"
-                      />
+                      {pic ? (
+                        <Image
+                          src={pic}
+                          alt=""
+                          width={40}
+                          height={40}
+                          className="h-10 w-10 rounded-full border border-white/20 object-cover"
+                          unoptimized
+                        />
+                      ) : (
+                        <ApiAvatarPlaceholder
+                          label={u.firstName || name}
+                          className="h-10 w-10 shrink-0 rounded-full border border-white/20"
+                        />
+                      )}
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium text-white">{name}</div>
                         <div className="truncate text-xs text-[#cde2f2]/70">{u.email || u.role || ""}</div>
