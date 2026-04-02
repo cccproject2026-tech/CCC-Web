@@ -105,6 +105,10 @@ export const apiDeleteDocument = (userId: string, fileUrl: string) =>
 export const apiGetNotes = (userId: string) =>
   axiosInstance.get<{ success: boolean; data: Note[] }>(`/users/${userId}/notes`);
 
+// GET /users/:id/notes/:noteId
+export const apiGetNoteById = (userId: string, noteId: string) =>
+  axiosInstance.get<{ success: boolean; data: Note }>(`/users/${userId}/notes/${noteId}`);
+
 // POST /users/:id/notes
 export const apiAddNote = (userId: string, payload: CreateNotePayload) =>
   axiosInstance.post<{ success: boolean; data: Note }>(`/users/${userId}/notes`, payload);
@@ -112,6 +116,13 @@ export const apiAddNote = (userId: string, payload: CreateNotePayload) =>
 // PATCH /users/:id/notes/:noteId
 export const apiUpdateNote = (userId: string, noteId: string, payload: UpdateNotePayload) =>
   axiosInstance.patch<{ success: boolean; data: Note }>(
+    `/users/${userId}/notes/${noteId}`,
+    payload,
+  );
+
+// PUT /users/:id/notes/:noteId (some backends use PUT instead of PATCH)
+export const apiPutNote = (userId: string, noteId: string, payload: UpdateNotePayload) =>
+  axiosInstance.put<{ success: boolean; data: Note }>(
     `/users/${userId}/notes/${noteId}`,
     payload,
   );

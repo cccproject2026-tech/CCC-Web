@@ -132,7 +132,7 @@ export default function MicroGrantApplicationPage() {
                   <button
                     type="button"
                     onClick={() => setActiveTab("Reporting Procedures")}
-                    className="rounded-xl bg-[#8ec5eb] px-8 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
+                    className="rounded-xl bg-[#8ec5eb] px-8 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
                   >
                     Next
                   </button>
@@ -204,7 +204,7 @@ export default function MicroGrantApplicationPage() {
 
                   <button
                     type="submit"
-                    className="rounded-xl bg-[#8ec5eb] px-8 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
+                    className="rounded-xl bg-[#8ec5eb] px-8 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
                   >
                     Submit
                   </button>

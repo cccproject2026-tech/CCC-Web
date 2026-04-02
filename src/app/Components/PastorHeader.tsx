@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { getNotifications, getSingleUser } from "../Services/pastor.service";
 import { apiGetRoadmaps, apiGetAssessments, apiGetAllUsers } from "../Services/api";
+import { parseAssessmentsListPayload } from "../Services/assessment.service";
 
 function PastorHeaderComponent({ showFullHeader = false }) {
   const pathname = usePathname();
@@ -112,6 +113,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
     { name: "Assessments", path: "/pastor/Assessments" },
     { name: "Progress", path: "/pastor/Myprogress" },
     { name: "Appointments", path: "/pastor/Appointments" },
+    { name: "Notes", path: "/pastor/notes" },
   ];
 
 
@@ -127,12 +129,12 @@ function PastorHeaderComponent({ showFullHeader = false }) {
 
   const settingsSubMenu = [
     {
-      icon: <Lock size={18} className="text-[#0033A0]" />,
+      icon: <Lock size={18} className="text-[#0f4a76]" />,
       label: "Change Password",
       active: true,
     },
     {
-      icon: <BellOff size={18} className="text-[#0033A0]" />,
+      icon: <BellOff size={18} className="text-[#0f4a76]" />,
       label: "Turn Off Notifications",
       active: true,
     },
@@ -183,9 +185,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
         const roadmaps = Array.isArray(roadmapsRes.data?.data)
           ? roadmapsRes.data.data
           : [];
-        const assessments = Array.isArray(assessmentsRes.data?.data)
-          ? assessmentsRes.data.data
-          : [];
+        const assessments = parseAssessmentsListPayload(assessmentsRes.data);
         const mentors = Array.isArray(mentorsRes.data?.data?.users)
           ? mentorsRes.data.data.users
           : Array.isArray(mentorsRes.data?.data)
@@ -205,7 +205,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
   }, [searchQuery]);
 
   return (
-    <header className="relative z-40 flex items-center justify-between bg-[#0b3558] px-4 py-3 text-white shadow-[0_6px_18px_rgba(2,20,38,0.35)] md:px-6 lg:px-10 font-[Albert_Sans]">
+    <header className="relative z-40 flex items-center justify-between border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md md:px-6 lg:px-10 font-[Albert_Sans]">
       {/* ✅ Left Logo */}
       <div className="flex items-center gap-3">
         <Image src={Framelogo1} alt="Logo" width={26} height={26} />
@@ -215,7 +215,9 @@ function PastorHeaderComponent({ showFullHeader = false }) {
       {showFullHeader && (
         <nav className="hidden lg:flex items-center gap-6">
           {navLinks.map((link, index) => {
-            const isActive = pathname === link.path;
+            const isActive =
+              pathname === link.path ||
+              (link.path.length > 1 && pathname.startsWith(`${link.path}/`));
             return (
               <a
                 key={index}
@@ -338,7 +340,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
 
                 {/* 🔥 Dynamic Count */}
                 {notificationCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-[#FFD700] text-[#1A2E7A] text-[10px] font-bold rounded-full w-[16px] h-[16px] flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-[#FFD700] text-[#0f4a76] text-[10px] font-bold rounded-full w-[16px] h-[16px] flex items-center justify-center">
                     {notificationCount}
                   </span>
                 )}
@@ -358,7 +360,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
                     </h2>
                     <a
                       href="/pastor/notifications"
-                      className="text-[#1A2E7A] text-[14px] font-medium hover:underline"
+                      className="text-[#0f4a76] text-[14px] font-medium hover:underline"
                     >
                       View All
                     </a>
@@ -443,7 +445,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
 
               {/* Profile Menu Dropdown */}
               {showProfileMenu && (
-                <div className="absolute right-0 mt-3 w-[200px] md:w-[230px] bg-white rounded-2xl shadow-lg border border-gray-100 text-[#0033A0] font-[Albert_Sans]">
+                <div className="absolute right-0 mt-3 w-[200px] md:w-[230px] rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(245,250,255,0.98)_100%)] text-[#0f4a76] shadow-[0_16px_40px_rgba(3,24,43,0.2)] font-[Albert_Sans]">
                   {/* Pointer */}
                   <div className="absolute -top-2 right-6 w-4 h-4 bg-white rotate-45 border-t border-l border-gray-100"></div>
 
@@ -454,7 +456,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
                           onClick={() => {
                             if (item.label === "Log out") {
                               clearAllCookies();
-                              router.push("/pastor/login");
+                              router.push("/");
                               return;
                             }
                             if (item.path) {
@@ -463,10 +465,10 @@ function PastorHeaderComponent({ showFullHeader = false }) {
                               setShowSettingsMenu(false);
                             }
                           }}
-                          className="flex w-full items-center gap-3 px-5 py-2 text-left text-[#0033A0] transition hover:bg-[#F5F7FA]"
+                          className="flex w-full items-center gap-3 px-5 py-2 text-left text-[#0f4a76] transition hover:bg-[#e8f2fa]"
                           suppressHydrationWarning
                         >
-                          <span className="text-[#0033A0]">{item.icon}</span>
+                          <span className="text-[#0f4a76]">{item.icon}</span>
                           <span className="text-[15px] font-medium">
                             {item.label}
                           </span>
@@ -485,11 +487,13 @@ function PastorHeaderComponent({ showFullHeader = false }) {
       {showFullHeader && showMobileMenu && (
         <div
           ref={mobileMenuRef}
-          className="lg:hidden absolute top-full left-0 right-0 bg-[#0b3558] border-t border-white/10 shadow-lg z-50"
+          className="lg:hidden absolute top-full left-0 right-0 border-t border-white/10 bg-[#062946]/98 shadow-lg backdrop-blur-md z-50"
         >
           <nav className="flex flex-col py-2">
             {navLinks.map((link, index) => {
-              const isActive = pathname === link.path;
+              const isActive =
+                pathname === link.path ||
+                (link.path.length > 1 && pathname.startsWith(`${link.path}/`));
               return (
                 <button
                   key={index}

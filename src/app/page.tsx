@@ -6,10 +6,14 @@ import { useRouter } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import Book from "@/app/Assets/book.png";
 
+type ModalMode = "login" | "interest" | null;
+
 export default function LandingPage() {
   const router = useRouter();
-  const [isChooseModalOpen, setIsChooseModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const isChooseModalOpen = modalMode !== null;
 
   const roles = [
     {
@@ -18,7 +22,7 @@ export default function LandingPage() {
       subtitle: "Church Leadership",
       description: "Guide your church in meaningful community impact through proven ministry methods.",
       loginPath: "/pastor/login",
-      interestPath: "/pastor/InterestForm",
+      interestPath: "/pastor/InterestForm?role=pastor",
     },
     {
       id: "mentor",
@@ -26,7 +30,7 @@ export default function LandingPage() {
       subtitle: "Leader Development",
       description: "Coach and support leaders as they grow in their community ministry journey.",
       loginPath: "/mentor/login",
-      interestPath: "/pastor/InterestForm",
+      interestPath: "/pastor/InterestForm?role=mentor",
     },
   ];
 
@@ -91,7 +95,7 @@ export default function LandingPage() {
               <div className="mt-9 flex flex-wrap items-center gap-4">
                 <button
                   type="button"
-                  onClick={() => setIsChooseModalOpen(true)}
+                  onClick={() => setModalMode("interest")}
                   className="inline-flex items-center gap-2 rounded-full bg-white px-10 py-4 text-base font-semibold text-[#1f4f7d] shadow-[0_14px_30px_rgba(0,0,0,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#e7f1fa] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#062946]"
                 >
                   Get Started
@@ -99,7 +103,7 @@ export default function LandingPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsChooseModalOpen(true)}
+                  onClick={() => setModalMode("login")}
                   className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-8 py-4 text-base font-semibold text-white shadow-[0_10px_24px_rgba(0,0,0,0.2)] backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ec5eb] focus-visible:ring-offset-2 focus-visible:ring-offset-[#062946]"
                 >
                   Login
@@ -107,7 +111,8 @@ export default function LandingPage() {
                 </button>
               </div>
               <p className="mt-3 text-sm text-[#cde2f2]">
-                New user? Choose <span className="font-semibold text-white">Submit Interest</span> in the next step.
+                New here? Use <span className="font-semibold text-white">Get Started</span> to submit interest. Returning? Use{" "}
+                <span className="font-semibold text-white">Login</span>.
               </p>
             </div>
 
@@ -241,7 +246,7 @@ export default function LandingPage() {
       {isChooseModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-[radial-gradient(circle_at_20%_15%,rgba(120,186,232,0.2),transparent_40%),rgba(2,16,30,0.72)] px-4 backdrop-blur-md"
-          onClick={() => setIsChooseModalOpen(false)}
+          onClick={() => setModalMode(null)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -249,14 +254,18 @@ export default function LandingPage() {
           >
             <div className="mb-6 flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-3xl font-semibold tracking-tight text-white">Select your role</h2>
+                <h2 className="text-3xl font-semibold tracking-tight text-white">
+                  {modalMode === "interest" ? "Submit your interest" : "Sign in"}
+                </h2>
                 <p className="mt-2 text-sm text-[#d4e8f6]">
-                  Continue directly to login or submit interest. No waiting-for-approval step before login.
+                  {modalMode === "interest"
+                    ? "Choose Pastor or Mentor to open the interest form for that path."
+                    : "Choose Pastor or Mentor to open the matching login page."}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setIsChooseModalOpen(false)}
+                onClick={() => setModalMode(null)}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white"
                 aria-label="Close role selection"
               >
@@ -265,36 +274,31 @@ export default function LandingPage() {
             </div>
 
             <div className="grid gap-5 md:grid-cols-2">
-              {roles.map((role) => (
-                <article
-                  key={role.id}
-                  className="group rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,67,107,0.72)_0%,rgba(10,53,88,0.72)_100%)] p-5 shadow-[0_14px_32px_rgba(2,20,38,0.38)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#8ec5eb66] hover:shadow-[0_20px_40px_rgba(2,20,38,0.5)]"
-                >
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#9bd2f5]">{role.subtitle}</p>
-                  <h3 className="mt-2 text-3xl font-semibold text-white">{role.title}</h3>
-                  <p className="mt-3 text-sm leading-6 text-[#d4e8f6]">{role.description}</p>
-                  <div className="mt-5 flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => handleNavigate(role.loginPath, `Opening ${role.title} login...`)}
-                      className="inline-flex items-center gap-2 rounded-full border border-white/50 bg-white px-5 py-2.5 text-sm font-semibold text-[#0f4a76] shadow-[0_8px_20px_rgba(2,20,38,0.22)] transition hover:-translate-y-0.5 hover:bg-[#e7f1fa]"
-                    >
-                      Login
-                      <i className="fa-solid fa-arrow-right text-xs" />
-                    </button>
-                    {role.interestPath ? (
-                      <button
-                        type="button"
-                        onClick={() => handleNavigate(role.interestPath!, `Opening ${role.title} interest form...`)}
-                        className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(90deg,#0f4a76_0%,#145c93_100%)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_10px_22px_rgba(2,20,38,0.34)] transition hover:-translate-y-0.5 hover:brightness-110"
-                      >
-                        Submit Interest
-                        <i className="fa-solid fa-arrow-right text-xs" />
-                      </button>
-                    ) : null}
-                  </div>
-                </article>
-              ))}
+              {roles.map((role) => {
+                const isInterest = modalMode === "interest";
+                const targetPath = isInterest ? role.interestPath : role.loginPath;
+                const toast = isInterest
+                  ? `Opening ${role.title} interest form...`
+                  : `Opening ${role.title} sign-in...`;
+                const cta = isInterest ? "Continue to submit interest" : "Continue to sign in";
+
+                return (
+                  <button
+                    key={role.id}
+                    type="button"
+                    onClick={() => handleNavigate(targetPath, toast)}
+                    className="group w-full rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,67,107,0.72)_0%,rgba(10,53,88,0.72)_100%)] p-6 text-left shadow-[0_14px_32px_rgba(2,20,38,0.38)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#8ec5eb66] hover:shadow-[0_20px_40px_rgba(2,20,38,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ec5eb] focus-visible:ring-offset-2 focus-visible:ring-offset-[#082a47]"
+                  >
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#9bd2f5]">{role.subtitle}</p>
+                    <h3 className="mt-2 text-3xl font-semibold text-white">{role.title}</h3>
+                    <p className="mt-3 text-sm leading-6 text-[#d4e8f6]">{role.description}</p>
+                    <p className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-[#8ec5eb] transition group-hover:text-white">
+                      {cta}
+                      <i className="fa-solid fa-arrow-right text-xs transition group-hover:translate-x-0.5" />
+                    </p>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

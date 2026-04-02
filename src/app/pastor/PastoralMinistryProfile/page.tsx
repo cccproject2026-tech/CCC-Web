@@ -124,7 +124,7 @@ export default function PastoralMinistryProfilePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
           <div className="w-[90%] max-w-[600px] overflow-hidden rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] shadow-[0_24px_70px_rgba(2,20,38,0.55)] animate-fadeIn">
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-white/15 bg-[#0b3558]/60 px-6 py-4 text-white">
+            <div className="flex items-center justify-between border-b border-white/15 bg-[#062946]/60 px-6 py-4 text-white">
               <div>
                 <h3 className="text-lg font-semibold">
                   Pastoral Ministry Profile (PMP)
@@ -169,7 +169,7 @@ export default function PastoralMinistryProfilePage() {
               <div className="flex justify-end mt-6">
                 <button
                  onClick={() =>router.push(`/pastor/PastorSurveyPMPPage`)}
-                  className="rounded-xl bg-[#8ec5eb] px-6 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
+                  className="rounded-xl bg-[#8ec5eb] px-6 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
                 >
                   Start Now
                 </button>

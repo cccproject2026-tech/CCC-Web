@@ -6,7 +6,7 @@ import Logo from "../Assets/Frame-logo-1.png";
 
 export default function PastorFooter() {
   return (
-    <footer className="relative overflow-hidden bg-[#0b3558] px-4 py-12 text-white sm:px-8 lg:px-20">
+    <footer className="relative overflow-hidden border-t border-white/10 bg-[#041f35] px-4 py-12 text-white sm:px-8 lg:px-20">
       <div className="pointer-events-none absolute -right-24 -top-16 h-72 w-72 rounded-full bg-[#8ec5eb]/10 blur-3xl" />
       <div className="pointer-events-none absolute -left-24 bottom-0 h-64 w-64 rounded-full bg-[#8ec5eb]/10 blur-3xl" />
 

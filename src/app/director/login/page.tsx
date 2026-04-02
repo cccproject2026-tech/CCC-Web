@@ -97,7 +97,12 @@ export default function DirectorLoginPage() {
       if (isAxiosError(err)) {
         const status = err.response?.status;
         if (status === 404) {
-          setErrorMsg("Login service not found (404). Please check API base URL configuration.");
+          const apiMsg = (err.response?.data as { message?: string } | undefined)?.message;
+          setErrorMsg(
+            typeof apiMsg === "string" && apiMsg
+              ? apiMsg
+              : "Login service not found (404). Please check API base URL configuration.",
+          );
         } else if (status === 401) {
           setErrorMsg("Invalid email or password.");
         } else {

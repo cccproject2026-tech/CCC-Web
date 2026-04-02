@@ -301,7 +301,7 @@ export default function PastorProfile() {
 
             <button
               onClick={openDocsModal}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#8ec5eb]/45 bg-[#0b3558]/55 px-4 py-3 text-base font-semibold text-[#d9ebf8] transition hover:border-[#8ec5eb]/70 hover:bg-[#0d426d]"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#8ec5eb]/45 bg-[#062946]/55 px-4 py-3 text-base font-semibold text-[#d9ebf8] transition hover:border-[#8ec5eb]/70 hover:bg-[#0d426d]"
             >
               <i className="fa-solid fa-paperclip text-[#8ec5eb] text-lg"></i>
               Upload documents
@@ -329,7 +329,7 @@ export default function PastorProfile() {
                   </button>
                   <button
                     onClick={handleSave}
-                    className="rounded-xl bg-[#8ec5eb] px-4 py-1 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
+                    className="rounded-xl bg-[#8ec5eb] px-4 py-1 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
                   >
                     Save Changes
                   </button>
@@ -477,7 +477,7 @@ export default function PastorProfile() {
               <button
                 onClick={handleUploadAll}
                 disabled={pendingFiles.filter(f => f.status === "pending").length === 0}
-                className="flex items-center gap-2 rounded-xl bg-[#8ec5eb] px-5 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2] disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex items-center gap-2 rounded-xl bg-[#8ec5eb] px-5 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <i className="fa-solid fa-cloud-arrow-up text-xs"></i>
                 Upload {pendingFiles.filter(f => f.status === "pending").length > 0

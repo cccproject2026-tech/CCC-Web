@@ -67,6 +67,11 @@ export default function LoginPage() {
       if (accessToken) setCookie("accessToken", accessToken);
       if (refreshToken) setCookie("refreshToken", refreshToken);
       if (user) setCookie("user", JSON.stringify(user));
+      {
+        const u = user as { _id?: string; id?: string } | undefined;
+        const uid = u?._id ?? u?.id;
+        if (uid) setCookie("userId", String(uid));
+      }
 
       // redirect – adjust based on role/status if needed
       showToast("Login successful. Redirecting...");
@@ -75,7 +80,12 @@ export default function LoginPage() {
       if (isAxiosError(err)) {
         const status = err.response?.status;
         if (status === 404) {
-          setErrorMsg("Login service not found (404). Please check API base URL configuration.");
+          const apiMsg = (err.response?.data as { message?: string } | undefined)?.message;
+          setErrorMsg(
+            typeof apiMsg === "string" && apiMsg
+              ? apiMsg
+              : "Login service not found (404). Please check API base URL configuration.",
+          );
         } else if (status === 401) {
           setErrorMsg("Invalid email or password.");
         } else {
@@ -90,8 +100,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#062946] text-white font-[Albert_Sans]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.22),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.12),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)]" />
+    <div className="relative min-h-screen bg-transparent text-white font-[Albert_Sans]">
       <PastorHeader />
 
       <section className="relative z-10 flex flex-col md:flex-row min-h-[calc(100vh-64px)]">

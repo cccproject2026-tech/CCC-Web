@@ -57,7 +57,13 @@ const baseCandidates = [
   "https://api.wisdomtooth.tech/api/v1",
 ].filter(Boolean) as string[];
 
-const resolvedBaseURL = ensureApiV1(baseCandidates[0]);
+/** Same-origin path — `next.config` rewrites to `app.wisdomtooth.tech/api/v1`. Required in the browser to avoid CORS. */
+export const BROWSER_API_BASE = "/api-proxy";
+
+const resolvedBaseURL =
+  typeof window !== "undefined"
+    ? BROWSER_API_BASE
+    : ensureApiV1(baseCandidates[0]);
 
 const axiosInstance = axios.create({
   baseURL: resolvedBaseURL,

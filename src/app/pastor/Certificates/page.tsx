@@ -83,7 +83,7 @@ export default function PastorCertificatesPage() {
             {fieldMentorState === "eligible" && (
               <button
                 onClick={() => router.push("/pastor/InterestForm")}
-                className="mt-3 rounded-xl bg-[#8ec5eb] px-4 py-2 text-sm font-semibold text-[#0b3558] hover:bg-[#a9d5f2]"
+                className="mt-3 rounded-xl bg-[#8ec5eb] px-4 py-2 text-sm font-semibold text-[#062946] hover:bg-[#a9d5f2]"
               >
                 Continue as Field Mentor
               </button>

@@ -97,7 +97,7 @@ export default function PastorAssignments() {
                   onClick={() => setActiveTab(tab)}
                   className={`px-6 py-2 text-sm font-medium transition-all ${
                     activeTab === tab
-                      ? "bg-[#8ec5eb] text-[#0b3558]"
+                      ? "bg-[#8ec5eb] text-[#062946]"
                       : "text-[#cde2f2] hover:bg-white/10"
                   }`}
                   suppressHydrationWarning={true}
@@ -180,7 +180,7 @@ export default function PastorAssignments() {
                   <div className="flex justify-end">
                     <button
                       onClick={() => router.push("/pastor/assignments/details")}
-                      className="rounded-lg bg-[#8ec5eb] px-5 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2] sm:px-4 sm:text-xs"
+                      className="rounded-lg bg-[#8ec5eb] px-5 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2] sm:px-4 sm:text-xs"
                       suppressHydrationWarning={true}
                     >
                       View

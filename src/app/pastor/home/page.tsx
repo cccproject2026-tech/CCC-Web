@@ -217,7 +217,7 @@ export default function PastorDashboard() {
     greetingHour < 12 ? "Good Morning" : greetingHour < 17 ? "Good Afternoon" : "Good Evening";
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">
+    <div className="flex min-h-screen flex-col bg-transparent text-white font-[Albert_Sans]">
       <PastorHeader showFullHeader={true} />
 
       <section

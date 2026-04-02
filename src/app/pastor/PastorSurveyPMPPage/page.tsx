@@ -347,7 +347,7 @@ export default function PastorSurveyPMPPage() {
             </p>
             <button
               onClick={handleScheduleClick}
-              className="rounded-xl bg-[#8ec5eb] px-5 py-2 text-xs font-semibold text-[#0b3558] shadow-sm transition hover:bg-[#a9d5f2] sm:px-6 sm:text-sm"
+              className="rounded-xl bg-[#8ec5eb] px-5 py-2 text-xs font-semibold text-[#062946] shadow-sm transition hover:bg-[#a9d5f2] sm:px-6 sm:text-sm"
             >
               Schedule Meeting
             </button>
@@ -473,7 +473,7 @@ function MentorSidebar({
           disabled={!selectedMentor}
           className={`w-full py-2 rounded-md text-white font-medium ${
             selectedMentor
-              ? "bg-[#8ec5eb] text-[#0b3558] hover:bg-[#a9d5f2]"
+              ? "bg-[#8ec5eb] text-[#062946] hover:bg-[#a9d5f2]"
               : "bg-white/20 text-white/60 cursor-not-allowed"
           }`}
         >
@@ -548,7 +548,7 @@ function ScheduleSidebar({
         </button>
         <button
           onClick={handleFinalSchedule}
-          className="flex-1 rounded-xl bg-[#8ec5eb] py-2 font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
+          className="flex-1 rounded-xl bg-[#8ec5eb] py-2 font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
         >
           Schedule
         </button>

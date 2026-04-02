@@ -1,8 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "@/app/Assets/assignments-bg.png";
 import Card1 from "@/app/Assets/card1.png";
 import Card2 from "@/app/Assets/card2.png";
@@ -10,20 +8,44 @@ import Card3 from "@/app/Assets/card3.png";
 import Card4 from "@/app/Assets/card4.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
-import { apiCreateAssessment, apiDeleteAssessments, apiGetAssessments } from "@/app/Services/assessment.service";
+import PastorFooter from "@/app/Components/PastorFooter";
+import {
+  apiCreateAssessment,
+  apiDeleteAssessments,
+  apiGetAssessments,
+  parseAssessmentsListPayload,
+} from "@/app/Services/assessment.service";
+import { apiAssignAssessment } from "@/app/Services/progress.service";
+import { apiGetAssignedUsers } from "@/app/Services/users.service";
+import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 import { useRouter } from "next/navigation";
+import Mentor1 from "@/app/Assets/mentor1.png";
 
 const IMAGE_FALLBACKS = [Card1, Card2, Card3, Card4];
 
+const glassPanel =
+  "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] backdrop-blur-md";
+
+function getAssessmentId(item: { _id?: string; id?: string }): string {
+  const raw = item._id ?? item.id;
+  return raw != null ? String(raw) : "";
+}
+
 export default function MentorAssessments() {
-    const router = useRouter();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [mode, setMode] = useState<"normal" | "select">("normal");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
-  const [showDropdown, setShowDropdown] = useState<number | null>(null);
+  const [showDropdown, setShowDropdown] = useState<string | null>(null);
   const [showAssignDrawer, setShowAssignDrawer] = useState(false);
+  const [assignAssessmentId, setAssignAssessmentId] = useState<string | null>(null);
+  const [assignUsers, setAssignUsers] = useState<any[]>([]);
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignSearch, setAssignSearch] = useState("");
+  const [selectedAssignUserIds, setSelectedAssignUserIds] = useState<string[]>([]);
+  const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [assessments, setAssessments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,8 +64,7 @@ export default function MentorAssessments() {
         const res = await apiGetAssessments({
           search: searchTerm || undefined,
         });
-        console.log(res.data)
-        setAssessments(res.data || []);
+        setAssessments(parseAssessmentsListPayload(res.data));
       } catch (err) {
         console.error("Failed to load assessments", err);
       } finally {
@@ -54,22 +75,90 @@ export default function MentorAssessments() {
     fetchAssessments();
   }, [searchTerm]);
 
-  // derived
+  useEffect(() => {
+    if (!showAssignDrawer) {
+      setAssignUsers([]);
+      setAssignSearch("");
+      setSelectedAssignUserIds([]);
+      setAssignAssessmentId(null);
+      return;
+    }
+
+    const mentor = getMentorFromCookie();
+    const mentorId = mentor?.id ?? mentor?._id;
+    if (!mentorId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setAssignLoading(true);
+        const res = await apiGetAssignedUsers(mentorId);
+        const raw = res.data?.data;
+        const list = Array.isArray(raw) ? raw : [];
+        if (!cancelled) setAssignUsers(list);
+      } catch {
+        if (!cancelled) setAssignUsers([]);
+      } finally {
+        if (!cancelled) setAssignLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showAssignDrawer]);
+
+  const filteredAssignUsers = useMemo(() => {
+    const q = assignSearch.trim().toLowerCase();
+    if (!q) return assignUsers;
+    return assignUsers.filter((u: any) => {
+      const name = `${u.firstName || ""} ${u.lastName || ""}`.trim().toLowerCase();
+      const email = String(u.email || "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  }, [assignUsers, assignSearch]);
+
+  const toggleAssignUser = (userId: string) => {
+    setSelectedAssignUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((x) => x !== userId) : [...prev, userId],
+    );
+  };
+
+  const handleAssignSubmit = async () => {
+    if (!assignAssessmentId || selectedAssignUserIds.length === 0) {
+      setToastMsg("Select at least one pastor to assign.");
+      setTimeout(() => setToastMsg(""), 3000);
+      return;
+    }
+    try {
+      setAssignSubmitting(true);
+      await apiAssignAssessment({
+        userIds: selectedAssignUserIds,
+        assessmentIds: [assignAssessmentId],
+      });
+      setShowAssignDrawer(false);
+      setToastMsg("Assessment assigned successfully");
+      setTimeout(() => setToastMsg(""), 3000);
+    } catch (e) {
+      console.error(e);
+      setToastMsg("Failed to assign assessment");
+      setTimeout(() => setToastMsg(""), 3000);
+    } finally {
+      setAssignSubmitting(false);
+    }
+  };
+
   const filtered = assessments;
 
   const toggleSelect = (id: string) => {
-    setSelectedIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   const handleDelete = async () => {
     try {
       await apiDeleteAssessments(selectedIds);
 
-      setAssessments(prev =>
-        prev.filter(a => !selectedIds.includes(a._id))
-      );
+      setAssessments((prev) => prev.filter((a) => !selectedIds.includes(getAssessmentId(a))));
 
       setToastMsg(`${selectedIds.length} assessment(s) deleted`);
       setSelectedIds([]);
@@ -94,13 +183,15 @@ export default function MentorAssessments() {
       const payload = {
         name: formTitle,
         description: formDesc,
-        instructions: formInstructions.filter(i => i.trim() !== ""),
+        instructions: formInstructions.filter((i) => i.trim() !== ""),
         sections: formSections,
       };
 
       const res = await apiCreateAssessment(payload);
-
-      setAssessments(prev => [res.data.data, ...prev]);
+      const created = (res.data as { data?: unknown })?.data;
+      if (created && typeof created === "object") {
+        setAssessments((prev) => [created, ...prev]);
+      }
 
       setFormTitle("");
       setFormDesc("");
@@ -118,242 +209,242 @@ export default function MentorAssessments() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#0A3C8C] text-[#0B1C58]">
+    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
       <MentorHeader showFullHeader={true} />
 
-      {/* HERO */}
       <section
-        className="relative h-[250px] flex items-end justify-start px-16 pb-12 bg-cover bg-center"
+        className="relative overflow-hidden bg-cover bg-center px-4 pb-10 pt-4 sm:px-8 lg:px-20"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-[#09256F]/70 via-[#0E2F8A]/40 to-[#133A9E]/90" />
-        <h1 className="relative z-10 text-4xl font-semibold text-white mb-1">
-          Assessments
-        </h1>
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.68)_0%,rgba(6,41,70,0.6)_50%,rgba(6,41,70,1)_100%)]" />
+
+        <div className="relative z-10 mx-auto w-full max-w-7xl">
+          <h1 className="text-2xl font-semibold sm:text-3xl">Assessments</h1>
+          <p className="mt-2 text-sm text-[#cde2f2]">Create, assign, and review mentoring assessments.</p>
+        </div>
       </section>
 
-      <main className="flex-1 bg-[#254487] pt-10 pb-20 px-10 md:px-20">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <main className="flex-1 px-4 pb-12 sm:px-8 lg:px-20">
+        <div className="mx-auto max-w-7xl space-y-6">
           {!showForm ? (
             <>
-              {/* 🔍 SEARCH + BUTTONS */}
-              <div className="flex flex-col md:flex-row items-center justify-between gap-5">
-                <div className="relative w-full md:w-[350px]">
-                  <i className="fa-solid fa-magnifying-glass text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2 text-sm" />
-                  <input
-                    type="text"
-                    placeholder="Search"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-md pl-10 pr-4 py-2 text-sm text-gray-600 shadow-sm outline-none focus:ring-2 focus:ring-[#103C8C]"
-                  />
-                </div>
+              <div className={`p-4 sm:p-5 ${glassPanel}`}>
+                <div className="flex flex-col items-stretch justify-between gap-4 md:flex-row md:items-center">
+                  <div className="flex w-full items-center rounded-xl border border-white/20 bg-white/10 md:max-w-md">
+                    <i className="fa-solid fa-magnifying-glass px-3 text-[#8ec5eb]" />
+                    <input
+                      type="search"
+                      placeholder="Search assessments..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full bg-transparent py-2.5 pr-3 text-sm text-white placeholder:text-white/50 focus:outline-none"
+                      autoComplete="off"
+                    />
+                  </div>
 
-                <div className="flex gap-3">
-                  <button
-                    onClick={() =>
-                      setMode(mode === "select" ? "normal" : "select")
-                    }
-                    className={`${mode === "select"
-                      ? "bg-[#103C8C] text-white"
-                      : "bg-white text-[#0B1C58]"
-                      } text-sm font-medium px-5 py-2 rounded-md border border-[#DDE2EB] hover:bg-[#F5F8FF] transition`}
-                  >
-                    <i className="fa-regular fa-pen-to-square mr-2"></i>
-                    {mode === "select" ? "Cancel" : "Select"}
-                  </button>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setMode(mode === "select" ? "normal" : "select")}
+                      className={`rounded-xl border px-5 py-2.5 text-sm font-medium transition ${
+                        mode === "select"
+                          ? "border-[#8ec5eb] bg-[#8ec5eb]/20 text-white"
+                          : "border-white/20 bg-white/10 text-[#cde2f2] hover:bg-white/15"
+                      }`}
+                    >
+                      <i className="fa-regular fa-pen-to-square mr-2" />
+                      {mode === "select" ? "Cancel" : "Select"}
+                    </button>
 
-                  <button
-                    onClick={() => router.push("/mentor/MentorAssessments/create")}
-                    className="px-6 py-3 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-50 shadow-md flex items-center gap-2"
-                  >
-                    <i className="fa-solid fa-plus"></i>
-                    Add
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => router.push("/mentor/MentorAssessments/create")}
+                      className="flex items-center gap-2 rounded-xl border border-white/20 bg-[#8ec5eb]/90 px-6 py-2.5 text-sm font-semibold text-[#062946] shadow-md transition hover:bg-[#8ec5eb]"
+                    >
+                      <i className="fa-solid fa-plus" />
+                      Add
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* SELECTED TOOLBAR */}
               {mode === "select" && (
-                <div className="bg-[#3C5FB8]/30 text-white rounded-md flex items-center justify-between px-5 py-3 mt-4">
-                  <p>
-                    Selected Items:{" "}
-                    <span className="font-semibold">{selectedIds.length}</span>
+                <div className={`flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${glassPanel}`}>
+                  <p className="text-sm text-[#cde2f2]">
+                    Selected: <span className="font-semibold text-white">{selectedIds.length}</span>
                   </p>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <button
-                      onClick={() => setSelectedIds(filtered.map((a) => a.id))}
-                      className="bg-white text-[#0B1C58] px-4 py-[6px] rounded-md text-sm font-medium"
+                      type="button"
+                      onClick={() =>
+                        setSelectedIds(filtered.map(getAssessmentId).filter(Boolean))
+                      }
+                      className="rounded-xl border border-white/25 bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/15"
                     >
-                      Select All
+                      Select all
                     </button>
                     <button
+                      type="button"
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="bg-[#fff] text-red-600 px-3 py-[6px] rounded-md text-sm font-medium flex items-center gap-2"
+                      className="flex items-center gap-2 rounded-xl border border-red-400/40 bg-red-500/20 px-4 py-2 text-sm font-medium text-red-100 hover:bg-red-500/30"
                     >
-                      <i className="fa-solid fa-trash"></i> Delete
+                      <i className="fa-solid fa-trash" /> Delete
                     </button>
                   </div>
                 </div>
               )}
 
-              {loading && (
-                <div className="text-center py-20 text-white">
-                  Loading assessments...
-                </div>
-              )}
+              {loading && <div className="py-16 text-center text-[#cde2f2]">Loading assessments…</div>}
 
               {!loading && filtered.length === 0 && (
-                <div className="text-center py-20 text-white/80">
-                  No assessments found.
-                </div>
+                <div className={`py-16 text-center text-[#cde2f2] ${glassPanel}`}>No assessments found.</div>
               )}
 
-              {/* GRID */}
-              <div className="grid sm:grid-cols-2 gap-8 mt-6">
-                {filtered.map((item, index) => (
-                  <div
-                    key={item._id}
-                    className={`relative bg-white rounded-xl shadow-md flex overflow-hidden border transition ${selectedIds.includes(item._id)
-                      ? "border-4 border-[#103C8C]"
-                      : "border-transparent"
-                      }`}
-                  >
-                    {/* CHECKBOX overlay */}
-                    {mode === "select" && (
-                      <div className="absolute right-3 top-3 z-10">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(item._id)}
-                          onChange={() => toggleSelect(item._id)}
-                          className="w-5 h-5 accent-[#103C8C]"
+              <div className="grid gap-6 sm:grid-cols-2">
+                {filtered.map((item, index) => {
+                  const aid = getAssessmentId(item);
+                  return (
+                    <div
+                      key={aid || index}
+                      className={`relative flex overflow-hidden rounded-2xl border transition ${
+                        selectedIds.includes(aid)
+                          ? "border-[#8ec5eb] ring-2 ring-[#8ec5eb]/40"
+                          : "border-white/15"
+                      } ${glassPanel}`}
+                    >
+                      {mode === "select" && (
+                        <div className="absolute right-3 top-3 z-20">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(aid)}
+                            onChange={() => toggleSelect(aid)}
+                            className="h-5 w-5 accent-[#8ec5eb]"
+                            aria-label={`Select ${item.name || "assessment"}`}
+                          />
+                        </div>
+                      )}
+
+                      <div className="m-4 h-[140px] w-[180px] flex-shrink-0 overflow-hidden rounded-xl border border-white/20">
+                        <Image
+                          src={item.bannerImage || IMAGE_FALLBACKS[index % IMAGE_FALLBACKS.length]}
+                          alt={item.name || "Assessment"}
+                          width={180}
+                          height={140}
+                          className="h-full w-full object-cover"
                         />
                       </div>
-                    )}
 
-                    <div className="w-[180px] h-[140px] flex-shrink-0 m-5">
-                      <Image
-                        src={item.bannerImage || IMAGE_FALLBACKS[index % IMAGE_FALLBACKS.length]}
-                        alt={item.name || "Assessment"}
-                        width={180}
-                        height={140}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-
-                    <div className="flex-1 p-5 flex flex-col justify-between">
-                      <div>
-                        <h3 className="font-semibold text-[#0B1C58] text-[15px] mb-1">
-                          {item.name} <button
-                            onClick={() =>
-                              setShowDropdown(
-                                showDropdown === item._id ? null : item._id
-                              )
-                            }
-                            className="text-gray-500 hover:text-[#103C8C]"
-                          >
-                            <i className="fa-solid fa-ellipsis-vertical"></i>
-                          </button>
-                        </h3>
-                        <div className="relative">
-
-
-                          {showDropdown === item._id && (
-                            <div className="absolute right-0 top-2 bg-white border border-gray-200 rounded-md shadow-lg w-36 text-sm text-[#0B1C58] z-20">
+                      <div className="flex min-w-0 flex-1 flex-col justify-between p-4 pr-3">
+                        <div>
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="text-[15px] font-semibold text-white">{item.name}</h3>
+                            <div className="relative shrink-0">
                               <button
-                                className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
-                                onClick={() => {
-                                  setShowDropdown(null);
-                                  setShowAssignDrawer(true);
-                                }}
+                                type="button"
+                                onClick={() => setShowDropdown(showDropdown === aid ? null : aid)}
+                                className="text-[#8ec5eb] hover:text-white"
+                                aria-label="More actions"
                               >
-                                <i className="fa-solid fa-user-plus text-[#103C8C]" />
-                                Assign to
+                                <i className="fa-solid fa-ellipsis-vertical" />
                               </button>
-                              <button
-                                className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
-                                onClick={() => {
-                                  setShowDropdown(null);
-                                  // setMode("edit");
-                                }}
-                              >
-                                <i className="fa-regular fa-pen-to-square text-[#103C8C]" />
-                                Edit
-                              </button>
-                              <button
-                                className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2 text-red-500"
-                                onClick={() => {
-                                  setShowDropdown(null);
-                                  setShowDeleteConfirm(true);
-                                }}
-                              >
-                                <i className="fa-solid fa-trash" /> Delete
-                              </button>
+
+                              {showDropdown === aid && (
+                                <div className="absolute right-0 top-8 z-40 min-w-[9rem] rounded-xl border border-white/20 bg-[#0a3558] py-1 text-sm shadow-xl">
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-[#cde2f2] hover:bg-white/10"
+                                    onClick={() => {
+                                      setShowDropdown(null);
+                                      setAssignAssessmentId(aid);
+                                      setSelectedAssignUserIds([]);
+                                      setShowAssignDrawer(true);
+                                    }}
+                                  >
+                                    <i className="fa-solid fa-user-plus text-[#8ec5eb]" />
+                                    Assign to
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-[#cde2f2] hover:bg-white/10"
+                                    onClick={() => {
+                                      setShowDropdown(null);
+                                      if (aid) router.push(`/mentor/MentorAssessments/${aid}/edit`);
+                                    }}
+                                  >
+                                    <i className="fa-regular fa-pen-to-square text-[#8ec5eb]" />
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-red-300 hover:bg-white/10"
+                                    onClick={() => {
+                                      setShowDropdown(null);
+                                      setSelectedIds([aid]);
+                                      setShowDeleteConfirm(true);
+                                    }}
+                                  >
+                                    <i className="fa-solid fa-trash" /> Delete
+                                  </button>
+                                </div>
+                              )}
                             </div>
-                          )}
+                          </div>
+                          <p className="mt-1 line-clamp-2 text-sm text-[#cde2f2]/90">{item.description}</p>
                         </div>
-                        <p className="text-sm text-gray-600 mb-2">{item.description}</p>
-                      </div>
-                      <div className="flex justify-between items-center mt-2">
-
-
-                        <button className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm font-medium px-5 py-[6px] rounded-md transition">
-                          View
-                        </button>
+                        <div className="relative z-10 mt-3 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (aid) router.push(`/mentor/MentorAssessments/${aid}`);
+                            }}
+                            disabled={!aid}
+                            className="rounded-xl bg-[#8ec5eb]/90 px-5 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#8ec5eb] disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            View
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           ) : (
             <>
-              {/* 🟨 CREATE ASSESSMENT INLINE FORM */}
-              <div className="bg-transparent text-white">
-                <h2 className="text-2xl font-semibold mb-8 text-white">
-                  Create – Assessment
-                </h2>
+              <div className="text-white">
+                <h2 className="mb-8 text-2xl font-semibold text-white">Create – Assessment</h2>
 
                 <form onSubmit={handleCreate} className="space-y-8">
-                  {/* Name + Description */}
                   <div>
-                    <label className="block text-white font-medium mb-2">
-                      Name of Assessment
-                    </label>
+                    <label className="mb-2 block font-medium text-[#cde2f2]">Name of Assessment</label>
                     <input
                       type="text"
                       value={formTitle}
                       onChange={(e) => setFormTitle(e.target.value)}
                       placeholder="Enter Name of Survey"
-                      className="w-full border border-[#3B63B8] bg-transparent rounded-md px-4 py-2 text-white"
+                      className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
                     />
-
                   </div>
 
                   <div>
-                    <label className="block text-white font-medium mb-2">
-                      Description
-                    </label>
+                    <label className="mb-2 block font-medium text-[#cde2f2]">Description</label>
                     <textarea
                       rows={3}
                       value={formDesc}
                       onChange={(e) => setFormDesc(e.target.value)}
                       placeholder="Brief Description for Thumbnail"
-                      className="w-full border border-[#3B63B8] bg-transparent rounded-md px-4 py-2 text-white"
+                      className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
                     />
                   </div>
 
-                  {/* Instructions */}
                   <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <label className="block text-white font-medium">
-                        General Instructions for the Assessment
-                      </label>
+                    <div className="mb-2 flex items-center justify-between">
+                      <label className="font-medium text-[#cde2f2]">General Instructions for the Assessment</label>
                       <button
                         type="button"
-                        className="flex items-center gap-2 bg-white text-[#0B1C58] text-sm font-medium px-4 py-[6px] rounded-md"
+                        className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/15"
                       >
-                        <i className="fa-solid fa-info-circle"></i> Instruction
+                        <i className="fa-solid fa-info-circle" /> Instruction
                       </button>
                     </div>
                     <textarea
@@ -361,93 +452,82 @@ export default function MentorAssessments() {
                       value={formInstructions[0]}
                       onChange={(e) => setFormInstructions([e.target.value])}
                       placeholder="Enter Instructions"
-                      className="w-full border border-[#3B63B8] bg-transparent rounded-md px-4 py-2 text-white"
+                      className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
                     />
                   </div>
 
-                  {/* Sections */}
-                  <div className="border border-[#3B63B8] rounded-md p-5">
-                    <div className="flex justify-between items-center mb-4">
-                      <label className="text-white font-medium">Sections</label>
+                  <div className={`rounded-xl border border-white/20 p-5 ${glassPanel}`}>
+                    <div className="mb-4 flex items-center justify-between">
+                      <label className="font-medium text-[#cde2f2]">Sections</label>
                       <button
                         type="button"
-                        className="flex items-center gap-2 bg-white text-[#0B1C58] text-sm font-medium px-4 py-[6px] rounded-md"
+                        className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/15"
                       >
-                        <i className="fa-solid fa-plus"></i> Add
+                        <i className="fa-solid fa-plus" /> Add
                       </button>
                     </div>
 
-                    {/* Section 1 */}
                     <div className="space-y-4">
                       <input
                         type="text"
                         placeholder="Enter Name of Survey"
-                        className="w-full border border-[#3B63B8] bg-transparent rounded-md px-4 py-2 text-white placeholder-gray-300"
+                        className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder:text-white/40"
                       />
                       <textarea
                         rows={2}
                         placeholder="Enter Guidelines"
-                        className="w-full border border-[#3B63B8] bg-transparent rounded-md px-4 py-2 text-white placeholder-gray-300"
+                        className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder:text-white/40"
                       />
 
-                      {/* Layers */}
                       {[
                         "Layer 1",
                         "Layer 2",
                         "Layer 1 - Customized Development Plans",
                         "Layer 2 - Customized Development Plans",
                       ].map((layer, i) => (
-                        <div
-                          key={i}
-                          className="border border-[#3B63B8] rounded-md p-4 space-y-3"
-                        >
-                          <div className="flex justify-between items-center">
-                            <label className="text-white font-medium">{layer}</label>
+                        <div key={i} className="space-y-3 rounded-xl border border-white/15 p-4">
+                          <div className="flex items-center justify-between">
+                            <label className="font-medium text-[#cde2f2]">{layer}</label>
                             <button
                               type="button"
-                              className="flex items-center gap-2 bg-white text-[#0B1C58] text-sm font-medium px-4 py-[6px] rounded-md"
+                              className="flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white"
                             >
                               <i
-                                className={`fa-solid ${layer.includes("Plan") ? "fa-file-alt" : "fa-list"
-                                  }`}
-                              ></i>
+                                className={`fa-solid ${layer.includes("Plan") ? "fa-file-alt" : "fa-list"}`}
+                              />
                               {layer.includes("Plan") ? "Plan" : "Choice"}
                             </button>
                           </div>
                           <input
                             type="text"
                             placeholder="Choice 1"
-                            className="w-full border border-[#3B63B8] bg-transparent rounded-md px-4 py-2 text-white placeholder-gray-300"
+                            className="w-full rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder:text-white/40"
                           />
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* Upload Image */}
                   <div>
-                    <label className="block text-white font-medium mb-3">
-                      Upload Image
-                    </label>
-                    <div className="border-2 border-dashed border-[#3B63B8] rounded-md py-10 text-center text-gray-200">
+                    <label className="mb-3 block font-medium text-[#cde2f2]">Upload Image</label>
+                    <div className="rounded-xl border-2 border-dashed border-white/25 py-10 text-center text-[#cde2f2]">
                       <p>Drag & Drop or Click here to choose file</p>
-                      <p className="text-xs mt-1 text-gray-300">Max file size: 10MB</p>
+                      <p className="mt-1 text-xs text-white/50">Max file size: 10MB</p>
                     </div>
                   </div>
 
-                  {/* Buttons */}
                   <div className="flex justify-center gap-6 pt-8">
                     <button
                       type="button"
                       onClick={() => setShowForm(false)}
-                      className="bg-white text-[#0B1C58] px-8 py-2 rounded-md font-medium"
+                      className="rounded-xl border border-white/25 bg-white/10 px-8 py-2.5 font-medium text-white hover:bg-white/15"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={creating}
-                      className="bg-[#FFD84E] text-[#0B1C58] px-8 py-2 rounded-md font-medium disabled:opacity-50"
+                      className="rounded-xl bg-[#ffd84e] px-8 py-2.5 font-semibold text-[#062946] disabled:opacity-50"
                     >
                       {creating ? "Creating..." : "Create Survey"}
                     </button>
@@ -459,26 +539,25 @@ export default function MentorAssessments() {
         </div>
       </main>
 
-
-
-      {/* DELETE CONFIRM MODAL */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 w-[380px] text-center shadow-lg">
-            <i className="fa-solid fa-trash text-red-500 text-3xl mb-4"></i>
-            <p className="text-[#0B1C58] font-medium mb-6">
-              Are you sure want to delete {selectedIds.length} Assignments?
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-[380px] rounded-2xl border border-white/20 bg-[#0a3558] p-8 text-center shadow-xl">
+            <i className="fa-solid fa-trash mb-4 text-3xl text-red-400" />
+            <p className="mb-6 font-medium text-white">
+              Delete {selectedIds.length} assessment{selectedIds.length === 1 ? "" : "s"}?
             </p>
             <div className="flex justify-center gap-4">
               <button
+                type="button"
                 onClick={() => setShowDeleteConfirm(false)}
-                className="border border-[#103C8C] text-[#103C8C] rounded-md px-6 py-2 font-medium hover:bg-[#F5F8FF]"
+                className="rounded-xl border border-white/30 px-6 py-2 font-medium text-[#cde2f2] hover:bg-white/10"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleDelete}
-                className="bg-[#103C8C] text-white rounded-md px-6 py-2 font-medium hover:bg-[#0B2E72]"
+                className="rounded-xl bg-red-600 px-6 py-2 font-medium text-white hover:bg-red-700"
               >
                 Delete
               </button>
@@ -487,92 +566,110 @@ export default function MentorAssessments() {
         </div>
       )}
 
-      {/* TOAST */}
       {toastMsg && (
-        <div className="fixed bottom-5 right-5 bg-white rounded-md shadow-lg flex items-center gap-2 px-4 py-2 text-[#0B1C58] border border-gray-200 animate-fade-in">
-          <i className="fa-solid fa-check text-green-500"></i>
+        <div className="animate-fade-in fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl border border-white/20 bg-[#0a3558] px-4 py-2 text-sm text-white shadow-lg">
+          <i className="fa-solid fa-check text-[#8ec5eb]" />
           {toastMsg}
         </div>
       )}
 
-      {/* 🟦 ASSIGN DRAWER */}
       {showAssignDrawer && (
-        <div className="fixed inset-0 bg-black/40 flex justify-end z-50">
-          <div className="bg-white w-[420px] h-full shadow-2xl flex flex-col">
-            <div className="flex items-center justify-between px-6 py-5 border-b">
-              <h3 className="text-lg font-semibold text-[#0B1C58]">
-                Assigned to
-              </h3>
-              <button
-                onClick={() => setShowAssignDrawer(false)}
-                className="text-gray-500 hover:text-[#103C8C]"
-              >
-                <i className="fa-solid fa-xmark text-xl"></i>
-              </button>
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/60">
+          <button
+            type="button"
+            aria-label="Close"
+            className="absolute inset-0 cursor-default bg-transparent"
+            onClick={() => setShowAssignDrawer(false)}
+          />
+          <div className="relative flex h-full w-full max-w-md flex-col border-l border-white/15 bg-[#062946] shadow-2xl">
+            <div className={`border-b border-white/10 px-6 py-5 ${glassPanel} mx-4 mt-4 rounded-2xl border`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Assign assessment</h3>
+                  <p className="mt-1 text-xs text-[#cde2f2]/80">Choose pastors (mentees) to receive this survey.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAssignDrawer(false)}
+                  className="text-[#8ec5eb] hover:text-white"
+                >
+                  <i className="fa-solid fa-xmark text-xl" />
+                </button>
+              </div>
             </div>
 
-            {/* Search */}
-            <div className="p-4 border-b">
+            <div className="border-b border-white/10 p-4">
               <div className="relative">
-                <i className="fa-solid fa-magnifying-glass text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2 text-sm"></i>
+                <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#8ec5eb]/70" />
                 <input
-                  type="text"
-                  placeholder="Search"
-                  className="w-full border border-gray-300 rounded-md pl-9 pr-4 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-[#103C8C] outline-none"
+                  type="search"
+                  value={assignSearch}
+                  onChange={(e) => setAssignSearch(e.target.value)}
+                  placeholder="Search pastors by name or email…"
+                  className="w-full rounded-xl border border-white/20 bg-white/10 py-2.5 pl-9 pr-4 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/40"
                 />
               </div>
             </div>
 
-            {/* User list */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between border border-gray-200 rounded-md p-2 hover:bg-gray-50"
-                >
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      className="accent-[#103C8C]"
-                      defaultChecked={i === 0}
-                    />
-                    <Image
-                      src={"/user.png"}
-                      alt="User"
-                      width={35}
-                      height={35}
-                      className="rounded-full bg-gray-200"
-                    />
-                    <span className="text-[#0B1C58] text-sm font-medium">
-                      John Ross
-                    </span>
-                  </div>
-                </div>
-              ))}
+            <div className="flex-1 space-y-2 overflow-y-auto p-4">
+              {assignLoading && (
+                <p className="py-8 text-center text-sm text-[#cde2f2]">Loading your mentees…</p>
+              )}
+              {!assignLoading && filteredAssignUsers.length === 0 && (
+                <p className="py-8 text-center text-sm text-[#cde2f2]">
+                  No mentees match your search, or none are assigned to you yet.
+                </p>
+              )}
+              {!assignLoading &&
+                filteredAssignUsers.map((u: any, idx: number) => {
+                  const uid = String(u._id ?? u.id ?? "");
+                  const name = `${u.firstName || ""} ${u.lastName || ""}`.trim() || "Pastor";
+                  const img = u.profilePicture || Mentor1;
+                  return (
+                    <label
+                      key={uid || idx}
+                      className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/10 p-3 transition hover:bg-white/5"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedAssignUserIds.includes(uid)}
+                        onChange={() => toggleAssignUser(uid)}
+                        className="h-5 w-5 accent-[#8ec5eb]"
+                      />
+                      <Image
+                        src={img}
+                        alt=""
+                        width={40}
+                        height={40}
+                        className="h-10 w-10 rounded-full border border-white/20 object-cover"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-white">{name}</div>
+                        <div className="truncate text-xs text-[#cde2f2]/70">{u.email || u.role || ""}</div>
+                      </div>
+                    </label>
+                  );
+                })}
             </div>
 
-            {/* Footer */}
-            <div className="border-t px-6 py-4">
-              <p className="text-xs text-gray-500 mb-2">
-                John Doe, John Ross and 3 Others
+            <div className="border-t border-white/10 px-6 py-4">
+              <p className="mb-3 text-xs text-[#cde2f2]/80">
+                {selectedAssignUserIds.length} selected
               </p>
               <button
-                onClick={() => {
-                  setShowAssignDrawer(false);
-                  setToastMsg("Assigned Survey Successfully");
-                  setTimeout(() => setToastMsg(""), 2500);
-                }}
-                className="w-full bg-[#103C8C] text-white rounded-md py-2 font-medium hover:bg-[#0B2E72]"
+                type="button"
+                disabled={assignSubmitting || selectedAssignUserIds.length === 0}
+                onClick={handleAssignSubmit}
+                className="w-full rounded-xl bg-[#8ec5eb]/90 py-2.5 font-semibold text-[#062946] hover:bg-[#8ec5eb] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Assign
+                {assignSubmitting ? "Assigning…" : "Assign"}
               </button>
             </div>
           </div>
         </div>
       )}
 
-
-
+      <PastorFooter />
     </div>
   );
 }

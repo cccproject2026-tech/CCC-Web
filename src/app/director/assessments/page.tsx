@@ -10,7 +10,11 @@ import Thumb1 from "../../Assets/thumb1.png";
 import Thumb2 from "../../Assets/thumb2.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import { User } from "@/app/Services/types";
-import { apiDeleteAssessments, apiGetAssessments } from "@/app/Services/assessment.service";
+import {
+  apiDeleteAssessments,
+  apiGetAssessments,
+  parseAssessmentsListPayload,
+} from "@/app/Services/assessment.service";
 import { apiGetAllUsers } from "@/app/Services/users.service";
 import { apiAssignAssessment } from "@/app/Services/progress.service";
 
@@ -48,7 +52,8 @@ export default function AssessmentsPage() {
           search: searchQuery || undefined,
         });
 
-        const mapped: any[] = res.data.map((item: any) => ({
+        const list = parseAssessmentsListPayload(res.data);
+        const mapped: any[] = list.map((item: any) => ({
           id: item._id,
           title: item.name,
           description: item.description,

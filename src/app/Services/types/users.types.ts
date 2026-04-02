@@ -12,8 +12,10 @@ export interface UploadedDocument {
 
 export interface Note {
   _id: string;
-  text: string;
-  createdBy: string;
+  /** Primary body — some API versions use `content` instead */
+  text?: string;
+  content?: string;
+  createdBy?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -101,11 +103,13 @@ export interface GetUsersResponse {
 
 export interface CreateNotePayload {
   text: string;
-  createdBy: string;
+  /** Optional — some backends take author from JWT only */
+  createdBy?: string;
 }
 
 export interface UpdateNotePayload {
-  text: string;
+  text?: string;
+  content?: string;
 }
 
 // ─── Legacy / convenience aliases ─────────────────────────────────────────────

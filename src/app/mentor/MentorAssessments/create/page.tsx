@@ -1,11 +1,14 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/Header/AppHeader";
-import AppFooter from "@/app/Components/AppFooter";
-import AppHero from "@/app/Components/Hero/AppHero";
-import AssessmentBg from "../../../Assets/assessment-bg.png";
+import "@fortawesome/fontawesome-free/css/all.min.css";
+import MentorHeader from "@/app/Components/MentorHeader";
+import PastorFooter from "@/app/Components/PastorFooter";
+import HeroBg from "@/app/Assets/assignments-bg.png";
 import { apiCreateAssessment } from "@/app/Services/assessment.service";
+
+const glassPanel =
+  "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] backdrop-blur-md";
 
 export default function CreateAssessmentPage() {
   const router = useRouter();
@@ -160,70 +163,70 @@ export default function CreateAssessmentPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#2876AC]">
-      <AppHero
-        title="Assessments"
-        backgroundImageUrl={AssessmentBg.src}
-        heightClasses="h-[200px]"
-      />
+    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
+      <MentorHeader showFullHeader={true} />
 
-      <section className="relative px-6 md:px-12 lg:px-20 py-10">
-        <div className="max-w-[900px] mx-auto">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-white">
-              Create - Assessment
-            </h2>
+      <section
+        className="relative overflow-hidden bg-cover bg-center px-4 pb-8 pt-4 sm:px-8 lg:px-20"
+        style={{ backgroundImage: `url(${HeroBg.src})` }}
+      >
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.68)_0%,rgba(6,41,70,0.6)_50%,rgba(6,41,70,1)_100%)]" />
+        <div className="relative z-10 mx-auto w-full max-w-4xl">
+          <h1 className="text-2xl font-semibold sm:text-3xl">Create assessment</h1>
+          <p className="mt-2 text-sm text-[#cde2f2]">Build a new survey for your mentees.</p>
+        </div>
+      </section>
+
+      <section className="relative flex-1 px-4 pb-16 sm:px-8 lg:px-20">
+        <div className="mx-auto max-w-[900px]">
+          <div className={`mb-8 p-6 sm:p-8 ${glassPanel}`}>
+            <h2 className="text-xl font-semibold text-white sm:text-2xl">Create – Assessment</h2>
           </div>
 
-          <div className="space-y-6">
+          <div className={`space-y-6 p-6 sm:p-8 ${glassPanel}`}>
             {/* Name of Assessment */}
             <div>
-              <label className="block text-white font-semibold mb-2">
-                Name of Assessment
-              </label>
+              <label className="mb-2 block font-semibold text-[#cde2f2]">Name of Assessment</label>
               <input
                 type="text"
                 value={assessmentName}
                 onChange={(e) => setAssessmentName(e.target.value)}
                 placeholder="Enter Name of Survey"
-                className="w-full px-4 py-3 bg-white/20 border border-white/40 text-white placeholder-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-white font-medium"
+                className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 font-medium text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
               />
             </div>
 
             {/* Description */}
             <div>
-              <label className="block text-white font-semibold mb-2">
-                Description
-              </label>
+              <label className="mb-2 block font-semibold text-[#cde2f2]">Description</label>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Brief Description for Thumbnail"
                 rows={3}
-                className="w-full px-4 py-3 bg-white/20 border border-white/40 text-white placeholder-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-white resize-none font-medium"
+                className="w-full resize-none rounded-xl border border-white/20 bg-white/10 px-4 py-3 font-medium text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
               />
             </div>
 
             {/* General Instructions */}
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-white font-semibold">
+              <div className="mb-3 flex items-center justify-between">
+                <label className="font-semibold text-[#cde2f2]">
                   General Instructions for the Assessment
                 </label>
                 <button
+                  type="button"
                   onClick={handleAddInstruction}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 text-sm shadow-md"
+                  className="flex items-center gap-2 rounded-xl border border-white/20 bg-[#8ec5eb]/90 px-4 py-2 text-sm font-semibold text-[#062946] shadow-md hover:bg-[#8ec5eb]"
                 >
-                  <i className="fa-solid fa-plus"></i>
+                  <i className="fa-solid fa-plus" />
                   Instruction
                 </button>
               </div>
               <div className="space-y-3">
                 {instructions.map((instruction, idx) => (
                   <div key={idx}>
-                    <label className="block text-white/80 text-sm mb-1">
-                      Instruction {idx + 1}
-                    </label>
+                    <label className="mb-1 block text-sm text-white/70">Instruction {idx + 1}</label>
                     <input
                       type="text"
                       value={instruction}
@@ -231,7 +234,7 @@ export default function CreateAssessmentPage() {
                         handleUpdateInstruction(idx, e.target.value)
                       }
                       placeholder="Enter Instruction"
-                      className="w-full px-4 py-3 bg-white/20 border border-white/40 text-white placeholder-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-white font-medium"
+                      className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 font-medium text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
                     />
                   </div>
                 ))}
@@ -240,13 +243,14 @@ export default function CreateAssessmentPage() {
 
             {/* Sections */}
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <label className="text-white font-semibold">Sections</label>
+              <div className="mb-3 flex items-center justify-between">
+                <label className="font-semibold text-[#cde2f2]">Sections</label>
                 <button
+                  type="button"
                   onClick={handleAddSection}
-                  className="flex items-center gap-2 px-4 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 text-sm shadow-md"
+                  className="flex items-center gap-2 rounded-xl border border-white/20 bg-[#8ec5eb]/90 px-4 py-2 text-sm font-semibold text-[#062946] shadow-md hover:bg-[#8ec5eb]"
                 >
-                  <i className="fa-solid fa-plus"></i>
+                  <i className="fa-solid fa-plus" />
                   Add
                 </button>
               </div>
@@ -254,17 +258,13 @@ export default function CreateAssessmentPage() {
               {sections.map((section, sectionIdx) => (
                 <div
                   key={section.id}
-                  className="bg-white/5 border border-white/20 rounded-lg p-6 mb-4 space-y-4"
+                  className="mb-4 space-y-4 rounded-xl border border-white/15 bg-white/5 p-6"
                 >
-                  <h3 className="text-white font-semibold text-lg">
-                    Section {sectionIdx + 1}
-                  </h3>
+                  <h3 className="text-lg font-semibold text-white">Section {sectionIdx + 1}</h3>
 
                   {/* Name of Section */}
                   <div>
-                    <label className="block text-white/80 text-sm mb-2">
-                      Name of Section
-                    </label>
+                    <label className="mb-2 block text-sm text-white/70">Name of Section</label>
                     <input
                       type="text"
                       value={section.name}
@@ -272,15 +272,13 @@ export default function CreateAssessmentPage() {
                         handleUpdateSection(sectionIdx, "name", e.target.value)
                       }
                       placeholder="Enter Name of Survey"
-                      className="w-full px-4 py-3 bg-white/20 border border-white/40 text-white placeholder-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-white font-medium"
+                      className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 font-medium text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
                     />
                   </div>
 
                   {/* Guidelines */}
                   <div>
-                    <label className="block text-white/80 text-sm mb-2">
-                      Guidelines
-                    </label>
+                    <label className="mb-2 block text-sm text-white/70">Guidelines</label>
                     <input
                       type="text"
                       value={section.guidelines}
@@ -292,15 +290,13 @@ export default function CreateAssessmentPage() {
                         )
                       }
                       placeholder="Enter Guidelines"
-                      className="w-full px-4 py-3 bg-white/20 border border-white/40 text-white placeholder-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-white font-medium"
+                      className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 font-medium text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
                     />
                   </div>
 
                   {/* Number of Layers */}
                   <div>
-                    <label className="block text-white/80 text-sm mb-2">
-                      Number of Layers
-                    </label>
+                    <label className="mb-2 block text-sm text-white/70">Number of Layers</label>
                     <select
                       value={section.numLayers}
                       onChange={(e) =>
@@ -310,7 +306,7 @@ export default function CreateAssessmentPage() {
                           Number(e.target.value)
                         )
                       }
-                      className="w-full px-4 py-3 bg-white/20 border border-white/40 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-white font-medium [&>option]:text-gray-900"
+                      className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 font-medium text-white focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50 [&>option]:text-gray-900"
                     >
                       <option value={2}>2</option>
                       <option value={3}>3</option>
@@ -322,17 +318,18 @@ export default function CreateAssessmentPage() {
                   {/* Layers */}
                   {section.layers.map((layer, layerIdx) => (
                     <div key={layer.id}>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-white font-semibold text-sm">
+                      <div className="mb-2 flex items-center justify-between">
+                        <label className="text-sm font-semibold text-[#cde2f2]">
                           Layer {layerIdx + 1}
                         </label>
                         <button
+                          type="button"
                           onClick={() =>
                             handleAddLayerChoice(sectionIdx, layerIdx)
                           }
-                          className="flex items-center gap-2 px-3 py-1 bg-white text-[#2E3B8E] rounded text-xs font-semibold hover:bg-gray-100"
+                          className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white hover:bg-white/15"
                         >
-                          <i className="fa-solid fa-plus"></i>
+                          <i className="fa-solid fa-plus" />
                           Choice
                         </button>
                       </div>
@@ -350,7 +347,7 @@ export default function CreateAssessmentPage() {
                             )
                           }
                           placeholder={`Choice ${choiceIdx + 1}`}
-                          className="w-full px-4 py-3 bg-white/20 border border-white/40 text-white placeholder-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-white font-medium mb-2"
+                          className="mb-2 w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 font-medium text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
                         />
                       ))}
                     </div>
@@ -359,15 +356,14 @@ export default function CreateAssessmentPage() {
                   {/* Customized Development Plans */}
                   {section.plans.map((plan, planIdx) => (
                     <div key={plan.id}>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-white font-semibold text-sm">
-                          {plan.name}
-                        </label>
+                      <div className="mb-2 flex items-center justify-between">
+                        <label className="text-sm font-semibold text-[#cde2f2]">{plan.name}</label>
                         <button
+                          type="button"
                           onClick={() => handleAddPlanItem(sectionIdx, planIdx)}
-                          className="flex items-center gap-2 px-3 py-1 bg-white text-[#2E3B8E] rounded text-xs font-semibold hover:bg-gray-100"
+                          className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white hover:bg-white/15"
                         >
-                          <i className="fa-solid fa-plus"></i>
+                          <i className="fa-solid fa-plus" />
                           Plan
                         </button>
                       </div>
@@ -385,7 +381,7 @@ export default function CreateAssessmentPage() {
                             )
                           }
                           placeholder={`Choice ${itemIdx + 1}`}
-                          className="w-full px-4 py-3 bg-white/20 border border-white/40 text-white placeholder-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-white font-medium mb-2"
+                          className="mb-2 w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 font-medium text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
                         />
                       ))}
                     </div>
@@ -396,21 +392,19 @@ export default function CreateAssessmentPage() {
 
             {/* Upload Banner Image */}
             <div>
-              <label className="flex items-center gap-2 text-white font-semibold mb-3">
-                <i className="fa-solid fa-cloud-arrow-up"></i>
+              <label className="mb-3 flex items-center gap-2 font-semibold text-[#cde2f2]">
+                <i className="fa-solid fa-cloud-arrow-up" />
                 Upload Banner Image
               </label>
-              <div className="border-2 border-dashed border-white/30 rounded-lg p-12 text-center hover:border-white/50 transition cursor-pointer">
+              <div className="cursor-pointer rounded-xl border-2 border-dashed border-white/25 p-12 text-center transition hover:border-[#8ec5eb]/50">
                 <div className="flex flex-col items-center gap-3">
-                  <div className="w-16 h-16 bg-white/10 rounded-full flex items-center justify-center">
-                    <i className="fa-solid fa-plus text-white text-2xl"></i>
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
+                    <i className="fa-solid fa-plus text-2xl text-[#8ec5eb]" />
                   </div>
                   <div className="text-white">
-                    <p className="font-semibold mb-1">
-                      Drag & Drop or Click here to choose file
-                    </p>
-                    <p className="text-sm text-white/60 flex items-center justify-center gap-1">
-                      <i className="fa-solid fa-circle-info"></i>
+                    <p className="mb-1 font-semibold">Drag & Drop or Click here to choose file</p>
+                    <p className="flex items-center justify-center gap-1 text-sm text-white/55">
+                      <i className="fa-solid fa-circle-info" />
                       Max file size: 10 MB
                     </p>
                   </div>
@@ -418,17 +412,18 @@ export default function CreateAssessmentPage() {
               </div>
             </div>
 
-            {/* Footer Buttons */}
-            <div className="flex justify-end gap-4 pt-8 pb-8">
+            <div className="flex justify-end gap-4 pb-2 pt-8">
               <button
+                type="button"
                 onClick={handleCancel}
-                className="px-10 py-3 bg-white text-gray-700 rounded-lg font-semibold hover:bg-gray-100 transition shadow-md"
+                className="rounded-xl border border-white/25 bg-white/10 px-10 py-3 font-semibold text-[#cde2f2] transition hover:bg-white/15"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleCreateSurvey}
-                className="px-10 py-3 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E] transition shadow-md"
+                className="rounded-xl bg-[#8ec5eb]/90 px-10 py-3 font-semibold text-[#062946] shadow-md transition hover:bg-[#8ec5eb]"
               >
                 Create Survey
               </button>
@@ -439,17 +434,17 @@ export default function CreateAssessmentPage() {
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[70] animate-fade-in">
-          <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3 border-2 border-green-500">
-            <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-              <i className="fa-solid fa-check text-white text-xs"></i>
+        <div className="animate-fade-in fixed left-1/2 top-8 z-[70] -translate-x-1/2">
+          <div className="flex items-center gap-3 rounded-xl border border-white/20 bg-[#0a3558] px-6 py-4 shadow-2xl">
+            <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-[#8ec5eb]">
+              <i className="fa-solid fa-check text-xs text-[#062946]" />
             </div>
-            <span className="text-[#2E3B8E] font-semibold">{toast}</span>
+            <span className="font-semibold text-white">{toast}</span>
           </div>
         </div>
       )}
 
-      <AppFooter />
+      <PastorFooter />
     </div>
   );
 }

@@ -744,7 +744,7 @@ function PastorSurveyCMAContent() {
             </p>
             <button
               onClick={handleScheduleMeeting}
-              className="rounded-xl bg-[#8ec5eb] px-8 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
+              className="rounded-xl bg-[#8ec5eb] px-8 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
             >
               Schedule Meeting
             </button>
@@ -792,7 +792,7 @@ function PastorSurveyCMAContent() {
                   <button
                     onClick={() => setMentorStep(2)}
                     disabled={!selectedMentor || mentors.length === 0}
-                    className={`rounded-xl px-6 py-2 text-sm font-semibold ${selectedMentor && mentors.length > 0 ? "bg-[#8ec5eb] text-[#0b3558] hover:bg-[#a9d5f2]" : "cursor-not-allowed bg-white/20 text-white/60"}`}
+                    className={`rounded-xl px-6 py-2 text-sm font-semibold ${selectedMentor && mentors.length > 0 ? "bg-[#8ec5eb] text-[#062946] hover:bg-[#a9d5f2]" : "cursor-not-allowed bg-white/20 text-white/60"}`}
                   >
                     Next
                   </button>
@@ -864,7 +864,7 @@ function PastorSurveyCMAContent() {
                   <button
                     onClick={handleFinalSchedule}
                     disabled={!selectedDate || !selectedTime}
-                    className={`rounded-xl px-6 py-2 text-sm font-semibold ${selectedDate && selectedTime ? "bg-[#8ec5eb] text-[#0b3558] hover:bg-[#a9d5f2]" : "cursor-not-allowed bg-white/20 text-white/60"}`}
+                    className={`rounded-xl px-6 py-2 text-sm font-semibold ${selectedDate && selectedTime ? "bg-[#8ec5eb] text-[#062946] hover:bg-[#a9d5f2]" : "cursor-not-allowed bg-white/20 text-white/60"}`}
                   >
                     Schedule
                   </button>

@@ -161,7 +161,7 @@ export default function CMAAssessment() {
       {showInstructionPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
           <div className="w-[90%] overflow-hidden rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] shadow-[0_24px_70px_rgba(2,20,38,0.55)] sm:w-[600px] animate-fadein">
-            <div className="flex items-center justify-between border-b border-white/15 bg-[#0b3558]/60 px-6 py-4">
+            <div className="flex items-center justify-between border-b border-white/15 bg-[#062946]/60 px-6 py-4">
               <h3 className="text-white text-lg font-semibold">
                 Church Assessment Evaluation (CMA)
               </h3>
@@ -188,7 +188,7 @@ export default function CMAAssessment() {
               <div className="flex justify-end mt-6">
                 <button
                   onClick={handleStartNow}
-                  className="rounded-xl bg-[#8ec5eb] px-6 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
+                  className="rounded-xl bg-[#8ec5eb] px-6 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
                 >
                   Start Now
                 </button>
@@ -202,7 +202,7 @@ export default function CMAAssessment() {
       {showQuestionPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
           <div className="w-[90%] overflow-hidden rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] shadow-[0_24px_70px_rgba(2,20,38,0.55)] sm:w-[600px] animate-fadein">
-            <div className="flex items-center justify-between border-b border-white/15 bg-[#0b3558]/60 px-6 py-4">
+            <div className="flex items-center justify-between border-b border-white/15 bg-[#062946]/60 px-6 py-4">
               <h3 className="text-white text-lg font-semibold">
                 Church Assessment Evaluation (CMA)
               </h3>
@@ -243,7 +243,7 @@ export default function CMAAssessment() {
                 </button>
                 <button
                   onClick={handleSubmitAnswers}
-                  className="rounded-xl bg-[#8ec5eb] px-6 py-2 text-sm font-semibold text-[#0b3558] transition hover:bg-[#a9d5f2]"
+                  className="rounded-xl bg-[#8ec5eb] px-6 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
                 >
                   Submit
                 </button>

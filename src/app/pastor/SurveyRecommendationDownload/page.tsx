@@ -38,7 +38,7 @@ export default function SurveyRecommendationDownload() {
         <button className="text-[#cbe6f9] font-medium text-sm flex items-center gap-2 hover:text-white">
           <i className="fa-solid fa-arrow-left"></i> Back
         </button>
-        <button className="rounded-xl bg-[#8ec5eb] px-5 py-2 text-sm font-semibold text-[#0b3558] shadow-[0_12px_30px_rgba(2,20,38,0.35)] transition hover:bg-[#a9d5f2]">
+        <button className="rounded-xl bg-[#8ec5eb] px-5 py-2 text-sm font-semibold text-[#062946] shadow-[0_12px_30px_rgba(2,20,38,0.35)] transition hover:bg-[#a9d5f2]">
           <i className="fa-solid fa-download mr-2"></i> Download
         </button>
       </div>

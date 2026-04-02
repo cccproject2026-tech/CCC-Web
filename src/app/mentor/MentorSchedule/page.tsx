@@ -258,7 +258,7 @@ export default function MentorSchedule() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F5F7FB] text-[#0B1C58] relative">
+    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white relative">
       <MentorHeader showFullHeader={true} />
 
       {/* 🟦 HERO SECTION */}
@@ -266,18 +266,18 @@ export default function MentorSchedule() {
         className="relative h-[260px] flex flex-col justify-center px-4 md:px-20 text-white bg-cover bg-center"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0A3C8C]/90 to-[#052860]/70"></div>
-        <h1 className="relative z-10 text-4xl font-semibold tracking-wide">
-          Schedule
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.68)_0%,rgba(6,41,70,0.6)_50%,rgba(6,41,70,1)_100%)]" />
+        <h1 className="relative z-10 text-3xl sm:text-4xl font-semibold tracking-wide">
+          Mentor Appointments
         </h1>
       </section>
 
       {/* 🟩 TAB CONTROLS */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 md:px-20 py-8 bg-[#176192] gap-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 md:px-20 py-8 gap-5">
         <input
           type="text"
           placeholder="Enter a date (dd-mm-yyyy)"
-          className="w-full sm:w-[320px] border bg-white border-[#DDE2EB] rounded-md px-4 py-2 text-sm text-gray-600 shadow-sm focus:outline-none focus:border-[#103C8C]"
+          className="w-full sm:w-[320px] bg-white/10 border border-white/20 rounded-md px-4 py-2 text-sm text-white placeholder:text-white/50 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/40"
         />
         <div className="flex gap-3 flex-wrap">
           {["Appointments", "Availability", "Schedule"].map((tab) => (
@@ -291,8 +291,8 @@ export default function MentorSchedule() {
                 }
               }}
               className={`px-3 sm:px-5 py-2 text-sm rounded-md font-medium transition-all ${activeTab === tab
-                ? "bg-[#103C8C] text-white shadow-sm"
-                : "bg-white text-[#103C8C] border border-[#103C8C] hover:bg-[#F5F8FF]"
+                ? "bg-[#8ec5eb]/25 text-white border border-[#8ec5eb]/35 shadow-sm"
+                : "bg-white/10 text-[#cde2f2] border border-white/15 hover:bg-white/15"
                 }`}
             >
               {tab}
@@ -302,12 +302,12 @@ export default function MentorSchedule() {
       </div>
 
       {/* 🟦 TAB CONTENT */}
-      <main className="flex-1 bg-[#176192] text-white px-4 md:px-20 pb-20">
+      <main className="flex-1 px-4 md:px-20 pb-20">
         {/* 🟨 APPOINTMENTS TAB */}
         {activeTab === "Appointments" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Calendar */}
-            <div className="bg-[#0C4A85] rounded-2xl p-6 text-white shadow-md">
+            <div className="rounded-2xl border border-white/15 bg-white/5 p-6 text-white shadow-sm">
               <h3 className="text-[15px] font-medium mb-4 flex items-center gap-2">
                 <i className="fa-regular fa-calendar"></i> Monthly Meeting
                 Calendar
@@ -714,7 +714,7 @@ export default function MentorSchedule() {
             className="fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40"
             onClick={() => setIsDrawerOpen(false)}
           />
-          <div className="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white text-[#0B1C58] z-50 shadow-2xl transition-transform duration-300">
+          <div className="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-[#062946] text-white z-50 border-l border-white/15 shadow-2xl transition-transform duration-300">
             {/* Step 1: Select Pastor/Director */}
             {drawerStep === 1 && (
               <div className="p-6">
@@ -933,6 +933,8 @@ export default function MentorSchedule() {
           </div>
         </div>
       )}
+
+      <PastorFooter />
     </div>
   );
 }

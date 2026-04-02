@@ -357,7 +357,7 @@ export default function Mymentors() {
                     <Image
                       src={img}
                       alt={mentor.firstName}
-                      className="rounded-full w-full h-full object-cover border border-[#0b3558]"
+                      className="rounded-full w-full h-full object-cover border border-[#062946]"
                     />
                   </div>
                   <p className="text-xs text-white mt-2 whitespace-nowrap">

@@ -49,10 +49,16 @@ export default function ProfileIncomplete() {
       const stored = getCookie("mentor");
       if (stored) {
         try {
-          const parsed: User = JSON.parse(stored);
-          setUser(parsed);
-          if (parsed.profilePicture) {
-            setProfileImage(parsed.profilePicture);
+          const parsedAny = JSON.parse(stored) as any;
+          // Normalize `_id` -> `id` since some backend responses store only `_id`.
+          const normalized: User = {
+            ...(parsedAny as User),
+            id: parsedAny?.id || parsedAny?._id,
+          };
+
+          setUser(normalized);
+          if (normalized.profilePicture) {
+            setProfileImage(normalized.profilePicture);
           }
         } catch (e) {
           console.error("Failed to parse user from localStorage", e);

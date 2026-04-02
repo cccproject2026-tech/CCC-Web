@@ -1,5 +1,5 @@
 import axios from "axios";
-import axiosInstance from "./config/axios-instance";
+import axiosInstance, { BROWSER_API_BASE } from "./config/axios-instance";
 import type { AxiosError } from "axios";
 import type {
   LoginResponse,
@@ -10,6 +10,17 @@ import type {
   ResetPasswordPayload,
   RefreshTokenPayload,
 } from "./types/auth.types";
+
+/** True when 404 is a JSON API error (e.g. "User not found"), not a missing route — must not fall through to other URLs. */
+function isStructuredApi404(error: AxiosError): boolean {
+  if (error.response?.status !== 404) return false;
+  const data = error.response.data;
+  if (!data || typeof data !== "object") return false;
+  const d = data as Record<string, unknown>;
+  if (d.success === false) return true;
+  if (typeof d.message === "string" && d.message.length > 0) return true;
+  return false;
+}
 
 // POST login (supports multiple backend route variants)
 export const apiLogin = async (email: string, password: string) => {
@@ -35,8 +46,10 @@ export const apiLogin = async (email: string, password: string) => {
 
   const requestUrls = Array.from(
     new Set([
+      // Browser: same-origin proxy (see next.config rewrites) — avoids CORS on direct HTTPS calls
+      ...(typeof window !== "undefined" ? [`${BROWSER_API_BASE}/auth/login`] : []),
       directLoginUrl,
-      ...loginPaths, // keep relative attempts first (works when proxy is configured)
+      ...loginPaths,
       ...baseCandidates.flatMap((base) =>
         loginPaths.map((path) => `${base.replace(/\/+$/, "")}${path}`),
       ),
@@ -62,6 +75,10 @@ export const apiLogin = async (email: string, password: string) => {
       lastError = error;
       // If endpoint doesn't exist, try next path. For other errors, stop immediately.
       if (axiosError.response?.status !== 404) {
+        throw error;
+      }
+      // Backend may use 404 + JSON for auth failures (e.g. user not found) — do not retry other URLs.
+      if (isStructuredApi404(axiosError)) {
         throw error;
       }
     }

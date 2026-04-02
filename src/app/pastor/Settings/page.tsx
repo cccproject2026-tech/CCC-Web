@@ -92,7 +92,7 @@ export default function PastorSettingsPage() {
               <button
                 type="button"
                 onClick={handleSendOtp}
-                className="rounded-xl bg-[#8ec5eb] px-4 py-2 text-sm font-semibold text-[#0b3558] hover:bg-[#a9d5f2]"
+                className="rounded-xl bg-[#8ec5eb] px-4 py-2 text-sm font-semibold text-[#062946] hover:bg-[#a9d5f2]"
               >
                 Send OTP
               </button>
@@ -116,7 +116,7 @@ export default function PastorSettingsPage() {
             <button
               type="submit"
               disabled={loading}
-              className="rounded-xl bg-[#8ec5eb] px-4 py-2 text-sm font-semibold text-[#0b3558] hover:bg-[#a9d5f2] disabled:opacity-60"
+              className="rounded-xl bg-[#8ec5eb] px-4 py-2 text-sm font-semibold text-[#062946] hover:bg-[#a9d5f2] disabled:opacity-60"
             >
               {loading ? "Updating..." : "Update Password"}
             </button>

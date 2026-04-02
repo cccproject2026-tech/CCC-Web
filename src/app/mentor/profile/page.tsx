@@ -7,6 +7,7 @@ import MentorHeader from "@/app/Components/MentorHeader";
 import DocumentsModal from "@/app/Components/DocumentsModal";
 import { apiGetUserById, apiUpdateUserById } from "@/app/Services/users.service";
 import { getGreeting, getMentorFromCookie } from "@/app/Services/utils/helpers";
+import PastorFooter from "@/app/Components/PastorFooter";
 
 const storedUser =
   typeof window !== "undefined"
@@ -152,34 +153,35 @@ export default function MentorProfile() {
   if (!profile) return <div className="text-white p-10">No profile found</div>;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#103C8C] to-[#1A4B9A] text-white">
+    <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans] relative overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),radial-gradient(circle_at_48%_56%,rgba(111,178,246,0.12),transparent_42%),radial-gradient(circle_at_90%_80%,rgba(8,52,85,0.4),transparent_40%),linear-gradient(180deg,#041f35_0%,#062946_100%)]" />
       {/* HEADER */}
       <MentorHeader showFullHeader={true} />
 
       {/* MAIN CONTENT */}
-      <main className="px-4 md:px-10 py-8 flex justify-center">
+      <main className="relative z-10 px-4 md:px-10 py-8 flex justify-center">
         <div className="flex flex-col md:flex-row gap-8 w-full max-w-7xl">
           {/* 🟦 LEFT PROFILE CARD */}
-          <div className="bg-white rounded-xl shadow-md p-5 text-center w-full h-[400px] md:w-[280px] flex-shrink-0">
+          <div className="rounded-3xl border border-white/20 bg-[linear-gradient(180deg,rgba(10,53,88,0.28)_0%,rgba(8,43,71,0.35)_100%)] backdrop-blur-sm p-5 text-center w-full h-[400px] md:w-[280px] flex-shrink-0 shadow-[0_24px_56px_rgba(2,20,38,0.28)]">
             <Image
               src={profile?.profilePicture || ProfilePic}
               alt="Profile"
               width={100}
               height={100}
-              className="rounded-full mx-auto mb-3"
+              className="rounded-full mx-auto mb-3 border border-white/20"
             />
-            <p className="text-gray-400 text-xs mb-1">{greeting}</p>
-            <h3 className="text-gray-900 font-semibold text-base">
+            <p className="text-[#cde2f2]/80 text-xs mb-1">{greeting}</p>
+            <h3 className="text-white font-semibold text-base">
               {profile.firstName} {profile.lastName}
             </h3>
-            <p className="text-gray-500 text-xs mb-3 capitalize">
+            <p className="text-[#cde2f2]/70 text-xs mb-3 capitalize">
               {profile.role}
             </p>
 
-            <div className="border-t border-gray-200 my-3"></div>
+            <div className="border-t border-white/10 my-3"></div>
 
             {/* Profile Info */}
-            <p className="text-left text-gray-400 text-xs font-medium mb-1">
+            <p className="text-left text-[#cde2f2]/80 text-xs font-medium mb-1">
               Profile Information
             </p>
             <textarea
@@ -188,27 +190,27 @@ export default function MentorProfile() {
                 profile?.interest?.profileInfo ||
                 "No profile information added by the user."
               }
-              className="w-full text-xs text-gray-700 border border-gray-300 rounded-md p-2 resize-none mb-4"
+              className="w-full text-xs text-white/80 border border-white/15 bg-white/5 rounded-md p-2 resize-none mb-4"
               rows={3}
             />
             <button
               onClick={() => setShowDocuments(true)}
-              className="text-xs font-medium text-[#103C8C] border border-[#DADADA] rounded-md px-3 py-2 flex items-center justify-center gap-2 w-full hover:bg-[#F5F7FB] transition"
+              className="text-xs font-semibold text-[#cde2f2] border border-white/20 rounded-md px-3 py-2 flex items-center justify-center gap-2 w-full hover:bg-white/10 transition"
             >
-              <i className="fa-solid fa-paperclip text-[#103C8C]"></i> Upload
+              <i className="fa-solid fa-paperclip text-[#8ec5eb]"></i> Upload
               documents
             </button>
           </div>
 
           {/* 🟩 RIGHT SIDE FORM */}
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl shadow-md p-8 text-white flex-1 border border-white/20">
+          <div className="rounded-3xl border border-white/20 bg-[linear-gradient(180deg,rgba(15,74,118,0.20)_0%,rgba(9,49,80,0.28)_100%)] backdrop-blur-sm p-8 text-white flex-1 shadow-[0_24px_56px_rgba(2,20,38,0.20)]">
             <div className="flex justify-between items-center mb-6">
               <h2 className="font-semibold text-lg">Personal Information</h2>
 
               {!isEditing ? (
                 <button
                   onClick={() => setIsEditing(true)}
-                  className="text-sm border border-white text-white px-4 py-1 rounded-md hover:bg-white hover:text-[#103C8C] transition"
+                  className="text-sm border border-white/20 bg-white/10 text-white px-4 py-1 rounded-md hover:bg-white/15 transition"
                 >
                   Edit Profile
                 </button>
@@ -216,13 +218,13 @@ export default function MentorProfile() {
                 <div className="flex gap-3">
                   <button
                     onClick={() => setIsEditing(false)}
-                    className="text-sm bg-[#F0F3FA] text-[#103C8C] px-5 py-1 rounded-md hover:bg-[#d9e3fa] transition"
+                    className="text-sm bg-white/10 text-[#cde2f2] px-5 py-1 rounded-md hover:bg-white/15 transition"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSave}
-                    className="text-sm bg-[#103C8C] text-white px-5 py-1 rounded-md hover:bg-[#0B2F6A] transition"
+                    className="text-sm bg-[#8ec5eb]/90 text-[#062946] px-5 py-1 rounded-md hover:bg-[#8ec5eb] transition"
                   >
                     Save
                   </button>
@@ -286,7 +288,7 @@ export default function MentorProfile() {
                             },
                           }));
                         }}
-                        className="text-xs bg-[#D9534F] hover:bg-[#b93e3a] text-white px-3 py-[4px] rounded-md"
+                        className="text-xs bg-red-500/20 hover:bg-red-500/30 text-white px-3 py-[4px] rounded-md border border-red-500/30"
                       >
                         Remove
                       </button>
@@ -399,9 +401,11 @@ export default function MentorProfile() {
       {/* FORM INPUT STYLE */}
       <style jsx>{`
         .form-input {
-          @apply border border-gray-300 bg-white/20 text-white rounded-md px-3 py-2 text-sm placeholder-gray-200 focus:outline-none focus:ring-2 focus:ring-[#00D1B2] disabled:opacity-80;
+          @apply w-full px-4 py-2 rounded-md border border-[#8ec5eb]/35 bg-white/5 text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-[#8ec5eb]/40 disabled:opacity-80;
         }
       `}</style>
+
+      <PastorFooter />
     </div>
   );
 }

@@ -3,85 +3,17 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import AppHeader from "@/app/Components/Header/AppHeader";
 import AppFooter from "@/app/Components/AppFooter";
-import { apiGetAssessmentById, apiUpdateInstructions, apiUpdateSections } from "@/app/Services/assessment.service";
-
-interface Recommendation {
-  id: string;
-  text: string;
-  selected: boolean;
-}
-
-interface Choice {
-  id: string;
-  text: string;
-}
-
-interface Layer {
-  id: string;
-  name: string;
-  choices: Choice[];
-  recommendations: Recommendation[];
-}
-
-interface Section {
-  id: string;
-  name: string;
-  description: string;
-  layers: Layer[];
-}
-
-export const mapAssessmentFromApi = (data: any) => ({
-  id: data._id,
-  name: data.name,
-  description: data.description,
-  bannerImage: data.bannerImage,
-  type: data.type,
-
-  instructions: (data.instructions ?? []).map((text: string, idx: number) => ({
-    id: `inst-${idx}`,
-    text,
-    checked: true,
-  })),
-
-  sections: (data.sections ?? []).map((section: any) => ({
-    id: section._id,
-    name: section.title,
-    description: section.description,
-
-    layers: (section.layers ?? []).map((layer: any) => ({
-      id: layer._id,
-      name: layer.title,
-
-      // 🔑 CRITICAL FIX
-      choices: (layer.choices ?? []).map((c: any) => ({
-        id: c._id,
-        text: c.text,
-      })),
-
-      // 🔑 recommendations are STRINGS in DTO
-      recommendations: (layer.recommendations ?? []).map(
-        (text: string, idx: number) => ({
-          id: `${layer._id}-rec-${idx}`,
-          text,
-          selected: false,
-        })
-      ),
-    })),
-  })),
-});
-
-const buildSectionsPayload = (sections: Section[]) => {
-  return sections.map(section => ({
-    title: section.name,
-    description: section.description,
-    layers: section.layers.map(layer => ({
-      title: layer.name,
-      choices: layer.choices.map(c => ({ text: c.text })),
-      recommendations: layer.recommendations.map(r => r.text),
-    })),
-  }));
-};
-
+import {
+  apiGetAssessmentById,
+  apiUpdateInstructions,
+  apiUpdateSections,
+  parseAssessmentDetailPayload,
+} from "@/app/Services/assessment.service";
+import {
+  mapAssessmentFromApi,
+  buildSectionsPayload,
+  type Section,
+} from "@/app/Services/utils/assessment-mapper";
 
 export default function ViewEditAssessmentPage() {
   const router = useRouter();
@@ -119,10 +51,12 @@ export default function ViewEditAssessmentPage() {
     const fetchAssessment = async () => {
       try {
         const res = await apiGetAssessmentById(params.id as string);
-
-        console.log("ASSESSMENT API RESPONSE 👉", res.data);
-
-        const mapped = mapAssessmentFromApi(res.data);
+        const raw = parseAssessmentDetailPayload(res.data);
+        if (!raw) {
+          console.error("Invalid assessment payload");
+          return;
+        }
+        const mapped = mapAssessmentFromApi(raw);
 
         setAssessment(mapped);
         setSections(mapped.sections);
