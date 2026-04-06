@@ -33,7 +33,14 @@ import { getNotifications, getSingleUser } from "../Services/pastor.service";
 import { apiGetRoadmaps, apiGetAssessments, apiGetAllUsers } from "../Services/api";
 import { parseAssessmentsListPayload } from "../Services/assessment.service";
 
-function PastorHeaderComponent({ showFullHeader = false }) {
+type PastorNotificationItem = {
+  module?: string;
+  name?: string;
+  details?: string;
+  createdAt?: string;
+};
+
+function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -50,7 +57,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [profile, setProfile] = useState<any>(null);
-  const [notificationList, setNotificationList] = useState([]);
+  const [notificationList, setNotificationList] = useState<PastorNotificationItem[]>([]);
   const [notificationCount, setNotificationCount] = useState(0);
 
   useEffect(() => {
@@ -110,9 +117,9 @@ function PastorHeaderComponent({ showFullHeader = false }) {
     { name: "Home", path: "/pastor/home" },
     { name: "My Mentors", path: "/pastor/Mymentors" },
     { name: "Revitalization Roadmap", path: "/pastor/revitalization-roadmap" },
-    { name: "Assessments", path: "/pastor/Assessments" },
+    { name: "Assessments", path: "/pastor/assessments" },
     { name: "Progress", path: "/pastor/Myprogress" },
-    { name: "Appointments", path: "/pastor/Appointments" },
+    { name: "Appointments", path: "/pastor/appointments" },
     { name: "Notes", path: "/pastor/notes" },
   ];
 
@@ -179,7 +186,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
         const [roadmapsRes, assessmentsRes, mentorsRes] = await Promise.all([
           apiGetRoadmaps("all", query),
           apiGetAssessments({ search: query }),
-          apiGetAllUsers({ search: query, roleMatch: "mentor", limit: 5 }),
+          apiGetAllUsers({ search: query, role: "mentor", limit: 5 }),
         ]);
 
         const roadmaps = Array.isArray(roadmapsRes.data?.data)
@@ -294,7 +301,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
                         {searchResults.assessments.slice(0, 4).map((item: any) => (
                           <Link
                             key={item._id || item.id}
-                            href="/pastor/Assessments"
+                            href="/pastor/assessments"
                             className="mb-1 block rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
                           >
                             {item.name || item.title || "Untitled assessment"}
