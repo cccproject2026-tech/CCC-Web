@@ -5,7 +5,6 @@ import { apiGetAssignedUsers, apiGetMentorByEmail, apiCreateAppointment } from "
 import { getCookie } from "@/app/utils/cookies";
 import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import MentorBg from "@/app/Assets/mentor-bg.png";
 import Mentor1 from "@/app/Assets/mentor1.png";
 import Mentor2 from "@/app/Assets/mentor2.png";

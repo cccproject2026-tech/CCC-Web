@@ -1,8 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
-import AppFooter from "@/app/Components/AppFooter";
-import AppHero from "@/app/Components/Hero/AppHero";
+import { useState, useEffect, useRef } from "react";import AppHero from "@/app/Components/Hero/AppHero";
 import ProgressBg from "../../../Assets/progress-bg.jpg";
 import Jumpstart from "../../../Assets/jumpstart-hero.png";
 import SelfRevitalization from "../../../Assets/self-revitalization-hero.png";
@@ -730,9 +728,6 @@ export default function PastorDetailPage({ params }) {
             </p>
           </div>
         </div>
-      )}
-
-      <AppFooter />
-    </div>
+      )}    </div>
   );
 }

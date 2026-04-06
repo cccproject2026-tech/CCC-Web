@@ -2,6 +2,10 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import {
+  directorGlassCard,
+  directorGlassCardHover,
+} from "@/app/director/directorUi";
 
 interface PersonListCardProps {
   id: string;
@@ -24,18 +28,18 @@ interface PersonListCardProps {
     response: "Accepted" | "Waiting" | "Not Interested";
   };
   menteeCount?: number;
-  // Progress info for mentees
   progress?: {
     phase?: string;
     value: number;
   };
-  // Options menu items
   optionsMenu?: {
     icon: string;
     label: string;
     color: string;
     onClick: () => void;
   }[];
+  /** Dark glass shell for director routes (RoleShell). */
+  variant?: "light" | "glass";
 }
 
 export default function PersonListCard({
@@ -52,59 +56,94 @@ export default function PersonListCard({
   menteeCount,
   progress,
   optionsMenu,
+  variant = "light",
 }: PersonListCardProps) {
   const [showOptions, setShowOptions] = useState(false);
+  const isGlass = variant === "glass";
+
+  const shellClass = isGlass
+    ? `rounded-xl p-4 sm:p-5 flex flex-col gap-4 sm:flex-row sm:items-start relative border border-white/15 ${directorGlassCard} ${directorGlassCardHover} sm:gap-5`
+    : "bg-white rounded-xl p-5 flex gap-5 items-start shadow-lg hover:shadow-xl transition-all relative";
+
+  const imgWrapClass = isGlass
+    ? "relative w-full max-w-[120px] h-[120px] mx-auto sm:mx-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 flex-shrink-0 cursor-pointer"
+    : "relative w-[120px] h-[120px] overflow-hidden rounded-xl bg-gray-100 flex-shrink-0 cursor-pointer";
+
+  const titleClass = isGlass
+    ? "font-semibold text-white text-[16px]"
+    : "font-bold text-[#1A2E7A] text-[16px]";
+
+  const descClass = isGlass
+    ? "text-[13px] text-white/65 mb-3 leading-relaxed"
+    : "text-[13px] text-gray-500 mb-3 leading-relaxed";
+
+  const iconRowClass = isGlass
+    ? "flex items-center gap-3 text-[#8ec5eb] text-[17px] sm:gap-4"
+    : "flex items-center gap-4 text-[#2E3B8E] text-[17px]";
 
   return (
-    <div className="bg-white rounded-xl p-5 flex gap-5 items-start shadow-lg hover:shadow-xl transition-all relative">
-      {/* Image with relative positioning for "New" badge - Clickable */}
-      <Link
-        href={profileLink}
-        className="relative w-[120px] h-[120px] overflow-hidden rounded-xl bg-gray-100 flex-shrink-0 cursor-pointer"
-      >
-        <Image
-          src={image}
-          alt={name}
-          fill
-          className="object-cover"
-        />
-
+    <div className={shellClass}>
+      <Link href={profileLink} className={imgWrapClass}>
+        <Image src={image} alt={name} fill className="object-cover" />
         {isNew && (
-          <span className="absolute top-2 left-2 px-2.5 py-1 bg-yellow-400 text-gray-900 rounded-md text-[11px] font-bold shadow-sm">
+          <span
+            className={`absolute left-2 top-2 rounded-md px-2.5 py-1 text-[11px] font-bold shadow-sm ${
+              isGlass
+                ? "bg-[#FFD700] text-[#0f4a76]"
+                : "bg-yellow-400 text-gray-900"
+            }`}
+          >
             New
           </span>
         )}
       </Link>
 
-      {/* Three-dot menu */}
       {optionsMenu && optionsMenu.length > 0 && (
-        <div className="absolute top-4 right-4">
+        <div className="absolute right-3 top-3 sm:right-4 sm:top-4">
           <button
+            type="button"
             onClick={() => setShowOptions(!showOptions)}
-            className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-all text-gray-600"
+            className={
+              isGlass
+                ? "flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 text-white/80 transition hover:bg-white/10"
+                : "flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 transition hover:bg-gray-100"
+            }
           >
-            <i className="fa-solid fa-ellipsis-vertical"></i>
+            <i className="fa-solid fa-ellipsis-vertical" />
           </button>
           {showOptions && (
             <>
               <div
                 className="fixed inset-0 z-40"
                 onClick={() => setShowOptions(false)}
-              ></div>
-              <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl py-2 px-1 min-w-[220px] z-50">
+              />
+              <div
+                className={`absolute right-0 top-full z-50 mt-2 min-w-[220px] rounded-xl py-2 pl-1 pr-1 shadow-2xl ${
+                  isGlass
+                    ? "border border-white/15 bg-[#041f35]/98 backdrop-blur-md"
+                    : "bg-white"
+                }`}
+              >
                 {optionsMenu.map((item, index) => (
                   <button
                     key={index}
+                    type="button"
                     onClick={() => {
                       item.onClick();
                       setShowOptions(false);
                     }}
-                    className="w-full text-left px-4 py-2.5 rounded-lg text-[13px] transition-all flex items-center gap-3 hover:bg-gray-50"
+                    className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-left text-[13px] transition-all ${
+                      isGlass
+                        ? "text-white/90 hover:bg-white/10"
+                        : "hover:bg-gray-50"
+                    }`}
                   >
-                    <i
-                      className={`${item.icon} ${item.color} text-base w-5`}
-                    ></i>
-                    <span className="text-gray-700 font-medium">
+                    <i className={`${item.icon} ${item.color} w-5 text-base`} />
+                    <span
+                      className={
+                        isGlass ? "font-medium text-white/90" : "font-medium text-gray-700"
+                      }
+                    >
                       {item.label}
                     </span>
                   </button>
@@ -115,58 +154,92 @@ export default function PersonListCard({
         </div>
       )}
 
-      {/* Content */}
-      <div className="flex-1 flex flex-col justify-between min-h-[120px]">
+      <div className="flex min-h-[120px] min-w-0 flex-1 flex-col justify-between">
         <div>
           <Link
             href={profileLink}
-            className="flex items-center gap-2 mb-1 hover:opacity-80 transition-opacity"
+            className="mb-1 flex items-center gap-2 transition-opacity hover:opacity-80"
           >
-            <h3 className="font-bold text-[#1A2E7A] text-[16px]">{name}</h3>
-            <i className="fa-solid fa-circle-check text-[#5B9FD7] text-sm"></i>
+            <h3 className={titleClass}>{name}</h3>
+            <i
+              className={`fa-solid fa-circle-check text-sm ${
+                isGlass ? "text-[#8ec5eb]" : "text-[#5B9FD7]"
+              }`}
+            />
           </Link>
-          <p className="text-[13px] text-gray-500 mb-3 leading-relaxed">
-            {description}
-          </p>
+          {role ? (
+            <p className={`mb-1 text-[12px] capitalize ${isGlass ? "text-white/50" : "text-gray-400"}`}>
+              {role}
+            </p>
+          ) : null}
+          <p className={descClass}>{description}</p>
 
           {badge && (
             <span
-              className={`inline-block px-3 py-1 rounded-full text-[11px] font-semibold ${badge.color}`}
+              className={`inline-block rounded-full px-3 py-1 text-[11px] font-semibold ${badge.color}`}
             >
               {badge.text}
             </span>
           )}
 
           {menteeCount !== undefined && (
-            <div className="inline-block px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-[11px] font-semibold">
+            <div
+              className={`inline-block rounded-full px-3 py-1 text-[11px] font-semibold ${
+                isGlass
+                  ? "border border-[#8ec5eb]/35 bg-[#8ec5eb]/15 text-[#cde2f2]"
+                  : "bg-yellow-100 text-yellow-800"
+              }`}
+            >
               {menteeCount} Mentees
             </div>
           )}
 
           {progress && (
-            <div className="mb-3">
-              <p className="text-[12px] font-semibold text-[#2E3B8E] mb-2">
-                Phase : {progress.phase}
+            <div className="mb-3 mt-1">
+              <p
+                className={`mb-2 text-[12px] font-semibold ${
+                  isGlass ? "text-[#8ec5eb]" : "text-[#2E3B8E]"
+                }`}
+              >
+                Phase: {progress.phase ?? "—"}
               </p>
               <div className="flex items-center gap-3">
                 <div className="flex-1">
-                  <div className="text-[11px] text-gray-500 mb-1">Progress</div>
-                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className={`mb-1 text-[11px] ${isGlass ? "text-white/55" : "text-gray-500"}`}
+                  >
+                    Progress
+                  </div>
+                  <div
+                    className={`h-2 w-full overflow-hidden rounded-full ${
+                      isGlass ? "bg-white/15" : "bg-gray-200"
+                    }`}
+                  >
                     <div
-                      className="h-full bg-green-500 transition-all"
-                      style={{ width: `${progress.value}%` }}
-                    ></div>
+                      className={`h-full transition-all ${
+                        isGlass ? "bg-[#8ec5eb]" : "bg-green-500"
+                      }`}
+                      style={{ width: `${Math.min(100, Math.max(0, progress.value))}%` }}
+                    />
                   </div>
                 </div>
-                <span className="text-[14px] font-bold text-gray-700">
-                  {progress.value}%
+                <span
+                  className={`text-[14px] font-bold ${
+                    isGlass ? "text-white" : "text-gray-700"
+                  }`}
+                >
+                  {Math.round(progress.value)}%
                 </span>
               </div>
             </div>
           )}
 
           {invitationInfo && (
-            <div className="text-[12px] text-gray-700 space-y-1 mb-3 mt-2">
+            <div
+              className={`mb-3 mt-2 space-y-1 text-[12px] ${
+                isGlass ? "text-white/80" : "text-gray-700"
+              }`}
+            >
               <p>
                 <span className="font-semibold">Invitation sent on :</span>{" "}
                 <span className="font-bold">{invitationInfo.date}</span>
@@ -174,12 +247,13 @@ export default function PersonListCard({
               <p className="flex items-center gap-2">
                 <span className="font-semibold">Response :</span>
                 <span
-                  className={`px-2 py-1 rounded-md text-white text-[11px] font-semibold ${invitationInfo.response === "Accepted"
-                    ? "bg-green-500"
-                    : invitationInfo.response === "Waiting"
-                      ? "bg-gray-400"
-                      : "bg-red-500"
-                    }`}
+                  className={`rounded-md px-2 py-1 text-[11px] font-semibold text-white ${
+                    invitationInfo.response === "Accepted"
+                      ? "bg-green-500"
+                      : invitationInfo.response === "Waiting"
+                        ? "bg-gray-400"
+                        : "bg-red-500"
+                  }`}
                 >
                   {invitationInfo.response}
                 </span>
@@ -188,28 +262,32 @@ export default function PersonListCard({
           )}
         </div>
 
-        <div className="flex items-center gap-4 text-[#2E3B8E] text-[17px]">
-          <button className="hover:opacity-70 transition" aria-label="Email">
-            <i className="fa-regular fa-envelope"></i>
+        <div className={iconRowClass}>
+          <button type="button" className="transition hover:opacity-80" aria-label="Email">
+            <i className="fa-regular fa-envelope" />
           </button>
-          <button className="hover:opacity-70 transition" aria-label="Message">
-            <i className="fa-regular fa-comment"></i>
+          <button type="button" className="transition hover:opacity-80" aria-label="Message">
+            <i className="fa-regular fa-comment" />
           </button>
-          <button className="hover:opacity-70 transition" aria-label="WhatsApp">
-            <i className="fa-brands fa-whatsapp"></i>
+          <button type="button" className="transition hover:opacity-80" aria-label="WhatsApp">
+            <i className="fa-brands fa-whatsapp" />
           </button>
-          <button className="hover:opacity-70 transition" aria-label="Call">
-            <i className="fa-solid fa-phone"></i>
+          <button type="button" className="transition hover:opacity-80" aria-label="Call">
+            <i className="fa-solid fa-phone" />
           </button>
         </div>
       </div>
 
-      {/* Action Button */}
       {actionButton && (
-        <div className="self-end flex-shrink-0">
+        <div className="flex shrink-0 self-start sm:self-end">
           <button
+            type="button"
             onClick={actionButton.onClick}
-            className="px-4 py-2.5 bg-[#1F2A6E] text-white rounded-lg text-[13px] font-semibold hover:bg-[#2E3B8E] transition-all shadow-md whitespace-nowrap"
+            className={
+              isGlass
+                ? "whitespace-nowrap rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/15 px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+                : "whitespace-nowrap rounded-lg bg-[#1F2A6E] px-4 py-2.5 text-[13px] font-semibold text-white shadow-md transition hover:bg-[#2E3B8E]"
+            }
           >
             {actionButton.text}
           </button>

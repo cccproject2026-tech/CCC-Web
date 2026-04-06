@@ -2,7 +2,6 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "@/app/Assets/progress-bg.png";
 import PastorImg from "@/app/Assets/mentor1.png"; // 👤 example pastor image
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -202,8 +201,6 @@ export default function TrackProgressPage() {
           </div>
         </div>
       </main>
-
-      <PastorFooter />
     </div>
   );
 }

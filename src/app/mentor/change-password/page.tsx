@@ -2,9 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import MentorHeader from "@/app/Components/MentorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
-import { getCookie } from "@/app/utils/cookies";
+import MentorHeader from "@/app/Components/MentorHeader";import { getCookie } from "@/app/utils/cookies";
 import { apiSetPassword } from "@/app/Services/auth.service";
 import { apiGetUserById } from "@/app/Services/users.service";
 
@@ -207,10 +205,7 @@ export default function MentorChangePasswordPage() {
               </form>
             </div>
           </div>
-        </section>
-
-        <PastorFooter />
-      </div>
+        </section>      </div>
     </div>
   );
 }

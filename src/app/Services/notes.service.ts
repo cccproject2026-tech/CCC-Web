@@ -1,6 +1,18 @@
 import { isAxiosError } from "axios";
 import axiosInstance from "./config/axios-instance";
+import { apiGetNotes } from "./users.service";
 import type { Note } from "./types/users.types";
+
+/** Stable string id for matching list items (handles `$oid` envelopes). */
+function noteIdString(note: Note): string | null {
+  const n = note as unknown as Record<string, unknown>;
+  const raw = n._id ?? n.id;
+  if (raw == null) return null;
+  if (typeof raw === "object" && raw !== null && "$oid" in raw) {
+    return String((raw as { $oid: string }).$oid);
+  }
+  return String(raw);
+}
 
 /** Pull notes array from varying API envelope shapes */
 export function normalizeNotesList(payload: unknown): Note[] {
@@ -43,16 +55,25 @@ function extractEnvelopeMessage(data: unknown): string | undefined {
 }
 
 /**
- * GET /users/:userId/notes/:noteId
+ * Resolve one note by id. The API does not expose GET /users/:userId/notes/:noteId,
+ * so we load GET /users/:userId/notes and find the matching item.
  */
 export async function fetchNoteById(userId: string, noteId: string): Promise<Note | null> {
-  const res = await axiosInstance.get<unknown>(`/users/${userId}/notes/${noteId}`);
-  const body = res.data as { success?: boolean; message?: string; data?: unknown };
-  if (body.success === false) {
-    throw new Error(body.message || "Could not load note.");
+  const res = await apiGetNotes(userId);
+  const envelope = res.data as { success?: boolean; message?: string; data?: unknown };
+  if (envelope && envelope.success === false) {
+    throw new Error(
+      typeof envelope.message === "string" ? envelope.message : "Could not load notes.",
+    );
   }
-  const raw = body.data !== undefined ? body.data : res.data;
-  return normalizeNoteRecord(raw);
+  const raw = envelope.data !== undefined ? envelope.data : (res.data as unknown);
+  const list = normalizeNotesList(raw);
+  const target = noteId.trim();
+  for (const n of list) {
+    const id = noteIdString(n);
+    if (id && id === target) return n;
+  }
+  throw new Error("Note not found.");
 }
 
 /**
@@ -102,10 +123,8 @@ export async function createNoteBestEffort(
   throw lastErr ?? new Error("Could not save note.");
 }
 
-type HttpMethod = "patch" | "put";
-
 /**
- * PATCH then PUT with common bodies — /users/:userId/notes/:noteId
+ * PATCH with common bodies — backend has no PUT for notes.
  */
 export async function updateNoteBestEffort(
   userId: string,
@@ -119,43 +138,36 @@ export async function updateNoteBestEffort(
     { body: text },
   ];
 
-  const methods: HttpMethod[] = ["patch", "put"];
   let lastErr: unknown;
 
-  for (const method of methods) {
-    for (const body of payloads) {
-      try {
-        const res =
-          method === "patch"
-            ? await axiosInstance.patch<unknown>(`/users/${userId}/notes/${noteId}`, body)
-            : await axiosInstance.put<unknown>(`/users/${userId}/notes/${noteId}`, body)
-        const data = res.data as { success?: boolean; message?: string; data?: unknown };
-        if (data && data.success === false) {
-          lastErr = new Error(data.message || "Update rejected.");
-          continue;
-        }
-        if (!envelopeSuccess(res.data)) {
-          lastErr = new Error(extractEnvelopeMessage(res.data) || "Update rejected.");
-          continue;
-        }
-        const raw = data.data !== undefined ? data.data : res.data;
-        let note = normalizeNoteRecord(raw);
-        if (!note) {
-          try {
-            note = await fetchNoteById(userId, noteId);
-          } catch {
-            /* ignore */
-          }
-        }
-        if (note) return note;
-      } catch (e) {
-        lastErr = e;
-        if (!isAxiosError(e)) break;
-        const st = e.response?.status;
-        if (st === 401 || st === 403) break;
-        if (st === 405) continue;
-        if (st !== 400 && st !== 422 && st !== 404) break;
+  for (const body of payloads) {
+    try {
+      const res = await axiosInstance.patch<unknown>(`/users/${userId}/notes/${noteId}`, body);
+      const data = res.data as { success?: boolean; message?: string; data?: unknown };
+      if (data && data.success === false) {
+        lastErr = new Error(data.message || "Update rejected.");
+        continue;
       }
+      if (!envelopeSuccess(res.data)) {
+        lastErr = new Error(extractEnvelopeMessage(res.data) || "Update rejected.");
+        continue;
+      }
+      const raw = data.data !== undefined ? data.data : res.data;
+      let note = normalizeNoteRecord(raw);
+      if (!note) {
+        try {
+          note = await fetchNoteById(userId, noteId);
+        } catch {
+          /* ignore */
+        }
+      }
+      if (note) return note;
+    } catch (e) {
+      lastErr = e;
+      if (!isAxiosError(e)) break;
+      const st = e.response?.status;
+      if (st === 401 || st === 403) break;
+      if (st !== 400 && st !== 422 && st !== 404) break;
     }
   }
 

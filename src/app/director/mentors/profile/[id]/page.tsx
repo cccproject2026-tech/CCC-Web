@@ -3,9 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import AppHero from "@/app/Components/Hero/AppHero";
-import AppFooter from "@/app/Components/AppFooter";
-import ConfirmModal from "@/app/Components/ConfirmModal";
+import AppHero from "@/app/Components/Hero/AppHero";import ConfirmModal from "@/app/Components/ConfirmModal";
 import MentorBg from "@/app/Assets/mentor-bg.png";
 import Mentor1 from "@/app/Assets/mentor1.png";
 import ProfileForm from "@/app/Components/ProfileForm";
@@ -122,9 +120,7 @@ export default function MentorProfilePage() {
         <AppHero title="Mentor Profile" backgroundImageUrl={MentorBg.src} />
         <div className="flex justify-center items-center py-32">
           <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-        </div>
-        <AppFooter />
-      </div>
+        </div>      </div>
     );
   }
 
@@ -365,9 +361,6 @@ export default function MentorProfilePage() {
           className="fixed inset-0 z-40"
           onClick={() => setShowOptionsMenu(false)}
         ></div>
-      )}
-
-      <AppFooter />
-    </div>
+      )}    </div>
   );
 }

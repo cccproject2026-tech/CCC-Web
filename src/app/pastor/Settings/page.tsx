@@ -1,9 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
-import { getCookie } from "@/app/utils/cookies";
+import PastorHeader from "@/app/Components/PastorHeader";import { getCookie } from "@/app/utils/cookies";
 import { apiSendOtp, apiResetPassword } from "@/app/Services/api";
 
 export default function PastorSettingsPage() {
@@ -122,9 +120,6 @@ export default function PastorSettingsPage() {
             </button>
           </form>
         </div>
-      </main>
-
-      <PastorFooter />
-    </div>
+      </main>    </div>
   );
 }

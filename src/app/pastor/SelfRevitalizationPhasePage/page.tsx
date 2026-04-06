@@ -3,7 +3,6 @@ import Image from "next/image";
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "@/app/Assets/self-revitalization-hero.png";
 import PhaseImg from "@/app/Assets/phase-img.png";
 import { apiGetRoadmapById } from "@/app/Services/api";
@@ -194,8 +193,6 @@ function SelfRevitalizationContent() {
           )}
         </div>
       </main>
-
-      <PastorFooter />
     </div>
   );
 }

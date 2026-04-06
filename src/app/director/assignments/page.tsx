@@ -2,9 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import AppHeader from "@/app/Components/Header/AppHeader";
-import AppFooter from "@/app/Components/AppFooter";
-import AppHero from "@/app/Components/Hero/AppHero";
+import AppHeader from "@/app/Components/Header/AppHeader";import AppHero from "@/app/Components/Hero/AppHero";
 import RoadmapBg from "../../Assets/roadmap-bg.png";
 import Thumb1 from "../../Assets/thumb1.png";
 import Thumb2 from "../../Assets/thumb2.png";
@@ -430,9 +428,6 @@ export default function AssignmentsPage() {
             <span className="text-[#2E3B8E] font-semibold">{toast}</span>
           </div>
         </div>
-      )}
-
-      <AppFooter />
-    </div>
+      )}    </div>
   );
 }

@@ -3,9 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import MentorHeader from "@/app/Components/MentorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
-import HeroBg from "@/app/Assets/assignments-bg.png";
+import MentorHeader from "@/app/Components/MentorHeader";import HeroBg from "@/app/Assets/assignments-bg.png";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 import {
@@ -193,9 +191,7 @@ export default function MentorAssignmentsPage() {
               </div>
             )}
           </div>
-        </main>
-        <PastorFooter />
-      </div>
+        </main>      </div>
     </div>
   );
 }

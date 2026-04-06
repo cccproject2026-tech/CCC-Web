@@ -7,8 +7,6 @@ import MentorHeader from "@/app/Components/MentorHeader";
 import DocumentsModal from "@/app/Components/DocumentsModal";
 import { apiGetUserById, apiUpdateUserById } from "@/app/Services/users.service";
 import { getGreeting, getMentorFromCookie } from "@/app/Services/utils/helpers";
-import PastorFooter from "@/app/Components/PastorFooter";
-
 const storedUser =
   typeof window !== "undefined"
     ? JSON.parse(localStorage.getItem("mentor") || "null")
@@ -404,8 +402,6 @@ export default function MentorProfile() {
           @apply w-full px-4 py-2 rounded-md border border-[#8ec5eb]/35 bg-white/5 text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-[#8ec5eb]/40 disabled:opacity-80;
         }
       `}</style>
-
-      <PastorFooter />
     </div>
   );
 }

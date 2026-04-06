@@ -1,15 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import Image from "next/image";
-import AppHero from "@/app/Components/Hero/AppHero";
-import AppFooter from "@/app/Components/AppFooter";
+import DirectorHero from "../DirectorHero";
+import { directorGlassCard, directorGlassCardHover, directorInputClass, directorPageRoot } from "../directorUi";
 import RoadmapJumpStartBg from "../../Assets/roadmap-jump-start-bg.jpg";
-import Card1 from "../../Assets/card1.png";
-import Card2 from "../../Assets/card2.png";
-import Card3 from "../../Assets/card3.png";
-import Card4 from "../../Assets/card4.png";
-import Card5 from "../../Assets/card5.png";
-import Card6 from "../../Assets/card6.png";
 import { createMedia, deleteMedia, getAllMedia, updateMedia } from "@/app/Services/media.service";
 
 interface Video {
@@ -21,6 +14,14 @@ interface Video {
   createdAt?: string;
 }
 
+type VideoFormState = {
+  heading: string;
+  subHeading: string;
+  description: string;
+  videoFile: File | null;
+  existingVideoUrl: string | null;
+};
+
 export default function VideosPage() {
   const [showAddVideoModal, setShowAddVideoModal] = useState(false);
   const [showEditVideoModal, setShowEditVideoModal] = useState(false);
@@ -31,63 +32,13 @@ export default function VideosPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
   const [deleteCount, setDeleteCount] = useState(0);
-  const [videoForm, setVideoForm] = useState({
+  const [videoForm, setVideoForm] = useState<VideoFormState>({
     heading: "",
     subHeading: "",
     description: "",
-    videoFile: null as File | null,
+    videoFile: null,
+    existingVideoUrl: null,
   });
-
-  // const videos: Video[] = [
-  //   {
-  //     id: 1,
-  //     heading: "Introduction",
-  //     subHeading: "Center for Community Change",
-  //     description: "Interested in receiving mentoring in community engagement",
-  //     thumbnail: Card1,
-  //     date: "20 Oct 2024",
-  //   },
-  //   {
-  //     id: 2,
-  //     heading: "Introduction",
-  //     subHeading: "Center for Community Change",
-  //     description: "Interested in receiving mentoring in community engagement",
-  //     thumbnail: Card2,
-  //     date: "20 Oct 2024",
-  //   },
-  //   {
-  //     id: 3,
-  //     heading: "Introduction",
-  //     subHeading: "Center for Community Change",
-  //     description: "Interested in receiving mentoring in community engagement",
-  //     thumbnail: Card3,
-  //     date: "20 Oct 2024",
-  //   },
-  //   {
-  //     id: 4,
-  //     heading: "Introduction",
-  //     subHeading: "Center for Community Change",
-  //     description: "Interested in receiving mentoring in community engagement",
-  //     thumbnail: Card4,
-  //     date: "20 Oct 2024",
-  //   },
-  //   {
-  //     id: 5,
-  //     heading: "Introduction",
-  //     subHeading: "Center for Community Change",
-  //     description: "Interested in receiving mentoring in community engagement",
-  //     thumbnail: Card5,
-  //     date: "20 Oct 2024",
-  //   },
-  //   {
-  //     id: 6,
-  //     heading: "Introduction",
-  //     subHeading: "Center for Community Change",
-  //     description: "Interested in receiving mentoring in community engagement",
-  //     thumbnail: Card6,
-  //     date: "20 Oct 2024",
-  //   },
-  // ];
 
   const [videos, setVideos] = useState<Video[]>([]);
 
@@ -97,7 +48,6 @@ export default function VideosPage() {
       try {
         const res = await getAllMedia();
         setVideos(res.data?.data || []);
-        console.log(res.data.data)
       } catch (err) {
         console.error("Failed to load videos", err);
       }
@@ -228,6 +178,7 @@ export default function VideosPage() {
         subHeading: "",
         description: "",
         videoFile: null,
+        existingVideoUrl: null,
       });
 
       setEditingVideoId(null);
@@ -248,7 +199,6 @@ export default function VideosPage() {
 
   const handleEdit = (videoId: string) => {
     const video = videos.find((v) => v._id === videoId);
-    console.log(video)
     if (video) {
       setEditingVideoId(videoId);
 
@@ -273,7 +223,6 @@ export default function VideosPage() {
 
       setVideos((prev) => prev.filter((v) => v._id !== videoId));
 
-      console.log("Deleted successfully");
     } catch (err) {
       console.error("Delete failed", err);
       alert("Failed to delete video");
@@ -288,56 +237,55 @@ export default function VideosPage() {
   };
 
   return (
-    <div
-      className="min-h-screen flex flex-col bg-gradient-to-b from-[#1A2E5C] to-[#2E3B8E]"
-      onClick={handleClickOutside}
-    >
-      {/* Hero Section */}
-      <AppHero
+    <div className={directorPageRoot} onClick={handleClickOutside}>
+      <DirectorHero
         title="Videos"
-        backgroundImageUrl={RoadmapJumpStartBg.src}
+        subtitle="Upload and manage media for pastors and mentors."
+        image={RoadmapJumpStartBg}
         breadcrumbItems={[
           { label: "Home", href: "/director/home" },
           { label: "Videos" },
         ]}
       />
 
-      {/* Main Content */}
-      <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-12 bg-[#b0d0e4]">
-        <div className="max-w-[1400px] mx-auto">
-          {/* Uploaded Media Header */}
-          <div className="flex items-center justify-between mb-6">
+      <section className="relative flex-1 px-4 pb-12 sm:px-6 md:px-12 lg:px-20">
+        <div className="mx-auto max-w-[1400px]">
+          <div className={`mb-8 flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 ${directorGlassCard}`}>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Uploaded Media</h2>
+              <h2 className="text-xl font-semibold text-white sm:text-2xl">Uploaded media</h2>
               {isSelectMode && selectedVideos.length > 0 && (
-                <p className="text-sm text-gray-600 mt-1">
-                  {selectedVideos.length} Selected {selectedVideos.length === 1 ? "Item" : "Items"}
+                <p className="mt-1 text-sm text-white/60">
+                  {selectedVideos.length} selected {selectedVideos.length === 1 ? "item" : "items"}
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {isSelectMode ? (
                 <>
                   <button
+                    type="button"
                     onClick={handleCancelSelect}
-                    className="bg-[#1E366F] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#1a2f5a] transition-colors shadow-sm flex items-center gap-2"
+                    className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
                   >
                     <i className="fa-solid fa-times"></i>
                     Cancel
                   </button>
                   <button
+                    type="button"
                     onClick={handleSelectAll}
-                    className="bg-white text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors shadow-sm border border-gray-300"
+                    className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
                   >
-                    Select All
+                    Select all
                   </button>
                   <button
+                    type="button"
                     onClick={handleDeleteClick}
                     disabled={selectedVideos.length === 0}
-                    className={`text-sm font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm ${selectedVideos.length === 0
-                      ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                      : "bg-red-600 text-white hover:bg-red-700"
-                      }`}
+                    className={`rounded-lg border px-4 py-2 text-sm font-semibold transition ${
+                      selectedVideos.length === 0
+                        ? "cursor-not-allowed border-white/10 bg-white/5 text-white/35"
+                        : "border-red-400/45 bg-red-500/15 text-red-100 hover:bg-red-500/25"
+                    }`}
                   >
                     Delete
                   </button>
@@ -345,107 +293,110 @@ export default function VideosPage() {
               ) : (
                 <>
                   <button
+                    type="button"
                     onClick={handleSelectMode}
-                    className="bg-white text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2"
+                    className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
                   >
-                    <i className="fa-solid fa-check-square text-gray-700"></i>
+                    <i className="fa-solid fa-check-square text-[#8ec5eb]/90"></i>
                     Select
                   </button>
                   <button
+                    type="button"
                     onClick={() => setShowAddVideoModal(true)}
-                    className="bg-white text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2"
+                    className="inline-flex items-center gap-2 rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
                   >
-                    <i className="fa-solid fa-plus text-gray-700"></i>
-                    Add Video
+                    <i className="fa-solid fa-plus"></i>
+                    Add video
                   </button>
                 </>
               )}
             </div>
           </div>
 
-          {/* Video Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {videos.map((video) => (
               <div
                 key={video._id}
-                className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-all"
+                className={`overflow-hidden rounded-2xl border border-white/12 ${directorGlassCard} ${directorGlassCardHover}`}
               >
-                {/* Thumbnail with Play Button */}
-                <div className="relative aspect-video bg-gray-200">
-                  {/* <Image
-                    src={video.thumbnail}
-                    alt={video.subHeading}
-                    fill
-                    className="object-cover"
-                  /> */}
+                <div className="relative aspect-video bg-[#041f35]/80">
                   {video.mediaFiles?.[0]?.url ? (
                     <video
                       src={video.mediaFiles[0].url}
-                      className="w-full h-full object-cover"
+                      className="h-full w-full object-cover"
+                      muted
+                      playsInline
+                      preload="metadata"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gray-300" />
+                    <div className="h-full w-full bg-[#062946]/90" />
                   )}
-                  {/* Play Button Overlay */}
                   <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                    <div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg hover:bg-white transition-all cursor-pointer">
-                      <i className="fa-solid fa-play text-gray-900 text-xl ml-1"></i>
+                    <div className="flex h-14 w-14 cursor-pointer items-center justify-center rounded-full bg-[#8ec5eb]/25 ring-2 ring-[#8ec5eb]/50 transition hover:bg-[#8ec5eb]/35">
+                      <i className="fa-solid fa-play ml-0.5 text-lg text-white"></i>
                     </div>
                   </div>
-                  {/* Date - Transparent Background */}
-                  <div className="absolute bottom-2 left-2 text-white text-xs font-medium">
-                    {video.date}
+                  <div className="absolute bottom-2 left-2 rounded-md bg-black/45 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+                    {video.createdAt
+                      ? new Date(video.createdAt).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
+                      : "—"}
                   </div>
-                  {/* Selection Checkbox - Only show in select mode */}
                   {isSelectMode && (
                     <div
-                      className="absolute top-2 left-2 cursor-pointer"
+                      className="absolute left-2 top-2 cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleSelectVideo(video._id);
                       }}
                     >
                       {selectedVideos.includes(video._id) ? (
-                        <div className="w-6 h-6 bg-blue-600 rounded flex items-center justify-center shadow-md">
-                          <i className="fa-solid fa-check text-white text-xs"></i>
+                        <div className="flex h-7 w-7 items-center justify-center rounded-md border border-[#8ec5eb]/60 bg-[#8ec5eb]/90 shadow-md">
+                          <i className="fa-solid fa-check text-xs text-[#041f35]"></i>
                         </div>
                       ) : (
-                        <div className="w-6 h-6 bg-white rounded border-2 border-gray-300 flex items-center justify-center shadow-md"></div>
+                        <div className="h-7 w-7 rounded-md border-2 border-white/50 bg-black/40 shadow-md backdrop-blur-sm" />
                       )}
                     </div>
                   )}
-                  {/* Options Menu - Three Dots - Only show when not in select mode */}
                   {!isSelectMode && (
-                    <div className="absolute top-2 right-2">
+                    <div className="absolute right-2 top-2">
                       <div className="relative">
                         <button
+                          type="button"
                           onClick={(e) => handleMenuToggle(video._id, e)}
-                          className="w-8 h-8 bg-white rounded-md flex items-center justify-center hover:bg-gray-100 transition-all shadow-sm"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/20 bg-black/40 text-white backdrop-blur-sm transition hover:bg-black/55"
                         >
-                          <i className="fa-solid fa-ellipsis-vertical text-blue-600 text-xs"></i>
+                          <i className="fa-solid fa-ellipsis-vertical text-xs"></i>
                         </button>
-                        {/* Dropdown Menu */}
                         {openMenuId === video._id && (
-                          <div className="absolute top-10 right-0 bg-white rounded-lg shadow-xl py-2 min-w-[140px] z-50 border border-gray-200">
+                          <div
+                            className={`absolute right-0 top-10 z-50 min-w-[150px] overflow-hidden rounded-xl py-2 ${directorGlassCard}`}
+                          >
                             <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleEdit(video._id);
                               }}
-                              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-[#8ec5eb] transition hover:bg-white/10"
                             >
-                              <i className="fa-regular fa-pen-to-square text-blue-600 text-sm"></i>
-                              <span className="text-blue-600 text-sm font-medium">Edit</span>
+                              <i className="fa-regular fa-pen-to-square text-sm"></i>
+                              Edit
                             </button>
                             <button
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDelete(video._id);
                               }}
-                              className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-red-200 transition hover:bg-red-500/25"
                             >
-                              <i className="fa-regular fa-trash-can text-red-600 text-sm"></i>
-                              <span className="text-red-600 text-sm font-medium">Delete</span>
+                              <i className="fa-regular fa-trash-can text-sm"></i>
+                              Delete
                             </button>
                           </div>
                         )}
@@ -454,50 +405,41 @@ export default function VideosPage() {
                   )}
                 </div>
 
-                {/* Video Info */}
-                <div className="p-4">
-                  <p className="text-xs text-gray-500 mb-1">{video.heading}</p>
-                  <h3 className="text-lg font-bold text-gray-900 mb-2">
-                    {video.subHeading}
-                  </h3>
-                  <p className="text-sm text-gray-600 leading-relaxed">
-                    {video.description}
-                  </p>
+                <div className="border-t border-white/10 p-4">
+                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[#8ec5eb]/80">{video.heading}</p>
+                  <h3 className="mb-2 text-lg font-semibold text-white">{video.subheading ?? "—"}</h3>
+                  <p className="line-clamp-3 text-sm leading-relaxed text-white/65">{video.description ?? ""}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
       </section>
-
-      <AppFooter />
-
-      {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-xl max-w-md w-full shadow-2xl border border-gray-200 overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+          <div className={`w-full max-w-md overflow-hidden rounded-2xl ${directorGlassCard}`}>
             <div className="p-8 text-center">
-              {/* Trash Icon */}
-              <div className="flex justify-center mb-4">
-                <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center">
-                  <i className="fa-solid fa-trash-can text-red-400 text-3xl"></i>
+              <div className="mb-4 flex justify-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full border border-red-400/30 bg-red-500/15">
+                  <i className="fa-solid fa-trash-can text-2xl text-red-300"></i>
                 </div>
               </div>
-              {/* Message */}
-              <h2 className="text-xl font-bold text-gray-900 mb-2">
-                Are you sure want to Delete {selectedVideos.length} {selectedVideos.length === 1 ? "item" : "items"} ?
+              <h2 className="mb-2 text-xl font-semibold text-white">
+                Delete {selectedVideos.length} {selectedVideos.length === 1 ? "item" : "items"}?
               </h2>
-              {/* Buttons */}
-              <div className="flex items-center justify-center gap-4 mt-6">
+              <p className="text-sm text-white/55">This action cannot be undone from this dialog.</p>
+              <div className="mt-6 flex items-center justify-center gap-4">
                 <button
+                  type="button"
                   onClick={() => setShowDeleteModal(false)}
-                  className="px-6 py-2.5 bg-white border border-[#1E366F] text-[#1E366F] rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+                  className="rounded-xl border border-white/25 bg-white/10 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleConfirmDelete}
-                  className="px-6 py-2.5 bg-[#1E366F] text-white rounded-lg text-sm font-semibold hover:bg-[#1a2f5a] transition-colors"
+                  className="rounded-xl border border-red-400/45 bg-red-500/20 px-6 py-2.5 text-sm font-semibold text-red-100 transition hover:bg-red-500/30"
                 >
                   Delete
                 </button>
@@ -507,123 +449,110 @@ export default function VideosPage() {
         </div>
       )}
 
-      {/* Delete Success Toast */}
       {showDeleteToast && (
-        <div className="fixed top-4 left-4 z-[110] bg-gray-100 rounded-lg shadow-xl px-4 py-3 flex items-center gap-3 animate-slide-in">
-          <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
-            <i className="fa-solid fa-check text-white text-sm"></i>
+        <div
+          className={`fixed left-4 top-4 z-[110] flex items-center gap-3 rounded-xl border border-[#8ec5eb]/35 px-4 py-3 shadow-xl ${directorGlassCard}`}
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-500/25 ring-1 ring-emerald-400/40">
+            <i className="fa-solid fa-check text-sm text-emerald-200"></i>
           </div>
-          <span className="text-gray-900 font-medium">
-            {deleteCount} {deleteCount === 1 ? "Item" : "Items"} Deleted
+          <span className="font-medium text-white">
+            {deleteCount} {deleteCount === 1 ? "item" : "items"} removed
           </span>
         </div>
       )}
 
-      {/* Add Video Modal */}
       {showAddVideoModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full shadow-2xl border border-gray-200 overflow-hidden">
-            {/* Header - Blue Background */}
-            <div className="bg-gradient-to-r from-[#1E366F] to-[#2E3B8E] px-8 py-6 relative">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+          <div className={`max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl ${directorGlassCard}`}>
+            <div className="relative border-b border-white/10 px-6 py-5 sm:px-8">
               <button
-                onClick={() => setShowAddVideoModal(false)}
-                className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-all"
+                type="button"
+                onClick={() => {
+                  setShowAddVideoModal(false);
+                  setVideoForm({
+                    heading: "",
+                    subHeading: "",
+                    description: "",
+                    videoFile: null,
+                    existingVideoUrl: null,
+                  });
+                }}
+                className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
               >
-                <i className="fa-solid fa-times text-white text-lg"></i>
+                <i className="fa-solid fa-times text-lg"></i>
               </button>
-              <h2 className="text-white text-3xl font-bold">Add Video</h2>
+              <h2 className="pr-12 text-2xl font-semibold text-white">Add video</h2>
+              <p className="mt-1 text-sm text-white/55">Upload a file and add titles for pastors and mentors.</p>
             </div>
 
-            {/* Content - White Background */}
-            <div className="p-8">
-              {/* Heading */}
-              <div className="mb-6">
-                <label className="block text-gray-900 font-semibold mb-2">
-                  Heading
-                </label>
+            <div className="space-y-5 p-6 sm:p-8">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-white/85">Heading</label>
                 <input
                   type="text"
                   value={videoForm.heading}
-                  onChange={(e) =>
-                    setVideoForm({ ...videoForm, heading: e.target.value })
-                  }
-                  placeholder="Enter Heading"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white focus:outline-none focus:border-[#2E3B8E]"
+                  onChange={(e) => setVideoForm({ ...videoForm, heading: e.target.value })}
+                  placeholder="Enter heading"
+                  className={directorInputClass}
                 />
               </div>
 
-              {/* Sub Heading */}
-              <div className="mb-6">
-                <label className="block text-gray-900 font-semibold mb-2">
-                  Sub Heading
-                </label>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-white/85">Sub heading</label>
                 <input
                   type="text"
                   value={videoForm.subHeading}
-                  onChange={(e) =>
-                    setVideoForm({ ...videoForm, subHeading: e.target.value })
-                  }
-                  placeholder="Enter Sub Heading"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white focus:outline-none focus:border-[#2E3B8E]"
+                  onChange={(e) => setVideoForm({ ...videoForm, subHeading: e.target.value })}
+                  placeholder="Enter sub heading"
+                  className={directorInputClass}
                 />
               </div>
 
-              {/* Description */}
-              <div className="mb-6">
-                <label className="block text-gray-900 font-semibold mb-2">
-                  Description
-                </label>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-white/85">Description</label>
                 <textarea
                   value={videoForm.description}
-                  onChange={(e) =>
-                    setVideoForm({ ...videoForm, description: e.target.value })
-                  }
-                  placeholder="Enter Description"
+                  onChange={(e) => setVideoForm({ ...videoForm, description: e.target.value })}
+                  placeholder="Enter description"
                   rows={4}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white focus:outline-none focus:border-[#2E3B8E] resize-none"
+                  className={`${directorInputClass} resize-none`}
                 />
               </div>
 
-              {/* Video Upload */}
-              <div className="mb-6">
-                <label className="block text-gray-900 font-semibold mb-2 flex items-center gap-2">
-                  <i className="fa-solid fa-cloud-upload text-gray-700"></i>
-                  Upload Video
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-medium text-white/85">
+                  <i className="fa-solid fa-cloud-arrow-up text-[#8ec5eb]"></i>
+                  Upload video
                 </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-[#2E3B8E] transition-colors cursor-pointer relative">
+                <div className="relative cursor-pointer rounded-xl border-2 border-dashed border-white/20 bg-white/[0.04] p-10 text-center transition hover:border-[#8ec5eb]/40">
                   <input
                     type="file"
                     accept="video/*"
                     onChange={handleFileChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                   />
-                  <div className="space-y-4">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                      <i className="fa-solid fa-plus text-gray-600 text-2xl"></i>
+                  <div className="space-y-3">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#8ec5eb]/15 ring-1 ring-[#8ec5eb]/30">
+                      <i className="fa-solid fa-plus text-xl text-[#8ec5eb]"></i>
                     </div>
-                    <div>
-                      <p className="text-gray-900 font-medium">
-                        Drag & Drop or Click here to choose file
-                      </p>
-                      <p className="text-gray-500 text-sm mt-2 flex items-center justify-center gap-1">
-                        Max file size : 1 GB
-                        <i className="fa-solid fa-circle-info text-gray-400"></i>
-                      </p>
-                    </div>
-                  </div>
-                  {videoForm.videoFile && (
-                    <p className="text-sm text-[#2E3B8E] mt-4 font-medium">
-                      Selected: {videoForm.videoFile.name}
+                    <p className="font-medium text-white">Drag and drop or click to choose a file</p>
+                    <p className="flex items-center justify-center gap-1 text-sm text-white/45">
+                      Max file size 1 GB
+                      <i className="fa-solid fa-circle-info text-white/35"></i>
                     </p>
-                  )}
+                  </div>
+                  {videoForm.videoFile ? (
+                    <p className="mt-4 text-sm font-medium text-[#8ec5eb]">Selected: {videoForm.videoFile.name}</p>
+                  ) : null}
                 </div>
               </div>
 
-              {/* Upload Button */}
-              <div className="flex justify-end">
+              <div className="flex justify-end pt-2">
                 <button
+                  type="button"
                   onClick={handleSubmit}
-                  className="bg-[#1E366F] text-white text-sm font-semibold px-6 py-3 rounded-lg hover:bg-[#1a2f5a] transition-colors"
+                  className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
                 >
                   Upload
                 </button>
@@ -633,13 +562,12 @@ export default function VideosPage() {
         </div>
       )}
 
-      {/* Edit Video Modal */}
       {showEditVideoModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full shadow-2xl border border-gray-200 overflow-hidden">
-            {/* Header - Blue Background */}
-            <div className="bg-gradient-to-r from-[#1E366F] to-[#2E3B8E] px-8 py-6 relative">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+          <div className={`max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl ${directorGlassCard}`}>
+            <div className="relative border-b border-white/10 px-6 py-5 sm:px-8">
               <button
+                type="button"
                 onClick={() => {
                   setShowEditVideoModal(false);
                   setEditingVideoId(null);
@@ -648,110 +576,84 @@ export default function VideosPage() {
                     subHeading: "",
                     description: "",
                     videoFile: null,
+                    existingVideoUrl: null,
                   });
                 }}
-                className="absolute top-4 right-4 w-10 h-10 bg-white/20 hover:bg-white/30 rounded-full flex items-center justify-center transition-all"
+                className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
               >
-                <i className="fa-solid fa-times text-white text-lg"></i>
+                <i className="fa-solid fa-times text-lg"></i>
               </button>
-              <h2 className="text-white text-3xl font-bold">Edit Video</h2>
+              <h2 className="pr-12 text-2xl font-semibold text-white">Edit video</h2>
+              <p className="mt-1 text-sm text-white/55">Update metadata or replace the file.</p>
             </div>
 
-            {/* Content - White Background */}
-            <div className="p-8">
-              {/* Heading */}
-              <div className="mb-6">
-                <label className="block text-gray-900 font-semibold mb-2">
-                  Heading
-                </label>
+            <div className="space-y-5 p-6 sm:p-8">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-white/85">Heading</label>
                 <input
                   type="text"
                   value={videoForm.heading}
-                  onChange={(e) =>
-                    setVideoForm({ ...videoForm, heading: e.target.value })
-                  }
-                  placeholder="Enter Heading"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white focus:outline-none focus:border-[#2E3B8E]"
+                  onChange={(e) => setVideoForm({ ...videoForm, heading: e.target.value })}
+                  placeholder="Enter heading"
+                  className={directorInputClass}
                 />
               </div>
 
-              {/* Sub Heading */}
-              <div className="mb-6">
-                <label className="block text-gray-900 font-semibold mb-2">
-                  Sub Heading
-                </label>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-white/85">Sub heading</label>
                 <input
                   type="text"
                   value={videoForm.subHeading}
-                  onChange={(e) =>
-                    setVideoForm({ ...videoForm, subHeading: e.target.value })
-                  }
-                  placeholder="Enter Sub Heading"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white focus:outline-none focus:border-[#2E3B8E]"
+                  onChange={(e) => setVideoForm({ ...videoForm, subHeading: e.target.value })}
+                  placeholder="Enter sub heading"
+                  className={directorInputClass}
                 />
               </div>
 
-              {/* Description */}
-              <div className="mb-6">
-                <label className="block text-gray-900 font-semibold mb-2">
-                  Description
-                </label>
+              <div>
+                <label className="mb-2 block text-sm font-medium text-white/85">Description</label>
                 <textarea
                   value={videoForm.description}
-                  onChange={(e) =>
-                    setVideoForm({ ...videoForm, description: e.target.value })
-                  }
-                  placeholder="Enter Description"
+                  onChange={(e) => setVideoForm({ ...videoForm, description: e.target.value })}
+                  placeholder="Enter description"
                   rows={4}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white focus:outline-none focus:border-[#2E3B8E] resize-none"
+                  className={`${directorInputClass} resize-none`}
                 />
               </div>
 
-              {/* Video Upload */}
-              <div className="mb-6">
-                <label className="block text-gray-900 font-semibold mb-2 flex items-center gap-2">
-                  <i className="fa-solid fa-cloud-upload text-gray-700"></i>
-                  Upload Video
+              <div>
+                <label className="mb-2 flex items-center gap-2 text-sm font-medium text-white/85">
+                  <i className="fa-solid fa-cloud-arrow-up text-[#8ec5eb]"></i>
+                  Replace video (optional)
                 </label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-[#2E3B8E] transition-colors cursor-pointer relative">
+                <div className="relative cursor-pointer rounded-xl border-2 border-dashed border-white/20 bg-white/[0.04] p-10 text-center transition hover:border-[#8ec5eb]/40">
                   <input
                     type="file"
                     accept="video/*"
                     onChange={handleFileChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
                   />
-                  <div className="space-y-4">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto">
-                      <i className="fa-solid fa-plus text-gray-600 text-2xl"></i>
+                  <div className="space-y-3">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#8ec5eb]/15 ring-1 ring-[#8ec5eb]/30">
+                      <i className="fa-solid fa-plus text-xl text-[#8ec5eb]"></i>
                     </div>
-                    <div>
-                      <p className="text-gray-900 font-medium">
-                        Drag & Drop or Click here to choose file
-                      </p>
-                      <p className="text-gray-500 text-sm mt-2 flex items-center justify-center gap-1">
-                        Max file size : 1 GB
-                        <i className="fa-solid fa-circle-info text-gray-400"></i>
-                      </p>
-                    </div>
+                    <p className="font-medium text-white">Drag and drop or click to choose a new file</p>
+                    <p className="text-sm text-white/45">Max file size 1 GB</p>
                   </div>
-                  {videoForm.videoFile && (
-                    <p className="text-sm text-[#2E3B8E] mt-4 font-medium">
-                      Selected: {videoForm.videoFile.name}
-                    </p>
-                  )}
-                  {!videoForm.videoFile && editingVideoId && (
-                    <p className="text-sm text-gray-500 mt-4 font-medium">
-                      Current video will be kept if no new file is selected
-                    </p>
-                  )}
+                  {videoForm.videoFile ? (
+                    <p className="mt-4 text-sm font-medium text-[#8ec5eb]">Selected: {videoForm.videoFile.name}</p>
+                  ) : null}
+                  {!videoForm.videoFile && videoForm.existingVideoUrl ? (
+                    <p className="mt-4 text-sm text-white/55">Current file is kept unless you choose a new one.</p>
+                  ) : null}
                 </div>
               </div>
 
-              {/* Save Button */}
-              <div className="flex justify-end">
+              <div className="flex justify-end pt-2">
                 <button
+                  type="button"
                   onClick={handleSubmit}
-                  className="bg-[#1E366F] text-white text-sm font-semibold px-6 py-3 rounded-lg hover:bg-[#1a2f5a] transition-colors"
+                  className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
                 >
                   Save
                 </button>

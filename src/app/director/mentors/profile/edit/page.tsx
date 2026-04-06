@@ -2,9 +2,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import AppHero from "@/app/Components/Hero/AppHero";
-import AppFooter from "@/app/Components/AppFooter";
-import ConfirmModal from "@/app/Components/ConfirmModal";
+import AppHero from "@/app/Components/Hero/AppHero";import ConfirmModal from "@/app/Components/ConfirmModal";
 import ProfileForm, {
   PersonalInfo,
   ChurchInfo,
@@ -507,10 +505,7 @@ function EditMentorProfileContent() {
             </div>
           </div>
         </div>
-      )}
-
-      <AppFooter />
-    </div>
+      )}    </div>
   );
 }
 

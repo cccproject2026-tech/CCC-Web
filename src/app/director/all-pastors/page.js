@@ -1,8 +1,6 @@
 "use client";
 import { useState } from "react";
-import AppHeader from "@/app/Components/Header/AppHeader";
-import AppFooter from "@/app/Components/AppFooter";
-import AppHero from "@/app/Components/Hero/AppHero";
+import AppHeader from "@/app/Components/Header/AppHeader";import AppHero from "@/app/Components/Hero/AppHero";
 import ProgressBg from "../../Assets/progress-bg.jpg";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
@@ -370,9 +368,6 @@ export default function AllPastorsPage() {
             <p className="text-gray-900 font-semibold text-xs sm:text-sm md:text-base">{toast}</p>
           </div>
         </div>
-      )}
-
-      <AppFooter />
-    </div>
+      )}    </div>
   );
 }

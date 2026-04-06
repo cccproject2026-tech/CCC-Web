@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import MentorHeader from "@/app/Components/MentorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
-import { getCookie } from "@/app/utils/cookies";
+import MentorHeader from "@/app/Components/MentorHeader";import { getCookie } from "@/app/utils/cookies";
 import { apiGetDocuments } from "@/app/Services/api";
 
 export default function MentorDocumentsPage() {
@@ -92,10 +90,7 @@ export default function MentorDocumentsPage() {
             </div>
           </div>
         </main>
-      </div>
-
-      <PastorFooter />
-    </div>
+      </div>    </div>
   );
 }
 

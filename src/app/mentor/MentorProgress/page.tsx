@@ -3,10 +3,7 @@ import { useEffect, useState, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import "@fortawesome/fontawesome-free/css/all.min.css";
-
-import PastorFooter from "@/app/Components/PastorFooter";
-import MentorHeader from "@/app/Components/MentorHeader";
+import "@fortawesome/fontawesome-free/css/all.min.css";import MentorHeader from "@/app/Components/MentorHeader";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import { apiAddFinalComment, apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetUserById } from "@/app/Services/users.service";
@@ -351,11 +348,7 @@ function PastorProgressPageContent() {
             )}
           </section>
         </div>
-      </main>
-
-      <PastorFooter />
-
-      {isDrawerOpen && (
+      </main>      {isDrawerOpen && (
         <>
           <div
             className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"

@@ -1,14 +1,16 @@
 "use client";
-import { useEffect, useState } from "react";
-import AppHero from "@/app/Components/Hero/AppHero";
+import { useEffect, useMemo, useState } from "react";
 import ProgressCard from "@/app/Components/Card/ProgressCard";
-import AppFooter from "@/app/Components/AppFooter";
+import DirectorHero from "../DirectorHero";
+import { directorGlassCard, directorInputClass, directorPageRoot } from "../directorUi";
 import ProgressBg from "../../Assets/progress-bg.jpg";
 import Mentor1 from "../../Assets/mentor1.png";
-import Mentor2 from "../../Assets/mentor2.png";
-import Mentor3 from "../../Assets/mentor3.png";
-import { UserOverallProgressDto } from "@/app/Services/types";
-import { apiGetOverallProgress } from "@/app/Services/progress.service";
+import {
+  apiGetOverallProgress,
+  extractUserIdFromOverallProgressRow,
+  unwrapOverallProgressList,
+} from "@/app/Services/progress.service";
+import type { UserOverallProgress } from "@/app/Services/types";
 
 type ProgressListItem = {
   userId: string;
@@ -18,6 +20,19 @@ type ProgressListItem = {
   profileImage?: string;
 };
 
+function normalizeRow(item: UserOverallProgress): ProgressListItem | null {
+  const userId = extractUserIdFromOverallProgressRow(item);
+  if (!userId) return null;
+  const fullName = `${item.firstName ?? ""} ${item.lastName ?? ""}`.trim() || item.email || "Unknown";
+  return {
+    userId,
+    fullName,
+    role: item.role ?? "—",
+    progress: Math.round(Math.min(100, Math.max(0, item.overallProgress ?? 0))),
+    profileImage: item.profilePicture,
+  };
+}
+
 export default function TrackProgressPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -26,191 +41,149 @@ export default function TrackProgressPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
     apiGetOverallProgress()
       .then((res) => {
-        const normalized = res.data.data.map((item) => ({
-          userId: item.userId,
-          fullName: `${item.firstName ?? ""} ${item.lastName ?? ""}`.trim(),
-          role: item.role,
-          progress: item.overallProgress ?? 0,
-          profileImage: item.profilePicture,
-        }));
-
-
-        setProgressData(normalized);
+        const rows = unwrapOverallProgressList(res);
+        const normalized = rows.map(normalizeRow).filter((x): x is ProgressListItem => x != null);
+        if (!cancelled) setProgressData(normalized);
       })
-      .finally(() => setLoading(false));
+      .catch((err) => {
+        console.error(err);
+        if (!cancelled) {
+          setError("Could not load progress.");
+          setProgressData([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
-  // const progressData = [
-  //   {
-  //     id: 1,
-  //     name: "John Doe",
-  //     slug: "john-doe",
-  //     image: Mentor1,
-  //     description:
-  //       "Sub text area write something here. That you can read more about him",
-  //     progress: 100,
-  //   },
-  //   {
-  //     id: 2,
-  //     name: "John Doe",
-  //     slug: "john-doe-2",
-  //     image: Mentor1,
-  //     description:
-  //       "Sub text area write something here. That you can read more about him",
-  //     progress: 70,
-  //   },
-  //   {
-  //     id: 3,
-  //     name: "John Doe",
-  //     slug: "john-doe-3",
-  //     image: Mentor1,
-  //     description:
-  //       "Sub text area write something here. That you can read more about him",
-  //     progress: 80,
-  //   },
-  //   {
-  //     id: 4,
-  //     name: "John Doe",
-  //     slug: "john-doe-4",
-  //     image: Mentor1,
-  //     description:
-  //       "Sub text area write something here. That you can read more about him",
-  //     progress: 90,
-  //   },
-  //   {
-  //     id: 5,
-  //     name: "John Doe",
-  //     slug: "john-doe-5",
-  //     image: Mentor1,
-  //     description:
-  //       "Sub text area write something here. That you can read more about him",
-  //     progress: 90,
-  //   },
-  //   {
-  //     id: 6,
-  //     name: "John Doe",
-  //     slug: "john-doe-6",
-  //     image: Mentor1,
-  //     description:
-  //       "Sub text area write something here. That you can read more about him",
-  //     progress: 100,
-  //   },
-  // ];
 
-  const filteredData = progressData.filter((item) => {
-    const matchesSearch = item.fullName
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-
-    const matchesFilter =
-      activeTab === "all" ||
-      (activeTab === "in-progress" && item.progress < 100) ||
-      (activeTab === "completed" && item.progress === 100);
-
-    return matchesSearch && matchesFilter;
-  });
+  const filteredData = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return progressData.filter((item) => {
+      const matchesSearch =
+        !q ||
+        item.fullName.toLowerCase().includes(q) ||
+        item.role.toLowerCase().includes(q) ||
+        item.userId.toLowerCase().includes(q);
+      const matchesFilter =
+        activeTab === "all" ||
+        (activeTab === "in-progress" && item.progress < 100) ||
+        (activeTab === "completed" && item.progress === 100);
+      return matchesSearch && matchesFilter;
+    });
+  }, [progressData, activeTab, searchQuery]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1A2E5C] to-[#2E3B8E]">
-      {/* Hero Section */}
-      <AppHero
+    <div className={directorPageRoot}>
+      <DirectorHero
         title="Track Progress"
-        backgroundImageUrl={ProgressBg.src}
+        subtitle="Monitor mentor and pastor completion across roadmaps and assessments."
+        image={ProgressBg}
         breadcrumbItems={[
           { label: "Home", href: "/director/home" },
           { label: "Track Progress" },
         ]}
       />
 
-      {/* Main Content */}
-      <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-12">
-        <div className="max-w-[1400px] mx-auto">
-          {/* Search and Filter */}
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
-            {/* Search Bar */}
-            <div className="flex-1 w-full md:max-w-md">
-              <div className="relative">
-                <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+      <section className="relative flex-1 px-4 pb-12 sm:px-6 md:px-12 lg:px-20">
+        <div className="mx-auto max-w-[1400px]">
+          <div className={`mb-8 p-4 sm:p-5 ${directorGlassCard}`}>
+            <div className="flex flex-col items-stretch justify-between gap-4 md:flex-row md:items-center">
+              <div className="relative w-full flex-1 md:max-w-md">
+                <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-[#8ec5eb]/70" />
                 <input
                   type="text"
-                  placeholder="Search"
+                  placeholder="Search by name, role, or id"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-white rounded-lg border-2 border-gray-200 focus:outline-none focus:border-[#2E3B8E] text-gray-900 placeholder-gray-400"
+                  className={`${directorInputClass} pl-11`}
                 />
               </div>
-            </div>
 
-            {/* Filter Tabs */}
-            <div className="bg-white inline-flex h-10 px-1 items-center gap-1 rounded-lg shadow-md">
-              {[
-                { id: "all", label: "All" },
-                { id: "in-progress", label: "In-Progress" },
-                { id: "completed", label: "Completed" },
-              ].map((tab, index) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`relative px-4 h-8 rounded-md capitalize font-semibold text-sm transition-all ${activeTab === tab.id
-                    ? "bg-[#1E366F] text-white"
-                    : "bg-transparent text-[#1E366F]"
-                    } ${index === 0 ? "rounded-l-lg" : ""} ${index === 2 ? "rounded-r-lg" : ""
+              <div className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-1">
+                {[
+                  { id: "all", label: "All" },
+                  { id: "in-progress", label: "In progress" },
+                  { id: "completed", label: "Completed" },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`relative h-8 rounded-md px-4 text-sm font-semibold capitalize transition-all ${
+                      activeTab === tab.id
+                        ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/35"
+                        : "bg-transparent text-white/70 hover:text-white"
                     }`}
-                >
-                  {tab.label}
-                </button>
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="flex flex-col items-center justify-center gap-4 py-20">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb]/30 border-t-[#8ec5eb]" />
+              <p className="text-sm text-white/60">Loading progress…</p>
+            </div>
+          ) : error ? (
+            <p className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 text-center text-sm text-red-100">{error}</p>
+          ) : null}
+
+          {!loading && !error && (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {filteredData.map((item) => (
+                <ProgressCard
+                  key={item.userId}
+                  variant="directorGlass"
+                  image={item.profileImage || Mentor1}
+                  name={item.fullName}
+                  description={item.role}
+                  progress={item.progress}
+                  slug={item.userId}
+                  showCompleteButton={item.progress === 100}
+                  onCompleteClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                  onEmailClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                  onMessageClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                  onWhatsAppClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                  onPhoneClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                />
               ))}
             </div>
-          </div>
+          )}
 
-          {/* Progress Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredData.map((item) => (
-              <ProgressCard
-                key={item.userId}
-                image={item.profileImage || Mentor1}
-                name={item.fullName}
-                description={item.role}
-                progress={item.progress}
-                slug={item.userId} // Mongo ID – correct routing
-                showCompleteButton={item.progress === 100}
-                onCompleteClick={(e) => {
-                  e.stopPropagation();
-                  console.log("Mark as complete");
-                }}
-                onEmailClick={(e) => {
-                  e.stopPropagation();
-                  console.log("Email clicked");
-                }}
-                onMessageClick={(e) => {
-                  e.stopPropagation();
-                  console.log("Message clicked");
-                }}
-                onWhatsAppClick={(e) => {
-                  e.stopPropagation();
-                  console.log("WhatsApp clicked");
-                }}
-                onPhoneClick={(e) => {
-                  e.stopPropagation();
-                  console.log("Phone clicked");
-                }}
-              />
-            ))}
-          </div>
-
-          {filteredData.length === 0 && (
-            <div className="text-center py-12">
-              <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <i className="fa-regular fa-folder-open text-white text-4xl"></i>
+          {!loading && !error && filteredData.length === 0 && (
+            <div className="py-14 text-center">
+              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-white/15 bg-white/5">
+                <i className="fa-regular fa-folder-open text-4xl text-white/50"></i>
               </div>
-              <p className="text-white text-lg">No progress data found</p>
+              <p className="text-lg text-white/80">
+                {progressData.length === 0 ? "No progress data yet." : "No entries match your search or filter."}
+              </p>
             </div>
           )}
         </div>
       </section>
-
-      <AppFooter />
     </div>
   );
 }

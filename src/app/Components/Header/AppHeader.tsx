@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
-import { useState } from "react";
+import Link from "next/link";
+import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Framelogo1 from "@/app/Assets/Frame-logo-1.png";
 import Connecticon from "@/app/Assets/Connect-icon.png";
@@ -13,6 +14,15 @@ import SettingsModal from "../SettingsModal";
 import CoursesDropdown from "../CoursesDropdown";
 import CCCDropdown from "../CCCDropdown";
 import DocumentsModal from "../DocumentsModal";
+import { getNotification, apiGetRoadmaps, apiGetAssessments, apiGetAllUsers } from "@/app/Services/api";
+import { parseAssessmentsListPayload } from "@/app/Services/assessment.service";
+import {
+  mapNotificationItemToPopup,
+  resolveSessionUserId,
+  unwrapNotificationsList,
+} from "@/app/Services/notificationUi";
+import type { NotificationItem } from "@/app/Services/types/home.types";
+import type { NotificationPopupItem } from "../NotificationPopup";
 
 export default function AppHeader({ showFullHeader = false }) {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -24,6 +34,94 @@ export default function AppHeader({ showFullHeader = false }) {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<{
+    roadmaps: any[];
+    assessments: any[];
+    people: any[];
+  }>({ roadmaps: [], assessments: [], people: [] });
+
+  const [notificationItems, setNotificationItems] = useState<NotificationPopupItem[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [notificationBadge, setNotificationBadge] = useState(0);
+
+  useEffect(() => {
+    const uid = resolveSessionUserId();
+    if (!uid) return;
+
+    let cancelled = false;
+    const load = async () => {
+      setNotificationsLoading(true);
+      try {
+        const res = await getNotification(uid);
+        const list: NotificationItem[] = unwrapNotificationsList(res);
+        if (cancelled) return;
+        const unread = list.filter((n) => n.isRead === false).length;
+        const badge = unread > 0 ? unread : list.length;
+        setNotificationBadge(Math.min(badge, 99));
+        setNotificationItems(list.slice(0, 6).map(mapNotificationItemToPopup));
+      } catch (e) {
+        console.error("Director notifications:", e);
+        if (!cancelled) {
+          setNotificationItems([]);
+          setNotificationBadge(0);
+        }
+      } finally {
+        if (!cancelled) setNotificationsLoading(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!query) {
+      setSearchResults({ roadmaps: [], assessments: [], people: [] });
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setSearchLoading(true);
+        const [roadmapsRes, assessmentsRes, peopleRes] = await Promise.all([
+          apiGetRoadmaps("all", query),
+          apiGetAssessments({ search: query }),
+          apiGetAllUsers({ search: query, roleMatch: "mixed", limit: 10 }),
+        ]);
+
+        const roadmaps = Array.isArray(roadmapsRes.data?.data) ? roadmapsRes.data.data : [];
+        const assessments = parseAssessmentsListPayload(assessmentsRes.data);
+        const users = Array.isArray(peopleRes.data?.data?.users)
+          ? peopleRes.data.data.users
+          : Array.isArray(peopleRes.data?.data)
+            ? peopleRes.data.data
+            : [];
+
+        setSearchResults({ roadmaps, assessments, people: users });
+      } catch (e) {
+        console.error("Director search failed:", e);
+        setSearchResults({ roadmaps: [], assessments: [], people: [] });
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const personSearchHref = (u: { _id?: string; id?: string; role?: string }) => {
+    const id = u._id || u.id;
+    const role = (u.role || "").toLowerCase();
+    if (role.includes("mentor") && id) return `/director/mentors/profile/${id}`;
+    if (id) return `/director/track-progress/${id}`;
+    return "/director/mentees";
+  };
 
   // Mock documents data
   const [documents, setDocuments] = useState([
@@ -69,6 +167,7 @@ export default function AppHeader({ showFullHeader = false }) {
     },
     { name: "Track Progress", path: "/director/track-progress" },
     { name: "Schedule", path: "/director/schedule" },
+    { name: "Notes", path: "/director/notes" },
     {
       name: "Course Completed",
       path: "/director/course-completed",
@@ -87,7 +186,7 @@ export default function AppHeader({ showFullHeader = false }) {
 
   return (
     <>
-      <header className="flex items-center justify-between px-4 sm:px-6 lg:px-10 py-3 bg-[#0b3558] text-white shadow-md relative z-50">
+      <header className="relative z-50 flex items-center justify-between border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md sm:px-6 lg:px-10 font-[Albert_Sans]">
         {/* Logo */}
         <div className="flex items-center gap-3">
           <Image src={Framelogo1} alt="Logo" width={26} height={26} />
@@ -102,7 +201,7 @@ export default function AppHeader({ showFullHeader = false }) {
                   onClick={(e) => handleNavClick(link, e)}
                   className={`text-sm transition relative flex items-center gap-1 ${pathname === link.path
                     ? "font-semibold text-white"
-                    : "text-white/90 hover:text-white"
+                    : "text-white/80 hover:text-white"
                     }`}
                 >
                   {link.name}
@@ -110,7 +209,7 @@ export default function AppHeader({ showFullHeader = false }) {
                     <i className="fa-solid fa-chevron-down text-[10px]"></i>
                   )}
                   {link.hasBadge && (
-                    <span className="absolute -top-2 -right-3 bg-[#FFD700] text-[#2E3B8E] text-[9px] font-bold rounded-full w-[16px] h-[16px] flex items-center justify-center">
+                    <span className="absolute -top-2 -right-3 bg-[#FFD700] text-[#0f4a76] text-[9px] font-bold rounded-full w-[16px] h-[16px] flex items-center justify-center">
                       {link.hasBadge}
                     </span>
                   )}
@@ -135,29 +234,109 @@ export default function AppHeader({ showFullHeader = false }) {
         )}
 
         {/* Right side icons */}
-        <div className="flex items-center gap-2 sm:gap-3 lg:gap-5">
+        <div className="relative flex items-center gap-2 sm:gap-3 lg:gap-5">
           {showFullHeader && (
             <>
-              {/* Search - Hidden on mobile */}
-              <button className="hidden sm:block hover:opacity-80 transition">
-                <Image src={SearchIcon} alt="Search" width={18} height={18} />
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSearch((s) => !s);
+                  setShowNotifications(false);
+                  setShowProfileDropdown(false);
+                }}
+                className="hidden h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15 sm:flex"
+                aria-expanded={showSearch}
+                aria-label="Search"
+              >
+                <Image src={SearchIcon} alt="" width={18} height={18} />
               </button>
 
-              {/* Notification with badge */}
+              {showSearch && (
+                <div className="absolute right-0 top-12 z-[60] w-[min(420px,calc(100vw-2rem))] rounded-2xl border border-white/20 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] p-3 shadow-2xl sm:right-[120px]">
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search roadmaps, assessments, people…"
+                    className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/70 outline-none focus:border-[#8ec5eb]/50"
+                    autoFocus
+                  />
+                  <div className="mt-3 max-h-[360px] space-y-3 overflow-auto pr-1 text-left">
+                    {searchLoading && <p className="text-xs text-white/80">Searching…</p>}
+                    {!searchLoading && searchQuery.trim() && (
+                      <>
+                        <div>
+                          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#cde2f2]">Roadmaps</p>
+                          {searchResults.roadmaps.slice(0, 4).map((item: { _id?: string; id?: string; name?: string; title?: string }) => (
+                            <Link
+                              key={item._id || item.id}
+                              href="/director/revitalization-roadmap/home"
+                              className="mb-1 block rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
+                              onClick={() => setShowSearch(false)}
+                            >
+                              {item.name || item.title || "Roadmap"}
+                            </Link>
+                          ))}
+                        </div>
+                        <div>
+                          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#cde2f2]">Assessments</p>
+                          {searchResults.assessments.slice(0, 4).map((item: { _id?: string; id?: string; name?: string; title?: string }) => (
+                            <Link
+                              key={item._id || item.id}
+                              href="/director/assessments"
+                              className="mb-1 block rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
+                              onClick={() => setShowSearch(false)}
+                            >
+                              {item.name || item.title || "Assessment"}
+                            </Link>
+                          ))}
+                        </div>
+                        <div>
+                          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#cde2f2]">People</p>
+                          {searchResults.people.slice(0, 6).map((item: { _id?: string; id?: string; firstName?: string; lastName?: string; role?: string }) => (
+                            <Link
+                              key={item._id || item.id}
+                              href={personSearchHref(item)}
+                              className="mb-1 block rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
+                              onClick={() => setShowSearch(false)}
+                            >
+                              {`${item.firstName || ""} ${item.lastName || ""}`.trim() || "User"}{" "}
+                              <span className="text-white/50">({item.role || "—"})</span>
+                            </Link>
+                          ))}
+                        </div>
+                        {searchResults.roadmaps.length === 0 &&
+                          searchResults.assessments.length === 0 &&
+                          searchResults.people.length === 0 && (
+                            <p className="text-xs text-white/80">No results.</p>
+                          )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <button
+                type="button"
                 className="relative"
-                onClick={() => setShowNotifications(!showNotifications)}
+                onClick={() => {
+                  setShowNotifications((n) => !n);
+                  setShowSearch(false);
+                  setShowProfileDropdown(false);
+                }}
+                aria-label="Notifications"
               >
                 <Image
                   src={NotificationIcon}
-                  alt="Notification"
+                  alt=""
                   width={20}
                   height={20}
                   className="hover:opacity-80 cursor-pointer"
                 />
-                <span className="absolute -top-1 -right-1 bg-[#FFD700] text-[#2E3B8E] text-[10px] font-bold rounded-full w-[14px] h-[14px] flex items-center justify-center">
-                  3
-                </span>
+                {notificationBadge > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-[#FFD700] px-0.5 text-[10px] font-bold text-[#0f4a76]">
+                    {notificationBadge}
+                  </span>
+                )}
               </button>
 
               {/* Connect - Hidden on small mobile */}
@@ -168,7 +347,7 @@ export default function AppHeader({ showFullHeader = false }) {
               {/* User Profile - Responsive */}
               <button
                 onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                className="flex items-center gap-1 sm:gap-2 bg-[#2E3B8E] px-2 sm:px-3 py-1 rounded-full hover:bg-[#1F2A6E] transition cursor-pointer"
+                className="flex cursor-pointer items-center gap-1 sm:gap-2 rounded-full border border-white/15 bg-white/10 px-2 sm:px-3 py-1 transition hover:bg-white/20"
               >
                 <div className="hidden sm:block text-right text-[11px] leading-tight">
                   <p className="text-white/80">Good Morning</p>
@@ -213,7 +392,7 @@ export default function AppHeader({ showFullHeader = false }) {
 
       {/* Mobile Navigation Menu */}
       {showFullHeader && showMobileMenu && (
-        <div className="lg:hidden bg-[#0b3558] border-t border-white/20 fixed top-[60px] left-0 right-0 z-40 shadow-lg">
+        <div className="fixed left-0 right-0 top-[60px] z-40 border-t border-white/10 bg-[#062946]/98 shadow-lg backdrop-blur-md lg:hidden">
           <nav className="px-4 py-4 space-y-2">
             {navLinks.map((link, index) => (
               <div key={index}>
@@ -223,14 +402,14 @@ export default function AppHeader({ showFullHeader = false }) {
                     if (!link.hasDropdown) setShowMobileMenu(false);
                   }}
                   className={`w-full text-left px-4 py-3 rounded-md transition flex items-center justify-between ${pathname === link.path
-                    ? "bg-[#2E3B8E] font-semibold text-white"
-                    : "text-white/90 hover:bg-[#2E3B8E]/50 hover:text-white"
+                    ? "bg-[#8ec5eb]/20 font-semibold text-white"
+                    : "text-white/90 hover:bg-white/10 hover:text-white"
                     }`}
                 >
                   <span className="flex items-center gap-2">
                     {link.name}
                     {link.hasBadge && (
-                      <span className="bg-[#FFD700] text-[#2E3B8E] text-[10px] font-bold rounded-full w-[18px] h-[18px] flex items-center justify-center">
+                      <span className="bg-[#FFD700] text-[#0f4a76] text-[10px] font-bold rounded-full w-[18px] h-[18px] flex items-center justify-center">
                         {link.hasBadge}
                       </span>
                     )}
@@ -282,7 +461,7 @@ export default function AppHeader({ showFullHeader = false }) {
                           setShowMobileMenu(false);
                           setShowCoursesDropdown(false);
                         }}
-                        className="w-full text-left px-4 py-2 rounded-md text-white/80 hover:bg-[#2E3B8E]/30 hover:text-white transition flex items-center gap-3"
+                        className="w-full text-left px-4 py-2 rounded-md text-white/80 transition hover:bg-white/10 hover:text-white flex items-center gap-3"
                       >
                         <i className={`${item.icon} text-sm`}></i>
                         <span className="text-sm">{item.label}</span>
@@ -303,7 +482,7 @@ export default function AppHeader({ showFullHeader = false }) {
                         setShowMobileMenu(false);
                         setShowCCCDropdown(false);
                       }}
-                      className="w-full text-left px-4 py-2 rounded-md text-white/80 hover:bg-[#2E3B8E]/30 hover:text-white transition flex items-center gap-3"
+                      className="w-full text-left px-4 py-2 rounded-md text-white/80 transition hover:bg-white/10 hover:text-white flex items-center gap-3"
                     >
                       <i className="fa-solid fa-building text-sm"></i>
                       <span className="text-sm">CCC Options</span>
@@ -314,7 +493,7 @@ export default function AppHeader({ showFullHeader = false }) {
             ))}
 
             {/* Mobile Search */}
-            <button className="w-full text-left px-4 py-3 rounded-md text-white/90 hover:bg-[#2E3B8E]/50 hover:text-white transition flex items-center gap-3">
+            <button className="w-full text-left px-4 py-3 rounded-md text-white/90 transition hover:bg-white/10 hover:text-white flex items-center gap-3">
               <Image src={SearchIcon} alt="Search" width={18} height={18} />
               Search
             </button>
@@ -326,6 +505,10 @@ export default function AppHeader({ showFullHeader = false }) {
       <NotificationPopup
         isOpen={showNotifications}
         onClose={() => setShowNotifications(false)}
+        notifications={notificationItems}
+        loading={notificationsLoading}
+        emptyMessage="No notifications yet."
+        viewAllHref="/director/notifications"
       />
 
       {/* Profile Dropdown */}

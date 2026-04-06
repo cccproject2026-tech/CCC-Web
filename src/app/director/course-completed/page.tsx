@@ -2,10 +2,10 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import AppHeader from "@/app/Components/Header/AppHeader";
-import AppFooter from "@/app/Components/AppFooter";
+import SearchBar from "@/app/Components/SearchBar";
 import MentorBg from "../../Assets/mentor-bg.png";
-import AppHero from "@/app/Components/Hero/AppHero";
+import DirectorHero from "../DirectorHero";
+import { directorGlassCard, directorPageRoot } from "../directorUi";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
@@ -220,107 +220,100 @@ export default function CourseCompletedPage() {
     sortOptions[0].label;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
-      <AppHero
+    <div className={directorPageRoot}>
+      <DirectorHero
         title={
           activeTab === "invited"
             ? "Invite to be a Field Mentor"
             : "Course Completed"
         }
-        backgroundImageUrl={MentorBg.src}
+        subtitle="Course completion and field mentor invitations."
+        image={MentorBg}
       />
 
-      {/* Controls Section - Below Hero Banner */}
-      <section className="relative bg-gradient-to-b from-[#4A90C0] to-[#5BA3D0] px-6 md:px-12 lg:px-20 py-8">
-        <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row gap-6 items-start lg:items-start justify-between">
-          {/* Search - Left Side */}
+      <section className="relative py-8">
+        <div className="mx-auto flex max-w-[1400px] flex-col items-start justify-between gap-6 lg:flex-row lg:items-start">
           <div className="w-full lg:w-[380px]">
-            <div className="relative">
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search"
-                className="w-full px-4 py-3 pl-11 rounded-lg bg-white text-[#1A2E7A] placeholder-gray-400 outline-none shadow-md text-[15px]"
-              />
-              <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-            </div>
+            <SearchBar value={query} onChange={setQuery} placeholder="Search" className="w-full" variant="dark" />
           </div>
 
-          {/* Right Side: Tabs + Sort */}
-          <div className="flex flex-col gap-4 items-end w-full lg:w-auto">
-            {/* Tabs */}
-            <div className="flex gap-2 bg-white rounded-xl p-2 shadow-lg">
+          <div className="flex w-full flex-col items-stretch gap-4 lg:w-auto lg:items-end">
+            <div className={`flex flex-wrap gap-2 rounded-xl p-2 ${directorGlassCard}`}>
               <button
+                type="button"
                 onClick={() => handleTabChange("completed")}
-                className={`px-6 py-3 rounded-lg text-[14px] font-semibold transition-all duration-200 whitespace-nowrap flex items-center gap-2 ${activeTab === "completed"
-                  ? "bg-[#2E3B8E] text-white shadow-md"
-                  : "text-gray-600 hover:text-gray-800"
-                  }`}
+                className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-5 py-2.5 text-[14px] font-semibold transition-all ${
+                  activeTab === "completed"
+                    ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/35"
+                    : "text-white/70 hover:text-white"
+                }`}
               >
                 <span>Completed</span>
                 {activeTab === "completed" && completedCount > 0 && (
-                  <span className="inline-flex items-center justify-center w-5 h-5 text-[11px] bg-yellow-400 text-gray-800 rounded-full font-bold">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#FFD700] text-[11px] font-bold text-[#0f4a76]">
                     {completedCount}
                   </span>
                 )}
               </button>
               <button
+                type="button"
                 onClick={() => handleTabChange("certificate_issued")}
-                className={`px-6 py-3 rounded-lg text-[14px] font-semibold transition-all duration-200 whitespace-nowrap ${activeTab === "certificate_issued"
-                  ? "bg-[#2E3B8E] text-white shadow-md"
-                  : "text-gray-600 hover:text-gray-800"
-                  }`}
+                className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-[14px] font-semibold transition-all ${
+                  activeTab === "certificate_issued"
+                    ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/35"
+                    : "text-white/70 hover:text-white"
+                }`}
               >
                 Certificate Issued
               </button>
               <button
+                type="button"
                 onClick={() => handleTabChange("invited")}
-                className={`px-6 py-3 rounded-lg text-[14px] font-semibold transition-all duration-200 whitespace-nowrap ${activeTab === "invited"
-                  ? "bg-[#2E3B8E] text-white shadow-md"
-                  : "text-gray-600 hover:text-gray-800"
-                  }`}
+                className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-[14px] font-semibold transition-all ${
+                  activeTab === "invited"
+                    ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/35"
+                    : "text-white/70 hover:text-white"
+                }`}
               >
                 Invited as Field Mentor
               </button>
             </div>
 
-            {/* Sort By */}
             <div className="flex items-center gap-3">
-              <span className="text-white text-[15px] font-medium whitespace-nowrap">
-                Sort By
-              </span>
+              <span className="whitespace-nowrap text-[15px] font-medium text-white">Sort By</span>
               <div className="relative">
                 <button
+                  type="button"
                   onClick={() => setShowSortMenu(!showSortMenu)}
-                  className="px-6 py-3 bg-transparent border-2 border-white text-white rounded-xl text-[14px] font-medium shadow-md hover:bg-white/10 transition-all flex items-center gap-3 min-w-[220px] justify-between"
+                  className="flex min-w-[220px] items-center justify-between gap-3 rounded-xl border border-white/20 bg-white/10 px-6 py-3 text-[14px] font-medium text-white shadow-md transition hover:bg-white/15"
                 >
                   <span>{currentSortLabel}</span>
                   <i className="fa-solid fa-chevron-down text-xs"></i>
                 </button>
 
-                {/* Sort Dropdown Menu */}
                 {showSortMenu && (
-                  <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl py-3 px-2 min-w-[220px] z-[60]">
+                  <div className="absolute right-0 top-full z-[60] mt-2 min-w-[220px] rounded-xl border border-white/15 bg-[#041f35]/98 py-3 px-2 shadow-2xl backdrop-blur-md">
                     {sortOptions.map((option) => (
                       <button
                         key={option.value}
+                        type="button"
                         onClick={() => {
                           setSortBy(option.value);
                           setShowSortMenu(false);
                         }}
-                        className={`w-full text-left px-4 py-2.5 rounded-lg text-[14px] transition-all flex items-center gap-2 ${sortBy === option.value
-                          ? "bg-green-50 text-green-700 font-semibold"
-                          : "text-gray-700 hover:bg-gray-50"
-                          }`}
+                        className={`flex w-full items-center gap-2 rounded-lg px-4 py-2.5 text-left text-[14px] transition-all ${
+                          sortBy === option.value
+                            ? "bg-[#8ec5eb]/20 font-semibold text-white"
+                            : "text-white/80 hover:bg-white/10"
+                        }`}
                       >
                         <span
-                          className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${sortBy === option.value
-                            ? "border-green-500 bg-green-500"
-                            : "border-gray-300"
-                            }`}
+                          className={`flex h-4 w-4 items-center justify-center rounded-full border-2 ${
+                            sortBy === option.value ? "border-[#8ec5eb] bg-[#8ec5eb]/40" : "border-white/30"
+                          }`}
                         >
                           {sortBy === option.value && (
-                            <i className="fa-solid fa-check text-white text-[8px]"></i>
+                            <i className="fa-solid fa-check text-[8px] text-white"></i>
                           )}
                         </span>
                         {option.label}
@@ -335,8 +328,8 @@ export default function CourseCompletedPage() {
       </section>
 
       {/* Cards Grid */}
-      <section className="px-6 md:px-12 lg:px-20 py-10 bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-[1400px] mx-auto">
+      <section className="pb-12 pt-2">
+        <div className="mx-auto grid max-w-[1400px] grid-cols-1 gap-6 md:grid-cols-2">
           {finalData.length === 0 && !loading && (
             <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
               <h3 className="text-xl font-semibold text-white mb-2">
@@ -356,7 +349,7 @@ export default function CourseCompletedPage() {
           {finalData.map((p) => (
             <div
               key={p.id}
-              className="bg-white rounded-xl p-5 flex gap-5 items-start shadow-lg hover:shadow-xl transition-all"
+              className={`flex items-start gap-5 rounded-xl p-5 ${directorGlassCard} transition-all hover:border-white/25`}
             >
               {/* Image with relative positioning for "New" badge - Clickable */}
               <Link
@@ -379,15 +372,15 @@ export default function CourseCompletedPage() {
               <div className="flex-1 flex flex-col justify-between min-h-[120px]">
                 <div>
                   <Link
-                    href="/director/mentees/profile?id=${p.id}"
-                    className="flex items-center gap-2 mb-1 hover:opacity-80 transition-opacity"
+                    href={`/director/mentees/profile?id=${p.id}`}
+                    className="mb-1 flex items-center gap-2 transition-opacity hover:opacity-80"
                   >
-                    <h3 className="font-bold text-[#1A2E7A] text-[16px]">
+                    <h3 className="text-[16px] font-bold text-white">
                       {p.name}
                     </h3>
-                    <i className="fa-solid fa-circle-check text-[#5B9FD7] text-sm"></i>
+                    <i className="fa-solid fa-circle-check text-sm text-[#8ec5eb]"></i>
                   </Link>
-                  <p className="text-[13px] text-gray-500 mb-3 leading-relaxed">
+                  <p className="mb-3 text-[13px] leading-relaxed text-white/60">
                     Sub text area write something here. That you can read more
                     about him
                   </p>
@@ -417,7 +410,7 @@ export default function CourseCompletedPage() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-4 text-[#2E3B8E] text-[17px]">
+                <div className="flex items-center gap-4 text-[17px] text-[#8ec5eb]">
                   <button className="hover:opacity-70 transition">
                     <i className="fa-regular fa-envelope"></i>
                   </button>
@@ -438,7 +431,7 @@ export default function CourseCompletedPage() {
                 {activeTab === "completed" && (
                   <button
                     onClick={() => handleIssueCertificate(p.id)}
-                    className="px-4 py-2.5 bg-[#1F2A6E] text-white rounded-lg text-[13px] font-semibold hover:bg-[#2E3B8E] transition-all shadow-md whitespace-nowrap"
+                    className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:bg-[#8ec5eb]/30"
                   >
                     Issue Certificate
                   </button>
@@ -446,13 +439,16 @@ export default function CourseCompletedPage() {
                 {activeTab === "certificate_issued" && (
                   <button
                     onClick={() => handleInvite(p.id)}
-                    className="px-4 py-2.5 bg-[#1F2A6E] text-white rounded-lg text-[13px] font-semibold hover:bg-[#2E3B8E] transition-all shadow-md whitespace-nowrap"
+                    className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:bg-[#8ec5eb]/30"
                   >
                     Invite as Field Mentor
                   </button>
                 )}
                 {activeTab === "invited" && (
-                  <button className="px-4 py-2.5 bg-[#1F2A6E] text-white rounded-lg text-[13px] font-semibold hover:bg-[#2E3B8E] transition-all shadow-md whitespace-nowrap">
+                  <button
+                    type="button"
+                    className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:bg-[#8ec5eb]/30"
+                  >
                     Invite as Field Mentor
                   </button>
                 )}
@@ -481,8 +477,6 @@ export default function CourseCompletedPage() {
           onClick={() => setShowSortMenu(false)}
         ></div>
       )}
-
-      <AppFooter />
     </div>
   );
 }

@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "@/app/Assets/assignments-bg.png";
 import { apiCreateAssessment } from "@/app/Services/assessment.service";
 
@@ -443,8 +442,6 @@ export default function CreateAssessmentPage() {
           </div>
         </div>
       )}
-
-      <PastorFooter />
     </div>
   );
 }

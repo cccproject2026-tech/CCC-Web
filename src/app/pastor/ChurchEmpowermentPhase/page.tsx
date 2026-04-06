@@ -3,7 +3,6 @@ import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "../../Assets/self-revitalization-hero.png";
 
 // Card images

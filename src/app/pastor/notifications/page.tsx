@@ -1,6 +1,5 @@
 "use client";
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import { useState, useEffect } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { getNotifications } from "@/app/Services/pastor.service";
@@ -108,7 +107,6 @@ export default function NotificationsPage() {
           </div>
         </div>
       </main>
-      <PastorFooter />
     </div>
   );
 }

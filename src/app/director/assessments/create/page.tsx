@@ -1,9 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/Header/AppHeader";
-import AppFooter from "@/app/Components/AppFooter";
-import AppHero from "@/app/Components/Hero/AppHero";
+import AppHeader from "@/app/Components/Header/AppHeader";import AppHero from "@/app/Components/Hero/AppHero";
 import AssessmentBg from "../../../Assets/assessment-bg.png";
 import { apiCreateAssessment } from "@/app/Services/assessment.service";
 
@@ -447,9 +445,6 @@ export default function CreateAssessmentPage() {
             <span className="text-[#2E3B8E] font-semibold">{toast}</span>
           </div>
         </div>
-      )}
-
-      <AppFooter />
-    </div>
+      )}    </div>
   );
 }

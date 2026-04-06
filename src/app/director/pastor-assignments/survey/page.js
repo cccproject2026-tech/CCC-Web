@@ -1,7 +1,5 @@
 "use client";
-import { useState } from "react";
-import AppFooter from "@/app/Components/AppFooter";
-import MentorBg from "../../../Assets/mentor-bg.png";
+import { useState } from "react";import MentorBg from "../../../Assets/mentor-bg.png";
 
 export default function SurveyPage() {
   const [activeSection, setActiveSection] = useState(1);
@@ -468,9 +466,6 @@ export default function SurveyPage() {
             </div>
           </div>
         </div>
-      )}
-
-      <AppFooter />
-    </div>
+      )}    </div>
   );
 }

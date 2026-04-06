@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import PastorFooter from "@/app/Components/PastorFooter";
-import MentorHeader from "@/app/Components/MentorHeader";
+import { useEffect, useState } from "react";import MentorHeader from "@/app/Components/MentorHeader";
 import { getCookie } from "@/app/utils/cookies";
 import { apiGetUserById } from "@/app/Services/api";
 
@@ -122,10 +120,7 @@ export default function MentorCertificatesPage() {
             </div>
           </div>
         </main>
-      </div>
-
-      <PastorFooter />
-    </div>
+      </div>    </div>
   );
 }
 

@@ -1,6 +1,10 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import axiosInstance from "@/app/Services/config/axios-instance";
+import {
+  directorGlassCard,
+  directorInputClass,
+} from "@/app/director/directorUi";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -16,16 +20,19 @@ const EXTRA_TYPES = [
   { value: "DATE_PICKER", label: "Date Picker" },
   { value: "SECTION", label: "Section" },
   { value: "SIGNATURE", label: "Signature" },
+  { value: "ASSESSMENT", label: "Assessment (link)" },
 ];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ExtraItem {
+export interface ExtraItem {
   type: string;
   name: string;
   placeHolder?: string;
   buttonName?: string;
   haveButton?: boolean;
+  /** Required when type is ASSESSMENT (matches backend ExtraItem / AssessmentExtra). */
+  assessmentId?: string;
 }
 
 interface NestedItem {
@@ -39,50 +46,67 @@ interface CreateRoadmapModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  /** Match director shell (glass + #8ec5eb). Default: glass. */
+  variant?: "light" | "glass";
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const defaultExtra = (): ExtraItem => ({ type: "TEXT_FIELD", name: "" });
+export const defaultExtra = (): ExtraItem => ({ type: "TEXT_FIELD", name: "", assessmentId: "" });
 const defaultNested = (): NestedItem => ({ name: "", duration: "", description: "", extras: [] });
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function ExtrasList({
+export function ExtrasList({
   extras,
   onChange,
   onAdd,
   onRemove,
+  glass,
+  hideFooterAdd = false,
 }: {
   extras: ExtraItem[];
   onChange: (idx: number, field: keyof ExtraItem, value: any) => void;
   onAdd: () => void;
   onRemove: (idx: number) => void;
+  glass: boolean;
+  /** When true, omit the dashed “Add Task/Extra” row (e.g. page supplies its own add control). */
+  hideFooterAdd?: boolean;
 }) {
+  const inCls = glass
+    ? `${directorInputClass} px-3 py-2 text-xs`
+    : "w-full rounded-lg border border-gray-300 px-3 py-2 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#2E3B8E]";
+  const selCls = glass
+    ? `${directorInputClass} appearance-none px-3 py-2 pr-8 text-xs [&>option]:bg-[#041f35] [&>option]:text-white`
+    : "w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-8 text-xs text-gray-800 focus:outline-none focus:border-[#2E3B8E]";
+  const rowCls = glass
+    ? "flex items-start gap-2 rounded-lg border border-white/15 bg-white/[0.06] p-3"
+    : "flex items-start gap-2 rounded-lg border border-gray-200 p-3";
+
   return (
     <div className="space-y-2">
       {extras.map((extra, idx) => (
-        <div key={idx} className="flex gap-2 items-start border border-gray-200 rounded-lg p-3">
-          <div className="flex-1 space-y-2">
-            <div className="flex gap-2">
+        <div key={idx} className={rowCls}>
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
               <div className="relative flex-1">
                 <select
                   value={extra.type}
                   onChange={(e) => onChange(idx, "type", e.target.value)}
-                  className="w-full appearance-none border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-800 bg-white focus:outline-none focus:border-[#2E3B8E] pr-8"
+                  className={selCls}
                 >
                   {EXTRA_TYPES.map((t) => (
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
                 </select>
-                <i className="fa-solid fa-chevron-down absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] pointer-events-none"></i>
+                <i className={`fa-solid fa-chevron-down pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] ${glass ? "text-[#8ec5eb]/70" : "text-gray-400"}`} />
               </div>
               <input
                 type="text"
                 value={extra.name}
                 onChange={(e) => onChange(idx, "name", e.target.value)}
                 placeholder="Field name *"
-                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#2E3B8E]"
+                className={`min-w-0 flex-1 ${inCls}`}
               />
             </div>
             {(extra.type === "TEXT_FIELD" || extra.type === "TEXT_AREA") && (
@@ -91,53 +115,87 @@ function ExtrasList({
                 value={extra.placeHolder || ""}
                 onChange={(e) => onChange(idx, "placeHolder", e.target.value)}
                 placeholder="Placeholder (optional)"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#2E3B8E]"
+                className={inCls}
+              />
+            )}
+            {extra.type === "ASSESSMENT" && (
+              <input
+                type="text"
+                value={extra.assessmentId || ""}
+                onChange={(e) => onChange(idx, "assessmentId", e.target.value)}
+                placeholder="Assessment ID (Mongo ID) *"
+                className={inCls}
               />
             )}
             {extra.type === "CHECKBOX" && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <div
+              <label className="flex cursor-pointer items-center gap-2">
+                <button
+                  type="button"
                   onClick={() => onChange(idx, "haveButton", !extra.haveButton)}
-                  className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition ${extra.haveButton ? "bg-[#2E3B8E] border-[#2E3B8E]" : "bg-white border-gray-300"}`}
+                  className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border-2 transition ${extra.haveButton ? (glass ? "border-[#8ec5eb] bg-[#8ec5eb]/30" : "border-[#2E3B8E] bg-[#2E3B8E]") : glass ? "border-white/30 bg-transparent" : "border-gray-300 bg-white"}`}
                 >
-                  {extra.haveButton && <i className="fa-solid fa-check text-white text-[8px]"></i>}
-                </div>
-                <span className="text-xs text-gray-600">Has button</span>
+                  {extra.haveButton && <i className={`fa-solid fa-check text-[8px] ${glass ? "text-[#8ec5eb]" : "text-white"}`} />}
+                </button>
+                <span className={`text-xs ${glass ? "text-white/70" : "text-gray-600"}`}>Has button</span>
               </label>
             )}
-            {(extra.type !== "TEXT_DISPLAY" && extra.type !== "UPLOAD" && extra.type !== "SECTION") && (
+            {(extra.type !== "TEXT_DISPLAY" &&
+              extra.type !== "UPLOAD" &&
+              extra.type !== "SECTION" &&
+              extra.type !== "ASSESSMENT") && (
               <input
                 type="text"
                 value={extra.buttonName || ""}
                 onChange={(e) => onChange(idx, "buttonName", e.target.value)}
                 placeholder="Button name (optional)"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#2E3B8E]"
+                className={inCls}
+              />
+            )}
+            {extra.type === "ASSESSMENT" && (
+              <input
+                type="text"
+                value={extra.buttonName || ""}
+                onChange={(e) => onChange(idx, "buttonName", e.target.value)}
+                placeholder="Button label (optional)"
+                className={inCls}
               />
             )}
           </div>
           <button
             type="button"
             onClick={() => onRemove(idx)}
-            className="mt-1 text-red-400 hover:text-red-600 transition text-xs flex-shrink-0"
+            className="mt-1 flex-shrink-0 text-xs text-red-400 transition hover:text-red-300"
           >
-            <i className="fa-solid fa-trash"></i>
+            <i className="fa-solid fa-trash" />
           </button>
         </div>
       ))}
-      <button
-        type="button"
-        onClick={onAdd}
-        className="w-full flex items-center justify-center gap-2 border border-dashed border-[#2E3B8E]/40 rounded-lg py-2 text-[#2E3B8E] text-xs font-medium hover:border-[#2E3B8E] hover:bg-blue-50/30 transition"
-      >
-        <i className="fa-solid fa-plus text-[10px]"></i> Add Task/Extra
-      </button>
+      {!hideFooterAdd ? (
+        <button
+          type="button"
+          onClick={onAdd}
+          className={`flex w-full items-center justify-center gap-2 rounded-lg border border-dashed py-2 text-xs font-medium transition ${
+            glass
+              ? "border-[#8ec5eb]/40 text-[#8ec5eb] hover:bg-[#8ec5eb]/10"
+              : "border-[#2E3B8E]/40 text-[#2E3B8E] hover:border-[#2E3B8E] hover:bg-blue-50/30"
+          }`}
+        >
+          <i className="fa-solid fa-plus text-[10px]" /> Add Task/Extra
+        </button>
+      ) : null}
     </div>
   );
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function CreateRoadmapModal({ isOpen, onClose, onSuccess }: CreateRoadmapModalProps) {
+export default function CreateRoadmapModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  variant = "glass",
+}: CreateRoadmapModalProps) {
+  const glass = variant === "glass";
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -256,6 +314,8 @@ export default function CreateRoadmapModal({ isOpen, onClose, onSuccess }: Creat
     if (!duration.trim()) { setError("Completion time is required."); return; }
     const invalidExtra = extras.find((e) => !e.name.trim());
     if (invalidExtra) { setError("All extras/tasks must have a name."); return; }
+    const badAssessment = extras.find((e) => e.type === "ASSESSMENT" && !e.assessmentId?.trim());
+    if (badAssessment) { setError("Assessment-type tasks must include an Assessment ID."); return; }
     setStep(2);
   };
 
@@ -265,6 +325,8 @@ export default function CreateRoadmapModal({ isOpen, onClose, onSuccess }: Creat
     if (!duration.trim()) { setError("Completion time is required."); return; }
     const invalidExtra = extras.find((e) => !e.name.trim());
     if (invalidExtra) { setError("All extras/tasks must have a name."); return; }
+    const badAssessmentRoot = extras.find((e) => e.type === "ASSESSMENT" && !e.assessmentId?.trim());
+    if (badAssessmentRoot) { setError("Assessment-type tasks must include an Assessment ID."); return; }
 
     if (isPhase && step === 2) {
       for (const item of nestedItems) {
@@ -275,6 +337,11 @@ export default function CreateRoadmapModal({ isOpen, onClose, onSuccess }: Creat
         const invalidNested = item.extras.find((e) => !e.name.trim());
         if (invalidNested) {
           setError("All nested roadmap extras/tasks must have a name.");
+          return;
+        }
+        const badNestedA = item.extras.find((e) => e.type === "ASSESSMENT" && !e.assessmentId?.trim());
+        if (badNestedA) {
+          setError("Nested Assessment tasks must include an Assessment ID.");
           return;
         }
       }
@@ -299,6 +366,9 @@ export default function CreateRoadmapModal({ isOpen, onClose, onSuccess }: Creat
         if (extra.placeHolder) formData.append(`extras[${i}][placeHolder]`, extra.placeHolder);
         if (extra.buttonName) formData.append(`extras[${i}][buttonName]`, extra.buttonName);
         if (extra.haveButton !== undefined) formData.append(`extras[${i}][haveButton]`, String(extra.haveButton));
+        if (extra.type === "ASSESSMENT" && extra.assessmentId?.trim()) {
+          formData.append(`extras[${i}][assessmentId]`, extra.assessmentId.trim());
+        }
       });
 
       // For Phase type: include nested roadmaps as indexed keys
@@ -314,6 +384,9 @@ export default function CreateRoadmapModal({ isOpen, onClose, onSuccess }: Creat
             if (extra.placeHolder) formData.append(`roadmaps[${i}][extras][${j}][placeHolder]`, extra.placeHolder);
             if (extra.buttonName) formData.append(`roadmaps[${i}][extras][${j}][buttonName]`, extra.buttonName);
             if (extra.haveButton !== undefined) formData.append(`roadmaps[${i}][extras][${j}][haveButton]`, String(extra.haveButton));
+            if (extra.type === "ASSESSMENT" && extra.assessmentId?.trim()) {
+              formData.append(`roadmaps[${i}][extras][${j}][assessmentId]`, extra.assessmentId.trim());
+            }
           });
         });
       }
@@ -335,51 +408,110 @@ export default function CreateRoadmapModal({ isOpen, onClose, onSuccess }: Creat
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-[560px] mx-4 overflow-hidden shadow-2xl">
+  const labelCls = glass ? "mb-1 block text-sm font-medium text-white/90" : "mb-1 block text-sm font-medium text-gray-800";
+  const subLabelCls = glass ? "text-xs text-white/55" : "text-xs text-gray-500";
+  const fieldClass = glass
+    ? directorInputClass
+    : "w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#2E3B8E]";
+  const fieldClassSm = glass
+    ? `${directorInputClass} px-3 py-2 text-sm`
+    : "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#2E3B8E]";
+  const selectClass = glass
+    ? `${directorInputClass} appearance-none pr-10 text-sm [&>option]:bg-[#041f35] [&>option]:text-white`
+    : "w-full appearance-none rounded-lg border border-gray-300 bg-white px-4 py-2.5 pr-10 text-sm text-gray-800 focus:outline-none focus:border-[#2E3B8E]";
 
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-roadmap-title"
+    >
+      <div
+        className={`flex max-h-[90vh] w-full max-w-[560px] flex-col overflow-hidden rounded-2xl border border-white/15 shadow-2xl ${
+          glass ? directorGlassCard : "bg-white"
+        }`}
+      >
         {/* Header */}
         <div
-          className="relative px-6 py-7 flex items-center justify-between"
-          style={{ background: "linear-gradient(135deg, #1A2E7A 0%, #2E3B8E 60%, #3B5BD4 100%)" }}
+          className={`relative flex items-center justify-between px-5 py-5 sm:px-6 sm:py-6 ${
+            glass
+              ? "border-b border-white/10 bg-gradient-to-r from-[#062946] via-[#0a3558] to-[#062946]"
+              : ""
+          }`}
+          style={
+            glass
+              ? undefined
+              : { background: "linear-gradient(135deg, #1A2E7A 0%, #2E3B8E 60%, #3B5BD4 100%)" }
+          }
         >
-          <div
-            className="absolute inset-0 opacity-10"
-            style={{
-              backgroundImage:
-                "repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.3) 20px, rgba(255,255,255,0.3) 40px)",
-            }}
-          />
-          <div className="relative z-10">
-            <h2 className="text-white text-xl font-bold">Create New Roadmap</h2>
-            {isPhase && (
-              <p className="text-white/60 text-xs mt-1">
-                Step {step} of 2 — {step === 1 ? "Basic Info & Tasks" : "Nested Roadmaps"}
+          {!glass ? (
+            <div
+              className="absolute inset-0 opacity-10"
+              style={{
+                backgroundImage:
+                  "repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.3) 20px, rgba(255,255,255,0.3) 40px)",
+              }}
+            />
+          ) : null}
+          <div className="relative z-10 min-w-0 pr-2">
+            <h2 id="create-roadmap-title" className="text-lg font-bold text-white sm:text-xl">
+              Create New Roadmap
+            </h2>
+            {isPhase ? (
+              <p className="mt-1 text-xs text-white/65">
+                Step {step} of 2 — {step === 1 ? "Details & optional tasks" : "Nested roadmaps"}
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-white/65">
+                Single-step form — fill required fields, then create.
               </p>
             )}
           </div>
           <button
+            type="button"
             onClick={handleClose}
-            className="relative z-10 w-8 h-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 text-white transition"
+            className="relative z-10 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+            aria-label="Close"
           >
-            <i className="fa-solid fa-xmark text-sm"></i>
+            <i className="fa-solid fa-xmark text-sm" />
           </button>
         </div>
 
         {/* Step progress bar (Phase only) */}
         {isPhase && (
-          <div className="flex">
-            <div className={`h-1 flex-1 transition-all ${step >= 1 ? "bg-[#2E3B8E]" : "bg-gray-200"}`} />
-            <div className={`h-1 flex-1 transition-all ${step >= 2 ? "bg-[#2E3B8E]" : "bg-gray-200"}`} />
+          <div className="flex border-b border-white/10">
+            <div
+              className={`h-1 flex-1 transition-all ${step >= 1 ? "bg-[#8ec5eb]" : glass ? "bg-white/15" : "bg-gray-200"}`}
+            />
+            <div
+              className={`h-1 flex-1 transition-all ${step >= 2 ? "bg-[#8ec5eb]" : glass ? "bg-white/15" : "bg-gray-200"}`}
+            />
           </div>
         )}
 
         {/* Body */}
-        <div className="px-6 py-5 space-y-4 max-h-[68vh] overflow-y-auto">
+        <div
+          className={`max-h-[min(68vh,720px)] space-y-4 overflow-y-auto px-5 py-4 sm:px-6 sm:py-5 ${
+            glass ? "bg-[#041f35]/35" : ""
+          }`}
+        >
           {error && (
-            <p className="text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+            <p
+              className={`rounded-lg border px-3 py-2 text-sm ${
+                glass
+                  ? "border-red-400/40 bg-red-500/15 text-red-200"
+                  : "border-red-200 bg-red-50 text-red-600"
+              }`}
+            >
               {error}
+            </p>
+          )}
+
+          {glass && step === 1 && (
+            <p className="text-xs leading-relaxed text-white/60">
+              <span className="font-semibold text-[#8ec5eb]">*</span> Required fields. Tasks / extras are
+              optional—add them only if this roadmap needs custom fields or linked assessments.
             </p>
           )}
 
@@ -388,91 +520,119 @@ export default function CreateRoadmapModal({ isOpen, onClose, onSuccess }: Creat
             <>
               {/* Type */}
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">Type</label>
+                <label className={labelCls}>Roadmap type</label>
+                <p className={`${subLabelCls} mb-2`}>
+                  <strong className={glass ? "text-white/80" : "font-semibold text-gray-900"}>Phase</strong>{" "}
+                  uses two steps (this page, then nested roadmaps).{" "}
+                  <strong className={glass ? "text-white/80" : "font-semibold text-gray-900"}>
+                    Single Roadmap
+                  </strong>{" "}
+                  saves in one step.
+                </p>
                 <div className="relative">
-                  <select
-                    value={type}
-                    onChange={(e) => setType(e.target.value)}
-                    className="w-full appearance-none border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-800 bg-white focus:outline-none focus:border-[#2E3B8E] pr-10"
-                  >
+                  <select value={type} onChange={(e) => setType(e.target.value)} className={selectClass}>
                     {ROADMAP_TYPES.map((t) => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
-                  <i className="fa-solid fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-xs pointer-events-none"></i>
+                  <i className={`fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs ${glass ? "text-[#8ec5eb]/70" : "text-gray-500"}`} />
                 </div>
               </div>
 
               {/* Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">
-                  Name <span className="text-red-500">*</span>
+                <label className={labelCls}>
+                  Name <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Enter roadmap name"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#2E3B8E]"
+                  className={fieldClass}
                 />
               </div>
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">Description</label>
+                <label className={labelCls}>Description</label>
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Enter description"
+                  placeholder="Enter description (optional)"
                   rows={3}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#2E3B8E] resize-none"
+                  className={`${fieldClass} resize-none`}
                 />
               </div>
 
               {/* Completion Time */}
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">
-                  Completion Time <span className="text-red-500">*</span>
+                <label className={labelCls}>
+                  Completion time <span className="text-red-400">*</span>
                 </label>
+                <p className={`${subLabelCls} mb-2`}>
+                  Shown to users (e.g. &quot;3 Months&quot;, &quot;12 Weeks&quot;).
+                </p>
                 <input
                   type="text"
                   value={duration}
                   onChange={(e) => setDuration(e.target.value)}
                   placeholder="e.g. 3 Months"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#2E3B8E]"
+                  className={fieldClass}
                 />
               </div>
 
               {/* Phase label */}
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">Phase</label>
+                <label className={labelCls}>Phase label</label>
                 <input
                   type="text"
                   value={phase}
                   onChange={(e) => setPhase(e.target.value)}
                   placeholder="e.g. Phase 1 (optional)"
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#2E3B8E]"
+                  className={fieldClass}
                 />
               </div>
 
               {/* Division multi-select */}
               <div ref={divisionRef}>
-                <label className="block text-sm font-medium text-gray-800 mb-1">Division</label>
+                <label className={labelCls}>Division</label>
+                <p className={`${subLabelCls} mb-2`}>Optional — limit visibility to church and/or pastor views.</p>
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setShowDivisionDropdown((p) => !p)}
-                    className="w-full flex items-center justify-between border border-gray-300 rounded-lg px-4 py-2.5 text-sm text-left focus:outline-none focus:border-[#2E3B8E] hover:border-[#2E3B8E] transition bg-white"
+                    className={`flex w-full items-center justify-between rounded-lg px-4 py-2.5 text-left text-sm transition ${
+                      glass
+                        ? directorInputClass
+                        : "border border-gray-300 bg-white focus:border-[#2E3B8E] hover:border-[#2E3B8E]"
+                    }`}
                   >
-                    <span className={divisions.length === 0 ? "text-gray-400" : "text-gray-800 capitalize"}>
+                    <span
+                      className={
+                        divisions.length === 0
+                          ? glass
+                            ? "text-white/45"
+                            : "text-gray-400"
+                          : glass
+                            ? "capitalize text-white"
+                            : "capitalize text-gray-800"
+                      }
+                    >
                       {divisions.length === 0
-                        ? "None"
+                        ? "None selected"
                         : divisions.map((d) => d.charAt(0).toUpperCase() + d.slice(1)).join(", ")}
                     </span>
-                    <i className={`fa-solid fa-chevron-down text-gray-500 text-xs transition-transform ${showDivisionDropdown ? "rotate-180" : ""}`}></i>
+                    <i className={`fa-solid fa-chevron-down text-xs transition-transform ${showDivisionDropdown ? "rotate-180" : ""} ${glass ? "text-[#8ec5eb]/70" : "text-gray-500"}`} />
                   </button>
                   {showDivisionDropdown && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+                    <div
+                      className={`absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border shadow-lg ${
+                        glass
+                          ? "border-white/15 bg-[#041f35]/98 backdrop-blur-md"
+                          : "border-gray-200 bg-white"
+                      }`}
+                    >
                       {DIVISION_OPTIONS.map((option) => {
                         const checked = divisions.includes(option);
                         return (
@@ -480,20 +640,48 @@ export default function CreateRoadmapModal({ isOpen, onClose, onSuccess }: Creat
                             key={option}
                             type="button"
                             onClick={() => toggleDivision(option)}
-                            className="w-full flex items-center gap-3 px-4 py-3 text-sm text-left hover:bg-gray-50 transition"
+                            className={`flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition ${
+                              glass ? "hover:bg-white/10" : "hover:bg-gray-50"
+                            }`}
                           >
-                            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition ${checked ? "bg-[#2E3B8E] border-[#2E3B8E]" : "bg-white border-gray-300"}`}>
-                              {checked && <i className="fa-solid fa-check text-white text-[9px]"></i>}
+                            <div
+                              className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border-2 transition ${
+                                checked
+                                  ? glass
+                                    ? "border-[#8ec5eb] bg-[#8ec5eb]/25"
+                                    : "border-[#2E3B8E] bg-[#2E3B8E]"
+                                  : glass
+                                    ? "border-white/30 bg-transparent"
+                                    : "border-gray-300 bg-white"
+                              }`}
+                            >
+                              {checked && (
+                                <i className={`fa-solid fa-check text-[9px] ${glass ? "text-[#8ec5eb]" : "text-white"}`} />
+                              )}
                             </div>
-                            <span className={`capitalize ${checked ? "text-[#2E3B8E] font-medium" : "text-gray-700"}`}>
+                            <span
+                              className={`capitalize ${
+                                checked
+                                  ? glass
+                                    ? "font-medium text-[#8ec5eb]"
+                                    : "font-medium text-[#2E3B8E]"
+                                  : glass
+                                    ? "text-white/85"
+                                    : "text-gray-700"
+                              }`}
+                            >
                               {option}
                             </span>
                           </button>
                         );
                       })}
                       {divisions.length > 0 && (
-                        <div className="border-t border-gray-100 px-4 py-2">
-                          <button type="button" onClick={() => setDivisions([])} className="text-xs text-red-500 hover:text-red-700 font-medium">
+                        <div className={`border-t px-4 py-2 ${glass ? "border-white/10" : "border-gray-100"}`}>
+                          <button
+                            type="button"
+                            onClick={() => setDivisions([])}
+                            className="text-xs font-medium text-red-400 hover:text-red-300"
+                          >
                             Clear all
                           </button>
                         </div>
@@ -505,23 +693,40 @@ export default function CreateRoadmapModal({ isOpen, onClose, onSuccess }: Creat
 
               {/* Banner upload */}
               <div>
-                <label className="block text-sm font-medium text-gray-800 mb-1">Upload Banner</label>
+                <label className={labelCls}>Banner image</label>
+                <p className={`${subLabelCls} mb-2`}>Optional. JPEG, PNG, or WebP (max 5 MB recommended).</p>
                 <div
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") fileInputRef.current?.click();
+                  }}
                   onClick={() => fileInputRef.current?.click()}
                   onDrop={handleBannerDrop}
                   onDragOver={(e) => e.preventDefault()}
-                  className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer hover:border-[#2E3B8E] hover:bg-blue-50/30 transition"
+                  className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 transition ${
+                    glass
+                      ? "border-white/20 hover:border-[#8ec5eb]/50 hover:bg-[#8ec5eb]/5"
+                      : "border-gray-300 hover:border-[#2E3B8E] hover:bg-blue-50/30"
+                  }`}
                 >
                   {bannerPreview ? (
-                    <img src={bannerPreview} alt="Banner preview" className="h-24 object-contain rounded-lg" />
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={bannerPreview} alt="Banner preview" className="h-24 rounded-lg object-contain" />
                   ) : (
                     <>
-                      <div className="w-8 h-8 rounded-full border-2 border-gray-400 flex items-center justify-center mb-2">
-                        <i className="fa-solid fa-plus text-gray-400"></i>
+                      <div
+                        className={`mb-2 flex h-8 w-8 items-center justify-center rounded-full border-2 ${
+                          glass ? "border-[#8ec5eb]/50" : "border-gray-400"
+                        }`}
+                      >
+                        <i className={`fa-solid fa-plus ${glass ? "text-[#8ec5eb]" : "text-gray-400"}`} />
                       </div>
-                      <p className="text-sm text-gray-500">Drag & Drop or Click here to choose file</p>
-                      <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                        <i className="fa-solid fa-circle-info"></i> Max file size: 5 MB
+                      <p className={`text-sm ${glass ? "text-white/70" : "text-gray-500"}`}>
+                        Drag & drop or click to choose a file
+                      </p>
+                      <p className={`mt-1 flex items-center gap-1 text-xs ${glass ? "text-white/45" : "text-gray-400"}`}>
+                        <i className="fa-solid fa-circle-info" /> Max ~5 MB
                       </p>
                     </>
                   )}
@@ -537,15 +742,18 @@ export default function CreateRoadmapModal({ isOpen, onClose, onSuccess }: Creat
 
               {/* Extras / Tasks */}
               <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium text-gray-800">Tasks / Extras</label>
-                  <span className="text-xs text-gray-400">{extras.length} added</span>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className={glass ? "text-sm font-medium text-white/90" : "text-sm font-medium text-gray-800"}>
+                    Tasks / extras
+                  </label>
+                  <span className={`text-xs ${glass ? "text-white/45" : "text-gray-400"}`}>{extras.length} added</span>
                 </div>
                 <ExtrasList
                   extras={extras}
                   onChange={handleExtraChange}
                   onAdd={handleAddExtra}
                   onRemove={handleRemoveExtra}
+                  glass={glass}
                 />
               </div>
             </>
@@ -554,72 +762,87 @@ export default function CreateRoadmapModal({ isOpen, onClose, onSuccess }: Creat
           {/* ── Step 2 (Phase only) ── */}
           {step === 2 && isPhase && (
             <>
-              <p className="text-sm text-gray-500">
-                Add nested roadmap items for this phase. Each requires a name and completion time.
+              <p className={`text-sm ${glass ? "text-white/65" : "text-gray-500"}`}>
+                Add one or more nested roadmaps for this phase. Each needs a <strong className={glass ? "text-white/90" : ""}>name</strong> and{" "}
+                <strong className={glass ? "text-white/90" : ""}>completion time</strong>. Tasks / extras are optional per nested item.
               </p>
               <div className="space-y-5">
                 {nestedItems.map((item, nIdx) => (
-                  <div key={nIdx} className="border border-gray-200 rounded-xl p-4 space-y-3">
+                  <div
+                    key={nIdx}
+                    className={`space-y-3 rounded-xl border p-4 ${
+                      glass ? "border-white/15 bg-white/[0.06]" : "border-gray-200"
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-[#2E3B8E]">Roadmap {nIdx + 1}</span>
+                      <span className={`text-sm font-semibold ${glass ? "text-[#8ec5eb]" : "text-[#2E3B8E]"}`}>
+                        Nested roadmap {nIdx + 1}
+                      </span>
                       {nestedItems.length > 1 && (
                         <button
+                          type="button"
                           onClick={() => setNestedItems((prev) => prev.filter((_, i) => i !== nIdx))}
-                          className="text-red-400 hover:text-red-600 transition text-xs"
+                          className="text-xs text-red-400 transition hover:text-red-300"
                         >
-                          <i className="fa-solid fa-trash"></i>
+                          <i className="fa-solid fa-trash" />
                         </button>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Name <span className="text-red-500">*</span>
+                      <label className={`mb-1 block text-xs font-medium ${glass ? "text-white/80" : "text-gray-700"}`}>
+                        Name <span className="text-red-400">*</span>
                       </label>
                       <input
                         type="text"
                         value={item.name}
                         onChange={(e) => handleNestedChange(nIdx, "name", e.target.value)}
                         placeholder="Enter name"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#2E3B8E]"
+                        className={fieldClassSm}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Completion Time <span className="text-red-500">*</span>
+                      <label className={`mb-1 block text-xs font-medium ${glass ? "text-white/80" : "text-gray-700"}`}>
+                        Completion time <span className="text-red-400">*</span>
                       </label>
                       <input
                         type="text"
                         value={item.duration}
                         onChange={(e) => handleNestedChange(nIdx, "duration", e.target.value)}
                         placeholder="e.g. 3 Months"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#2E3B8E]"
+                        className={fieldClassSm}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+                      <label className={`mb-1 block text-xs font-medium ${glass ? "text-white/80" : "text-gray-700"}`}>
+                        Description
+                      </label>
                       <input
                         type="text"
                         value={item.description}
                         onChange={(e) => handleNestedChange(nIdx, "description", e.target.value)}
-                        placeholder="Enter description"
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:border-[#2E3B8E]"
+                        placeholder="Enter description (optional)"
+                        className={fieldClassSm}
                       />
                     </div>
 
-                    {/* Nested extras */}
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-xs font-medium text-gray-700">Tasks / Extras</label>
-                        <span className="text-xs text-gray-400">{item.extras.length} added</span>
+                      <div className="mb-2 flex items-center justify-between">
+                        <label className={`text-xs font-medium ${glass ? "text-white/80" : "text-gray-700"}`}>
+                          Tasks / extras
+                        </label>
+                        <span className={`text-xs ${glass ? "text-white/45" : "text-gray-400"}`}>
+                          {item.extras.length} added
+                        </span>
                       </div>
                       <ExtrasList
                         extras={item.extras}
                         onChange={(eIdx, field, value) => handleNestedExtraChange(nIdx, eIdx, field, value)}
                         onAdd={() => handleAddNestedExtra(nIdx)}
                         onRemove={(eIdx) => handleRemoveNestedExtra(nIdx, eIdx)}
+                        glass={glass}
                       />
                     </div>
                   </div>
@@ -627,40 +850,67 @@ export default function CreateRoadmapModal({ isOpen, onClose, onSuccess }: Creat
               </div>
 
               <button
+                type="button"
                 onClick={() => setNestedItems((prev) => [...prev, defaultNested()])}
-                className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-[#2E3B8E]/40 rounded-xl py-2.5 text-[#2E3B8E] text-sm font-medium hover:border-[#2E3B8E] hover:bg-blue-50/30 transition"
+                className={`flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed py-2.5 text-sm font-medium transition ${
+                  glass
+                    ? "border-[#8ec5eb]/40 text-[#8ec5eb] hover:bg-[#8ec5eb]/10"
+                    : "border-[#2E3B8E]/40 text-[#2E3B8E] hover:border-[#2E3B8E] hover:bg-blue-50/30"
+                }`}
               >
-                <i className="fa-solid fa-plus text-xs"></i> Add Another Roadmap
+                <i className="fa-solid fa-plus text-xs" /> Add another nested roadmap
               </button>
             </>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-100 flex gap-3 justify-end">
+        <div
+          className={`flex flex-col gap-2 border-t px-5 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6 ${
+            glass ? "border-white/10 bg-[#041f35]/50" : "border-gray-100 bg-white"
+          }`}
+        >
           {step === 2 && (
             <button
-              onClick={() => { setError(""); setStep(1); }}
-              className="px-6 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition"
+              type="button"
+              onClick={() => {
+                setError("");
+                setStep(1);
+              }}
+              className={`rounded-xl px-6 py-2.5 text-sm font-semibold transition ${
+                glass
+                  ? "border border-white/20 text-white hover:bg-white/10"
+                  : "border border-gray-300 text-gray-700 hover:bg-gray-50"
+              }`}
             >
               Back
             </button>
           )}
           {step === 1 && isPhase ? (
             <button
+              type="button"
               onClick={handleNext}
-              className="px-8 py-2.5 rounded-xl bg-[#2E3B8E] text-white text-sm font-semibold hover:bg-[#1F2A6E] transition"
+              className={`rounded-xl px-8 py-2.5 text-sm font-semibold transition ${
+                glass
+                  ? "bg-[#8ec5eb] text-[#062946] hover:bg-[#b8ddf5]"
+                  : "bg-[#2E3B8E] text-white hover:bg-[#1F2A6E]"
+              }`}
             >
               Next
             </button>
           ) : (
             <button
+              type="button"
               onClick={handleSubmit}
               disabled={submitting}
-              className="px-8 py-2.5 rounded-xl bg-[#2E3B8E] text-white text-sm font-semibold hover:bg-[#1F2A6E] transition disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+              className={`flex items-center justify-center gap-2 rounded-xl px-8 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                glass
+                  ? "bg-[#8ec5eb] text-[#062946] hover:bg-[#b8ddf5]"
+                  : "bg-[#2E3B8E] text-white hover:bg-[#1F2A6E]"
+              }`}
             >
-              {submitting && <i className="fa-solid fa-spinner animate-spin text-xs"></i>}
-              Create
+              {submitting && <i className="fa-solid fa-spinner animate-spin text-xs" />}
+              Create roadmap
             </button>
           )}
         </div>

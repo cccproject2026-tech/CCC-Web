@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "../../Assets/jumpstart-hero.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { useRouter } from "next/navigation";

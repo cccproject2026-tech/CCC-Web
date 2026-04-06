@@ -1,9 +1,7 @@
 "use client";
 import { useState } from "react";
 import Image from "next/image";
-import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
-import HeroBg from "@/app/Assets/jumpstart-hero.png"; // Replace with correct hero image
+import PastorHeader from "@/app/Components/PastorHeader";import HeroBg from "@/app/Assets/jumpstart-hero.png"; // Replace with correct hero image
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 export default function PrayerAndVisitationStrategyPage() {

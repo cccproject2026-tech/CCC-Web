@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
-import { getCookie } from "@/app/utils/cookies";
+import PastorHeader from "@/app/Components/PastorHeader";import { getCookie } from "@/app/utils/cookies";
 import { apiGetUserById } from "@/app/Services/api";
 import { useRouter } from "next/navigation";
 
@@ -110,9 +108,6 @@ export default function PastorCertificatesPage() {
             )}
           </div>
         </div>
-      </main>
-
-      <PastorFooter />
-    </div>
+      </main>    </div>
   );
 }

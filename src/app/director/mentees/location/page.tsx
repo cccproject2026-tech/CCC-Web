@@ -1,12 +1,12 @@
 "use client";
-import Image from "next/image";
+
 import Link from "next/link";
-import { useState } from "react";
-import AppHeader from "@/app/Components/Header/AppHeader";
-import AppFooter from "@/app/Components/AppFooter";
-import AppHero from "@/app/Components/Hero/AppHero";
-import MapCard, { MapMarker } from "@/app/Components/MapCard";
+import { useEffect, useMemo, useState } from "react";
+
 import SearchBar from "@/app/Components/SearchBar";
+import DirectorHero from "../../DirectorHero";
+import { directorPageRoot } from "../../directorUi";
+import MapCard, { MapMarker } from "@/app/Components/MapCard";
 import FeaturedAvatars, {
   FeaturedAvatarItem,
 } from "@/app/Components/FeaturedAvatars";
@@ -14,120 +14,158 @@ import MentorBg from "@/app/Assets/mentor-bg.png";
 import Mentor1 from "@/app/Assets/mentor1.png";
 import Mentor2 from "@/app/Assets/mentor2.png";
 import Mentor3 from "@/app/Assets/mentor3.png";
+import { apiGetAllUsers } from "@/app/Services/users.service";
 
-interface MenteeMarker extends MapMarker {
-  status?: "inprogress" | "completed" | "pending";
-}
+const IMAGE_POOL = [Mentor1, Mentor2, Mentor3];
 
-const FEATURED = [
-  { id: 1, name: "Jacob Jones", img: Mentor1 },
-  { id: 2, name: "John Doe", img: Mentor2 },
-  { id: 3, name: "Robert Fox", img: Mentor3 },
-  { id: 4, name: "Jacob Jones", img: Mentor1 },
-  { id: 5, name: "Robert Fox", img: Mentor3 },
-  { id: 6, name: "John Doe", img: Mentor2 },
+/** Deterministic overlay positions (percent) when API has no coordinates */
+const MARKER_SLOTS: { top: string; left: string }[] = [
+  { top: "38%", left: "30%" },
+  { top: "30%", left: "50%" },
+  { top: "52%", left: "63%" },
+  { top: "70%", left: "40%" },
+  { top: "58%", left: "78%" },
+  { top: "44%", left: "22%" },
 ];
 
-const MARKERS: MenteeMarker[] = [
-  {
-    id: 1,
-    name: "Pr. John Ross",
-    img: Mentor1,
-    top: "38%",
-    left: "30%",
-    status: "inprogress",
-  },
-  {
-    id: 2,
-    name: "Pr. Kevin",
-    img: Mentor2,
-    top: "30%",
-    left: "50%",
-    status: "inprogress",
-  },
-  {
-    id: 3,
-    name: "Pr. Alex",
-    img: Mentor3,
-    top: "52%",
-    left: "63%",
-    status: "inprogress",
-  },
-  {
-    id: 4,
-    name: "Pr. Ben",
-    img: Mentor2,
-    top: "70%",
-    left: "40%",
-    status: "inprogress",
-  },
-  {
-    id: 5,
-    name: "Pr. Adam",
-    img: Mentor1,
-    top: "58%",
-    left: "78%",
-    status: "inprogress",
-  },
-];
+type MenteeRow = {
+  id: string;
+  name: string;
+  img: typeof Mentor1;
+};
 
 export default function MenteesLocationPage() {
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [rows, setRows] = useState<MenteeRow[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const featuredItems: FeaturedAvatarItem[] = FEATURED.map((m) => ({
-    id: m.id,
-    name: m.name,
-    img: m.img,
-  }));
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const search =
+          debouncedQuery.length > 0 ? debouncedQuery : undefined;
+        const res = await apiGetAllUsers({
+          role: "pastor",
+          roleMatch: "mixed",
+          search,
+          limit: 48,
+        });
+        if (cancelled) return;
+        const users = res.data.data.users;
+        const mapped: MenteeRow[] = users.map((u: any, i: number) => ({
+          id: String(u.id ?? u._id),
+          name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Mentee",
+          img: u.profilePicture || IMAGE_POOL[i % IMAGE_POOL.length],
+        }));
+        setRows(mapped);
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) setRows([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedQuery]);
+
+  const featuredItems: FeaturedAvatarItem[] = useMemo(
+    () =>
+      rows.slice(0, 6).map((m) => ({
+        id: m.id,
+        name: m.name,
+        img: m.img,
+      })),
+    [rows]
+  );
+
+  const mapMarkers: MapMarker[] = useMemo(
+    () =>
+      rows.slice(0, MARKER_SLOTS.length).map((m, i) => ({
+        id: m.id,
+        name: m.name,
+        img: m.img,
+        top: MARKER_SLOTS[i].top,
+        left: MARKER_SLOTS[i].left,
+      })),
+    [rows]
+  );
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHero title="Mentees" backgroundImageUrl={MentorBg.src} />
+    <div className={directorPageRoot}>
+      <DirectorHero
+        title="Mentees map"
+        subtitle="Pastor locations on the network map (placeholder positions until coordinates are available)."
+        image={MentorBg}
+        breadcrumbItems={[
+          { label: "Home", href: "/director/home" },
+          { label: "Mentees", href: "/director/mentees" },
+          { label: "Location" },
+        ]}
+      />
 
-      {/* Search, Close and Featured Profiles */}
-      <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-6 md:py-8">
-        <div className="max-w-[1400px] mx-auto">
-          {/* Row: Search + Close */}
-          <div className="flex items-center justify-between gap-4 mb-6">
-            <div className="w-full max-w-[520px]">
+      <section className="relative py-4 md:py-6">
+        <div className="mx-auto max-w-[1400px]">
+          <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 w-full sm:max-w-[min(520px,100%)]">
               <SearchBar
                 value={query}
                 onChange={setQuery}
-                placeholder="Search"
+                placeholder="Search mentees by name or email…"
                 className="w-full"
+                variant="dark"
               />
             </div>
             <Link
-              href="/director/mentors"
-              className="px-4 py-2 bg-white text-[#2E3B8E] rounded-lg text-[13px] font-semibold shadow-sm hover:bg-gray-50 flex items-center gap-2"
+              href="/director/mentees"
+              className="flex shrink-0 items-center justify-center gap-2 self-end rounded-lg border border-white/20 bg-white/10 px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-white/15 sm:self-auto"
             >
-              <i className="fa-solid fa-xmark"></i>
+              <i className="fa-solid fa-xmark text-[#8ec5eb]" />
               <span>Close</span>
             </Link>
           </div>
 
-          {/* Featured avatars below search */}
-          <FeaturedAvatars
-            items={featuredItems}
-            gapClass="gap-6"
-            nameClass="text-white text-[12px]"
-            showDivider
-          />
+          {loading ? (
+            <p className="mb-4 text-sm text-white/55">Loading mentees…</p>
+          ) : featuredItems.length > 0 ? (
+            <FeaturedAvatars
+              items={featuredItems}
+              gapClass="gap-6"
+              nameClass="text-[12px] text-white/90"
+              showDivider
+              className="mb-2"
+            />
+          ) : (
+            <p className="mb-4 text-sm text-white/55">
+              No mentees match this search.
+            </p>
+          )}
         </div>
       </section>
 
-      {/* Map section */}
-      <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 pb-10">
-        <div className="max-w-[1400px] mx-auto">
+      <section className="relative px-0 pb-10 md:pb-12">
+        <div className="mx-auto max-w-[1400px]">
           <MapCard
-            title="In-progress"
+            title="In progress"
             iframeSrc="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d31568.68148787118!2d-122.356!3d37.7799!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x808f7fd1d5f8d9f1%3A0x3e1f9a5c95f9a!2sSan%20Francisco%20Bay%20Area!5e0!3m2!1sen!2sus!4v1710000000000&zoom=10"
-            markers={MARKERS}
+            markers={mapMarkers}
           />
+          <p className="mt-4 text-center text-xs text-white/50">
+            Avatars are placed for illustration. Connect real lat/lng from your
+            backend to pin exact locations.
+          </p>
         </div>
       </section>
-
-      <AppFooter />
     </div>
   );
 }

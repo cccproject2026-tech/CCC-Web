@@ -1,7 +1,6 @@
 "use client";
 import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import Logo from "../../Assets/CCCLogo.png"; // 🖼 replace with your actual logo image
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
@@ -103,8 +102,6 @@ export default function SurveyRecommendationDownload() {
           </div>
         </div>
       </main>
-
-      <PastorFooter />
     </div>
   );
 }

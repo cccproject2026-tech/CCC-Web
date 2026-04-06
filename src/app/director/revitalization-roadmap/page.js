@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import AppFooter from "@/app/Components/AppFooter";
 import RoadmapCard from "@/app/Components/RoadmapCard";
 import FeaturedAvatars from "@/app/Components/FeaturedAvatars";
 import MentorCard from "@/app/Components/Card/MentorCard";
@@ -12,13 +11,14 @@ import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
 import Card1 from "../../Assets/card1.png";
 import { apiGetRoadmaps, apiGetMentorList, apiGetOverallProgress, apiDeleteRoadmap } from "@/app/Services/api";
-import CreateRoadmapModal from "@/app/Components/CreateRoadmapModal";
+import { unwrapRoadmapsList } from "@/app/Services/roadmap-assignments";
+import DirectorHero from "../DirectorHero";
+import { directorGlassCard, directorInputClass, directorPageRoot } from "../directorUi";
 
 
 export default function RevitalizationRoadmapPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("roadmap-library");
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("least-mentees");
   const [filterCount, setFilterCount] = useState(3);
@@ -78,10 +78,11 @@ export default function RevitalizationRoadmapPage() {
       try {
         setLoadingRoadmaps(true);
         const res = await apiGetRoadmaps();
-        const data = res.data?.data || [];
-        const mapped = data.map((item) => ({
+        /** Handles raw arrays, { data }, { roadmaps }, nested envelopes, etc. */
+        const list = unwrapRoadmapsList(res);
+        const mapped = list.map((item) => ({
           id: item._id,
-          title: item.name,
+          title: item.name || "Untitled roadmap",
           description: item.description || item.roadMapDetails || "No description",
           completionTime: item.duration || "N/A",
           img: item.imageUrl || Card1,
@@ -160,39 +161,31 @@ export default function RevitalizationRoadmapPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      {/* Hero Section */}
-      <section
-        className="relative bg-cover bg-center text-white h-[250px] flex items-end pb-10 px-20"
-        style={{ backgroundImage: `url(${HeroBg.src})` }}
-      >
-        {/* Dark overlay gradient for readability */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[#001845]/70 via-[#0B2E72]/50 to-[#1A4A9A]/90"></div>
+    <div className={directorPageRoot}>
+      <DirectorHero
+        title="Revitalization Roadmap"
+        subtitle="Track and manage church revitalization phases."
+        image={HeroBg}
+        breadcrumbItems={[
+          { label: "Home", href: "/director/home" },
+          { label: "Revitalization Roadmap" },
+        ]}
+      />
 
-        <div className="relative z-10">
-          <h1 className="text-3xl font-semibold">Revitalization Roadmap</h1>
-          <p className="text-white/80 text-lg mt-2">
-            Track and manage church revitalization phases
-          </p>
-        </div>
-      </section>
-
-      {/* Main Content */}
-      <main className="flex-1 px-16 py-10">
-        <div className="max-w-7xl mx-auto">
-          {/* Search and Tabs Section */}
-          <div className="bg-white rounded-2xl shadow-xl p-6 mb-8">
+      <main className="flex-1 pb-12">
+        <div className="mx-auto max-w-7xl">
+          <div className={`mb-8 p-6 ${directorGlassCard}`}>
             <div className="flex flex-col md:flex-row gap-4 items-center">
               {/* Search Bar */}
               <div className="flex-1">
                 <div className="relative">
-                  <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                  <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-[#8ec5eb]/70"></i>
                   <input
                     type="text"
                     placeholder="Search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-white border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#2E3B8E] text-gray-900 placeholder-gray-400"
+                    className={`${directorInputClass} pl-11`}
                   />
                 </div>
               </div>
@@ -200,45 +193,50 @@ export default function RevitalizationRoadmapPage() {
               {/* Tab Navigation */}
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={() => setActiveTab("roadmap-library")}
-                  className={`px-6 py-3 rounded-lg font-semibold text-[14px] transition-all ${
+                  className={`rounded-lg px-6 py-3 text-[14px] font-semibold transition-all ${
                     activeTab === "roadmap-library"
-                      ? "bg-[#2E3B8E] text-white"
-                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                      ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/40"
+                      : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
                   }`}
                 >
                   Roadmap Library
                 </button>
                 <button
+                  type="button"
                   onClick={() => setActiveTab("mentors")}
-                  className={`px-6 py-3 rounded-lg font-semibold text-[14px] transition-all ${
+                  className={`rounded-lg px-6 py-3 text-[14px] font-semibold transition-all ${
                     activeTab === "mentors"
-                      ? "bg-[#2E3B8E] text-white"
-                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                      ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/40"
+                      : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
                   }`}
                 >
                   Mentors
                 </button>
                 <button
+                  type="button"
                   onClick={() => setActiveTab("pastor-roadmaps")}
-                  className={`px-6 py-3 rounded-lg font-semibold text-[14px] transition-all ${
+                  className={`rounded-lg px-6 py-3 text-[14px] font-semibold transition-all ${
                     activeTab === "pastor-roadmaps"
-                      ? "bg-[#2E3B8E] text-white"
-                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                      ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/40"
+                      : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
                   }`}
                 >
                   Pastor's Roadmaps
                 </button>
                 <button
+                  type="button"
                   onClick={() => router.push("/director/pastor-assignments")}
-                  className="px-6 py-3 bg-white text-[#2E3B8E] border border-[#2E3B8E] rounded-lg font-semibold text-[14px] hover:bg-blue-50 transition-all flex items-center gap-2"
+                  className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/10 px-6 py-3 text-[14px] font-semibold text-white transition hover:bg-[#8ec5eb]/20"
                 >
                   <i className="fa-solid fa-share-nodes"></i>
                   Assign
                 </button>
                 <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="px-6 py-3 bg-[#2E3B8E] text-white rounded-lg font-semibold text-[14px] hover:bg-[#1F2A6E] transition-all flex items-center gap-2"
+                  type="button"
+                  onClick={() => router.push("/director/revitalization-roadmap/create")}
+                  className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-6 py-3 text-[14px] font-semibold text-white transition hover:bg-[#8ec5eb]/30"
                 >
                   <i className="fa-solid fa-plus"></i>
                   New Roadmap
@@ -258,24 +256,42 @@ export default function RevitalizationRoadmapPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   {roadmapLibrary
                     .filter((r) =>
-                      r.title.toLowerCase().includes(searchQuery.toLowerCase())
+                      r.title
+                        .toLowerCase()
+                        .includes((searchQuery || "").trim().toLowerCase())
                     )
                     .map((roadmap) => (
                       <RoadmapCard
                         key={roadmap.id}
+                        variant="directorGlass"
                         id={roadmap.id}
                         img={roadmap.img}
                         title={roadmap.title}
                         description={roadmap.description}
                         completionTime={roadmap.completionTime}
-                        onEdit={() => {}}
+                        onView={() =>
+                          router.push(
+                            `/director/pastor-assignments/roadmap/${roadmap.id}`
+                          )
+                        }
+                        onEdit={() =>
+                          router.push(
+                            `/director/pastor-assignments/roadmap/${roadmap.id}`
+                          )
+                        }
                         onDelete={() => handleDeleteRoadmap(roadmap.id)}
                       />
                     ))}
                   {roadmapLibrary.filter((r) =>
-                    r.title.toLowerCase().includes(searchQuery.toLowerCase())
+                    r.title
+                      .toLowerCase()
+                      .includes((searchQuery || "").trim().toLowerCase())
                   ).length === 0 && (
-                    <p className="text-white/70 col-span-2">No roadmaps found.</p>
+                    <p className="text-white/70 col-span-2">
+                      {roadmapLibrary.length === 0
+                        ? "No roadmaps yet. Create one with New Roadmap."
+                        : "No roadmaps match your search."}
+                    </p>
                   )}
                 </div>
               )}
@@ -657,29 +673,6 @@ export default function RevitalizationRoadmapPage() {
           )}
         </div>
       </main>
-
-      <CreateRoadmapModal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={() => {
-          // re-fetch roadmaps if on roadmap-library tab
-          if (activeTab === "roadmap-library") {
-            setRoadmapLibrary([]);
-            setLoadingRoadmaps(true);
-            apiGetRoadmaps().then((res) => {
-              const data = res.data?.data || [];
-              setRoadmapLibrary(data.map((item) => ({
-                id: item._id,
-                title: item.name,
-                description: item.description || item.roadMapDetails || "No description",
-                completionTime: item.duration || "N/A",
-                img: item.imageUrl || Card1,
-              })));
-            }).catch(() => {}).finally(() => setLoadingRoadmaps(false));
-          }
-        }}
-      />
-      <AppFooter />
     </div>
   );
 }

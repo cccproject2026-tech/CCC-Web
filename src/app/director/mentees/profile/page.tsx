@@ -1,10 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { getCookie } from "@/app/utils/cookies";
-import { useRouter, useSearchParams } from "next/navigation";
-
-import AppFooter from "@/app/Components/AppFooter";
-import AppHero from "@/app/Components/Hero/AppHero";
+import { useRouter, useSearchParams } from "next/navigation";import AppHero from "@/app/Components/Hero/AppHero";
 import ProfileForm from "@/app/Components/ProfileForm";
 import ProfileSidebarCard from "@/app/Components/ProfileSidebarCard";
 import ConfirmModal from "@/app/Components/ConfirmModal";
@@ -328,10 +325,7 @@ function MenteeProfileContent() {
         confirmColor="bg-red-600 hover:bg-red-700"
         icon="fa-regular fa-trash-can"
         iconColor="text-red-600 bg-red-100"
-      />
-
-      <AppFooter />
-    </div>
+      />    </div>
   );
 }
 

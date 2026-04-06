@@ -2,10 +2,7 @@
 import { useState, useRef, useEffect, Suspense, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import "@fortawesome/fontawesome-free/css/all.min.css";
-
-import PastorFooter from "@/app/Components/PastorFooter";
-import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
+import "@fortawesome/fontawesome-free/css/all.min.css";import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import { useSearchParams } from "next/navigation";
 import { apiGetUserRoadmaps } from "@/app/Services/roadmaps.service";
@@ -335,10 +332,7 @@ function RevitalizationRoadmapHomeContent() {
             )}
           </div>
         </div>
-      </main>
-
-      <PastorFooter />
-    </div>
+      </main>    </div>
   );
 }
 

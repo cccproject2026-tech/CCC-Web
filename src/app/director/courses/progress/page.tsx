@@ -1,9 +1,7 @@
 "use client";
 import { useState } from "react";
 import Image from "next/image";
-import AppHeader from "@/app/Components/Header/AppHeader";
-import AppFooter from "@/app/Components/AppFooter";
-import AppHero from "@/app/Components/Hero/AppHero";
+import AppHeader from "@/app/Components/Header/AppHeader";import AppHero from "@/app/Components/Hero/AppHero";
 import MentorBg from "../../../Assets/mentor-bg.png";
 import Mentor1 from "../../../Assets/mentor1.png";
 import Mentor2 from "../../../Assets/mentor2.png";
@@ -329,9 +327,6 @@ export default function CourseProgressPage() {
             </div>
           )}
         </div>
-      </section>
-
-      <AppFooter />
-    </div>
+      </section>    </div>
   );
 }

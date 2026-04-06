@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import { getCookie, setCookie } from "@/app/utils/cookies";
 
 type Note = {
@@ -217,8 +216,6 @@ export default function NotificationsPage() {
           )}
         </div>
       </main>
-
-      <PastorFooter />
     </div>
   );
 }

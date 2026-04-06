@@ -1,9 +1,7 @@
 "use client";
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import AppHero from "@/app/Components/Hero/AppHero";
-import AppFooter from "@/app/Components/AppFooter";
-import ConfirmModal from "@/app/Components/ConfirmModal";
+import AppHero from "@/app/Components/Hero/AppHero";import ConfirmModal from "@/app/Components/ConfirmModal";
 import ProfileForm, { ChurchInfo, OtherInfo, PersonalInfo } from "@/app/Components/ProfileForm";
 import ProfileSidebarCard from "@/app/Components/ProfileSidebarCard";
 import MentorBg from "@/app/Assets/mentor-bg.png";
@@ -279,10 +277,7 @@ function MentorProfileContent() {
           className="fixed inset-0 z-40"
           onClick={() => setShowOptionsMenu(false)}
         ></div>
-      )}
-
-      <AppFooter />
-    </div>
+      )}    </div>
   );
 }
 

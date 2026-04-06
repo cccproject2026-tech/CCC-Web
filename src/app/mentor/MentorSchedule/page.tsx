@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "../../Assets/appointment-bg.png";
 import DuoIcon from "../../Assets/duo.png";
 import MeetIcon from "../../Assets/meet.png";
@@ -1148,8 +1147,6 @@ export default function MentorSchedule() {
           </div>
         </div>
       )}
-
-      <PastorFooter />
     </div>
   );
 }

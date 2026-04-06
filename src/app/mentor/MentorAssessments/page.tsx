@@ -4,7 +4,6 @@ import Image from "next/image";
 import HeroBg from "@/app/Assets/assignments-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import { ApiAvatarPlaceholder, ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import {
   apiCreateAssessment,
@@ -679,8 +678,6 @@ export default function MentorAssessments() {
           </div>
         </div>
       )}
-
-      <PastorFooter />
     </div>
   );
 }

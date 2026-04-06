@@ -7,7 +7,6 @@ import { getCookie } from "@/app/utils/cookies";
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/hero-bg.png";
 import UserProfile from "../../Assets/user-profile.png";
-import PastorFooter from "@/app/Components/PastorFooter";
 import { useRouter } from "next/navigation";
 import { getUpcomingAppointments, getUserAppointments } from "@/app/Services/pastor.service";
 import { apiGetAssignedUsers, apiGetRoadmapsByUser } from "@/app/Services/api";
@@ -350,8 +349,6 @@ export default function PastorDashboard() {
           )}
         </div>
       </section>
-
-      <PastorFooter />
     </div>
   );
 }

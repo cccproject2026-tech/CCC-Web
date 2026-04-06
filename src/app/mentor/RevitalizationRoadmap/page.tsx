@@ -6,7 +6,6 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import { useRouter } from "next/navigation";
 
 import MentorHeader from "@/app/Components/MentorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import RoadmapHero from "@/app/Assets/roadmap-bg.png";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 
@@ -360,8 +359,6 @@ export default function RevitalizationRoadmapPage() {
           )}
         </div>
       </main>
-
-      <PastorFooter />
     </div>
   );
 }

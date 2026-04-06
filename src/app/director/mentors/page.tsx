@@ -2,9 +2,12 @@
 import { useMemo, useState, useEffect, useCallback, memo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import AppHeader from "@/app/Components/Header/AppHeader";
-import AppHero from "@/app/Components/Hero/AppHero";
-import AppFooter from "@/app/Components/AppFooter";
+import DirectorHero from "../DirectorHero";
+import {
+  directorGlassCard,
+  directorGlassCardHover,
+  directorPageRoot,
+} from "../directorUi";
 import SearchBar from "@/app/Components/SearchBar";
 import FeaturedAvatars, {
   FeaturedAvatarItem,
@@ -32,17 +35,16 @@ interface Mentor {
   assignedIds: string[];
 }
 
-// Helper function to convert User to Mentor
-const convertUserToMentor = (user: any): Mentor => {
+// Helper function to convert User to Mentor (index = stable fallback avatar)
+const convertUserToMentor = (user: any, index: number): Mentor => {
   const defaultImages = [Mentor1, Mentor2, Mentor3];
-  const randomImage = defaultImages[Math.floor(Math.random() * defaultImages.length)];
 
   return {
     id: user.id || user._id,
     name: `${user.firstName} ${user.lastName}`,
     role: user.role,
     description: `${user.role} with ${user.assignedId?.length || 0} assigned mentees`,
-    img: user.profilePicture || randomImage,
+    img: user.profilePicture || defaultImages[index % defaultImages.length],
     menteeCount: user.assignedId?.length || 0,
     isFeatured: false,
     lastContact: undefined,
@@ -55,27 +57,27 @@ const optionsMenuItems = [
   {
     icon: "fa-solid fa-users",
     label: "List of Mentees",
-    color: "text-[#2E3B8E]",
+    color: "text-[#8ec5eb]",
   },
   {
     icon: "fa-solid fa-user-plus",
     label: "Assign New Mentee",
-    color: "text-[#2E3B8E]",
+    color: "text-[#8ec5eb]",
   },
   {
     icon: "fa-solid fa-user-minus",
     label: "Remove a Mentee",
-    color: "text-[#2E3B8E]",
+    color: "text-[#8ec5eb]",
   },
   {
     icon: "fa-regular fa-calendar",
     label: "Schedule an Appointment",
-    color: "text-[#2E3B8E]",
+    color: "text-[#8ec5eb]",
   },
   {
     icon: "fa-regular fa-pen-to-square",
     label: "Edit Profile",
-    color: "text-[#2E3B8E]",
+    color: "text-[#8ec5eb]",
   },
   // {
   //   icon: "fa-solid fa-times-circle",
@@ -99,46 +101,47 @@ const MentorGridCard = memo(({
   onViewProfile: (mentorId: string) => void;
 }) => {
   return (
-    <div className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all border border-gray-100">
-      {/* Profile Image with Options Menu */}
-      <div className="relative w-full h-[240px] bg-gray-100">
+    <div
+      className={`flex h-full flex-col overflow-hidden rounded-2xl border border-white/15 ${directorGlassCard} ${directorGlassCardHover}`}
+    >
+      <div className="relative aspect-[4/5] max-h-[280px] min-h-[200px] w-full bg-white/5">
         <Image
           src={mentor.img}
           alt={mentor.name}
           fill
-          style={{ objectFit: 'cover' }}
+          style={{ objectFit: "cover" }}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
           quality={85}
         />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#062946]/60 to-transparent" />
 
-        {/* Options Menu - Positioned in top-right corner of image */}
-        <div className="absolute top-2 right-2">
+        <div className="absolute right-2 top-2">
           <div className="relative">
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleMenu(mentor.id);
               }}
-              className="w-7 h-7 bg-white/95 backdrop-blur-sm rounded-lg flex items-center justify-center hover:bg-white transition-all shadow-sm"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/20 bg-[#062946]/85 text-white backdrop-blur-sm transition hover:bg-[#062946]"
             >
-              <i className="fa-solid fa-ellipsis-vertical text-gray-700 text-sm"></i>
+              <i className="fa-solid fa-ellipsis-vertical text-sm" />
             </button>
 
             {isMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl py-2 px-1 min-w-[240px] z-50">
+              <div className="absolute right-0 top-full z-50 mt-2 min-w-[240px] rounded-xl border border-white/15 bg-[#041f35]/98 py-2 pl-1 pr-1 shadow-2xl backdrop-blur-md">
                 {optionsMenuItems.map((item, index) => (
                   <button
                     key={index}
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       onMenuAction(item.label, mentor);
                     }}
-                    className="w-full text-left px-4 py-2.5 rounded-lg text-[13px] transition-all flex items-center gap-3 hover:bg-gray-50"
+                    className="flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-left text-[13px] text-white/90 transition hover:bg-white/10"
                   >
-                    <i className={`${item.icon} ${item.color} text-base w-5`}></i>
-                    <span className="text-gray-700 font-medium">
-                      {item.label}
-                    </span>
+                    <i className={`${item.icon} ${item.color} w-5 text-base`} />
+                    <span className="font-medium">{item.label}</span>
                   </button>
                 ))}
               </div>
@@ -147,58 +150,45 @@ const MentorGridCard = memo(({
         </div>
       </div>
 
-      {/* Mentor Info */}
-      <div className="p-4">
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex-1">
-            <h3 className="text-[17px] font-bold text-gray-900 mb-0.5">
+      <div className="flex flex-1 flex-col p-4 sm:p-5">
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <h3 className="mb-0.5 line-clamp-2 text-base font-semibold text-white sm:text-[17px]">
               {mentor.name}
             </h3>
-            <p className="text-[13px] text-gray-500">
+            <p className="line-clamp-1 text-[13px] capitalize text-white/65">
               {mentor.role}
             </p>
           </div>
-          <span className="px-2.5 py-1 bg-yellow-50 text-yellow-700 rounded-full text-[11px] font-semibold whitespace-nowrap ml-2 border border-yellow-200">
+          <span className="ml-2 shrink-0 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/15 px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap text-[#cde2f2]">
             {mentor.menteeCount} Mentees
           </span>
         </div>
-        <p className="text-[12px] text-gray-400 leading-relaxed mb-4">
+        <p className="mb-4 line-clamp-2 text-[12px] leading-relaxed text-white/50">
           {mentor.description}
         </p>
 
-        {/* Action Icons */}
-        <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-          <div className="flex items-center gap-3 sm:gap-4 text-[#2E3B8E]">
-            <button
-              className="hover:opacity-70 transition"
-              aria-label="Email"
-            >
-              <i className="fa-regular fa-envelope text-[16px] sm:text-[17px]"></i>
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-white/10 pt-3">
+          <div className="flex flex-wrap items-center gap-2 text-[#8ec5eb] sm:gap-3">
+            <button type="button" className="transition hover:opacity-80" aria-label="Email">
+              <i className="fa-regular fa-envelope text-base sm:text-[17px]" />
             </button>
-            <button
-              className="hover:opacity-70 transition"
-              aria-label="Message"
-            >
-              <i className="fa-regular fa-comment text-[16px] sm:text-[17px]"></i>
+            <button type="button" className="transition hover:opacity-80" aria-label="Message">
+              <i className="fa-regular fa-comment text-base sm:text-[17px]" />
             </button>
-            <button
-              className="hover:opacity-70 transition"
-              aria-label="WhatsApp"
-            >
-              <i className="fa-brands fa-whatsapp text-[16px] sm:text-[17px]"></i>
+            <button type="button" className="transition hover:opacity-80" aria-label="WhatsApp">
+              <i className="fa-brands fa-whatsapp text-base sm:text-[17px]" />
             </button>
-            <button
-              className="hover:opacity-70 transition"
-              aria-label="Call"
-            >
-              <i className="fa-solid fa-phone text-[16px] sm:text-[17px]"></i>
+            <button type="button" className="transition hover:opacity-80" aria-label="Call">
+              <i className="fa-solid fa-phone text-base sm:text-[17px]" />
             </button>
           </div>
           <button
+            type="button"
             onClick={() => onViewProfile(mentor.id)}
-            className="w-9 h-9 bg-[#2E3B8E] text-white rounded-lg flex items-center justify-center hover:bg-[#3A4BA0] transition-all flex-shrink-0"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/10 text-[#8ec5eb] transition hover:bg-[#8ec5eb]/20"
           >
-            <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+            <i className="fa-solid fa-arrow-up-right-from-square text-xs" />
           </button>
         </div>
       </div>
@@ -223,101 +213,101 @@ const MentorListCard = memo(({
   onViewProfile: (mentorId: string) => void;
 }) => {
   return (
-    <div className="bg-white rounded-2xl p-4 md:p-5 shadow-md hover:shadow-lg transition-all border border-gray-100">
-      <div className="flex items-center gap-3 md:gap-5">
-        {/* Profile Image */}
-        <div className="relative flex-shrink-0">
-          <div className="relative w-14 h-14 md:w-16 md:h-16 rounded-full overflow-hidden bg-gray-100 border-2 border-gray-200">
+    <div
+      className={`rounded-2xl border border-white/15 p-4 md:p-5 ${directorGlassCard} ${directorGlassCardHover}`}
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
+        <div className="relative shrink-0">
+          <div className="relative h-14 w-14 overflow-hidden rounded-full border-2 border-white/20 bg-white/10 md:h-16 md:w-16">
             <Image
               src={mentor.img}
               alt={mentor.name}
-              className="w-full h-full object-cover"
+              className="h-full w-full object-cover"
               fill
               sizes="64px"
             />
           </div>
         </div>
 
-        {/* Mentor Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1">
-            <h3 className="text-[15px] md:text-[17px] font-bold text-gray-900">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex flex-wrap items-center gap-2 md:gap-3">
+            <h3 className="text-[15px] font-semibold text-white md:text-[17px]">
               {mentor.name}
             </h3>
-            <span className="px-2.5 py-1 bg-yellow-50 text-yellow-700 rounded-full text-[10px] md:text-[11px] font-semibold whitespace-nowrap border border-yellow-200">
+            <span className="rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/15 px-2.5 py-1 text-[10px] font-semibold whitespace-nowrap text-[#cde2f2] md:text-[11px]">
               {mentor.menteeCount} Mentees
             </span>
           </div>
-          <p className="text-[12px] md:text-[13px] text-gray-500 mb-1">
+          <p className="mb-1 text-[12px] capitalize text-white/65 md:text-[13px]">
             {mentor.role}
           </p>
-          <p className="text-[11px] md:text-[12px] text-gray-400 leading-relaxed hidden sm:block">
+          <p className="hidden text-[11px] leading-relaxed text-white/50 sm:block md:text-[12px]">
             {mentor.description}
           </p>
         </div>
 
-        {/* Action Icons */}
-        <div className="flex items-center gap-2 md:gap-4 text-[#2E3B8E]">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 text-[#8ec5eb] md:gap-3">
           <button
-            className="hover:opacity-70 transition p-1 hidden sm:block"
+            type="button"
+            className="hidden p-1 transition hover:opacity-80 sm:inline-flex"
             aria-label="Email"
           >
-            <i className="fa-regular fa-envelope text-[16px] md:text-[17px]"></i>
+            <i className="fa-regular fa-envelope text-[16px] md:text-[17px]" />
           </button>
           <button
-            className="hover:opacity-70 transition p-1 hidden sm:block"
+            type="button"
+            className="hidden p-1 transition hover:opacity-80 sm:inline-flex"
             aria-label="Message"
           >
-            <i className="fa-regular fa-comment text-[16px] md:text-[17px]"></i>
+            <i className="fa-regular fa-comment text-[16px] md:text-[17px]" />
           </button>
           <button
-            className="hover:opacity-70 transition p-1 hidden md:block"
+            type="button"
+            className="hidden p-1 transition hover:opacity-80 md:inline-flex"
             aria-label="WhatsApp"
           >
-            <i className="fa-brands fa-whatsapp text-[17px]"></i>
+            <i className="fa-brands fa-whatsapp text-[17px]" />
           </button>
-          <button
-            className="hover:opacity-70 transition p-1"
-            aria-label="Call"
-          >
-            <i className="fa-solid fa-phone text-[16px] md:text-[17px]"></i>
+          <button type="button" className="p-1 transition hover:opacity-80" aria-label="Call">
+            <i className="fa-solid fa-phone text-[16px] md:text-[17px]" />
           </button>
           <div className="relative">
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleMenu(mentor.id);
               }}
-              className="w-7 h-7 flex items-center justify-center hover:bg-gray-100 rounded-lg transition-all"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 text-white/80 transition hover:bg-white/10"
             >
-              <i className="fa-solid fa-ellipsis-vertical text-gray-600 text-sm"></i>
+              <i className="fa-solid fa-ellipsis-vertical text-sm" />
             </button>
 
             {isMenuOpen && (
-              <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl py-2 px-1 min-w-[240px] z-50">
+              <div className="absolute right-0 top-full z-50 mt-2 min-w-[240px] rounded-xl border border-white/15 bg-[#041f35]/98 py-2 pl-1 pr-1 shadow-2xl backdrop-blur-md">
                 {optionsMenuItems.map((item, index) => (
                   <button
                     key={index}
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       onMenuAction(item.label, mentor);
                     }}
-                    className="w-full text-left px-4 py-2.5 rounded-lg text-[13px] transition-all flex items-center gap-3 hover:bg-gray-50"
+                    className="flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-left text-[13px] text-white/90 transition hover:bg-white/10"
                   >
-                    <i className={`${item.icon} ${item.color} text-base w-5`}></i>
-                    <span className="text-gray-700 font-medium">
-                      {item.label}
-                    </span>
+                    <i className={`${item.icon} ${item.color} w-5 text-base`} />
+                    <span className="font-medium">{item.label}</span>
                   </button>
                 ))}
               </div>
             )}
           </div>
           <button
+            type="button"
             onClick={() => onViewProfile(mentor.id)}
-            className="w-9 h-9 bg-[#2E3B8E] text-white rounded-lg flex items-center justify-center hover:bg-[#3A4BA0] transition-all flex-shrink-0"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/10 text-[#8ec5eb] transition hover:bg-[#8ec5eb]/20"
           >
-            <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+            <i className="fa-solid fa-arrow-up-right-from-square text-xs" />
           </button>
         </div>
       </div>
@@ -358,8 +348,8 @@ export default function MyMentorsPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedQuery(query);
-    }, 500);
+      setDebouncedQuery(query.trim());
+    }, 300);
 
     return () => clearTimeout(timer);
   }, [query]);
@@ -373,31 +363,39 @@ export default function MyMentorsPage() {
     const fetchMentors = async () => {
       setLoading(true);
       try {
-        let role: string;
-        let roleMatch: 'exact' | 'mixed' | undefined;
+        const search =
+          debouncedQuery.length > 0 ? debouncedQuery : undefined;
 
-        if (activeFilter === "All") {
-          role = "mentor";
-          roleMatch = "mixed";
-        } else if (activeFilter === "Mentors") {
-          role = "mentor";
-        } else if (activeFilter === "Field Mentor") {
-          role = "field mentor";
-        } else {
-          role = "mentor";
-          roleMatch = "mixed";
-        }
+        const base = { search, page: currentPage, limit: PAGE_SIZE };
 
-        const response = await apiGetAllUsers({
-          role,
-          roleMatch,
-          search: debouncedQuery || undefined,
-          page: currentPage,
-          limit: PAGE_SIZE,
-        });
+        const response =
+          activeFilter === "All"
+            ? await apiGetAllUsers({
+                ...base,
+                role: "mentor",
+                roleMatch: "mixed",
+              })
+            : activeFilter === "Mentors"
+              ? await apiGetAllUsers({
+                  ...base,
+                  role: "mentor",
+                  roleMatch: "exact",
+                })
+              : activeFilter === "Field Mentor"
+                ? await apiGetAllUsers({
+                    ...base,
+                    role: "field-mentor",
+                  })
+                : await apiGetAllUsers({
+                    ...base,
+                    role: "mentor",
+                    roleMatch: "mixed",
+                  });
 
         const { users, total, totalPages: tp } = response.data.data;
-        setAllMentors(users.map(convertUserToMentor));
+        setAllMentors(
+          users.map((u: any, i: number) => convertUserToMentor(u, i))
+        );
         setTotalCount(total);
         setTotalPages(tp);
       } catch (error) {
@@ -512,28 +510,38 @@ export default function MyMentorsPage() {
   }, [router, handleScheduleMeeting, handleAssignMentees, handleRemoveMentee, handleListMentees]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHero title="Mentors" backgroundImageUrl={MentorBg.src} />
+    <div className={directorPageRoot}>
+      <DirectorHero
+        title="Mentors"
+        subtitle="Manage mentors and mentee assignments."
+        image={MentorBg}
+        breadcrumbItems={[
+          { label: "Home", href: "/director/home" },
+          { label: "Mentors" },
+        ]}
+      />
 
       {/* Search and Featured Mentors Section */}
-      <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-6 md:py-8">
-        <div className="max-w-[1400px] mx-auto">
+      <section className="relative py-4 md:py-6">
+        <div className="mx-auto max-w-[1400px]">
           {/* Search Bar and View Toggle */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6 md:mb-8">
-            <div className="w-full sm:max-w-[420px]">
+          <div className="mb-6 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0 w-full sm:max-w-[min(420px,100%)]">
               <SearchBar
                 value={query}
                 onChange={setQuery}
-                placeholder="Search"
+                placeholder="Search by name or email…"
                 className="w-full"
+                variant="dark"
               />
             </div>
-            <div className="flex gap-2 justify-end">
+            <div className="flex shrink-0 justify-end gap-2 sm:pl-2">
               <button
+                type="button"
                 onClick={() =>
                   setViewMode(viewMode === "grid" ? "list" : "grid")
                 }
-                className={`w-11 h-11 rounded-lg flex items-center justify-center shadow-sm transition-all bg-white text-[#2E3B8E]`}
+                className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-[#8ec5eb] shadow-sm transition-all hover:bg-white/15"
                 aria-label="Toggle view"
                 title={
                   viewMode === "grid"
@@ -544,7 +552,7 @@ export default function MyMentorsPage() {
                 <i
                   className={`fa-solid ${viewMode === "grid" ? "fa-bars" : "fa-th"
                     } text-base`}
-                ></i>
+                />
               </button>
             </div>
           </div>
@@ -557,17 +565,19 @@ export default function MyMentorsPage() {
       </section>
 
       {/* Filters and Sort Section */}
-      <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 pb-6 md:pb-8 pt-4">
-        <div className="max-w-[1400px] mx-auto flex flex-col lg:flex-row gap-4 lg:gap-6 items-stretch lg:items-center justify-between">
+      <section className="relative pb-6 pt-2 md:pb-8">
+        <div className="mx-auto flex max-w-[1400px] flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-center lg:gap-6">
           {/* Filter Tabs */}
-          <div className="flex gap-1.5 sm:gap-2 bg-white rounded-xl p-1.5 shadow-sm overflow-x-auto scrollbar-hide">
+          <div
+            className={`scrollbar-hide flex gap-1.5 overflow-x-auto rounded-xl p-1.5 sm:gap-2 ${directorGlassCard}`}
+          >
             {filterOptions.map((option) => (
               <button
                 key={option.value}
                 onClick={() => setActiveFilter(option.value)}
-                className={`px-5 sm:px-7 py-2.5 rounded-lg text-[13px] sm:text-[14px] font-semibold transition-all duration-200 whitespace-nowrap ${activeFilter === option.value
-                  ? "bg-[#2E3B8E] text-white shadow-sm"
-                  : "text-gray-600 hover:text-gray-800"
+                className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-[13px] font-semibold transition-all duration-200 sm:px-7 sm:text-[14px] ${activeFilter === option.value
+                  ? "bg-[#8ec5eb]/25 text-white shadow-sm ring-1 ring-[#8ec5eb]/35"
+                  : "text-white/65 hover:text-white"
                   }`}
               >
                 {option.label}
@@ -576,21 +586,21 @@ export default function MyMentorsPage() {
           </div>
 
           {/* Sort Dropdown */}
-          <div className="flex items-center gap-3">
-            <span className="text-white text-[14px] sm:text-[15px] font-semibold">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3 lg:shrink-0">
+            <span className="text-[14px] font-semibold whitespace-nowrap text-white sm:text-[15px]">
               Sort By
             </span>
-            <div className="relative flex-1 sm:flex-initial">
+            <div className="relative w-full sm:w-auto sm:min-w-[200px]">
               <button
                 onClick={() => setShowSortMenu(!showSortMenu)}
-                className="w-full sm:w-auto px-4 sm:px-5 py-2.5 bg-white text-gray-700 rounded-lg text-[13px] sm:text-[14px] font-medium shadow-sm hover:shadow-md transition-all flex items-center gap-3 min-w-[160px] sm:min-w-[180px] justify-between"
+                className="flex min-w-[160px] w-full items-center justify-between gap-3 rounded-lg border border-white/15 bg-white/10 px-4 py-2.5 text-[13px] font-medium text-white shadow-sm transition-all hover:bg-white/15 sm:w-auto sm:min-w-[180px] sm:text-[14px]"
               >
                 <span className="truncate">{sortBy}</span>
                 <i className="fa-solid fa-chevron-down text-[10px]"></i>
               </button>
 
               {showSortMenu && (
-                <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl py-2 px-1 min-w-[200px] z-50">
+                <div className="absolute right-0 top-full z-50 mt-2 min-w-[200px] rounded-xl border border-white/15 bg-[#041f35]/98 py-2 px-1 shadow-2xl backdrop-blur-md">
                   {sortOptions.map((option) => (
                     <button
                       key={option}
@@ -598,19 +608,19 @@ export default function MyMentorsPage() {
                         setSortBy(option);
                         setShowSortMenu(false);
                       }}
-                      className={`w-full text-left px-4 py-2.5 rounded-lg text-[13px] sm:text-[14px] transition-all flex items-center gap-3 ${sortBy === option
-                        ? "bg-green-50 text-green-700 font-semibold"
-                        : "text-gray-700 hover:bg-gray-50"
+                      className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-left text-[13px] transition-all sm:text-[14px] ${sortBy === option
+                        ? "bg-[#8ec5eb]/20 font-semibold text-white"
+                        : "text-white/80 hover:bg-white/10"
                         }`}
                     >
                       <span
-                        className={`w-[18px] h-[18px] rounded-full border-2 flex items-center justify-center flex-shrink-0 ${sortBy === option
-                          ? "border-green-500 bg-green-500"
-                          : "border-gray-300"
+                        className={`flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full border-2 ${sortBy === option
+                          ? "border-[#8ec5eb] bg-[#8ec5eb]/40"
+                          : "border-white/30"
                           }`}
                       >
                         {sortBy === option && (
-                          <i className="fa-solid fa-check text-white text-[9px]"></i>
+                          <i className="fa-solid fa-check text-[9px] text-white"></i>
                         )}
                       </span>
                       {option}
@@ -624,12 +634,12 @@ export default function MyMentorsPage() {
       </section>
 
       {/* Mentors Grid/List */}
-      <section className="px-4 sm:px-6 md:px-12 lg:px-20 py-6 md:py-8">
-        <div className="max-w-[1400px] mx-auto">
+      <section className="py-6 md:py-8">
+        <div className="mx-auto max-w-[1400px]">
           {loading ? (
             <div className="flex items-center justify-center py-20">
               <div className="text-center">
-                <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
+                <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]"></div>
                 <p className="text-white text-lg font-medium">Loading mentors...</p>
               </div>
             </div>
@@ -642,7 +652,7 @@ export default function MyMentorsPage() {
               </div>
             </div>
           ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-5">
+            <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-5">
               {filteredMentors.map((mentor) => (
                 <MentorGridCard
                   key={mentor.id}
@@ -679,7 +689,7 @@ export default function MyMentorsPage() {
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="w-9 h-9 rounded-lg bg-white text-[#2E3B8E] flex items-center justify-center disabled:opacity-40 hover:bg-gray-100 transition"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-[#8ec5eb] transition hover:bg-white/15 disabled:opacity-40"
                 >
                   <i className="fa-solid fa-chevron-left text-xs"></i>
                 </button>
@@ -698,10 +708,10 @@ export default function MyMentorsPage() {
                       <button
                         key={item}
                         onClick={() => setCurrentPage(item as number)}
-                        className={`w-9 h-9 rounded-lg text-sm font-semibold transition ${
+                        className={`h-9 w-9 rounded-lg text-sm font-semibold transition ${
                           currentPage === item
-                            ? "bg-[#2E3B8E] text-white shadow"
-                            : "bg-white text-[#2E3B8E] hover:bg-gray-100"
+                            ? "bg-[#8ec5eb]/30 text-white shadow ring-1 ring-[#8ec5eb]/40"
+                            : "border border-white/15 bg-white/10 text-[#8ec5eb] hover:bg-white/15"
                         }`}
                       >
                         {item}
@@ -712,7 +722,7 @@ export default function MyMentorsPage() {
                 <button
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="w-9 h-9 rounded-lg bg-white text-[#2E3B8E] flex items-center justify-center disabled:opacity-40 hover:bg-gray-100 transition"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-[#8ec5eb] transition hover:bg-white/15 disabled:opacity-40"
                 >
                   <i className="fa-solid fa-chevron-right text-xs"></i>
                 </button>
@@ -743,20 +753,40 @@ export default function MyMentorsPage() {
           // Refresh the mentors list to show updated assigned counts
           const fetchMentors = async () => {
             try {
-              let role: string;
-              let roleMatch: 'exact' | 'mixed' | undefined;
-              if (activeFilter === "All") { role = "mentor"; roleMatch = "mixed"; }
-              else if (activeFilter === "Field Mentor") { role = "field mentor"; }
-              else { role = "mentor"; }
-
-              const response = await apiGetAllUsers({
-                role, roleMatch,
-                search: debouncedQuery || undefined,
+              const search =
+                debouncedQuery.length > 0 ? debouncedQuery : undefined;
+              const base = {
+                search,
                 page: currentPage,
                 limit: PAGE_SIZE,
-              });
+              };
+              const response =
+                activeFilter === "All"
+                  ? await apiGetAllUsers({
+                      ...base,
+                      role: "mentor",
+                      roleMatch: "mixed",
+                    })
+                  : activeFilter === "Mentors"
+                    ? await apiGetAllUsers({
+                        ...base,
+                        role: "mentor",
+                        roleMatch: "exact",
+                      })
+                    : activeFilter === "Field Mentor"
+                      ? await apiGetAllUsers({
+                          ...base,
+                          role: "field-mentor",
+                        })
+                      : await apiGetAllUsers({
+                          ...base,
+                          role: "mentor",
+                          roleMatch: "mixed",
+                        });
               const { users, total, totalPages: tp } = response.data.data;
-              setAllMentors(users.map(convertUserToMentor));
+              setAllMentors(
+                users.map((u: any, i: number) => convertUserToMentor(u, i))
+              );
               setTotalCount(total);
               setTotalPages(tp);
             } catch (error) {
@@ -803,10 +833,10 @@ export default function MyMentorsPage() {
 
       {/* Toast Notification */}
       {toast && (
-        <div className="fixed top-6 right-6 z-[100] animate-fade-in">
-          <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3 border border-gray-100">
-            <i className={`fa-solid ${toast.type === 'success' ? 'fa-circle-check text-green-500' : 'fa-circle-exclamation text-red-500'} text-xl`}></i>
-            <span className="text-[#2E3B8E] font-semibold text-[15px]">
+        <div className="fixed right-6 top-6 z-[100] animate-fade-in">
+          <div className="flex items-center gap-3 rounded-xl border border-white/15 bg-[#041f35]/95 px-6 py-4 shadow-2xl backdrop-blur-md">
+            <i className={`fa-solid ${toast.type === 'success' ? 'fa-circle-check text-emerald-400' : 'fa-circle-exclamation text-red-400'} text-xl`}></i>
+            <span className="text-[15px] font-semibold text-white">
               {toast.message}
             </span>
           </div>
@@ -823,8 +853,6 @@ export default function MyMentorsPage() {
           }}
         ></div>
       )}
-
-      <AppFooter />
     </div>
   );
 }

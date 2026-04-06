@@ -2,9 +2,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import AppHeader from "@/app/Components/Header/AppHeader";
-import AppFooter from "@/app/Components/AppFooter";
-import AppHero from "@/app/Components/Hero/AppHero";
+import DirectorHero from "../DirectorHero";
+import { directorGlassCard, directorInputClass, directorPageRoot } from "../directorUi";
 import AssessmentBg from "../../Assets/assessment-bg.png";
 import Thumb1 from "../../Assets/thumb1.png";
 import Thumb2 from "../../Assets/thumb2.png";
@@ -209,47 +208,38 @@ export default function AssessmentsPage() {
   }, [showOptionsMenu]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#2876AC]">
-      {/* Hero Section */}
-      <AppHero
-        title="Assessments"
-        backgroundImageUrl={AssessmentBg.src}
-        heightClasses="h-[280px]"
-      />
+    <div className={directorPageRoot}>
+      <DirectorHero title="Assessments" subtitle="Create and assign assessments to pastors." image={AssessmentBg} />
 
-      {/* Main Content */}
-      <section className="relative px-6 md:px-12 lg:px-20 py-10">
-        <div className="max-w-[1400px] mx-auto">
-          {/* Search and Action Bar */}
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8">
-            {/* Search Bar */}
-            <div className="flex-1 w-full max-w-md">
-              <div className="relative">
-                <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                <input
-                  type="text"
-                  placeholder="Search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-white rounded-lg focus:outline-none text-gray-900 placeholder-gray-400 shadow-md"
-                />
-              </div>
+      <section className="relative py-8">
+        <div className="mx-auto max-w-[1400px]">
+          <div className={`mb-8 flex flex-col items-center justify-between gap-4 md:flex-row ${directorGlassCard} p-5`}>
+            <div className="relative w-full max-w-md flex-1">
+              <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-[#8ec5eb]/70" />
+              <input
+                type="text"
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`${directorInputClass} pl-11`}
+              />
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               {!isSelectionMode ? (
                 <>
                   <button
+                    type="button"
                     onClick={handleSelectMode}
-                    className="px-6 py-3 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-50 shadow-md flex items-center gap-2"
+                    className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-6 py-3 font-semibold text-white shadow-md transition hover:bg-white/15"
                   >
                     <i className="fa-solid fa-check-square"></i>
                     Select
                   </button>
                   <button
+                    type="button"
                     onClick={() => router.push("/director/assessments/create")}
-                    className="px-6 py-3 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-50 shadow-md flex items-center gap-2"
+                    className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-3 font-semibold text-white shadow-md transition hover:bg-[#8ec5eb]/25"
                   >
                     <i className="fa-solid fa-plus"></i>
                     Add
@@ -257,8 +247,9 @@ export default function AssessmentsPage() {
                 </>
               ) : (
                 <button
+                  type="button"
                   onClick={() => setShowAssignModal(true)}
-                  className="px-6 py-3 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-50 shadow-md flex items-center gap-2"
+                  className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-3 font-semibold text-white shadow-md transition hover:bg-[#8ec5eb]/25"
                 >
                   <i className="fa-solid fa-user-plus"></i>
                   Assigned to
@@ -267,31 +258,33 @@ export default function AssessmentsPage() {
             </div>
           </div>
 
-          {/* Selection Mode Controls */}
           {isSelectionMode && (
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-4">
-                <span className="text-white font-semibold">
-                  {selectedAssessments.length} Selected Items
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-4">
+                <span className="font-semibold text-white">
+                  {selectedAssessments.length} selected
                 </span>
                 <button
+                  type="button"
                   onClick={handleSelectAll}
-                  className="px-4 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-50"
+                  className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 font-semibold text-white hover:bg-white/15"
                 >
                   Select All
                 </button>
               </div>
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={() => setShowDeleteModal(true)}
                   disabled={selectedAssessments.length === 0}
-                  className="w-10 h-10 bg-white text-red-600 rounded-lg hover:bg-red-50 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-400/40 bg-red-500/20 text-red-200 hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <i className="fa-solid fa-trash"></i>
                 </button>
                 <button
+                  type="button"
                   onClick={handleCancelSelection}
-                  className="w-10 h-10 bg-white text-[#2E3B8E] rounded-lg hover:bg-gray-50 flex items-center justify-center"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white hover:bg-white/15"
                 >
                   <i className="fa-solid fa-xmark"></i>
                 </button>
@@ -303,7 +296,7 @@ export default function AssessmentsPage() {
           {loadingAssessments ? (
             <div className="flex items-center justify-center py-20">
               <div className="flex flex-col items-center gap-4">
-                <div className="w-10 h-10 border-4 border-white/40 border-t-white rounded-full animate-spin" />
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/20 border-t-[#8ec5eb]" />
                 <p className="text-white font-semibold">Loading assessments...</p>
               </div>
             </div>
@@ -312,8 +305,8 @@ export default function AssessmentsPage() {
               {filteredAssessments.map((assessment) => (
                 <div
                   key={assessment.id}
-                  className={`bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all relative ${selectedAssessments.includes(assessment.id)
-                    ? "ring-2 ring-[#2E3B8E]"
+                  className={`relative rounded-xl border border-white/10 transition-all ${directorGlassCard} ${selectedAssessments.includes(assessment.id)
+                    ? "ring-2 ring-[#8ec5eb]/60"
                     : ""
                     }`}
                 >
@@ -324,7 +317,7 @@ export default function AssessmentsPage() {
                         type="checkbox"
                         checked={selectedAssessments.includes(assessment.id)}
                         onChange={() => handleSelectAssessment(assessment.id)}
-                        className="w-5 h-5 text-[#2E3B8E] rounded focus:ring-2 focus:ring-[#2E3B8E] cursor-pointer"
+                        className="h-5 w-5 cursor-pointer rounded accent-[#8ec5eb] focus:ring-2 focus:ring-[#8ec5eb]/50"
                       />
                     </div>
                   )}
@@ -340,33 +333,35 @@ export default function AssessmentsPage() {
                               : assessment.id
                           )
                         }
-                        className="w-8 h-8 flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-lg"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-white/70 hover:bg-white/10"
                       >
                         <i className="fa-solid fa-ellipsis-vertical"></i>
                       </button>
                       {showOptionsMenu === assessment.id && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 py-2 z-[200] animate-slide-down">
+                        <div className="absolute right-0 z-[200] mt-2 w-48 animate-slide-down rounded-lg border border-white/15 bg-[#041f35]/98 py-2 shadow-xl backdrop-blur-md">
                           <button
+                            type="button"
                             onClick={() => {
                               setShowAssignModal(true);
                               setShowOptionsMenu(null);
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-gray-50 text-gray-700"
+                            className="flex w-full items-center gap-3 px-4 py-2 text-left text-white/90 hover:bg-white/10"
                           >
-                            <i className="fa-solid fa-user-plus text-[#2E3B8E]"></i>
+                            <i className="fa-solid fa-user-plus text-[#8ec5eb]"></i>
                             Assign to
                           </button>
-                          <button className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-gray-50 text-gray-700">
-                            <i className="fa-solid fa-pen text-blue-600"></i>
+                          <button type="button" className="flex w-full items-center gap-3 px-4 py-2 text-left text-white/90 hover:bg-white/10">
+                            <i className="fa-solid fa-pen text-[#8ec5eb]"></i>
                             Edit
                           </button>
                           <button
+                            type="button"
                             onClick={() => {
                               setSelectedAssessments([assessment.id]);
                               setShowDeleteModal(true);
                               setShowOptionsMenu(null);
                             }}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-left hover:bg-gray-50 text-red-600"
+                            className="flex w-full items-center gap-3 px-4 py-2 text-left text-red-300 hover:bg-red-500/10"
                           >
                             <i className="fa-solid fa-trash"></i>
                             Delete
@@ -390,19 +385,20 @@ export default function AssessmentsPage() {
                     {/* Assessment Info */}
                     <div className="flex-1 flex flex-col justify-between">
                       <div>
-                        <h3 className="text-lg font-bold text-gray-900 mb-2">
+                        <h3 className="mb-2 text-lg font-bold text-white">
                           {assessment.title}
                         </h3>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-white/65">
                           {assessment.description}
                         </p>
                       </div>
 
                       <button
+                        type="button"
                         onClick={() =>
                           router.push(`/director/assessments/${assessment.id}`)
                         }
-                        className="self-end px-6 py-2 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E] transition text-sm mt-4"
+                        className="mt-4 self-end rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
                       >
                         View
                       </button>
@@ -444,7 +440,9 @@ export default function AssessmentsPage() {
                 <input
                   type="text"
                   placeholder="Search"
-                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E]"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  className="w-full rounded-lg border border-white/20 bg-white/10 py-3 pl-12 pr-4 text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/40"
                 />
               </div>
             </div>
@@ -540,8 +538,6 @@ export default function AssessmentsPage() {
           </div>
         </div>
       )}
-
-      <AppFooter />
     </div>
   );
 }

@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import {
   IndividualBreakdownBarChart,
@@ -272,8 +271,6 @@ export default function PastorMyProgressPage() {
           </section>
         </div>
       </main>
-
-      <PastorFooter />
     </div>
   );
 }

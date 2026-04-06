@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "../../Assets/hero-bg.png";
 import DuoIcon from "../../Assets/duo.png";
 import MeetIcon from "../../Assets/meet.png";
@@ -627,7 +626,6 @@ export default function MentorHomePage() {
       </nav>
 
       <div className="relative z-10 mt-auto">
-        <PastorFooter />
       </div>
     </div>
   );

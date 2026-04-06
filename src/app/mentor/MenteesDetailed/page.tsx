@@ -8,7 +8,6 @@ import Mentor2 from "@/app/Assets/mentor2.png";
 import Mentor3 from "@/app/Assets/mentor3.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { useRouter } from "next/navigation";
@@ -377,8 +376,6 @@ export default function MyMenteesPage() {
           </div>
         </div>
       </section>
-
-      <PastorFooter />
     </div>
   );
 }

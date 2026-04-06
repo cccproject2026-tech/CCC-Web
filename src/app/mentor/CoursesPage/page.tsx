@@ -1,9 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import Image from "next/image";
-import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
-import HeroBg from "@/app/Assets/assignments-bg.png";
+import PastorHeader from "@/app/Components/PastorHeader";import HeroBg from "@/app/Assets/assignments-bg.png";
 import Card1 from "@/app/Assets/card1.png";
 import Card2 from "@/app/Assets/card2.png";
 import Card3 from "@/app/Assets/card3.png";

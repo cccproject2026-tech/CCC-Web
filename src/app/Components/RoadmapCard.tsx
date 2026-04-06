@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import AssignRoadmapModal from "./AssignRoadmapModal";
+import { directorGlassCard } from "@/app/director/directorUi";
 
 interface RoadmapCardProps {
   id?: string;
@@ -11,6 +12,8 @@ interface RoadmapCardProps {
   onView?: () => void;
   onEdit?: () => void;
   onDelete?: () => Promise<void>;
+  /** Director shell: glass + #8ec5eb accents */
+  variant?: "default" | "directorGlass";
 }
 
 export default function RoadmapCard({
@@ -22,7 +25,9 @@ export default function RoadmapCard({
   onView,
   onEdit,
   onDelete,
+  variant = "default",
 }: RoadmapCardProps) {
+  const glass = variant === "directorGlass";
   const [showMenu, setShowMenu] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -57,46 +62,104 @@ export default function RoadmapCard({
     }
   };
 
+  const openRoadmap = () => {
+    onView?.();
+  };
+
   return (
     <>
-      <div className="bg-white rounded-2xl shadow-[0_2px_6px_rgba(0,0,0,0.05)] border border-[#E5EAF1] flex overflow-hidden hover:shadow-md transition-all">
+      <div
+        role={onView ? "button" : undefined}
+        tabIndex={onView ? 0 : undefined}
+        aria-label={onView ? `Open roadmap: ${title}` : undefined}
+        onClick={onView ? openRoadmap : undefined}
+        onKeyDown={
+          onView
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openRoadmap();
+                }
+              }
+            : undefined
+        }
+        className={`flex overflow-hidden rounded-2xl transition-all ${
+          glass
+            ? `${directorGlassCard} border-white/15 hover:border-[#8ec5eb]/25`
+            : "border border-[#E5EAF1] bg-white shadow-[0_2px_6px_rgba(0,0,0,0.05)] hover:shadow-md"
+        } ${onView ? `cursor-pointer focus:outline-none focus:ring-2 ${glass ? "focus:ring-[#8ec5eb]/35" : "focus:ring-[#2E3B8E]/40"}` : ""}`}
+      >
         {/* Left Image Section */}
-        <div className="relative w-[42%] h-[200px] shrink-0 m-3 rounded-l-2xl overflow-hidden">
+        <div
+          className={`relative m-3 h-[200px] w-[42%] shrink-0 overflow-hidden rounded-l-2xl ${
+            glass ? "ring-1 ring-white/10" : ""
+          }`}
+        >
           <Image src={img} alt={title} fill className="object-cover" />
         </div>
 
         {/* Right Content Section */}
-        <div className="flex flex-col justify-between flex-1 px-5 py-4 relative">
+        <div className="relative flex flex-1 flex-col justify-between px-5 py-4">
           {/* 3-dot menu */}
-          <div className="absolute top-4 right-5" ref={menuRef}>
+          <div className="absolute right-5 top-4" ref={menuRef}>
             <button
-              onClick={() => setShowMenu((p) => !p)}
-              className="text-[#214080] hover:text-[#1F2A6E] transition-all"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowMenu((p) => !p);
+              }}
+              className={
+                glass
+                  ? "text-[#8ec5eb] transition-all hover:text-white"
+                  : "text-[#214080] transition-all hover:text-[#1F2A6E]"
+              }
             >
               <i className="fa-solid fa-ellipsis-vertical text-lg"></i>
             </button>
 
             {showMenu && (
-              <div className="absolute top-7 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-50 min-w-[140px] overflow-hidden">
+              <div
+                className={`absolute top-7 right-0 z-50 min-w-[140px] overflow-hidden rounded-xl border shadow-lg ${
+                  glass
+                    ? "border-white/15 bg-[#041f35]/95 backdrop-blur-xl"
+                    : "border border-gray-200 bg-white"
+                }`}
+              >
                 <button
-                  onClick={() => { setShowMenu(false); setShowAssignModal(true); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition text-left"
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowAssignModal(true);
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition text-left ${
+                    glass
+                      ? "text-white/90 hover:bg-white/10"
+                      : "text-gray-700 hover:bg-gray-50"
+                  }`}
                 >
-                  <i className="fa-solid fa-share-nodes text-[#2E3B8E] text-xs w-4"></i>
+                  <i className={`fa-solid fa-share-nodes text-xs w-4 ${glass ? "text-[#8ec5eb]" : "text-[#2E3B8E]"}`}></i>
                   Assign
                 </button>
                 <button
-                  onClick={() => { setShowMenu(false); onEdit?.(); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition text-left"
+                  onClick={() => {
+                    setShowMenu(false);
+                    onEdit?.();
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition text-left ${
+                    glass
+                      ? "text-white/90 hover:bg-white/10"
+                      : "text-gray-700 hover:bg-gray-50"
+                  }`}
                 >
-                  <i className="fa-solid fa-pen text-[#2E3B8E] text-xs w-4"></i>
+                  <i className={`fa-solid fa-pen text-xs w-4 ${glass ? "text-[#8ec5eb]" : "text-[#2E3B8E]"}`}></i>
                   Edit
                 </button>
                 <button
                   onClick={handleDeleteClick}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-500 hover:bg-red-50 transition text-left"
+                  className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition text-left ${
+                    glass ? "text-red-300 hover:bg-red-500/15" : "text-red-500 hover:bg-red-50"
+                  }`}
                 >
-                  <i className="fa-solid fa-trash text-red-500 text-xs w-4"></i>
+                  <i className="fa-solid fa-trash text-xs w-4"></i>
                   Delete
                 </button>
               </div>
@@ -105,18 +168,30 @@ export default function RoadmapCard({
 
           <div className="pt-6 flex flex-col h-full justify-between">
             <div>
-              <h3 className="text-[17px] font-bold text-black mb-2">{title}</h3>
-              <p className="text-[14px] text-[#808080] leading-relaxed mb-4">{description}</p>
+              <h3 className={`text-[17px] font-bold mb-2 ${glass ? "text-white" : "text-black"}`}>{title}</h3>
+              <p className={`text-[14px] leading-relaxed mb-4 ${glass ? "text-white/70" : "text-[#808080]"}`}>
+                {description}
+              </p>
               <div className="mb-4">
-                <p className="text-[14px] font-bold text-black mb-1">Completion Time</p>
-                <p className="text-[14px] text-[#808080]">{completionTime}</p>
+                <p className={`text-[14px] font-bold mb-1 ${glass ? "text-white/90" : "text-black"}`}>
+                  Completion Time
+                </p>
+                <p className={`text-[14px] ${glass ? "text-white/60" : "text-[#808080]"}`}>{completionTime}</p>
               </div>
             </div>
             {onView && (
               <div className="flex justify-end">
                 <button
-                  onClick={onView}
-                  className="px-5 py-2 bg-[#2E3B8E] text-white rounded-lg text-[14px] font-semibold hover:bg-[#1F2A6E] transition-all"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onView();
+                  }}
+                  className={
+                    glass
+                      ? "rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-5 py-2 text-[14px] font-semibold text-white transition-all hover:bg-[#8ec5eb]/30"
+                      : "rounded-lg bg-[#2E3B8E] px-5 py-2 text-[14px] font-semibold text-white transition-all hover:bg-[#1F2A6E]"
+                  }
                 >
                   View
                 </button>

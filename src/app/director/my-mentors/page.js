@@ -1,9 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHero from "@/app/Components/Hero/AppHero";
-import AppFooter from "@/app/Components/AppFooter";
-import MentorBg from "../../Assets/mentor-bg.png";
+import AppHero from "@/app/Components/Hero/AppHero";import MentorBg from "../../Assets/mentor-bg.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import Image from "next/image";
 
@@ -329,9 +327,6 @@ export default function AssignMentorsPage() {
             </div>
           )}
         </div>
-      </section>
-
-      <AppFooter />
-    </div>
+      </section>    </div>
   );
 }

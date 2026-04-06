@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setCookie, getCookie } from "@/app/utils/cookies";
 import Image from "next/image";
-import PastorFooter from "@/app/Components/PastorFooter";
 import MentorCard from "@/app/Components/Card/MentorCard";
+import { directorPageRoot } from "../directorUi";
 import HeroBg from "../../Assets/hero-bg.png";
 import Book from "../../Assets/book.png";
 import MapImg from "../../Assets/map-placeholder.png";
@@ -25,10 +25,13 @@ import {
   apiGetPastors,
   apiCreateUser,
   apiGetUserById,
+  apiGetOverallProgress,
+  apiGetAllUsers,
   Appointment,
   Interest,
   MentorPastor,
   User,
+  UserOverallProgress,
 } from "@/app/Services/api";
 import { getPastorMedia } from "@/app/Services/pastor.service";
 import { getGreeting } from "@/app/Services/utils/helpers";
@@ -38,7 +41,10 @@ import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 
-const FALLBACK_USER_ID = "699feb343ef7ed6efc40a945";
+const glassCard =
+  "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.1)_0%,rgba(255,255,255,0.04)_100%)] backdrop-blur-xl shadow-[0_8px_40px_rgba(3,24,43,0.4)]";
+const glassCardHover =
+  "transition-all duration-300 hover:border-white/25 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.14)_0%,rgba(255,255,255,0.06)_100%)] hover:shadow-[0_12px_48px_rgba(3,24,43,0.45)]";
 
 function parseUserCookie(): { firstName?: string; lastName?: string } | null {
   if (typeof window === "undefined") return null;
@@ -86,7 +92,7 @@ const directorExploreCards = [
 
 export default function DirectorHome() {
   const router = useRouter();
-  const [resolvedUserId, setResolvedUserId] = useState<string>(FALLBACK_USER_ID);
+  const [resolvedUserId, setResolvedUserId] = useState<string>("");
 
   const [activeTab, setActiveTab] = useState<"mentors" | "pastors">("mentors");
   const [fullName, setFullName] = useState("");
@@ -107,6 +113,10 @@ export default function DirectorHome() {
   const [mentorsLoading, setMentorsLoading] = useState(true);
   const [pastorsLoading, setPastorsLoading] = useState(true);
   const [overviewLoading, setOverviewLoading] = useState(true);
+  const [networkProgressRows, setNetworkProgressRows] = useState<UserOverallProgress[]>([]);
+  const [networkProgressLoading, setNetworkProgressLoading] = useState(true);
+  const [completedPastorsCount, setCompletedPastorsCount] = useState<number | null>(null);
+  const [roadmapFilterTab, setRoadmapFilterTab] = useState<0 | 1 | 2>(0);
   const [addUserLoading, setAddUserLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [mediaList, setMediaList] = useState<
@@ -123,7 +133,7 @@ export default function DirectorHome() {
 
   useEffect(() => {
     const id = getCookie("userId");
-    setResolvedUserId(id && id.trim() ? id : FALLBACK_USER_ID);
+    setResolvedUserId(id?.trim() ?? "");
     setCookieUser(parseUserCookie());
   }, []);
 
@@ -185,8 +195,10 @@ export default function DirectorHome() {
   useEffect(() => {
     const fetchAllData = async () => {
       const uid = resolvedUserId;
+      setNetworkProgressLoading(true);
+
       const results = await Promise.allSettled([
-        apiGetTodaysAppointments(uid),
+        apiGetTodaysAppointments(uid || undefined),
         apiGetAllInterests({ status: 'new' }),
         apiGetMentors({ limit: 4, roleMatch: "mixed" }),
         apiGetPastors({ limit: 4, roleMatch: "mixed" }),
@@ -196,6 +208,8 @@ export default function DirectorHome() {
           includeUsers: false,
         }),
         uid ? apiGetUserById(uid) : Promise.resolve(null),
+        apiGetOverallProgress(),
+        apiGetAllUsers({ role: "pastor", hasCompleted: true, limit: 1 }),
       ]);
 
       // Handle appointments
@@ -251,6 +265,31 @@ export default function DirectorHome() {
       } else if (results[5].status === 'rejected') {
         console.error('Error fetching user details:', results[5].reason);
         setUser(null);
+      }
+
+      // Network-wide progress rows (mentors & pastors) for snapshot list
+      if (results[6].status === 'fulfilled') {
+        const rows = results[6].value.data?.data;
+        setNetworkProgressRows(Array.isArray(rows) ? rows : []);
+      } else {
+        console.error('Error fetching network progress:', results[6].reason);
+        setNetworkProgressRows([]);
+      }
+      setNetworkProgressLoading(false);
+
+      // Completed-course count (pastors marked completed)
+      if (results[7].status === 'fulfilled') {
+        const body = results[7].value.data?.data;
+        const total =
+          typeof body?.total === 'number'
+            ? body.total
+            : Array.isArray(body?.users)
+              ? body.users.length
+              : 0;
+        setCompletedPastorsCount(total);
+      } else {
+        console.error('Error fetching completed pastors count:', results[7].reason);
+        setCompletedPastorsCount(null);
       }
     };
 
@@ -337,77 +376,88 @@ export default function DirectorHome() {
       ? `${user?.firstName ?? cookieUser?.firstName ?? ""} ${user?.lastName ?? cookieUser?.lastName ?? ""}, Welcome Aboard!`
       : "Welcome Aboard!";
 
+  const roadmapSnapshotRows = useMemo(() => {
+    const rows = networkProgressRows;
+    if (roadmapFilterTab === 1) {
+      return rows.filter((r) => (r.role || "").toLowerCase() === "pastor");
+    }
+    if (roadmapFilterTab === 2) {
+      return rows.filter((r) => {
+        const role = (r.role || "").toLowerCase();
+        return role === "mentor" || role === "field-mentor";
+      });
+    }
+    return rows;
+  }, [networkProgressRows, roadmapFilterTab]);
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8FAFF]">
-      {/* Hero — aligned with mentor home */}
-      <section
-        className="relative bg-cover bg-top text-white h-[450px] flex flex-col justify-between px-4 sm:px-8 md:px-16 lg:px-20 pt-6 pb-10"
-        style={{ backgroundImage: `url(${HeroBg.src})` }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 to-transparent" />
+    <div className={directorPageRoot}>
+      {/* Hero — mentor / pastor glass + image */}
+      <section className={`relative overflow-hidden rounded-3xl border border-white/10 ${glassCard}`}>
+        <div className="relative h-[240px] sm:h-[300px] lg:h-[340px]">
+          <Image
+            src={HeroBg}
+            alt=""
+            fill
+            className="object-cover object-center"
+            priority
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#062946] via-[#062946]/75 to-[#0a3558]/50" />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#041f35]/90 via-transparent to-transparent" />
 
-        <div className="relative z-10 flex justify-center sm:justify-end">
-          <div className="text-center sm:text-right">
-            <div className="text-2xl sm:text-3xl font-bold tracking-wide">{formattedTime}</div>
-            <p className="text-sm text-white/80">{formattedDate}</p>
-          </div>
-        </div>
-
-        <div className="relative z-10 flex flex-col sm:flex-row justify-between items-center sm:items-end gap-4 sm:gap-0">
-          <div className="max-w-full sm:max-w-2xl text-center sm:text-left">
-            <h1 className="text-2xl sm:text-4xl font-semibold leading-snug">
-              Cultivate Spiritual, Professional, Social, And Community–
-              <br className="hidden sm:block" />
-              Engagement Developments
-            </h1>
-          </div>
-
-          <div className="flex flex-col items-center sm:items-end">
-            <p className="text-white/90 text-sm mb-2">{getGreeting()}</p>
-            <div
-              className="bg-white/15 backdrop-blur-md border border-white/30 rounded-md p-4 w-[280px] shadow-lg cursor-pointer"
-              onClick={() => router.push("/director/profile")}
-            >
-              <div className="flex items-center gap-3">
-                <Image
-                  src={UserProfile}
-                  alt="User"
-                  width={42}
-                  height={42}
-                  className="rounded-full border border-white/40"
-                />
-                <div className="flex flex-col items-start">
-                  <p className="text-xs text-white font-semibold">{displayName}</p>
-                  <div className="w-[120px] h-2 bg-white/30 rounded-full mt-1">
-                    <div className="h-2 bg-[#00B3FF] rounded-full w-[70%]" />
-                  </div>
-                  <p className="text-[10px] mt-1 text-white/70">Progress 70%</p>
-                </div>
-              </div>
+          <div className="relative z-10 flex h-full flex-col justify-between p-5 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-full space-y-2 lg:max-w-2xl">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
+                {getGreeting()}
+              </p>
+              <h1 className="text-xl font-semibold leading-snug sm:text-3xl lg:text-4xl">
+                Cultivate Spiritual, Professional, Social, And Community–
+                <br className="hidden sm:block" />
+                Engagement Developments
+              </h1>
+              <p className="text-sm text-white/80">{formattedTime}</p>
+              <p className="text-xs text-white/60 sm:text-sm">{formattedDate}</p>
             </div>
+
+            <button
+              type="button"
+              onClick={() => router.push("/director/profile")}
+              className="mt-4 flex w-full max-w-sm items-center gap-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-left backdrop-blur-md transition hover:bg-white/15 lg:mt-0 lg:w-auto"
+            >
+              <Image
+                src={UserProfile}
+                alt=""
+                width={48}
+                height={48}
+                className="rounded-full border-2 border-white/30"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-white">{displayName}</p>
+              </div>
+            </button>
           </div>
         </div>
       </section>
 
-      {/* Continue watching — mentor styling */}
-      <section className="py-16 bg-[#F8FAFF] px-4 md:px-16 flex flex-col lg:flex-row items-start justify-between gap-10">
-        <div className="lg:w-1/4 flex flex-col justify-center">
-          <h2 className="text-3xl font-semibold text-[#000] leading-tight mb-4">
+      {/* Continue watching */}
+      <section className="mt-10 flex flex-col items-start justify-between gap-10 py-10 lg:flex-row">
+        <div className="flex flex-col justify-center lg:w-1/4">
+          <h2 className="mb-4 text-3xl font-semibold leading-tight text-white">
             Continue <br /> Watching{" "}
-            <span className="text-[#103C8C] underline decoration-[#103C8C]/40 decoration-2 underline-offset-4">
+            <span className="text-[#8ec5eb] underline decoration-[#8ec5eb]/40 decoration-2 underline-offset-4">
               Course
             </span>
           </h2>
         </div>
 
-        <div className="lg:w-3/4 w-full relative">
+        <div className="relative w-full lg:w-3/4">
           <Swiper
             modules={[Navigation, Pagination]}
             spaceBetween={24}
             slidesPerView={3}
             pagination={{ clickable: true }}
             loop={mediaList.length > 3}
-            className="pb-12"
+            className="pb-12 [&_.swiper-pagination-bullet]:bg-white/40 [&_.swiper-pagination-bullet-active]:bg-[#8ec5eb]"
             breakpoints={{
               0: { slidesPerView: 1 },
               768: { slidesPerView: 2 },
@@ -416,37 +466,37 @@ export default function DirectorHome() {
           >
             {mediaList.map((item) => (
               <SwiperSlide key={item._id}>
-                <div className="bg-white text-black rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300">
+                <div className={`overflow-hidden rounded-xl text-left ${glassCard} ${glassCardHover}`}>
                   <div className="relative">
                     <Image
                       src={getMediaThumbnail(item)}
                       alt={item.heading || "Media thumbnail"}
                       width={400}
                       height={200}
-                      className="w-full h-[160px] sm:h-[180px] object-cover"
+                      className="h-[160px] w-full object-cover sm:h-[180px]"
                     />
-                    <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
                       <button
                         type="button"
-                        className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center hover:scale-110 transition"
+                        className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 transition hover:scale-110"
                       >
-                        <i className="fa-solid fa-play text-[#103C8C] text-sm" />
+                        <i className="fa-solid fa-play text-sm text-[#0f4a76]" />
                       </button>
                     </div>
                   </div>
                   <div className="p-4">
-                    <p className="text-xs text-[#103C8C] font-semibold mb-1">
+                    <p className="mb-1 text-xs font-semibold text-[#8ec5eb]">
                       {item.subheading || "Introduction"}
                     </p>
-                    <h4 className="text-sm font-semibold mb-1">{item.heading}</h4>
-                    <p className="text-xs text-gray-600 mb-3 leading-snug">{item.description}</p>
-                    <div className="flex justify-between items-center text-xs text-gray-400">
+                    <h4 className="mb-1 text-sm font-semibold text-white">{item.heading}</h4>
+                    <p className="mb-3 text-xs leading-snug text-white/65">{item.description}</p>
+                    <div className="flex items-center justify-between text-xs text-white/50">
                       <span>
                         {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ""}
                       </span>
                       <button
                         type="button"
-                        className="border border-[#103C8C] text-[#103C8C] p-[6px] rounded-md hover:bg-[#103C8C] hover:text-white transition"
+                        className="rounded-md border border-[#8ec5eb]/50 p-[6px] text-[#8ec5eb] transition hover:bg-[#8ec5eb]/15"
                       >
                         <i className="fa-solid fa-arrow-up-right-from-square text-[10px]" />
                       </button>
@@ -460,24 +510,25 @@ export default function DirectorHome() {
       </section>
 
       {/* Today's Appointments */}
-      <section className="bg-white py-16 px-4 md:px-20 relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-[400px] h-[400px] bg-[radial-gradient(circle_at_70%_30%,#103C8C_10%,transparent_70%)] opacity-5" />
-        <div className="relative z-10 flex justify-between items-center mb-8">
-          <h2 className="text-[22px] font-semibold text-[#000]">Today&apos;s Appointments</h2>
+      <section className="relative mt-10 overflow-hidden py-10">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold sm:text-xl">Today&apos;s Appointments</h2>
           <Link
             href="/director/schedule"
-            className="text-[#103C8C] text-sm font-medium hover:underline hover:text-[#0D2E6E]"
+            className="text-sm font-medium text-[#8ec5eb] hover:text-[#b8ddf5]"
           >
             See all
           </Link>
         </div>
 
         {appointmentsLoading ? (
-          <p className="text-gray-500 relative z-10">Loading appointments...</p>
+          <p className="text-sm text-white/55">Loading appointments…</p>
         ) : appointments.length === 0 ? (
-          <p className="text-gray-500 relative z-10">No appointments scheduled for today</p>
+          <div className={`p-8 text-center text-sm text-white/55 ${glassCard}`}>
+            No appointments scheduled for today.
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 relative z-10">
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
             {appointments.slice(0, 2).map((appointment) => {
               const { platformIcon, mentorName, mentorRole, meetingDate, meetingTime } =
                 formatAppointment(appointment);
@@ -485,55 +536,57 @@ export default function DirectorHome() {
               return (
                 <div
                   key={appointment.id}
-                  className="bg-[#14517d] rounded-2xl p-4 sm:p-6 flex flex-col sm:flex-row gap-4 sm:gap-5 items-center shadow-lg border border-[#0B1C58]/40"
+                  className={`flex flex-col gap-4 p-5 sm:flex-row sm:items-center ${glassCard}`}
                 >
-                  <div className="bg-white rounded-xl flex items-center justify-center w-[100px] h-[100px] sm:w-[150px] sm:h-[150px] shrink-0">
-                    <Image
-                      src={platformIcon}
-                      alt={appointment.platform}
-                      className="w-[50px] h-[50px] sm:w-[65px] sm:h-[65px]"
-                    />
+                  <div className="flex shrink-0 justify-center sm:justify-start">
+                    <div className="flex h-[100px] w-[100px] items-center justify-center rounded-2xl border border-white/15 bg-white/10 sm:h-[120px] sm:w-[120px]">
+                      <Image
+                        src={platformIcon}
+                        alt={appointment.platform}
+                        className="h-12 w-12 sm:h-14 sm:w-14"
+                      />
+                    </div>
                   </div>
 
-                  <div className="flex flex-col text-white w-full text-center sm:text-left">
-                    <div className="flex items-center gap-3 mb-3 justify-center sm:justify-start">
+                  <div className="min-w-0 flex-1 text-center sm:text-left">
+                    <div className="mb-3 flex items-center justify-center gap-3 sm:justify-start">
                       {appointment.mentor?.profilePicture ? (
                         <Image
                           src={appointment.mentor.profilePicture}
                           alt={mentorName}
-                          width={36}
-                          height={36}
-                          className="rounded-full border border-white/40"
+                          width={40}
+                          height={40}
+                          className="rounded-full border border-white/30"
                         />
                       ) : (
-                        <Image src={UserProfile} alt="User" width={36} height={36} className="rounded-full border border-white/40" />
+                        <Image src={UserProfile} alt="User" width={40} height={40} className="rounded-full border border-white/30" />
                       )}
                       <div>
-                        <h4 className="text-white font-semibold text-sm">{mentorName}</h4>
-                        <p className="text-white/70 text-xs capitalize">{mentorRole}</p>
+                        <h4 className="font-semibold text-white">{mentorName}</h4>
+                        <p className="text-xs capitalize text-white/60">{mentorRole}</p>
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2 mb-3 text-xs justify-center sm:justify-start">
-                      <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-[3px] flex items-center gap-2">
-                        <i className="fa-regular fa-calendar text-[#E3D247]" />
-                        <span>Date : {meetingDate.toLocaleDateString()}</span>
-                      </div>
-                      <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-[3px] flex items-center gap-2">
-                        <i className="fa-regular fa-clock text-[#24E0C2]" />
-                        <span>Time : {meetingTime}</span>
-                      </div>
+                    <div className="mb-3 flex flex-wrap justify-center gap-2 text-xs sm:justify-start">
+                      <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-white/85">
+                        <i className="fa-regular fa-calendar mr-1 text-[#e3d247]" />
+                        {meetingDate.toLocaleDateString()}
+                      </span>
+                      <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-white/85">
+                        <i className="fa-regular fa-clock mr-1 text-[#5ee0d0]" />
+                        {meetingTime}
+                      </span>
                     </div>
 
-                    <div className="flex justify-between items-end">
+                    <div className="flex flex-col items-center justify-between gap-3 sm:flex-row sm:items-end">
                       <div>
-                        <p className="text-xs mb-2">
-                          Mode :{" "}
-                          <span className="underline underline-offset-2 text-[#B8D4FF] capitalize">
+                        <p className="text-xs text-white/55">
+                          Mode:{" "}
+                          <span className="text-[#b8d4ff] underline underline-offset-2 capitalize">
                             {appointment.platform}
                           </span>
                         </p>
-                        <div className="flex gap-4 text-white text-sm">
+                        <div className="mt-2 flex gap-4 text-sm text-white/80">
                           <i className="fa-solid fa-phone" />
                           <i className="fa-regular fa-comment" />
                           <i className="fa-brands fa-whatsapp" />
@@ -542,7 +595,7 @@ export default function DirectorHome() {
 
                       <button
                         type="button"
-                        className="bg-[#0B1C58] hover:bg-[#122D80] px-6 py-[6px] rounded-md text-sm"
+                        className="rounded-lg border border-white/20 bg-white/10 px-5 py-2 text-sm text-white transition hover:bg-white/15"
                       >
                         Details
                       </button>
@@ -555,18 +608,21 @@ export default function DirectorHome() {
         )}
       </section>
 
-      {/* Today&apos;s roadmap list — mentor styling */}
-      <section className="py-16 px-4 md:px-20 bg-[#196394]">
-        <div className="bg-white rounded-2xl p-8 shadow-md max-w-5xl mx-auto">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <h3 className="text-lg font-semibold text-[#0B1C58]">Today&apos;s Roadmap List</h3>
-            <div className="flex bg-[#F1F4F9] rounded-md overflow-hidden w-full sm:w-auto">
-              {["All", "Roadmap", "Survey"].map((tab, index) => (
+      {/* Today's roadmap list */}
+      <section className="mt-10">
+        <div className={`p-5 sm:p-6 lg:p-8 ${glassCard}`}>
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <h3 className="text-lg font-semibold">Today&apos;s Roadmap List</h3>
+            <div className="flex w-full rounded-xl border border-white/10 bg-white/5 p-1 sm:w-auto">
+              {(["All", "Roadmap", "Survey"] as const).map((tab, index) => (
                 <button
                   key={tab}
                   type="button"
-                  className={`px-3 sm:px-4 py-[6px] text-sm font-medium flex-1 sm:flex-none ${
-                    index === 0 ? "bg-[#0B1C58] text-white" : "text-gray-500 hover:text-[#0B1C58]"
+                  onClick={() => setRoadmapFilterTab(index as 0 | 1 | 2)}
+                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium sm:flex-none ${
+                    roadmapFilterTab === index
+                      ? "bg-[#8ec5eb]/20 text-white"
+                      : "text-white/55 hover:text-white/85"
                   }`}
                 >
                   {tab}
@@ -576,36 +632,47 @@ export default function DirectorHome() {
           </div>
 
           <div className="space-y-3">
-            {[
-              {
-                title: "Submitted Roadmap",
-                desc: "Task: Complete a Community Engagement Project",
-                user: "John Doe",
-              },
-              {
-                title: "Submitted Survey",
-                desc: "Title: Pastoral Ministry Profile (PMP)",
-                user: "Richard Roe",
-              },
-            ].map((item, idx) => (
-              <div
-                key={idx}
-                className="bg-[#F8FBFF] border border-[#E3E8F0] rounded-lg px-5 py-3 flex justify-between items-center"
-              >
-                <div>
-                  <p className="text-sm font-medium text-[#0B1C58]">{item.title}</p>
-                  <p className="text-xs text-gray-600">{item.desc}</p>
-                </div>
-                <span className="text-sm text-gray-700">{item.user}</span>
-              </div>
-            ))}
+            {networkProgressLoading ? (
+              <p className="rounded-xl border border-white/10 bg-white/[0.05] px-5 py-6 text-center text-sm text-white/55">
+                Loading roadmap activity…
+              </p>
+            ) : roadmapSnapshotRows.length === 0 ? (
+              <p className="rounded-xl border border-white/10 bg-white/[0.05] px-5 py-6 text-center text-sm text-white/55">
+                No progress records for this filter.
+              </p>
+            ) : (
+              roadmapSnapshotRows.slice(0, 8).map((row) => {
+                const roleLabel = (row.role || "user").replace(/-/g, " ");
+                const pct = Math.round(row.overallProgress ?? 0);
+                return (
+                  <button
+                    key={row.userId}
+                    type="button"
+                    onClick={() => router.push(`/director/track-progress/${row.userId}`)}
+                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.05] px-5 py-3 text-left transition hover:border-white/20 hover:bg-white/[0.08]"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium capitalize text-white">
+                        {roleLabel} · {pct}% overall
+                      </p>
+                      <p className="text-xs text-white/60">
+                        {"Roadmaps & assessments combined progress"}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-sm text-white/80">
+                      {row.firstName} {row.lastName}
+                    </span>
+                  </button>
+                );
+              })
+            )}
           </div>
 
-          <div className="flex justify-end mt-6">
+          <div className="mt-6 flex justify-end">
             <button
               type="button"
-              onClick={() => router.push("/director/revitalization-roadmap")}
-              className="bg-[#103C8C] hover:bg-[#0A2B6B] text-white px-5 py-2 rounded-md text-sm"
+              onClick={() => router.push("/director/revitalization-roadmap/create")}
+              className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-5 py-2 text-sm font-medium text-white transition hover:bg-[#8ec5eb]/25"
             >
               View Roadmap
             </button>
@@ -614,64 +681,60 @@ export default function DirectorHome() {
       </section>
 
       {/* New Interests Section */}
-      <section className="py-16 px-4 md:px-20 bg-gradient-to-b from-[#E8F1FA] to-[#F7FAFF]">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
-          {/* Left side - Description */}
-          <div className="text-[#0B1C58]">
-            <h2 className="text-2xl sm:text-3xl md:text-[32px] font-semibold mb-4">
-              New Interests
-            </h2>
-            <p className="text-gray-700 text-base mb-6 leading-relaxed">
+      <section className="mt-10 py-10">
+        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2 lg:gap-12">
+          <div>
+            <h2 className="mb-4 text-2xl font-semibold sm:text-3xl md:text-[32px]">New Interests</h2>
+            <p className="mb-6 text-base leading-relaxed text-white/70">
               Review the details of the newly submitted interest and take the
               next steps to guide and support the process effectively.
             </p>
             <button
               type="button"
               onClick={() => router.push("/director/interest-list")}
-              className="bg-[#103C8C] text-white px-8 py-3 rounded-md font-semibold hover:bg-[#0A2B6B] transition shadow-md"
+              className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-8 py-3 font-semibold text-white transition hover:bg-[#8ec5eb]/25"
             >
               See All
             </button>
           </div>
 
-          {/* Right side - Interest Cards */}
           <div className="space-y-4">
             {interestsLoading ? (
-              <div className="text-gray-600 text-center py-8">Loading interests...</div>
+              <div className="py-8 text-center text-white/55">Loading interests…</div>
             ) : interests.length === 0 ? (
-              <div className="text-gray-600 text-center py-8">No new interests</div>
+              <div className={`py-8 text-center text-sm text-white/55 ${glassCard}`}>No new interests</div>
             ) : (
               interests.slice(0, 4).map((interest) => (
                 <div
                   key={interest._id}
-                  className="bg-white rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 shadow-md border border-[#E3E8F0]"
+                  className={`flex flex-col items-start justify-between gap-4 rounded-xl p-4 sm:flex-row sm:items-center sm:p-5 ${glassCard}`}
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-[50px] h-[50px] bg-[#103C8C] rounded-full flex items-center justify-center">
-                      <i className="fa-solid fa-user text-white text-xl"></i>
+                    <div className="flex h-[50px] w-[50px] items-center justify-center rounded-full border border-white/15 bg-[#8ec5eb]/20">
+                      <i className="fa-solid fa-user text-xl text-[#8ec5eb]" />
                     </div>
                     <div>
-                      <h4 className="text-[#000] font-semibold text-base">
+                      <h4 className="text-base font-semibold text-white">
                         {interest.firstName} {interest.lastName}
                       </h4>
-                      <p className="text-gray-500 text-sm">{interest.title || "No title"}</p>
+                      <p className="text-sm text-white/55">{interest.title || "No title"}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
-                    <button type="button" className="hover:opacity-80">
-                      <i className="fa-solid fa-envelope text-[#103C8C] text-lg"></i>
+                  <div className="flex w-full items-center justify-end gap-3 sm:w-auto">
+                    <button type="button" className="text-[#8ec5eb] hover:opacity-80">
+                      <i className="fa-solid fa-envelope text-lg" />
                     </button>
-                    <button type="button" className="hover:opacity-80">
-                      <i className="fa-regular fa-comment text-[#103C8C] text-lg"></i>
+                    <button type="button" className="text-[#8ec5eb] hover:opacity-80">
+                      <i className="fa-regular fa-comment text-lg" />
                     </button>
-                    <button type="button" className="hover:opacity-80">
-                      <i className="fa-solid fa-phone text-[#103C8C] text-lg"></i>
+                    <button type="button" className="text-[#8ec5eb] hover:opacity-80">
+                      <i className="fa-solid fa-phone text-lg" />
                     </button>
                     <button
                       type="button"
                       onClick={() => router.push(`/director/interest-list/${interest.id || interest._id}`)}
-                      className="bg-[#103C8C] text-white px-4 sm:px-6 py-2 rounded-md font-medium hover:bg-[#0A2B6B] transition w-full sm:w-auto"
+                      className="rounded-md border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8ec5eb]/25 sm:px-6"
                     >
                       View
                     </button>
@@ -684,8 +747,8 @@ export default function DirectorHome() {
       </section>
 
       {/* Add User Section */}
-      <section className="py-8 px-4 sm:py-12 sm:px-8 md:py-16 md:px-16 lg:px-20 bg-[#F2F6FC]">
-        <div className="bg-gradient-to-br from-[#0A3C8C] to-[#052860] rounded-3xl p-8 sm:p-12 max-w-6xl mx-auto shadow-lg">
+      <section className="mt-6 py-8 sm:py-12 md:py-16">
+        <div className={`mx-auto max-w-6xl rounded-3xl border border-white/15 bg-[linear-gradient(135deg,rgba(142,197,235,0.12)_0%,rgba(6,41,70,0.95)_45%,#041f35_100%)] p-8 shadow-lg sm:p-12`}>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
             {/* Left side */}
             <div className="text-white">
@@ -748,7 +811,7 @@ export default function DirectorHome() {
                 <button
                   type="submit"
                   disabled={addUserLoading}
-                  className="bg-white text-[#103C8C] px-10 py-3 rounded-md font-semibold hover:bg-gray-100 transition mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="mt-2 rounded-md border border-white/30 bg-white/95 px-10 py-3 font-semibold text-[#062946] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {addUserLoading ? 'Adding...' : 'Add'}
                 </button>
@@ -759,15 +822,15 @@ export default function DirectorHome() {
 
         {/* Mentors/Pastors Section */}
         <div className="mt-12 sm:mt-16">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-            <div className="flex gap-2 sm:gap-4 bg-[#E8F0F8] p-2 rounded-[20px] w-full sm:w-auto">
+          <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+            <div className="flex w-full gap-2 rounded-[20px] border border-white/10 bg-white/5 p-2 sm:w-auto sm:gap-4">
               <button
                 type="button"
                 onClick={() => setActiveTab("mentors")}
-                className={`px-6 sm:px-8 md:px-10 py-3 rounded-[16px] font-semibold text-sm sm:text-[16px] transition-all duration-300 flex-1 sm:flex-none ${
+                className={`flex-1 rounded-[16px] px-6 py-3 text-sm font-semibold transition-all duration-300 sm:flex-none sm:px-8 md:px-10 sm:text-[16px] ${
                   activeTab === "mentors"
-                    ? "bg-[#103C8C] text-white shadow-lg"
-                    : "bg-transparent text-gray-500 hover:text-gray-700"
+                    ? "bg-[#8ec5eb]/25 text-white shadow-md"
+                    : "bg-transparent text-white/50 hover:text-white/85"
                 }`}
               >
                 Mentors
@@ -775,10 +838,10 @@ export default function DirectorHome() {
               <button
                 type="button"
                 onClick={() => setActiveTab("pastors")}
-                className={`px-6 sm:px-8 md:px-10 py-3 rounded-[16px] font-semibold text-sm sm:text-[16px] transition-all duration-300 flex-1 sm:flex-none ${
+                className={`flex-1 rounded-[16px] px-6 py-3 text-sm font-semibold transition-all duration-300 sm:flex-none sm:px-8 md:px-10 sm:text-[16px] ${
                   activeTab === "pastors"
-                    ? "bg-[#103C8C] text-white shadow-lg"
-                    : "bg-transparent text-gray-500 hover:text-gray-700"
+                    ? "bg-[#8ec5eb]/25 text-white shadow-md"
+                    : "bg-transparent text-white/50 hover:text-white/85"
                 }`}
               >
                 Pastors
@@ -786,18 +849,18 @@ export default function DirectorHome() {
             </div>
             <Link
               href={activeTab === "mentors" ? "/director/mentors" : "/director/mentees"}
-              className="text-[#103C8C] text-sm sm:text-[15px] font-semibold hover:underline"
+              className="text-sm font-semibold text-[#8ec5eb] hover:text-[#b8ddf5] sm:text-[15px]"
             >
               See all
             </Link>
           </div>
 
           {currentLoading ? (
-            <div className="text-center py-8 text-gray-500">Loading...</div>
+            <div className="py-8 text-center text-white/55">Loading…</div>
           ) : currentData.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">No data available</div>
+            <div className="py-8 text-center text-white/55">No data available</div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6">
               {currentData.map((person) => {
                 const personId = (person as any).id || person._id;
                 const menteeCount = person.assignedId?.length || person.menteeCount || 0;
@@ -805,6 +868,7 @@ export default function DirectorHome() {
                 return (
                   <MentorCard
                     key={personId}
+                    variant="glass"
                     image={person?.profilePicture ? person.profilePicture : Mentor1}
                     name={`${person.firstName} ${person.lastName}`}
                     role={person.role}
@@ -822,11 +886,11 @@ export default function DirectorHome() {
         </div>
       </section>
 
-      {/* Explore CCC — mentor home styling */}
-      <section className="py-20 px-4 md:px-20 bg-gradient-to-b from-[#E8F1FA] to-[#F7FAFF]">
-        <h2 className="text-[22px] font-semibold text-[#000] mb-10">Explore CCC</h2>
+      {/* Explore CCC */}
+      <section className="py-16">
+        <h2 className="mb-10 text-[22px] font-semibold text-white">Explore CCC</h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
           {directorExploreCards.map((item) => (
             <div
               key={item.route}
@@ -836,15 +900,15 @@ export default function DirectorHome() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") router.push(item.route);
               }}
-              className="cursor-pointer rounded-xl p-6 bg-gradient-to-br from-[#0A3C8C] to-[#052860] text-white flex flex-col justify-between hover:scale-[1.02] transition min-h-[200px]"
+              className={`flex min-h-[200px] cursor-pointer flex-col justify-between rounded-xl p-6 text-white transition hover:scale-[1.02] ${glassCard} ${glassCardHover}`}
             >
-              <i className={`${item.icon} text-2xl mb-4`} />
+              <i className={`${item.icon} mb-4 text-2xl text-[#8ec5eb]`} />
               <div>
-                <h3 className="text-lg font-semibold mb-2">{item.title}</h3>
-                <p className="text-sm text-white/80">{item.desc}</p>
+                <h3 className="mb-2 text-lg font-semibold">{item.title}</h3>
+                <p className="text-sm text-white/75">{item.desc}</p>
               </div>
-              <div className="flex justify-end mt-4">
-                <span className="flex items-center gap-2 text-sm hover:text-[#BFD9FF]">
+              <div className="mt-4 flex justify-end">
+                <span className="flex items-center gap-2 text-sm text-[#8ec5eb] hover:text-[#b8ddf5]">
                   More
                   <i className="fa-solid fa-arrow-up-right-from-square text-xs" />
                 </span>
@@ -855,125 +919,123 @@ export default function DirectorHome() {
       </section>
 
       {/* Over View */}
-      <section className="py-16 px-4 md:px-20 bg-white">
-        <h2 className="text-[22px] font-semibold text-[#000] mb-8">Over View</h2>
+      <section className="py-16">
+        <h2 className="mb-8 text-[22px] font-semibold text-white">Over View</h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:mb-12 sm:grid-cols-3 sm:gap-6">
           {overviewLoading ? (
-            <div className="col-span-3 text-center py-8 text-gray-500">Loading overview...</div>
+            <div className="col-span-3 py-8 text-center text-white/55">Loading overview…</div>
           ) : directorOverview ? (
             <>
-              <div className="bg-[#F8FBFF] border border-[#E3E8F0] rounded-xl p-8 shadow-sm">
-                <p className="text-gray-600 text-sm mb-2">Total Mentors</p>
-                <h3 className="text-4xl font-bold text-[#103C8C]">
+              <div className={`rounded-xl p-8 ${glassCard}`}>
+                <p className="mb-2 text-sm text-white/60">Total Mentors</p>
+                <h3 className="text-4xl font-bold text-[#8ec5eb]">
                   {directorOverview.totalMentors}
                 </h3>
               </div>
-              <div className="bg-[#F8FBFF] border border-[#E3E8F0] rounded-xl p-8 shadow-sm">
-                <p className="text-gray-600 text-sm mb-2">Total Pastors</p>
-                <h3 className="text-4xl font-bold text-[#103C8C]">
+              <div className={`rounded-xl p-8 ${glassCard}`}>
+                <p className="mb-2 text-sm text-white/60">Total Pastors</p>
+                <h3 className="text-4xl font-bold text-[#8ec5eb]">
                   {directorOverview.totalPastors}
                 </h3>
               </div>
-              <div className="bg-[#F8FBFF] border border-[#E3E8F0] rounded-xl p-8 shadow-sm">
-                <p className="text-gray-600 text-sm mb-2">Pastors Completed</p>
-                <h3 className="text-4xl font-bold text-[#103C8C]">
+              <div className={`rounded-xl p-8 ${glassCard}`}>
+                <p className="mb-2 text-sm text-white/60">Pastors Completed</p>
+                <h3 className="text-4xl font-bold text-[#8ec5eb]">
                   {directorOverview.completedPastors}
                 </h3>
               </div>
             </>
           ) : (
-            <div className="col-span-3 text-center py-8 text-gray-500">No data available</div>
+            <div className="col-span-3 py-8 text-center text-white/55">No data available</div>
           )}
         </div>
 
         {/* Overall Progress */}
-        <h2 className="text-[22px] font-semibold text-[#000] mb-8">Overall Progress</h2>
+        <h2 className="mb-8 text-[22px] font-semibold text-white">Overall Progress</h2>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
           {/* Donut Chart */}
-          <div className="bg-[#F8FBFF] border border-[#E3E8F0] rounded-xl p-8 shadow-sm">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-semibold text-[#000]">
+          <div className={`rounded-xl p-8 ${glassCard}`}>
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">
                 Roadmap & Assessments
               </h3>
               <div className="flex gap-4 text-sm">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-[#103C8C] rounded-full"></div>
-                  <span className="text-gray-600">Completed</span>
+                  <div className="h-3 w-3 rounded-full bg-[#8ec5eb]" />
+                  <span className="text-white/65">Completed</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-[#F9C74F] rounded-full"></div>
-                  <span className="text-gray-600">Remaining</span>
+                  <div className="h-3 w-3 rounded-full bg-[#F9C74F]" />
+                  <span className="text-white/65">Remaining</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-center items-center h-[280px]">
+            <div className="flex h-[280px] items-center justify-center">
               {overviewLoading ? (
-                <div className="text-gray-500">Loading...</div>
+                <div className="text-white/55">Loading…</div>
               ) : donutChartData ? (
                 <div className="relative">
-                  <div className="w-[240px] h-[240px] rounded-full relative">
-                    {/* Outer circle with conic gradient */}
+                  <div className="relative h-[240px] w-[240px] rounded-full">
                     <div
-                      className="w-full h-full rounded-full absolute inset-0"
+                      className="absolute inset-0 rounded-full"
                       style={{
                         background: `conic-gradient(
-                          #103C8C 0deg ${donutChartData.completedDegrees}deg,
+                          #8ec5eb 0deg ${donutChartData.completedDegrees}deg,
                           #F9C74F ${donutChartData.completedDegrees}deg 360deg
                         )`,
                       }}
-                    ></div>
-                    {/* Inner white circle to create donut effect */}
-                    <div className="w-[160px] h-[160px] rounded-full bg-white absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"></div>
+                    />
+                    <div className="absolute left-1/2 top-1/2 h-[160px] w-[160px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#062946]" />
                   </div>
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="text-center">
-                      <div className="text-3xl font-bold text-[#103C8C]">
+                      <div className="text-3xl font-bold text-[#8ec5eb]">
                         {donutChartData.completed.toFixed(1)}%
                       </div>
-                      <div className="text-xs text-gray-500 mt-1">Completed</div>
+                      <div className="mt-1 text-xs text-white/55">Completed</div>
                     </div>
                   </div>
-                  <div className="absolute -left-12 sm:-left-20 top-1/2 transform -translate-y-1/2 bg-[#103C8C] text-white px-2 sm:px-4 py-2 rounded-md font-semibold text-sm">
+                  <div className="absolute -left-12 top-1/2 -translate-y-1/2 transform rounded-md bg-[#8ec5eb]/30 px-2 py-2 text-sm font-semibold text-white sm:-left-20 sm:px-4">
                     {donutChartData.completed.toFixed(1)}%
                   </div>
-                  <div className="absolute -right-12 sm:-right-20 top-1/2 transform -translate-y-1/2 bg-[#F9C74F] text-[#103C8C] px-2 sm:px-4 py-2 rounded-md font-semibold text-sm">
+                  <div className="absolute -right-12 top-1/2 -translate-y-1/2 transform rounded-md bg-[#F9C74F] px-2 py-2 text-sm font-semibold text-[#062946] sm:-right-20 sm:px-4">
                     {donutChartData.remaining.toFixed(1)}%
                   </div>
                 </div>
               ) : (
-                <div className="text-gray-500">No data available</div>
+                <div className="text-white/55">No data available</div>
               )}
             </div>
           </div>
 
           {/* Bar Chart */}
-          <div className="bg-[#F8FBFF] border border-[#E3E8F0] rounded-xl p-4 sm:p-8 shadow-sm">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-              <h3 className="text-lg font-semibold text-[#000]">
+          <div className={`rounded-xl p-4 sm:p-8 ${glassCard}`}>
+            <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+              <h3 className="text-lg font-semibold text-white">
                 Roadmap & Assessments
               </h3>
               <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                 <div className="flex items-center gap-2 text-sm">
-                  <div className="w-3 h-3 bg-[#5B7FDB] rounded-full"></div>
-                  <span className="text-gray-600">Pastor</span>
+                  <div className="h-3 w-3 rounded-full bg-[#8ec5eb]" />
+                  <span className="text-white/65">Pastor</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
-                  <div className="w-3 h-3 bg-[#4AC5D9] rounded-full"></div>
-                  <span className="text-gray-600">Mentor</span>
+                  <div className="h-3 w-3 rounded-full bg-[#5ee0d0]" />
+                  <span className="text-white/65">Mentor</span>
                 </div>
-                <select className="border border-gray-300 rounded-md px-3 py-1 text-sm">
-                  <option>Past 6 Months</option>
+                <select className="rounded-md border border-white/20 bg-white/10 px-3 py-1 text-sm text-white outline-none">
+                  <option className="text-black">Past 6 Months</option>
                 </select>
               </div>
             </div>
 
-            <div className="h-[200px] sm:h-[280px] flex items-end justify-between gap-2 sm:gap-4">
+            <div className="flex h-[200px] items-end justify-between gap-2 sm:h-[280px] sm:gap-4">
               {overviewLoading ? (
-                <div className="w-full flex items-center justify-center h-full text-gray-500">
-                  Loading chart data...
+                <div className="flex h-full w-full items-center justify-center text-white/55">
+                  Loading chart data…
                 </div>
               ) : chartData.length > 0 ? (
                 chartData.map((data, i) => {
@@ -986,24 +1048,24 @@ export default function DirectorHome() {
                   return (
                     <div
                       key={i}
-                      className="flex-1 flex flex-col items-center gap-2"
+                      className="flex flex-1 flex-col items-center gap-2"
                     >
-                      <div className="w-full flex gap-1 items-end h-[160px] sm:h-[220px]">
+                      <div className="flex h-[160px] w-full items-end gap-1 sm:h-[220px]">
                         <div
-                          className="flex-1 bg-[#5B7FDB] rounded-t-md"
+                          className="flex-1 rounded-t-md bg-[#8ec5eb]/80"
                           style={{ height: `${pastorHeight}%` }}
-                        ></div>
+                        />
                         <div
-                          className="flex-1 bg-[#4AC5D9] rounded-t-md"
+                          className="flex-1 rounded-t-md bg-[#5ee0d0]/80"
                           style={{ height: `${mentorHeight}%` }}
-                        ></div>
+                        />
                       </div>
-                      <span className="text-xs text-gray-600">{data.monthName}</span>
+                      <span className="text-xs text-white/60">{data.monthName}</span>
                     </div>
                   );
                 })
               ) : (
-                <div className="w-full flex items-center justify-center h-full text-gray-500">
+                <div className="flex h-full w-full items-center justify-center text-white/55">
                   No chart data available
                 </div>
               )}
@@ -1013,71 +1075,69 @@ export default function DirectorHome() {
       </section>
 
       {/* Course Completed & Invite */}
-      <section className="py-16 px-4 md:px-20 bg-[#F2F6FC]">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+      <section className="py-16">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
           <button
             type="button"
             onClick={() => router.push("/director/course-completed")}
-            className="text-left bg-gradient-to-r from-[#103C8C] to-[#0B1C58] rounded-xl p-6 sm:p-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 text-white w-full"
+            className={`flex w-full flex-col items-start justify-between gap-4 rounded-xl p-6 text-left text-white sm:flex-row sm:items-center sm:p-8 ${glassCard} ${glassCardHover}`}
           >
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                <i className="fa-solid fa-award text-2xl"></i>
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/10">
+                <i className="fa-solid fa-award text-2xl text-[#8ec5eb]" />
               </div>
               <div>
-                <h3 className="text-lg sm:text-xl font-semibold">Course Completed</h3>
-                <div className="w-7 h-7 bg-[#FFD700] text-[#103C8C] rounded-full flex items-center justify-center text-sm font-bold mt-1">
-                  3
+                <h3 className="text-lg font-semibold sm:text-xl">Course Completed</h3>
+                <div className="mt-1 flex h-7 min-w-[1.75rem] items-center justify-center rounded-full bg-[#FFD700] px-1.5 text-sm font-bold text-[#0f4a76]">
+                  {completedPastorsCount == null ? "—" : completedPastorsCount}
                 </div>
               </div>
             </div>
-            <span className="hover:opacity-80 self-end sm:self-auto">
-              <i className="fa-solid fa-arrow-up-right-from-square text-xl"></i>
+            <span className="self-end text-[#8ec5eb] hover:opacity-80 sm:self-auto">
+              <i className="fa-solid fa-arrow-up-right-from-square text-xl" />
             </span>
           </button>
 
           <button
             type="button"
             onClick={() => router.push("/director/invite-field-mentor")}
-            className="text-left bg-gradient-to-r from-[#0F4A85] to-[#0B1C58] rounded-xl p-6 sm:p-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 text-white w-full"
+            className={`flex w-full flex-col items-start justify-between gap-4 rounded-xl p-6 text-left text-white sm:flex-row sm:items-center sm:p-8 ${glassCard} ${glassCardHover}`}
           >
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                <i className="fa-solid fa-user-plus text-2xl"></i>
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/10">
+                <i className="fa-solid fa-user-plus text-2xl text-[#8ec5eb]" />
               </div>
-              <h3 className="text-lg sm:text-xl font-semibold">Invite to be a Field Mentor</h3>
+              <h3 className="text-lg font-semibold sm:text-xl">Invite to be a Field Mentor</h3>
             </div>
-            <span className="hover:opacity-80 self-end sm:self-auto">
-              <i className="fa-solid fa-arrow-up-right-from-square text-xl"></i>
+            <span className="self-end text-[#8ec5eb] hover:opacity-80 sm:self-auto">
+              <i className="fa-solid fa-arrow-up-right-from-square text-xl" />
             </span>
           </button>
         </div>
       </section>
 
-      {/* Map — mentor home */}
-      <section className="py-20 px-4 md:px-20 bg-[#0F4A85] text-white">
-        <div className="flex justify-between items-center mb-8 flex-wrap gap-4">
-          <h2 className="text-[22px] font-semibold">Network map</h2>
+      {/* Map */}
+      <section className="py-16">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+          <h2 className="text-[22px] font-semibold text-white">Network map</h2>
           <input
             type="text"
             placeholder="Search..."
-            className="px-4 py-2 rounded-md text-sm text-gray-800 max-w-xs w-full sm:w-auto"
+            className="w-full max-w-xs rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm text-white placeholder:text-white/50 outline-none focus:ring-2 focus:ring-[#8ec5eb]/40 sm:w-auto"
           />
         </div>
 
-        <div className="relative rounded-2xl overflow-hidden shadow-lg border border-[#ffffff22]">
+        <div className={`relative overflow-hidden rounded-2xl border border-white/15 ${glassCard}`}>
           <Image
             src={MapImg}
             alt="Map"
-            className="w-full h-[420px] object-cover"
+            className="h-[420px] w-full object-cover"
           />
-          <div className="absolute bottom-6 left-6 bg-white/20 backdrop-blur-md px-5 py-3 rounded-lg">
-            <p className="text-sm font-medium">Mentor and mentee locations across the region</p>
+          <div className="absolute bottom-6 left-6 rounded-lg border border-white/20 bg-[#062946]/70 px-5 py-3 backdrop-blur-md">
+            <p className="text-sm font-medium text-white/95">Mentor and mentee locations across the region</p>
           </div>
         </div>
       </section>
-
-      <PastorFooter />
     </div>
   );
 }

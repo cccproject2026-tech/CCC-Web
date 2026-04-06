@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import {
   apiGetAssessmentById,
   apiUpdateInstructions,
@@ -835,8 +834,6 @@ export default function MentorEditAssessmentPage() {
           </div>
         </div>
       )}
-
-      <PastorFooter />
     </div>
   );
 }

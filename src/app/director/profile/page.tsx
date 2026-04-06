@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { getCookie } from "@/app/utils/cookies";
 import Image from "next/image";
-import AppFooter from "@/app/Components/AppFooter";
+import { directorGlassCard, directorInputClass, directorPageRoot } from "../directorUi";
 import DocumentsModal from "@/app/Components/DocumentsModal";
 import UserProfile from "../../Assets/user-profile.png";
 import { apiGetUserById, apiUpdateUserById } from "@/app/Services/users.service";
@@ -200,16 +200,13 @@ export default function DirectorProfilePage() {
 
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#2876AC] via-[#3A8EC4] to-[#4A9FD4]">
-      {/* Main Content */}
-      <div className="flex-1 py-12 px-20">
-        {/* Title */}
-        <h1 className="text-white text-[32px] font-bold mb-8">Profile</h1>
+    <div className={directorPageRoot}>
+      <div className="flex-1 py-10">
+        <h1 className="mb-8 text-[32px] font-bold text-white">Profile</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Left Sidebar */}
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl p-6 shadow-lg">
+            <div className={`rounded-2xl p-6 ${directorGlassCard}`}>
               {/* Profile Photo */}
               <div className="flex flex-col items-center mb-6">
                 <div className="relative">
@@ -224,14 +221,14 @@ export default function DirectorProfilePage() {
                     <i className="fa-solid fa-camera text-white text-xs"></i>
                   </button>
                 </div>
-                <p className="text-gray-500 text-sm mt-3">Good Morning</p>
-                <h3 className="text-xl font-bold text-gray-900">David Roe</h3>
-                <p className="text-[#2E3B8E] text-sm">Director</p>
+                <p className="mt-3 text-sm text-white/55">Good Morning</p>
+                <h3 className="text-xl font-bold text-white">David Roe</h3>
+                <p className="text-sm text-[#8ec5eb]">Director</p>
               </div>
 
               {/* Profile Information */}
               <div className="mb-6">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                <h4 className="mb-3 text-sm font-semibold text-white/85">
                   Profile Information
                 </h4>
                 {isEditing ? (
@@ -240,11 +237,11 @@ export default function DirectorProfilePage() {
                     onChange={(e) =>
                       setProfile({ ...profile, profileInfo: e.target.value })
                     }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none"
+                    className={`${directorInputClass} min-h-[100px] resize-none`}
                     rows={4}
                   />
                 ) : (
-                  <p className="text-sm text-gray-600 leading-relaxed">
+                  <p className="text-sm leading-relaxed text-white/70">
                     {profile.profileInfo}
                   </p>
                 )}
@@ -253,7 +250,7 @@ export default function DirectorProfilePage() {
               {/* Documents Button */}
               <button
                 onClick={() => setShowDocuments(true)}
-                className="w-full flex items-center justify-between px-4 py-3 border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg font-semibold hover:bg-[#2E3B8E] hover:text-white transition"
+                className="flex w-full items-center justify-between rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-3 font-semibold text-white transition hover:bg-[#8ec5eb]/25"
               >
                 <div className="flex items-center gap-2">
                   <i className="fa-regular fa-file-lines"></i>
@@ -266,7 +263,7 @@ export default function DirectorProfilePage() {
 
           {/* Main Form */}
           <div className="lg:col-span-3">
-            <div className="bg-gradient-to-br from-[#2876AC] to-[#3A8EC4] rounded-2xl p-8 shadow-lg">
+            <div className={`rounded-2xl p-8 ${directorGlassCard}`}>
               {/* Personal Information */}
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-bold text-white">
@@ -660,8 +657,6 @@ export default function DirectorProfilePage() {
           </div>
         </div>
       )}
-
-      <AppFooter />
     </div>
   );
 }

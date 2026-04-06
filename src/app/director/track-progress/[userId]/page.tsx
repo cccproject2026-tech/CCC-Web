@@ -14,15 +14,25 @@ import {
   Tooltip,
   Legend,
 } from "chart.js";
-import AppHero from "@/app/Components/Hero/AppHero";
-import AppFooter from "@/app/Components/AppFooter";
+import DirectorHero from "../../DirectorHero";
+import { directorGlassCard, directorInputClass, directorPageRoot } from "../../directorUi";
 import ProgressBg from "../../../Assets/progress-bg.jpg";
 import Card1 from "../../../Assets/card1.png";
 import Card2 from "../../../Assets/card2.png";
 import Card3 from "../../../Assets/card3.png";
 import Card4 from "../../../Assets/card4.png";
-import { apiAddFinalComment, apiGetUserProgress } from "@/app/Services/progress.service";
-import { apiGetUserById } from "@/app/Services/users.service";
+import {
+  apiAddFinalComment,
+  apiGetUserProgress,
+  unwrapUserProgressDetail,
+} from "@/app/Services/progress.service";
+import { apiGetUserById, unwrapUserResponse } from "@/app/Services/users.service";
+import type {
+  ProgressAssessment,
+  ProgressResponse,
+  ProgressRoadmap,
+  UserResponse,
+} from "@/app/Services/types";
 
 // Register Chart.js components
 ChartJS.register(
@@ -57,86 +67,63 @@ function RoadmapProgressCard({
   const getStatusBadgeStyle = () => {
     switch (status) {
       case "Completed":
-        return "bg-green-100 text-green-700";
+        return "border-emerald-400/40 bg-emerald-500/15 text-emerald-100";
       case "In-progress":
-        return "bg-orange-100 text-orange-700";
+        return "border-amber-400/40 bg-amber-500/15 text-amber-100";
       case "Not Started":
-        return "bg-blue-100 text-blue-700";
+        return "border-[#8ec5eb]/35 bg-[#8ec5eb]/10 text-[#cde9f7]";
       case "Over Due":
-        return "bg-red-100 text-red-700";
+        return "border-red-400/40 bg-red-500/15 text-red-100";
       default:
-        return "bg-gray-100 text-gray-700";
+        return "border-white/20 bg-white/10 text-white/80";
     }
   };
 
+  const taskPct =
+    tasksCompleted && tasksCompleted.includes("/")
+      ? (() => {
+          const [a, b] = tasksCompleted.split("/").map((x) => parseInt(x, 10));
+          if (!b || Number.isNaN(a) || Number.isNaN(b)) return 0;
+          return Math.min(100, Math.round((a / b) * 100));
+        })()
+      : 0;
 
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden flex">
-      {/* Image Section - Left (1/3 width) */}
-      <div className="relative w-1/3 flex-shrink-0">
-        <Image
-          src={image}
-          alt={title}
-          width={200}
-          height={200}
-          className="w-full h-full object-cover"
-        />
-        {/* Green Checkmark Icon - Only show for Completed status */}
+    <div className={`flex overflow-hidden rounded-2xl border border-white/12 ${directorGlassCard}`}>
+      <div className="relative w-1/3 shrink-0">
+        <Image src={image} alt={title} width={200} height={200} className="h-full w-full object-cover" />
         {status === "Completed" && (
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-            {/* Outer ring with light green border */}
-            <div className="relative w-14 h-14">
-              {/* Outer border ring - light green */}
-              <div className="absolute inset-0 rounded-full border-2 border-green-400"></div>
-              {/* Transparent gap layer - shows background through */}
-              <div className="absolute inset-[4px] rounded-full bg-transparent"></div>
-              {/* Inner green fill circle - inside transparent gap */}
-              <div className="absolute inset-[6px] rounded-full bg-green-500"></div>
-              {/* White checkmark centered */}
-              <div className="absolute inset-[6px] flex items-center justify-center">
-                <i className="fa-solid fa-check text-white text-sm font-bold"></i>
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="relative h-14 w-14">
+              <div className="absolute inset-0 rounded-full border-2 border-emerald-400/80" />
+              <div className="absolute inset-[6px] flex items-center justify-center rounded-full bg-emerald-500">
+                <i className="fa-solid fa-check text-sm font-bold text-white"></i>
               </div>
             </div>
           </div>
         )}
       </div>
-      {/* Content Section - Right (2/3 width) */}
-      <div className="flex-1 p-5 flex flex-col justify-between">
+      <div className="flex flex-1 flex-col justify-between p-5">
         <div>
-          <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
-          <p className="text-sm text-gray-600 mb-4">{description}</p>
+          <h3 className="mb-2 text-lg font-semibold text-white">{title}</h3>
+          <p className="mb-4 text-sm text-white/65">{description}</p>
         </div>
         <div className="flex flex-col gap-2">
-          <span
-            className={`${getStatusBadgeStyle()} text-xs font-semibold px-3 py-1 rounded-md w-fit`}
-          >
+          <span className={`w-fit rounded-md border px-3 py-1 text-xs font-semibold ${getStatusBadgeStyle()}`}>
             Status: {status}
           </span>
           {status === "Completed" && completedDate && (
-            <span className="text-xs text-gray-700">
-              Completed on : {completedDate}
-            </span>
+            <span className="text-xs text-white/70">Completed on: {completedDate}</span>
           )}
           {tasksCompleted && (
             <div className="flex flex-col gap-1">
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-green-500 h-2 rounded-full"
-                  style={{
-                    width: `${(parseInt(tasksCompleted.split("/")[0]) / parseInt(tasksCompleted.split("/")[1])) * 100}%`,
-                  }}
-                ></div>
+              <div className="h-2 w-full rounded-full bg-white/15">
+                <div className="h-2 rounded-full bg-[#8ec5eb]/80" style={{ width: `${taskPct}%` }} />
               </div>
-              <span className="text-xs text-gray-600">
-                Task Completed: {tasksCompleted}
-              </span>
+              <span className="text-xs text-white/55">Tasks: {tasksCompleted}</span>
             </div>
           )}
-          {completionTime && (
-            <span className="text-xs text-gray-700">
-              Completion Time: {completionTime}
-            </span>
-          )}
+          {completionTime && <span className="text-xs text-white/70">Completion time: {completionTime}</span>}
         </div>
       </div>
     </div>
@@ -163,36 +150,27 @@ function SurveyProgressCard({
   onButtonClick,
 }: SurveyCardProps) {
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden flex">
-      {/* Image Section - Left (square) */}
-      <div className="relative w-1/3 flex-shrink-0">
-        <Image
-          src={image}
-          alt={title}
-          width={200}
-          height={200}
-          className="w-full h-full object-cover"
-        />
+    <div className={`flex overflow-hidden rounded-2xl border border-white/12 ${directorGlassCard}`}>
+      <div className="relative w-1/3 shrink-0">
+        <Image src={image} alt={title} width={200} height={200} className="h-full w-full object-cover" />
       </div>
-      {/* Content Section - Right (2/3 width) */}
-      <div className="flex-1 p-5 flex flex-col justify-between">
+      <div className="flex flex-1 flex-col justify-between p-5">
         <div>
-          <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
-          <p className="text-sm text-gray-600 mb-4">{description}</p>
+          <h3 className="mb-2 text-lg font-semibold text-white">{title}</h3>
+          <p className="mb-4 text-sm text-white/65">{description}</p>
         </div>
         <div className="flex flex-col gap-3">
           {status === "Completed" && (
             <button
+              type="button"
               onClick={onButtonClick}
-              className="bg-[#1E366F] text-white text-sm font-semibold px-5 py-2 rounded-lg hover:bg-[#1a2f5a] transition-colors border-2 border-purple-500/30 shadow-sm w-fit"
+              className="w-fit rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
             >
-              Customized Development Plans
+              Customized development plans
             </button>
           )}
-          <span className="text-xs text-gray-600">
-            {status === "Completed"
-              ? `Submitted On : ${submittedDate}`
-              : `Due ${dueDate}`}
+          <span className="text-xs text-white/55">
+            {status === "Completed" ? `Submitted: ${submittedDate}` : `Due: ${dueDate}`}
           </span>
         </div>
       </div>
@@ -200,17 +178,34 @@ function SurveyProgressCard({
   );
 }
 
+function mapRoadmapStatus(rm: ProgressRoadmap): RoadmapCardProps["status"] {
+  const s = (rm.status || "").toLowerCase().replace(/\s+/g, "_");
+  if (s === "completed" || s === "complete") return "Completed";
+  if (s === "overdue" || s === "over_due") return "Over Due";
+  if (s === "in_progress" || s === "in-progress" || s === "inprogress") return "In-progress";
+  return "Not Started";
+}
+
+function mapAssessmentStatus(as: ProgressAssessment): SurveyCardProps["status"] {
+  const s = (as.status || "").toLowerCase();
+  if (s === "completed" || s === "complete") return "Completed";
+  return "Remaining";
+}
+
 export default function IndividualProgressPage() {
-  const { userId } = useParams<{ userId: string }>();
   const params = useParams();
+  const rawId = params?.userId;
+  const userId =
+    typeof rawId === "string" ? decodeURIComponent(rawId) : Array.isArray(rawId) ? decodeURIComponent(rawId[0] ?? "") : "";
   const [isFinalCommentsModalOpen, setIsFinalCommentsModalOpen] = useState(false);
   const [finalComments, setFinalComments] = useState("");
   const [hasComments, setHasComments] = useState(false);
   const [roadmapFilter, setRoadmapFilter] = useState<"All" | "Completed" | "Remaining">("All");
   const [surveyFilter, setSurveyFilter] = useState<"All" | "Completed" | "Remaining">("All");
-  const [progressData, setProgressData] = useState<any>(null);
+  const [progressData, setProgressData] = useState<ProgressResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<UserResponse | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const userName = user
     ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim()
     : "—";
@@ -224,13 +219,18 @@ export default function IndividualProgressPage() {
 
   useEffect(() => {
     if (!userId) return;
-    Promise.all([
-      apiGetUserById(userId),
-      apiGetUserProgress(userId),
-    ])
+    setLoading(true);
+    setLoadError(null);
+    Promise.all([apiGetUserById(userId), apiGetUserProgress(userId)])
       .then(([userRes, progressRes]) => {
-        setUser(userRes.data.data);
-        setProgressData(progressRes.data.data);
+        setUser(unwrapUserResponse(userRes));
+        setProgressData(unwrapUserProgressDetail(progressRes));
+      })
+      .catch((e) => {
+        console.error(e);
+        setLoadError("Could not load this user’s progress.");
+        setUser(null);
+        setProgressData(null);
       })
       .finally(() => setLoading(false));
   }, [userId]);
@@ -256,7 +256,7 @@ export default function IndividualProgressPage() {
 
       // Fetch latest progress after save
       const progressRes = await apiGetUserProgress(userId);
-      setProgressData(progressRes.data.data);
+      setProgressData(unwrapUserProgressDetail(progressRes));
 
 
       setHasComments(true);
@@ -272,33 +272,30 @@ export default function IndividualProgressPage() {
   };
 
   const roadmapCards =
-    progressData?.roadmaps.map((rm: any) => ({
+    progressData?.roadmaps?.map((rm) => ({
       id: rm.roadMapId,
-      image: Card1, // static until backend provides images
+      image: Card1,
       title: "Roadmap",
-      description: "Revitalization Roadmap",
-      status:
-        rm.status === "completed"
-          ? "Completed"
-          : rm.status === "in_progress"
-            ? "In-progress"
-            : "Not Started",
-      tasksCompleted:
-        rm.totalSteps > 0
-          ? `${rm.completedSteps}/${rm.totalSteps}`
-          : undefined,
+      description: "Revitalization roadmap",
+      status: mapRoadmapStatus(rm),
+      tasksCompleted: rm.totalSteps > 0 ? `${rm.completedSteps}/${rm.totalSteps}` : undefined,
     })) ?? [];
 
   const surveyCards =
-    progressData?.assessments.map((as: any) => ({
+    progressData?.assessments?.map((as) => ({
       id: as.assessmentId,
       image: Card2,
       title: "Assessment",
-      description: "Assessment Progress",
-      status: as.status === "completed" ? "Completed" : "Remaining",
-      submittedDate: as.status === "completed" ? "Submitted" : undefined,
-      dueDate: as.status !== "completed" ? "Pending" : undefined,
+      description: "Assessment progress",
+      status: mapAssessmentStatus(as),
+      submittedDate: mapAssessmentStatus(as) === "Completed" ? "Submitted" : undefined,
+      dueDate: mapAssessmentStatus(as) === "Remaining" ? "Pending" : undefined,
     })) ?? [];
+
+  const roadmapPct =
+    progressData && progressData.totalRoadmaps > 0
+      ? Math.round((progressData.completedRoadmaps / progressData.totalRoadmaps) * 100)
+      : 0;
 
   const progress = {
     completed: progressData?.overallProgress ?? 0,
@@ -311,7 +308,7 @@ export default function IndividualProgressPage() {
     datasets: [
       {
         data: [progress.completed, progress.remaining],
-        backgroundColor: ["#5B7FDB", "#FFD84E"],
+        backgroundColor: ["#8ec5eb", "rgba(255,255,255,0.12)"],
         borderWidth: 0,
       },
     ],
@@ -337,31 +334,33 @@ export default function IndividualProgressPage() {
     datasets: [
       {
         label: "Total",
-        data: [
-          progressData?.totalRoadmaps ?? 0,
-          progressData?.totalAssessments ?? 0,
-        ],
-        backgroundColor: "#5B7FDB",
+        data: [progressData?.totalRoadmaps ?? 0, progressData?.totalAssessments ?? 0],
+        backgroundColor: "rgba(142, 197, 235, 0.35)",
         borderRadius: 4,
       },
       {
         label: "Completed",
-        data: [
-          progressData?.completedRoadmaps ?? 0,
-          progressData?.completedAssessments ?? 0,
-        ],
-        backgroundColor: "#5BC0DE",
+        data: [progressData?.completedRoadmaps ?? 0, progressData?.completedAssessments ?? 0],
+        backgroundColor: "#8ec5eb",
         borderRadius: 4,
       },
     ],
   };
+
+  const maxBar = Math.max(
+    3,
+    progressData?.totalRoadmaps ?? 0,
+    progressData?.totalAssessments ?? 0,
+    progressData?.completedRoadmaps ?? 0,
+    progressData?.completedAssessments ?? 0,
+  );
 
   const barChartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false, // Hide default legend, we'll use custom one
+        display: false,
       },
       tooltip: {
         enabled: true,
@@ -370,24 +369,24 @@ export default function IndividualProgressPage() {
     scales: {
       y: {
         beginAtZero: true,
-        max: 5,
+        max: maxBar,
         ticks: {
           stepSize: 1,
-          color: "#666666",
+          color: "rgba(255,255,255,0.55)",
           font: {
             size: 12,
           },
         },
         grid: {
           display: true,
-          color: "#E0E0E0",
+          color: "rgba(255,255,255,0.08)",
           borderDash: [5, 5],
           drawBorder: false,
         },
       },
       x: {
         ticks: {
-          color: "#333333",
+          color: "rgba(255,255,255,0.75)",
           font: {
             size: 14,
           },
@@ -416,12 +415,31 @@ export default function IndividualProgressPage() {
     return true;
   });
 
+  if (!userId) {
+    return (
+      <div className={directorPageRoot}>
+        <p className="p-8 text-white">Invalid link.</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className={directorPageRoot}>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 py-24">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb]/30 border-t-[#8ec5eb]" />
+          <p className="text-sm text-white/70">Loading progress…</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1A2E5C] to-[#2E3B8E]">
-      {/* Hero Section */}
-      <AppHero
+    <div className={directorPageRoot}>
+      <DirectorHero
         title={userName}
-        backgroundImageUrl={ProgressBg.src}
+        subtitle="Roadmaps, assessments, and final comments."
+        image={ProgressBg}
         breadcrumbItems={[
           { label: "Home", href: "/director/home" },
           { label: "Track Progress", href: "/director/track-progress" },
@@ -429,56 +447,55 @@ export default function IndividualProgressPage() {
         ]}
       />
 
-      {/* Main Content */}
-      <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-12">
-        <div className="max-w-[1400px] mx-auto space-y-12">
-          {/* Progress Overview Section */}
+      {loadError ? (
+        <section className="relative px-4 pb-12 sm:px-6 md:px-12 lg:px-20">
+          <div className="mx-auto max-w-lg rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-6 text-center text-red-100">
+            {loadError}
+          </div>
+        </section>
+      ) : null}
+
+      <section className={`relative flex-1 px-4 pb-12 sm:px-6 md:px-12 lg:px-20 ${loadError ? "hidden" : ""}`}>
+        <div className="mx-auto max-w-[1400px] space-y-10">
           <div className="relative">
-            {/* Add/View Final Comments Button - Above and outside the cards */}
-            <div className="flex justify-end mb-4">
+            <div className="mb-4 flex justify-end">
               <button
+                type="button"
                 onClick={() => setIsFinalCommentsModalOpen(true)}
-                className="bg-[#1E366F] text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-[#1a2f5a] transition-colors shadow-md"
+                className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
               >
-                {isCompleted ? "View Final Comments" : "Add Final Comments"}
+                {isCompleted ? "View final comments" : "Add final comments"}
               </button>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Overall Progress Card */}
-              <div className="bg-white rounded-xl shadow-lg p-8">
-                <h2 className="text-xl font-bold text-gray-900 mb-6">
-                  Roadmap & Assessments
-                </h2>
-                <div className="flex items-center gap-4 mb-6">
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              <div className={`p-6 sm:p-8 ${directorGlassCard}`}>
+                <h2 className="mb-6 text-xl font-semibold text-white">Roadmap &amp; assessments</h2>
+                <div className="mb-6 flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-[#5B7FDB] rounded-full"></div>
-                    <span className="text-xs text-gray-600">Completed</span>
+                    <div className="h-3 w-3 rounded-full bg-[#8ec5eb]" />
+                    <span className="text-xs text-white/65">Completed</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-[#FFD84E] rounded-full"></div>
-                    <span className="text-xs text-gray-600">Remaining</span>
+                    <div className="h-3 w-3 rounded-full bg-white/25" />
+                    <span className="text-xs text-white/65">Remaining</span>
                   </div>
                 </div>
-                <div className="relative h-64 flex items-center justify-center">
-                  <div className="relative w-full h-full flex items-center justify-center">
+                <div className="relative flex h-64 items-center justify-center">
+                  <div className="relative flex h-full w-full items-center justify-center">
                     <Doughnut data={donutChartData} options={donutChartOptions} />
-                    {/* Center white circle with text */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center">
-                        <span className="text-gray-900 font-bold text-lg">
-                          {progress.completed === 100 ? "Completed" : `${progress.completed}%`}
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                      <div className="flex h-32 w-32 items-center justify-center rounded-full border border-white/15 bg-[#041f35]/90 backdrop-blur-sm">
+                        <span className="text-lg font-bold text-white">
+                          {progress.completed === 100 ? "Done" : `${progress.completed}%`}
                         </span>
                       </div>
                     </div>
                   </div>
-                  {/* Percentage Label with connecting line - positioned to the right of donut */}
                   {progress.completed > 0 && (
-                    <div className="absolute right-8 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2">
                       <div className="relative flex items-center">
-                        {/* Connecting line from donut edge */}
-                        <div className="w-12 h-0.5 bg-[#5B7FDB] mr-2"></div>
-                        {/* Percentage Label */}
-                        <div className="bg-[#1E366F] text-white text-sm font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap">
+                        <div className="mr-2 h-0.5 w-10 bg-[#8ec5eb]" />
+                        <div className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-3 py-1.5 text-sm font-semibold text-white">
                           {progress.completed}%
                         </div>
                       </div>
@@ -487,31 +504,19 @@ export default function IndividualProgressPage() {
                 </div>
               </div>
 
-              {/* Individual Progress Card */}
-              <div className="bg-white rounded-xl shadow-lg p-8 relative">
+              <div className={`relative p-6 sm:p-8 ${directorGlassCard}`}>
                 <div className="mb-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-2">
-                    Individual Progress
-                  </h2>
-                  <p className="text-sm text-gray-600 mb-6">
-                    Roadmap & Assessments
-                  </p>
+                  <h2 className="mb-2 text-xl font-semibold text-white">Breakdown</h2>
+                  <p className="text-sm text-white/55">Roadmaps vs assessments (totals and completed)</p>
                 </div>
-                <div className="flex items-center justify-end gap-4 mb-6">
-                  {/* Custom Legend */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 bg-[#5B7FDB] rounded-full"></div>
-                      <span className="text-xs text-gray-600">Total</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 bg-[#5BC0DE] rounded-full"></div>
-                      <span className="text-xs text-gray-600">Completed</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 bg-[#FFD84E] rounded-full"></div>
-                      <span className="text-xs text-gray-600">Remaining</span>
-                    </div>
+                <div className="mb-6 flex flex-wrap items-center justify-end gap-3">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-3 w-3 rounded-full bg-[#8ec5eb]/40" />
+                    <span className="text-xs text-white/65">Total</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-3 w-3 rounded-full bg-[#8ec5eb]" />
+                    <span className="text-xs text-white/65">Completed</span>
                   </div>
                 </div>
                 <div className="relative h-64">
@@ -525,15 +530,12 @@ export default function IndividualProgressPage() {
                           const ctx = chart.ctx;
                           const meta = chart.getDatasetMeta(1); // Completed dataset
                           meta.data.forEach((bar: any, index: number) => {
-                            if (index === 0 && progress.roadmap > 0) {
-                              // Only for Roadmap (first bar) - draw percentage badge
+                            if (index === 0 && roadmapPct > 0) {
                               const x = bar.x;
                               const y = bar.y;
-                              const barWidth = bar.width;
                               const barHeight = bar.height;
 
-                              // Calculate percentage
-                              const percentage = Math.round((progress.roadmap / 5) * 100);
+                              const percentage = roadmapPct;
 
                               // Calculate badge dimensions
                               const badgeWidth = 40;
@@ -543,7 +545,7 @@ export default function IndividualProgressPage() {
 
                               ctx.save();
                               // Draw rounded rectangle background
-                              ctx.fillStyle = "#5BC0DE";
+                              ctx.fillStyle = "#8ec5eb";
                               const radius = 4;
                               ctx.beginPath();
                               ctx.moveTo(badgeX + radius, badgeY);
@@ -576,41 +578,24 @@ export default function IndividualProgressPage() {
             </div>
           </div>
 
-          {/* Revitalization Roadmap Progress Section */}
-          <div className="bg-[#b0d0e4] rounded-xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
-                Revitalization Roadmap Progress
-              </h2>
-              {/* Filter Tabs */}
-              <div className="flex items-center gap-0 bg-white rounded-lg p-1 shadow-sm">
-                <button
-                  onClick={() => setRoadmapFilter("All")}
-                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${roadmapFilter === "All"
-                    ? "bg-[#1E366F] text-white"
-                    : "text-gray-700 hover:bg-gray-50"
+          <div className={`rounded-2xl border border-white/12 p-5 sm:p-6 ${directorGlassCard}`}>
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-xl font-semibold text-white sm:text-2xl">Revitalization roadmap</h2>
+              <div className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-1">
+                {(["All", "Completed", "Remaining"] as const).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setRoadmapFilter(f)}
+                    className={`h-8 rounded-md px-4 text-sm font-semibold transition-all ${
+                      roadmapFilter === f
+                        ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/35"
+                        : "text-white/70 hover:text-white"
                     }`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setRoadmapFilter("Completed")}
-                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${roadmapFilter === "Completed"
-                    ? "bg-[#1E366F] text-white"
-                    : "text-gray-700 hover:bg-gray-50"
-                    }`}
-                >
-                  Completed
-                </button>
-                <button
-                  onClick={() => setRoadmapFilter("Remaining")}
-                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${roadmapFilter === "Remaining"
-                    ? "bg-[#1E366F] text-white"
-                    : "text-gray-700 hover:bg-gray-50"
-                    }`}
-                >
-                  Remaining
-                </button>
+                  >
+                    {f}
+                  </button>
+                ))}
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -621,49 +606,30 @@ export default function IndividualProgressPage() {
                   title={card.title}
                   description={card.description}
                   status={card.status}
-                  completedDate={card.completedDate}
                   tasksCompleted={card.tasksCompleted}
-                  completionTime={card.completionTime}
                 />
               ))}
             </div>
           </div>
 
-          {/* Survey Progress Section */}
-          <div className="bg-[#b0d0e4] rounded-xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">
-                Survey Progress
-              </h2>
-              {/* Filter Tabs */}
-              <div className="flex items-center gap-0 bg-white rounded-lg p-1 shadow-sm">
-                <button
-                  onClick={() => setSurveyFilter("All")}
-                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${surveyFilter === "All"
-                    ? "bg-[#1E366F] text-white"
-                    : "text-gray-700 hover:bg-gray-50"
+          <div className={`rounded-2xl border border-white/12 p-5 sm:p-6 ${directorGlassCard}`}>
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-xl font-semibold text-white sm:text-2xl">Survey / assessments</h2>
+              <div className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-1">
+                {(["All", "Completed", "Remaining"] as const).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setSurveyFilter(f)}
+                    className={`h-8 rounded-md px-4 text-sm font-semibold transition-all ${
+                      surveyFilter === f
+                        ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/35"
+                        : "text-white/70 hover:text-white"
                     }`}
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => setSurveyFilter("Completed")}
-                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${surveyFilter === "Completed"
-                    ? "bg-[#1E366F] text-white"
-                    : "text-gray-700 hover:bg-gray-50"
-                    }`}
-                >
-                  Completed
-                </button>
-                <button
-                  onClick={() => setSurveyFilter("Remaining")}
-                  className={`px-4 py-2 text-sm font-semibold rounded-md transition-all ${surveyFilter === "Remaining"
-                    ? "bg-[#1E366F] text-white"
-                    : "text-gray-700 hover:bg-gray-50"
-                    }`}
-                >
-                  Remaining
-                </button>
+                  >
+                    {f}
+                  </button>
+                ))}
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -683,58 +649,59 @@ export default function IndividualProgressPage() {
           </div>
         </div>
       </section>
-
-      <AppFooter />
-
       {/* Final Comments Modal */}
       {isFinalCommentsModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-xl max-w-2xl w-full shadow-2xl border border-gray-200">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+          <div className={`max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl ${directorGlassCard}`}>
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">Final Comments</h2>
-                <p className="text-sm text-gray-600 mt-1">Pr. {userName}</p>
+                <h2 className="text-xl font-semibold text-white">Final comments</h2>
+                <p className="mt-1 text-sm text-white/55">{userName}</p>
               </div>
               <button
+                type="button"
                 onClick={() => setIsFinalCommentsModalOpen(false)}
-                className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition"
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white transition hover:bg-white/20"
               >
-                <i className="fa-solid fa-xmark text-gray-600"></i>
+                <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
 
-            {/* Content */}
             <div className="p-6">
               <textarea
                 value={finalComments}
                 onChange={(e) => !hasComments && setFinalComments(e.target.value)}
-                placeholder={hasComments ? "" : "Write the Comments here..."}
+                placeholder={hasComments ? "" : "Write comments here…"}
                 readOnly={hasComments}
-                className={`w-full h-64 px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#1E366F] focus:border-transparent resize-none ${hasComments ? "bg-gray-50 cursor-not-allowed" : ""
-                  }`}
+                rows={10}
+                className={`${directorInputClass} min-h-[200px] resize-none ${
+                  hasComments ? "cursor-not-allowed opacity-90" : ""
+                }`}
               />
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+            <div className="flex items-center justify-end gap-3 border-t border-white/10 px-6 py-4">
               <button
+                type="button"
                 onClick={() => setIsFinalCommentsModalOpen(false)}
-                className="px-6 py-2.5 bg-white border border-[#1E366F] text-[#1E366F] rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+                className="rounded-xl border border-white/25 bg-white/10 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
               >
                 Cancel
               </button>
               {hasComments ? (
                 <button
+                  type="button"
                   onClick={handleMarkAsCompleted}
-                  className="px-6 py-2.5 bg-[#1E366F] text-white rounded-lg text-sm font-semibold hover:bg-[#1a2f5a] transition-colors"
+                  className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
                 >
-                  Mark Programme as Completed
+                  Mark programme as completed
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={handleSubmitComments}
-                  className="px-6 py-2.5 bg-[#1E366F] text-white rounded-lg text-sm font-semibold hover:bg-[#1a2f5a] transition-colors"
+                  disabled={!directorId}
+                  className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Submit
                 </button>

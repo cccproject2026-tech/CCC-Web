@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import MentorHeader from "@/app/Components/MentorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
-import HeroBg from "@/app/Assets/assignments-bg.png";
+import MentorHeader from "@/app/Components/MentorHeader";import HeroBg from "@/app/Assets/assignments-bg.png";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import { apiGetAssessmentById, parseAssessmentDetailPayload } from "@/app/Services/assessment.service";
 import type { AssessmentResponse } from "@/app/Services/types/assessment.types";
@@ -210,9 +208,6 @@ export default function MentorAssessmentDetailPage() {
             </>
           )}
         </div>
-      </main>
-
-      <PastorFooter />
-    </div>
+      </main>    </div>
   );
 }

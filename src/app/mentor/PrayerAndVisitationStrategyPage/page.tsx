@@ -2,9 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
-import HeroBg from "@/app/Assets/jumpstart-hero.png"; // replace if you have a dedicated hero
+import PastorHeader from "@/app/Components/PastorHeader";import HeroBg from "@/app/Assets/jumpstart-hero.png"; // replace if you have a dedicated hero
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 

@@ -2,9 +2,7 @@
 import { useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import AppHeader from "@/app/Components/Header/AppHeader";
-import AppHero from "@/app/Components/Hero/AppHero";
-import AppFooter from "@/app/Components/AppFooter";
-import ConfirmModal from "@/app/Components/ConfirmModal";
+import AppHero from "@/app/Components/Hero/AppHero";import ConfirmModal from "@/app/Components/ConfirmModal";
 import ProfileForm, {
   PersonalInfo,
   ChurchInfo,
@@ -231,9 +229,6 @@ export default function EditMentorProfilePage() {
         confirmColor="bg-red-600 hover:bg-red-700"
         icon="fa-regular fa-trash-can"
         iconColor="text-red-600 bg-red-100"
-      />
-
-      <AppFooter />
-    </div>
+      />    </div>
   );
 }

@@ -1,19 +1,20 @@
 "use client";
 import Image from "next/image";
+import { directorGlassCard } from "@/app/director/directorUi";
 
 export interface MapMarker {
   id: number | string;
   name: string;
   img: any;
-  top: string; // percentage string e.g., "35%"
-  left: string; // percentage string e.g., "45%"
+  top: string;
+  left: string;
 }
 
 interface MapCardProps {
   title?: string;
-  iframeSrc?: string; // when using Google Maps embed
-  imageSrc?: string; // alternative static map image
-  height?: string; // tailwind height
+  iframeSrc?: string;
+  imageSrc?: string;
+  height?: string;
   markers?: MapMarker[];
 }
 
@@ -25,20 +26,22 @@ export default function MapCard({
   markers = [],
 }: MapCardProps) {
   return (
-    <div className="bg-gradient-to-b from-[#1f4b86]/70 to-[#143d74]/70 rounded-xl p-3 border border-white/20">
-      {title && (
-        <div className="px-3 py-2 text-white text-[14px] font-semibold">
+    <div
+      className={`rounded-2xl border border-white/15 p-3 sm:p-4 ${directorGlassCard}`}
+    >
+      {title ? (
+        <div className="px-1 pb-3 text-[14px] font-semibold text-white sm:text-[15px]">
           {title}
         </div>
-      )}
-      <div className="relative rounded-xl overflow-hidden bg-white">
+      ) : null}
+      <div className="relative overflow-hidden rounded-xl border border-white/10 bg-[#062946]/40">
         {iframeSrc ? (
           <iframe
             title="map"
             className={`w-full ${height}`}
             src={iframeSrc}
             loading="lazy"
-          ></iframe>
+          />
         ) : imageSrc ? (
           <Image
             src={imageSrc}
@@ -49,26 +52,27 @@ export default function MapCard({
           />
         ) : null}
 
-        {/* Overlay markers */}
-        {markers.length > 0 && (
-          <div className="absolute inset-0 pointer-events-none">
+        {markers.length > 0 ? (
+          <div className="pointer-events-none absolute inset-0">
             {markers.map((m) => (
               <div
-                key={m.id}
+                key={String(m.id)}
                 className="absolute -translate-x-1/2 -translate-y-full"
                 style={{ top: m.top, left: m.left }}
               >
-                <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-yellow-300 shadow-md">
+                <div className="h-9 w-9 overflow-hidden rounded-full shadow-lg ring-2 ring-[#8ec5eb]/90 ring-offset-2 ring-offset-[#062946]/80">
                   <Image
                     src={m.img}
                     alt={m.name}
-                    className="w-full h-full object-cover"
+                    width={36}
+                    height={36}
+                    className="h-full w-full object-cover"
                   />
                 </div>
               </div>
             ))}
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

@@ -1,9 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHero from "@/app/Components/Hero/AppHero";
-import AppFooter from "@/app/Components/AppFooter";
 import MentorBg from "../../Assets/mentor-bg.png";
+import DirectorHero from "../DirectorHero";
+import {
+  directorGlassCard,
+  directorGlassCardHover,
+  directorInputClass,
+  directorPageRoot,
+} from "../directorUi";
 import { apiGetAllInterests } from "@/app/Services/interests.service";
 import { Interest, InterestStatus } from "@/app/Services/types";
 
@@ -139,224 +144,211 @@ export default function InterestReceivedPage() {
 
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHero title="Interest Received" backgroundImageUrl={MentorBg.src} />
+    <div className={directorPageRoot}>
+      <DirectorHero
+        title="Interest received"
+        subtitle="Review and follow up on new leads."
+        image={MentorBg}
+      />
 
-      {/* Main Content */}
-      <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-8 md:py-12">
-        <div className="max-w-[1400px] mx-auto">
-          {/* Search, Filter, and Sort Section */}
-          <div className="bg-white rounded-2xl shadow-2xl p-6 mb-8 border border-gray-200 border-dashed">
-            <div className="flex flex-col md:flex-row gap-4 items-center">
-              {/* Search Bar */}
-              <div className="flex-1 w-full">
-                <div className="relative">
-                  <i className="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-                  <input
-                    type="text"
-                    placeholder="Search"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-white border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 text-gray-900 placeholder-gray-400"
-                  />
-                </div>
+      <section className="pb-10">
+        <div className="mx-auto max-w-[1400px]">
+          <div className={`mb-8 p-6 ${directorGlassCard}`}>
+            <div className="flex flex-col items-center gap-4 md:flex-row">
+              <div className="relative w-full flex-1">
+                <i className="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8ec5eb]/80" />
+                <input
+                  type="text"
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={`${directorInputClass} pl-11`}
+                />
               </div>
 
-              {/* Filter Tabs */}
-              <div className="flex gap-3">
+              <div className="flex flex-wrap justify-center gap-2">
                 <button
+                  type="button"
                   onClick={() => setActiveTab("new")}
-                  className={`relative px-6 py-3 rounded-full font-semibold text-[14px] transition-all ${activeTab === "new"
-                    ? "bg-[#2E3B8E] text-white"
-                    : "bg-white text-gray-700 border border-gray-300"
-                    }`}
+                  className={`relative rounded-full px-5 py-2.5 text-sm font-semibold transition-all ${
+                    activeTab === "new"
+                      ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/40"
+                      : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
+                  }`}
                 >
                   New
                   {newCount > 0 && (
                     <span
-                      className={`absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-bold ${activeTab === "new"
-                        ? "bg-white text-[#2E3B8E]"
-                        : "bg-[#FFD700] text-[#2E3B8E]"
-                        }`}
+                      className={`absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full text-[11px] font-bold ${
+                        activeTab === "new" ? "bg-[#FFD700] text-[#0f4a76]" : "bg-white/20 text-white"
+                      }`}
                     >
                       {newCount}
                     </span>
                   )}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setActiveTab("pending")}
-                  className={`relative px-6 py-3 rounded-full font-semibold text-[14px] transition-all ${activeTab === "pending"
-                    ? "bg-[#2E3B8E] text-white"
-                    : "bg-white text-gray-700 border border-gray-300"
-                    }`}
+                  className={`relative rounded-full px-5 py-2.5 text-sm font-semibold transition-all ${
+                    activeTab === "pending"
+                      ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/40"
+                      : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
+                  }`}
                 >
                   Pending
                   {pendingCount > 0 && (
                     <span
-                      className={`absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-full text-[12px] font-bold ${activeTab === "pending"
-                        ? "bg-white text-[#2E3B8E]"
-                        : "bg-[#FFD700] text-[#2E3B8E]"
-                        }`}
+                      className={`absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full text-[11px] font-bold ${
+                        activeTab === "pending" ? "bg-[#FFD700] text-[#0f4a76]" : "bg-white/20 text-white"
+                      }`}
                     >
                       {pendingCount}
                     </span>
                   )}
                 </button>
                 <button
+                  type="button"
                   onClick={() => setActiveTab("accepted")}
-                  className={`px-6 py-3 rounded-full font-semibold text-[14px] transition-all ${activeTab === "accepted"
-                    ? "bg-[#2E3B8E] text-white"
-                    : "bg-white text-gray-700 border border-gray-300"
-                    }`}
+                  className={`rounded-full px-5 py-2.5 text-sm font-semibold transition-all ${
+                    activeTab === "accepted"
+                      ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/40"
+                      : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
+                  }`}
                 >
                   Accepted
                 </button>
               </div>
 
-              {/* State Filter Dropdown */}
-              <div className="relative">
+              <div className="relative w-full md:w-auto">
                 <select
                   value={selectedState}
                   onChange={(e) => setSelectedState(e.target.value)}
-                  className="appearance-none bg-white border-2 border-gray-200 rounded-lg px-6 py-3 pr-10 text-gray-700 font-semibold text-[14px] focus:outline-none focus:border-blue-500 cursor-pointer"
+                  className={`${directorInputClass} appearance-none pr-10 font-semibold`}
                 >
-                  <option value="state">State</option>
-                  <option value="usa">USA</option>
-                  <option value="canada">Canada</option>
-                  <option value="mexico">Mexico</option>
-                  <option value="brazil">Brazil</option>
+                  <option value="state" className="text-black">
+                    State
+                  </option>
+                  <option value="usa" className="text-black">
+                    USA
+                  </option>
+                  <option value="canada" className="text-black">
+                    Canada
+                  </option>
+                  <option value="mexico" className="text-black">
+                    Mexico
+                  </option>
+                  <option value="brazil" className="text-black">
+                    Brazil
+                  </option>
                 </select>
-                <i className="fa-solid fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"></i>
+                <i className="fa-solid fa-chevron-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/50" />
               </div>
             </div>
           </div>
 
-          {/* Selection Bar */}
           {selectedPastors.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-xl p-4 mb-6 border border-gray-200 border-dashed">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <span className="text-[15px] font-semibold text-gray-700">
+            <div className={`mb-6 p-4 ${directorGlassCard}`}>
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div className="flex flex-wrap items-center gap-4">
+                  <span className="text-[15px] font-semibold text-white/90">
                     {selectedPastors.length}{" "}
-                    {selectedPastors.length === 1 ? "Pastor" : "Pastors"}{" "}
-                    Selected
+                    {selectedPastors.length === 1 ? "Pastor" : "Pastors"} selected
                   </span>
                   <button
+                    type="button"
                     onClick={() => setSelectedPastors([])}
-                    className="text-[14px] text-blue-600 hover:text-blue-800 font-medium"
+                    className="text-sm font-medium text-[#8ec5eb] hover:text-[#b8ddf5]"
                   >
-                    Clear Selection
+                    Clear selection
                   </button>
                 </div>
-                <div className="flex items-center gap-3">
-                  <button className="px-5 py-2.5 bg-blue-600 text-white rounded-lg text-[14px] font-semibold hover:bg-blue-700 transition-all">
-                    Assign to Mentors
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+                >
+                  Assign to mentors
+                </button>
               </div>
             </div>
           )}
 
-          {/* Interest Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {interests.map((interest) => (
-              <div
-                key={interest._id}
-                className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all relative"
-              >
-                {/* Checkbox */}
-                <div className="absolute top-4 right-4">
-                  <input
-                    type="checkbox"
-                    checked={selectedPastors.includes(interest._id)}
-                    onChange={() => handleToggleSelect(interest._id)}
-                    className="w-5 h-5 cursor-pointer accent-[#2E3B8E]"
-                  />
-                </div>
-
-                {/* Header with Icon and Timestamp */}
-                <div className="flex items-start justify-between mb-4 pr-8">
-                  <div className="w-16 h-16 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <i className="fa-solid fa-user text-blue-600 text-2xl"></i>
-                  </div>
-                  <span className="text-[13px] text-gray-500 font-medium">
-                    {new Date(interest.createdAt).toLocaleDateString("en-GB", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </span>
-
-                </div>
-
-                {/* Name and Role */}
-                <div className="mb-4">
-                  <h3 className="text-[17px] font-bold text-gray-900 mb-1">
-                    {interest.firstName} {interest.lastName}
-                  </h3>
-                  <p className="text-[14px] text-gray-600">
-                    {interest.title ?? "—"}
-                  </p>
-                </div>
-
-                {/* Contact Icons and View Button */}
-                <div className="flex items-center justify-between gap-4">
-                  {/* Contact Icons */}
-                  <div className="flex items-center gap-4 text-gray-500 text-[18px]">
-                    <button
-                      className="hover:text-blue-600 transition-colors"
-                      aria-label="Email"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                      }}
-                    >
-                      <i className="fa-regular fa-envelope"></i>
-                    </button>
-                    <button
-                      className="hover:text-blue-600 transition-colors"
-                      aria-label="Chat"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                      }}
-                    >
-                      <i className="fa-regular fa-comment"></i>
-                    </button>
-                    <button
-                      className="hover:text-blue-600 transition-colors"
-                      aria-label="Call"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                      }}
-                    >
-                      <i className="fa-solid fa-phone"></i>
-                    </button>
-                  </div>
-
-                  {/* View Button */}
-                  <button
-                    onClick={() =>
-                      router.push(`/director/interest-list/${interest._id}`)
-                    }
-                    className="px-4 py-2.5 bg-[#2E3B8E] text-white rounded-lg text-[14px] font-semibold hover:bg-[#1F2A6E] transition-all whitespace-nowrap"
-                  >
-                    View
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Empty State */}
-          {interests.length === 0 && (
-            <div className="text-center py-12">
-              <i className="fa-solid fa-search text-gray-300 text-6xl mb-4"></i>
-              <p className="text-gray-500 text-[16px]">No interests found</p>
+          {loading ? (
+            <div className="flex justify-center py-16">
+              <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
             </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {interests.map((interest) => (
+                  <div
+                    key={interest._id}
+                    className={`relative p-6 transition-all ${directorGlassCard} ${directorGlassCardHover}`}
+                  >
+                    <div className="absolute right-4 top-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedPastors.includes(interest._id)}
+                        onChange={() => handleToggleSelect(interest._id)}
+                        className="h-5 w-5 cursor-pointer accent-[#8ec5eb]"
+                      />
+                    </div>
+
+                    <div className="mb-4 flex items-start justify-between pr-8">
+                      <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-xl border border-white/15 bg-[#8ec5eb]/15">
+                        <i className="fa-solid fa-user text-2xl text-[#8ec5eb]" />
+                      </div>
+                      <span className="text-[13px] font-medium text-white/55">
+                        {new Date(interest.createdAt).toLocaleDateString("en-GB", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </div>
+
+                    <div className="mb-4">
+                      <h3 className="mb-1 text-[17px] font-bold text-white">
+                        {interest.firstName} {interest.lastName}
+                      </h3>
+                      <p className="text-[14px] text-white/65">{interest.title ?? "—"}</p>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-4 text-[18px] text-white/55">
+                        <button type="button" className="hover:text-[#8ec5eb]" aria-label="Email">
+                          <i className="fa-regular fa-envelope" />
+                        </button>
+                        <button type="button" className="hover:text-[#8ec5eb]" aria-label="Chat">
+                          <i className="fa-regular fa-comment" />
+                        </button>
+                        <button type="button" className="hover:text-[#8ec5eb]" aria-label="Call">
+                          <i className="fa-solid fa-phone" />
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/director/interest-list/${interest._id}`)}
+                        className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+                      >
+                        View
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {interests.length === 0 && (
+                <div className="py-12 text-center">
+                  <i className="fa-solid fa-search mb-4 text-6xl text-white/20" />
+                  <p className="text-[16px] text-white/55">No interests found</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>
-
-      <AppFooter />
     </div>
   );
 }

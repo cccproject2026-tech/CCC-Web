@@ -5,7 +5,6 @@ import { getCookie } from "@/app/utils/cookies";
 import PastorHeader from "@/app/Components/PastorHeader";
 import ProfilePic from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import PastorFooter from "@/app/Components/PastorFooter";
 import {
   getSingleUser,
   updateUser,
@@ -488,8 +487,6 @@ export default function PastorProfile() {
           </div>
         </div>
       )}
-      <PastorFooter />
-
       <style jsx>{`
         .form-input {
           @apply rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder-[#cde2f2] focus:outline-none focus:ring-2 focus:ring-[#8ec5eb];

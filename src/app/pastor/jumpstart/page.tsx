@@ -3,7 +3,6 @@ import { useState, useEffect, Suspense } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "@/app/Assets/jumpstart-hero.png";
 import UserPlaceholder from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -778,8 +777,6 @@ function JumpStartContent() {
           </div>
         </div>
       </main>
-
-      <PastorFooter />
     </div>
   );
 }

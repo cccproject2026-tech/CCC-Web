@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
 import HeroBg from "@/app/Assets/assignments-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
@@ -214,7 +213,6 @@ export default function PastorAssignments() {
           )}
         </div>
       </main>
-      <PastorFooter />
     </div>
   );
 }

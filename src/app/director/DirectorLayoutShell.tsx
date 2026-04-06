@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import AppHeader from "../Components/Header/AppHeader";
+import RoleShell from "../Components/RoleShell";
 
 export default function DirectorLayoutShell({
   children,
@@ -17,9 +18,11 @@ export default function DirectorLayoutShell({
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <RoleShell>
       <AppHeader showFullHeader={true} />
-      <main className="flex-1">{children}</main>
-    </div>
+      <main className="relative z-10 mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col px-4 pb-10 pt-4 sm:px-6 sm:pb-12 lg:px-8 lg:pt-6">
+        {children}
+      </main>
+    </RoleShell>
   );
 }

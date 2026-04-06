@@ -1,9 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHero from "@/app/Components/Hero/AppHero";
-import AppFooter from "@/app/Components/AppFooter";
-import MentorBg from "../../../Assets/mentor-bg.png";
+import AppHero from "@/app/Components/Hero/AppHero";import MentorBg from "../../../Assets/mentor-bg.png";
 
 export default function CreateAssignmentPage() {
   const router = useRouter();
@@ -511,9 +509,6 @@ export default function CreateAssignmentPage() {
             </div>
           </div>
         </>
-      )}
-
-      <AppFooter />
-    </div>
+      )}    </div>
   );
 }

@@ -1,8 +1,6 @@
 "use client";
 import Image from "next/image";
-import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
-import Logo from "@/app/Assets/CCCLogo.png"; // 🖼️ Replace with your logo image
+import PastorHeader from "@/app/Components/PastorHeader";import Logo from "@/app/Assets/CCCLogo.png"; // 🖼️ Replace with your logo image
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 export default function ExpectedOutcomePage() {

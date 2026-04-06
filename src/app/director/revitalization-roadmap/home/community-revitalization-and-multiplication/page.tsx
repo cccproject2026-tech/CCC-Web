@@ -1,9 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/Header/AppHeader";
-import AppFooter from "@/app/Components/AppFooter";
-import JumpStartHero from "@/app/Components/Hero/JumpStartHero";
+import AppHeader from "@/app/Components/Header/AppHeader";import JumpStartHero from "@/app/Components/Hero/JumpStartHero";
 import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
 import SelfRevitalizationHeroBg from "@/app/Assets/self-revitalization-hero.png";
 import Card1 from "@/app/Assets/card1.png";
@@ -263,9 +261,6 @@ export default function CommunityRevitalizationAndMultiplicationPage() {
             ))}
           </div>
         </div>
-      </main>
-
-      <AppFooter />
-    </div>
+      </main>    </div>
   );
 }

@@ -1,9 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/Header/AppHeader";
-import AppFooter from "@/app/Components/AppFooter";
-import AppHero from "@/app/Components/Hero/AppHero";
+import AppHeader from "@/app/Components/Header/AppHeader";import AppHero from "@/app/Components/Hero/AppHero";
 import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import Card1 from "@/app/Assets/card1.png";
@@ -252,9 +250,6 @@ export default function RevitalizationRoadmapHome() {
             ))}
           </div>
         </div>
-      </main>
-
-      <AppFooter />
-    </div>
+      </main>    </div>
   );
 }

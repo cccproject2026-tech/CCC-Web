@@ -3,8 +3,6 @@ import { useState } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import HeroBg from "@/app/Assets/jumpstart-hero.png";
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
-
 export default function MicroGrantApplicationPage() {
   const [activeTab, setActiveTab] = useState("Cover Sheet");
 
@@ -214,7 +212,6 @@ export default function MicroGrantApplicationPage() {
           </section>
         </div>
       </main>
-      <PastorFooter />
     </div>
   );
 }

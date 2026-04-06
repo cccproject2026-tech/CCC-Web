@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
-import AppHero from "@/app/Components/Hero/AppHero";
-import AppFooter from "@/app/Components/AppFooter";
+import DirectorHero from "../DirectorHero";
+import { directorGlassCard, directorInputClass, directorPageRoot } from "../directorUi";
 import ContactDetailHeader from "../../Assets/contactdetailheader.jpg";
 
 export default function ContactDetailsPage() {
@@ -74,51 +74,29 @@ export default function ContactDetailsPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1A2E5C] to-[#2E3B8E]">
-      {/* Hero Section with Blue Overlay */}
-      <div
-        className="relative bg-cover bg-center text-white min-h-[300px] sm:min-h-[360px] md:min-h-[400px]"
-        style={{
-          backgroundImage: `linear-gradient(to bottom, rgba(30, 54, 111, 0.8), rgba(46, 59, 142, 0.8)), url(${ContactDetailHeader.src})`,
-        }}
-      >
-        <div className="relative h-full flex flex-col justify-between z-10 px-6 md:px-12 lg:px-20 pt-8 pb-10">
-          {/* Breadcrumbs */}
-          <div className="text-sm text-white/80">
-            <span>
-              <a href="/director/home" className="hover:text-white cursor-pointer">
-                Home
-              </a>
-              <span className="mx-2">&gt;</span>
-              <span className="font-semibold">Contact Details</span>
-            </span>
-          </div>
+    <div className={directorPageRoot}>
+      <DirectorHero
+        title="Contact Details"
+        subtitle="Organization phone, address, and social links."
+        image={ContactDetailHeader}
+        breadcrumbItems={[
+          { label: "Home", href: "/director/home" },
+          { label: "Contact Details" },
+        ]}
+      />
 
-          {/* Title */}
-          <div className="mt-auto">
-            <h1 className="text-[28px] md:text-[36px] lg:text-[44px] font-semibold leading-tight">
-              Contact Details
-            </h1>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-12 bg-[#b0d0e4]">
-        <div className="max-w-[1000px] mx-auto">
-          {/* Contact Details Form Card */}
-          <div className="bg-white rounded-xl shadow-2xl overflow-hidden">
-            {/* Header - Blue Background */}
-            <div className="bg-gradient-to-r from-[#1E366F] to-[#2E3B8E] px-8 py-6 relative">
-              <h2 className="text-white text-3xl font-bold">Contact Details</h2>
+      <section className="relative py-10">
+        <div className="mx-auto max-w-[1000px]">
+          <div className={`overflow-hidden rounded-xl ${directorGlassCard}`}>
+            <div className="border-b border-white/10 px-8 py-6">
+              <h2 className="text-3xl font-bold text-white">Contact Details</h2>
             </div>
 
-            {/* Form Content */}
             <div className="p-8">
               {/* Phone Numbers - Side by Side */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
-                  <label className="block text-gray-900 font-semibold mb-2">
+                  <label className="mb-2 block font-semibold text-white/85">
                     Phone Number 1
                   </label>
                   <input
@@ -127,11 +105,11 @@ export default function ContactDetailsPage() {
                     value={formData.phoneNumber1}
                     onChange={handleInputChange}
                     placeholder="Enter Phone number"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white focus:outline-none focus:border-[#2E3B8E]"
+                    className={directorInputClass}
                   />
                 </div>
                 <div>
-                  <label className="block text-gray-900 font-semibold mb-2">
+                  <label className="mb-2 block font-semibold text-white/85">
                     Phone Number 2
                   </label>
                   <input
@@ -140,14 +118,14 @@ export default function ContactDetailsPage() {
                     value={formData.phoneNumber2}
                     onChange={handleInputChange}
                     placeholder="Enter Phone number"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white focus:outline-none focus:border-[#2E3B8E]"
+                    className={directorInputClass}
                   />
                 </div>
               </div>
 
               {/* Address */}
               <div className="mb-6">
-                <label className="block text-gray-900 font-semibold mb-2">
+                <label className="mb-2 block font-semibold text-white/85">
                   Address
                 </label>
                 <textarea
@@ -156,7 +134,7 @@ export default function ContactDetailsPage() {
                   onChange={handleInputChange}
                   placeholder="Enter Address"
                   rows={4}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white focus:outline-none focus:border-[#2E3B8E] resize-none"
+                  className={`${directorInputClass} resize-none`}
                 />
               </div>
 
@@ -273,8 +251,6 @@ export default function ContactDetailsPage() {
           </div>
         </div>
       </section>
-
-      <AppFooter />
     </div>
   );
 }
