@@ -20,9 +20,9 @@ import {
   mapNotificationItemToPopup,
   resolveSessionUserId,
   unwrapNotificationsList,
+  type NotificationPopupItem,
 } from "@/app/Services/notificationUi";
 import type { NotificationItem } from "@/app/Services/types/home.types";
-import type { NotificationPopupItem } from "../NotificationPopup";
 
 export default function AppHeader({ showFullHeader = false }) {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -47,6 +47,11 @@ export default function AppHeader({ showFullHeader = false }) {
   const [notificationItems, setNotificationItems] = useState<NotificationPopupItem[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationBadge, setNotificationBadge] = useState(0);
+  const [sessionUserId, setSessionUserId] = useState("");
+
+  useEffect(() => {
+    setSessionUserId(resolveSessionUserId() ?? "");
+  }, []);
 
   useEffect(() => {
     const uid = resolveSessionUserId();
@@ -121,31 +126,6 @@ export default function AppHeader({ showFullHeader = false }) {
     if (role.includes("mentor") && id) return `/director/mentors/profile/${id}`;
     if (id) return `/director/track-progress/${id}`;
     return "/director/mentees";
-  };
-
-  // Mock documents data
-  const [documents, setDocuments] = useState([
-    {
-      id: "1",
-      name: "My Documents 1.pdf",
-      date: "15 Oct 2024",
-      time: "9:41 am",
-    },
-    {
-      id: "2",
-      name: "My Educational Documents 1.pdf",
-      date: "12 Oct 2024",
-      time: "9:41 am",
-    },
-  ]);
-
-  const handleDeleteDocument = (id: string) => {
-    setDocuments(documents.filter((doc) => doc.id !== id));
-  };
-
-  const handleUploadDocument = () => {
-    console.log("Upload document");
-    // Implement file upload logic
   };
 
   const navLinks = [
@@ -529,9 +509,7 @@ export default function AppHeader({ showFullHeader = false }) {
       <DocumentsModal
         isOpen={showDocuments}
         onClose={() => setShowDocuments(false)}
-        documents={documents}
-        onDelete={handleDeleteDocument}
-        onUpload={handleUploadDocument}
+        userId={sessionUserId}
       />
     </>
   );

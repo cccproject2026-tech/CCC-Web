@@ -1,28 +1,39 @@
 "use client";
 import { useEffect, useRef } from "react";
 
+export type NotificationPopupItem = {
+  id: string;
+  icon: string;
+  iconColor: string;
+  title: string;
+  subtitle?: string;
+  link?: string;
+  linkText?: string;
+  time: string;
+  isStarred?: boolean;
+  avatarGroup?: boolean;
+  count?: string;
+};
+
 interface NotificationPopupProps {
   isOpen: boolean;
   onClose: () => void;
-  notifications?: Array<{
-    id: string;
-    icon: string;
-    iconColor: string;
-    title: string;
-    subtitle?: string;
-    link?: string;
-    linkText?: string;
-    time: string;
-    isStarred?: boolean;
-    avatarGroup?: boolean;
-    count?: string;
-  }>;
+  notifications?: NotificationPopupItem[];
+  /** When true, shows a loading state instead of the list */
+  loading?: boolean;
+  /** Shown when there are no notifications and `loading` is false (skips demo placeholders) */
+  emptyMessage?: string;
+  /** "View all" link target */
+  viewAllHref?: string;
 }
 
 export default function NotificationPopup({
   isOpen,
   onClose,
   notifications = [],
+  loading = false,
+  emptyMessage,
+  viewAllHref = "/director/notifications",
 }: NotificationPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
 
@@ -100,7 +111,11 @@ export default function NotificationPopup({
   ];
 
   const displayNotifications =
-    notifications.length > 0 ? notifications : defaultNotifications;
+    notifications.length > 0
+      ? notifications
+      : emptyMessage !== undefined
+        ? []
+        : defaultNotifications;
 
   return (
     <div
@@ -111,7 +126,7 @@ export default function NotificationPopup({
       <div className="bg-gradient-to-r from-[#2E3B8E] to-[#4A5FB8] px-6 py-4 flex justify-between items-center">
         <h3 className="text-white font-semibold text-[17px]">Notifications</h3>
         <a
-          href="/director/notifications"
+          href={viewAllHref}
           className="text-white text-[13px] hover:underline"
         >
           View All
@@ -120,7 +135,17 @@ export default function NotificationPopup({
 
       {/* Notification List */}
       <div className="max-h-[500px] overflow-y-auto">
-        {displayNotifications.map((notification) => (
+        {loading && (
+          <div className="flex items-center justify-center gap-2 px-6 py-12 text-sm text-gray-500">
+            <i className="fa-solid fa-spinner fa-spin" />
+            Loading…
+          </div>
+        )}
+        {!loading && displayNotifications.length === 0 && emptyMessage !== undefined && (
+          <p className="px-6 py-10 text-center text-sm text-gray-500">{emptyMessage}</p>
+        )}
+        {!loading &&
+          displayNotifications.map((notification) => (
           <div
             key={notification.id}
             className="border-b border-gray-100 px-6 py-4 hover:bg-gray-50 transition relative"
