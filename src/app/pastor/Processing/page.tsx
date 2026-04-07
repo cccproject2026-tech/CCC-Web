@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import HeroSection from "../../Components/HeroSection";
 import WhatWeDoSection from "../../Components/WhatWeDoSection";
 import { useRouter } from "next/navigation";
@@ -7,33 +7,93 @@ import { apiGetInterestByEmail } from "@/app/Services/interests.service";
 import { getCookie } from "@/app/utils/cookies";
 import { Interest } from "@/app/Services/types";
 
+function normStatus(s: string | undefined | null): string {
+  return String(s ?? "")
+    .trim()
+    .toLowerCase();
+}
+
 export default function Processing() {
   const router = useRouter();
   const [showPopup, setShowPopup] = useState(true);
   const [interest, setInterest] = useState<Interest | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const navigatedRef = useRef(false);
+
+  const fetchStatus = useCallback(async (): Promise<Interest | null> => {
+    const email = getCookie("interestEmail");
+    if (!email?.trim()) {
+      setStatusError("No saved email. Open the interest link from your confirmation email or resubmit the form.");
+      setInterest(null);
+      return null;
+    }
+
+    const res = await apiGetInterestByEmail(email);
+    const body = res.data;
+    if (body && body.success === false) {
+      throw new Error(body.message || "Unable to load status");
+    }
+    const data = body?.data ?? null;
+    setInterest(data);
+    setStatusError(null);
+    return data;
+  }, []);
 
   useEffect(() => {
-    const email = getCookie("interestEmail");
-    if (!email) {
-      setStatusLoading(false);
-      return;
-    }
-    apiGetInterestByEmail(email)
-      .then((res) => {
-        const data = res.data.data;
-        setInterest(data);
-        if (data?.status === "accepted") {
-          setTimeout(() => router.push("/pastor/setpassword"), 1500);
-        }
-      })
-      .catch((err) => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setStatusLoading(true);
+        await fetchStatus();
+      } catch (err) {
         console.error("Failed to fetch interest status:", err);
-        setStatusError("Unable to load your status. Please try again later.");
-      })
-      .finally(() => setStatusLoading(false));
-  }, []);
+        if (!cancelled) {
+          setStatusError("Unable to load your status. Please try again later.");
+        }
+      } finally {
+        if (!cancelled) setStatusLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchStatus]);
+
+  /** Poll every 20s so the banner updates after the director accepts (avoids stale nginx/CDN cache + no manual refresh). */
+  useEffect(() => {
+    const email = getCookie("interestEmail");
+    if (!email?.trim()) return;
+
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+
+    const tick = async () => {
+      try {
+        const data = await fetchStatus();
+        const next = normStatus(data?.status);
+        if (next === "accepted" && !navigatedRef.current) {
+          navigatedRef.current = true;
+          if (intervalId != null) window.clearInterval(intervalId);
+          setTimeout(() => router.push("/pastor/setpassword"), 1500);
+          return;
+        }
+        if (next === "rejected" && intervalId != null) {
+          window.clearInterval(intervalId);
+        }
+      } catch {
+        /* keep last good state */
+      }
+    };
+
+    intervalId = window.setInterval(tick, 20000);
+    return () => {
+      if (intervalId != null) window.clearInterval(intervalId);
+    };
+  }, [fetchStatus, router]);
+
+  const status = normStatus(interest?.status);
+  const isAccepted = status === "accepted";
+  const isRejected = status === "rejected";
 
   return (
     <div className="relative">
@@ -50,10 +110,10 @@ export default function Processing() {
             setStatusError(null);
             setShowPopup(true);
             try {
-              const res = await apiGetInterestByEmail(email);
-              const data = res.data.data;
-              setInterest(data);
-              if (data?.status === "accepted") {
+              const data = await fetchStatus();
+              const st = normStatus(data?.status);
+              if (st === "accepted" && !navigatedRef.current) {
+                navigatedRef.current = true;
                 setTimeout(() => router.push("/pastor/setpassword"), 1500);
               }
             } catch (err) {
@@ -87,11 +147,7 @@ export default function Processing() {
               ) : (
                 <span
                   className={`w-2.5 h-2.5 rounded-full ${
-                    interest?.status === "accepted"
-                      ? "bg-green-400"
-                      : interest?.status === "rejected"
-                      ? "bg-red-400"
-                      : "bg-yellow-400"
+                    isAccepted ? "bg-green-400" : isRejected ? "bg-red-400" : "bg-yellow-400"
                   }`}
                 />
               )}
@@ -99,12 +155,12 @@ export default function Processing() {
                 {statusLoading
                   ? "Checking status..."
                   : statusError
-                  ? statusError
-                  : interest?.status === "accepted"
-                  ? "Your application has been accepted!"
-                  : interest?.status === "rejected"
-                  ? "Your application was not approved."
-                  : "Waiting for Approval"}
+                    ? statusError
+                    : isAccepted
+                      ? "Your application has been accepted!"
+                      : isRejected
+                        ? "Your application was not approved."
+                        : "Waiting for Approval"}
               </span>
             </div>
             <button

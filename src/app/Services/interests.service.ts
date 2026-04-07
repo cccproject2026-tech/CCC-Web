@@ -19,8 +19,12 @@ export const apiCreateInterest = (payload: CreateInterestPayload) =>
   );
 
 // GET /interests?search=&status=
+/** `t` cache-busts GET requests (matches director mobile) so proxies/CDNs don’t serve a stale empty list. */
 export const apiGetAllInterests = (params?: GetInterestsParams) =>
-  axiosInstance.get<{ success: boolean; data: InterestResponse[] }>("/interests", { params });
+  axiosInstance.get<{ success: boolean; data: InterestResponse[]; message?: string }>(
+    "/interests",
+    { params: { ...params, t: Date.now() } },
+  );
 
 // GET /interests/metadata
 export const apiGetInterestMetadata = () =>
@@ -72,9 +76,12 @@ export const apiUpdateInterestStatus = (id: string, status: "accepted" | "reject
 export const apiGetInterestById = (id: string) =>
   axiosInstance.get<{ success: boolean; data: InterestResponse }>(`/interests/by-id/${id}`);
 
-// GET /interests/by-email/:email
+// GET /interests/by-email/:email (public-ish; cache-bust so pastor "Processing" sees fresh status after director accepts)
 export const apiGetInterestByEmail = (email: string) =>
-  axiosInstance.get<{ success: boolean; data: InterestResponse }>(`/interests/by-email/${email}`);
+  axiosInstance.get<{ success: boolean; data: InterestResponse }>(
+    `/interests/by-email/${encodeURIComponent(email)}`,
+    { params: { t: Date.now() }, skipAuth: true },
+  );
 
 // PATCH /interests/by-email/:email
 export const apiUpdateInterestByEmail = (email: string, payload: UpdateInterestPayload) =>

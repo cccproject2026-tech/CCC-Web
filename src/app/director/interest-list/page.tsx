@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { isAxiosError } from "axios";
 import MentorBg from "../../Assets/mentor-bg.png";
 import DirectorHero from "../DirectorHero";
 import {
@@ -11,6 +12,43 @@ import {
 } from "../directorUi";
 import { apiGetAllInterests } from "@/app/Services/interests.service";
 import { Interest, InterestStatus } from "@/app/Services/types";
+
+function normalizeInterestStatus(raw: unknown): InterestStatus {
+  const v = String(raw ?? "")
+    .toLowerCase()
+    .trim();
+  if (v === "new" || v === "pending" || v === "accepted" || v === "rejected") return v;
+  return "new";
+}
+
+function normalizeInterestRow(item: Interest): Interest {
+  const id =
+    item._id != null && String(item._id).length > 0
+      ? String(item._id)
+      : String((item as unknown as { id?: string }).id ?? "");
+  return {
+    ...item,
+    _id: id,
+    status: normalizeInterestStatus(item.status),
+  };
+}
+
+function loadInterestsErrorMessage(err: unknown): string {
+  if (!isAxiosError(err)) {
+    return "Could not load interests. Check your connection and try again.";
+  }
+  const status = err.response?.status;
+  if (status === 401 || status === 403) {
+    return "Session expired or not allowed. Sign in again as a director, then retry.";
+  }
+  const data = err.response?.data;
+  if (data && typeof data === "object" && "message" in data) {
+    const m = (data as { message?: string | string[] }).message;
+    if (Array.isArray(m) && m[0]) return String(m[0]);
+    if (typeof m === "string" && m.trim()) return m;
+  }
+  return "Could not load interests. Check your connection and try again.";
+}
 
 // export interface Interest {
 //   _id: string;
@@ -38,6 +76,7 @@ export default function InterestReceivedPage() {
   const [selectedCountry, setSelectedCountry] = useState<string>("All");
   const [selectedPastors, setSelectedPastors] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [allInterests, setAllInterests] = useState<Interest[]>([]);
 
   /** Same approach as CCC-Director-Mobile: load full list once, then filter by tab/search/country client-side. */
@@ -167,23 +206,34 @@ export default function InterestReceivedPage() {
     );
   };
 
-  useEffect(() => {
-    const fetchInterests = async () => {
-      try {
-        setLoading(true);
-        const res = await apiGetAllInterests();
-        const raw = res.data.data ?? [];
-        setAllInterests(raw);
-      } catch (error) {
-        console.error("Failed to fetch interests", error);
-        setAllInterests([]);
-      } finally {
-        setLoading(false);
+  const loadInterests = useCallback(async () => {
+    setFetchError(null);
+    try {
+      setLoading(true);
+      const res = await apiGetAllInterests();
+      const body = res.data;
+      if (body && body.success === false) {
+        throw new Error(body.message || "Failed to load interests");
       }
-    };
-
-    fetchInterests();
+      const raw = body?.data;
+      const list = Array.isArray(raw) ? raw : [];
+      setAllInterests(
+        list
+          .map((row) => normalizeInterestRow(row as Interest))
+          .filter((row) => row._id.length > 0),
+      );
+    } catch (error) {
+      console.error("Failed to fetch interests", error);
+      setFetchError(loadInterestsErrorMessage(error));
+      setAllInterests([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadInterests();
+  }, [loadInterests]);
 
 
   return (
@@ -336,6 +386,22 @@ export default function InterestReceivedPage() {
             </div>
           )}
 
+          {fetchError && !loading && (
+            <div
+              className={`mb-6 flex flex-col gap-3 rounded-xl border border-amber-400/40 bg-amber-500/10 p-4 text-amber-50 sm:flex-row sm:items-center sm:justify-between ${directorGlassCard}`}
+              role="alert"
+            >
+              <p className="text-sm">{fetchError}</p>
+              <button
+                type="button"
+                onClick={() => void loadInterests()}
+                className="shrink-0 rounded-lg border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex justify-center py-16">
               <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
@@ -405,10 +471,14 @@ export default function InterestReceivedPage() {
                 })}
               </div>
 
-              {filteredInterests.length === 0 && (
+              {filteredInterests.length === 0 && !fetchError && (
                 <div className="py-12 text-center">
                   <i className="fa-solid fa-search mb-4 text-6xl text-white/20" />
-                  <p className="text-[16px] text-white/55">No interests found</p>
+                  <p className="text-[16px] text-white/55">
+                    {allInterests.length === 0
+                      ? "No interests yet, or adjust filters / search."
+                      : "No interests match the current tab, search, or country filter."}
+                  </p>
                 </div>
               )}
             </>
