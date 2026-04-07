@@ -87,19 +87,28 @@ export const apiLogin = async (email: string, password: string) => {
   throw lastError;
 };
 
-// POST /auth/send-otp
+// POST /auth/send-otp (public — no Bearer; matches mobile onboarding)
 export const apiSendOtp = (payload: SendOtpPayload) =>
-  axiosInstance.post<{ success: boolean; message: string }>("/auth/send-otp", payload);
+  axiosInstance.post<{ success: boolean; message: string }>(
+    "/auth/send-otp",
+    payload,
+    { skipAuth: true },
+  );
 
 // POST /auth/verify-otp
 export const apiVerifyOtp = (payload: VerifyOtpPayload) =>
-  axiosInstance.post<{ success: boolean; message: string }>("/auth/verify-otp", payload);
+  axiosInstance.post<{ success: boolean; message: string }>(
+    "/auth/verify-otp",
+    payload,
+    { skipAuth: true },
+  );
 
-// POST /auth/set-password
+// POST /auth/set-password — backend requires email verified (OTP) first; see mobile set-password flow.
 export const apiSetPassword = (email: string, password: string, confirmPassword: string) =>
   axiosInstance.post<{ success: boolean; message?: string }>(
     "/auth/set-password",
     { email, password, confirmPassword } as SetPasswordPayload,
+    { skipAuth: true },
   );
 
 // POST /auth/forgot-password

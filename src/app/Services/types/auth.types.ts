@@ -20,7 +20,8 @@ export interface LoginResponse {
 
 export interface SendOtpPayload {
   email: string;
-  purpose?: 'set-password' | 'forgot-password';
+  /** Must match backend `SendOtpDto` — see `/auth/send-otp`. */
+  purpose: "email_verification" | "password_reset";
 }
 
 export interface VerifyOtpPayload {

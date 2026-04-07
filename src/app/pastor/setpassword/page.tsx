@@ -1,12 +1,26 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
+import { isAxiosError } from "axios";
 import CCCLogo from "../../Assets/CCCLogo.png";
 import PastorHeader from "@/app/Components/PastorHeader";
 import AndrewsLogo from "../../Assets/andrews-logo.png";
 import { useRouter } from "next/navigation";
-import { apiSetPassword } from "@/app/Services/api";
+import { apiSendOtp, apiSetPassword, apiVerifyOtp } from "@/app/Services/api";
 import { getCookie } from "@/app/utils/cookies";
+
+function apiErrorMessage(err: unknown, fallback: string): string {
+  if (!isAxiosError(err)) return fallback;
+  const data = err.response?.data;
+  if (data && typeof data === "object" && "message" in data) {
+    const m = (data as { message?: string | string[] }).message;
+    if (Array.isArray(m) && m[0]) return String(m[0]);
+    if (typeof m === "string" && m.trim()) return m;
+  }
+  return fallback;
+}
+
+type Step = 1 | 2 | 3;
 
 export default function SetPasswordPage() {
   const router = useRouter();
@@ -14,27 +28,73 @@ export default function SetPasswordPage() {
   const [showPopup, setShowPopup] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<Step>(1);
 
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     confirmPassword: "",
   });
+  const [otp, setOtp] = useState("");
+  const [emailFromCookie, setEmailFromCookie] = useState(false);
 
   useEffect(() => {
     const email = getCookie("interestEmail");
     if (email) {
       setFormData((prev) => ({ ...prev, email }));
+      setEmailFromCookie(true);
     }
   }, []);
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const userEmail = formData.email.trim();
+
+  const handleSendOtp = useCallback(async () => {
+    setError(null);
+    if (!userEmail) {
+      setError("No email found. Submit an interest form first or enter your email.");
+      return;
+    }
+    try {
+      setLoading(true);
+      await apiSendOtp({ email: userEmail, purpose: "email_verification" });
+      setStep(2);
+    } catch (err) {
+      console.error(err);
+      setError(apiErrorMessage(err, "Could not send verification code."));
+    } finally {
+      setLoading(false);
+    }
+  }, [userEmail]);
+
+  const handleVerifyOtp = useCallback(async () => {
+    setError(null);
+    const code = otp.trim();
+    if (code.length < 4 || code.length > 8) {
+      setError("Enter the verification code from your email (4–8 characters).");
+      return;
+    }
+    try {
+      setLoading(true);
+      const res = await apiVerifyOtp({ email: userEmail, otp: code });
+      if (res.data?.success) {
+        setStep(3);
+      } else {
+        setError("Verification failed. Check the code and try again.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError(apiErrorMessage(err, "Invalid or expired code."));
+    } finally {
+      setLoading(false);
+    }
+  }, [userEmail, otp]);
+
+  const handleSubmitPassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError(null);
 
     const { email, password, confirmPassword } = formData;
 
-    // 🔹 Basic validation
     if (!email || !password || !confirmPassword) {
       setError("All fields are required.");
       return;
@@ -53,7 +113,7 @@ export default function SetPasswordPage() {
     try {
       setLoading(true);
 
-      const response = await apiSetPassword(email, password, confirmPassword);
+      const response = await apiSetPassword(email.trim(), password, confirmPassword);
       const data = response.data;
 
       if (!data?.success) {
@@ -61,11 +121,10 @@ export default function SetPasswordPage() {
         return;
       }
 
-      // ✅ Success – show popup
       setShowPopup(true);
     } catch (err) {
       console.error(err);
-      setError("Something went wrong. Please try again later.");
+      setError(apiErrorMessage(err, "Something went wrong. Please try again later."));
     } finally {
       setLoading(false);
     }
@@ -96,58 +155,130 @@ export default function SetPasswordPage() {
             </p>
           </div>
 
-          {/* FORM */}
           <div className="w-full max-w-[380px] bg-transparent">
-            <h2 className="text-white text-left text-sm mb-3 font-medium">
+            <h2 className="text-white text-left text-sm mb-1 font-medium">
               Set Password
             </h2>
+            <p className="text-white/70 text-xs mb-3 text-left">
+              Step {step} of 3 — verify your email, then choose a password (same flow as the mobile app).
+            </p>
 
-            <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-              <input
-                type="email"
-                placeholder="Username (Auto generated) Email ID"
-                className="w-full rounded-md px-4 py-2 text-sm bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white read-only:opacity-70 read-only:cursor-not-allowed"
-                value={formData.email}
-                readOnly={!!formData.email}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, email: e.target.value }))
-                }
-              />
-              <input
-                type="password"
-                placeholder="Create Password"
-                className="w-full rounded-md px-4 py-2 text-sm bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white"
-                value={formData.password}
-                onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, password: e.target.value }))
-                }
-              />
-              <input
-                type="password"
-                placeholder="Confirm Password"
-                className="w-full rounded-md px-4 py-2 text-sm bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white"
-                value={formData.confirmPassword}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    confirmPassword: e.target.value,
-                  }))
-                }
-              />
+            {/* Email (all steps) */}
+            <input
+              type="email"
+              placeholder="Username (Auto generated) Email ID"
+              className="w-full rounded-md px-4 py-2 text-sm bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white read-only:opacity-70 read-only:cursor-not-allowed mb-4"
+              value={formData.email}
+              readOnly={emailFromCookie}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, email: e.target.value }))
+              }
+            />
 
-              {/* 🔻 Error message */}
-              {error && (
-                <p className="text-red-200 text-xs mt-1 text-left">{error}</p>
-              )}
+            {step === 1 && (
+              <div className="flex flex-col gap-4">
+                <p className="text-white/80 text-xs text-left">
+                  We&apos;ll send a verification code to this email. Enter it on the next step, then set your password.
+                </p>
+                {error && (
+                  <p className="text-red-200 text-xs text-left">{error}</p>
+                )}
+                <button
+                  type="button"
+                  disabled={loading || !userEmail}
+                  onClick={handleSendOtp}
+                  className="w-full bg-white text-[#103C8C] font-medium py-2 rounded-md hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {loading ? "Sending…" : "Send verification code"}
+                </button>
+              </div>
+            )}
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full mt-4 bg-white text-[#103C8C] font-medium py-2 rounded-md hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {loading ? "Submitting..." : "Submit"}
-              </button>
-            </form>
+            {step === 2 && (
+              <div className="flex flex-col gap-4">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="Enter verification code from email"
+                  className="w-full rounded-md px-4 py-2 text-sm bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white"
+                  value={otp}
+                  maxLength={8}
+                  onChange={(e) => setOtp(e.target.value.replace(/\s/g, ""))}
+                />
+                {error && (
+                  <p className="text-red-200 text-xs text-left">{error}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={() => {
+                      setStep(1);
+                      setOtp("");
+                      setError(null);
+                    }}
+                    className="flex-1 border border-white/50 text-white py-2 rounded-md text-sm hover:bg-white/10 disabled:opacity-60"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={loading}
+                    onClick={handleVerifyOtp}
+                    className="flex-1 bg-white text-[#103C8C] font-medium py-2 rounded-md hover:opacity-90 disabled:opacity-60"
+                  >
+                    {loading ? "Verifying…" : "Verify"}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="text-[#8ec5eb] text-xs underline text-left"
+                  onClick={handleSendOtp}
+                  disabled={loading}
+                >
+                  Resend code
+                </button>
+              </div>
+            )}
+
+            {step === 3 && (
+              <form className="flex flex-col gap-4" onSubmit={handleSubmitPassword}>
+                <input
+                  type="password"
+                  placeholder="Create Password"
+                  className="w-full rounded-md px-4 py-2 text-sm bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white"
+                  value={formData.password}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, password: e.target.value }))
+                  }
+                />
+                <input
+                  type="password"
+                  placeholder="Confirm Password"
+                  className="w-full rounded-md px-4 py-2 text-sm bg-transparent border border-white/50 text-white placeholder:text-white/70 focus:outline-none focus:border-white"
+                  value={formData.confirmPassword}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      confirmPassword: e.target.value,
+                    }))
+                  }
+                />
+
+                {error && (
+                  <p className="text-red-200 text-xs mt-1 text-left">{error}</p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full mt-4 bg-white text-[#103C8C] font-medium py-2 rounded-md hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {loading ? "Submitting..." : "Submit"}
+                </button>
+              </form>
+            )}
           </div>
 
           {/* ANDREWS UNIVERSITY LOGO */}
