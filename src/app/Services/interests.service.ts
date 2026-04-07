@@ -7,11 +7,15 @@ import type {
   DynamicField,
 } from "./types/interests.types";
 
-// POST /interests
+/**
+ * POST /interests — public registration (no Bearer token).
+ * Sending `Authorization` can make the API apply a different validation path and return 400.
+ */
 export const apiCreateInterest = (payload: CreateInterestPayload) =>
   axiosInstance.post<{ success: boolean; message?: string; data: InterestResponse }>(
     "/interests",
     payload,
+    { skipAuth: true },
   );
 
 // GET /interests?search=&status=

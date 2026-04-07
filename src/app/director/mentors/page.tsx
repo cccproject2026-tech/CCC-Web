@@ -21,6 +21,7 @@ import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
 import { apiGetAllUsers } from "@/app/Services/users.service";
+import { isRemoteImageSrc } from "@/app/utils/image";
 
 interface Mentor {
   id: string;
@@ -109,6 +110,7 @@ const MentorGridCard = memo(({
           src={mentor.img}
           alt={mentor.name}
           fill
+          unoptimized={isRemoteImageSrc(mentor.img)}
           style={{ objectFit: "cover" }}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
           quality={85}
@@ -224,6 +226,7 @@ const MentorListCard = memo(({
               alt={mentor.name}
               className="h-full w-full object-cover"
               fill
+              unoptimized={isRemoteImageSrc(mentor.img)}
               sizes="64px"
             />
           </div>

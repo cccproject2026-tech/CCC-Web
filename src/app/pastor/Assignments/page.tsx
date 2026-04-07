@@ -16,9 +16,11 @@ function isHttpUrl(u?: string): boolean {
   return !!u && (u.startsWith("http://") || u.startsWith("https://"));
 }
 
+type AssignmentsTab = "New" | "In Progress" | "Due" | "Completed";
+
 export default function PastorAssignments() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"New" | "Due" | "Completed">("New");
+  const [activeTab, setActiveTab] = useState<AssignmentsTab>("New");
   const [searchTerm, setSearchTerm] = useState("");
   const [assignments, setAssignments] = useState<RoadmapAssignmentUi[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,6 +66,8 @@ export default function PastorAssignments() {
       const matchesTab =
         activeTab === "New"
           ? a.status === "Not Started"
+          : activeTab === "In Progress"
+            ? a.status === "In-progress"
           : activeTab === "Due"
             ? a.status === "Due"
             : a.status === "Completed";
@@ -112,7 +116,7 @@ export default function PastorAssignments() {
             </div>
 
             <div className="flex overflow-hidden rounded-xl border border-white/20 bg-white/10 shadow-sm">
-              {(["New", "Due", "Completed"] as const).map((tab) => (
+              {(["New", "In Progress", "Due", "Completed"] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -199,7 +203,16 @@ export default function PastorAssignments() {
                       <div className="mt-4 flex justify-end">
                         <button
                           type="button"
-                          onClick={() => router.push(`/pastor/jumpstart?id=${item.id}`)}
+                          onClick={() => {
+                            const hasParent =
+                              item.parentRoadmapId &&
+                              item.parentRoadmapId.trim() !== "" &&
+                              item.parentRoadmapId !== item.id;
+                            const href = hasParent
+                              ? `/pastor/jumpstart?id=${item.id}&parentId=${item.parentRoadmapId}`
+                              : `/pastor/jumpstart?id=${item.id}`;
+                            router.push(href);
+                          }}
                           className="rounded-lg bg-[#8ec5eb] px-5 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2] sm:px-4 sm:text-xs"
                         >
                           View

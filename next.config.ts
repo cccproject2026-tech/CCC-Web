@@ -30,12 +30,16 @@ const nextConfig: NextConfig = {
     ];
   },
   images: {
-    domains: ['example.com'],
+    /** Avoid Node fetching remote URLs during optimization (TLS / corporate CA issues in dev). */
+    unoptimized:
+      process.env.NODE_ENV === "development" ||
+      process.env.SKIP_IMAGE_OPTIMIZATION === "1",
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
+      { protocol: "https", hostname: "example.com", pathname: "/**" },
+      { protocol: "https", hostname: "www.example.com", pathname: "/**" },
+      { protocol: "https", hostname: "wisdomtooth.tech", pathname: "/**" },
+      { protocol: "https", hostname: "**.wisdomtooth.tech", pathname: "/**" },
+      { protocol: "https", hostname: "app.wisdomtooth.tech", pathname: "/**" },
     ],
   },
   typescript: {

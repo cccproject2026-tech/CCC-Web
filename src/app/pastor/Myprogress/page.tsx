@@ -23,6 +23,7 @@ import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
 import { apiGetAssessmentById, parseAssessmentDetailPayload } from "@/app/Services/assessment.service";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
+import { subscribeProgressUpdated } from "@/app/utils/progress-sync";
 
 export default function PastorMyProgressPage() {
   const router = useRouter();
@@ -77,6 +78,22 @@ export default function PastorMyProgressPage() {
     };
 
     run();
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    return subscribeProgressUpdated((uid) => {
+      if (uid !== userId) return;
+      void (async () => {
+        try {
+          const res = await apiGetUserProgress(userId);
+          setProgress(unwrapProgressData(res));
+        } catch (e) {
+          console.error("Failed to fetch progress", e);
+          setProgress(null);
+        }
+      })();
+    });
   }, [userId]);
 
   useEffect(() => {
@@ -262,7 +279,9 @@ export default function PastorMyProgressPage() {
                     assessment={a}
                     onOpen={() => {
                       if (!a.assessmentId) return;
-                      router.push(`/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(a.assessmentId)}`);
+                      router.push(
+                        `/pastor/assessments/guidelines?assessmentId=${encodeURIComponent(a.assessmentId)}`,
+                      );
                     }}
                   />
                 ))}

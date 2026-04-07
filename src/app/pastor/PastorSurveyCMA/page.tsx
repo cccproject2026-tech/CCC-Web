@@ -9,10 +9,36 @@ import {
   parseAssessmentDetailPayload,
   apiSubmitSectionAnswers,
 } from "@/app/Services/assessment.service";
+import { apiGetRoadmapsByUser, apiTriggerJumpstartComplete } from "@/app/Services/api";
 import { getCookie } from "@/app/utils/cookies";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { apiCreateAppointment } from "@/app/Services/appointments.service";
 import axiosInstance from "@/app/Services/config/axios-instance";
+import { isAxiosError } from "axios";
+
+/** Match API + mobile: same id used when loading answers, in UI, and on submit. */
+function resolveLayerKey(layer: any, sectionIndex: number, layerIndex: number): string {
+  return String(layer?.layerId ?? layer?._id ?? `layer_${sectionIndex}_${layerIndex}`);
+}
+
+/** CCC-Mobile: trigger jumpstart POST before assessment submit (non-blocking). */
+async function ensureJumpstartTriggeredForAssessment(userId: string): Promise<void> {
+  try {
+    const res = await apiGetRoadmapsByUser(userId);
+    const raw = res.data as unknown;
+    const list = Array.isArray(raw) ? raw : (raw as { data?: unknown })?.data;
+    const roadmaps = Array.isArray(list) ? list : [];
+    const norm = (s: string) => s.toLowerCase().replace(/[\s-]+/g, "");
+    const jump = roadmaps.find((r: { name?: string }) =>
+      norm(String(r?.name ?? "")).includes("jumpstart"),
+    ) as { _id?: string } | undefined;
+    const roadmapId = jump?._id ?? (roadmaps[0] as { _id?: string } | undefined)?._id;
+    if (!roadmapId) return;
+    await apiTriggerJumpstartComplete(String(roadmapId), userId);
+  } catch {
+    /* non-blocking */
+  }
+}
 
 function PastorSurveyCMAContent() {
   const router = useRouter();
@@ -95,9 +121,7 @@ function PastorSurveyCMAContent() {
                     layer.selectedChoice ??
                     (Array.isArray(layer.selectedValues) ? layer.selectedValues[0] : undefined);
                   if (sel != null && String(sel) !== "") {
-                    const layerId = String(
-                      layer.layerId || layer._id || `layer_${sectionIndex}_${layerIndex}`,
-                    );
+                    const layerId = resolveLayerKey(layer, sectionIndex, layerIndex);
                     userAnswers[layerId] = String(sel);
                   }
                 });
@@ -105,7 +129,13 @@ function PastorSurveyCMAContent() {
               setAnswers(userAnswers);
             }
           } catch (err) {
-            console.error("Failed to fetch user answers", err);
+            // No saved response yet is often exposed as 404 — start with a blank survey.
+            const status = isAxiosError(err) ? err.response?.status : undefined;
+            if (status === 404) {
+              setAnswers({});
+            } else {
+              console.error("Failed to fetch user answers", err);
+            }
           }
         } else if (!viewOnly) {
           setMentors([]);
@@ -175,7 +205,7 @@ function PastorSurveyCMAContent() {
     if (!section?.layers?.length) return true;
 
     return section.layers.every((layer: any, layerIndex: number) => {
-      const layerId = layer._id || `layer_${sectionIndex}_${layerIndex}`;
+      const layerId = resolveLayerKey(layer, sectionIndex, layerIndex);
       return !!answers[layerId];
     });
   };
@@ -210,8 +240,15 @@ function PastorSurveyCMAContent() {
       await submitAllSectionAnswers();
     } catch (error) {
       console.error("Failed to submit survey answers", error);
-      setToast("Failed to submit survey answers");
-      setTimeout(() => setToast(null), 3000);
+      let msg = "Failed to submit survey answers.";
+      if (isAxiosError(error)) {
+        const d = error.response?.data as { message?: string | string[] } | undefined;
+        const m = d?.message;
+        if (typeof m === "string" && m.trim()) msg = m.trim();
+        else if (Array.isArray(m) && m[0]) msg = String(m[0]);
+      }
+      setToast(msg);
+      setTimeout(() => setToast(null), 5000);
       return;
     }
 
@@ -232,24 +269,27 @@ function PastorSurveyCMAContent() {
     if (!uid) return;
 
     const formattedAnswers = sections.map((section, sectionIndex) => {
-      const sectionId = section._id || section.id;
+      const sectionId = String(section._id ?? section.id ?? "");
       const layers = (section.layers || [])
         .map((layer: any, layerIndex: number) => {
-          const layerId = layer._id || `layer_${sectionIndex}_${layerIndex}`;
+          const layerId = resolveLayerKey(layer, sectionIndex, layerIndex);
           const selectedValue = answers[layerId];
+          if (!selectedValue || String(selectedValue).trim() === "") return null;
           return {
             layerId,
-            selectedValues: selectedValue ? [selectedValue] : [],
+            selectedChoice: String(selectedValue),
           };
         })
-        .filter((layer: any) => layer.selectedValues.length > 0);
+        .filter((layer): layer is { layerId: string; selectedChoice: string } => layer != null);
 
       return { sectionId, layers };
-    }).filter((sectionAnswer) => sectionAnswer.layers.length > 0);
+    }).filter((sectionAnswer) => sectionAnswer.sectionId && sectionAnswer.layers.length > 0);
 
     if (!formattedAnswers.length) {
       return;
     }
+
+    await ensureJumpstartTriggeredForAssessment(uid);
 
     await apiSubmitSectionAnswers(assessmentId, {
       userId: uid,
@@ -686,7 +726,7 @@ function PastorSurveyCMAContent() {
 
               <div className="space-y-4 sm:space-y-6 text-[13px] sm:text-[14px]">
                 {sections[activeSection]?.layers?.map((layer: any, layerIndex: number) => {
-                  const layerId = layer._id || `layer_${activeSection}_${layerIndex}`;
+                  const layerId = resolveLayerKey(layer, activeSection, layerIndex);
                   return (
                     <div
                       key={layerId}

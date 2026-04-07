@@ -20,9 +20,9 @@ import {
   mapNotificationItemToPopup,
   resolveSessionUserId,
   unwrapNotificationsList,
+  type NotificationPopupItem,
 } from "@/app/Services/notificationUi";
 import type { NotificationItem } from "@/app/Services/types/home.types";
-import type { NotificationPopupItem } from "../NotificationPopup";
 
 export default function AppHeader({ showFullHeader = false }) {
   const [showNotifications, setShowNotifications] = useState(false);

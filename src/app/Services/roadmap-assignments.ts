@@ -9,7 +9,7 @@ export type RoadmapAssignmentUi = {
   parentRoadmapName: string;
   title: string;
   desc: string;
-  status: "Not Started" | "Due" | "Completed";
+  status: "Not Started" | "In-progress" | "Due" | "Completed";
   months: string;
   imageUrl?: string;
   meetings?: string[];
@@ -123,20 +123,173 @@ export function unwrapProgressData(res: { data: unknown }): ProgressResponse | n
   if (!body || typeof body !== "object") return null;
   const o = body as Record<string, unknown>;
   if (o.success === false) return null;
-  if (o.data && typeof o.data === "object") return o.data as ProgressResponse;
-  return body as ProgressResponse;
+  if (o.data && typeof o.data === "object") return normalizeProgressResponse(o.data as ProgressResponse);
+  return normalizeProgressResponse(body as ProgressResponse);
 }
 
+/** Backend may nest `roadmaps` or `nestedRoadmaps` as `{ items: [...] }`. */
+function normalizeProgressResponse(p: ProgressResponse | null | undefined): ProgressResponse | null {
+  if (!p || typeof p !== "object") return null;
+  const any = p as unknown as Record<string, unknown>;
+  let roadmaps = any.roadmaps as unknown;
+  if (!Array.isArray(roadmaps) && roadmaps && typeof roadmaps === "object") {
+    const items = (roadmaps as { items?: unknown }).items;
+    if (Array.isArray(items)) roadmaps = items;
+  }
+  if (!Array.isArray(roadmaps)) roadmaps = [];
+  return { ...(p as ProgressResponse), roadmaps: roadmaps as ProgressRoadmap[] };
+}
+
+function nestedProgressList(pr: ProgressRoadmap | undefined): NestedRoadmapProgress[] {
+  if (!pr) return [];
+  const raw = pr.nestedRoadmaps as unknown;
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === "object" && Array.isArray((raw as { items?: unknown }).items)) {
+    return (raw as { items: NestedRoadmapProgress[] }).items;
+  }
+  return [];
+}
+
+/** Trimmed string compare — backend may add whitespace or mix id field shapes. */
+function sameId(a: unknown, b: unknown): boolean {
+  return String(a ?? "").trim() === String(b ?? "").trim();
+}
+
+/** Parent id on progress rows — backend may use roadMapId, roadmapId, or _id. */
+function progressRowParentId(p: ProgressRoadmap | Record<string, unknown>): string {
+  const r = p as Record<string, unknown>;
+  return String(r.roadMapId ?? r.roadmapId ?? r.roadMapID ?? r._id ?? "").trim();
+}
+
+/** Nested task id on progress rows — backend may use nestedRoadmapId, _id, or id. */
+function nestedRowTaskId(n: NestedRoadmapProgress | Record<string, unknown>): string {
+  const r = n as Record<string, unknown>;
+  return String(r.nestedRoadmapId ?? r.nestedItemId ?? r._id ?? r.id ?? "").trim();
+}
+
+/** Find parent progress row when roadMapId does not strictly equal phase _id (API quirks). */
+function findProgressRoadmapForParent(
+  progress: ProgressResponse | null | undefined,
+  parentRoadmapId: string,
+): ProgressRoadmap | undefined {
+  const pid = String(parentRoadmapId).trim();
+  const list = normalizeProgressResponse(progress)?.roadmaps;
+  if (!list?.length) return undefined;
+  return list.find((p) => sameId(progressRowParentId(p), pid));
+}
+
+/**
+ * Find nested progress for a task: prefer the parent’s nested list, then scan all progress parents
+ * (nested row is sometimes stored under a mismatched roadMapId).
+ */
+function findNestedProgressForTask(
+  progress: ProgressResponse | null | undefined,
+  parentRoadmapId: string,
+  taskId: string,
+): NestedRoadmapProgress | undefined {
+  const tid = String(taskId).trim();
+  if (!tid) return undefined;
+
+  const pr = findProgressRoadmapForParent(progress, parentRoadmapId);
+  const fromParent = nestedProgressList(pr).find((n) => sameId(nestedRowTaskId(n), tid));
+  if (fromParent) return fromParent;
+
+  const all = normalizeProgressResponse(progress)?.roadmaps;
+  if (!all?.length) return undefined;
+  for (const p of all) {
+    const hit = nestedProgressList(p).find((n) => sameId(nestedRowTaskId(n), tid));
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+function isEndDatePast(endDate?: string): boolean {
+  if (!endDate || typeof endDate !== "string") return false;
+  const end = new Date(endDate);
+  if (Number.isNaN(end.getTime())) return false;
+  const today = new Date();
+  const a = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const b = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  return b < a;
+}
+
+/**
+ * Aligns with mobile-style rules: completed / in-progress from steps & %,
+ * "Due" mainly for overdue endDate or explicit due/blocked, not as a catch-all.
+ */
 function mapNestedStatus(
   np: NestedRoadmapProgress | undefined,
-  itemStatus?: string,
-): "Not Started" | "Due" | "Completed" {
-  const pct = np?.progressPercentage ?? 0;
+  opts: { itemStatus?: string; endDate?: string; parentProgressStatus?: string },
+): "Not Started" | "In-progress" | "Due" | "Completed" {
+  const { itemStatus, endDate, parentProgressStatus } = opts;
+  const totalSteps = Math.max(0, Number(np?.totalSteps) || 0);
+  const completedSteps = Math.max(0, Number(np?.completedSteps) || 0);
+  const pct = Number(np?.progressPercentage) || 0;
+
+  const npSt = String(np?.status ?? "").toLowerCase().replace(/_/g, " ");
+  const itemSt = String(itemStatus ?? "").toLowerCase().replace(/_/g, " ");
+  const parSt = String(parentProgressStatus ?? "").toLowerCase().replace(/_/g, " ");
+  // Task document / optimistic UI can be "completed" while GET /progress still has a stale nested row.
+  if (itemSt === "completed") return "Completed";
+  // Meaningful item/template status must win over parent row and over stale `np` strings.
+  const nonDefaultItem =
+    itemSt && !itemSt.includes("not started") && itemSt !== "initial" ? itemSt : "";
+  const merged = nonDefaultItem || npSt || parSt || itemSt;
+
   if (pct >= 100) return "Completed";
-  const s = (np?.status || itemStatus || "").toLowerCase();
-  if (s.includes("complete")) return "Completed";
-  if (s.includes("not started") || s === "" || s === "not started") return "Not Started";
-  return "Due";
+  if (totalSteps > 0 && completedSteps >= totalSteps) return "Completed";
+  // Backend sometimes sends totalSteps:0 when only status/% are maintained
+  if (totalSteps === 0 && completedSteps > 0 && pct >= 100) return "Completed";
+  if (merged.includes("complete")) return "Completed";
+
+  if (totalSteps > 0 && completedSteps > 0 && completedSteps < totalSteps) return "In-progress";
+  if (pct > 0 && pct < 100) return "In-progress";
+  if (merged.includes("progress")) return "In-progress";
+
+  if (merged.includes("blocked") || merged.includes("overdue") || merged === "due") return "Due";
+  if (isEndDatePast(endDate)) return "Due";
+
+  if (!merged || merged.includes("not started") || merged === "initial") return "Not Started";
+
+  return "Not Started";
+}
+
+/** Map list UI status to template `status` strings merged onto roadmap docs (all tasks, not only jumpstart). */
+function uiStatusToRoadmapDocStatus(s: RoadmapAssignmentUi["status"]): string {
+  switch (s) {
+    case "Completed":
+      return "completed";
+    case "In-progress":
+      return "in-progress";
+    case "Due":
+      return "due";
+    case "Not Started":
+    default:
+      return "not started";
+  }
+}
+
+/**
+ * Same status as `/pastor/revitalization-roadmap` cards — derived from GET /progress/:userId
+ * plus nested item fallbacks (matches mobile mergeRoadmapWithProgress behavior).
+ */
+export function deriveTaskStatusForList(
+  progress: ProgressResponse | null,
+  args: {
+    parentRoadmapId: string;
+    taskId: string;
+    itemStatus?: string;
+    endDate?: string;
+  },
+): RoadmapAssignmentUi["status"] {
+  const { parentRoadmapId, taskId, itemStatus, endDate } = args;
+  const pr = findProgressRoadmapForParent(progress, parentRoadmapId);
+  const np = findNestedProgressForTask(progress, parentRoadmapId, taskId);
+  return mapNestedStatus(np, {
+    itemStatus,
+    endDate,
+    parentProgressStatus: pr?.status,
+  });
 }
 
 /**
@@ -146,44 +299,48 @@ export function buildRoadmapAssignments(
   roadmaps: RoadMapResponse[],
   progress: ProgressResponse | null,
 ): RoadmapAssignmentUi[] {
-  const progressRoadmapById = new Map<string, ProgressRoadmap>();
-  progress?.roadmaps?.forEach((pr) => progressRoadmapById.set(pr.roadMapId, pr));
-
   const out: RoadmapAssignmentUi[] = [];
 
   for (const rm of roadmaps) {
-    const parentId = String(rm._id);
-    const pr = progressRoadmapById.get(parentId);
-    const nestedProgressById = new Map<string, NestedRoadmapProgress>();
-    pr?.nestedRoadmaps?.forEach((n) => nestedProgressById.set(n.nestedRoadmapId, n));
+    const parentId = String(rm._id ?? (rm as { id?: string }).id ?? "").trim();
+    const pr = findProgressRoadmapForParent(progress, parentId);
+    const parentProgressStatus = pr?.status;
 
     const children: NestedRoadMapItem[] = Array.isArray(rm.roadmaps) ? rm.roadmaps : [];
 
     if (children.length === 0) {
-      const np = nestedProgressById.get(parentId);
+      const np = pr ? mapNestedProgressSelf(pr) : undefined;
       out.push({
         id: parentId,
         parentRoadmapId: parentId,
         parentRoadmapName: rm.name,
         title: rm.name,
         desc: rm.roadMapDetails || rm.description || "",
-        status: mapNestedStatus(np, rm.status),
+        status: mapNestedStatus(np, {
+          itemStatus: rm.status,
+          endDate: rm.endDate,
+          parentProgressStatus,
+        }),
         months: rm.duration || "—",
         imageUrl: rm.imageUrl,
         meetings: rm.meetings,
       });
     } else {
       for (const child of children) {
-        const cid = String(child._id || "");
+        const cid = String(child._id ?? (child as { id?: string }).id ?? "").trim();
         if (!cid) continue;
-        const np = nestedProgressById.get(cid);
+        const np = findNestedProgressForTask(progress, parentId, cid);
         out.push({
           id: cid,
           parentRoadmapId: parentId,
           parentRoadmapName: rm.name,
           title: child.name,
           desc: child.roadMapDetails || child.description || "",
-          status: mapNestedStatus(np, child.status),
+          status: mapNestedStatus(np, {
+            itemStatus: child.status,
+            endDate: child.endDate,
+            parentProgressStatus,
+          }),
           months: child.duration || rm.duration || "—",
           imageUrl: child.imageUrl,
           meetings: child.meetings,
@@ -193,6 +350,17 @@ export function buildRoadmapAssignments(
   }
 
   return out;
+}
+
+/** When there are no nested children, map parent-level progress row to pseudo nested metrics. */
+function mapNestedProgressSelf(pr: ProgressRoadmap): NestedRoadmapProgress | undefined {
+  return {
+    nestedRoadmapId: pr.roadMapId,
+    completedSteps: pr.completedSteps ?? 0,
+    totalSteps: pr.totalSteps ?? 0,
+    progressPercentage: pr.progressPercentage ?? 0,
+    status: pr.status ?? "",
+  };
 }
 
 /** Throw when API returns { success: false, message? } with HTTP 200 */
@@ -212,15 +380,53 @@ export function mergeProgressOntoRoadmaps(
   roadmaps: RoadMapResponse[],
   progress: ProgressResponse | null,
 ): RoadMapResponse[] {
-  if (!progress?.roadmaps?.length) return roadmaps;
-  const byRoadMapId = new Map(progress.roadmaps.map((p) => [p.roadMapId, p]));
+  const progressNorm = normalizeProgressResponse(progress);
+  if (!progressNorm?.roadmaps?.length) return roadmaps;
+
   return roadmaps.map((r) => {
-    const pr = byRoadMapId.get(r._id);
+    const rid = String(r._id ?? (r as { id?: string }).id ?? "").trim();
+    const pr = progressNorm.roadmaps.find((p) => sameId(progressRowParentId(p), rid));
     if (!pr) return r;
-    const existing = (r as RoadMapResponse & { progress?: unknown }).progress;
-    if (existing && typeof existing === "object") return r;
+
+    const parentProgressStatus = pr.status;
+    const children: NestedRoadMapItem[] = Array.isArray(r.roadmaps) ? r.roadmaps : [];
+
+    if (children.length === 0) {
+      const np = mapNestedProgressSelf(pr);
+      const derived = mapNestedStatus(np, {
+        itemStatus: r.status,
+        endDate: r.endDate,
+        parentProgressStatus,
+      });
+      return {
+        ...r,
+        status: uiStatusToRoadmapDocStatus(derived),
+        progress: {
+          status: pr.status,
+          completedSteps: pr.completedSteps,
+          totalSteps: pr.totalSteps,
+        },
+      } as RoadMapResponse;
+    }
+
+    const updatedChildren = children.map((child) => {
+      const cid = String(child._id ?? (child as { id?: string }).id ?? "").trim();
+      if (!cid) return child;
+      const np = findNestedProgressForTask(progressNorm, rid, cid);
+      const derived = mapNestedStatus(np, {
+        itemStatus: child.status,
+        endDate: child.endDate,
+        parentProgressStatus,
+      });
+      return {
+        ...child,
+        status: uiStatusToRoadmapDocStatus(derived),
+      } as NestedRoadMapItem;
+    });
+
     return {
       ...r,
+      roadmaps: updatedChildren,
       progress: {
         status: pr.status,
         completedSteps: pr.completedSteps,
@@ -265,11 +471,12 @@ export async function resolveMentorUserRoadmapsList(
   progress: ProgressResponse | null,
 ): Promise<RoadMapResponse[]> {
   assertRoadmapsEnvelopeSuccess(roadmapsAxiosRes.data);
+  const progressNorm = normalizeProgressResponse(progress);
   let list = unwrapRoadmapsList(roadmapsAxiosRes);
-  if (list.length === 0 && progress?.roadmaps?.length) {
-    list = await hydrateRoadmapsFromProgress(progress);
+  if (list.length === 0 && progressNorm?.roadmaps?.length) {
+    list = await hydrateRoadmapsFromProgress(progressNorm);
   }
-  return mergeProgressOntoRoadmaps(list, progress);
+  return mergeProgressOntoRoadmaps(list, progressNorm);
 }
 
 export async function fetchRoadmapAssignmentsForUser(userId: string): Promise<RoadmapAssignmentUi[]> {
@@ -277,7 +484,12 @@ export async function fetchRoadmapAssignmentsForUser(userId: string): Promise<Ro
     apiGetRoadmapsByUser(userId),
     apiGetUserProgress(userId),
   ]);
-  const roadmaps = unwrapRoadmapsList(rmRes);
+  assertRoadmapsEnvelopeSuccess(rmRes.data);
+  let roadmaps = unwrapRoadmapsList(rmRes);
   const progress = unwrapProgressData(progRes);
+  if (roadmaps.length === 0 && progress?.roadmaps?.length) {
+    roadmaps = await hydrateRoadmapsFromProgress(progress);
+  }
+  roadmaps = mergeProgressOntoRoadmaps(roadmaps, progress);
   return buildRoadmapAssignments(roadmaps, progress);
 }

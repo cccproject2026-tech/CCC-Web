@@ -34,7 +34,7 @@
 // export default axiosInstance;
 
 
-import axios from "axios";
+import axios, { AxiosHeaders } from "axios";
 import { getCookie } from "@/app/utils/cookies";
 
 const normalizeBaseUrl = (raw?: string | null): string | null => {
@@ -78,6 +78,15 @@ const axiosInstance = axios.create({
 // --------------------------------------------------
 axiosInstance.interceptors.request.use(
   (config) => {
+    /** Public routes (e.g. interest registration) must not send a user token or the API may validate differently and return 400. */
+    if (config.skipAuth) {
+      if (config.headers instanceof AxiosHeaders) {
+        config.headers.delete("Authorization");
+      } else {
+        delete (config.headers as Record<string, unknown>)["Authorization"];
+      }
+      return config;
+    }
     const token = getCookie("accessToken");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

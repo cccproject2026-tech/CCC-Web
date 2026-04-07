@@ -1,116 +1,187 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PhaseImg from "@/app/Assets/phase-img.png";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import { apiGetRoadmapsByUser } from "../../Services/api";
 import { getCookie } from "@/app/utils/cookies";
-import { unwrapRoadmapsList } from "@/app/Services/roadmap-assignments";
+import {
+  fetchRoadmapAssignmentsForUser,
+  type RoadmapAssignmentUi,
+} from "@/app/Services/roadmap-assignments";
+import { subscribeProgressUpdated } from "@/app/utils/progress-sync";
 
-interface Phase {
+type TabKey = "All" | "Due" | "In Progress" | "Not Started" | "Completed";
+type UiStatus = "Not Started" | "In-progress" | "Due" | "Completed";
+
+interface PhaseCard {
   id: string;
+  parentRoadmapId?: string;
+  parentRoadmapName: string;
   title: string;
   description: string;
-  phase: string;
   months: string;
-  status: string;
+  status: UiStatus;
   sessionDate?: string;
-  isPhase: boolean;
   imageUrl: string;
+}
+
+const TABS: TabKey[] = ["All", "Due", "In Progress", "Not Started", "Completed"];
+
+function formatStatusDisplay(status: UiStatus): string {
+  if (status === "In-progress") return "In Progress";
+  return status;
 }
 
 export default function RevitalizationRoadmap() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("All");
+  const pathname = usePathname();
+  const [activeTab, setActiveTab] = useState<TabKey>("All");
   const [searchTerm, setSearchTerm] = useState("");
-  const [phases, setPhases] = useState<Phase[]>([]);
+  const [phases, setPhases] = useState<PhaseCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Fetch API
-  useEffect(() => {
-    const fetchRoadmaps = async () => {
-      try {
-        setLoading(true);
-        const user = JSON.parse(getCookie("user") || "{}");
-        const userId = user?.id || user?._id;
-        if (!userId) {
-          setError("User session not found. Please log in again.");
-          return;
-        }
+  const toUiStatus = (rawStatus: unknown): UiStatus => {
+    const t = String(rawStatus ?? "").trim();
+    if (t === "Not Started" || t === "In-progress" || t === "Due" || t === "Completed") {
+      return t as UiStatus;
+    }
+    const s = t.toLowerCase().replace(/_/g, " ");
+    if (!s || s === "not started") return "Not Started";
+    if (s.includes("complete")) return "Completed";
+    if (s.includes("progress")) return "In-progress";
+    if (s.includes("due") || s.includes("overdue") || s.includes("blocked")) return "Due";
+    return "Not Started";
+  };
 
-        const res = await apiGetRoadmapsByUser(userId);
-        const data = unwrapRoadmapsList(res);
+  const normalizeStatus = (raw: string): string =>
+    raw.trim().toLowerCase().replace(/[_\s]+/g, "-");
 
-        const mappedPhases = data.map((item: any) => {
-          const isValidImageUrl = (url: string) => {
-            return (
-              url && (url.startsWith("http://") || url.startsWith("https://"))
-            );
-          };
+  const getSessionUserId = (): string => {
+    const direct = getCookie("userId")?.trim();
+    if (direct) return direct;
+    try {
+      const user = JSON.parse(getCookie("user") || "{}") as { id?: string; _id?: string };
+      return String(user?.id || user?._id || "");
+    } catch {
+      return "";
+    }
+  };
 
-          return {
-            id: item._id,
-            title: item.name,
-            description:
-              item.description || item.roadMapDetails || "No description",
-            phase: item.phase || "N/A",
-            months: item.duration || "N/A",
-            status:
-              item.status?.toLowerCase() === "in progress"
-                ? "In-progress"
-                : item.status
-                ? item.status.charAt(0).toUpperCase() + item.status.slice(1)
-                : "Not Started",
-            sessionDate:
-              item.extras?.find((ex: any) => ex.name === "Session Date")
-                ?.date || "",
-            isPhase: item.type === "Phase" || item.haveNextedRoadMaps === true || (item.roadmaps && item.roadmaps.length > 0),
-            imageUrl: isValidImageUrl(item.imageUrl)
-              ? item.imageUrl
-              : PhaseImg.src,
-          };
-        });
-
-        setPhases(mappedPhases);
-      } catch (err: any) {
-        console.error(err);
+  const fetchRoadmaps = useCallback(async (showLoader = true) => {
+    try {
+      if (showLoader) setLoading(true);
+      const userId = getSessionUserId();
+      if (!userId) {
         setPhases([]);
-        setError(err?.response?.data?.message || "Unable to fetch roadmap data from API.");
-      } finally {
-        setLoading(false);
+        setError("User session not found. Please sign in again.");
+        return;
       }
-    };
 
-    fetchRoadmaps();
+      const data: RoadmapAssignmentUi[] = await fetchRoadmapAssignmentsForUser(userId);
+      const isValidImageUrl = (url?: string) =>
+        !!url && (url.startsWith("http://") || url.startsWith("https://"));
+
+      const mappedPhases: PhaseCard[] = data.map((item) => ({
+        id: item.id,
+        title: item.title,
+        description: item.desc || "No description",
+        parentRoadmapName: item.parentRoadmapName || "Roadmap",
+        parentRoadmapId: item.parentRoadmapId,
+        months: item.months || "N/A",
+        status: toUiStatus(item.status),
+        sessionDate: item.meetings?.[0] || "",
+        imageUrl: isValidImageUrl(item.imageUrl) ? item.imageUrl : PhaseImg.src,
+      }));
+
+      setPhases(mappedPhases);
+      setError("");
+    } catch (err: any) {
+      console.error(err);
+      setPhases([]);
+      setError(err?.response?.data?.message || "Unable to fetch roadmap data from API.");
+    } finally {
+      if (showLoader) setLoading(false);
+    }
   }, []);
 
-  const filteredPhases = phases.filter((phase) => {
-    const matchesSearch = phase.title
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesTab =
-      activeTab === "All" || phase.status === activeTab.replace("-", " ");
-    return matchesSearch && matchesTab;
-  });
+  useEffect(() => {
+    fetchRoadmaps();
 
-  // Loading state
+    const onFocus = () => fetchRoadmaps(false);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") fetchRoadmaps(false);
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    const unsubProgress = subscribeProgressUpdated((uid) => {
+      if (uid === getSessionUserId()) fetchRoadmaps(false);
+    });
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+      unsubProgress();
+    };
+  }, [fetchRoadmaps, pathname]);
+
+  const filteredPhases = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return phases.filter((phase) => {
+      const matchesSearch =
+        !q ||
+        phase.title.toLowerCase().includes(q) ||
+        phase.description.toLowerCase().includes(q) ||
+        phase.parentRoadmapName.toLowerCase().includes(q);
+
+      const matchesTab =
+        activeTab === "All" ||
+        normalizeStatus(phase.status) === normalizeStatus(activeTab);
+      return matchesSearch && matchesTab;
+    });
+  }, [phases, searchTerm, activeTab]);
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#062946]">
-        <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent"></div>
+      <div className="min-h-screen bg-[#062946] text-white">
+        <PastorHeader showFullHeader={true} />
+        <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+          <p className="text-sm text-[#cde2f2]">Loading your roadmap...</p>
+        </div>
       </div>
     );
   }
 
-  // Error state
   if (error) {
+    const showLogin =
+      /sign in|log in|session|not found/i.test(error) && !/Unable to fetch/i.test(error);
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#062946] text-white">
-        <p>{error}</p>
+      <div className="min-h-screen bg-[#062946] text-white">
+        <PastorHeader showFullHeader={true} />
+        <div className="flex min-h-[70vh] items-center justify-center px-4">
+          <div className="max-w-xl rounded-2xl border border-red-400/25 bg-red-500/10 p-5 text-center">
+            <p className="text-red-100">{error}</p>
+            {showLogin && (
+              <p className="mt-3 text-sm text-[#cde2f2]">
+                <Link href="/pastor/login" className="font-semibold text-white underline underline-offset-2 hover:text-[#8ec5eb]">
+                  Go to pastor login
+                </Link>
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => fetchRoadmaps()}
+              className="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#0f4a76] hover:bg-[#e7f1fa]"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -150,23 +221,20 @@ export default function RevitalizationRoadmap() {
         <div className="max-w-7xl mx-auto">
           {/* Top Controls */}
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 mb-8">
-            {/* Search Bar */}
             <div className="flex items-center rounded-xl border border-white/20 bg-white/10 px-4 py-2 shadow-sm backdrop-blur w-full lg:max-w-md">
               <i className="fa-solid fa-magnifying-glass mr-3 text-[#cde2f2]"></i>
               <input
                 type="text"
-                placeholder="Search"
+                placeholder="Search roadmaps..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="flex-1 bg-transparent text-sm text-white placeholder:text-[#cde2f2] outline-none"
               />
             </div>
 
-            {/* Tabs and Menu Container */}
             <div className="flex items-center gap-3 w-full lg:w-auto">
-              {/* Tabs */}
               <div className="flex items-center rounded-xl border border-white/20 bg-white/10 px-2 py-1 overflow-x-auto shadow-sm backdrop-blur flex-1 lg:flex-none">
-                {["All", "Due", "Not Started", "Completed", "In-progress"].map(
+                {TABS.map(
                   (tab) => (
                     <button
                       key={tab}
@@ -183,100 +251,118 @@ export default function RevitalizationRoadmap() {
                 )}
               </div>
 
-              {/* Right Icons */}
-              <button className="h-9 w-9 shrink-0 rounded-full border border-white/20 bg-white/10 text-[#d9ebf8] shadow-sm transition hover:bg-white/20">
-                <i className="fa-solid fa-ellipsis-vertical text-sm"></i>
+              <button
+                type="button"
+                onClick={() => fetchRoadmaps()}
+                className="h-9 w-9 shrink-0 rounded-full border border-white/20 bg-white/10 text-[#d9ebf8] shadow-sm transition hover:bg-white/20"
+                aria-label="Refresh roadmap"
+                title="Refresh roadmap"
+              >
+                <i className="fa-solid fa-rotate-right text-sm"></i>
               </button>
             </div>
           </div>
 
-          {/* Cards Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
-            {filteredPhases.map((phase) => (
-              <div
-                key={phase.id}
-                className="flex flex-col overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:flex-row"
-              >
-                {/* Left Image */}
-                <div className="relative w-full sm:w-[180px] md:w-[200px] h-[180px] md:h-[200px] flex-shrink-0 m-4">
-                  <Image
-                    src={phase.imageUrl}
-                    alt={phase.title}
-                    width={200}
-                    height={200}
-                    className="w-full h-full object-cover rounded-lg"
-                  />
-                </div>
+          {phases.length === 0 ? (
+            <div className="rounded-2xl border border-white/15 bg-white/5 p-8 text-center text-[#cde2f2]">
+              No roadmap assignments found. Please contact your administrator.
+            </div>
+          ) : filteredPhases.length === 0 ? (
+            <div className="rounded-2xl border border-white/15 bg-white/5 p-8 text-center text-[#cde2f2]">
+              No roadmaps match this filter.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+              {filteredPhases.map((phase) => (
+                <div
+                  key={`${phase.parentRoadmapId || "parent"}-${phase.id}`}
+                  className="flex flex-col overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:flex-row"
+                >
+                  <div className="relative w-full sm:w-[180px] md:w-[200px] h-[180px] md:h-[200px] flex-shrink-0 m-4">
+                    <Image
+                      src={phase.imageUrl}
+                      alt={phase.title}
+                      width={200}
+                      height={200}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  </div>
 
-                {/* Right Content */}
-                <div className="flex flex-col justify-between flex-1 p-4 md:p-5">
-                  <div>
-                    <h3 className="mb-1 text-[16px] font-semibold text-white md:text-[17px]">
-                      {phase.title}
-                    </h3>
-                    <p className="mb-3 text-sm text-[#cde2f2]">
-                      {phase.description}
-                    </p>
-
-                    {/* Status */}
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="text-xs font-medium text-[#d9ebf8]">
-                        Status
-                      </span>
-                      <span
-                        className={`text-xs font-medium px-2 py-[2px] rounded ${
-                          phase.status === "Completed"
-                            ? "bg-[#d8fff2] text-[#00A878]"
-                            : phase.status === "In-progress"
-                            ? "bg-[#fff6d8] text-[#d38a00]"
-                            : "bg-[#e6edff] text-[#1e40af]"
-                        }`}
-                      >
-                        {phase.status}
-                      </span>
-                    </div>
-
-                    {/* Session Date */}
-                    {phase.sessionDate && (
-                      <div className="flex items-center gap-2 mb-3">
-                        <i className="fa-regular fa-calendar text-[#8ec5eb] text-sm"></i>
-                        <input
-                          type="text"
-                          value={phase.sessionDate}
-                          readOnly
-                          className="w-[140px] rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-[#d9ebf8] focus:outline-none sm:w-[150px]"
-                        />
-                      </div>
-                    )}
-
-                    {/* Completion Time */}
+                  <div className="flex flex-col justify-between flex-1 p-4 md:p-5">
                     <div>
-                      <p className="text-[12px] text-[#d9ebf8]">
-                        Completion Time
+                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-[#8ec5eb]/90">
+                        {phase.parentRoadmapName}
                       </p>
-                      <p className="text-sm font-medium text-white">
-                        {phase.months}
+                      <h3 className="mb-1 text-[16px] font-semibold text-white md:text-[17px]">
+                        {phase.title}
+                      </h3>
+                      <p className="mb-3 text-sm text-[#cde2f2]">
+                        {phase.description}
                       </p>
+
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-xs font-medium text-[#d9ebf8]">
+                          Status
+                        </span>
+                        <span
+                          className={`text-xs font-medium px-2 py-[2px] rounded ${
+                            phase.status === "Completed"
+                              ? "bg-[#d8fff2] text-[#00A878]"
+                              : phase.status === "In-progress"
+                              ? "bg-[#fff6d8] text-[#d38a00]"
+                              : phase.status === "Due"
+                              ? "bg-[#ffe4e6] text-[#be123c]"
+                              : "bg-[#e6edff] text-[#1e40af]"
+                          }`}
+                        >
+                          {formatStatusDisplay(phase.status)}
+                        </span>
+                      </div>
+
+                      {phase.sessionDate && (
+                        <div className="flex items-center gap-2 mb-3">
+                          <i className="fa-regular fa-calendar text-[#8ec5eb] text-sm"></i>
+                          <input
+                            type="text"
+                            value={phase.sessionDate}
+                            readOnly
+                            className="w-[140px] rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-[#d9ebf8] focus:outline-none sm:w-[150px]"
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <p className="text-[12px] text-[#d9ebf8]">
+                          Completion Time
+                        </p>
+                        <p className="text-sm font-medium text-white">
+                          {phase.months}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end mt-3 sm:mt-0">
+                      <button
+                        onClick={() => {
+                          const hasParent =
+                            phase.parentRoadmapId &&
+                            phase.parentRoadmapId.trim() !== "" &&
+                            phase.parentRoadmapId !== phase.id;
+                          const href = hasParent
+                            ? `/pastor/jumpstart?id=${phase.id}&parentId=${phase.parentRoadmapId}`
+                            : `/pastor/jumpstart?id=${phase.id}`;
+                          router.push(href);
+                        }}
+                        className="rounded-lg bg-white px-5 py-2 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa]"
+                      >
+                        View
+                      </button>
                     </div>
                   </div>
-
-                  {/* View Button */}
-                  <div className="flex justify-end mt-3 sm:mt-0">
-                    <button
-                      onClick={() =>
-                        phase.isPhase
-                          ? router.push(`/pastor/SelfRevitalizationPhasePage?id=${phase.id}`)
-                          : router.push(`/pastor/jumpstart?id=${phase.id}`)
-                      }
-                      className="rounded-lg bg-white px-5 py-2 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa]"
-                    >
-                      View
-                    </button>
-                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
     </div>

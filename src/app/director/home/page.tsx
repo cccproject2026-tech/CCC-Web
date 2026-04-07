@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setCookie, getCookie } from "@/app/utils/cookies";
 import Image from "next/image";
+import { isRemoteImageSrc } from "@/app/utils/image";
 import MentorCard from "@/app/Components/Card/MentorCard";
 import { directorPageRoot } from "../directorUi";
 import HeroBg from "../../Assets/hero-bg.png";
@@ -556,6 +557,9 @@ export default function DirectorHome() {
                           alt={mentorName}
                           width={40}
                           height={40}
+                          unoptimized={isRemoteImageSrc(
+                            appointment.mentor.profilePicture,
+                          )}
                           className="rounded-full border border-white/30"
                         />
                       ) : (

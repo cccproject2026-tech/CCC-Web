@@ -90,9 +90,12 @@ export interface UpdateAssessmentPayload extends Partial<CreateAssessmentPayload
 
 // ─── Answers ──────────────────────────────────────────────────────────────────
 
+/** POST /assessment/:id/answers — backend validates `selectedChoice` (see CCC-Mobile). */
 export interface LayerAnswer {
   layerId: string;
-  selectedValues: string[];
+  selectedChoice: string;
+  /** Some older docs used arrays; prefer selectedChoice for API compatibility. */
+  selectedValues?: string[];
 }
 
 export interface SectionAnswer {
@@ -105,15 +108,13 @@ export interface SubmitSectionAnswersPayload {
   answers: SectionAnswer[];
 }
 
-export interface PreSurveyAnswer {
-  questionId: string;
-  selectedValues: string[];
-}
-
+/** POST /assessment/:id/submit-pre-survey — matches CCC-Mobile `SubmitPreSurveyPayload`. */
 export interface SubmitPreSurveyPayload {
   userId: string;
-  assessmentId: string;
-  answers: PreSurveyAnswer[];
+  preSurveyAnswers: Array<{
+    questionText: string;
+    answer: string | number;
+  }>;
 }
 
 // ─── Recommendations ─────────────────────────────────────────────────────────

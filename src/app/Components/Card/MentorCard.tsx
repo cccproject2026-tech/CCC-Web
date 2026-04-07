@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { StaticImageData } from "next/image";
+import { isRemoteImageSrc } from "@/app/utils/image";
 
 const glassShell =
   "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.1)_0%,rgba(255,255,255,0.04)_100%)] backdrop-blur-xl shadow-[0_8px_40px_rgba(3,24,43,0.4)] transition-all duration-300 hover:border-white/25 hover:shadow-[0_12px_48px_rgba(3,24,43,0.45)]";
@@ -44,6 +45,7 @@ export default function MentorCard({
           alt={name}
           className={isGlass ? "object-cover" : "h-[340px] rounded-xl object-cover"}
           fill
+          unoptimized={isRemoteImageSrc(image)}
           sizes={isGlass ? "(max-width: 640px) 100vw, (max-width: 1280px) 33vw, 25vw" : "(max-width: 768px) 100vw, 400px"}
         />
         {isGlass ? (

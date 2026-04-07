@@ -1,37 +1,119 @@
 "use client";
 import Image from "next/image";
-import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, Suspense, useCallback } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "@/app/Assets/self-revitalization-hero.png";
 import PhaseImg from "@/app/Assets/phase-img.png";
 import { apiGetRoadmapById } from "@/app/Services/api";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
+import {
+  deriveTaskStatusForList,
+  unwrapProgressData,
+  type RoadmapAssignmentUi,
+} from "@/app/Services/roadmap-assignments";
+import type { ProgressResponse } from "@/app/Services/types/progress.types";
+import { getCookie } from "@/app/utils/cookies";
+import { subscribeProgressUpdated } from "@/app/utils/progress-sync";
+
+function getSessionUserId(): string {
+  const direct = getCookie("userId")?.trim();
+  if (direct) return direct;
+  try {
+    const user = JSON.parse(getCookie("user") || "{}") as { id?: string; _id?: string };
+    return String(user?.id || user?._id || "");
+  } catch {
+    return "";
+  }
+}
 
 function SelfRevitalizationContent() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const roadmapId = searchParams.get("id");
+  const roadmapId = searchParams.get("id")?.trim() || null;
 
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [roadmap, setRoadmap] = useState<any>(null);
+  const [progressData, setProgressData] = useState<ProgressResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const normalizeStatus = (status: unknown) =>
+    String(status ?? "").trim().toLowerCase().replace(/[_\s]+/g, " ");
+
+  const isCompletedStatus = (status: unknown) => {
+    const s = String(status ?? "").trim().toLowerCase();
+    return s === "completed" || s === "complete";
+  };
+
+  const statusLabel = (status: unknown) => {
+    const s = normalizeStatus(status);
+    if (!s || s === "not started") return "Not Started";
+    if (s.includes("complete")) return "Completed";
+    if (s.includes("progress")) return "In-progress";
+    if (s.includes("due") || s.includes("overdue")) return "Due";
+    return "Not Started";
+  };
+
+  /** Align cards with `/pastor/revitalization-roadmap` + jumpstart (GET /progress merge). */
+  const taskStatusFromProgress = (
+    item: { _id?: string; id?: string; status?: unknown; endDate?: string },
+  ): string => {
+    const tid = String(item._id ?? item.id ?? "").trim();
+    if (!roadmapId || !tid) return statusLabel(item.status);
+    const derived: RoadmapAssignmentUi["status"] = deriveTaskStatusForList(progressData, {
+      parentRoadmapId: roadmapId,
+      taskId: tid,
+      itemStatus: item.status != null && String(item.status).trim() !== "" ? String(item.status) : undefined,
+      endDate: typeof item.endDate === "string" ? item.endDate : undefined,
+    });
+    if (derived === "In-progress") return "In-progress";
+    return derived;
+  };
+
+  const loadRoadmapAndProgress = useCallback(async () => {
     if (!roadmapId) return;
-    const fetchRoadmap = async () => {
-      try {
-        setLoading(true);
-        const res = await apiGetRoadmapById(roadmapId);
-        setRoadmap(res.data?.data || res.data);
-      } catch (err) {
-        console.error("Failed to fetch roadmap", err);
-      } finally {
-        setLoading(false);
+    try {
+      setLoading(true);
+      const userId = getSessionUserId();
+      const rmRes = await apiGetRoadmapById(roadmapId);
+      const body = rmRes.data as { data?: unknown };
+      setRoadmap(body?.data ?? rmRes.data);
+      if (userId) {
+        try {
+          const progRes = await apiGetUserProgress(userId);
+          setProgressData(unwrapProgressData(progRes));
+        } catch {
+          setProgressData(null);
+        }
+      } else {
+        setProgressData(null);
       }
-    };
-    fetchRoadmap();
+    } catch (err) {
+      console.error("Failed to fetch roadmap", err);
+    } finally {
+      setLoading(false);
+    }
   }, [roadmapId]);
+
+  useEffect(() => {
+    void loadRoadmapAndProgress();
+  }, [loadRoadmapAndProgress, pathname]);
+
+  useEffect(() => {
+    const onVis = () => {
+      if (document.visibilityState === "visible" && roadmapId) void loadRoadmapAndProgress();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    const unsub = subscribeProgressUpdated((uid) => {
+      if (uid === getSessionUserId() && roadmapId) void loadRoadmapAndProgress();
+    });
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      unsub();
+    };
+  }, [roadmapId, loadRoadmapAndProgress]);
 
   const title = roadmap?.name || "Self Revitalization Phase";
   const phase = roadmap?.phase || "";
@@ -41,9 +123,16 @@ function SelfRevitalizationContent() {
     url && (url.startsWith("http://") || url.startsWith("https://"));
 
   const filteredCards = nestedRoadmaps.filter((item) => {
-    const matchesSearch = item.name?.toLowerCase().includes(search.toLowerCase());
-    const status = item.status || "Not Started";
-    const matchesFilter = filter === "All" || status.toLowerCase() === filter.toLowerCase();
+    const q = search.trim().toLowerCase();
+    const matchesSearch =
+      !q ||
+      item.name?.toLowerCase().includes(q) ||
+      item.description?.toLowerCase().includes(q) ||
+      item.roadMapDetails?.toLowerCase().includes(q);
+    const status = statusLabel(item.status);
+    const matchesFilter =
+      filter === "All" ||
+      normalizeStatus(status) === normalizeStatus(filter);
     return matchesSearch && matchesFilter;
   });
 
@@ -103,7 +192,7 @@ function SelfRevitalizationContent() {
 
             <div className="flex items-center gap-3">
               <div className="flex rounded-xl border border-white/20 bg-white/10 shadow-sm overflow-hidden p-1 backdrop-blur">
-                {["All", "Due", "Not Started", "Completed"].map((tab) => (
+                {["All", "Due", "In-progress", "Not Started", "Completed"].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setFilter(tab)}
@@ -130,7 +219,7 @@ function SelfRevitalizationContent() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {filteredCards.map((item, index) => {
                 const imgSrc = isValidImageUrl(item.imageUrl) ? item.imageUrl : PhaseImg;
-                const status = item.status || "Not Started";
+                const status = taskStatusFromProgress(item);
 
                 return (
                   <div
@@ -160,8 +249,12 @@ function SelfRevitalizationContent() {
                         <div className="flex flex-wrap items-center gap-2 mb-2">
                           <span className="text-[12px] font-medium text-[#d9ebf8]">Status</span>
                           <span className={`text-[11px] px-2 py-[3px] rounded-full font-medium border ${
-                            status === "Completed"
+                            isCompletedStatus(status)
                               ? "bg-[#d8fff2] text-[#00A878] border-transparent"
+                              : status === "In-progress"
+                              ? "bg-[#fff6d8] text-[#d38a00] border-transparent"
+                              : status === "Due"
+                              ? "bg-[#ffe4e6] text-[#be123c] border-transparent"
                               : "bg-[#e6edff] text-[#1e40af] border-transparent"
                           }`}>
                             {status}

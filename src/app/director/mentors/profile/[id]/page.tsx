@@ -3,11 +3,14 @@ import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import AppHero from "@/app/Components/Hero/AppHero";import ConfirmModal from "@/app/Components/ConfirmModal";
+import { isAxiosError } from "axios";
+import AppHero from "@/app/Components/Hero/AppHero";
+import ConfirmModal from "@/app/Components/ConfirmModal";
 import MentorBg from "@/app/Assets/mentor-bg.png";
 import Mentor1 from "@/app/Assets/mentor1.png";
 import ProfileForm from "@/app/Components/ProfileForm";
-import { apiGetUserById } from "@/app/Services/users.service";
+import { apiDeleteUser, apiGetUserById } from "@/app/Services/users.service";
+import { isRemoteImageSrc } from "@/app/utils/image";
 
 export default function MentorProfilePage() {
   const router = useRouter();
@@ -15,7 +18,10 @@ export default function MentorProfilePage() {
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    variant: "success" | "error";
+  } | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Profile state populated from API
@@ -106,12 +112,27 @@ export default function MentorProfilePage() {
     { id: 3, name: "Michael Brown", church: "Hope Church", progress: 45 },
   ];
 
-  const handleDeleteProfile = () => {
-    setToast("Mentor Profile Deleted Successfully");
-    setTimeout(() => {
-      setToast(null);
-      // Redirect to mentors list
-    }, 2000);
+  const handleDeleteProfile = async () => {
+    if (!id) {
+      setToast({
+        message: "Missing mentor id. Refresh the page and try again.",
+        variant: "error",
+      });
+      throw new Error("Missing mentor id");
+    }
+    try {
+      await apiDeleteUser(id);
+      setToast({ message: "Mentor profile deleted successfully.", variant: "success" });
+      router.replace("/director/mentors");
+    } catch (err) {
+      let message = "Could not delete this mentor. Try again.";
+      if (isAxiosError(err)) {
+        const data = err.response?.data as { message?: string } | undefined;
+        if (data?.message) message = data.message;
+      }
+      setToast({ message, variant: "error" });
+      throw err;
+    }
   };
 
   if (loading) {
@@ -120,7 +141,8 @@ export default function MentorProfilePage() {
         <AppHero title="Mentor Profile" backgroundImageUrl={MentorBg.src} />
         <div className="flex justify-center items-center py-32">
           <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-        </div>      </div>
+        </div>
+      </div>
     );
   }
 
@@ -151,6 +173,9 @@ export default function MentorProfilePage() {
                     alt={fullName}
                     width={140}
                     height={140}
+                    unoptimized={isRemoteImageSrc(
+                      mentorData.profilePicture || "",
+                    )}
                     className="w-full h-full object-cover"
                   />
                 </div>
@@ -312,10 +337,16 @@ export default function MentorProfilePage() {
       {/* Toast Notification */}
       {toast && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-fade-in">
-          <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3 border border-gray-100">
-            <i className="fa-solid fa-circle-check text-green-500 text-xl"></i>
+          <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3 border border-gray-100 max-w-[min(90vw,28rem)]">
+            <i
+              className={`fa-solid text-xl ${
+                toast.variant === "success"
+                  ? "fa-circle-check text-green-500"
+                  : "fa-circle-exclamation text-red-500"
+              }`}
+            ></i>
             <span className="text-[#2E3B8E] font-semibold text-[15px]">
-              {toast}
+              {toast.message}
             </span>
           </div>
         </div>
@@ -329,6 +360,7 @@ export default function MentorProfilePage() {
         title="Delete Mentor Profile"
         message="Are you sure you want to delete this mentor profile? This will unassign all mentees and cannot be undone."
         confirmText="Delete"
+        pendingConfirmText="Deleting…"
         cancelText="Cancel"
         confirmColor="bg-red-500 hover:bg-red-600"
         icon="fa-solid fa-trash-can"
@@ -361,6 +393,7 @@ export default function MentorProfilePage() {
           className="fixed inset-0 z-40"
           onClick={() => setShowOptionsMenu(false)}
         ></div>
-      )}    </div>
+      )}
+    </div>
   );
 }
