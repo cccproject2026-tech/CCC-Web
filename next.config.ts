@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
   /** App Router paths are case-sensitive in production; normalize legacy lowercase links from breadcrumbs/old bookmarks */
   async redirects() {
     return [
+      /** Do not add /pastor/assessments → /pastor/Assessments redirects here: on case-insensitive
+       *  hosts the matcher can match both casings and cause ERR_TOO_MANY_REDIRECTS. In-app links use `/pastor/Assessments/...`. */
       {
         source: "/mentor/revitalization-roadmap",
         destination: "/mentor/RevitalizationRoadmap",

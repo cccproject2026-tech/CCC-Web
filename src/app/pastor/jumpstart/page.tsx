@@ -528,7 +528,7 @@ function JumpStartContent() {
       return;
     }
     router.push(
-      `/pastor/assessments/guidelines?assessmentId=${encodeURIComponent(assessmentId)}`,
+      `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(assessmentId)}`,
     );
   };
 

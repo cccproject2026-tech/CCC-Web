@@ -95,7 +95,7 @@ function GuidelinesInner() {
   const hasPreSurvey = Array.isArray(preSurveyRaw) && preSurveyRaw.length > 0;
 
   const surveyUrl = `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(assessmentId)}`;
-  const preSurveyUrl = `/pastor/assessments/pre-survey?assessmentId=${encodeURIComponent(assessmentId)}`;
+  const preSurveyUrl = `/pastor/Assessments/pre-survey?assessmentId=${encodeURIComponent(assessmentId)}`;
 
   if (!assessmentId) {
     return (
@@ -172,7 +172,8 @@ function GuidelinesInner() {
               <button
                 type="button"
                 onClick={() =>
-                  router.push(`${surveyUrl}&viewOnly=1`)
+                  /* Do not use viewOnly=1 here — that mode is for mentors reviewing a pastor and requires userId. */
+                  router.push(`${surveyUrl}&readOnly=1`)
                 }
                 className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-[#0f4a76] hover:bg-[#e7f1fa]"
               >

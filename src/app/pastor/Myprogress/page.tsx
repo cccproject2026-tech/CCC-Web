@@ -280,7 +280,7 @@ export default function PastorMyProgressPage() {
                     onOpen={() => {
                       if (!a.assessmentId) return;
                       router.push(
-                        `/pastor/assessments/guidelines?assessmentId=${encodeURIComponent(a.assessmentId)}`,
+                        `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(a.assessmentId)}`,
                       );
                     }}
                   />

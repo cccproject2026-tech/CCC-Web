@@ -47,10 +47,17 @@ function PastorSurveyCMAContent() {
   const searchParams = useSearchParams();
   const assessmentId = searchParams.get("assessmentId");
   const reviewUserId = (searchParams.get("userId") || "").trim();
-  const viewOnly =
+  /** Mentor opened a review link: ?viewOnly=1&userId=<pastorId> */
+  const viewOnlyParam =
     searchParams.get("viewOnly") === "1" ||
     searchParams.get("viewOnly") === "true" ||
     searchParams.get("mode") === "review";
+  /** Pastor viewing their own submitted survey (guidelines "View response") — not mentor review */
+  const readOnlySelf =
+    searchParams.get("readOnly") === "1" || searchParams.get("readOnly") === "true";
+  const mentorReviewMode = viewOnlyParam && !!reviewUserId;
+  const selfReadOnlyMode = readOnlySelf && !mentorReviewMode;
+  const uiReadOnly = mentorReviewMode || selfReadOnlyMode;
   const [sections, setSections] = useState<any[]>([]);
   const [assessmentTitle, setAssessmentTitle] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -87,13 +94,14 @@ function PastorSurveyCMAContent() {
         setAssessmentTitle((detail?.name as string) || "");
 
         let answersUserId = "";
-        if (viewOnly) {
-          if (!reviewUserId) {
-            setSections([]);
-            setMentors([]);
-            setLoading(false);
-            return;
-          }
+        if (viewOnlyParam && !reviewUserId) {
+          /* Broken mentor review link (missing ?userId=) — not pastor readOnly=1 */
+          setSections([]);
+          setMentors([]);
+          setLoading(false);
+          return;
+        }
+        if (mentorReviewMode) {
           answersUserId = reviewUserId;
         } else {
           const userCookie = getCookie("user");
@@ -137,7 +145,7 @@ function PastorSurveyCMAContent() {
               console.error("Failed to fetch user answers", err);
             }
           }
-        } else if (!viewOnly) {
+        } else if (!mentorReviewMode) {
           setMentors([]);
         }
       } catch (err) {
@@ -151,7 +159,7 @@ function PastorSurveyCMAContent() {
     };
 
     fetchData();
-  }, [assessmentId, viewOnly, reviewUserId]);
+  }, [assessmentId, viewOnlyParam, reviewUserId]);
 
   useEffect(() => {
     if (selectedMentor) {
@@ -195,12 +203,12 @@ function PastorSurveyCMAContent() {
   }, [selectedDate, availability]);
 
   const handleCheck = (layerId: string, choiceId: string) => {
-    if (viewOnly) return;
+    if (uiReadOnly) return;
     setAnswers((prev) => ({ ...prev, [layerId]: choiceId }));
   };
 
   const isSectionComplete = (sectionIndex: number) => {
-    if (viewOnly) return true;
+    if (uiReadOnly) return true;
     const section = sections[sectionIndex];
     if (!section?.layers?.length) return true;
 
@@ -228,7 +236,7 @@ function PastorSurveyCMAContent() {
 
   // New Submit Flow
   const handleSubmitSurvey = async () => {
-    if (viewOnly) return;
+    if (uiReadOnly) return;
     const allComplete = sections.every((_, idx) => isSectionComplete(idx));
     if (!allComplete) {
       setToast("Please complete all questions in every section before submitting.");
@@ -260,7 +268,7 @@ function PastorSurveyCMAContent() {
   };
 
   const submitAllSectionAnswers = async () => {
-    if (viewOnly) return;
+    if (uiReadOnly) return;
     const userCookie = getCookie("user");
     if (!userCookie || !assessmentId) return;
 
@@ -659,9 +667,11 @@ function PastorSurveyCMAContent() {
             {assessmentTitle || "Church Assessment Evaluation (CMA)"}
           </h2>
           <p className="text-xs sm:text-sm mt-2 text-white/85 max-w-full sm:max-w-md">
-            {viewOnly
+            {mentorReviewMode
               ? "Read-only review of this pastor’s saved responses."
-              : "Complete each section using the options that best reflect your church."}
+              : selfReadOnlyMode
+                ? "Read-only view of your saved responses."
+                : "Complete each section using the options that best reflect your church."}
           </p>
         </div>
       </header>
@@ -674,7 +684,7 @@ function PastorSurveyCMAContent() {
           </div>
         ) : sections.length === 0 ? (
           <div className="flex justify-center items-center flex-1 text-white text-center px-4">
-            {viewOnly && !reviewUserId
+            {viewOnlyParam && !reviewUserId
               ? "This review link is missing a pastor user id."
               : "No sections available for this assessment."}
           </div>
@@ -683,7 +693,7 @@ function PastorSurveyCMAContent() {
             {/* LEFT PANEL */}
             <aside className="w-full sm:w-[300px] md:w-[340px] bg-white rounded-xl p-4 sm:p-6 shadow-lg h-auto sm:h-[500px] md:h-[550px]">
               <h2 className="text-[#0F1E44] text-base sm:text-lg font-semibold mb-4 sm:mb-6">
-                {viewOnly ? "Sections" : "My Responses"}
+                {mentorReviewMode ? "Sections" : "My Responses"}
               </h2>
               <div className="flex flex-col gap-3 sm:gap-4">
                 {sections.map((sec, i) => (
@@ -746,13 +756,13 @@ function PastorSurveyCMAContent() {
                         return (
                           <label
                             key={`${layerId}-${choiceKey}-${ci}`}
-                            className={`flex items-start gap-2 ${viewOnly ? "cursor-default" : "cursor-pointer"}`}
+                            className={`flex items-start gap-2 ${uiReadOnly ? "cursor-default" : "cursor-pointer"}`}
                           >
                             <input
                               type="radio"
                               name={layerId}
-                              readOnly={viewOnly}
-                              disabled={viewOnly}
+                              readOnly={uiReadOnly}
+                              disabled={uiReadOnly}
                               checked={isChecked}
                               onChange={() => handleCheck(layerId, choiceKey)}
                               className="accent-[#FFD84E] w-3 h-3 sm:w-4 sm:h-4 mt-[2px]"
@@ -782,7 +792,7 @@ function PastorSurveyCMAContent() {
                 </button>
 
                 {activeSection === sections.length - 1 ? (
-                  viewOnly ? (
+                  uiReadOnly ? (
                     <button
                       type="button"
                       onClick={() => router.back()}

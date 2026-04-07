@@ -260,7 +260,7 @@ export default function PastorAssessments() {
                         type="button"
                         onClick={() =>
                           router.push(
-                            `/pastor/assessments/guidelines?assessmentId=${encodeURIComponent(item.id)}`,
+                            `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(item.id)}`,
                           )
                         }
                         className="rounded-lg bg-white px-4 py-2 text-xs font-semibold text-[#0f4a76] hover:bg-[#e7f1fa] md:px-5 md:text-sm"
