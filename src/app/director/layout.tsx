@@ -1,3 +1,4 @@
+import DirectorAuthGate from "../Components/DirectorAuthGate";
 import DirectorLayoutShell from "./DirectorLayoutShell";
 
 export default function DirectorLayout({
@@ -5,5 +6,9 @@ export default function DirectorLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <DirectorLayoutShell>{children}</DirectorLayoutShell>;
+  return (
+    <DirectorAuthGate>
+      <DirectorLayoutShell>{children}</DirectorLayoutShell>
+    </DirectorAuthGate>
+  );
 }

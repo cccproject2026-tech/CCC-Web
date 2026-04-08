@@ -28,7 +28,9 @@ export const apiGetMentorList = (params?: GetMentorsParams) =>
 
 // GET /home/mentor/:email
 export const apiGetMentorByEmail = (email: string) =>
-  axiosInstance.get<{ success: boolean; data: MentorResponse }>(`/home/mentor/${email}`);
+  axiosInstance.get<{ success: boolean; data: MentorResponse }>(
+    `/home/mentor/${encodeURIComponent(email.trim())}`,
+  );
 
 // GET /home/mentees?page=&limit=&phase=&country=&search=
 export const apiGetMenteeList = (params?: GetMenteesParams) =>

@@ -30,6 +30,8 @@ interface AssignRoadmapModalProps {
   roadmapIds: string[];
   roadmapName: string;
   onSuccess?: () => void;
+  /** When set (e.g. deep link from mentees list), this user is pre-selected in the list. */
+  initialUserId?: string | null;
 }
 
 export default function AssignRoadmapModal({
@@ -38,6 +40,7 @@ export default function AssignRoadmapModal({
   roadmapIds,
   roadmapName,
   onSuccess,
+  initialUserId,
 }: AssignRoadmapModalProps) {
   const [query, setQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -49,12 +52,12 @@ export default function AssignRoadmapModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    setSelected([]);
+    setSelected(initialUserId ? [initialUserId] : []);
     setQuery("");
     setRoleFilter("all");
     fetchUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, initialUserId]);
 
   const fetchUsers = async () => {
     setLoading(true);

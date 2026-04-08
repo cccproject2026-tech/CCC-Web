@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { apiGetAssignedUsers, apiGetMentorByEmail, apiCreateAppointment } from "@/app/Services/api";
-import { getCookie } from "@/app/utils/cookies";
+import { useState, useEffect, useCallback } from "react";
+import {
+  apiGetAssignedUsers,
+  apiGetMentorByEmail,
+  apiGetUserById,
+  apiCreateAppointment,
+} from "@/app/Services/api";
+import { getPastorUserId } from "@/app/utils/pastor-auth";
 import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
 import MentorBg from "@/app/Assets/mentor-bg.png";
@@ -22,16 +27,81 @@ type Mentor = {
 
 const mentorImages = [Mentor1, Mentor2, Mentor3];
 
+/** Backend may return a raw array, { data: [] }, { data: { users } }, or rows with nested `mentor`. */
+function extractAssignedMentorsPayload(body: unknown): unknown[] {
+  if (Array.isArray(body)) return body;
+  if (!body || typeof body !== "object") return [];
+  const o = body as Record<string, unknown>;
+  if (Array.isArray(o.data)) return o.data;
+  if (o.data && typeof o.data === "object") {
+    const d = o.data as Record<string, unknown>;
+    if (Array.isArray(d.users)) return d.users;
+    if (Array.isArray(d.mentors)) return d.mentors;
+    if (Array.isArray(d.items)) return d.items;
+  }
+  if (Array.isArray(o.users)) return o.users;
+  if (Array.isArray(o.mentors)) return o.mentors;
+  return [];
+}
+
+function mapRowToMentor(row: unknown): Mentor | null {
+  if (!row || typeof row !== "object") return null;
+  const r = row as Record<string, unknown>;
+  const u =
+    r.mentor && typeof r.mentor === "object" && !Array.isArray(r.mentor)
+      ? (r.mentor as Record<string, unknown>)
+      : r;
+  const id = String(u._id ?? u.id ?? "").trim();
+  if (!id) return null;
+  const interest = u.interest as Record<string, unknown> | undefined;
+  const bio =
+    (typeof u.bio === "string" && u.bio) ||
+    (typeof u.profileInfo === "string" && u.profileInfo) ||
+    (interest && typeof interest.comments === "string" ? interest.comments : "") ||
+    "";
+  return {
+    _id: id,
+    firstName: String(u.firstName ?? ""),
+    lastName: String(u.lastName ?? ""),
+    role: String(u.role ?? "Mentor"),
+    email: String(u.email ?? "").trim(),
+    profileInfo: bio,
+  };
+}
+
+function normalizeMentorDetail(raw: Record<string, unknown>, fallback: Mentor): Mentor {
+  const id = String(raw._id ?? raw.id ?? fallback._id);
+  const interest = raw.interest as Record<string, unknown> | undefined;
+  const profileInfo =
+    (typeof raw.bio === "string" && raw.bio) ||
+    (typeof raw.profileInfo === "string" && raw.profileInfo) ||
+    (interest && typeof interest.comments === "string" ? interest.comments : "") ||
+    fallback.profileInfo ||
+    "";
+  return {
+    _id: id,
+    firstName: String(raw.firstName ?? fallback.firstName),
+    lastName: String(raw.lastName ?? fallback.lastName),
+    role: String(raw.role ?? fallback.role),
+    email: String(raw.email ?? fallback.email),
+    profileInfo,
+  };
+}
+
 /* ----------------------------------------------------
     SCHEDULER COMPONENT
 -----------------------------------------------------*/
-function Scheduler({ mentorId }: { mentorId: string }) {
+function Scheduler({
+  mentorId,
+  pastorUserId,
+}: {
+  mentorId: string;
+  pastorUserId: string;
+}) {
   const [selectedDay, setSelectedDay] = useState<number | null>(14);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [platform, setPlatform] = useState("zoom");
   const [notes, setNotes] = useState("");
-
-  const userId = "691da9a53a4a17f447471109";
 
   const timeSlots = [
     "09:00 am - 10:00 am",
@@ -65,7 +135,7 @@ function Scheduler({ mentorId }: { mentorId: string }) {
 
     try {
       const payload = {
-        userId,
+        userId: pastorUserId,
         mentorId,
         meetingDate,
         platform,
@@ -200,80 +270,112 @@ function Scheduler({ mentorId }: { mentorId: string }) {
 -----------------------------------------------------*/
 export default function Mymentors() {
   const [isListView, setIsListView] = useState(false);
-  const [selectedMentor, setSelectedMentor] = useState<any | null>(null);
+  const [selectedMentor, setSelectedMentor] = useState<Mentor | null>(null);
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [filteredMentors, setFilteredMentors] = useState<Mentor[]>([]);
   const [searchText, setSearchText] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [pastorUserId, setPastorUserId] = useState("");
 
   const showToast = (message: string) => {
     setToastMessage(message);
     setTimeout(() => setToastMessage(null), 1800);
   };
 
-  /* FETCH ASSIGNED MENTORS */
   useEffect(() => {
-    const fetchMentors = async () => {
-      try {
-        const user = JSON.parse(getCookie("user") || "{}");
-        const userId = user?.id || user?._id;
-        if (!userId) {
-          showToast("User session not found. Please log in again.");
-          return;
-        }
-
-        const response = await apiGetAssignedUsers(userId);
-        const assigned = (response.data?.data || []).map((mentor: any) => ({
-          _id: mentor._id || mentor.id || "",
-          firstName: mentor.firstName || "",
-          lastName: mentor.lastName || "",
-          role: mentor.role || "Mentor",
-          email: mentor.email || "",
-          profileInfo: mentor.profileInfo || "",
-        }));
-        setMentors(assigned);
-        setFilteredMentors(assigned);
-      } catch (err) {
-        console.error("Error fetching assigned mentors:", err);
-        setMentors([]);
-        setFilteredMentors([]);
-        showToast("Unable to fetch mentors from API.");
-      }
-    };
-
-    fetchMentors();
+    setPastorUserId(getPastorUserId() || "");
   }, []);
 
-  /* FETCH SINGLE MENTOR */
-  const fetchSingleMentor = async (email: string) => {
-    showToast("Opening mentor details...");
+  const loadAssignedMentors = useCallback(async () => {
     try {
-      const response = await apiGetMentorByEmail(email);
-      const json = response.data;
-
-      if (json.success) {
-        setSelectedMentor(json.data);
+      const uid = getPastorUserId();
+      if (!uid) {
+        showToast("User session not found. Please log in again.");
+        return;
       }
+
+      const response = await apiGetAssignedUsers(uid);
+      const list = extractAssignedMentorsPayload(response.data);
+      const assigned = list
+        .map((row) => mapRowToMentor(row))
+        .filter((m): m is Mentor => m != null);
+
+      setMentors(assigned);
+      setFilteredMentors(assigned);
     } catch (err) {
-      console.error("Error fetching mentor details:", err);
+      console.error("Error fetching assigned mentors:", err);
+      setMentors([]);
+      setFilteredMentors([]);
+      showToast("Unable to fetch mentors from API.");
     }
+  }, []);
+
+  /* FETCH ASSIGNED MENTORS */
+  useEffect(() => {
+    void loadAssignedMentors();
+  }, [loadAssignedMentors]);
+
+  /* Refetch when returning to this tab (e.g. after director assigns a mentor). */
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void loadAssignedMentors();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [loadAssignedMentors]);
+
+  /** Prefer GET /users/:id (works for newly assigned mentors); fall back to /home/mentor/:email; then list row. */
+  const fetchMentorDetail = async (m: Mentor) => {
+    try {
+      const res = await apiGetUserById(m._id);
+      const raw = res.data?.data as Record<string, unknown> | undefined;
+      if (raw && typeof raw === "object" && (raw._id || raw.id)) {
+        setSelectedMentor(normalizeMentorDetail(raw, m));
+        return;
+      }
+    } catch {
+      /* try email route */
+    }
+
+    if (m.email) {
+      try {
+        const response = await apiGetMentorByEmail(m.email);
+        const json = response.data;
+        if (json.success && json.data) {
+          const d = json.data as unknown as Record<string, unknown>;
+          setSelectedMentor(normalizeMentorDetail(d, m));
+          return;
+        }
+      } catch (err) {
+        console.error("Error fetching mentor by email:", err);
+      }
+    }
+
+    setSelectedMentor(m);
   };
 
-  /* SEARCH FILTER */
+  /* SEARCH FILTER — single source of truth: searchText */
   useEffect(() => {
-    if (!searchText) {
+    const q = searchText.trim().toLowerCase();
+    if (!q) {
       setFilteredMentors(mentors);
-    } else {
-      const lower = searchText.toLowerCase();
-      setFilteredMentors(
-        mentors.filter(
-          (m) =>
-            m.firstName.toLowerCase().includes(lower) ||
-            m.lastName.toLowerCase().includes(lower) ||
-            m.role.toLowerCase().includes(lower)
-        )
-      );
+      return;
     }
+    setFilteredMentors(
+      mentors.filter((m) => {
+        const first = (m.firstName || "").toLowerCase();
+        const last = (m.lastName || "").toLowerCase();
+        const role = (m.role || "").toLowerCase();
+        const email = (m.email || "").toLowerCase();
+        return (
+          first.includes(q) ||
+          last.includes(q) ||
+          `${first} ${last}`.trim().includes(q) ||
+          role.includes(q) ||
+          email.includes(q)
+        );
+      }),
+    );
   }, [searchText, mentors]);
 
   return (
@@ -307,22 +409,12 @@ export default function Mymentors() {
             <div className="flex items-center bg-white/10 border border-white/20 rounded-lg px-4 py-2 shadow w-full max-w-md">
               <i className="fa-solid fa-magnifying-glass text-[#cde2f2] mr-3"></i>
               <input
+                type="search"
                 value={searchText}
-                onChange={(e) =>
-                  setFilteredMentors(
-                    mentors.filter((x) =>
-                      (
-                        x.firstName +
-                        x.lastName +
-                        x.role
-                      )
-                        .toLowerCase()
-                        .includes(e.target.value.toLowerCase())
-                    )
-                  )
-                }
-                placeholder="Search"
+                onChange={(e) => setSearchText(e.target.value)}
+                placeholder="Search by name, role, or email…"
                 className="flex-1 text-sm outline-none bg-transparent text-white placeholder:text-[#cde2f2]"
+                autoComplete="off"
               />
             </div>
 
@@ -388,7 +480,7 @@ export default function Mymentors() {
                 ------------------------------------------- */
                 <div
                   key={mentor._id}
-                  onClick={() => fetchSingleMentor(mentor.email)}
+                  onClick={() => void fetchMentorDetail(mentor)}
                   className="cursor-pointer bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] border border-white/15 rounded-xl p-4 shadow flex items-center gap-4 hover:shadow-lg hover:border-[#8ec5eb66] transition"
                 >
                   <Image
@@ -424,7 +516,7 @@ export default function Mymentors() {
                 ------------------------------------------- */
                 <div
                   key={mentor._id}
-                  onClick={() => fetchSingleMentor(mentor.email)}
+                  onClick={() => void fetchMentorDetail(mentor)}
                   className="cursor-pointer bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] border border-white/15 rounded-xl shadow hover:shadow-lg hover:-translate-y-0.5 hover:border-[#8ec5eb66] transition-all duration-300 flex flex-col"
                 >
                   <div className="w-full h-[170px] overflow-hidden rounded-t-xl">
@@ -516,7 +608,10 @@ export default function Mymentors() {
             />
 
             {/* SCHEDULER */}
-            <Scheduler mentorId={selectedMentor._id} />
+            <Scheduler
+              mentorId={selectedMentor._id}
+              pastorUserId={pastorUserId}
+            />
           </div>
         </div>
       )}

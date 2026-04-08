@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import DirectorHero from "../DirectorHero";
 import { directorGlassCard, directorInputClass, directorPageRoot } from "../directorUi";
@@ -26,6 +26,9 @@ const mapUserToAssignUser = (user: any) => ({
 
 export default function AssessmentsPage() {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const assignUserFromQuery = searchParams.get("assignUser");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedAssessments, setSelectedAssessments] = useState<string[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -71,6 +74,18 @@ export default function AssessmentsPage() {
 
     fetchAssessments();
   }, [searchQuery]);
+
+  useEffect(() => {
+    if (!assignUserFromQuery) return;
+
+    setSelectedUsers([assignUserFromQuery]);
+    setIsSelectionMode(true);
+    setToast("Select assessments, then tap Assigned to.");
+    const t = setTimeout(() => setToast(null), 4500);
+    router.replace(pathname, { scroll: false });
+
+    return () => clearTimeout(t);
+  }, [assignUserFromQuery, pathname, router]);
 
   useEffect(() => {
     if (!showAssignModal) return;

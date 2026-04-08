@@ -35,7 +35,10 @@
 
 
 import axios, { AxiosHeaders } from "axios";
-import { getCookie } from "@/app/utils/cookies";
+import { getCookie, clearAllCookies } from "@/app/utils/cookies";
+import { isPastorPublicRoute } from "@/app/utils/pastor-auth";
+import { isMentorPublicRoute } from "@/app/utils/mentor-auth";
+import { isDirectorPublicRoute } from "@/app/utils/director-auth";
 
 const normalizeBaseUrl = (raw?: string | null): string | null => {
   if (!raw) return null;
@@ -102,8 +105,22 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
-    // optional log:
-    // console.error("API Error:", error.response?.data || error.message);
+    const status = error?.response?.status;
+    if (status === 401 && typeof window !== "undefined") {
+      const path = window.location.pathname;
+      const search = window.location.search || "";
+      const ret = `${path}${search}`;
+      if (path.startsWith("/pastor/") && !isPastorPublicRoute(path)) {
+        clearAllCookies();
+        window.location.assign(`/pastor/login?returnUrl=${encodeURIComponent(ret)}`);
+      } else if (path.startsWith("/mentor/") && !isMentorPublicRoute(path)) {
+        clearAllCookies();
+        window.location.assign(`/mentor/login?returnUrl=${encodeURIComponent(ret)}`);
+      } else if (path.startsWith("/director/") && !isDirectorPublicRoute(path)) {
+        clearAllCookies();
+        window.location.assign(`/director/login?returnUrl=${encodeURIComponent(ret)}`);
+      }
+    }
     return Promise.reject(error);
   }
 );

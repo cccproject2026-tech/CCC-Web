@@ -1,24 +1,42 @@
 "use client";
 import Image from "next/image";
 import { isAxiosError } from "axios";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiLogin } from "@/app/Services/api";
 import { setCookie } from "@/app/utils/cookies";
+import {
+  hasMentorSession,
+  normalizeUserCookieForClient,
+} from "@/app/utils/mentor-auth";
 
 import MentorHeader from "@/app/Components/MentorHeader";
 import AndrewsLogo from "../../Assets/andrews-logo.png";
 
 const ENABLE_TEMP_LOGIN_BYPASS = false;
 
-export default function LoginPage() {
+function isSafeMentorReturnUrl(url: string | null): url is string {
+  if (!url || !url.startsWith("/")) return false;
+  if (!url.startsWith("/mentor/")) return false;
+  if (url.startsWith("/mentor/login")) return false;
+  return true;
+}
+
+function LoginInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (hasMentorSession()) {
+      router.replace("/mentor/home");
+    }
+  }, [router]);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -40,8 +58,14 @@ export default function LoginPage() {
       setCookie("accessToken", "temp-access-token");
       setCookie("refreshToken", "temp-refresh-token");
       setCookie("mentor", JSON.stringify(mockMentorUser));
+      setCookie("userId", mockMentorUser.id);
       showToast("Login successful. Redirecting...");
-      setTimeout(() => router.push("/mentor/profile-incomplete"), 350);
+      const next = searchParams.get("returnUrl");
+      setTimeout(
+        () =>
+          router.push(isSafeMentorReturnUrl(next) ? next : "/mentor/profile-incomplete"),
+        350,
+      );
       return;
     }
 
@@ -63,19 +87,22 @@ export default function LoginPage() {
 
       const { accessToken, refreshToken, user } = json.data || {};
 
-      // save tokens / user – you can later move this to a context or Zustand store
       if (accessToken) setCookie("accessToken", accessToken);
       if (refreshToken) setCookie("refreshToken", refreshToken);
-      if (user) setCookie("mentor", JSON.stringify(user));
-      {
-        const u = user as { _id?: string; id?: string } | undefined;
-        const uid = u?._id ?? u?.id;
+      if (user) {
+        const normalized = normalizeUserCookieForClient(user as Record<string, unknown>);
+        setCookie("mentor", JSON.stringify(normalized));
+        const uid = (normalized.id ?? normalized._id) as string | undefined;
         if (uid) setCookie("userId", String(uid));
       }
 
-      // redirect – adjust based on role/status if needed
+      const next = searchParams.get("returnUrl");
+      const destination = isSafeMentorReturnUrl(next)
+        ? next
+        : "/mentor/profile-incomplete";
+
       showToast("Login successful. Redirecting...");
-      setTimeout(() => router.push("/mentor/profile-incomplete"), 350);
+      setTimeout(() => router.push(destination), 350);
     } catch (err) {
       if (isAxiosError(err)) {
         const status = err.response?.status;
@@ -104,7 +131,6 @@ export default function LoginPage() {
       <MentorHeader />
 
       <section className="relative z-10 flex flex-col md:flex-row min-h-[calc(100vh-64px)]">
-        {/* LEFT INFO SECTION */}
         <div className="w-full md:w-1/2 flex flex-col items-center justify-center p-6 sm:p-8">
           <div className="w-full max-w-[500px] rounded-3xl border border-white/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.12)_0%,rgba(255,255,255,0.05)_100%)] p-7 shadow-[0_24px_52px_rgba(3,24,43,0.35)] backdrop-blur">
             <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 text-[#8ec5eb]">
@@ -127,72 +153,71 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* RIGHT LOGIN SECTION */}
         <div className="w-full md:w-1/2 bg-[linear-gradient(180deg,rgba(10,53,88,0.8)_0%,rgba(8,43,71,0.85)_100%)] border-l border-white/10 flex flex-col items-center justify-center px-6 sm:px-8 py-10 md:py-12 relative min-h-[540px]">
-          {/* HEADER */}
           <div className="text-left w-full max-w-[420px] mb-4 sm:mb-6">
-            <h1 className="text-white text-2xl sm:text-3xl font-semibold tracking-tight">
-              Login
-            </h1>
+            <h1 className="text-white text-2xl sm:text-3xl font-semibold tracking-tight">Login</h1>
             <p className="mt-1 text-sm text-[#cde2f2]">Welcome back. Continue your journey.</p>
           </div>
 
-          {/* FORM */}
-          <div className="w-full max-w-[420px] rounded-2xl border border-white/20 bg-white/5 p-5 backdrop-blur">
-            <form className="flex flex-col gap-3 sm:gap-4" onSubmit={handleLogin}>
+          <div className="w-full max-w-[420px] rounded-2xl border border-white/20 bg-white/5 p-5 sm:p-6 backdrop-blur">
+            <form className="flex flex-col gap-4" onSubmit={handleLogin}>
               <input
                 type="email"
                 placeholder="Email"
-                className="w-full rounded-lg px-4 py-2.5 text-sm sm:text-base bg-white/10 border border-white/35 text-white placeholder:text-white/65 focus:outline-none focus:border-[#8ec5eb]"
+                autoComplete="email"
+                className="w-full rounded-lg px-4 py-3 text-sm sm:text-base bg-white/10 border border-white/35 text-white placeholder:text-white/65 focus:outline-none focus:border-[#8ec5eb] focus:ring-1 focus:ring-[#8ec5eb]/40"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
 
-              <input
-                type="password"
-                placeholder="Password"
-                className="w-full rounded-lg px-4 py-2.5 text-sm sm:text-base bg-white/10 border border-white/35 text-white placeholder:text-white/65 focus:outline-none focus:border-[#8ec5eb]"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div className="flex flex-col gap-2">
+                <input
+                  type="password"
+                  placeholder="Password"
+                  autoComplete="current-password"
+                  className="w-full rounded-lg px-4 py-3 text-sm sm:text-base bg-white/10 border border-white/35 text-white placeholder:text-white/65 focus:outline-none focus:border-[#8ec5eb] focus:ring-1 focus:ring-[#8ec5eb]/40"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <div className="flex justify-end">
+                  <a
+                    href="/pastor/resetpassword"
+                    className="text-xs sm:text-sm text-[#cde2f2] hover:text-white underline-offset-2 hover:underline"
+                  >
+                    Forgot password?
+                  </a>
+                </div>
+              </div>
 
               {errorMsg && (
-                <p className="text-red-200 text-xs sm:text-sm mt-1">
+                <p className="text-red-200 text-xs sm:text-sm" role="alert">
                   {errorMsg}
                 </p>
               )}
 
               <button
                 type="submit"
-                className="w-full mt-3 sm:mt-4 bg-white text-[#0f4a76] font-semibold py-2.5 rounded-lg text-sm sm:text-base hover:bg-[#e7f1fa] transition disabled:opacity-60"
+                className="w-full bg-white text-[#0f4a76] font-semibold py-3 rounded-lg text-sm sm:text-base hover:bg-[#e7f1fa] transition disabled:opacity-60"
                 disabled={isLoading}
               >
-                {isLoading ? "Logging in..." : "Login"}
+                {isLoading ? "Logging in…" : "Log in"}
               </button>
-            </form>
 
-            <div className="text-right mt-2">
-              <a
-                href="resetpassword"
-                className="text-[12px] sm:text-[13px] text-[#cde2f2] hover:text-white transition"
-              >
-                Forgot Password ?
-              </a>
-            </div>
+              <div className="relative flex items-center justify-center py-1">
+                <span className="absolute inset-x-0 top-1/2 h-px bg-white/15" aria-hidden />
+                <span className="relative bg-white/5 px-3 text-[11px] font-medium uppercase tracking-wide text-[#cde2f2]/90">
+                  or
+                </span>
+              </div>
 
-            {/* NEW USER BUTTON */}
-            <div className="flex mt-5 sm:mt-6">
               <button
-                className="w-full bg-[#0f4a76] text-white py-2 px-6 sm:px-12 rounded-lg text-xs sm:text-sm font-medium flex items-center justify-between hover:bg-[#0c3f66] transition cursor-pointer"
+                type="button"
+                className="w-full rounded-lg border border-white/25 bg-[#0f4a76] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#0c3f66] focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
                 onClick={() => router.push(`/pastor/InterestForm`)}
               >
-                <span className="flex items-center gap-1">
-                  New User <span>»</span>
-                </span>
-                <span className="hidden sm:flex">Submit Interest</span>
-                <span className="sm:hidden">Submit Interest</span>
+                Submit interest
               </button>
-            </div>
+            </form>
           </div>
 
           <div className="absolute bottom-4 md:bottom-6 inset-x-0 flex justify-center opacity-95">
@@ -211,5 +236,22 @@ export default function LoginPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="relative min-h-screen bg-transparent text-white font-[Albert_Sans]">
+          <MentorHeader />
+          <div className="flex min-h-[calc(100vh-64px)] items-center justify-center">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+          </div>
+        </div>
+      }
+    >
+      <LoginInner />
+    </Suspense>
   );
 }

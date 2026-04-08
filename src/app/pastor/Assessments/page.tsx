@@ -7,6 +7,7 @@ import HeroBg from "@/app/Assets/assignments-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import { getCookie } from "@/app/utils/cookies";
+import { resolveApiMediaUrl } from "@/app/utils/image";
 import {
   apiGetAssignedAssessments,
   parseAssignedAssessmentsListBody,
@@ -14,10 +15,6 @@ import {
 } from "@/app/Services/assessment.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
-
-function isHttpUrl(u?: string): boolean {
-  return !!u && (u.startsWith("http://") || u.startsWith("https://"));
-}
 
 type Row = {
   id: string;
@@ -80,8 +77,13 @@ export default function PastorAssessments() {
             )
               status = "Due";
 
-            const banner = assessment?.bannerImage as string | undefined;
-            const imgUrl = isHttpUrl(banner) ? banner! : null;
+            const a = assessment as Record<string, unknown>;
+            const rawBanner =
+              (typeof a.bannerImage === "string" && a.bannerImage) ||
+              (typeof a.imageUrl === "string" && a.imageUrl) ||
+              (typeof a.image === "string" && a.image) ||
+              undefined;
+            const imgUrl = resolveApiMediaUrl(rawBanner);
 
             return {
               id: aid,

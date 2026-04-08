@@ -311,13 +311,19 @@ export default function MenteesPage() {
       icon: "fa-solid fa-route",
       label: "Revitalization Roadmap",
       color: "text-[#8ec5eb]",
-      onClick: () => setToast("Opening Roadmap..."),
+      onClick: () =>
+        router.push(
+          `/director/pastor-assignments?assignUser=${encodeURIComponent(menteeId)}`
+        ),
     },
     {
       icon: "fa-solid fa-clipboard-check",
       label: "Assessments",
       color: "text-[#8ec5eb]",
-      onClick: () => setToast("Opening Assessments..."),
+      onClick: () =>
+        router.push(
+          `/director/assessments?assignUser=${encodeURIComponent(menteeId)}`
+        ),
     },
     {
       icon: "fa-regular fa-note-sticky",

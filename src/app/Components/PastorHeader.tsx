@@ -2,6 +2,7 @@
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import { getCookie, clearAllCookies } from "@/app/utils/cookies";
+import { getPastorUserId } from "@/app/utils/pastor-auth";
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -30,7 +31,12 @@ import {
   X,
 } from "lucide-react";
 import { getNotifications, getSingleUser } from "../Services/pastor.service";
-import { apiGetRoadmaps, apiGetAssessments, apiGetAllUsers } from "../Services/api";
+import {
+  apiGetRoadmaps,
+  apiGetAssessments,
+  apiGetAllUsers,
+  apiLogout,
+} from "../Services/api";
 import { parseAssessmentsListPayload } from "../Services/assessment.service";
 
 function PastorHeaderComponent({ showFullHeader = false }) {
@@ -58,11 +64,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
   }, []);
 
   useEffect(() => {
-    // Read user info from localStorage
-    const storedUser = JSON.parse(getCookie("user") || "{}");
-
-    const userId = storedUser?.id;
-
+    const userId = getPastorUserId();
     if (!userId) return;
 
     async function fetchProfile() {
@@ -146,9 +148,7 @@ function PastorHeaderComponent({ showFullHeader = false }) {
   ];
 
   useEffect(() => {
-    const storedUser = JSON.parse(getCookie("user") || "{}");
-
-    const userId = storedUser?.id;
+    const userId = getPastorUserId();
     if (!userId) return;
 
     async function fetchNotifications() {
@@ -455,8 +455,9 @@ function PastorHeaderComponent({ showFullHeader = false }) {
                         <button
                           onClick={() => {
                             if (item.label === "Log out") {
+                              void apiLogout().catch(() => {});
                               clearAllCookies();
-                              router.push("/");
+                              router.push("/pastor/login");
                               return;
                             }
                             if (item.path) {

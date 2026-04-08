@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { clearAllCookies } from "@/app/utils/cookies";
+import { apiLogout } from "@/app/Services/api";
 
 interface ProfileDropdownProps {
   isOpen: boolean;
@@ -46,8 +47,9 @@ export default function ProfileDropdown({
   };
 
   const handleLogout = () => {
+    void apiLogout().catch(() => {});
     clearAllCookies();
-    router.push("/");
+    router.push("/director/login");
     onClose();
   };
 

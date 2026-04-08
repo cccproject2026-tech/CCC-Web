@@ -2,29 +2,42 @@
 import Image from "next/image";
 import Link from "next/link";
 import { isAxiosError } from "axios";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiLogin } from "@/app/Services/api";
 import { setCookie } from "@/app/utils/cookies";
+import {
+  hasDirectorSession,
+  normalizeUserCookieForClient,
+} from "@/app/utils/director-auth";
 
 import Framelogo1 from "@/app/Assets/Frame-logo-1.png";
 import AndrewsLogo from "../../Assets/andrews-logo.png";
 
 const ENABLE_TEMP_LOGIN_BYPASS = false;
 
-function userIdFromLoginUser(user: Record<string, unknown>): string | null {
-  const id = user._id ?? user.id;
-  return typeof id === "string" ? id : null;
+function isSafeDirectorReturnUrl(url: string | null): url is string {
+  if (!url || !url.startsWith("/")) return false;
+  if (!url.startsWith("/director/")) return false;
+  if (url.startsWith("/director/login")) return false;
+  return true;
 }
 
-export default function DirectorLoginPage() {
+function DirectorLoginInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (hasDirectorSession()) {
+      router.replace("/director/home");
+    }
+  }, [router]);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -38,6 +51,7 @@ export default function DirectorLoginPage() {
     if (ENABLE_TEMP_LOGIN_BYPASS) {
       const mockDirectorUser = {
         _id: "temp-director-user",
+        id: "temp-director-user",
         firstName: "Director",
         lastName: "Demo",
         email: email || "director.demo@ccc.local",
@@ -48,7 +62,11 @@ export default function DirectorLoginPage() {
       setCookie("user", JSON.stringify(mockDirectorUser));
       setCookie("userId", mockDirectorUser._id);
       showToast("Login successful. Redirecting...");
-      setTimeout(() => router.push("/director/home"), 350);
+      const next = searchParams.get("returnUrl");
+      setTimeout(
+        () => router.push(isSafeDirectorReturnUrl(next) ? next : "/director/home"),
+        350,
+      );
       return;
     }
 
@@ -86,13 +104,17 @@ export default function DirectorLoginPage() {
       if (accessToken) setCookie("accessToken", accessToken);
       if (refreshToken) setCookie("refreshToken", refreshToken);
       if (user) {
-        setCookie("user", JSON.stringify(user));
-        const uid = userIdFromLoginUser(user as Record<string, unknown>);
-        if (uid) setCookie("userId", uid);
+        const normalized = normalizeUserCookieForClient(user as Record<string, unknown>);
+        setCookie("user", JSON.stringify(normalized));
+        const uid = (normalized.id ?? normalized._id) as string | undefined;
+        if (uid) setCookie("userId", String(uid));
       }
 
+      const next = searchParams.get("returnUrl");
+      const destination = isSafeDirectorReturnUrl(next) ? next : "/director/home";
+
       showToast("Login successful. Redirecting...");
-      setTimeout(() => router.push("/director/home"), 350);
+      setTimeout(() => router.push(destination), 350);
     } catch (err) {
       if (isAxiosError(err)) {
         const status = err.response?.status;
@@ -158,45 +180,50 @@ export default function DirectorLoginPage() {
             <p className="mt-1 text-sm text-[#cde2f2]">Use your director credentials to continue.</p>
           </div>
 
-          <div className="w-full max-w-[420px] rounded-2xl border border-white/20 bg-white/5 p-5 backdrop-blur">
-            <form className="flex flex-col gap-3 sm:gap-4" onSubmit={handleLogin}>
+          <div className="w-full max-w-[420px] rounded-2xl border border-white/20 bg-white/5 p-5 sm:p-6 backdrop-blur">
+            <form className="flex flex-col gap-4" onSubmit={handleLogin}>
               <input
                 type="email"
                 placeholder="Email"
-                className="w-full rounded-lg px-4 py-2.5 text-sm sm:text-base bg-white/10 border border-white/35 text-white placeholder:text-white/65 focus:outline-none focus:border-[#8ec5eb]"
+                autoComplete="email"
+                className="w-full rounded-lg px-4 py-3 text-sm sm:text-base bg-white/10 border border-white/35 text-white placeholder:text-white/65 focus:outline-none focus:border-[#8ec5eb] focus:ring-1 focus:ring-[#8ec5eb]/40"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
 
-              <input
-                type="password"
-                placeholder="Password"
-                className="w-full rounded-lg px-4 py-2.5 text-sm sm:text-base bg-white/10 border border-white/35 text-white placeholder:text-white/65 focus:outline-none focus:border-[#8ec5eb]"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <div className="flex flex-col gap-2">
+                <input
+                  type="password"
+                  placeholder="Password"
+                  autoComplete="current-password"
+                  className="w-full rounded-lg px-4 py-3 text-sm sm:text-base bg-white/10 border border-white/35 text-white placeholder:text-white/65 focus:outline-none focus:border-[#8ec5eb] focus:ring-1 focus:ring-[#8ec5eb]/40"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <div className="flex justify-end">
+                  <a
+                    href="/pastor/resetpassword"
+                    className="text-xs sm:text-sm text-[#cde2f2] hover:text-white underline-offset-2 hover:underline"
+                  >
+                    Forgot password?
+                  </a>
+                </div>
+              </div>
 
               {errorMsg && (
-                <p className="text-red-200 text-xs sm:text-sm mt-1">{errorMsg}</p>
+                <p className="text-red-200 text-xs sm:text-sm" role="alert">
+                  {errorMsg}
+                </p>
               )}
 
               <button
                 type="submit"
-                className="w-full mt-3 sm:mt-4 bg-white text-[#0f4a76] font-semibold py-2.5 rounded-lg text-sm sm:text-base hover:bg-[#e7f1fa] transition disabled:opacity-60"
+                className="w-full bg-white text-[#0f4a76] font-semibold py-3 rounded-lg text-sm sm:text-base hover:bg-[#e7f1fa] transition disabled:opacity-60"
                 disabled={isLoading}
               >
-                {isLoading ? "Logging in..." : "Login"}
+                {isLoading ? "Logging in…" : "Log in"}
               </button>
             </form>
-
-            <div className="text-right mt-2">
-              <a
-                href="/pastor/resetpassword"
-                className="text-[12px] sm:text-[13px] text-[#cde2f2] hover:text-white transition"
-              >
-                Forgot Password ?
-              </a>
-            </div>
           </div>
 
           <div className="absolute bottom-4 md:bottom-6 inset-x-0 flex justify-center opacity-95">
@@ -215,5 +242,19 @@ export default function DirectorLoginPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function DirectorLoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#062946] flex items-center justify-center text-white">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+        </div>
+      }
+    >
+      <DirectorLoginInner />
+    </Suspense>
   );
 }

@@ -2,6 +2,8 @@
 import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import { getCookie, setCookie, clearAllCookies } from "@/app/utils/cookies";
+import { getMentorUserId } from "@/app/utils/mentor-auth";
+import { apiLogout } from "../Services/api";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Framelogo1 from "../Assets/Frame-logo-1.png";
@@ -52,11 +54,8 @@ export default function MentorHeader({ showFullHeader = false }) {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const mentorData = getCookie("mentor");
-    if (!mentorData) return;
-
-    const mentor = JSON.parse(mentorData);
-    const mentorId = mentor.id;
+    const mentorId = getMentorUserId();
+    if (!mentorId) return;
 
     const fetchUser = async () => {
       try {
@@ -97,10 +96,7 @@ export default function MentorHeader({ showFullHeader = false }) {
   ];
 
   useEffect(() => {
-    const mentorData = getCookie("mentor");
-    if (!mentorData) return;
-    const mentor = JSON.parse(mentorData);
-    const mentorId = mentor?.id || mentor?._id;
+    const mentorId = getMentorUserId();
     if (!mentorId) return;
 
     const fetchNotifications = async () => {
@@ -393,8 +389,9 @@ export default function MentorHeader({ showFullHeader = false }) {
 
                             // 2️⃣ Handle logout action
                             if (item.action === "logout") {
+                              void apiLogout().catch(() => {});
                               clearAllCookies();
-                              router.push("/");
+                              router.push("/mentor/login");
                               return;
                             }
 

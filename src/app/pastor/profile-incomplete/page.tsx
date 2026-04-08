@@ -1,6 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { getCookie, setCookie } from "@/app/utils/cookies";
+import {
+  getPastorUserId,
+  normalizeUserCookieForClient,
+} from "@/app/utils/pastor-auth";
 import Image, { StaticImageData } from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
 import ProfileLogo from "../../Assets/profile.png";
@@ -9,7 +13,8 @@ import { useRouter } from "next/navigation";
 import { apiUploadProfilePicture, apiUploadDocument } from "@/app/Services/api";
 
 type User = {
-  id: string;
+  id?: string;
+  _id?: string;
   firstName?: string;
   lastName?: string;
   profilePicture?: string;
@@ -49,13 +54,14 @@ export default function ProfileIncomplete() {
       const stored = getCookie("user");
       if (stored) {
         try {
-          const parsed: User = JSON.parse(stored);
-          setUser(parsed);
-          if (parsed.profilePicture) {
-            setProfileImage(parsed.profilePicture);
+          const parsed = JSON.parse(stored) as Record<string, unknown>;
+          const normalized = normalizeUserCookieForClient(parsed) as User;
+          setUser(normalized);
+          if (normalized.profilePicture) {
+            setProfileImage(normalized.profilePicture);
           }
         } catch (e) {
-          console.error("Failed to parse user from localStorage", e);
+          console.error("Failed to parse user from cookie", e);
         }
       }
     }
@@ -70,7 +76,8 @@ export default function ProfileIncomplete() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!user?.id) {
+    const uid = getPastorUserId() || user?.id || user?._id;
+    if (!uid) {
       setProfileErrorMsg("Missing user id. Please login again.");
       return;
     }
@@ -82,7 +89,7 @@ export default function ProfileIncomplete() {
       setIsProfileUploading(true);
       setProfileErrorMsg(null);
 
-      const response = await apiUploadProfilePicture(user.id, formData);
+      const response = await apiUploadProfilePicture(String(uid), formData);
       const json = response.data;
 
       if (!json.success) {
@@ -97,10 +104,16 @@ export default function ProfileIncomplete() {
         setProfileImage(newUrl);
 
         // update local user + localStorage
-        const updatedUser: User = { ...user, profilePicture: newUrl };
-        setUser(updatedUser);
+        const updatedUser: User = {
+          ...user,
+          profilePicture: newUrl,
+        };
+        const merged = normalizeUserCookieForClient(
+          updatedUser as Record<string, unknown>,
+        ) as User;
+        setUser(merged);
         if (typeof window !== "undefined") {
-          setCookie("user", JSON.stringify(updatedUser));
+          setCookie("user", JSON.stringify(merged));
         }
       }
     } catch (err) {
@@ -124,7 +137,8 @@ export default function ProfileIncomplete() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!user?.id) {
+    const uid = getPastorUserId() || user?.id || user?._id;
+    if (!uid) {
       setDocErrorMsg("Missing user id. Please login again.");
       return;
     }
@@ -136,7 +150,7 @@ export default function ProfileIncomplete() {
       setIsDocUploading(true);
       setDocErrorMsg(null);
 
-      const response = await apiUploadDocument(user.id, formData);
+      const response = await apiUploadDocument(String(uid), formData);
       const json = response.data;
 
       if (!json.success) {

@@ -1,8 +1,12 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import AppHero from "@/app/Components/Hero/AppHero";
-import AppFooter from "@/app/Components/AppFooter";
+import { useRouter, useSearchParams } from "next/navigation";
+import DirectorHero from "../DirectorHero";
+import {
+  directorGlassCard,
+  directorInputClass,
+  directorPageRoot,
+} from "../directorUi";
 import AssignmentCard from "@/app/Components/AssignmentCard";
 import AssignRoadmapModal from "@/app/Components/AssignRoadmapModal";
 import ConfirmModal from "@/app/Components/ConfirmModal";
@@ -12,6 +16,8 @@ import { apiGetRoadmaps, apiDeleteRoadmap } from "@/app/Services/api";
 
 export default function PastorAssignmentsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const assignUserId = searchParams.get("assignUser");
   const [searchQuery, setSearchQuery] = useState("");
   const [roadmaps, setRoadmaps] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -114,50 +120,63 @@ export default function PastorAssignmentsPage() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      <AppHero title="Roadmap" backgroundImageUrl={MentorBg.src} />
+    <div className={directorPageRoot}>
+      <DirectorHero
+        title="Roadmap"
+        subtitle="Create, assign, and manage revitalization roadmaps for pastors."
+        image={MentorBg}
+        breadcrumbItems={[
+          { label: "Home", href: "/director/home" },
+          { label: "Roadmap" },
+        ]}
+      />
 
-      <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-6 md:py-8">
-        <div className="max-w-[1400px] mx-auto">
+      <section className="relative py-6 md:py-8">
+        <div className="mx-auto max-w-[1400px]">
           {/* Search Bar and Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-8">
-            <div className="w-full sm:max-w-[420px]">
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search"
-                  className="w-full px-4 py-3 pl-11 rounded-lg bg-white text-[#1A2E7A] placeholder-gray-400 outline-none shadow-md text-[15px]"
-                />
-                <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-              </div>
+          <div
+            className={`mb-8 flex flex-col items-stretch justify-between gap-4 p-5 sm:flex-row sm:items-center ${directorGlassCard}`}
+          >
+            <div className="relative w-full flex-1 sm:max-w-md">
+              <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-[#8ec5eb]/70" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search roadmaps…"
+                className={`${directorInputClass} pl-11 text-[15px]`}
+              />
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               {!isSelectionMode ? (
                 <>
                   <button
+                    type="button"
                     onClick={() => setIsSelectionMode(true)}
-                    className="px-6 py-3 bg-white text-[#2E3B8E] rounded-lg text-[15px] font-semibold shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+                    className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-6 py-3 text-[15px] font-semibold text-white shadow-md transition hover:bg-white/15"
                   >
-                    <i className="fa-regular fa-square-check"></i>
+                    <i className="fa-regular fa-square-check" />
                     <span>Select</span>
                   </button>
                   <button
-                    onClick={() => router.push("/director/pastor-assignments/create")}
-                    className="px-6 py-3 bg-[#2E3B8E] text-white rounded-lg text-[15px] font-semibold shadow-md hover:bg-[#1F2A6E] transition-all flex items-center gap-2"
+                    type="button"
+                    onClick={() =>
+                      router.push("/director/pastor-assignments/create")
+                    }
+                    className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-3 text-[15px] font-semibold text-white shadow-md transition hover:bg-[#8ec5eb]/25"
                   >
-                    <i className="fa-solid fa-plus"></i>
+                    <i className="fa-solid fa-plus" />
                     <span>Add</span>
                   </button>
                 </>
               ) : (
                 <button
+                  type="button"
                   onClick={exitSelection}
-                  className="px-6 py-3 bg-white text-gray-600 rounded-lg text-[15px] font-semibold shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+                  className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-6 py-3 text-[15px] font-semibold text-white/90 transition hover:bg-white/15"
                 >
-                  <i className="fa-solid fa-xmark"></i>
+                  <i className="fa-solid fa-xmark" />
                   <span>Cancel</span>
                 </button>
               )}
@@ -166,28 +185,33 @@ export default function PastorAssignmentsPage() {
 
           {/* Selection Mode Bar */}
           {isSelectionMode && selectedAssignments.length > 0 && (
-            <div className="bg-white rounded-xl shadow-md p-4 mb-6 flex items-center justify-between">
-              <span className="text-[15px] font-semibold text-gray-700">
-                {selectedAssignments.length} Selected Items
+            <div
+              className={`mb-6 flex flex-wrap items-center justify-between gap-4 p-5 ${directorGlassCard}`}
+            >
+              <span className="text-[15px] font-semibold text-white">
+                {selectedAssignments.length} selected
               </span>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <button
+                  type="button"
                   onClick={selectAll}
-                  className="px-4 py-2 text-[#2E3B8E] rounded-lg text-[14px] font-semibold hover:bg-gray-50 transition-all"
+                  className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-[14px] font-semibold text-[#8ec5eb] transition hover:bg-white/15"
                 >
                   Select All
                 </button>
                 <button
+                  type="button"
                   onClick={handleAssignedToClick}
-                  className="px-5 py-2 bg-[#2E3B8E] text-white rounded-lg text-[14px] font-semibold hover:bg-[#1F2A6E] transition-all"
+                  className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-5 py-2 text-[14px] font-semibold text-white transition hover:bg-[#8ec5eb]/25"
                 >
                   Assigned to
                 </button>
                 <button
+                  type="button"
                   onClick={handleDeleteClick}
-                  className="px-4 py-2 text-red-600 rounded-lg text-[14px] font-semibold hover:bg-red-50 transition-all"
+                  className="rounded-lg border border-red-400/40 bg-red-500/15 px-4 py-2 text-[14px] font-semibold text-red-200 transition hover:bg-red-500/25"
                 >
-                  <i className="fa-solid fa-trash"></i>
+                  <i className="fa-solid fa-trash" />
                 </button>
               </div>
             </div>
@@ -196,12 +220,12 @@ export default function PastorAssignmentsPage() {
           {/* Cards Grid */}
           {loading ? (
             <div className="flex justify-center py-16">
-              <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/20 border-t-[#8ec5eb]" />
             </div>
           ) : filtered.length === 0 ? (
-            <p className="text-white/70 text-center py-16">No roadmaps found.</p>
+            <p className="py-16 text-center text-white/70">No roadmaps found.</p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {filtered.map((roadmap) => (
                 <AssignmentCard
                   key={roadmap.id}
@@ -209,7 +233,12 @@ export default function PastorAssignmentsPage() {
                   title={roadmap.title}
                   description={roadmap.description}
                   image={roadmap.image}
-                  onView={() => router.push(`/director/pastor-assignments/roadmap/${roadmap.id}`)}
+                  variant="glass"
+                  onView={() =>
+                    router.push(
+                      `/director/pastor-assignments/roadmap/${roadmap.id}`
+                    )
+                  }
                   onOptionsClick={handleOptionsClick}
                   isSelected={selectedAssignments.includes(roadmap.id)}
                   onSelect={toggleSelection}
@@ -242,6 +271,7 @@ export default function PastorAssignmentsPage() {
             : roadmaps.find((r) => r.id === selectedAssignment)?.title || ""
         }
         onSuccess={handleAssignComplete}
+        initialUserId={assignUserId || undefined}
       />
 
       {/* Delete Confirmation Modal */}
@@ -257,8 +287,6 @@ export default function PastorAssignmentsPage() {
         icon="fa-solid fa-trash"
         iconColor="text-red-500 bg-red-100"
       />
-
-      <AppFooter />
     </div>
   );
 }
