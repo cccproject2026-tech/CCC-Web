@@ -71,3 +71,21 @@ export const getMentorFromCookie = () => {
         return null;
     }
 };
+
+export const filterSlotsAfter2Hours = (slots: string[], selectedDateISO: string) => {
+    const now = new Date();
+
+    return slots.filter((slot) => {
+        try {
+            const startTime = slot.split("–")[0].trim();
+
+            const slotDateTime = new Date(`${selectedDateISO} ${startTime}`);
+
+            const minAllowedTime = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+
+            return slotDateTime >= minAllowedTime;
+        } catch {
+            return false;
+        }
+    });
+};
