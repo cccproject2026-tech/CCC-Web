@@ -1,51 +1,53 @@
 "use client";
+
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import Image from "next/image";
 import AppFooter from "@/app/Components/AppFooter";
+import DirectorHero from "../../DirectorHero";
 import MentorBg from "../../../Assets/mentor-bg.png";
 import Mentor1 from "../../../Assets/mentor1.png";
-import Image from "next/image";
 import { apiGetInterestById, apiUpdateInterestStatus } from "@/app/Services/interests.service";
-import { Interest } from "@/app/Services/types";
+import type { ChurchDetails } from "@/app/Services/types/interests.types";
+import type { Interest } from "@/app/Services/types";
+import { directorGlassCard, directorPageRoot } from "../../directorUi";
+
+function formatChurchLocation(c: ChurchDetails | undefined): string {
+  if (!c) return "—";
+  const parts = [c.city, c.state, c.country].filter(Boolean);
+  return parts.length ? parts.join(", ") : "—";
+}
+
+function statusBadgeClass(status: Interest["status"]): string {
+  switch (status) {
+    case "new":
+      return "bg-emerald-500/20 text-emerald-100 ring-1 ring-emerald-400/35";
+    case "pending":
+      return "bg-amber-500/20 text-amber-100 ring-1 ring-amber-400/35";
+    case "accepted":
+      return "bg-sky-500/20 text-sky-100 ring-1 ring-sky-400/35";
+    case "rejected":
+      return "bg-red-500/20 text-red-100 ring-1 ring-red-400/35";
+    default:
+      return "bg-white/10 text-white/80 ring-1 ring-white/15";
+  }
+}
+
+const panelInner = "p-5 sm:p-6";
 
 export default function InterestDetailPage() {
   const router = useRouter();
   const params = useParams();
   const slug = params.slug;
 
-  const [activeTab, setActiveTab] = useState("details");
+  const [activeTab, setActiveTab] = useState<"details" | "interests" | "history">("details");
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
-  const [toast, setToast] = useState(null);
+  const [toast, setToast] = useState<string | null>(null);
 
   const [interestData, setInterestData] = useState<Interest | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Mock data for the specific interest/pastor
-  // const interestData = {
-  //   id: slug,
-  //   name: "Robert Fox",
-  //   role: "Pastor",
-  //   email: "robert.fox@email.com",
-  //   phone: "+1 (555) 123-4567",
-  //   church: "Grace Community Church",
-  //   location: "New York, NY",
-  //   status: "new",
-  //   timestamp: "09:43 AM",
-  //   date: "15 Nov 2024",
-  //   image: Mentor1,
-  //   bio: "Experienced pastor with over 15 years of ministry experience. Passionate about community outreach and church growth.",
-  //   interests: [
-  //     "Community Engagement",
-  //     "Church Growth",
-  //     "Leadership Development",
-  //     "Pastoral Care",
-  //   ],
-  //   experience: "15+ years",
-  //   education: "Master of Divinity, Seminary University",
-  //   languages: ["English", "Spanish"],
-  //   availability: "Monday - Friday, 9 AM - 5 PM EST",
-  // };
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -53,10 +55,19 @@ export default function InterestDetailPage() {
     const fetchInterest = async () => {
       try {
         setLoading(true);
+        setLoadError(null);
         const res = await apiGetInterestById(slug as string);
-        setInterestData(res.data.data);
+        const data = res.data?.data;
+        if (!data) {
+          setLoadError("Interest not found.");
+          setInterestData(null);
+          return;
+        }
+        setInterestData(data);
       } catch (err) {
         console.error("Failed to fetch interest", err);
+        setLoadError("Could not load this interest. Try again or return to the list.");
+        setInterestData(null);
       } finally {
         setLoading(false);
       }
@@ -72,22 +83,18 @@ export default function InterestDetailPage() {
   };
 
   const handleReject = async () => {
-    if (!interestData) return;
+    if (!interestData?.userId) {
+      setToast("Missing user id — cannot reject.");
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
 
     try {
-      await apiUpdateInterestStatus(interestData?.userId, "rejected");
-
-      setInterestData({
-        ...interestData,
-        status: "rejected",
-      });
-
+      await apiUpdateInterestStatus(interestData.userId, "rejected");
+      setInterestData({ ...interestData, status: "rejected" });
       setToast("Interest rejected successfully");
       setShowRejectModal(false);
-
-      setTimeout(() => {
-        router.back();
-      }, 1200);
+      setTimeout(() => router.back(), 1200);
     } catch (error) {
       console.error("Failed to reject interest", error);
       setToast("Failed to reject interest");
@@ -96,343 +103,337 @@ export default function InterestDetailPage() {
     }
   };
 
-
   const handleAccept = async () => {
-    if (!interestData) return;
+    if (!interestData?.userId) {
+      setToast("Missing user id — cannot accept.");
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
 
     try {
-      console.log(interestData)
-      await apiUpdateInterestStatus(interestData?.userId, "accepted");
-
-      setInterestData({
-        ...interestData,
-        status: "accepted",
-      });
-
+      await apiUpdateInterestStatus(interestData.userId, "accepted");
+      setInterestData({ ...interestData, status: "accepted" });
       setToast("Interest accepted successfully");
-
-      setTimeout(() => {
-        router.back();
-      }, 1200);
-
+      setTimeout(() => router.back(), 1200);
     } catch (error) {
       console.error("Failed to accept interest", error);
       setToast("Failed to accept interest");
-    } finally {
       setTimeout(() => setToast(null), 3000);
     }
   };
 
-  const church = interestData?.churchDetails?.[0];
-
-  if (loading || !interestData) {
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-white">
-        Loading interest details...
+      <div className={directorPageRoot}>
+        <DirectorHero title="Interest details" subtitle="Loading…" image={MentorBg} />
+        <section className="flex flex-1 items-center justify-center px-4 py-16">
+          <div className={`${directorGlassCard} w-full max-w-lg px-8 py-12 text-center`}>
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
+            <p className="text-sm text-[#cde2f2]">Loading interest details…</p>
+          </div>
+        </section>
+        <AppFooter />
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-400 p-12 text-center mb-8">
-        <h1 className="text-4xl font-bold text-white">Interest Details</h1>
-      </div>
-
-      {/* Main Content */}
-      <section className="relative px-4 sm:px-6 md:px-12 lg:px-20 py-8">
-        <div className="max-w-[1400px] mx-auto">
-          {/* Back Button */}
-          <div className="mb-6">
+  if (loadError || !interestData) {
+    return (
+      <div className={directorPageRoot}>
+        <DirectorHero title="Interest details" subtitle="Something went wrong" image={MentorBg} />
+        <section className="flex flex-1 flex-col items-center justify-center gap-4 px-4 py-16">
+          <div className={`${directorGlassCard} w-full max-w-lg px-8 py-8 text-center`}>
+            <p className="text-[#ffb2b2]">{loadError ?? "Not found."}</p>
             <button
-              onClick={() => router.back()}
-              className="flex items-center gap-2 px-4 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-50 transition-all"
+              type="button"
+              onClick={() => router.push("/director/interest-list")}
+              className="mt-6 rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
             >
-              <i className="fa-solid fa-arrow-left"></i>
-              Back to Interest List
+              Back to interest list
             </button>
           </div>
+        </section>
+        <AppFooter />
+      </div>
+    );
+  }
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column - Profile Card */}
+  const church = interestData.churchDetails?.[0];
+  const interestsList = interestData.interests ?? [];
+  const fullName = `${interestData.firstName} ${interestData.lastName}`.trim();
+
+  return (
+    <div className={directorPageRoot}>
+      <DirectorHero
+        title="Interest details"
+        subtitle={`${fullName} · ${interestData.title ?? "—"}`}
+        image={MentorBg}
+        breadcrumbItems={[
+          { label: "Home", href: "/director/home" },
+          { label: "New interests", href: "/director/interest-list" },
+          { label: fullName || "Detail" },
+        ]}
+      />
+
+      <section className="flex-1 pb-10">
+        <div className="mx-auto max-w-[1400px]">
+          <button
+            type="button"
+            onClick={() => router.push("/director/interest-list")}
+            className="mb-6 inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+          >
+            <i className="fa-solid fa-arrow-left text-xs" />
+            Back to list
+          </button>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-8">
+            {/* Profile column */}
             <div className="lg:col-span-1">
-              <div className="bg-white rounded-xl shadow-lg p-6 sticky top-6">
-                {/* Profile Image */}
-                <div className="flex justify-center mb-6">
-                  <div className="relative w-32 h-32 rounded-full overflow-hidden">
-                    <Image
-                      src={interestData.profilePicture || Mentor1}
-                      alt={`${interestData.firstName} ${interestData.lastName}`}
-                      className="w-full h-full object-cover"
-                    />
+              <div className={`${directorGlassCard} sticky top-4`}>
+                <div className={panelInner}>
+                  <div className="mx-auto mb-5 flex h-28 w-28 shrink-0 overflow-hidden rounded-full border border-white/20 bg-white/5 ring-2 ring-[#8ec5eb]/25">
+                    {interestData.profilePicture ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={interestData.profilePicture}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <Image
+                        src={Mentor1}
+                        alt=""
+                        width={112}
+                        height={112}
+                        className="h-full w-full object-cover"
+                      />
+                    )}
                   </div>
-                </div>
 
-                {/* Name and Role */}
-                <div className="text-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                    {interestData.firstName} {interestData.lastName}
-                  </h2>
-                  <p className="text-lg text-gray-600 mb-2">
-                    {interestData.title}
-                  </p>
-                  <span
-                    className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${interestData.status === "new"
-                      ? "bg-green-100 text-green-700"
-                      : interestData.status === "pending"
-                        ? "bg-yellow-100 text-yellow-700"
-                        : "bg-blue-100 text-blue-700"
-                      }`}
-                  >
-                    {interestData.status.charAt(0).toUpperCase() +
-                      interestData.status.slice(1)}
-                  </span>
-                </div>
-
-                {/* Contact Information */}
-                <div className="space-y-3 mb-6">
-                  <div className="flex items-center gap-3">
-                    <i className="fa-solid fa-envelope text-[#2E3B8E]"></i>
-                    <span className="text-gray-700">{interestData.email}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <i className="fa-solid fa-phone text-[#2E3B8E]"></i>
-                    <span className="text-gray-700">{interestData.phoneNumber}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <i className="fa-solid fa-church text-[#2E3B8E]"></i>
-                    <span className="text-gray-700">
-                      {church?.churchName ?? "—"}
-                    </span>
-                    <span className="text-gray-700">
-                      {church
-                        ? `${church.city ?? ""}${church.city && church.state ? ", " : ""}${church.state ?? ""}${church.country ? `, ${church.country}` : ""}`
-                        : "—"}
+                  <div className="mb-5 text-center">
+                    <h2 className="text-xl font-semibold text-white">{fullName}</h2>
+                    <p className="mt-1 text-sm text-[#cde2f2]">{interestData.title ?? "—"}</p>
+                    <span
+                      className={`mt-3 inline-block rounded-full px-3 py-1 text-xs font-semibold capitalize ${statusBadgeClass(interestData.status)}`}
+                    >
+                      {interestData.status}
                     </span>
                   </div>
-                  {/* <div className="flex items-center gap-3">
-                    <i className="fa-solid fa-location-dot text-[#2E3B8E]"></i>
-                    <span className="text-gray-700">
-                      {interestData.location}
-                    </span>
-                  </div> */}
-                </div>
 
-                {/* Action Buttons */}
-                <div className="space-y-3">
-                  <button
-                    onClick={() => setShowAssignModal(true)}
-                    className="w-full px-4 py-3 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E] transition-all"
-                  >
-                    Assign to Mentor
-                  </button>
-                  <button
-                    onClick={handleAccept}
-                    className="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-all"
-                  >
-                    Accept Interest
-                  </button>
-                  <button
-                    onClick={() => setShowRejectModal(true)}
-                    className="w-full px-4 py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-all"
-                  >
-                    Reject Interest
-                  </button>
+                  <dl className="space-y-3 border-t border-white/10 pt-5 text-sm">
+                    <div className="flex gap-3">
+                      <i className="fa-solid fa-envelope mt-0.5 w-5 text-center text-[#8ec5eb]" />
+                      <div>
+                        <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#8ec5eb]/80">
+                          Email
+                        </dt>
+                        <dd className="break-all text-[#d9ebf8]">{interestData.email}</dd>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <i className="fa-solid fa-phone mt-0.5 w-5 text-center text-[#8ec5eb]" />
+                      <div>
+                        <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#8ec5eb]/80">
+                          Phone
+                        </dt>
+                        <dd className="text-[#d9ebf8]">{interestData.phoneNumber ?? "—"}</dd>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <i className="fa-solid fa-church mt-0.5 w-5 text-center text-[#8ec5eb]" />
+                      <div>
+                        <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#8ec5eb]/80">
+                          Church
+                        </dt>
+                        <dd className="text-[#d9ebf8]">{church?.churchName ?? "—"}</dd>
+                        <dd className="mt-0.5 text-xs text-[#cde2f2]/90">
+                          {formatChurchLocation(church)}
+                        </dd>
+                        {church?.churchAddress ? (
+                          <dd className="mt-1 text-xs text-white/55">{church.churchAddress}</dd>
+                        ) : null}
+                      </div>
+                    </div>
+                  </dl>
+
+                  <div className="mt-6 space-y-2 border-t border-white/10 pt-6">
+                    <button
+                      type="button"
+                      onClick={() => setShowAssignModal(true)}
+                      className="w-full rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 py-3 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+                    >
+                      Assign to mentor
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAccept}
+                      disabled={interestData.status === "accepted"}
+                      className="w-full rounded-xl border border-emerald-400/40 bg-emerald-500/20 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Accept interest
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowRejectModal(true)}
+                      disabled={interestData.status === "rejected"}
+                      className="w-full rounded-xl border border-red-400/40 bg-red-500/15 py-3 text-sm font-semibold text-red-100 transition hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Reject interest
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Right Column - Details */}
+            {/* Tabs */}
             <div className="lg:col-span-2">
-              {/* Tabs */}
-              <div className="bg-white rounded-xl shadow-lg mb-6">
-                <div className="flex border-b">
-                  <button
-                    onClick={() => setActiveTab("details")}
-                    className={`px-6 py-4 font-semibold text-sm transition-all ${activeTab === "details"
-                      ? "text-[#2E3B8E] border-b-2 border-[#2E3B8E]"
-                      : "text-gray-600 hover:text-gray-800"
+              <div className={`${directorGlassCard} overflow-hidden`}>
+                <div className="flex flex-wrap gap-0 border-b border-white/10">
+                  {(
+                    [
+                      ["details", "Details"],
+                      ["interests", "Interests & goals"],
+                      ["history", "History"],
+                    ] as const
+                  ).map(([id, label]) => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setActiveTab(id)}
+                      className={`min-w-[120px] flex-1 px-4 py-3.5 text-sm font-semibold transition sm:px-6 ${
+                        activeTab === id
+                          ? "border-b-2 border-[#8ec5eb] bg-white/5 text-white"
+                          : "text-[#cde2f2]/80 hover:bg-white/5 hover:text-white"
                       }`}
-                  >
-                    Details
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("interests")}
-                    className={`px-6 py-4 font-semibold text-sm transition-all ${activeTab === "interests"
-                      ? "text-[#2E3B8E] border-b-2 border-[#2E3B8E]"
-                      : "text-gray-600 hover:text-gray-800"
-                      }`}
-                  >
-                    Interests & Goals
-                  </button>
-                  <button
-                    onClick={() => setActiveTab("history")}
-                    className={`px-6 py-4 font-semibold text-sm transition-all ${activeTab === "history"
-                      ? "text-[#2E3B8E] border-b-2 border-[#2E3B8E]"
-                      : "text-gray-600 hover:text-gray-800"
-                      }`}
-                  >
-                    History
-                  </button>
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
 
-                {/* Tab Content */}
-                <div className="p-6">
+                <div className={panelInner}>
                   {activeTab === "details" && (
-                    <div className="space-y-6">
+                    <div className="space-y-8">
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                          Personal Information
+                        <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-[#8ec5eb]">
+                          Ministry information
                         </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">
-                              Experience
-                            </label>
-                            <p className="text-gray-800">
-                              {interestData.experience}
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                          <div className="rounded-xl border border-white/10 bg-[#041f35]/40 px-4 py-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8ec5eb]/80">
+                              Years in ministry
+                            </p>
+                            <p className="mt-1 text-sm text-[#d9ebf8]">
+                              {interestData.yearsInMinistry ?? "—"}
                             </p>
                           </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">
-                              Education
-                            </label>
-                            <p className="text-gray-800">
-                              {interestData.education}
+                          <div className="rounded-xl border border-white/10 bg-[#041f35]/40 px-4 py-3">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8ec5eb]/80">
+                              Conference
                             </p>
-                          </div>
-                          {/* <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">
-                              Languages
-                            </label>
-                            <p className="text-gray-800">
-                              {interestData.languages.join(", ")}
-                            </p>
-                          </div> */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">
-                              Availability
-                            </label>
-                            <p className="text-gray-800">
-                              {interestData.availability}
-                            </p>
+                            <p className="mt-1 text-sm text-[#d9ebf8]">{interestData.conference ?? "—"}</p>
                           </div>
                         </div>
                       </div>
 
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                          Bio
+                        <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#8ec5eb]">
+                          Current community projects
                         </h3>
-                        <p className="text-gray-700 leading-relaxed">
-                          {interestData.bio}
+                        <p className="rounded-xl border border-white/10 bg-[#041f35]/35 px-4 py-3 text-sm leading-relaxed text-[#cde2f2]">
+                          {interestData.currentCommunityProjects?.trim() || "—"}
                         </p>
                       </div>
+
+                      <div>
+                        <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#8ec5eb]">
+                          Comments
+                        </h3>
+                        <p className="rounded-xl border border-white/10 bg-[#041f35]/35 px-4 py-3 text-sm leading-relaxed text-[#cde2f2]">
+                          {interestData.comments?.trim() || "—"}
+                        </p>
+                      </div>
+
+                      {interestData.profileInfo?.trim() ? (
+                        <div>
+                          <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#8ec5eb]">
+                            Profile notes
+                          </h3>
+                          <p className="rounded-xl border border-white/10 bg-[#041f35]/35 px-4 py-3 text-sm leading-relaxed text-[#cde2f2]">
+                            {interestData.profileInfo}
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
                   )}
 
                   {activeTab === "interests" && (
-                    <div className="space-y-6">
+                    <div className="space-y-8">
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                          Areas of Interest
+                        <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-[#8ec5eb]">
+                          Selected interests
                         </h3>
-                        <div className="flex flex-wrap gap-2">
-                          {interestData.interests.map((interest, index) => (
-                            <span
-                              key={index}
-                              className="px-3 py-1 bg-[#2E3B8E]/10 text-[#2E3B8E] rounded-full text-sm font-medium"
-                            >
-                              {interest}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                          Goals & Objectives
-                        </h3>
-                        <div className="space-y-3">
-                          <div className="flex items-start gap-3">
-                            <i className="fa-solid fa-check-circle text-green-500 mt-1"></i>
-                            <p className="text-gray-700">
-                              Develop stronger community engagement strategies
-                            </p>
+                        {interestsList.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {interestsList.map((item) => (
+                              <span
+                                key={item}
+                                className="rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1.5 text-sm font-medium text-[#d9ebf8]"
+                              >
+                                {item}
+                              </span>
+                            ))}
                           </div>
-                          <div className="flex items-start gap-3">
-                            <i className="fa-solid fa-check-circle text-green-500 mt-1"></i>
-                            <p className="text-gray-700">
-                              Improve church leadership and management skills
-                            </p>
-                          </div>
-                          <div className="flex items-start gap-3">
-                            <i className="fa-solid fa-check-circle text-green-500 mt-1"></i>
-                            <p className="text-gray-700">
-                              Learn effective pastoral care techniques
-                            </p>
-                          </div>
-                          <div className="flex items-start gap-3">
-                            <i className="fa-solid fa-check-circle text-green-500 mt-1"></i>
-                            <p className="text-gray-700">
-                              Build sustainable church growth programs
-                            </p>
-                          </div>
-                        </div>
+                        ) : (
+                          <p className="text-sm text-white/55">No interest tags submitted.</p>
+                        )}
                       </div>
                     </div>
                   )}
 
                   {activeTab === "history" && (
-                    <div className="space-y-6">
+                    <div className="space-y-8">
                       <div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                          Application Timeline
+                        <h3 className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-[#8ec5eb]">
+                          Timeline
                         </h3>
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-4">
-                            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                        <ul className="space-y-4">
+                          <li className="flex gap-4">
+                            <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(52,211,153,0.2)]" />
                             <div>
-                              <p className="font-medium text-gray-800">
-                                Interest Submitted
-                              </p>
-                              <p className="text-sm text-gray-600">
-                                {new Date(interestData.createdAt).toLocaleDateString()}
+                              <p className="font-medium text-white">Interest submitted</p>
+                              <p className="text-sm text-[#cde2f2]/80">
+                                {new Date(interestData.createdAt).toLocaleString(undefined, {
+                                  dateStyle: "medium",
+                                  timeStyle: "short",
+                                })}
                               </p>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
+                          </li>
+                          <li className="flex gap-4">
+                            <span
+                              className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
+                                interestData.status !== "new" ? "bg-[#8ec5eb]" : "bg-white/25"
+                              }`}
+                            />
                             <div>
-                              <p className="font-medium text-gray-800">
-                                Under Review
+                              <p className="font-medium text-white">Review</p>
+                              <p className="text-sm text-[#cde2f2]/80">
+                                {interestData.status === "new" ? "Awaiting review" : `Status: ${interestData.status}`}
                               </p>
-                              <p className="text-sm text-gray-600">Pending</p>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
-                            <div>
-                              <p className="font-medium text-gray-800">
-                                Mentor Assignment
-                              </p>
-                              <p className="text-sm text-gray-600">Pending</p>
-                            </div>
-                          </div>
-                        </div>
+                          </li>
+                        </ul>
                       </div>
-
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-800 mb-3">
-                          Previous Interactions
-                        </h3>
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <p className="text-gray-600 text-sm">
-                            No previous interactions recorded.
-                          </p>
-                        </div>
-                      </div>
+                      {interestData.updatedAt ? (
+                        <p className="text-xs text-white/45">
+                          Last updated{" "}
+                          {new Date(interestData.updatedAt).toLocaleString(undefined, {
+                            dateStyle: "medium",
+                            timeStyle: "short",
+                          })}
+                        </p>
+                      ) : null}
                     </div>
                   )}
                 </div>
@@ -442,51 +443,60 @@ export default function InterestDetailPage() {
         </div>
       </section>
 
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed top-6 right-6 z-50 animate-fade-in">
-          <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3">
-            <i className="fa-solid fa-circle-check text-green-500 text-xl"></i>
-            <span className="text-gray-800 font-semibold">{toast}</span>
+      {toast ? (
+        <div className="fixed right-4 top-20 z-[60] max-w-sm sm:right-8">
+          <div
+            className={`${directorGlassCard} flex items-center gap-3 px-5 py-3 text-sm font-medium text-white shadow-2xl`}
+          >
+            <i className="fa-solid fa-circle-check text-emerald-300" />
+            {toast}
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Assign Mentor Modal */}
-      {showAssignModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full mx-4">
-            <div className="p-6">
-              <h3 className="text-xl font-bold mb-4">Assign to Mentor</h3>
-              <p className="text-gray-600 mb-6">
+      {showAssignModal ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="assign-title"
+        >
+          <div className={`${directorGlassCard} w-full max-w-md overflow-hidden`}>
+            <div className={panelInner}>
+              <h3 id="assign-title" className="text-lg font-semibold text-white">
+                Assign to mentor
+              </h3>
+              <p className="mt-2 text-sm text-[#cde2f2]/90">
                 Select a mentor to assign this interest to.
               </p>
-              <div className="space-y-3 mb-6">
-                <div className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                  <input type="radio" name="mentor" className="w-4 h-4" />
+              <div className="mt-5 space-y-2">
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-3 py-3 transition hover:bg-white/10">
+                  <input type="radio" name="mentor" className="accent-[#8ec5eb]" />
                   <div>
-                    <p className="font-medium">John Doe</p>
-                    <p className="text-sm text-gray-600">Mentor</p>
+                    <p className="font-medium text-white">John Doe</p>
+                    <p className="text-xs text-[#cde2f2]/70">Mentor</p>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
-                  <input type="radio" name="mentor" className="w-4 h-4" />
+                </label>
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-3 py-3 transition hover:bg-white/10">
+                  <input type="radio" name="mentor" className="accent-[#8ec5eb]" />
                   <div>
-                    <p className="font-medium">Jacob Jones</p>
-                    <p className="text-sm text-gray-600">Field Mentor</p>
+                    <p className="font-medium text-white">Jacob Jones</p>
+                    <p className="text-xs text-[#cde2f2]/70">Field mentor</p>
                   </div>
-                </div>
+                </label>
               </div>
-              <div className="flex gap-3">
+              <div className="mt-6 flex gap-3">
                 <button
+                  type="button"
                   onClick={() => setShowAssignModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
+                  className="flex-1 rounded-xl border border-white/20 py-2.5 text-sm font-semibold text-white/90 transition hover:bg-white/10"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleAssign}
-                  className="flex-1 px-4 py-2 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E]"
+                  className="flex-1 rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
                 >
                   Assign
                 </button>
@@ -494,28 +504,35 @@ export default function InterestDetailPage() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Reject Modal */}
-      {showRejectModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl max-w-md w-full mx-4">
-            <div className="p-6">
-              <h3 className="text-xl font-bold mb-4">Reject Interest</h3>
-              <p className="text-gray-600 mb-6">
-                Are you sure you want to reject this interest? This action
-                cannot be undone.
+      {showRejectModal ? (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reject-title"
+        >
+          <div className={`${directorGlassCard} w-full max-w-md overflow-hidden`}>
+            <div className={panelInner}>
+              <h3 id="reject-title" className="text-lg font-semibold text-white">
+                Reject interest
+              </h3>
+              <p className="mt-2 text-sm text-[#cde2f2]/90">
+                Are you sure you want to reject this interest? This action cannot be undone.
               </p>
-              <div className="flex gap-3">
+              <div className="mt-6 flex gap-3">
                 <button
+                  type="button"
                   onClick={() => setShowRejectModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
+                  className="flex-1 rounded-xl border border-white/20 py-2.5 text-sm font-semibold text-white/90 transition hover:bg-white/10"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleReject}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700"
+                  className="flex-1 rounded-xl border border-red-400/50 bg-red-500/20 py-2.5 text-sm font-semibold text-red-100 transition hover:bg-red-500/30"
                 >
                   Reject
                 </button>
@@ -523,7 +540,7 @@ export default function InterestDetailPage() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       <AppFooter />
     </div>

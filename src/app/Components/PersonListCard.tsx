@@ -2,6 +2,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { isRemoteImageSrc } from "@/app/utils/image";
 import {
   directorGlassCard,
   directorGlassCardHover,
@@ -84,7 +85,13 @@ export default function PersonListCard({
   return (
     <div className={shellClass}>
       <Link href={profileLink} className={imgWrapClass}>
-        <Image src={image} alt={name} fill className="object-cover" />
+        <Image
+          src={image}
+          alt={name}
+          fill
+          className="object-cover"
+          unoptimized={isRemoteImageSrc(image)}
+        />
         {isNew && (
           <span
             className={`absolute left-2 top-2 rounded-md px-2.5 py-1 text-[11px] font-bold shadow-sm ${

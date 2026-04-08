@@ -1,131 +1,335 @@
 "use client";
-import { useState, useEffect } from "react";
-import HeroSection from "../../Components/HeroSection";
-import WhatWeDoSection from "../../Components/WhatWeDoSection";
+
+import Link from "next/link";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import PastorHeader from "@/app/Components/PastorHeader";
+import HeroBg from "../../Assets/hero-bg.png";
 import { apiGetInterestByEmail } from "@/app/Services/interests.service";
 import { getCookie } from "@/app/utils/cookies";
 import { Interest } from "@/app/Services/types";
 
-export default function Processing() {
+function normStatus(s: string | undefined | null): string {
+  return String(s ?? "")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Interest approval tracking — same visual system as `/pastor/Thankyou` and `/pastor/home`.
+ * Copy aligns with CCC-Mobile pending panel; polling keeps status fresh after director action.
+ */
+export default function ProcessingPage() {
   const router = useRouter();
-  const [showPopup, setShowPopup] = useState(true);
   const [interest, setInterest] = useState<Interest | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const navigatedRef = useRef(false);
+
+  const fetchStatus = useCallback(async (): Promise<Interest | null> => {
+    const email = getCookie("interestEmail");
+    if (!email?.trim()) {
+      setStatusError("No saved email. Open the interest link from your confirmation email or resubmit the form.");
+      setInterest(null);
+      return null;
+    }
+
+    const res = await apiGetInterestByEmail(email);
+    const body = res.data;
+    if (body && body.success === false) {
+      throw new Error(body.message || "Unable to load status");
+    }
+    const data = body?.data ?? null;
+    setInterest(data);
+    setStatusError(null);
+    return data;
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setStatusLoading(true);
+        await fetchStatus();
+      } catch (err) {
+        console.error("Failed to fetch interest status:", err);
+        if (!cancelled) {
+          setStatusError("Unable to load your status. Please try again later.");
+        }
+      } finally {
+        if (!cancelled) setStatusLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchStatus]);
 
   useEffect(() => {
     const email = getCookie("interestEmail");
-    if (!email) {
-      setStatusLoading(false);
-      return;
-    }
-    apiGetInterestByEmail(email)
-      .then((res) => {
-        const data = res.data.data;
-        setInterest(data);
-        if (data?.status === "accepted") {
+    if (!email?.trim()) return;
+
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+
+    const tick = async () => {
+      try {
+        const data = await fetchStatus();
+        const next = normStatus(data?.status);
+        if (next === "accepted" && !navigatedRef.current) {
+          navigatedRef.current = true;
+          if (intervalId != null) window.clearInterval(intervalId);
           setTimeout(() => router.push("/pastor/setpassword"), 1500);
+          return;
         }
-      })
-      .catch((err) => {
-        console.error("Failed to fetch interest status:", err);
-        setStatusError("Unable to load your status. Please try again later.");
-      })
-      .finally(() => setStatusLoading(false));
-  }, []);
+        if (next === "rejected" && intervalId != null) {
+          window.clearInterval(intervalId);
+        }
+      } catch {
+        /* keep last good state */
+      }
+    };
+
+    intervalId = window.setInterval(tick, 20000);
+    return () => {
+      if (intervalId != null) window.clearInterval(intervalId);
+    };
+  }, [fetchStatus, router]);
+
+  const status = normStatus(interest?.status);
+  const isAccepted = status === "accepted";
+  const isRejected = status === "rejected";
+  const isPending = !isAccepted && !isRejected && !statusError;
+
+  const handleCheckStatus = async () => {
+    const email = getCookie("interestEmail");
+    if (!email) return;
+    setStatusLoading(true);
+    setStatusError(null);
+    try {
+      const data = await fetchStatus();
+      const st = normStatus(data?.status);
+      if (st === "accepted" && !navigatedRef.current) {
+        navigatedRef.current = true;
+        setTimeout(() => router.push("/pastor/setpassword"), 1500);
+      }
+    } catch (err) {
+      console.error("Failed to fetch interest status:", err);
+      setStatusError("Unable to load your status. Please try again later.");
+    } finally {
+      setStatusLoading(false);
+    }
+  };
 
   return (
-    <div className="relative">
-      {/* ✅ Hero Section */}
-      <HeroSection
-        title="Processing"
-        subtitle="Your form submitted successfully please wait for approval"
-        primaryBtn={{
-          label: statusLoading ? "Checking..." : "Check Status",
-          onClick: async () => {
-            const email = getCookie("interestEmail");
-            if (!email) return;
-            setStatusLoading(true);
-            setStatusError(null);
-            setShowPopup(true);
-            try {
-              const res = await apiGetInterestByEmail(email);
-              const data = res.data.data;
-              setInterest(data);
-              if (data?.status === "accepted") {
-                setTimeout(() => router.push("/pastor/setpassword"), 1500);
-              }
-            } catch (err) {
-              console.error("Failed to fetch interest status:", err);
-              setStatusError("Unable to load your status. Please try again later.");
-            } finally {
-              setStatusLoading(false);
-            }
-          },
-        }}
-        showContactBox={true}
-      />
+    <div className="flex min-h-screen flex-col bg-transparent text-white font-[Albert_Sans]">
+      <PastorHeader showFullHeader={true} />
 
-      {/* Status Banner */}
-      {showPopup && (
-        <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50">
-          <div className="flex items-center justify-between bg-[#1A2E7A] text-white px-6 py-3 rounded-lg shadow-lg min-w-[320px] gap-4">
-            <div className="flex items-center gap-3">
+      <section
+        className="relative flex-1 overflow-hidden bg-cover bg-top px-4 pb-16 pt-6 sm:px-8 lg:px-20"
+        style={{ backgroundImage: `url(${HeroBg.src})` }}
+      >
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.72)_0%,rgba(6,41,70,0.78)_45%,rgba(6,41,70,0.96)_100%)]" />
+
+        <div className="relative z-10 mx-auto w-full max-w-6xl">
+          <div className="mb-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-between sm:items-start">
+            {/* Live status pill — gradient when waiting; solid accents when terminal */}
+            <div
+              className={`inline-flex items-center gap-3 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-lg sm:order-2 ${
+                isAccepted
+                  ? "bg-emerald-600/90 shadow-emerald-900/30"
+                  : isRejected
+                    ? "bg-red-600/85 shadow-red-900/30"
+                    : statusError
+                      ? "bg-amber-600/85 shadow-amber-900/30"
+                      : ""
+              }`}
+              style={
+                isPending || statusLoading
+                  ? { background: "linear-gradient(90deg, #B83AF3 0%, #21B6E9 100%)" }
+                  : undefined
+              }
+            >
               {statusLoading ? (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="animate-spin h-5 w-5 text-white"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v2a6 6 0 00-6 6H4z" />
-                </svg>
+                <i className="fa-solid fa-circle-notch animate-spin text-white/90" aria-hidden />
               ) : (
                 <span
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    interest?.status === "accepted"
-                      ? "bg-green-400"
-                      : interest?.status === "rejected"
-                      ? "bg-red-400"
-                      : "bg-yellow-400"
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    isAccepted ? "bg-white" : isRejected ? "bg-white" : statusError ? "bg-white" : "bg-white"
                   }`}
+                  style={
+                    isPending && !statusLoading
+                      ? { boxShadow: "0 0 0 3px rgba(255,255,255,0.25)" }
+                      : undefined
+                  }
                 />
               )}
-              <span className="font-medium text-sm tracking-wide">
-                {statusLoading
-                  ? "Checking status..."
-                  : statusError
-                  ? statusError
-                  : interest?.status === "accepted"
-                  ? "Your application has been accepted!"
-                  : interest?.status === "rejected"
-                  ? "Your application was not approved."
-                  : "Waiting for Approval"}
-              </span>
+              {statusLoading
+                ? "Checking status..."
+                : statusError
+                  ? "Could not load status"
+                  : isAccepted
+                    ? "Application accepted"
+                    : isRejected
+                      ? "Application not approved"
+                      : "Waiting for Approval"}
+              {!statusLoading && !statusError && (isPending || isAccepted || isRejected) && (
+                <i className="fa-solid fa-chevron-right text-xs text-white/80" aria-hidden />
+              )}
             </div>
-            <button
-              onClick={() => setShowPopup(false)}
-              className="text-white hover:text-gray-300 transition"
-              aria-label="Close"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path
-                  fillRule="evenodd"
-                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
+            <p className="text-center text-xs uppercase tracking-[0.2em] text-white/75 sm:order-1 sm:text-left">
+              Live status · updates
+            </p>
+          </div>
+
+          <div className="grid gap-8 lg:grid-cols-12 lg:gap-10">
+            <div className="lg:col-span-7 xl:col-span-8">
+              <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.55)_0%,rgba(9,49,80,0.72)_100%)] p-8 shadow-[0_20px_50px_rgba(2,20,38,0.4)] backdrop-blur-md md:p-10 lg:p-12">
+                <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/15 bg-white/10 md:h-20 md:w-20">
+                  {statusLoading ? (
+                    <i className="fa-solid fa-spinner fa-spin text-3xl text-[#8ec5eb] md:text-4xl" aria-hidden />
+                  ) : isAccepted ? (
+                    <i className="fa-solid fa-circle-check text-3xl text-emerald-300 md:text-4xl" aria-hidden />
+                  ) : isRejected ? (
+                    <i className="fa-solid fa-circle-xmark text-3xl text-red-300 md:text-4xl" aria-hidden />
+                  ) : statusError ? (
+                    <i className="fa-solid fa-triangle-exclamation text-3xl text-amber-300 md:text-4xl" aria-hidden />
+                  ) : (
+                    <i className="fa-regular fa-clock text-3xl text-[#8ec5eb] md:text-4xl" aria-hidden />
+                  )}
+                </div>
+
+                <h1 className="text-3xl font-semibold leading-tight text-white md:text-4xl lg:text-[2.5rem] lg:leading-snug">
+                  {statusLoading
+                    ? "Checking your application…"
+                    : statusError
+                      ? "We couldn’t refresh your status"
+                      : isAccepted
+                        ? "Your application has been accepted!"
+                        : isRejected
+                          ? "Your application was not approved"
+                          : "Your Application Under Review"}
+                </h1>
+
+                <div className="mt-6 max-w-2xl space-y-4 text-base leading-relaxed text-[#cde2f2] md:text-lg">
+                  {statusError ? (
+                    <p>{statusError}</p>
+                  ) : isAccepted ? (
+                    <>
+                      <p>You’re approved to continue. You’ll be redirected to set your password shortly.</p>
+                      <p>If nothing happens, go to Set Password from your email or open the button below.</p>
+                    </>
+                  ) : isRejected ? (
+                    <p>
+                      If you have questions, please contact us using the information on this page. We’re grateful for
+                      your interest in Community Change.
+                    </p>
+                  ) : (
+                    <>
+                      <p>Thank you for your submission.</p>
+                      <p>Your application is under review.</p>
+                      <p>We will notify you soon. God bless you!</p>
+                    </>
+                  )}
+                </div>
+
+                {isPending && !statusLoading && (
+                  <p className="mt-6 flex flex-wrap items-center gap-2 text-sm text-[#8ec5eb]/95">
+                    <i className="fa-solid fa-rotate text-[#8ec5eb]" aria-hidden />
+                    This page rechecks your approval about every 20 seconds. Use{" "}
+                    <strong className="font-semibold text-white">Check Status</strong> for an immediate refresh.
+                  </p>
+                )}
+
+                <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                  <button
+                    type="button"
+                    disabled={statusLoading}
+                    onClick={handleCheckStatus}
+                    className="rounded-xl bg-white px-8 py-3 text-sm font-semibold text-[#0f4a76] shadow-[0_8px_24px_rgba(0,0,0,0.2)] transition hover:bg-[#e7f1fa] disabled:cursor-not-allowed disabled:opacity-70 md:px-10 md:text-base"
+                  >
+                    {statusLoading ? "Checking…" : "Check Status"}
+                  </button>
+                  {isAccepted && (
+                    <button
+                      type="button"
+                      onClick={() => router.push("/pastor/setpassword")}
+                      className="rounded-xl border border-white/30 bg-white/10 px-8 py-3 text-sm font-semibold text-white transition hover:bg-white/15 md:text-base"
+                    >
+                      Go to Set Password
+                    </button>
+                  )}
+                  <Link
+                    href="/"
+                    className="rounded-xl border border-white/30 bg-white/10 px-8 py-3 text-center text-sm font-semibold text-white transition hover:bg-white/15 md:text-base"
+                  >
+                    Back to home
+                  </Link>
+                  <Link
+                    href="/pastor/Thankyou"
+                    className="text-center text-sm font-medium text-[#8ec5eb] underline-offset-4 hover:underline sm:text-left"
+                  >
+                    Thank you page
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-6 lg:col-span-5 xl:col-span-4">
+              <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] p-6 backdrop-blur-md">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
+                    <i className="fa-solid fa-address-card text-[#8ec5eb]" aria-hidden />
+                  </div>
+                  <h2 className="text-xl font-semibold text-white">Contact Information</h2>
+                </div>
+                <ul className="space-y-3 text-sm text-[#cde2f2]">
+                  <li className="flex items-start gap-3">
+                    <i className="fa-solid fa-phone mt-0.5 text-[#8ec5eb]" aria-hidden />
+                    <span>269-471-6159</span>
+                  </li>
+                  <li className="flex items-start gap-3 break-all">
+                    <i className="fa-solid fa-envelope mt-0.5 text-[#8ec5eb]" aria-hidden />
+                    <span>communitychange@andrews.edu</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <i className="fa-solid fa-globe mt-0.5 text-[#8ec5eb]" aria-hidden />
+                    <span>communitychange.world</span>
+                  </li>
+                </ul>
+              </div>
+
+              <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] p-6 backdrop-blur-md">
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
+                    <i className="fa-solid fa-satellite-dish text-[#8ec5eb]" aria-hidden />
+                  </div>
+                  <h2 className="text-xl font-semibold text-white">How this page works</h2>
+                </div>
+                <ul className="space-y-3 text-sm leading-relaxed text-[#cde2f2]">
+                  <li className="flex gap-2">
+                    <span className="text-[#8ec5eb]">•</span>
+                    <span>Loads your real status from the server (same email you used on the form).</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-[#8ec5eb]">•</span>
+                    <span>Polls in the background so you see approval without refreshing manually.</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="text-[#8ec5eb]">•</span>
+                    <span>
+                      The{" "}
+                      <Link href="/pastor/Thankyou" className="font-semibold text-[#8ec5eb] underline-offset-2 hover:underline">
+                        confirmation screen
+                      </Link>{" "}
+                      only says we received your form — it does not check status.
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
-      )}
-
-      {/* ✅ Below Section */}
-      <WhatWeDoSection />
+      </section>
     </div>
   );
 }

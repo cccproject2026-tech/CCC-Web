@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import { isRemoteImageSrc } from "@/app/utils/image";
 
 export interface FeaturedAvatarItem {
   id: number | string;
@@ -46,8 +47,8 @@ export default function FeaturedAvatars({
                     src={item.img}
                     alt={item.name}
                     className="w-full h-full object-cover rounded-full"
-                    // style={{ objectFit: 'cover', borderRadius: '50%' }}
                     fill
+                    unoptimized={isRemoteImageSrc(item.img)}
                     sizes={`${sizePx}px`}
                   />
                 </button>

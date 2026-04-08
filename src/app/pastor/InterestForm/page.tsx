@@ -1,10 +1,69 @@
 "use client";
 
 import { useState } from "react";
+import { isAxiosError } from "axios";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { useRouter } from "next/navigation";
 import { apiCreateInterest } from "@/app/Services/api";
+import type {
+  ChurchDetails,
+  CreateInterestPayload,
+  InterestTitle,
+} from "@/app/Services/types/interests.types";
 import { setCookie } from "@/app/utils/cookies";
+
+/** Omit empty strings on nested church fields — backend may reject "" for enum/select fields. */
+function churchDetailsForApi(row: {
+  churchName: string;
+  churchPhone: string;
+  churchWebsite: string;
+  churchAddress: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  country: string;
+}): ChurchDetails[] {
+  const d: ChurchDetails = { churchName: row.churchName };
+  const opt: (keyof ChurchDetails)[] = [
+    "churchPhone",
+    "churchWebsite",
+    "churchAddress",
+    "city",
+    "state",
+    "zipCode",
+    "country",
+  ];
+  for (const k of opt) {
+    const v = row[k]?.trim();
+    if (v) d[k] = v;
+  }
+  return [d];
+}
+
+function axiosErrorMessage(err: unknown): string {
+  if (isAxiosError(err)) {
+    const d = err.response?.data;
+    if (d && typeof d === "object") {
+      const o = d as Record<string, unknown>;
+      const m = o.message;
+      if (typeof m === "string" && m.trim()) return m;
+      if (Array.isArray(m)) {
+        const parts = m.map((x) => (typeof x === "string" ? x : String(x)));
+        if (parts.length) return parts.join("; ");
+      }
+      if (m && typeof m === "object") {
+        const nested = Object.values(m as Record<string, unknown>).flatMap((v) =>
+          Array.isArray(v) ? v : [v],
+        );
+        const strs = nested.filter((x): x is string => typeof x === "string");
+        if (strs.length) return strs.join("; ");
+      }
+    }
+    return err.message || "Request failed.";
+  }
+  if (err instanceof Error) return err.message;
+  return "Something went wrong. Please try again.";
+}
 
 export default function InterestForm() {
   const router = useRouter();
@@ -36,46 +95,64 @@ export default function InterestForm() {
     const phoneNumber = (fd.get("phoneNumber") || "").toString().trim();
     const email = (fd.get("email") || "").toString().trim();
 
-    // basic validation – API requires these
+    const churchName = (fd.get("churchName") || "").toString().trim();
+
+    // basic validation — backend /interests/form-fields marks these as required
     if (!firstName || !lastName || !phoneNumber || !email) {
       setErrorMsg("Please fill First Name, Last Name, Phone Number and Email.");
       return;
     }
+    if (!churchName) {
+      setErrorMsg("Please enter Church Name (required).");
+      return;
+    }
 
-    const payload = {
-      // you can add profileInfo / profilePicture later if you add fields
+    const titleRaw = (fd.get("title") || "").toString().trim();
+    const interestSelect = (fd.get("interestSelect") || "").toString().trim();
+    const commentsRaw = (fd.get("comments") || "").toString().trim();
+    /** Backend rejects POST /interests without `title` (400 Bad Request). Default matches pastor flow. */
+    const titleForApi = (titleRaw || "Pastor") as InterestTitle;
+
+    const churchRow = {
+      churchName,
+      churchPhone: (fd.get("churchPhone") || "").toString().trim(),
+      churchWebsite: (fd.get("churchWebsite") || "").toString().trim(),
+      churchAddress: (fd.get("churchAddress") || "").toString().trim(),
+      city: (fd.get("city") || "").toString().trim(),
+      state: (fd.get("state") || "").toString().trim(),
+      zipCode: (fd.get("zipCode") || "").toString().trim(),
+      country: (fd.get("country") || "").toString().trim(),
+    };
+
+    const conference = (fd.get("conference") || "").toString().trim();
+    const yearsInMinistry = (fd.get("yearsInMinistry") || "").toString().trim();
+    const currentCommunityProjects = (fd.get("currentProjects") || "").toString().trim();
+
+    const createPayload: CreateInterestPayload = {
       firstName,
       lastName,
-      phoneNumber,
       email,
-      churchDetails: [
-        {
-          churchName: (fd.get("churchName") || "").toString().trim(),
-          churchPhone: (fd.get("churchPhone") || "").toString().trim(),
-          churchWebsite: (fd.get("churchWebsite") || "").toString().trim(),
-          churchAddress: (fd.get("churchAddress") || "").toString().trim(),
-          city: (fd.get("city") || "").toString().trim(),
-          state: (fd.get("state") || "").toString().trim(),
-          zipCode: (fd.get("zipCode") || "").toString().trim(),
-          country: (fd.get("country") || "").toString().trim(),
-        },
-      ],
-      title: (fd.get("title") || "").toString().trim(),
-      conference: (fd.get("conference") || "").toString().trim(),
-      yearsInMinistry: (fd.get("yearsInMinistry") || "").toString().trim(),
-      currentCommunityProjects: (
-        fd.get("currentProjects") || ""
-      ).toString().trim(),
-      // for now we’re not capturing the checkbox interests – you can wire them
-      // into state and send them here if backend needs them
-      interests: [] as string[],
-      comments: (fd.get("comments") || "").toString().trim(),
+      phoneNumber,
+      churchDetails: churchDetailsForApi(churchRow),
+      title: titleForApi,
     };
+    if (commentsRaw) {
+      createPayload.comments = commentsRaw;
+    }
+    // Values must match /interests/form-fields staticFields for `interests`
+    if (interestSelect) {
+      createPayload.interests = [interestSelect];
+    }
+    if (conference) createPayload.conference = conference;
+    if (yearsInMinistry) createPayload.yearsInMinistry = yearsInMinistry;
+    if (currentCommunityProjects) {
+      createPayload.currentCommunityProjects = currentCommunityProjects;
+    }
 
     try {
       setIsSubmitting(true);
 
-      const response = await apiCreateInterest(payload);
+      const response = await apiCreateInterest(createPayload);
       const json = response.data;
 
       if (!json.success) {
@@ -92,7 +169,7 @@ export default function InterestForm() {
       // form.reset();
     } catch (error) {
       console.error("Interest submit error:", error);
-      setErrorMsg("Something went wrong. Please try again.");
+      setErrorMsg(axiosErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -197,7 +274,7 @@ export default function InterestForm() {
                 <input
                   name="churchName"
                   type="text"
-                  placeholder="Church Name"
+                  placeholder="Church Name (required)"
                   className="form-input"
                 />
                 <input
@@ -224,12 +301,21 @@ export default function InterestForm() {
                   placeholder="City"
                   className="form-input"
                 />
-                <input
+                <select
                   name="state"
-                  type="text"
-                  placeholder="State"
-                  className="form-input"
-                />
+                  className="form-input text-gray-500"
+                  defaultValue=""
+                >
+                  <option value="" disabled>
+                    State
+                  </option>
+                  <option value="California">California</option>
+                  <option value="Texas">Texas</option>
+                  <option value="New York">New York</option>
+                  <option value="Ontario">Ontario</option>
+                  <option value="Quebec">Quebec</option>
+                  <option value="British Columbia">British Columbia</option>
+                </select>
                 <input
                   name="zipCode"
                   type="text"
@@ -244,8 +330,8 @@ export default function InterestForm() {
                   <option value="" disabled>
                     Country
                   </option>
-                  <option value="India">India</option>
-                  {/* add more countries if needed */}
+                  <option value="United States">United States</option>
+                  <option value="Canada">Canada</option>
                 </select>
               </div>
 
@@ -266,11 +352,10 @@ export default function InterestForm() {
                 <select
                   name="title"
                   className="form-input text-gray-500"
-                  defaultValue=""
+                  defaultValue="Pastor"
+                  required
+                  aria-label="Your role or title"
                 >
-                  <option value="" disabled>
-                    Title
-                  </option>
                   <option value="Pastor">Pastor</option>
                   <option value="Lay Leader">Lay Leader</option>
                   <option value="Seminarian">Seminarian</option>
@@ -304,9 +389,9 @@ export default function InterestForm() {
                   <option value="" disabled>
                     Interests
                   </option>
-                  <option value="Spiritual Growth">Spiritual Growth</option>
-                  <option value="Mentorship">Mentorship</option>
-                  <option value="Social Impact">Social Impact</option>
+                  <option value="Children/Youth Ministry">Children/Youth Ministry</option>
+                  <option value="Community Outreach">Community Outreach</option>
+                  <option value="Leadership Development">Leadership Development</option>
                 </select>
                 <textarea
                   name="comments"

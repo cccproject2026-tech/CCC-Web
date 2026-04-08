@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Image from "next/image";
+import { isRemoteImageSrc } from "@/app/utils/image";
 
 interface AssignmentCardProps {
   id: number | string;
@@ -64,7 +65,13 @@ export default function AssignmentCard({
 
       {/* Image */}
       <div className="h-40 relative overflow-hidden">
-        <Image src={image} alt={title} fill className="object-cover" />
+        <Image
+          src={image}
+          alt={title}
+          fill
+          className="object-cover"
+          unoptimized={isRemoteImageSrc(image)}
+        />
       </div>
 
       {/* Content */}

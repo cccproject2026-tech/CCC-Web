@@ -48,6 +48,7 @@ export interface InterestResponse {
   updatedAt?: string;
 }
 
+/** POST /interests — matches backend form-fields (see /interests/form-fields). */
 export interface CreateInterestPayload {
   firstName: string;
   lastName: string;
@@ -56,6 +57,10 @@ export interface CreateInterestPayload {
   title?: InterestTitle;
   comments?: string;
   interests?: string[];
+  churchDetails?: ChurchDetails[];
+  conference?: string;
+  yearsInMinistry?: string;
+  currentCommunityProjects?: string;
 }
 
 export interface UpdateInterestPayload {

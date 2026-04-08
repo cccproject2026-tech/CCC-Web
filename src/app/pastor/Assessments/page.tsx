@@ -259,7 +259,9 @@ export default function PastorAssessments() {
                       <button
                         type="button"
                         onClick={() =>
-                          router.push(`/pastor/PastorSurveyCMA?assessmentId=${item.id}`)
+                          router.push(
+                            `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(item.id)}`,
+                          )
                         }
                         className="rounded-lg bg-white px-4 py-2 text-xs font-semibold text-[#0f4a76] hover:bg-[#e7f1fa] md:px-5 md:text-sm"
                       >

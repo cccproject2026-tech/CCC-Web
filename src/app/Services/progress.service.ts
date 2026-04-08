@@ -30,11 +30,15 @@ export const apiGetOverallProgress = (roles?: string | string[]) => {
   );
 };
 
-// GET /progress/:userId
+// GET /progress/:userId — bust HTTP caches (304) so list/phase pages match latest PATCH.
 export const apiGetUserProgress = (userId: string) =>
-  axiosInstance.get<{ success: boolean; data: ProgressResponse | null }>(
-    `/progress/${userId}`,
-  );
+  axiosInstance.get<{ success: boolean; data: ProgressResponse | null }>(`/progress/${userId}`, {
+    params: { _cb: Date.now() },
+    headers: {
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+  });
 
 // POST /progress/assign-roadmap  body: { userIds, roadMapIds }
 export const apiAssignRoadmap = (payload: AssignRoadmapPayload) =>

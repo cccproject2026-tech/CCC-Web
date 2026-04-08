@@ -209,7 +209,7 @@ export default function CreateAndAssignPage() {
             {/* Footer buttons */}
             <div className="flex justify-center gap-4 pt-2">
               <a
-                href="/pastor/assessments"
+                href="/pastor/Assessments"
                 className="bg-white text-[#103C8C] px-6 py-2 rounded-md text-sm font-medium"
               >
                 Cancel

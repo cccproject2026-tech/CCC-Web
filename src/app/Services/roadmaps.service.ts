@@ -53,11 +53,17 @@ export const apiGetRoadmaps = (status = 'all', search = '') =>
 
 // GET /roadmaps/user/:userId
 export const apiGetRoadmapsByUser = (userId: string) =>
-  axiosInstance.get(`/roadmaps/user/${userId}`);
+  axiosInstance.get(`/roadmaps/user/${userId}`, {
+    params: { _cb: Date.now() },
+    headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+  });
 
 // GET /roadmaps/:id
 export const apiGetRoadmapById = (id: string) =>
-  axiosInstance.get(`/roadmaps/${id}`);
+  axiosInstance.get(`/roadmaps/${id}`, {
+    params: { _cb: Date.now() },
+    headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+  });
 
 // POST /roadmaps  (multipart/form-data when image provided)
 export const apiCreateRoadmap = (payload: CreateRoadMapPayload, image?: File) => {
@@ -171,10 +177,84 @@ export const apiReplyToQuery = (roadMapId: string, queryItemId: string, payload:
 // ─── Extras ──────────────────────────────────────────────────────────────────
 
 // GET /roadmaps/:roadMapId/extras?userId=&nestedRoadMapItemId=
+function isObjectId(v?: string): v is string {
+  return typeof v === "string" && /^[0-9a-fA-F]{24}$/.test(v.trim());
+}
+
+function cleanQueryIds(userId: string, nestedRoadMapItemId?: string): {
+  userId: string;
+  nestedRoadMapItemId?: string;
+} {
+  const out: { userId: string; nestedRoadMapItemId?: string } = { userId };
+  if (isObjectId(nestedRoadMapItemId)) out.nestedRoadMapItemId = nestedRoadMapItemId.trim();
+  return out;
+}
+
 export const apiGetExtras = (roadMapId: string, userId: string, nestedRoadMapItemId?: string) =>
   axiosInstance.get(`/roadmaps/${roadMapId}/extras`, {
-    params: { userId, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
+    params: cleanQueryIds(userId, nestedRoadMapItemId),
   });
+
+/**
+ * Mobile parity: POST minimal extras row so PATCH/GET target the same document as nested tasks.
+ * See CCC-Mobile `roadmapService.triggerJumpstartComplete`.
+ */
+export async function apiTriggerJumpstartComplete(
+  roadmapId: string,
+  userId: string,
+  nestedRoadMapItemId?: string,
+): Promise<{ success: boolean; message: string; alreadyExists?: boolean }> {
+  if (!roadmapId?.trim()) throw new Error("roadmapId is required to trigger jumpstart completion");
+  if (!userId?.trim()) throw new Error("userId is required to trigger jumpstart completion");
+
+  const validNestedId =
+    nestedRoadMapItemId &&
+    nestedRoadMapItemId.trim() !== "" &&
+    nestedRoadMapItemId.length === 24 &&
+    /^[0-9a-fA-F]{24}$/.test(nestedRoadMapItemId)
+      ? nestedRoadMapItemId
+      : undefined;
+
+  const body: {
+    userId: string;
+    extras: { type: string }[];
+    nestedRoadMapItemId?: string;
+  } = {
+    userId,
+    extras: [{ type: "JUMPSTART_COMPLETE" }],
+  };
+  if (validNestedId) body.nestedRoadMapItemId = validNestedId;
+
+  try {
+    const response = await axiosInstance.post<{ success: boolean; message?: string }>(
+      `/roadmaps/${roadmapId}/extras`,
+      body,
+    );
+    if (!response.data?.success) {
+      throw new Error(response.data?.message || "Failed to trigger jumpstart completion");
+    }
+    return { success: true, message: response.data.message || "Jumpstart completion triggered." };
+  } catch (error: unknown) {
+    const err = error as {
+      response?: { status?: number; data?: { message?: string } };
+      message?: string;
+    };
+    const status = err?.response?.status;
+    const message =
+      err?.response?.data?.message || err?.message || "Failed to trigger jumpstart completion";
+    if (
+      status === 409 ||
+      (status === 400 && /already exists|duplicate|already/i.test(String(message)))
+    ) {
+      return {
+        success: true,
+        message: "Jumpstart completion already recorded.",
+        alreadyExists: true,
+      };
+    }
+    throw error;
+  }
+}
 
 // POST /roadmaps/:roadMapId/extras  body: { userId, nestedRoadMapItemId?, extras? }
 export const apiSaveExtras = (roadMapId: string, payload: CreateExtrasPayload) =>
@@ -188,13 +268,13 @@ export const apiUpdateExtras = (
   nestedRoadMapItemId?: string,
 ) =>
   axiosInstance.patch(`/roadmaps/${roadMapId}/extras`, payload, {
-    params: { userId, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
+    params: cleanQueryIds(userId, nestedRoadMapItemId),
   });
 
 // DELETE /roadmaps/:roadMapId/extras?userId=&nestedRoadMapItemId=
 export const apiDeleteExtras = (roadMapId: string, userId: string, nestedRoadMapItemId?: string) =>
   axiosInstance.delete(`/roadmaps/${roadMapId}/extras`, {
-    params: { userId, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
+    params: cleanQueryIds(userId, nestedRoadMapItemId),
   });
 
 // ─── Extras Documents ────────────────────────────────────────────────────────

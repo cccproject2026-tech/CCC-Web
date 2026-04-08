@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { isAxiosError } from "axios";
 import MentorBg from "../../Assets/mentor-bg.png";
 import DirectorHero from "../DirectorHero";
 import {
@@ -11,6 +12,43 @@ import {
 } from "../directorUi";
 import { apiGetAllInterests } from "@/app/Services/interests.service";
 import { Interest, InterestStatus } from "@/app/Services/types";
+
+function normalizeInterestStatus(raw: unknown): InterestStatus {
+  const v = String(raw ?? "")
+    .toLowerCase()
+    .trim();
+  if (v === "new" || v === "pending" || v === "accepted" || v === "rejected") return v;
+  return "new";
+}
+
+function normalizeInterestRow(item: Interest): Interest {
+  const id =
+    item._id != null && String(item._id).length > 0
+      ? String(item._id)
+      : String((item as unknown as { id?: string }).id ?? "");
+  return {
+    ...item,
+    _id: id,
+    status: normalizeInterestStatus(item.status),
+  };
+}
+
+function loadInterestsErrorMessage(err: unknown): string {
+  if (!isAxiosError(err)) {
+    return "Could not load interests. Check your connection and try again.";
+  }
+  const status = err.response?.status;
+  if (status === 401 || status === 403) {
+    return "Session expired or not allowed. Sign in again as a director, then retry.";
+  }
+  const data = err.response?.data;
+  if (data && typeof data === "object" && "message" in data) {
+    const m = (data as { message?: string | string[] }).message;
+    if (Array.isArray(m) && m[0]) return String(m[0]);
+    if (typeof m === "string" && m.trim()) return m;
+  }
+  return "Could not load interests. Check your connection and try again.";
+}
 
 // export interface Interest {
 //   _id: string;
@@ -35,13 +73,61 @@ export default function InterestReceivedPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<InterestStatus>("new");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [selectedState, setSelectedState] = useState<string>("state");
+  const [selectedCountry, setSelectedCountry] = useState<string>("All");
   const [selectedPastors, setSelectedPastors] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [interests, setInterests] = useState<Interest[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [allInterests, setAllInterests] = useState<Interest[]>([]);
 
-  const newCount = interests.filter(i => i.status === "new").length;
-  const pendingCount = interests.filter(i => i.status === "pending").length;
+  /** Same approach as CCC-Director-Mobile: load full list once, then filter by tab/search/country client-side. */
+  const groupedInterests = useMemo(() => {
+    const list = allInterests;
+    return {
+      new: list.filter(i => i.status === "new"),
+      pending: list.filter(i => i.status === "pending"),
+      accepted: list.filter(i => i.status === "accepted"),
+      rejected: list.filter(i => i.status === "rejected"),
+    };
+  }, [allInterests]);
+
+  const countryOptions = useMemo(() => {
+    const countries = allInterests
+      .map(i => i.churchDetails?.[0]?.country)
+      .filter((c): c is string => typeof c === "string" && c.trim() !== "");
+    const unique = Array.from(new Set(countries));
+    return ["All", ...unique.sort((a, b) => a.localeCompare(b))];
+  }, [allInterests]);
+
+  const filteredInterests = useMemo(() => {
+    const key = activeTab as keyof typeof groupedInterests;
+    let list = groupedInterests[key] ?? [];
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(i => {
+        const fullName = `${i.firstName ?? ""} ${i.lastName ?? ""}`.toLowerCase();
+        const churchCountry = i.churchDetails?.[0]?.country?.toLowerCase() ?? "";
+        const title = (i.title ?? "").toLowerCase();
+        return (
+          fullName.includes(q) ||
+          title.includes(q) ||
+          churchCountry.includes(q) ||
+          (i.email ?? "").toLowerCase().includes(q)
+        );
+      });
+    }
+
+    if (selectedCountry !== "All") {
+      list = list.filter(i => i.churchDetails?.[0]?.country === selectedCountry);
+    }
+
+    return list;
+  }, [activeTab, searchQuery, selectedCountry, groupedInterests]);
+
+  const newCount = groupedInterests.new.length;
+  const pendingCount = groupedInterests.pending.length;
+  const acceptedCount = groupedInterests.accepted.length;
+  const rejectedCount = groupedInterests.rejected.length;
 
 
   // // Dummy data for interests
@@ -120,27 +206,34 @@ export default function InterestReceivedPage() {
     );
   };
 
-  useEffect(() => {
-    const fetchInterests = async () => {
-      try {
-        setLoading(true);
-
-        const res = await apiGetAllInterests({
-          search: searchQuery || undefined,
-          status: activeTab,
-        });
-
-        setInterests(res.data.data);
-      } catch (error) {
-        console.error("Failed to fetch interests", error);
-        setInterests([]);
-      } finally {
-        setLoading(false);
+  const loadInterests = useCallback(async () => {
+    setFetchError(null);
+    try {
+      setLoading(true);
+      const res = await apiGetAllInterests();
+      const body = res.data;
+      if (body && body.success === false) {
+        throw new Error(body.message || "Failed to load interests");
       }
-    };
+      const raw = body?.data;
+      const list = Array.isArray(raw) ? raw : [];
+      setAllInterests(
+        list
+          .map((row) => normalizeInterestRow(row as Interest))
+          .filter((row) => row._id.length > 0),
+      );
+    } catch (error) {
+      console.error("Failed to fetch interests", error);
+      setFetchError(loadInterestsErrorMessage(error));
+      setAllInterests([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    fetchInterests();
-  }, [searchQuery, activeTab]);
+  useEffect(() => {
+    void loadInterests();
+  }, [loadInterests]);
 
 
   return (
@@ -210,37 +303,57 @@ export default function InterestReceivedPage() {
                 <button
                   type="button"
                   onClick={() => setActiveTab("accepted")}
-                  className={`rounded-full px-5 py-2.5 text-sm font-semibold transition-all ${
+                  className={`relative rounded-full px-5 py-2.5 text-sm font-semibold transition-all ${
                     activeTab === "accepted"
                       ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/40"
                       : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
                   }`}
                 >
                   Accepted
+                  {acceptedCount > 0 && (
+                    <span
+                      className={`absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full text-[11px] font-bold ${
+                        activeTab === "accepted" ? "bg-[#FFD700] text-[#0f4a76]" : "bg-white/20 text-white"
+                      }`}
+                    >
+                      {acceptedCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("rejected")}
+                  className={`relative rounded-full px-5 py-2.5 text-sm font-semibold transition-all ${
+                    activeTab === "rejected"
+                      ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/40"
+                      : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
+                  }`}
+                >
+                  Rejected
+                  {rejectedCount > 0 && (
+                    <span
+                      className={`absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full text-[11px] font-bold ${
+                        activeTab === "rejected" ? "bg-[#FFD700] text-[#0f4a76]" : "bg-white/20 text-white"
+                      }`}
+                    >
+                      {rejectedCount}
+                    </span>
+                  )}
                 </button>
               </div>
 
               <div className="relative w-full md:w-auto">
                 <select
-                  value={selectedState}
-                  onChange={(e) => setSelectedState(e.target.value)}
+                  value={selectedCountry}
+                  onChange={(e) => setSelectedCountry(e.target.value)}
                   className={`${directorInputClass} appearance-none pr-10 font-semibold`}
+                  aria-label="Filter by country"
                 >
-                  <option value="state" className="text-black">
-                    State
-                  </option>
-                  <option value="usa" className="text-black">
-                    USA
-                  </option>
-                  <option value="canada" className="text-black">
-                    Canada
-                  </option>
-                  <option value="mexico" className="text-black">
-                    Mexico
-                  </option>
-                  <option value="brazil" className="text-black">
-                    Brazil
-                  </option>
+                  {countryOptions.map(c => (
+                    <option key={c} value={c} className="text-black">
+                      {c === "All" ? "All countries" : c}
+                    </option>
+                  ))}
                 </select>
                 <i className="fa-solid fa-chevron-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/50" />
               </div>
@@ -273,6 +386,22 @@ export default function InterestReceivedPage() {
             </div>
           )}
 
+          {fetchError && !loading && (
+            <div
+              className={`mb-6 flex flex-col gap-3 rounded-xl border border-amber-400/40 bg-amber-500/10 p-4 text-amber-50 sm:flex-row sm:items-center sm:justify-between ${directorGlassCard}`}
+              role="alert"
+            >
+              <p className="text-sm">{fetchError}</p>
+              <button
+                type="button"
+                onClick={() => void loadInterests()}
+                className="shrink-0 rounded-lg border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
           {loading ? (
             <div className="flex justify-center py-16">
               <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
@@ -280,16 +409,18 @@ export default function InterestReceivedPage() {
           ) : (
             <>
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {interests.map((interest) => (
+                {filteredInterests.map((interest) => {
+                  const rowId = interest._id;
+                  return (
                   <div
-                    key={interest._id}
+                    key={rowId}
                     className={`relative p-6 transition-all ${directorGlassCard} ${directorGlassCardHover}`}
                   >
                     <div className="absolute right-4 top-4">
                       <input
                         type="checkbox"
-                        checked={selectedPastors.includes(interest._id)}
-                        onChange={() => handleToggleSelect(interest._id)}
+                        checked={selectedPastors.includes(rowId)}
+                        onChange={() => handleToggleSelect(rowId)}
                         className="h-5 w-5 cursor-pointer accent-[#8ec5eb]"
                       />
                     </div>
@@ -329,20 +460,25 @@ export default function InterestReceivedPage() {
 
                       <button
                         type="button"
-                        onClick={() => router.push(`/director/interest-list/${interest._id}`)}
+                        onClick={() => router.push(`/director/interest-list/${rowId}`)}
                         className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#8ec5eb]/25"
                       >
                         View
                       </button>
                     </div>
                   </div>
-                ))}
+                );
+                })}
               </div>
 
-              {interests.length === 0 && (
+              {filteredInterests.length === 0 && !fetchError && (
                 <div className="py-12 text-center">
                   <i className="fa-solid fa-search mb-4 text-6xl text-white/20" />
-                  <p className="text-[16px] text-white/55">No interests found</p>
+                  <p className="text-[16px] text-white/55">
+                    {allInterests.length === 0
+                      ? "No interests yet, or adjust filters / search."
+                      : "No interests match the current tab, search, or country filter."}
+                  </p>
                 </div>
               )}
             </>

@@ -23,7 +23,7 @@ export default function PastorSettingsPage() {
     try {
       setError(null);
       setMessage(null);
-      await apiSendOtp({ email, purpose: "forgot-password" });
+      await apiSendOtp({ email, purpose: "password_reset" });
       setMessage("OTP sent to your registered email.");
     } catch (err) {
       console.error("Failed to send OTP:", err);
