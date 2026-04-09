@@ -9,6 +9,7 @@ import HeroBg from "@/app/Assets/roadmap-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { getCookie } from "@/app/utils/cookies";
 import {
+  collapseRoadmapAssignmentsToParents,
   fetchRoadmapAssignmentsForUser,
   type RoadmapAssignmentUi,
 } from "@/app/Services/roadmap-assignments";
@@ -27,6 +28,8 @@ interface PhaseCard {
   status: UiStatus;
   sessionDate?: string;
   imageUrl: string;
+  /** Parent roadmap has nested tasks — View opens sub-phase list (SelfRevitalizationPhasePage). */
+  hasNestedTasks?: boolean;
 }
 
 const TABS: TabKey[] = ["All", "Due", "In Progress", "Not Started", "Completed"];
@@ -83,10 +86,11 @@ export default function RevitalizationRoadmap() {
       }
 
       const data: RoadmapAssignmentUi[] = await fetchRoadmapAssignmentsForUser(userId);
+      const parentCards = collapseRoadmapAssignmentsToParents(data);
       const isValidImageUrl = (url?: string) =>
         !!url && (url.startsWith("http://") || url.startsWith("https://"));
 
-      const mappedPhases: PhaseCard[] = data.map((item) => ({
+      const mappedPhases: PhaseCard[] = parentCards.map((item) => ({
         id: item.id,
         title: item.title,
         description: item.desc || "No description",
@@ -96,6 +100,7 @@ export default function RevitalizationRoadmap() {
         status: toUiStatus(item.status),
         sessionDate: item.meetings?.[0] || "",
         imageUrl: isValidImageUrl(item.imageUrl) ? item.imageUrl : PhaseImg.src,
+        hasNestedTasks: item.hasNestedTasks === true,
       }));
 
       setPhases(mappedPhases);
@@ -344,6 +349,12 @@ export default function RevitalizationRoadmap() {
                     <div className="flex justify-end mt-3 sm:mt-0">
                       <button
                         onClick={() => {
+                          if (phase.hasNestedTasks) {
+                            router.push(
+                              `/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(phase.id)}`,
+                            );
+                            return;
+                          }
                           const hasParent =
                             phase.parentRoadmapId &&
                             phase.parentRoadmapId.trim() !== "" &&

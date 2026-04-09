@@ -6,6 +6,7 @@ import Mentor2 from "../Assets/mentor2.png";
 import Mentor3 from "../Assets/mentor3.png";
 import { apiGetAllUsers } from "@/app/Services/users.service";
 import { apiAssignRoadmap } from "@/app/Services/api";
+import { emitPastorAssignmentsChanged } from "@/app/utils/progress-sync";
 
 const ROLE_FILTERS = [
   { label: "All", value: "all" },
@@ -101,6 +102,7 @@ export default function AssignRoadmapModal({
     setAssigning(true);
     try {
       await apiAssignRoadmap({ userIds: selected, roadMapIds: roadmapIds });
+      emitPastorAssignmentsChanged(selected);
       onSuccess?.();
       onClose();
     } catch (err: any) {

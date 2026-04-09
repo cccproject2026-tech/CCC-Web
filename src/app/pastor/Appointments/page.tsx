@@ -7,21 +7,27 @@ import DuoIcon from "../../Assets/duo.png";
 import MeetIcon from "../../Assets/meet.png";
 import UserProfile from "../../Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import { getMentors } from "@/app/Services/pastor.service";
 import axiosInstance from "@/app/Services/config/axios-instance";
 import {
   apiCancelAppointment,
   apiCreateAppointment,
   apiGetAppointments,
+  apiGetMonthlyAvailability,
+  apiGetWeeklyAvailability,
   apiGetUserSchedule,
   apiRescheduleAppointment,
   apiUpdateAppointment,
 } from "@/app/Services/appointments.service";
+import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import {
   appointmentEntityId,
+  formatAvailabilitySlotLabel,
+  meetingDateLocalYmd,
   parseSlotStartToIso,
+  slotDateToYmd,
   uiMeetingModeToPlatform,
   unwrapAppointmentsAxiosData,
+  unwrapMonthlyAvailabilityPayload,
 } from "@/app/Services/appointment-utils";
 import { getCookie } from "@/app/utils/cookies";
 
@@ -106,6 +112,8 @@ const handleNextMonth = () => {
 
 
   function getPastorUserId(): string | null {
+    const direct = getCookie("userId")?.trim();
+    if (direct) return direct;
     try {
       const c = getCookie("user");
       if (c) {
@@ -133,25 +141,45 @@ const handleNextMonth = () => {
     const userId = getPastorUserId();
     if (!userId) return;
     try {
-      const [fullRes, upRes] = await Promise.all([
+      const [scheduleResult, upcomingResult] = await Promise.allSettled([
         apiGetUserSchedule(userId),
         apiGetAppointments({ userId, futureOnly: true }),
       ]);
-      const data = unwrapAppointmentsAxiosData(fullRes);
-      setAppointments(data);
-      const today = new Date().toISOString().split("T")[0];
+
+      const fromSchedule =
+        scheduleResult.status === "fulfilled" ? unwrapAppointmentsAxiosData(scheduleResult.value) : [];
+      const fromUpcomingEndpoint =
+        upcomingResult.status === "fulfilled" ? unwrapAppointmentsAxiosData(upcomingResult.value) : [];
+
+      const merged = new Map<string, Record<string, unknown>>();
+      for (const a of [...fromSchedule, ...fromUpcomingEndpoint]) {
+        const id = appointmentEntityId(a as { _id?: string; id?: string });
+        if (id) merged.set(id, a as Record<string, unknown>);
+      }
+      const data = Array.from(merged.values());
+
+      setAppointments(data as any);
+
+      const todayYmd = new Date().toLocaleDateString("en-CA");
       setAppointmentsToday(
         data.filter((a: any) => {
           if (!a?.meetingDate) return false;
-          try {
-            return String(a.meetingDate).split("T")[0] === today;
-          } catch {
-            return false;
-          }
-        }),
+          return meetingDateLocalYmd(String(a.meetingDate)) === todayYmd;
+        }) as any,
       );
-      const upcoming = unwrapAppointmentsAxiosData(upRes);
-      setUpcomingAppointments(upcoming.length ? upcoming : data);
+
+      const nowMs = Date.now();
+      const upcomingSorted = data
+        .filter((a: any) => {
+          if (!a?.meetingDate) return false;
+          const t = new Date(a.meetingDate).getTime();
+          return !Number.isNaN(t) && t >= nowMs - 60_000;
+        })
+        .sort(
+          (a: any, b: any) =>
+            new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
+        );
+      setUpcomingAppointments((upcomingSorted.length ? upcomingSorted : data) as any);
     } catch (err) {
       console.error("Error fetching appointments:", err);
     }
@@ -160,6 +188,12 @@ const handleNextMonth = () => {
   useEffect(() => {
     refreshAppointmentLists();
   }, []);
+
+  /** Keep selected day valid when month/year changes (e.g. Jan 31 → Feb). */
+  useEffect(() => {
+    const max = getDaysInMonth(currentMonth, currentYear);
+    setSelectedDate((d) => (d > max ? max : d));
+  }, [currentMonth, currentYear]);
 
 
 
@@ -192,19 +226,35 @@ const formatTime = (dateString) => {
 }
 useEffect(() => {
   async function fetchMentors() {
+    const uid = getPastorUserId();
+    if (!uid) {
+      setMentors([]);
+      setFilteredMentors([]);
+      return;
+    }
     try {
-      const res = await getMentors();
-      const list = res.data?.data?.mentors || [];
-
+      const res = await apiGetAssignedUsers(uid);
+      const body = res.data as { data?: unknown };
+      const raw = Array.isArray(body?.data) ? body.data : [];
+      const list = (raw as Record<string, unknown>[]).map((m) => ({
+        ...m,
+        id: m.id ?? m._id,
+        _id: m._id ?? m.id,
+        firstName: m.firstName ?? "",
+        lastName: m.lastName ?? "",
+        role: m.role ?? "mentor",
+      }));
       setMentors(list);
       setFilteredMentors(list);
     } catch (error) {
       console.error("Error fetching mentors", error);
+      setMentors([]);
+      setFilteredMentors([]);
     }
   }
 
   if (drawerStep === "mentor") {
-    fetchMentors();
+    void fetchMentors();
   }
 }, [drawerStep]);
 
@@ -214,7 +264,7 @@ useEffect(() => {
   } else {
     setFilteredMentors(
       mentors.filter((m) =>
-        `${m.firstName} ${m.lastName}`
+        `${m.firstName ?? ""} ${m.lastName ?? ""} ${(m as { name?: string }).name ?? ""}`
           .toLowerCase()
           .includes(search.toLowerCase())
       )
@@ -227,16 +277,37 @@ useEffect(() => {
       setMonthlySlots([]);
       return;
     }
-    const mentorId = selectedMentor.id || selectedMentor._id;
+    const mentorId = String(selectedMentor.id ?? selectedMentor._id ?? "").trim();
     if (!mentorId) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await axiosInstance.get(`/appointments/availability/${mentorId}/month`, {
-          params: { year: currentYear, month: currentMonth + 1 },
-        });
-        const raw = res.data?.data;
-        const slots = Array.isArray(raw) ? raw : [];
+        const monthStart = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
+        const selectedYmdForWeek = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}`;
+        let slots: any[] = [];
+        try {
+          const availRes = await apiGetMonthlyAvailability(String(mentorId), monthStart);
+          slots = unwrapMonthlyAvailabilityPayload(availRes);
+        } catch {
+          const legacy = await axiosInstance.get(`/appointments/availability/${mentorId}/month`, {
+            params: { year: currentYear, month: currentMonth + 1 },
+          });
+          const raw = legacy.data?.data;
+          slots = Array.isArray(raw) ? raw : [];
+        }
+        if (!slots.length) {
+          try {
+            const wk = await apiGetWeeklyAvailability(String(mentorId), selectedYmdForWeek);
+            const wRaw = unwrapMonthlyAvailabilityPayload(wk);
+            if (wRaw.length) slots = wRaw;
+            else {
+              const d = (wk.data as { data?: unknown })?.data;
+              if (Array.isArray(d)) slots = d;
+            }
+          } catch {
+            /* ignore */
+          }
+        }
         if (!cancelled) setMonthlySlots(slots);
       } catch {
         if (!cancelled) setMonthlySlots([]);
@@ -245,7 +316,7 @@ useEffect(() => {
     return () => {
       cancelled = true;
     };
-  }, [drawerStep, selectedMentor, currentYear, currentMonth]);
+  }, [drawerStep, selectedMentor, currentYear, currentMonth, selectedDate]);
 
   useEffect(() => {
     if (!selectedMentor || drawerStep !== "schedule") {
@@ -254,19 +325,15 @@ useEffect(() => {
     }
     const selectedYmd = new Date(currentYear, currentMonth, selectedDate).toLocaleDateString("en-CA");
     const dateSlot = monthlySlots.find((slot: any) => {
-      if (!slot?.date) return false;
-      try {
-        return new Date(slot.date).toLocaleDateString("en-CA") === selectedYmd;
-      } catch {
-        return false;
-      }
+      const ymd = slotDateToYmd(
+        slot?.date ?? slot?.day ?? slot?.calendarDate ?? slot?.meetingDate ?? slot?.dateString,
+      );
+      return ymd === selectedYmd;
     });
     if (dateSlot?.slots?.length) {
-      const times = dateSlot.slots.map((raw: any) => {
-        const start = `${raw.startTime} ${String(raw.startPeriod || "").toLowerCase()}`;
-        const end = `${raw.endTime} ${String(raw.endPeriod || "").toLowerCase()}`;
-        return `${start} – ${end}`;
-      });
+      const times = (dateSlot.slots as any[])
+        .map((raw: any) => formatAvailabilitySlotLabel(raw))
+        .filter((s: string) => s.length > 0);
       setAvailableTimesForBooking(times);
     } else {
       setAvailableTimesForBooking([]);
@@ -1037,10 +1104,11 @@ const handleCancelAppointment = async () => {
 
       <div>
         <p className="text-sm font-medium text-[#0B1C58]">
-          {m.firstName} {m.lastName}
+          {[m.firstName, m.lastName].filter(Boolean).join(" ").trim() ||
+            String((m as { name?: string }).name ?? "Mentor")}
         </p>
         <p className="text-xs text-gray-500 capitalize">
-          {m.role.replace("-", " ")}
+          {String(m.role ?? "mentor").replace(/-/g, " ")}
         </p>
       </div>
     </div>
@@ -1060,6 +1128,24 @@ const handleCancelAppointment = async () => {
               </>
             ) : (
               <>
+                <label className="mb-1 block text-xs font-medium text-[#0B1C58]">
+                  Meeting date
+                </label>
+                <input
+                  type="date"
+                  className="mb-4 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-[#0B1C58]"
+                  value={`${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}`}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v) return;
+                    const [y, mo, d] = v.split("-").map((n) => parseInt(n, 10));
+                    if (!y || !mo || !d) return;
+                    setCurrentYear(y);
+                    setCurrentMonth(mo - 1);
+                    setSelectedDate(d);
+                    setSelectedTime("");
+                  }}
+                />
                 <p className="text-sm font-medium mb-2 text-[#0B1C58]">
                   Select a time ({new Date(currentYear, currentMonth, selectedDate).toLocaleDateString()})
                 </p>

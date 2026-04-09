@@ -2,8 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getCookie } from "@/app/utils/cookies";
+import {
+  subscribePastorAssignmentsBroadcast,
+  subscribeProgressUpdated,
+} from "@/app/utils/progress-sync";
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/hero-bg.png";
 import UserProfile from "../../Assets/user-profile.png";
@@ -21,8 +25,20 @@ type Mentor = {
   role: string;
 };
 
+function readPastorUserId(): string | null {
+  try {
+    const user = JSON.parse(getCookie("user") || "{}");
+    const id = user?.id || user?._id;
+    return id ? String(id) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function PastorDashboard() {
   const router = useRouter();
+
+  const [pastorUserId] = useState<string | null>(() => readPastorUserId());
 
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [loadingMentors, setLoadingMentors] = useState(false);
@@ -115,51 +131,64 @@ export default function PastorDashboard() {
   const [roadmapTab, setRoadmapTab] = useState("All");
   const [overallProgress, setOverallProgress] = useState<number | null>(null);
 
-  useEffect(() => {
-    const fetchRoadmaps = async () => {
-      try {
-        const user = JSON.parse(getCookie("user") || "{}");
-        const uid = user?.id || user?._id;
-        if (!uid) return;
-        const res = await apiGetRoadmapsByUser(uid);
-        const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
-        const mapped = data.map((item: any) => ({
-          id: item._id,
-          title: item.name,
-          hasNested: Array.isArray(item.roadmaps) && item.roadmaps.length > 0,
-          status:
-            item.status?.toLowerCase() === "in progress"
-              ? "In Progress"
-              : item.status?.toLowerCase() === "completed"
-              ? "Completed"
-              : item.status?.toLowerCase() === "due"
-              ? "Due"
-              : "Remaining",
-        }));
-        setRoadmaps(mapped);
-      } catch (err) {
-        console.error("Error fetching roadmaps:", err);
-      }
-    };
-    fetchRoadmaps();
-  }, []);
+  const refreshRoadmapsAndProgress = useCallback(async () => {
+    if (!pastorUserId) return;
+    try {
+      const res = await apiGetRoadmapsByUser(pastorUserId);
+      const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+      const mapped = data.map((item: any) => ({
+        id: item._id,
+        title: item.name,
+        hasNested: Array.isArray(item.roadmaps) && item.roadmaps.length > 0,
+        status:
+          item.status?.toLowerCase() === "in progress"
+            ? "In Progress"
+            : item.status?.toLowerCase() === "completed"
+            ? "Completed"
+            : item.status?.toLowerCase() === "due"
+            ? "Due"
+            : "Remaining",
+      }));
+      setRoadmaps(mapped);
+    } catch (err) {
+      console.error("Error fetching roadmaps:", err);
+    }
+    try {
+      const res = await apiGetUserProgress(pastorUserId);
+      const progress = Number(res.data?.data?.overallProgress ?? 0);
+      setOverallProgress(Number.isFinite(progress) ? progress : 0);
+    } catch (error) {
+      console.error("Error fetching overall progress:", error);
+      setOverallProgress(null);
+    }
+  }, [pastorUserId]);
 
   useEffect(() => {
-    const fetchOverallProgress = async () => {
-      try {
-        const user = JSON.parse(getCookie("user") || "{}");
-        const userId = user?.id || user?._id;
-        if (!userId) return;
-        const res = await apiGetUserProgress(userId);
-        const progress = Number(res.data?.data?.overallProgress ?? 0);
-        setOverallProgress(Number.isFinite(progress) ? progress : 0);
-      } catch (error) {
-        console.error("Error fetching overall progress:", error);
-        setOverallProgress(null);
-      }
+    void refreshRoadmapsAndProgress();
+  }, [refreshRoadmapsAndProgress]);
+
+  useEffect(() => {
+    if (!pastorUserId) return;
+
+    const run = () => void refreshRoadmapsAndProgress();
+
+    const unsubProgress = subscribeProgressUpdated((uid) => {
+      if (uid === pastorUserId) run();
+    });
+    const unsubBc = subscribePastorAssignmentsBroadcast((ids) => {
+      if (ids.includes(pastorUserId)) run();
+    });
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") run();
     };
-    fetchOverallProgress();
-  }, []);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      unsubProgress();
+      unsubBc();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [pastorUserId, refreshRoadmapsAndProgress]);
 
   const filteredRoadmaps =
     roadmapTab === "All"

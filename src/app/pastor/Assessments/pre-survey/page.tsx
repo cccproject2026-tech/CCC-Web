@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { isAxiosError } from "axios";
 import PastorHeader from "@/app/Components/PastorHeader";
 import {
   apiGetAssessmentById,
@@ -107,7 +108,18 @@ function PreSurveyInner() {
       );
     } catch (e) {
       console.error(e);
-      setError("Could not submit pre-survey. Try again.");
+      let msg = "Could not submit pre-survey. Try again.";
+      if (isAxiosError(e)) {
+        const st = e.response?.status;
+        const body = e.response?.data as { message?: string | string[] } | undefined;
+        const m = body?.message;
+        if (typeof m === "string" && m.trim()) msg = m.trim();
+        else if (Array.isArray(m) && m[0]) msg = String(m[0]);
+        else if (st === 404)
+          msg =
+            "Pre-survey submit is not available on the server for this assessment. Contact support or skip to the main survey if your app allows it.";
+      }
+      setError(msg);
     } finally {
       setSubmitting(false);
     }

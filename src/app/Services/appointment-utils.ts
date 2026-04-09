@@ -10,20 +10,105 @@ export function unwrapAppointmentsList(body: unknown): any[] {
   if (Array.isArray(body)) return body;
   if (typeof body !== "object") return [];
   const o = body as Record<string, unknown>;
-  const data = o.data;
-  if (Array.isArray(data)) return data;
-  if (data && typeof data === "object") {
-    const inner = data as Record<string, unknown>;
-    if (Array.isArray(inner.appointments)) return inner.appointments as any[];
-    if (Array.isArray(inner.upcomingAppointments)) return inner.upcomingAppointments as any[];
-    if (Array.isArray(inner.items)) return inner.items as any[];
+  if (o.meetingDate != null && (o._id != null || o.id != null)) {
+    return [o];
   }
-  if (Array.isArray(o.appointments)) return o.appointments as any[];
+
+  const pickArray = (v: unknown): any[] | null => (Array.isArray(v) ? (v as any[]) : null);
+
+  if (pickArray(o.data)) return pickArray(o.data)!;
+  if (pickArray(o.appointments)) return pickArray(o.appointments)!;
+  if (pickArray(o.items)) return pickArray(o.items)!;
+  if (pickArray(o.results)) return pickArray(o.results)!;
+
+  const data = o.data;
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const inner = data as Record<string, unknown>;
+    if (inner.meetingDate != null && (inner._id != null || inner.id != null)) {
+      return [inner];
+    }
+    const nestedKeys = [
+      "appointments",
+      "upcomingAppointments",
+      "items",
+      "rows",
+      "list",
+      "results",
+      "records",
+      "schedule",
+      "data",
+    ];
+    for (const k of nestedKeys) {
+      if (Array.isArray(inner[k])) return inner[k] as any[];
+    }
+  }
   return [];
 }
 
 export function unwrapAppointmentsAxiosData(res: { data?: unknown } | null | undefined): any[] {
   return unwrapAppointmentsList(res?.data);
+}
+
+/** GET monthly availability — same unwrap as CMA scheduling (multiple API envelope shapes). */
+export function unwrapMonthlyAvailabilityPayload(availRes: { data?: unknown }): any[] {
+  const body = availRes?.data as Record<string, unknown> | undefined;
+  if (!body) return [];
+  const inner = body.data;
+  if (Array.isArray(inner)) return inner;
+  if (inner && typeof inner === "object") {
+    const o = inner as Record<string, unknown>;
+    const keys = ["days", "slots", "availability", "calendar", "items", "dates"];
+    for (const k of keys) {
+      if (Array.isArray(o[k])) return o[k] as any[];
+    }
+  }
+  for (const k of ["days", "slots", "availability", "calendar"]) {
+    if (Array.isArray((body as Record<string, unknown>)[k])) {
+      return (body as Record<string, unknown>)[k] as any[];
+    }
+  }
+  return [];
+}
+
+/** Build a display label for one availability slot row (API field names vary). */
+export function formatAvailabilitySlotLabel(raw: Record<string, unknown> | string | null | undefined): string {
+  if (raw == null) return "";
+  if (typeof raw === "string") return raw.trim();
+  const r = raw as Record<string, unknown>;
+  if (r.startTime != null || r.endTime != null) {
+    const sp = String(r.startPeriod ?? "").toLowerCase();
+    const ep = String(r.endPeriod ?? "").toLowerCase();
+    const start = sp || ep ? `${r.startTime} ${sp}`.trim() : String(r.startTime ?? "");
+    const end = sp || ep ? `${r.endTime} ${ep}`.trim() : String(r.endTime ?? "");
+    if (start && end) return `${start} – ${end}`;
+  }
+  if (r.start != null && r.end != null) {
+    return `${r.start} – ${r.end}`;
+  }
+  if (typeof r.label === "string") return r.label;
+  return "";
+}
+
+/** Local calendar YYYY-MM-DD for a meeting ISO string (avoid UTC day shift). */
+export function meetingDateLocalYmd(iso: string | undefined | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) {
+    const head = String(iso).match(/^(\d{4}-\d{2}-\d{2})/);
+    return head ? head[1] : "";
+  }
+  return d.toLocaleDateString("en-CA");
+}
+
+/** Compare API slot.date to YYYY-MM-DD without UTC shift. */
+export function slotDateToYmd(raw: unknown): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  const head = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (head) return head[1];
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-CA");
 }
 
 /** Map UI meeting labels to API `platform` values. */

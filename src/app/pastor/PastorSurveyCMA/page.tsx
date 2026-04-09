@@ -6,19 +6,252 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   apiGetAssessmentById,
   apiGetUserAnswers,
+  apiGetSectionRecommendations,
   parseAssessmentDetailPayload,
+  extractSurveySectionsForCma,
   apiSubmitSectionAnswers,
 } from "@/app/Services/assessment.service";
 import { apiGetRoadmapsByUser, apiTriggerJumpstartComplete } from "@/app/Services/api";
 import { getCookie } from "@/app/utils/cookies";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
-import { apiCreateAppointment } from "@/app/Services/appointments.service";
+import {
+  apiCreateAppointment,
+  apiGetMonthlyAvailability,
+} from "@/app/Services/appointments.service";
 import axiosInstance from "@/app/Services/config/axios-instance";
 import { isAxiosError } from "axios";
+
+/** HTML `input[type=date]` value is YYYY-MM-DD — parse without UTC day-shift. */
+function parseYmdParts(ymd: string): { y: number; m: number } | null {
+  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  return { y: Number(m[1]), m: Number(m[2]) };
+}
+
+/** Compare API slot.date to selectedDate (both calendar YYYY-MM-DD). */
+function slotDateToYmd(raw: unknown): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  const head = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (head) return head[1];
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-CA");
+}
+
+function unwrapMonthlyAvailabilityPayload(availRes: { data?: unknown }): any[] {
+  const body = availRes?.data as Record<string, unknown> | undefined;
+  if (!body) return [];
+  const inner = body.data;
+  if (Array.isArray(inner)) return inner;
+  if (inner && typeof inner === "object") {
+    const o = inner as Record<string, unknown>;
+    if (Array.isArray(o.days)) return o.days as any[];
+    if (Array.isArray(o.slots)) return o.slots as any[];
+  }
+  return [];
+}
+
+/** Ensure layers have question + choices the CMA UI can render (API may use title/text). */
+function normalizeSectionsForCmaUi(raw: unknown[]): any[] {
+  return raw.map((sec: any) => ({
+    ...sec,
+    name: sec.name ?? sec.title ?? "Section",
+    layers: (Array.isArray(sec.layers) ? sec.layers : []).map((layer: any) => ({
+      ...layer,
+      question: layer.question ?? layer.title ?? layer.name ?? "",
+      choices: Array.isArray(layer.choices)
+        ? layer.choices.map((c: any, ci: number) =>
+            typeof c === "string"
+              ? { _id: `opt_${ci}`, label: c, value: c }
+              : {
+                  ...c,
+                  _id: c._id ?? c.id ?? c.value ?? `opt_${ci}`,
+                  label: c.label ?? c.text ?? String(c.value ?? ""),
+                },
+          )
+        : [],
+    })),
+  }));
+}
 
 /** Match API + mobile: same id used when loading answers, in UI, and on submit. */
 function resolveLayerKey(layer: any, sectionIndex: number, layerIndex: number): string {
   return String(layer?.layerId ?? layer?._id ?? `layer_${sectionIndex}_${layerIndex}`);
+}
+
+function choiceMatchesSelection(c: Record<string, unknown> | undefined, sel: string): boolean {
+  if (!c) return false;
+  const id = c._id != null ? String(c._id) : "";
+  const cid = c.id != null ? String(c.id) : "";
+  const val = c.value != null ? String(c.value) : "";
+  const lab = c.label != null ? String(c.label) : "";
+  const text = c.text != null ? String(c.text) : "";
+  return sel === id || sel === cid || sel === val || sel === lab || sel === text;
+}
+
+/**
+ * CMA assessments often store CDP as `layer.recommendations[]` parallel to `choices[]`, or as
+ * score bands (minScore/maxScore). This does not require a separate mentor API field.
+ */
+function pickCdpFromLayerTemplate(layer: any, selectedAnswer: string | undefined): string {
+  if (!layer || !selectedAnswer) return "";
+  const sel = String(selectedAnswer).trim();
+  if (!sel) return "";
+  const choices: any[] = Array.isArray(layer.choices) ? layer.choices : [];
+  const recs: any[] = Array.isArray(layer.recommendations) ? layer.recommendations : [];
+  if (!recs.length) return "";
+
+  const choice = choices.find((c: any) => choiceMatchesSelection(c, sel));
+  const score = choice != null ? Number(choice.score) : NaN;
+  if (Number.isFinite(score)) {
+    for (const r of recs) {
+      if (r && typeof r === "object" && !Array.isArray(r)) {
+        const min = Number((r as { minScore?: number }).minScore);
+        const max = Number((r as { maxScore?: number }).maxScore);
+        if (Number.isFinite(min) && Number.isFinite(max) && score >= min && score <= max) {
+          return String(
+            (r as { message?: string }).message ??
+              (r as { label?: string }).label ??
+              (r as { text?: string }).text ??
+              "",
+          ).trim();
+        }
+      }
+    }
+  }
+
+  const idx = choices.findIndex((c: any) => choiceMatchesSelection(c, sel));
+  if (idx < 0 || idx >= recs.length) return "";
+  const r = recs[idx];
+  if (typeof r === "string") return r.trim();
+  if (r && typeof r === "object") {
+    return String(
+      (r as { message?: string }).message ??
+        (r as { label?: string }).label ??
+        (r as { description?: string }).description ??
+        (r as { text?: string }).text ??
+        "",
+    ).trim();
+  }
+  return "";
+}
+
+/** Mentor-written CDP / backend-computed text may live on answer layers under varying keys. */
+function extractMentorCdpText(layer: Record<string, unknown> | null | undefined): string {
+  if (!layer || typeof layer !== "object") return "";
+  const keys = [
+    "mentorCdp",
+    "cdp",
+    "customizedDevelopmentPlan",
+    "customDevelopmentPlan",
+    "mentorDevelopmentPlan",
+    "developmentPlan",
+    "mentorFeedback",
+    "mentorMessage",
+    "cdpText",
+    "developmentPlanText",
+    "recommendation",
+    "recommendationMessage",
+    "recommendationText",
+    "matchedRecommendation",
+    "appliedRecommendation",
+    "selectedRecommendation",
+    "personalizedPlan",
+    "mentorNotes",
+    "notes",
+  ];
+  for (const k of keys) {
+    const v = layer[k];
+    if (v != null && String(v).trim()) return String(v).trim();
+  }
+  const rec = layer.recommendation;
+  if (rec && typeof rec === "object" && !Array.isArray(rec)) {
+    const o = rec as Record<string, unknown>;
+    const m = o.message ?? o.text ?? o.label;
+    if (m != null && String(m).trim()) return String(m).trim();
+  }
+  return "";
+}
+
+/** GET /assessment/:id/recommendations — unwrap and map CDP by layer key + raw ids. */
+function parseRecommendationsCdpPayload(data: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (Array.isArray(data)) {
+    data.forEach((r: Record<string, unknown>) => {
+      const msg = r?.message ?? r?.text ?? r?.cdp ?? r?.mentorCdp;
+      const lid = r?.layerId ?? r?.layer_id ?? r?._id;
+      if (lid != null && msg != null && String(msg).trim()) {
+        out[String(lid)] = String(msg).trim();
+      }
+    });
+    return out;
+  }
+  let body: Record<string, unknown> | null = null;
+  if (data && typeof data === "object") {
+    body = data as Record<string, unknown>;
+    if (body.data && typeof body.data === "object" && !Array.isArray(body.data)) {
+      body = body.data as Record<string, unknown>;
+    } else if (Array.isArray(body.data)) {
+      return parseRecommendationsCdpPayload(body.data);
+    }
+  }
+  if (!body) return out;
+
+  const mergeFromSections = (secList: unknown) => {
+    if (!Array.isArray(secList)) return;
+    secList.forEach((section: any, si: number) => {
+      const layers = section?.layers;
+      if (!Array.isArray(layers)) return;
+      layers.forEach((layer: any, li: number) => {
+        const text = extractMentorCdpText(layer);
+        if (!text) return;
+        const layerId = resolveLayerKey(layer, si, li);
+        out[layerId] = text;
+        const id = layer.layerId ?? layer._id ?? layer.id;
+        if (id != null) out[String(id)] = text;
+      });
+    });
+  };
+
+  mergeFromSections(body.sections);
+
+  const rec = body.recommendations;
+  if (Array.isArray(rec)) {
+    rec.forEach((r: Record<string, unknown>) => {
+      const msg =
+        r.message ?? r.text ?? r.cdp ?? r.mentorCdp ?? r.mentorMessage ?? r.description;
+      if (msg == null || !String(msg).trim()) return;
+      const lid = r.layerId ?? r.layer_id ?? r.layerID ?? r._id;
+      if (lid != null) out[String(lid)] = String(msg).trim();
+    });
+  }
+
+  return out;
+}
+
+/** Try several URL shapes — backends differ on query vs path for mentor CDP / recommendations. */
+async function fetchMentorRecommendationsPayload(
+  assessmentId: string,
+  userId: string,
+): Promise<unknown | null> {
+  const attempts: (() => Promise<unknown>)[] = [
+    async () => (await apiGetSectionRecommendations(assessmentId, userId)).data,
+    async () => (await axiosInstance.get(`/assessment/${assessmentId}/recommendations/${userId}`)).data,
+    async () =>
+      (await axiosInstance.get(`/assessments/${assessmentId}/recommendations`, { params: { userId } })).data,
+    async () =>
+      (await axiosInstance.get(`/assessment/recommendations`, { params: { assessmentId, userId } })).data,
+  ];
+  for (const run of attempts) {
+    try {
+      const data = await run();
+      if (data != null) return data;
+    } catch {
+      /* try next */
+    }
+  }
+  return null;
 }
 
 /** CCC-Mobile: trigger jumpstart POST before assessment submit (non-blocking). */
@@ -77,6 +310,8 @@ function PastorSurveyCMAContent() {
   const [mentorStep, setMentorStep] = useState(1);
   const [showFinalPopup, setShowFinalPopup] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  /** Mentor Customized Development Plan (CDP) text per layer — from answers doc + GET recommendations. */
+  const [mentorLayerCdp, setMentorLayerCdp] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!assessmentId) {
@@ -90,7 +325,8 @@ function PastorSurveyCMAContent() {
 
         const res = await apiGetAssessmentById(assessmentId);
         const detail = parseAssessmentDetailPayload(res.data);
-        setSections(detail?.sections || []);
+        const rawSections = extractSurveySectionsForCma(detail ?? undefined);
+        setSections(normalizeSectionsForCmaUi(rawSections));
         setAssessmentTitle((detail?.name as string) || "");
 
         let answersUserId = "";
@@ -115,6 +351,8 @@ function PastorSurveyCMAContent() {
           }
         }
 
+        const cdpMap: Record<string, string> = {};
+
         if (answersUserId) {
           try {
             const answersRes = await apiGetUserAnswers(assessmentId, answersUserId);
@@ -125,19 +363,24 @@ function PastorSurveyCMAContent() {
               const userAnswers: Record<string, string> = {};
               sectionsData.forEach((section: any, sectionIndex: number) => {
                 section.layers?.forEach((layer: any, layerIndex: number) => {
+                  const layerId = resolveLayerKey(layer, sectionIndex, layerIndex);
                   const sel =
                     layer.selectedChoice ??
                     (Array.isArray(layer.selectedValues) ? layer.selectedValues[0] : undefined);
                   if (sel != null && String(sel) !== "") {
-                    const layerId = resolveLayerKey(layer, sectionIndex, layerIndex);
                     userAnswers[layerId] = String(sel);
+                  }
+                  const cdp = extractMentorCdpText(layer as Record<string, unknown>);
+                  if (cdp) {
+                    cdpMap[layerId] = cdp;
+                    const id = layer.layerId ?? layer._id;
+                    if (id != null) cdpMap[String(id)] = cdp;
                   }
                 });
               });
               setAnswers(userAnswers);
             }
           } catch (err) {
-            // No saved response yet is often exposed as 404 — start with a blank survey.
             const status = isAxiosError(err) ? err.response?.status : undefined;
             if (status === 404) {
               setAnswers({});
@@ -145,13 +388,27 @@ function PastorSurveyCMAContent() {
               console.error("Failed to fetch user answers", err);
             }
           }
-        } else if (!mentorReviewMode) {
-          setMentors([]);
+
+          try {
+            const recData = await fetchMentorRecommendationsPayload(assessmentId, answersUserId);
+            if (recData != null) {
+              Object.assign(cdpMap, parseRecommendationsCdpPayload(recData));
+            }
+          } catch {
+            /* optional */
+          }
+          setMentorLayerCdp(cdpMap);
+        } else {
+          setMentorLayerCdp({});
+          if (!mentorReviewMode) {
+            setMentors([]);
+          }
         }
       } catch (err) {
         console.error(err);
         setSections([]);
         setMentors([]);
+        setMentorLayerCdp({});
         setAssessmentTitle("");
       } finally {
         setLoading(false);
@@ -162,35 +419,43 @@ function PastorSurveyCMAContent() {
   }, [assessmentId, viewOnlyParam, reviewUserId]);
 
   useEffect(() => {
-    if (selectedMentor) {
-      const fetchAvailability = async () => {
-        try {
-          const availRes = await axiosInstance.get(`/appointments/availability/${selectedMentor}/month`, {
-            params: { year: currentYear, month: currentMonth }
-          });
-          const slots = availRes.data.data || availRes.data.data || [];
-          setAvailability(slots);
-        } catch (err) {
-          console.error("Failed to fetch availability", err);
-          setAvailability([]);
-        }
-      };
-      fetchAvailability();
-    } else {
+    if (!selectedMentor) {
       setAvailability([]);
+      return;
     }
+    const fetchAvailability = async () => {
+      try {
+        const monthStart = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
+        let slots: any[] = [];
+        try {
+          const availRes = await apiGetMonthlyAvailability(selectedMentor, monthStart);
+          slots = unwrapMonthlyAvailabilityPayload(availRes);
+        } catch {
+          const legacy = await axiosInstance.get(`/appointments/availability/${selectedMentor}/month`, {
+            params: { year: currentYear, month: currentMonth },
+          });
+          const raw = legacy.data?.data;
+          slots = Array.isArray(raw) ? raw : [];
+        }
+        setAvailability(slots);
+      } catch (err) {
+        console.error("Failed to fetch availability", err);
+        setAvailability([]);
+      }
+    };
+    void fetchAvailability();
   }, [selectedMentor, currentYear, currentMonth]);
 
   useEffect(() => {
     if (selectedDate && availability.length > 0) {
       const dateSlot = availability.find((slot: any) => {
-        const slotDate = new Date(slot.date).toLocaleDateString('en-CA'); // YYYY-MM-DD format
-        return slotDate === selectedDate;
+        const ymd = slotDateToYmd(slot?.date);
+        return ymd === selectedDate;
       });
       if (dateSlot && dateSlot.slots) {
         const times = dateSlot.slots.map((raw: any) => {
-          const start = `${raw.startTime} ${raw.startPeriod.toLowerCase()}`;
-          const end = `${raw.endTime} ${raw.endPeriod.toLowerCase()}`;
+          const start = `${raw.startTime} ${String(raw.startPeriod ?? "").toLowerCase()}`;
+          const end = `${raw.endTime} ${String(raw.endPeriod ?? "").toLowerCase()}`;
           return `${start} – ${end}`;
         });
         setAvailableTimes(times);
@@ -772,6 +1037,25 @@ function PastorSurveyCMAContent() {
                           </label>
                         );
                       })}
+                      {(() => {
+                        const selectedAns = answers[layerId];
+                        const fromApi =
+                          mentorLayerCdp[layerId] ||
+                          (layer.layerId != null && mentorLayerCdp[String(layer.layerId)]) ||
+                          (layer._id != null && mentorLayerCdp[String(layer._id)]) ||
+                          "";
+                        const fromTemplate = pickCdpFromLayerTemplate(layer, selectedAns);
+                        const cdp = (fromApi || fromTemplate).trim();
+                        if (!cdp) return null;
+                        return (
+                          <div className="mt-3 rounded-md border border-emerald-400/45 bg-[#0a2844]/90 p-3 text-[13px] sm:text-sm">
+                            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-200/95">
+                              Customized Development Plan (CDP)
+                            </p>
+                            <p className="whitespace-pre-line leading-relaxed text-white/95">{cdp}</p>
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
@@ -916,15 +1200,11 @@ function PastorSurveyCMAContent() {
                     onChange={(e) => {
                       const newDate = e.target.value;
                       setSelectedDate(newDate);
-                      setSelectedTime(""); // Reset time when date changes
-                      if (newDate) {
-                        const dateObj = new Date(newDate);
-                        const newYear = dateObj.getFullYear();
-                        const newMonth = dateObj.getMonth() + 1;
-                        if (newYear !== currentYear || newMonth !== currentMonth) {
-                          setCurrentYear(newYear);
-                          setCurrentMonth(newMonth);
-                        }
+                      setSelectedTime("");
+                      const parts = parseYmdParts(newDate);
+                      if (parts && (parts.y !== currentYear || parts.m !== currentMonth)) {
+                        setCurrentYear(parts.y);
+                        setCurrentMonth(parts.m);
                       }
                     }}
                     className="w-full rounded-xl border border-white/20 bg-white/5 p-2 text-white outline-none focus:border-[#8ec5eb]"

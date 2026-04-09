@@ -29,6 +29,8 @@ const nextConfig: NextConfig = {
         source: "/api-proxy/:path*",
         destination: "https://app.wisdomtooth.tech/api/v1/:path*",
       },
+      /** Case-only alias — avoids 404 when users/bookmarks use lowercase. */
+      { source: "/pastor/appointments", destination: "/pastor/Appointments" },
     ];
   },
   images: {

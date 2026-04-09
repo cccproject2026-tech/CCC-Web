@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
@@ -15,6 +15,10 @@ import {
 } from "@/app/Services/assessment.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
+import {
+  subscribePastorAssignmentsBroadcast,
+  subscribeProgressUpdated,
+} from "@/app/utils/progress-sync";
 
 type Row = {
   id: string;
@@ -27,26 +31,37 @@ type Row = {
   meeting?: string;
 };
 
+function readSessionUserId(): string | null {
+  try {
+    const userCookie = getCookie("user");
+    if (!userCookie) return null;
+    const user = JSON.parse(userCookie) as { id?: string; _id?: string };
+    const id = user.id || user._id;
+    return id ? String(id) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function PastorAssessments() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [assessments, setAssessments] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sessionUserId] = useState<string | null>(() => readSessionUserId());
 
-  useEffect(() => {
-    const fetchAssessments = async () => {
+  const loadAssessments = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!sessionUserId) {
+        setLoading(false);
+        return;
+      }
+      if (!opts?.silent) setLoading(true);
       try {
-        const userCookie = getCookie("user");
-        if (!userCookie) return;
-
-        const user = JSON.parse(userCookie) as { id?: string; _id?: string };
-        const userId = user.id || user._id;
-        if (!userId) return;
-
         const [assessmentRes, progressRes] = await Promise.all([
-          apiGetAssignedAssessments(String(userId)),
-          apiGetUserProgress(String(userId)),
+          apiGetAssignedAssessments(sessionUserId),
+          apiGetUserProgress(sessionUserId),
         ]);
 
         const list = parseAssignedAssessmentsListBody(assessmentRes.data);
@@ -58,7 +73,7 @@ export default function PastorAssessments() {
           .map((item) => {
             const flat = flattenAssignedAssessmentRow(item);
             if (!flat) return null;
-            const { assessment, assessmentId: aid, assignmentId, dueDate, meetingDate, updatedAt } = flat;
+            const { assessment, assessmentId: aid, assignmentId, dueDate, meetingDate } = flat;
             const progress = assessmentProgress.find(
               (p: { assessmentId?: string; assignmentId?: string }) =>
                 String(p.assessmentId) === aid ||
@@ -109,10 +124,36 @@ export default function PastorAssessments() {
       } finally {
         setLoading(false);
       }
-    };
+    },
+    [sessionUserId],
+  );
 
-    fetchAssessments();
-  }, []);
+  useEffect(() => {
+    void loadAssessments();
+  }, [loadAssessments]);
+
+  useEffect(() => {
+    if (!sessionUserId) return;
+
+    const refetch = () => void loadAssessments({ silent: true });
+
+    const unsubProgress = subscribeProgressUpdated((uid) => {
+      if (uid === sessionUserId) refetch();
+    });
+    const unsubBc = subscribePastorAssignmentsBroadcast((ids) => {
+      if (ids.includes(sessionUserId)) refetch();
+    });
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refetch();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      unsubProgress();
+      unsubBc();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [sessionUserId, loadAssessments]);
 
   const filtered = assessments.filter((a) => {
     const q = searchTerm.toLowerCase();

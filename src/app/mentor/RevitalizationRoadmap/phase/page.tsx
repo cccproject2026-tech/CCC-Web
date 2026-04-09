@@ -1,116 +1,278 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import JumpStartHero from "@/app/Components/Hero/JumpStartHero";
+import "@fortawesome/fontawesome-free/css/all.min.css";
+
 import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
-import SelfRevitalizationHeroBg from "@/app/Assets/self-revitalization-hero.png";
+import HeroBg from "@/app/Assets/roadmap-bg.png";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
+import { apiGetUserById } from "@/app/Services/users.service";
 import MentorHeader from "@/app/Components/MentorHeader";
 
+function isHttpUrl(u?: string): boolean {
+  return !!u && (u.startsWith("http://") || u.startsWith("https://"));
+}
+
+function formatStatus(status: string): "Not Started" | "In-progress" | "Completed" | "Over Due" {
+  const s = String(status || "")
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/-/g, "_");
+  if (s.includes("complete")) return "Completed";
+  if (s.includes("progress") || s === "due" || s === "assigned") return "In-progress";
+  if (s.includes("over") && s.includes("due")) return "Over Due";
+  if (s.includes("not_started") || s === "notstarted" || s === "") return "Not Started";
+  return "Not Started";
+}
+
+function taskCardStatus(task: Record<string, unknown>): "Not Started" | "In-progress" | "Completed" | "Over Due" {
+  const p = task?.progress as { status?: string } | undefined;
+  const raw = p?.status ?? (task.status as string | undefined) ?? "";
+  return formatStatus(String(raw));
+}
+
+function taskCounts(task: Record<string, unknown>): { completed: number; total: number } {
+  const p = task?.progress as { completedSteps?: number; totalSteps?: number } | undefined;
+  const completed = Number(p?.completedSteps ?? 0);
+  const total = Number(p?.totalSteps ?? (task as { totalSteps?: number }).totalSteps ?? 0);
+  return { completed, total: Math.max(total, completed, 1) };
+}
+
 function PhasePageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-    const router = useRouter();
-    const searchParams = useSearchParams();
+  const userId = searchParams.get("userId");
+  const roadmapId = searchParams.get("roadmapId");
 
-    const userId = searchParams.get("userId");
-    const roadmapId = searchParams.get("roadmapId");
+  const [phase, setPhase] = useState<Record<string, unknown> | null>(null);
+  const [tasks, setTasks] = useState<Record<string, unknown>[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<{ firstName?: string; lastName?: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
-    const [phase, setPhase] = useState<any>(null);
-    const [tasks, setTasks] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!userId) return;
 
-    useEffect(() => {
-
-        if (!roadmapId) return;
-
-        const fetch = async () => {
-            try {
-
-                const res = await apiGetRoadmapById(roadmapId);
-                const raw = res.data as { data?: unknown };
-                const roadmap = raw?.data ?? res.data;
-
-                setPhase(roadmap);
-                setTasks(roadmap?.roadmaps || []);
-
-            } catch (err) {
-                console.error("Failed to fetch roadmap:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetch();
-
-    }, [roadmapId]);
-
-
-    const openTask = (taskId: string) => {
-
-        if (!userId || !roadmapId) return;
-
-        router.push(
-            `/mentor/RevitalizationRoadmap/task?userId=${userId}&roadmapId=${roadmapId}&taskId=${taskId}`
-        );
-
+    const load = async () => {
+      try {
+        const res = await apiGetUserById(userId);
+        const body = res.data as { data?: unknown };
+        setUser((body?.data ?? res.data) as { firstName?: string; lastName?: string });
+      } catch (err) {
+        console.error("Failed to fetch user", err);
+      }
     };
 
-    if (loading) {
-        return <div className="text-white p-10">Loading...</div>;
+    load();
+  }, [userId]);
+
+  useEffect(() => {
+    if (!roadmapId) {
+      setLoading(false);
+      setPhase(null);
+      setTasks([]);
+      return;
     }
 
-    return (
-        <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
-            <MentorHeader showFullHeader={true} />
-            {/* HERO */}
-            <JumpStartHero
-                backgroundImageUrl={SelfRevitalizationHeroBg.src}
-                title={phase?.name || "Phase"}
-                breadcrumbItems={[
-                    { label: "Revitalization Roadmap", href: "/mentor/RevitalizationRoadmap" },
-                    { label: phase?.name }
-                ]}
-                heightClasses="h-[240px]"
-            />
+    const fetchRoadmap = async () => {
+      try {
+        setLoading(true);
+        const res = await apiGetRoadmapById(roadmapId);
+        const raw = res.data as { data?: unknown };
+        const roadmap = (raw?.data ?? res.data) as Record<string, unknown> | null;
 
-            {/* MAIN */}
-            <main className="flex-1 px-6 md:px-12 lg:px-20 py-10">
+        setPhase(roadmap);
+        const nested = roadmap?.roadmaps;
+        setTasks(Array.isArray(nested) ? (nested as Record<string, unknown>[]) : []);
+      } catch (err) {
+        console.error("Failed to fetch roadmap:", err);
+        setPhase(null);
+        setTasks([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+    fetchRoadmap();
+  }, [roadmapId]);
 
-                    {tasks.length === 0 && (
-                        <p className="text-white text-center col-span-2">
-                            No tasks found for this phase
-                        </p>
-                    )}
-
-                    {tasks.map((task: any) => (
-                        <RoadmapHomeCard
-                            key={task._id}
-                            img={task.imageUrl}
-                            title={task.name}
-                            description={task.description}
-                            status={task.status || "Not Started"}
-                            completionTime={`Months ${task.duration}`}
-                            showDateSelector={false}
-                            onViewClick={() => openTask(task._id)}
-                            onCardClick={() => openTask(task._id)}
-                        />
-                    ))}
-
-                </div>
-
-            </main>
-
-        </div>
+  const openTask = (taskId: string) => {
+    if (!userId || !roadmapId) return;
+    router.push(
+      `/mentor/RevitalizationRoadmap/task?userId=${userId}&roadmapId=${roadmapId}&taskId=${taskId}`,
     );
+  };
+
+  const userName = user
+    ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Pastor"
+    : userId
+      ? "Loading…"
+      : "Pastor";
+
+  const phaseName = String(phase?.name ?? "Phase");
+
+  const filteredTasks = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return tasks;
+    return tasks.filter((t) => {
+      const blob = `${t.name ?? ""} ${t.description ?? ""}`.toLowerCase();
+      return blob.includes(q);
+    });
+  }, [tasks, searchQuery]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
+        <MentorHeader showFullHeader={true} />
+        <div className="flex flex-1 items-center justify-center px-6 py-20">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
+      <MentorHeader showFullHeader={true} />
+
+      <section
+        className="relative flex min-h-[200px] flex-col justify-end bg-cover bg-bottom px-6 pb-8 pt-8 text-white sm:min-h-[240px] sm:px-10 sm:pb-10 md:px-20 md:pb-12"
+        style={{ backgroundImage: `url(${HeroBg.src})` }}
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]" />
+        <div className="relative z-10 mx-auto w-full max-w-7xl">
+          <nav className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[#d9ebf8]">
+            <Link href="/mentor/RevitalizationRoadmap" className="hover:text-white">
+              Revitalization Roadmap
+            </Link>
+            <span className="opacity-70">&gt;</span>
+            {userId ? (
+              <>
+                <Link
+                  href={`/mentor/RevitalizationRoadmap/home?userId=${encodeURIComponent(userId)}`}
+                  className="hover:text-white"
+                >
+                  {userName}
+                </Link>
+                <span className="opacity-70">&gt;</span>
+              </>
+            ) : null}
+            <span className="font-semibold text-white">{phaseName}</span>
+          </nav>
+          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
+            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
+            Leadership Support Network
+          </p>
+          <h1 className="mt-4 text-2xl font-semibold sm:text-3xl md:text-4xl">{phaseName}</h1>
+          <p className="mt-2 max-w-2xl text-sm text-[#cde2f2] md:text-base">
+            Open a task to review details and continue supporting this pastor along this phase.
+          </p>
+        </div>
+      </section>
+
+      <main className="relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-8 sm:px-8 md:px-16 md:py-10">
+        <div className="mx-auto max-w-7xl">
+          {!roadmapId && (
+            <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
+              Missing <code className="rounded bg-white/10 px-1">roadmapId</code> in the URL. Open a phase from the pastor&apos;s roadmap list.
+            </p>
+          )}
+
+          {roadmapId && !userId && (
+            <p className="mb-6 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
+              Missing <code className="rounded bg-white/10 px-1">userId</code>. Task links need a pastor context — open this phase from{" "}
+              <Link href="/mentor/RevitalizationRoadmap" className="font-semibold text-white underline-offset-2 hover:underline">
+                Revitalization Roadmap
+              </Link>
+              .
+            </p>
+          )}
+
+          <div className="mb-8 flex w-full max-w-md items-center rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 shadow-sm backdrop-blur">
+            <i className="fa-solid fa-magnifying-glass mr-3 shrink-0 text-[#8ec5eb]" />
+            <input
+              type="search"
+              placeholder="Search tasks…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-[#cde2f2] outline-none"
+              aria-label="Search tasks"
+              disabled={!roadmapId}
+            />
+            {searchQuery.trim() ? (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="shrink-0 text-white/60 hover:text-white"
+                aria-label="Clear search"
+              >
+                <i className="fa-solid fa-xmark text-sm" />
+              </button>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
+            {roadmapId && tasks.length === 0 && (
+              <p className="col-span-full text-center text-sm text-[#cde2f2]">
+                No tasks found for this phase.
+              </p>
+            )}
+
+            {roadmapId &&
+              tasks.length > 0 &&
+              filteredTasks.length === 0 && (
+                <p className="col-span-full text-center text-sm text-[#cde2f2]">No tasks match your search.</p>
+              )}
+
+            {roadmapId &&
+              filteredTasks.map((task) => {
+                const tid = String(task._id ?? task.id ?? "");
+                const img = isHttpUrl(task.imageUrl as string | undefined)
+                  ? (task.imageUrl as string)
+                  : HeroBg.src;
+                const cardStatus = taskCardStatus(task);
+                const { completed, total } = taskCounts(task);
+                const duration = task.duration != null ? `Months ${task.duration}` : "—";
+
+                return (
+                  <RoadmapHomeCard
+                    key={tid || String(task.name)}
+                    variant="mentor"
+                    img={img}
+                    title={String(task.name ?? "Task")}
+                    description={String(task.description ?? "")}
+                    status={cardStatus}
+                    completionTime={duration}
+                    showDateSelector={false}
+                    taskCompleted={{
+                      completed,
+                      total,
+                    }}
+                    onViewClick={() => tid && openTask(tid)}
+                    onCardClick={() => tid && openTask(tid)}
+                  />
+                );
+              })}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
 }
 
 export default function PhasePage() {
-    return (
-        <Suspense fallback={<div className="text-white p-10">Loading...</div>}>
-            <PhasePageContent />
-        </Suspense>
-    );
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen flex-col items-center justify-center bg-[#062946] font-[Albert_Sans] text-[#cde2f2]">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+        </div>
+      }
+    >
+      <PhasePageContent />
+    </Suspense>
+  );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { useRouter } from "next/navigation";
@@ -13,7 +14,7 @@ import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetRoadmaps } from "@/app/Services/roadmaps.service";
 import { unwrapRoadmapsList, unwrapProgressData } from "@/app/Services/roadmap-assignments";
-import { getMentorFromCookie } from "@/app/Services/utils/helpers";
+import { getMentorUserId } from "@/app/utils/mentor-auth";
 
 function isHttpUrl(u?: string): boolean {
   return !!u && (u.startsWith("http://") || u.startsWith("https://"));
@@ -51,14 +52,19 @@ export default function RevitalizationRoadmapPage() {
 
   const [mentees, setMentees] = useState<Mentee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sessionMissing, setSessionMissing] = useState(false);
   const libraryFetchedRef = useRef(false);
 
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const mentor = getMentorFromCookie();
-        const mentorId = mentor?.id ?? mentor?._id;
-        if (!mentorId) return;
+        const mentorId = getMentorUserId();
+        if (!mentorId) {
+          setSessionMissing(true);
+          setMentees([]);
+          return;
+        }
+        setSessionMissing(false);
 
         const usersRes = await apiGetAssignedUsers(mentorId);
         const body = usersRes.data as { data?: unknown };
@@ -238,7 +244,20 @@ export default function RevitalizationRoadmapPage() {
                   <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
                 </div>
               )}
-              {!loading && mentees.length === 0 && (
+              {!loading && sessionMissing && (
+                <div className="py-16 text-center">
+                  <p className="text-sm text-[#cde2f2]">
+                    Sign in as a mentor to see assigned pastors and their roadmap progress.
+                  </p>
+                  <Link
+                    href="/mentor/login?returnUrl=%2Fmentor%2FRevitalizationRoadmap"
+                    className="mt-4 inline-block rounded-lg bg-white px-5 py-2 text-sm font-semibold text-[#0f4a76]"
+                  >
+                    Mentor sign in
+                  </Link>
+                </div>
+              )}
+              {!loading && !sessionMissing && mentees.length === 0 && (
                 <p className="py-16 text-center text-sm text-[#cde2f2]">No assigned pastors yet.</p>
               )}
               {!loading && mentees.length > 0 && filteredPastors.length === 0 && (

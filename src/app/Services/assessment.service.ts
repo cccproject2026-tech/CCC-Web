@@ -1,3 +1,4 @@
+import { isAxiosError } from "axios";
 import axiosInstance from "./config/axios-instance";
 import type {
   AssessmentResponse,
@@ -30,18 +31,64 @@ export function parseAssessmentsListPayload(body: unknown): AssessmentResponse[]
 
 /**
  * GET /assessment/:id may return the document on the JSON root (axios `response.data`)
- * or wrapped as `{ data: assessment }` / `{ success, data }`.
+ * or wrapped as `{ data: assessment }` / `{ success, data }` / `{ data: { assessment } }`.
  */
 export function parseAssessmentDetailPayload(body: unknown): AssessmentResponse | null {
   if (body == null || typeof body !== "object") return null;
   const o = body as Record<string, unknown>;
+
   if (o.data != null && typeof o.data === "object" && !Array.isArray(o.data)) {
+    const inner = o.data as Record<string, unknown>;
+    if (inner.assessment != null && typeof inner.assessment === "object" && !Array.isArray(inner.assessment)) {
+      return parseAssessmentDetailPayload(inner.assessment);
+    }
     return parseAssessmentDetailPayload(o.data);
   }
+
+  if (o.assessment != null && typeof o.assessment === "object" && !Array.isArray(o.assessment)) {
+    return parseAssessmentDetailPayload(o.assessment);
+  }
+  if (o.document != null && typeof o.document === "object" && !Array.isArray(o.document)) {
+    return parseAssessmentDetailPayload(o.document);
+  }
+  if (o.result != null && typeof o.result === "object" && !Array.isArray(o.result)) {
+    return parseAssessmentDetailPayload(o.result);
+  }
+
   if ("_id" in o || "name" in o || "sections" in o || "title" in o) {
     return body as AssessmentResponse;
   }
   return null;
+}
+
+/**
+ * CMA survey UI expects `sections[].layers[].choices[]`. APIs may use alternate keys or JSON strings.
+ */
+export function extractSurveySectionsForCma(detail: AssessmentResponse | Record<string, unknown> | null | undefined): unknown[] {
+  if (!detail || typeof detail !== "object") return [];
+  const any = detail as Record<string, unknown>;
+
+  let sections: unknown = any.sections;
+  if (typeof sections === "string") {
+    try {
+      sections = JSON.parse(sections) as unknown;
+    } catch {
+      sections = [];
+    }
+  }
+  if (Array.isArray(sections) && sections.length > 0) return sections;
+
+  const fallbacks: unknown[] = [
+    any.surveySections,
+    any.cmaSections,
+    (any.survey as Record<string, unknown> | undefined)?.sections,
+    (any.content as Record<string, unknown> | undefined)?.sections,
+  ];
+  for (const fb of fallbacks) {
+    if (Array.isArray(fb) && fb.length > 0) return fb;
+  }
+
+  return [];
 }
 
 /**
@@ -165,9 +212,48 @@ export const apiSaveSectionAnswers = (
   layers: { layerId: string; selectedChoice: string }[],
 ) => axiosInstance.post(`/assessment/${assessmentId}/section/${userId}`, { sectionId, layers });
 
-// POST /assessment/:id/submit-pre-survey
-export const apiSubmitPreSurvey = (assessmentId: string, payload: SubmitPreSurveyPayload) =>
-  axiosInstance.post(`/assessment/${assessmentId}/submit-pre-survey`, payload);
+/**
+ * POST pre-survey answers — backend route name varies by deploy; retry alternate paths on 404.
+ */
+export async function apiSubmitPreSurvey(
+  assessmentId: string,
+  payload: SubmitPreSurveyPayload,
+) {
+  const id = encodeURIComponent(assessmentId);
+  const pathCandidates = [
+    `/assessment/${id}/submit-pre-survey`,
+    `/assessment/${id}/pre-survey`,
+    `/assessment/${id}/preSurvey`,
+    `/assessments/${id}/submit-pre-survey`,
+    `/assessments/${id}/pre-survey`,
+  ];
+  const bodyWithId = { assessmentId, ...payload };
+  const bodyCandidates = [
+    ["/assessment/submit-pre-survey", bodyWithId] as const,
+    ["/assessments/submit-pre-survey", bodyWithId] as const,
+  ];
+
+  let lastError: unknown;
+  for (const url of pathCandidates) {
+    try {
+      return await axiosInstance.post(url, payload);
+    } catch (err) {
+      lastError = err;
+      if (isAxiosError(err) && err.response?.status === 404) continue;
+      throw err;
+    }
+  }
+  for (const [url, body] of bodyCandidates) {
+    try {
+      return await axiosInstance.post(url, body);
+    } catch (err) {
+      lastError = err;
+      if (isAxiosError(err) && err.response?.status === 404) continue;
+      throw err;
+    }
+  }
+  throw lastError;
+}
 
 // POST /assessment/:id/recommendations/send
 export const apiSendSectionRecommendations = (assessmentId: string, payload: SendSectionRecommendationsPayload) =>
@@ -180,7 +266,11 @@ export const apiGetSectionRecommendations = (assessmentId: string, userId: strin
 // GET /assessment/assigned/:userId
 export const apiGetAssignedAssessments = (userId: string) =>
   axiosInstance.get<{ success: boolean; data: AssessmentResponse[] }>(
-    `/assessment/assigned/${userId}`
+    `/assessment/assigned/${userId}`,
+    {
+      params: { _cb: Date.now() },
+      headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+    },
   );
 
 //  GET /assessment/:assessmentId/answers/:userId

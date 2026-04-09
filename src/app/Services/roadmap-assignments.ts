@@ -13,6 +13,8 @@ export type RoadmapAssignmentUi = {
   months: string;
   imageUrl?: string;
   meetings?: string[];
+  /** True when this roadmap has nested `roadmaps` tasks — open phase overview, not jumpstart-only. */
+  hasNestedTasks?: boolean;
 };
 
 /**
@@ -349,6 +351,58 @@ export function buildRoadmapAssignments(
     }
   }
 
+  return out;
+}
+
+function mergeGroupStatus(statuses: RoadmapAssignmentUi["status"][]): RoadmapAssignmentUi["status"] {
+  if (statuses.length === 0) return "Not Started";
+  if (statuses.every((s) => s === "Completed")) return "Completed";
+  if (statuses.some((s) => s === "Due")) return "Due";
+  if (statuses.some((s) => s === "In-progress")) return "In-progress";
+  if (statuses.some((s) => s === "Completed") && statuses.some((s) => s !== "Completed")) {
+    return "In-progress";
+  }
+  return "Not Started";
+}
+
+/**
+ * One list row per assigned roadmap. Nested tasks stay under jumpstart; the API list is flattened
+ * per task — collapse so the revitalization page matches the previous “parent roadmap only” cards.
+ */
+export function collapseRoadmapAssignmentsToParents(items: RoadmapAssignmentUi[]): RoadmapAssignmentUi[] {
+  const byParent = new Map<string, RoadmapAssignmentUi[]>();
+  for (const it of items) {
+    const pid = String(it.parentRoadmapId ?? it.id ?? "").trim();
+    if (!pid) continue;
+    const list = byParent.get(pid) ?? [];
+    list.push(it);
+    byParent.set(pid, list);
+  }
+  const out: RoadmapAssignmentUi[] = [];
+  for (const [parentId, group] of byParent) {
+    if (group.length === 1 && String(group[0].id ?? "").trim() === parentId) {
+      out.push({ ...group[0], hasNestedTasks: false });
+      continue;
+    }
+    const name = (group[0]?.parentRoadmapName || "").trim() || group[0]?.title || "Roadmap";
+    const mergedStatus = mergeGroupStatus(group.map((g) => g.status));
+    const firstMeeting = group.map((g) => g.meetings?.[0]).find((m) => m && String(m).trim());
+    const img = group.find((g) => g.imageUrl && String(g.imageUrl).trim())?.imageUrl;
+    const descFromNestedOnly =
+      group.length > 1 || String(group[0]?.id ?? "").trim() !== parentId ? "" : group[0]?.desc ?? "";
+    out.push({
+      id: parentId,
+      parentRoadmapId: parentId,
+      parentRoadmapName: name,
+      title: name,
+      desc: descFromNestedOnly,
+      status: mergedStatus,
+      months: group[0]?.months || "—",
+      imageUrl: img,
+      meetings: firstMeeting ? [String(firstMeeting)] : group[0]?.meetings,
+      hasNestedTasks: true,
+    });
+  }
   return out;
 }
 

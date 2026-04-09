@@ -16,10 +16,27 @@ import {
 } from "@/app/Services/assessment.service";
 import { apiGetAllUsers } from "@/app/Services/users.service";
 import { apiAssignAssessment } from "@/app/Services/progress.service";
+import { emitPastorAssignmentsChanged } from "@/app/utils/progress-sync";
+
+function getApiErrorMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === "object" && "response" in err) {
+    const data = (err as { response?: { data?: Record<string, unknown> } }).response?.data;
+    const msg = data?.message ?? data?.error;
+    if (typeof msg === "string" && msg.trim()) return msg.trim();
+    if (Array.isArray(msg) && msg.length && typeof msg[0] === "string") return msg[0];
+  }
+  if (err instanceof Error && err.message.trim()) return err.message.trim();
+  return fallback;
+}
+
+function unwrapUsersList(res: { data?: { data?: { users?: unknown[] } } }): any[] {
+  const users = res.data?.data?.users;
+  return Array.isArray(users) ? users : [];
+}
 
 const mapUserToAssignUser = (user: any) => ({
-  id: user.id ?? user._id,
-  name: `${user.firstName} ${user.lastName}`,
+  id: String(user.id ?? user._id ?? ""),
+  name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "User",
   role: user.role,
   avatar: user.profilePicture || Mentor1,
 });
@@ -138,7 +155,9 @@ export default function AssessmentsPage() {
   };
 
   const handleAssign = async () => {
-    if (!selectedUsers.length || !selectedAssessments.length) {
+    const userIds = selectedUsers.map(String).filter(Boolean);
+    const assessmentIds = selectedAssessments.map(String).filter(Boolean);
+    if (!userIds.length || !assessmentIds.length) {
       setToast("Select at least one user and one assessment");
       return;
     }
@@ -146,10 +165,15 @@ export default function AssessmentsPage() {
     try {
       setLoading(true);
 
-      await apiAssignAssessment({
-        userIds: selectedUsers,
-        assessmentIds: selectedAssessments,
-      });
+      /** Backend matches mentor flow: one assessment id per request, many users each time. */
+      for (const assessmentId of assessmentIds) {
+        await apiAssignAssessment({
+          userIds,
+          assessmentIds: [assessmentId],
+        });
+      }
+
+      emitPastorAssignmentsChanged(userIds);
 
       setShowAssignModal(false);
       setIsSelectionMode(false);
@@ -159,10 +183,10 @@ export default function AssessmentsPage() {
       setToast("Assessment assigned successfully");
     } catch (error) {
       console.error("Assignment failed", error);
-      setToast("Failed to assign assessment");
+      setToast(getApiErrorMessage(error, "Failed to assign assessment"));
     } finally {
       setLoading(false);
-      setTimeout(() => setToast(null), 3000);
+      setTimeout(() => setToast(null), 5000);
     }
   };
 
