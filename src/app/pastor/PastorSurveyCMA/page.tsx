@@ -3,6 +3,7 @@ import { useEffect, useState, Suspense } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import headerBg from "../../Assets/CMA-hero-bg.png";
 import { useRouter, useSearchParams } from "next/navigation";
+import PastorHeader from "@/app/Components/PastorHeader";
 import {
   apiGetAssessmentById,
   apiGetUserAnswers,
@@ -911,27 +912,30 @@ function PastorSurveyCMAContent() {
   //   },
   // ];
 
-  // ✅ Original return kept intact
+  const pageShell =
+    "flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white antialiased";
+  const mainBand =
+    "relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)]";
+
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] text-white">
-      {/* HEADER */}
+    <div className={pageShell}>
+      <PastorHeader showFullHeader={true} />
+
       <header
-        className="relative flex items-center px-4 sm:px-8 md:px-16 py-5 sm:py-8 md:py-10 bg-cover bg-no-repeat text-white h-[150px] sm:h-[200px]"
+        className="relative flex min-h-[150px] items-center bg-cover bg-center bg-no-repeat px-4 py-8 text-white sm:min-h-[200px] sm:px-8 md:px-16 md:py-10"
         style={{
           backgroundImage: `url(${headerBg.src})`,
-          backgroundPosition: "center", // Adjusted for mobile
+          backgroundPosition: "center",
           backgroundSize: "cover",
         }}
       >
-        {/* Optional transparent overlay for better text contrast */}
-        <div className="absolute inset-0 bg-black/20"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.92)_100%)]" />
 
-        {/* Left text content */}
-        <div className="relative z-10 mt-4 sm:mt-7">
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold">
+        <div className="relative z-10 max-w-4xl">
+          <h2 className="text-xl font-bold sm:text-2xl md:text-3xl">
             {assessmentTitle || "Church Assessment Evaluation (CMA)"}
           </h2>
-          <p className="text-xs sm:text-sm mt-2 text-white/85 max-w-full sm:max-w-md">
+          <p className="mt-2 max-w-full text-sm text-[#d9ebf8] sm:max-w-2xl">
             {mentorReviewMode
               ? "Read-only review of this pastor’s saved responses."
               : selfReadOnlyMode
@@ -941,74 +945,75 @@ function PastorSurveyCMAContent() {
         </div>
       </header>
 
-      {/* MAIN BODY */}
-      <main className="flex flex-1 flex-col sm:flex-row px-4 sm:px-8 md:px-16 py-5 sm:py-8 md:py-10 gap-5 sm:gap-8 md:gap-10">
+      <main className={`${mainBand} flex flex-col gap-6 px-4 py-8 sm:flex-row sm:gap-8 md:px-16 md:py-10`}>
         {loading ? (
-          <div className="flex justify-center items-center flex-1 text-white">
-            Loading assessment...
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 py-20">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+            <p className="text-sm text-[#cde2f2]">Loading assessment…</p>
           </div>
         ) : sections.length === 0 ? (
-          <div className="flex justify-center items-center flex-1 text-white text-center px-4">
-            {viewOnlyParam && !reviewUserId
-              ? "This review link is missing a pastor user id."
-              : "No sections available for this assessment."}
+          <div className="flex flex-1 flex-col items-center justify-center px-4 py-16 text-center">
+            <p className="max-w-md text-[#cde2f2]">
+              {viewOnlyParam && !reviewUserId
+                ? "This review link is missing a pastor user id."
+                : "No sections available for this assessment."}
+            </p>
           </div>
         ) : (
           <>
-            {/* LEFT PANEL */}
-            <aside className="w-full sm:w-[300px] md:w-[340px] bg-white rounded-xl p-4 sm:p-6 shadow-lg h-auto sm:h-[500px] md:h-[550px]">
-              <h2 className="text-[#0F1E44] text-base sm:text-lg font-semibold mb-4 sm:mb-6">
+            <aside className="h-auto w-full shrink-0 rounded-2xl border border-white/15 bg-white/5 p-4 shadow-[0_8px_40px_rgba(3,24,43,0.4)] backdrop-blur-md sm:h-[min(560px,70vh)] sm:w-[300px] md:w-[340px]">
+              <h2 className="mb-4 text-base font-semibold text-white sm:mb-6 sm:text-lg">
                 {mentorReviewMode ? "Sections" : "My Responses"}
               </h2>
-              <div className="flex flex-col gap-3 sm:gap-4">
+              <div className="flex max-h-[min(480px,60vh)] flex-col gap-3 overflow-y-auto pr-1 sm:gap-4">
                 {sections.map((sec, i) => (
-                  <div
+                  <button
+                    type="button"
                     key={sec._id || sec.id || i}
                     onClick={() => setActiveSection(i)}
-                    className={`rounded-xl border transition-all cursor-pointer ${activeSection === i
-                      ? "bg-[#103C8C] text-white border-[#103C8C]"
-                      : "bg-[#F7F9FC] text-[#0F1E44] border-[#E0E7F1]"
-                      }`}
+                    className={`w-full rounded-xl border text-left transition-all ${
+                      activeSection === i
+                        ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/15 text-white shadow-[0_0_0_1px_rgba(142,197,235,0.2)]"
+                        : "border-white/15 bg-white/[0.06] text-[#cde2f2] hover:border-white/25 hover:bg-white/10"
+                    }`}
                   >
-                    <div className="px-3 sm:px-4 py-2 sm:py-3">
+                    <div className="px-3 py-2.5 sm:px-4 sm:py-3">
                       <p
-                        className={`text-xs sm:text-sm font-semibold mb-1 ${activeSection === i ? "text-white" : "text-[#103C8C]"
-                          }`}
+                        className={`mb-1 text-xs font-semibold sm:text-sm ${
+                          activeSection === i ? "text-[#8ec5eb]" : "text-[#8ec5eb]/90"
+                        }`}
                       >
                         Section {i + 1}
                       </p>
-                      <p
-                        className={`text-xs leading-snug ${activeSection === i
-                          ? "text-white/90"
-                          : "text-[#0F1E44]/80"
-                          }`}
-                      >
+                      <p className="text-xs leading-snug text-[#d9ebf8]/95">
                         {sec.name || sec.title || `Section ${i + 1}`}
                       </p>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </aside>
 
-            {/* RIGHT PANEL */}
-            <section className="flex-1">
-              <p className="text-xs sm:text-sm leading-relaxed mb-4 sm:mb-6 max-w-full sm:max-w-2xl">
-                Choose the option in each box that best matches how you feel and who
-                you are. Your accuracy allows us to provide the best support and
-                guidance.
+            <section className="min-w-0 flex-1">
+              <p className="mb-6 max-w-2xl text-sm leading-relaxed text-[#cde2f2]">
+                Choose the option in each box that best matches how you feel and who you are. Your accuracy allows us
+                to provide the best support and guidance.
               </p>
 
-              <div className="space-y-4 sm:space-y-6 text-[13px] sm:text-[14px]">
+              <div className="space-y-5 text-sm sm:space-y-6 sm:text-[15px]">
                 {sections[activeSection]?.layers?.map((layer: any, layerIndex: number) => {
                   const layerId = resolveLayerKey(layer, activeSection, layerIndex);
                   return (
                     <div
                       key={layerId}
-                      className="border border-[#5A8DCB] rounded-md p-3 sm:p-4 space-y-2"
+                      className="space-y-3 rounded-2xl border border-[#8ec5eb]/25 bg-[linear-gradient(180deg,rgba(12,58,95,0.55)_0%,rgba(9,49,80,0.72)_100%)] p-4 sm:p-5 shadow-[0_8px_32px_rgba(2,20,40,0.35)]"
                     >
-                      <h4 className="font-semibold mb-2 text-sm sm:text-base">
-                        {layer.question || layer.title || sections[activeSection].name || sections[activeSection].title || "Question"}
+                      <h4 className="mb-1 text-base font-semibold text-white sm:text-lg">
+                        {layer.question ||
+                          layer.title ||
+                          sections[activeSection].name ||
+                          sections[activeSection].title ||
+                          "Question"}
                       </h4>
 
                       {layer.choices?.map((choice: any, ci: number) => {
@@ -1021,7 +1026,7 @@ function PastorSurveyCMAContent() {
                         return (
                           <label
                             key={`${layerId}-${choiceKey}-${ci}`}
-                            className={`flex items-start gap-2 ${uiReadOnly ? "cursor-default" : "cursor-pointer"}`}
+                            className={`flex items-start gap-3 rounded-lg border border-transparent px-1 py-0.5 transition hover:border-white/10 hover:bg-white/[0.04] ${uiReadOnly ? "cursor-default" : "cursor-pointer"}`}
                           >
                             <input
                               type="radio"
@@ -1030,10 +1035,10 @@ function PastorSurveyCMAContent() {
                               disabled={uiReadOnly}
                               checked={isChecked}
                               onChange={() => handleCheck(layerId, choiceKey)}
-                              className="accent-[#FFD84E] w-3 h-3 sm:w-4 sm:h-4 mt-[2px]"
+                              className="mt-1 h-4 w-4 shrink-0 accent-[#8ec5eb]"
                             />
 
-                            <span className="text-sm sm:text-base">{choiceLabel}</span>
+                            <span className="leading-relaxed text-[#e8f4fc]">{choiceLabel}</span>
                           </label>
                         );
                       })}
@@ -1048,11 +1053,11 @@ function PastorSurveyCMAContent() {
                         const cdp = (fromApi || fromTemplate).trim();
                         if (!cdp) return null;
                         return (
-                          <div className="mt-3 rounded-md border border-emerald-400/45 bg-[#0a2844]/90 p-3 text-[13px] sm:text-sm">
-                            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-emerald-200/95">
+                          <div className="mt-4 rounded-xl border border-[#8ec5eb]/35 bg-[#041f35]/80 p-3 text-sm sm:p-4">
+                            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#8ec5eb]">
                               Customized Development Plan (CDP)
                             </p>
-                            <p className="whitespace-pre-line leading-relaxed text-white/95">{cdp}</p>
+                            <p className="whitespace-pre-line leading-relaxed text-[#d9ebf8]">{cdp}</p>
                           </div>
                         );
                       })()}
@@ -1061,18 +1066,19 @@ function PastorSurveyCMAContent() {
                 })}
               </div>
 
-              {/* Navigation */}
-              <div className="flex flex-col sm:flex-row justify-between items-center mt-6 sm:mt-10 gap-4 sm:gap-0">
+              <div className="mt-10 flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <button
+                  type="button"
                   onClick={handlePrev}
                   disabled={activeSection === 0}
-                  className={`border border-[#A6B8E8] text-[#E8ECFF] text-xs sm:text-sm font-medium px-4 sm:px-6 py-2 rounded-md ${activeSection === 0
-                    ? "opacity-50 cursor-not-allowed"
-                    : "hover:bg-[#103C8C]"
-                    }`}
+                  className={`rounded-lg border px-5 py-2.5 text-sm font-semibold transition sm:px-6 ${
+                    activeSection === 0
+                      ? "cursor-not-allowed border-white/10 text-[#cde2f2]/40"
+                      : "border-white/25 bg-white/10 text-[#cde2f2] hover:bg-white/15"
+                  }`}
                 >
-                  <i className="fa-solid fa-angle-left mr-2"></i> View Previous
-                  Section
+                  <i className="fa-solid fa-angle-left mr-2" aria-hidden />
+                  View Previous Section
                 </button>
 
                 {activeSection === sections.length - 1 ? (
@@ -1080,7 +1086,7 @@ function PastorSurveyCMAContent() {
                     <button
                       type="button"
                       onClick={() => router.back()}
-                      className="bg-[#103C8C] text-white text-xs sm:text-sm font-medium px-4 sm:px-6 py-2 rounded-md hover:bg-[#0B2E72]"
+                      className="rounded-lg bg-white px-6 py-2.5 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa]"
                     >
                       Done
                     </button>
@@ -1088,17 +1094,18 @@ function PastorSurveyCMAContent() {
                     <button
                       type="button"
                       onClick={handleSubmitSurvey}
-                      className="bg-[#103C8C] text-white text-xs sm:text-sm font-medium px-4 sm:px-6 py-2 rounded-md hover:bg-[#0B2E72]"
+                      className="rounded-lg bg-white px-6 py-2.5 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa]"
                     >
                       Submit Survey
                     </button>
                   )
                 ) : (
                   <button
+                    type="button"
                     onClick={handleNext}
-                    className="bg-[#103C8C] text-white text-xs sm:text-sm font-medium px-4 sm:px-6 py-2 rounded-md hover:bg-[#0B2E72]"
+                    className="rounded-lg bg-white px-6 py-2.5 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa]"
                   >
-                    View Next Section <i className="fa-solid fa-angle-right ml-2"></i>
+                    View Next Section <i className="fa-solid fa-angle-right ml-2" aria-hidden />
                   </button>
                 )}
               </div>
@@ -1119,7 +1126,7 @@ function PastorSurveyCMAContent() {
 
       {showSchedulePrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
-          <div className="w-[480px] rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-10 py-8 text-center text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)]">
+          <div className="mx-4 w-full max-w-[480px] rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#062946_100%)] px-8 py-8 text-center text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)] sm:px-10">
             <p className="font-semibold text-lg mb-4">
               On completion of the PMP and CMA assessment tools please schedule
               a meeting with your mentor.
@@ -1136,7 +1143,7 @@ function PastorSurveyCMAContent() {
 
       {showMentorSidebar && (
         <div className="fixed inset-0 z-50 flex justify-end bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
-          <div className="h-full w-[480px] overflow-y-auto border-l border-white/15 bg-[linear-gradient(180deg,#0d3e66_0%,#0a3457_100%)] p-8 text-white shadow-[-20px_0_50px_rgba(2,20,38,0.55)]">
+          <div className="h-full w-full max-w-[480px] overflow-y-auto border-l border-white/15 bg-[linear-gradient(180deg,#062946_0%,#041f35_100%)] p-6 text-white shadow-[-20px_0_50px_rgba(2,20,38,0.55)] sm:p-8">
             {mentorStep === 1 ? (
               <>
                 <h2 className="text-xl font-semibold mb-6">
@@ -1279,7 +1286,16 @@ function PastorSurveyCMAContent() {
 
 export default function PastorSurveyCMA() {
   return (
-    <Suspense fallback={<div className="text-white p-10">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen flex-col bg-[#062946] text-white">
+          <PastorHeader showFullHeader={true} />
+          <div className="flex flex-1 items-center justify-center">
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+          </div>
+        </div>
+      }
+    >
       <PastorSurveyCMAContent />
     </Suspense>
   );

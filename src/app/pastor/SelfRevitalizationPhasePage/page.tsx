@@ -15,6 +15,7 @@ import {
 import type { ProgressResponse } from "@/app/Services/types/progress.types";
 import { getCookie } from "@/app/utils/cookies";
 import { subscribeProgressUpdated } from "@/app/utils/progress-sync";
+import { pastorRoadmapDescription } from "@/app/Components/pastor/pastor-theme";
 
 function getSessionUserId(): string {
   const direct = getCookie("userId")?.trim();
@@ -242,7 +243,7 @@ function SelfRevitalizationContent() {
                         <h3 className="text-[15px] font-semibold leading-snug mb-[6px]">
                           {item.name}
                         </h3>
-                        <p className="mb-[8px] text-[13px] leading-snug text-[#cde2f2]">
+                        <p className={`mb-[8px] ${pastorRoadmapDescription}`}>
                           {item.description || item.roadMapDetails || ""}
                         </p>
 

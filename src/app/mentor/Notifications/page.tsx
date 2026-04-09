@@ -1,217 +1,195 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import HeroBg from "../../Assets/hero-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { getCookie, setCookie } from "@/app/utils/cookies";
+import { getMentorUserId } from "@/app/utils/mentor-auth";
+import { getNotification } from "@/app/Services/api";
+import type { NotificationItem } from "@/app/Services/types/home.types";
+import {
+  mapNotificationItemToPopup,
+  unwrapNotificationsList,
+} from "@/app/Services/notificationUi";
+import {
+  mentorBodyText,
+  mentorHeroOverlay,
+  mentorMainGradient,
+  mentorPageRoot,
+  mentorPrimaryCta,
+  mentorSecondaryCta,
+  mentorGlassCardFrost,
+  mentorSpinner,
+  mentorEmptyPanel,
+} from "@/app/Components/mentor/mentor-theme";
 
-type Note = {
-  id: number;
-  title: string;
-  desc: string;
-  icon: string;
-  color: string;
-  time: string;
-  tag?: string;
-};
-
-const sampleNotifications: Note[] = [
-  {
-    id: 1,
-    title: "YOUR PROFILE IS INCOMPLETE",
-    desc: "Interested in receiving mentoring in community engagement",
-    icon: "fa-id-badge",
-    color: "text-orange-500",
-    time: "9:43 am",
-  },
-  {
-    id: 2,
-    title: "ROADMAP COMPLETED BY JOHN AND 3 OTHERS",
-    desc: "CCC Module 3: Mission Basics",
-    icon: "fa-route",
-    color: "text-green-500",
-    time: "9:40 am",
-    tag: "⭐",
-  },
-  {
-    id: 3,
-    title: "ROADMAP DUE",
-    desc: "CCC Module 4: Leadership & Vision",
-    icon: "fa-map",
-    color: "text-red-500",
-    time: "9:40 am",
-  },
-  {
-    id: 4,
-    title: "ROBERT SUBMITTED ROADMAP (GOD’S VISION FOR YOUR CHURCH)",
-    desc: "Interested in receiving mentoring in community engagement",
-    icon: "fa-file-signature",
-    color: "text-blue-400",
-    time: "9:38 am",
-  },
-  {
-    id: 5,
-    title: "JOHN COMMENTED ON TANYA’S ROADMAP",
-    desc: "Interested in receiving mentoring in community engagement",
-    icon: "fa-comment-dots",
-    color: "text-sky-500",
-    time: "9:37 am",
-  },
-  {
-    id: 6,
-    title: "ROBERT FOX HAS A NEW QUERY",
-    desc: "Interested in receiving mentoring in community engagement",
-    icon: "fa-question-circle",
-    color: "text-yellow-500",
-    time: "9:35 am",
-  },
-  {
-    id: 7,
-    title: "ASSIGNMENT SUBMITTED BY JOHN AND 2 OTHERS",
-    desc: "Mentoring Conversations | CCC Module 4",
-    icon: "fa-file-alt",
-    color: "text-green-500",
-    time: "9:33 am",
-  },
-  {
-    id: 8,
-    title: "ASSESSMENT DUE",
-    desc: "CCC Module 4: Personal Growth Assessment",
-    icon: "fa-clipboard-check",
-    color: "text-red-500",
-    time: "9:32 am",
-  },
-  {
-    id: 9,
-    title: "APPOINTMENT WITH JOHN SCHEDULED ON 20 NOV 2024",
-    desc: "Mentoring Session | CCC Roadmap Discussion",
-    icon: "fa-calendar-check",
-    color: "text-yellow-600",
-    time: "9:30 am",
-  },
-  {
-    id: 10,
-    title: "APPOINTMENT CANCELED",
-    desc: "Your mentoring appointment with Robert was canceled",
-    icon: "fa-calendar-xmark",
-    color: "text-red-600",
-    time: "9:28 am",
-  },
-  {
-    id: 11,
-    title: "NEW MENTEES HAVE BEEN ASSIGNED",
-    desc: "2 new mentees added to your dashboard",
-    icon: "fa-users",
-    color: "text-green-500",
-    time: "9:25 am",
-  },
-  {
-    id: 12,
-    title: "DAVID (DIRECTOR) REVIEWED YOU AS A MENTOR",
-    desc: "Reviewed in mentoring & community engagement",
-    icon: "fa-user-check",
-    color: "text-blue-500",
-    time: "9:23 am",
-  },
-];
+const listRowClass =
+  "rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-3 text-white shadow-sm transition hover:border-white/25 hover:shadow-md sm:flex sm:items-start sm:justify-between sm:gap-0 sm:p-4";
 
 export default function NotificationsPage() {
-  const glassPanel =
-    "rounded-2xl border border-white/15 bg-white/5 backdrop-blur-md shadow-[0_24px_56px_rgba(2,20,38,0.18)]";
-
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [notifications, setNotifications] = useState<Note[]>([]);
+  const [items, setItems] = useState<NotificationItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const enabledBadgeText = useMemo(() => {
-    return notificationsEnabled ? "Enabled" : "Disabled";
-  }, [notificationsEnabled]);
-
-  useEffect(() => {
+  const loadNotifications = useCallback(async () => {
     const enabledCookie = getCookie("mentor_notifications_enabled");
     const enabled = enabledCookie === null ? true : enabledCookie !== "false";
     setNotificationsEnabled(enabled);
-    setNotifications(enabled ? sampleNotifications : []);
+
+    if (!enabled) {
+      setItems([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    const mentorId = getMentorUserId();
+    if (!mentorId) {
+      setLoading(false);
+      setError("Sign in as a mentor to view notifications.");
+      setItems([]);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await getNotification(mentorId);
+      const list = unwrapNotificationsList(res);
+      setItems(list);
+    } catch (e) {
+      console.error("Mentor notifications:", e);
+      setError("Could not load notifications.");
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  return (
-    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),radial-gradient(circle_at_48%_56%,rgba(111,178,246,0.12),transparent_42%),radial-gradient(circle_at_90%_80%,rgba(8,52,85,0.4),transparent_40%),linear-gradient(180deg,#041f35_0%,#062946_100%)]" />
+  useEffect(() => {
+    loadNotifications();
+  }, [loadNotifications]);
 
+  const handleTurnOff = () => {
+    setCookie("mentor_notifications_enabled", "false", 30);
+    setNotificationsEnabled(false);
+    setItems([]);
+    setError(null);
+    setLoading(false);
+  };
+
+  const handleTurnOn = () => {
+    setCookie("mentor_notifications_enabled", "true", 30);
+    setNotificationsEnabled(true);
+    void loadNotifications();
+  };
+
+  return (
+    <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
-      <main className="relative z-10 flex-1 px-4 md:px-20 py-10 text-white overflow-y-auto">
-        <div className="max-w-4xl mx-auto">
-          <div className={`${glassPanel} p-5 sm:p-6 mb-6`}>
-            <div className="flex items-start justify-between gap-4">
+      <section
+        className="relative flex min-h-[180px] flex-col justify-center bg-cover bg-center px-4 py-10 text-white sm:min-h-[220px] md:px-20"
+        style={{ backgroundImage: `url(${HeroBg.src})` }}
+      >
+        <div className={mentorHeroOverlay} />
+        <div className="relative z-10 max-w-3xl">
+          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
+            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
+            Leadership Support Network
+          </p>
+          <h1 className="mt-3 text-2xl font-semibold sm:text-3xl md:text-4xl">Notifications</h1>
+          <p className={`mt-2 max-w-2xl ${mentorBodyText}`}>
+            Stay up to date with assessments, assignments, appointments, and roadmap activity — the same feed as in
+            your header bell.
+          </p>
+        </div>
+      </section>
+
+      <main className={`${mentorMainGradient} flex-1 px-4 pb-16 pt-8 md:px-16 lg:px-20`}>
+        <div className="mx-auto max-w-5xl">
+          <div className={`${mentorGlassCardFrost} mb-6 p-5 sm:p-6`}>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <h1 className="text-2xl font-semibold">Notifications</h1>
-                <p className="mt-1 text-sm text-[#cde2f2]">
+                <h2 className="text-lg font-semibold text-white">Preferences</h2>
+                <p className={`mt-1 ${mentorBodyText}`}>
                   {notificationsEnabled
-                    ? "You are receiving updates."
-                    : "Notifications are currently turned off."}
+                    ? "Browser alerts use your account notification list."
+                    : "Alerts are paused. Turn them back on to load your list."}
                 </p>
               </div>
-
-              <span className="rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs text-[#cde2f2]/90 whitespace-nowrap">
-                {enabledBadgeText}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="whitespace-nowrap rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs text-[#cde2f2]/90">
+                  {notificationsEnabled ? "Enabled" : "Disabled"}
+                </span>
+                {notificationsEnabled ? (
+                  <>
+                    <button type="button" className={mentorSecondaryCta} onClick={() => void loadNotifications()}>
+                      Refresh
+                    </button>
+                    <button type="button" className={mentorSecondaryCta} onClick={handleTurnOff}>
+                      Turn off
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className={mentorPrimaryCta} onClick={handleTurnOn}>
+                    Turn on notifications
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
-          {!notificationsEnabled ? (
-            <div className="text-center py-14">
-              <div className="mx-auto mb-4 h-16 w-16 rounded-full border border-white/20 bg-white/5 flex items-center justify-center">
-                <i className="fa-solid fa-bell-slash text-3xl text-[#cde2f2]" />
-              </div>
-              <p className="text-white/80">Turn notifications on from here.</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setCookie("mentor_notifications_enabled", "true", 30);
-                  setNotificationsEnabled(true);
-                  setNotifications(sampleNotifications);
-                }}
-                className="mt-4 rounded-xl bg-[#8ec5eb]/90 px-6 py-2.5 text-sm font-semibold text-[#062946] hover:bg-[#8ec5eb]"
-              >
-                Turn On Notifications
-              </button>
+          {loading && (
+            <div className="flex flex-col items-center justify-center gap-4 py-16">
+              <div className={mentorSpinner} />
+              <p className={`text-sm ${mentorBodyText}`}>Loading notifications…</p>
             </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {notifications.map((note) => (
-                <div
-                  key={note.id}
-                  className="rounded-xl border border-white/15 bg-white/5 p-4 flex justify-between items-start gap-4 hover:bg-white/10 transition"
-                >
-                  <div className="flex items-start gap-4">
-                    <div
-                      className={`mt-1 text-lg ${note.color} w-10 h-10 flex items-center justify-center bg-white/5 rounded-full border border-white/10`}
-                    >
-                      <i className={`fa-solid ${note.icon}`} />
-                    </div>
+          )}
 
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-sm leading-tight">
-                          {note.title}
-                        </p>
-                        {note.tag && (
-                          <span className="text-yellow-300 text-xs">
-                            {note.tag}
-                          </span>
-                        )}
+          {!loading && error && (
+            <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
+              {error}
+            </div>
+          )}
+
+          {!loading && !error && notificationsEnabled && items.length === 0 && (
+            <div className={mentorEmptyPanel}>
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-white/5">
+                <i className="fa-regular fa-bell text-2xl text-[#8ec5eb]" aria-hidden />
+              </div>
+              <p className={`${mentorBodyText}`}>No notifications yet.</p>
+            </div>
+          )}
+
+          {!loading && !error && notificationsEnabled && items.length > 0 && (
+            <div className="flex flex-col gap-4">
+              {items.map((note) => {
+                const p = mapNotificationItemToPopup(note);
+                return (
+                  <div key={note._id} className={listRowClass}>
+                    <div className="flex items-start gap-3 sm:gap-4">
+                      <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-base sm:text-lg">
+                        <i className={`${p.icon} ${p.iconColor}`} aria-hidden />
                       </div>
-                      <p className="text-xs text-[#cde2f2]/80 mt-1">
-                        {note.desc}
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="text-xs text-[#cde2f2]/70 whitespace-nowrap">
-                    {note.time}
+                      <div className="min-w-0">
+                        <div className="flex items-start gap-2">
+                          <p className="text-sm font-semibold leading-snug">{p.title}</p>
+                          {!note.isRead && (
+                            <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#FFD700]" title="Unread" />
+                          )}
+                        </div>
+                        {p.subtitle ? <p className="mt-1 text-xs text-[#cde2f2]">{p.subtitle}</p> : null}
+                      </div>
+                    </div>
+
+                    <div className="mt-2 text-xs text-[#cde2f2] sm:mt-1 sm:text-right">{p.time}</div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

@@ -1,60 +1,89 @@
 "use client";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "@/app/Assets/progress-bg.png";
-import PastorImg from "@/app/Assets/mentor1.png"; // 👤 example pastor image
+import PastorImg from "@/app/Assets/mentor1.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { useRouter } from "next/navigation";
 import MentorHeader from "@/app/Components/MentorHeader";
+import MentorFilterTabGroup from "@/app/Components/mentor/MentorFilterTabGroup";
+import MentorSearchBar from "@/app/Components/mentor/MentorSearchBar";
+import {
+  mentorBodyText,
+  mentorEmptyPanel,
+  mentorGlassCardRoadmap,
+  mentorHeroOverlay,
+  mentorMainGradient,
+  mentorPageRoot,
+  mentorPrimaryCta,
+  mentorFilterPanel,
+  mentorSpinner,
+  mentorWarningPanel,
+} from "@/app/Components/mentor/mentor-theme";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
+import { isRemoteImageSrc } from "@/app/utils/image";
 
 export default function TrackProgressPage() {
-  const [filter, setFilter] = useState("All");
+  const [filter, setFilter] = useState<"All" | "In-Progress" | "Completed">("All");
   const [search, setSearch] = useState("");
   const router = useRouter();
 
   const [pastors, setPastors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchPastors = async () => {
       try {
+        setLoadError(null);
         const mentor = getMentorFromCookie();
-        if (!mentor?.id) return;
+        const mentorId = mentor?.id ?? mentor?._id;
+        if (!mentorId) {
+          setLoadError("Sign in as a mentor to track assigned pastors.");
+          setPastors([]);
+          return;
+        }
 
-        const res = await apiGetAssignedUsers(mentor.id);
-        const users = res.data?.data || [];
+        const res = await apiGetAssignedUsers(String(mentorId));
+        const users = Array.isArray(res.data?.data) ? res.data.data : [];
 
         const results = await Promise.all(
           users.map(async (u: any) => {
+            const uid = u._id ?? u.id;
+            if (uid == null || String(uid).trim() === "") {
+              return null;
+            }
             try {
-              const progressRes = await apiGetUserProgress(u._id);
+              const progressRes = await apiGetUserProgress(String(uid));
 
               return {
-                id: u._id,
-                name: `${u.firstName} ${u.lastName}`,
+                id: String(uid),
+                name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Pastor",
                 desc: u.profileInfo || "Assigned pastor",
                 img: u.profilePicture || PastorImg,
                 progress: progressRes.data?.data?.overallProgress ?? 0,
               };
             } catch {
               return {
-                id: u._id,
-                name: `${u.firstName} ${u.lastName}`,
+                id: String(uid),
+                name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Pastor",
                 desc: u.profileInfo || "Assigned pastor",
                 img: u.profilePicture || PastorImg,
                 progress: 0,
               };
             }
-          })
+          }),
         );
 
-        setPastors(results);
+        setPastors(
+          results.filter((p): p is NonNullable<typeof p> => p != null && Boolean(p.id)),
+        );
       } catch (err) {
         console.error("Failed to load pastors", err);
+        setLoadError("Could not load progress. Please try again.");
+        setPastors([]);
       } finally {
         setLoading(false);
       }
@@ -74,131 +103,135 @@ export default function TrackProgressPage() {
   );
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
+    <div className={mentorPageRoot}>
       <MentorHeader showFullHeader />
 
-      {/* HERO SECTION */}
       <section
         className="relative overflow-hidden bg-cover bg-top px-4 pb-10 pt-4 sm:px-8 lg:px-20"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.68)_0%,rgba(6,41,70,0.6)_50%,rgba(6,41,70,1)_100%)]" />
+        <div className={mentorHeroOverlay} />
 
         <div className="relative z-10 mx-auto w-full max-w-6xl">
           <h1 className="text-2xl font-semibold sm:text-3xl">Track Progress</h1>
-          <p className="mt-2 text-sm text-[#cde2f2]">
+          <p className={`mt-2 ${mentorBodyText}`}>
             Monitor mentoring progress and mark completion.
           </p>
         </div>
       </section>
 
-      {/* MAIN SECTION */}
-      <main className="flex-1 px-4 md:px-20 py-10">
-        <div className="max-w-7xl mx-auto">
-          {/* SEARCH BAR */}
-          {/* SEARCH BAR + FILTERS */}
-          <div className="mb-12 rounded-2xl border border-white/15 bg-white/5 p-4 sm:p-5">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            {/* Search */}
-            <div className="flex items-center w-full sm:w-[480px] rounded-xl border border-white/15 bg-white/10 overflow-hidden">
-              <i className="fa-solid fa-magnifying-glass text-[#8ec5eb] px-3"></i>
-              <input
-                type="text"
-                placeholder="Search"
+      <main className={`${mentorMainGradient} flex-1 px-4 py-10 md:px-20`}>
+        <div className="mx-auto max-w-7xl">
+          {loadError ? <div className={`mb-6 ${mentorWarningPanel}`}>{loadError}</div> : null}
+
+          <div className={`${mentorFilterPanel} mb-10`}>
+            <div className="flex flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-center">
+              <MentorSearchBar
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full px-3 py-[10px] text-sm text-white placeholder:text-white/60 focus:outline-none bg-transparent"
+                onChange={setSearch}
+                placeholder="Search pastors…"
+                aria-label="Search pastors"
+                className="w-full max-w-none lg:max-w-md"
+              />
+              <MentorFilterTabGroup
+                tabs={["All", "In-Progress", "Completed"] as const}
+                active={filter}
+                onChange={setFilter}
+                aria-label="Progress filter"
+                className="w-full lg:w-auto"
               />
             </div>
-
-            {/* Tabs */}
-            <div className="flex rounded-xl border border-white/15 bg-white/10 overflow-hidden">
-              {["All", "In-Progress", "Completed"].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setFilter(tab)}
-                  className={`px-8 py-[8px] text-sm font-medium transition-all duration-200 rounded-md
-          ${filter === tab
-                      ? "bg-[#8ec5eb]/25 text-white border border-[#8ec5eb]/40 shadow-sm"
-                      : "text-[#cde2f2] hover:bg-white/10"
-                    }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-            </div>
           </div>
 
-          {/* GRID OF CARDS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {visible.map((pastor, index) => (
-              <div
-                key={pastor.id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  router.push(`/mentor/MentorProgress?userId=${pastor.id}`);
-                }}
-                className="rounded-2xl border border-white/15 bg-white/5 p-5 flex flex-col sm:flex-row items-center gap-4 sm:gap-6 shadow-sm hover:bg-white/10 transition-all duration-200"
-              >
-                {/* LEFT: IMAGE */}
-                <Image
-                  src={pastor.img}
-                  alt={pastor.name}
-                  width={120}
-                  height={120}
-                  className="rounded-xl object-cover sm:w-[150px] sm:h-[150px] border border-white/15"
-                />
-                {/* RIGHT: DETAILS */}
-                <div className="flex-1">
-                  <h4 className="text-[16px] font-semibold">{pastor.name}</h4>
-                  <p className="text-sm text-[#cde2f2]/80 mt-[2px]">
-                    {pastor.desc}
-                  </p>
+          {loading ? (
+            <div className="flex flex-col items-center justify-center gap-4 py-20">
+              <div className={mentorSpinner} />
+              <p className={`text-sm ${mentorBodyText}`}>Loading progress…</p>
+            </div>
+          ) : null}
 
-                  {/* PROGRESS SECTION */}
-                  <div className="mt-4">
-                    <p className="text-xs text-[#cde2f2] mb-[4px] font-medium">
-                      Progress
-                    </p>
-                    <div className="w-full bg-white/15 h-[6px] rounded-full mb-[6px]">
-                      <div
-                        className="h-[6px] bg-[#8ec5eb] rounded-full"
-                        style={{ width: `${pastor.progress}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <p className="text-xs text-[#cde2f2]">
-                        {pastor.progress}%
-                      </p>
+          {!loading && !loadError && visible.length === 0 ? (
+            <div className={mentorEmptyPanel}>
+              {pastors.length === 0
+                ? "No pastors are assigned to you yet."
+                : search.trim()
+                  ? "No pastors match your search."
+                  : "No pastors in this filter."}
+            </div>
+          ) : null}
 
-                      {/* BUTTONS */}
-                      {pastor.progress === 100 ? (
-                        <button className="bg-[#8ec5eb]/25 text-[#8ec5eb] text-[12px] font-medium px-4 py-[4px] rounded-md border border-[#8ec5eb]/35">
-                          Completed
-                        </button>
-                      ) : pastor.progress >= 90 ? (
-                        <button
-                          className="bg-[#8ec5eb]/90 text-[#062946] text-[12px] font-medium px-4 py-[4px] rounded-md hover:bg-[#8ec5eb] transition"
-                          onClick={() => router.push(`/mentor/MentorProgress?userId=${pastor.id}`)}
-                        >
-                          Mark as Complete
-                        </button>
-                      ) : null}
-                    </div>
+          {!loading && visible.length > 0 ? (
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
+              {visible.map((pastor) => (
+                <div
+                  key={pastor.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open progress for ${pastor.name}`}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      router.push(`/mentor/MentorProgress?userId=${pastor.id}`);
+                    }
+                  }}
+                  onClick={() => router.push(`/mentor/MentorProgress?userId=${pastor.id}`)}
+                  className={`${mentorGlassCardRoadmap} cursor-pointer flex-col items-stretch gap-4 p-5 text-left sm:flex-row sm:items-center sm:gap-6`}
+                >
+                  <div className="relative mx-auto shrink-0 sm:mx-0">
+                    <Image
+                      src={pastor.img}
+                      alt={pastor.name}
+                      width={120}
+                      height={120}
+                      unoptimized={isRemoteImageSrc(pastor.img)}
+                      className="h-[88px] w-[88px] rounded-xl border border-white/20 object-cover sm:h-[120px] sm:w-[120px]"
+                    />
                   </div>
 
-                  {/* ACTION ICONS */}
-                  <div className="flex gap-5 text-[#8ec5eb] text-[15px] mt-3">
-                    <i className="fa-regular fa-envelope cursor-pointer hover:text-white"></i>
-                    <i className="fa-regular fa-comment cursor-pointer hover:text-white"></i>
-                    <i className="fa-solid fa-phone cursor-pointer hover:text-white"></i>
-                    <i className="fa-brands fa-whatsapp cursor-pointer hover:text-white"></i>
+                  <div className="flex min-w-0 flex-1 flex-col text-left">
+                    <h4 className="text-base font-semibold text-white">{pastor.name}</h4>
+                    <p className="mt-0.5 text-sm text-[#cde2f2]/90">{pastor.desc}</p>
+
+                    <div className="mt-4">
+                      <p className="mb-1 text-xs font-medium text-[#cde2f2]">Progress</p>
+                      <div className="mb-1.5 h-1.5 w-full rounded-full bg-white/15">
+                        <div
+                          className="h-1.5 rounded-full bg-[#8ec5eb]"
+                          style={{ width: `${Math.min(100, pastor.progress)}%` }}
+                        />
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-[#cde2f2]">{pastor.progress}%</p>
+                        {pastor.progress === 100 ? (
+                          <span className="rounded-md border border-[#8ec5eb]/35 bg-[#8ec5eb]/25 px-3 py-1 text-xs font-medium text-[#8ec5eb]">
+                            Completed
+                          </span>
+                        ) : pastor.progress >= 90 ? (
+                          <button
+                            type="button"
+                            className={`${mentorPrimaryCta} px-4 py-1.5 text-xs`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/mentor/MentorProgress?userId=${pastor.id}`);
+                            }}
+                          >
+                            Mark as Complete
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex gap-4 text-[15px] text-[#8ec5eb]">
+                      <i className="fa-regular fa-envelope pointer-events-none" aria-hidden />
+                      <i className="fa-regular fa-comment pointer-events-none" aria-hidden />
+                      <i className="fa-solid fa-phone pointer-events-none" aria-hidden />
+                      <i className="fa-brands fa-whatsapp pointer-events-none" aria-hidden />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       </main>
     </div>

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import HeroBg from "../../Assets/hero-bg.png";
 import DuoIcon from "../../Assets/duo.png";
@@ -10,16 +10,40 @@ import Mentor3 from "../../Assets/mentor3.png";
 import UserProfile from "../../Assets/user-profile.png";
 import MapImg from "../../Assets/map-placeholder.png";
 import { useRouter } from "next/navigation";
-import { apiAssignUsers, apiGetMentorAppointments } from "@/app/Services/api";
+import {
+  apiGetAssessments,
+  apiGetAssignedUsers,
+  apiGetMentorAppointments,
+  apiGetMentorSchedule,
+} from "@/app/Services/api";
+import { parseAssessmentsListPayload } from "@/app/Services/assessment.service";
+import { unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { getGreeting } from "@/app/Services/utils/helpers";
 import Cookies from "js-cookie";
 import Link from "next/link";
+import MentorSearchBar from "@/app/Components/mentor/MentorSearchBar";
+import {
+  mentorGlassCardFrost,
+  mentorPageRoot,
+  mentorSpinner,
+} from "@/app/Components/mentor/mentor-theme";
 
-const glassCard =
-  "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.1)_0%,rgba(255,255,255,0.04)_100%)] backdrop-blur-xl shadow-[0_8px_40px_rgba(3,24,43,0.4)]";
-const glassCardHover =
-  "transition-all duration-300 hover:border-white/25 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.14)_0%,rgba(255,255,255,0.06)_100%)] hover:shadow-[0_12px_48px_rgba(3,24,43,0.45)]";
+const innerTileHover =
+  "transition-all duration-300 hover:border-white/25 hover:bg-white/[0.08] hover:shadow-[0_12px_48px_rgba(3,24,43,0.45)]";
+
+/**
+ * Dashboard “Things to Focus On” — each href loads a page that fetches its own data:
+ * - Schedule → GET mentor appointments + weekly availability APIs
+ * - Mentees → GET assigned pastors (mentees)
+ * - Assessments → GET /assessment list
+ */
+const FOCUS_HREF = {
+  todaySessions: "/mentor/MentorSchedule?tab=appointments",
+  otherMeetings: "/mentor/MentorSchedule?tab=availability",
+  pastorQueries: "/mentor/MenteesDetailed?focus=pastors",
+  surveys: "/mentor/MentorAssessments",
+} as const;
 
 const getMentorFromCookie = () => {
   const cookie = Cookies.get("mentor");
@@ -33,7 +57,6 @@ const getMentorFromCookie = () => {
 
 const mentorStatic = getMentorFromCookie();
 const userIdStatic = mentorStatic?.id ?? mentorStatic?._id;
-const assignedIdsStatic = mentorStatic?.assignedId || [];
 
 const isToday = (dateString: string) => {
   const today = new Date();
@@ -44,33 +67,6 @@ const isToday = (dateString: string) => {
     date.getFullYear() === today.getFullYear()
   );
 };
-
-const focusItems = [
-  {
-    label: "Today's Mentorship Sessions",
-    shortLabel: "Today's Mentorship",
-    icon: "fa-regular fa-calendar-check",
-    route: "/mentor/MentorSchedule",
-  },
-  {
-    label: "Other Meetings",
-    shortLabel: "Other Meetings",
-    icon: "fa-solid fa-layer-group",
-    route: "/mentor/MentorSchedule",
-  },
-  {
-    label: "Pastor Queries",
-    shortLabel: "Pastor Queries",
-    icon: "fa-regular fa-comments",
-    route: "/mentor/MenteesDetailed",
-  },
-  {
-    label: "Survey Submissions",
-    shortLabel: "Survey Submissions",
-    icon: "fa-regular fa-file-lines",
-    route: "/mentor/MentorAssessments",
-  },
-];
 
 const quickLinks = [
   {
@@ -122,12 +118,14 @@ export default function MentorHomePage() {
   const [mentees, setMentees] = useState<any[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [loading, setLoading] = useState(true);
-  const [appointments, setAppointments] = useState<any[]>([]);
-  const [appointmentsLoading, setAppointmentsLoading] = useState(true);
+  /** Full mentor schedule / upcoming list for counts and “today” strip */
+  const [scheduleList, setScheduleList] = useState<any[]>([]);
+  const [scheduleLoading, setScheduleLoading] = useState(true);
+  const [assessmentCount, setAssessmentCount] = useState<number | null>(null);
   const [mentorUser, setMentorUser] = useState<ReturnType<typeof getMentorFromCookie>>(null);
+  const [mapSearch, setMapSearch] = useState("");
 
   const userId = mentorUser?.id ?? mentorUser?._id ?? userIdStatic;
-  const assignedIds = mentorUser?.assignedId || assignedIdsStatic;
 
   useEffect(() => {
     setMentorUser(getMentorFromCookie());
@@ -148,9 +146,9 @@ export default function MentorHomePage() {
           setMentees([]);
           return;
         }
-        const ids = m?.assignedId || [];
-        const res = await apiAssignUsers(uid, ids);
-        setMentees(res.data?.data?.assignedId || []);
+        const res = await apiGetAssignedUsers(String(uid));
+        const raw = res.data?.data;
+        setMentees(Array.isArray(raw) ? raw : []);
       } catch (error) {
         console.error("Error fetching mentor home data:", error);
         setMentees([]);
@@ -162,25 +160,105 @@ export default function MentorHomePage() {
   }, []);
 
   useEffect(() => {
-    const fetchAppointments = async () => {
+    if (!userId) {
+      setScheduleList([]);
+      setScheduleLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      setScheduleLoading(true);
       try {
-        if (!userId) return;
-        setAppointmentsLoading(true);
-        const res = await apiGetMentorAppointments(userId, true);
-        const allAppointments = res.data?.data || [];
-        const todays = allAppointments.filter((a: { meetingDate: string }) =>
-          isToday(a.meetingDate),
-        );
-        setAppointments(todays);
+        let list: any[] = [];
+        try {
+          const res = await apiGetMentorSchedule(userId);
+          list = unwrapAppointmentsAxiosData(res);
+        } catch {
+          const res = await apiGetMentorAppointments(userId, false);
+          list = unwrapAppointmentsAxiosData(res);
+        }
+        if (!cancelled) setScheduleList(Array.isArray(list) ? list : []);
       } catch (err) {
-        console.error("Failed to load appointments:", err);
-        setAppointments([]);
+        console.error("Failed to load mentor schedule:", err);
+        if (!cancelled) setScheduleList([]);
       } finally {
-        setAppointmentsLoading(false);
+        if (!cancelled) setScheduleLoading(false);
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-    fetchAppointments();
   }, [userId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiGetAssessments({});
+        const list = parseAssessmentsListPayload(res.data);
+        if (!cancelled) setAssessmentCount(Array.isArray(list) ? list.length : 0);
+      } catch {
+        if (!cancelled) setAssessmentCount(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const todaysAppointments = useMemo(
+    () => scheduleList.filter((a) => a?.meetingDate && isToday(a.meetingDate)),
+    [scheduleList],
+  );
+
+  const otherUpcomingCount = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return scheduleList.filter((a) => {
+      if (!a?.meetingDate) return false;
+      const d = new Date(a.meetingDate);
+      return !isToday(a.meetingDate) && d >= start;
+    }).length;
+  }, [scheduleList]);
+
+  const focusItems = useMemo(
+    () => [
+      {
+        label: "Today's Mentorship Sessions",
+        shortLabel: "Today's Mentorship",
+        icon: "fa-regular fa-calendar-check",
+        href: FOCUS_HREF.todaySessions,
+        count: todaysAppointments.length,
+        ariaLabel: "Open schedule — today’s mentorship appointments",
+      },
+      {
+        label: "Other Meetings",
+        shortLabel: "Other Meetings",
+        icon: "fa-solid fa-layer-group",
+        href: FOCUS_HREF.otherMeetings,
+        count: otherUpcomingCount,
+        ariaLabel: "Open schedule — availability and other meetings",
+      },
+      {
+        label: "Pastor Queries",
+        shortLabel: "Pastor Queries",
+        icon: "fa-regular fa-comments",
+        href: FOCUS_HREF.pastorQueries,
+        count: mentees.length,
+        ariaLabel: "Open my mentees — assigned pastors",
+      },
+      {
+        label: "Survey Submissions",
+        shortLabel: "Survey Submissions",
+        icon: "fa-regular fa-file-lines",
+        href: FOCUS_HREF.surveys,
+        count: assessmentCount,
+        ariaLabel: "Open assessments and surveys",
+      },
+    ],
+    [todaysAppointments.length, otherUpcomingCount, mentees.length, assessmentCount],
+  );
 
   const formattedTime = currentTime.toLocaleTimeString("en-US", {
     hour: "2-digit",
@@ -203,9 +281,9 @@ export default function MentorHomePage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-1 items-center justify-center bg-transparent font-[Albert_Sans]">
+      <div className={`${mentorPageRoot} items-center justify-center`}>
         <div className="text-center text-white">
-          <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
+          <div className={`mx-auto mb-4 ${mentorSpinner}`} />
           <p className="text-sm text-[#cde2f2]">Loading your dashboard…</p>
         </div>
       </div>
@@ -213,13 +291,13 @@ export default function MentorHomePage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-transparent font-[Albert_Sans] text-white">
+    <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
       <main className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-4 pb-28 pt-4 sm:px-6 sm:pb-10 lg:px-8 lg:pt-6">
         {/* Hero */}
         <section
-          className={`relative overflow-hidden rounded-3xl border border-white/10 ${glassCard}`}
+          className={`relative overflow-hidden rounded-3xl border border-white/10 ${mentorGlassCardFrost}`}
         >
           <div className="relative h-[220px] sm:h-[280px] lg:h-[320px]">
             <Image
@@ -265,21 +343,27 @@ export default function MentorHomePage() {
         {/* Quick filter chips — horizontal scroll on small screens */}
         <div className="mt-6 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible">
           {focusItems.map((item) => (
-            <button
+            <Link
               key={item.label}
-              type="button"
-              onClick={() => router.push(item.route)}
-              className="shrink-0 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-left text-xs font-medium text-white/90 backdrop-blur-sm transition hover:border-[#8ec5eb]/40 hover:bg-white/10 sm:text-sm"
+              href={item.href}
+              aria-label={item.ariaLabel}
+              prefetch
+              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-left text-xs font-medium text-white/90 backdrop-blur-sm transition hover:border-[#8ec5eb]/40 hover:bg-white/10 sm:text-sm"
             >
               <span className="hidden sm:inline">{item.label}</span>
               <span className="sm:hidden">{item.shortLabel}</span>
-            </button>
+              {item.count != null ? (
+                <span className="rounded-full bg-[#8ec5eb]/25 px-2 py-0.5 text-[10px] font-bold text-white tabular-nums">
+                  {item.count > 99 ? "99+" : item.count}
+                </span>
+              ) : null}
+            </Link>
           ))}
         </div>
 
         {/* Things to focus on */}
         <section className="mt-8">
-          <div className={`p-5 sm:p-6 lg:p-8 ${glassCard}`}>
+          <div className={`p-5 sm:p-6 lg:p-8 ${mentorGlassCardFrost}`}>
             <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10">
                 <i className="fa-solid fa-filter text-lg text-[#8ec5eb]" />
@@ -294,17 +378,25 @@ export default function MentorHomePage() {
 
             <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               {focusItems.map((item) => (
-                <button
+                <Link
                   key={item.label}
-                  type="button"
-                  onClick={() => router.push(item.route)}
-                  className={`flex min-h-[120px] flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-center ${glassCardHover}`}
+                  href={item.href}
+                  aria-label={item.ariaLabel}
+                  prefetch
+                  className={`flex min-h-[120px] flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-center ${innerTileHover}`}
                 >
                   <i className={`${item.icon} text-2xl text-[#8ec5eb]`} />
                   <span className="text-xs font-medium leading-snug text-white/90 sm:text-sm">
                     {item.label}
                   </span>
-                </button>
+                  {item.count != null ? (
+                    <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-[#8ec5eb]">
+                      {item.count > 99 ? "99+" : item.count}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-white/40">…</span>
+                  )}
+                </Link>
               ))}
             </div>
           </div>
@@ -313,7 +405,7 @@ export default function MentorHomePage() {
         {/* Need a help? */}
         <section className="mt-6">
           <div
-            className={`flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6 ${glassCard}`}
+            className={`flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6 ${mentorGlassCardFrost}`}
           >
             <div className="flex flex-1 items-start gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10">
@@ -327,22 +419,22 @@ export default function MentorHomePage() {
               </div>
             </div>
             <div className="flex shrink-0 gap-2 sm:gap-3">
-              <button
-                type="button"
-                onClick={() => router.push("/mentor/MentorAssessments")}
+              <Link
+                href={FOCUS_HREF.surveys}
+                prefetch
                 className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium backdrop-blur-sm transition hover:bg-white/15"
               >
                 <i className="fa-regular fa-circle-question text-[#8ec5eb]" />
                 Help
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push("/mentor/MentorSchedule")}
+              </Link>
+              <Link
+                href={FOCUS_HREF.todaySessions}
+                prefetch
                 className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium backdrop-blur-sm transition hover:bg-white/15"
               >
                 <i className="fa-regular fa-calendar text-[#8ec5eb]" />
                 Sessions
-              </button>
+              </Link>
             </div>
           </div>
         </section>
@@ -352,27 +444,29 @@ export default function MentorHomePage() {
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-lg font-semibold sm:text-xl">Today&apos;s Appointments</h2>
             <Link
-              href="/mentor/MentorSchedule"
+              href={FOCUS_HREF.todaySessions}
+              prefetch
               className="text-sm font-medium text-[#8ec5eb] hover:text-[#b8ddf5]"
             >
               See all
             </Link>
           </div>
 
-          {appointmentsLoading ? (
+          {scheduleLoading ? (
             <p className="text-sm text-white/55">Loading appointments…</p>
-          ) : appointments.length === 0 ? (
-            <div className={`p-8 text-center text-sm text-white/55 ${glassCard}`}>
+          ) : todaysAppointments.length === 0 ? (
+            <div className={`p-8 text-center text-sm text-white/55 ${mentorGlassCardFrost}`}>
               No appointments scheduled for today.
             </div>
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
-              {appointments.slice(0, 2).map((appt, i) => {
+              {todaysAppointments.slice(0, 2).map((appt, i) => {
                 const meetingDate = new Date(appt.meetingDate);
+                const otherParty = appt.user ?? appt.mentor ?? appt.pastor;
                 return (
                   <div
                     key={appt._id || i}
-                    className={`flex flex-col gap-4 p-5 sm:flex-row sm:items-center ${glassCard}`}
+                    className={`flex flex-col gap-4 p-5 sm:flex-row sm:items-center ${mentorGlassCardFrost}`}
                   >
                     <div className="flex shrink-0 justify-center sm:justify-start">
                       <div className="flex h-[100px] w-[100px] items-center justify-center rounded-2xl border border-white/15 bg-white/10 sm:h-[120px] sm:w-[120px]">
@@ -386,7 +480,7 @@ export default function MentorHomePage() {
                     <div className="min-w-0 flex-1 text-center sm:text-left">
                       <div className="mb-3 flex items-center justify-center gap-3 sm:justify-start">
                         <Image
-                          src={appt.mentor?.profilePicture || UserProfile}
+                          src={otherParty?.profilePicture || UserProfile}
                           alt=""
                           width={40}
                           height={40}
@@ -394,9 +488,9 @@ export default function MentorHomePage() {
                         />
                         <div>
                           <p className="font-semibold text-white">
-                            {appt.mentor?.firstName} {appt.mentor?.lastName}
+                            {otherParty?.firstName} {otherParty?.lastName}
                           </p>
-                          <p className="text-xs text-white/60">{appt.mentor?.role || "Mentor"}</p>
+                          <p className="text-xs text-white/60">{otherParty?.role || "Pastor"}</p>
                         </div>
                       </div>
                       <div className="flex flex-wrap justify-center gap-2 text-xs sm:justify-start">
@@ -426,7 +520,7 @@ export default function MentorHomePage() {
 
         {/* Quick links */}
         <section className="mt-10">
-          <div className={`p-5 sm:p-6 lg:p-8 ${glassCard}`}>
+          <div className={`p-5 sm:p-6 lg:p-8 ${mentorGlassCardFrost}`}>
             <div className="mb-6 flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10">
                 <i className="fa-solid fa-map text-[#8ec5eb]" />
@@ -435,15 +529,14 @@ export default function MentorHomePage() {
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
               {quickLinks.map((q) => (
-                <button
+                <Link
                   key={q.title}
-                  type="button"
-                  onClick={() => router.push(q.route)}
-                  className={`flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] py-8 ${glassCardHover}`}
+                  href={q.route}
+                  className={`flex flex-col items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] py-8 ${innerTileHover}`}
                 >
                   <i className={`${q.icon} text-2xl text-[#8ec5eb]`} />
                   <span className="text-sm font-medium text-white/90">{q.title}</span>
-                </button>
+                </Link>
               ))}
             </div>
           </div>
@@ -461,7 +554,7 @@ export default function MentorHomePage() {
             </Link>
           </div>
           {mentees.length === 0 ? (
-            <div className={`p-8 text-center text-sm text-white/55 ${glassCard}`}>
+            <div className={`p-8 text-center text-sm text-white/55 ${mentorGlassCardFrost}`}>
               No mentees are assigned yet.
             </div>
           ) : (
@@ -473,7 +566,7 @@ export default function MentorHomePage() {
                   onClick={() =>
                     router.push(`/mentor/MenteesDetailed/profile?id=${mentee._id}`)
                   }
-                  className={`overflow-hidden text-left ${glassCard} ${glassCardHover}`}
+                  className={`overflow-hidden text-left ${mentorGlassCardFrost}`}
                 >
                   <div className="relative aspect-[4/3] w-full">
                     <Image
@@ -498,7 +591,7 @@ export default function MentorHomePage() {
 
         {/* Roadmap list */}
         <section className="mt-10">
-          <div className={`p-5 sm:p-6 lg:p-8 ${glassCard}`}>
+          <div className={`p-5 sm:p-6 lg:p-8 ${mentorGlassCardFrost}`}>
             <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="text-lg font-semibold">Today&apos;s Roadmap List</h3>
               <div className="flex rounded-xl border border-white/10 bg-white/5 p-1">
@@ -559,11 +652,10 @@ export default function MentorHomePage() {
           <h2 className="mb-6 text-lg font-semibold sm:text-xl">Explore CCC</h2>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {exploreCards.map((item) => (
-              <button
+              <Link
                 key={item.route}
-                type="button"
-                onClick={() => router.push(item.route)}
-                className={`flex flex-col items-start p-5 text-left ${glassCard} ${glassCardHover}`}
+                href={item.route}
+                className={`flex flex-col items-start p-5 text-left ${mentorGlassCardFrost}`}
               >
                 <i className={`${item.icon} mb-4 text-2xl text-[#8ec5eb]`} />
                 <span className="font-semibold text-white">{item.title}</span>
@@ -571,22 +663,24 @@ export default function MentorHomePage() {
                 <span className="mt-4 flex items-center gap-2 text-sm text-[#8ec5eb]">
                   More <i className="fa-solid fa-arrow-up-right-from-square text-xs" />
                 </span>
-              </button>
+              </Link>
             ))}
           </div>
         </section>
 
         {/* Map */}
         <section className="mt-10">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <h2 className="text-lg font-semibold sm:text-xl">Mentees map</h2>
-            <input
-              type="search"
+            <MentorSearchBar
+              value={mapSearch}
+              onChange={setMapSearch}
               placeholder="Search mentees…"
-              className="w-full max-w-xs rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm text-white placeholder:text-white/40 outline-none focus:border-[#8ec5eb]/50 sm:w-auto"
+              aria-label="Search mentees on map"
+              className="w-full sm:max-w-xs"
             />
           </div>
-          <div className={`overflow-hidden rounded-3xl border border-white/10 ${glassCard} p-1`}>
+          <div className={`overflow-hidden rounded-3xl border border-white/10 ${mentorGlassCardFrost} p-1`}>
             <div className="relative aspect-[21/9] min-h-[280px] w-full sm:min-h-[360px] lg:min-h-[420px]">
               <Image src={MapImg} alt="Map" fill className="rounded-[1.35rem] object-cover" />
               <div className="absolute bottom-4 left-4 rounded-xl border border-white/15 bg-black/40 px-4 py-3 backdrop-blur-md sm:bottom-6 sm:left-6">

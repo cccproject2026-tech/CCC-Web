@@ -15,13 +15,23 @@ import { apiAssignAssessment } from "@/app/Services/progress.service";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 import { useRouter } from "next/navigation";
+import MentorModal from "@/app/Components/mentor/MentorModal";
+import MentorSearchBar from "@/app/Components/mentor/MentorSearchBar";
+import {
+  mentorBodyText,
+  mentorEmptyPanel,
+  mentorFilterPanel,
+  mentorGlassCardFrost,
+  mentorGlassCardRoadmap,
+  mentorHeroOverlay,
+  mentorMainGradient,
+  mentorModalBtnSecondary,
+  mentorPageRoot,
+} from "@/app/Components/mentor/mentor-theme";
 
 function isHttpUrl(u?: string): boolean {
   return !!u && (u.startsWith("http://") || u.startsWith("https://"));
 }
-
-const glassPanel =
-  "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] backdrop-blur-md";
 
 function getAssessmentId(item: { _id?: string; id?: string }): string {
   const raw = item._id ?? item.id;
@@ -206,38 +216,34 @@ export default function MentorAssessments() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
+    <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
       <section
         className="relative overflow-hidden bg-cover bg-center px-4 pb-10 pt-4 sm:px-8 lg:px-20"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.68)_0%,rgba(6,41,70,0.6)_50%,rgba(6,41,70,1)_100%)]" />
+        <div className={mentorHeroOverlay} />
 
         <div className="relative z-10 mx-auto w-full max-w-7xl">
           <h1 className="text-2xl font-semibold sm:text-3xl">Assessments</h1>
-          <p className="mt-2 text-sm text-[#cde2f2]">Create, assign, and review mentoring assessments.</p>
+          <p className={`mt-2 ${mentorBodyText}`}>Create, assign, and review mentoring assessments.</p>
         </div>
       </section>
 
-      <main className="flex-1 px-4 pb-12 sm:px-8 lg:px-20">
+      <main className={`${mentorMainGradient} flex-1 px-4 pb-12 sm:px-8 lg:px-20`}>
         <div className="mx-auto max-w-7xl space-y-6">
           {!showForm ? (
             <>
-              <div className={`p-4 sm:p-5 ${glassPanel}`}>
+              <div className={mentorFilterPanel}>
                 <div className="flex flex-col items-stretch justify-between gap-4 md:flex-row md:items-center">
-                  <div className="flex w-full items-center rounded-xl border border-white/20 bg-white/10 md:max-w-md">
-                    <i className="fa-solid fa-magnifying-glass px-3 text-[#8ec5eb]" />
-                    <input
-                      type="search"
-                      placeholder="Search assessments..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full bg-transparent py-2.5 pr-3 text-sm text-white placeholder:text-white/50 focus:outline-none"
-                      autoComplete="off"
-                    />
-                  </div>
+                  <MentorSearchBar
+                    value={searchTerm}
+                    onChange={setSearchTerm}
+                    placeholder="Search assessments..."
+                    aria-label="Search assessments"
+                    className="w-full md:max-w-md"
+                  />
 
                   <div className="flex flex-wrap gap-3">
                     <button
@@ -266,7 +272,9 @@ export default function MentorAssessments() {
               </div>
 
               {mode === "select" && (
-                <div className={`flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${glassPanel}`}>
+                <div
+                  className={`${mentorFilterPanel} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}
+                >
                   <p className="text-sm text-[#cde2f2]">
                     Selected: <span className="font-semibold text-white">{selectedIds.length}</span>
                   </p>
@@ -294,7 +302,7 @@ export default function MentorAssessments() {
               {loading && <div className="py-16 text-center text-[#cde2f2]">Loading assessments…</div>}
 
               {!loading && filtered.length === 0 && (
-                <div className={`py-16 text-center text-[#cde2f2] ${glassPanel}`}>No assessments found.</div>
+                <div className={mentorEmptyPanel}>No assessments found.</div>
               )}
 
               <div className="grid gap-6 sm:grid-cols-2">
@@ -303,11 +311,9 @@ export default function MentorAssessments() {
                   return (
                     <div
                       key={aid || `row-${index}`}
-                      className={`relative flex overflow-hidden rounded-2xl border transition ${
-                        selectedIds.includes(aid)
-                          ? "border-[#8ec5eb] ring-2 ring-[#8ec5eb]/40"
-                          : "border-white/15"
-                      } ${glassPanel}`}
+                      className={`relative flex overflow-hidden ${mentorGlassCardRoadmap} ${
+                        selectedIds.includes(aid) ? "ring-2 ring-[#8ec5eb]/50" : ""
+                      }`}
                     >
                       {mode === "select" && (
                         <div className="absolute right-3 top-3 z-20">
@@ -458,7 +464,7 @@ export default function MentorAssessments() {
                     />
                   </div>
 
-                  <div className={`rounded-xl border border-white/20 p-5 ${glassPanel}`}>
+                  <div className={mentorFilterPanel}>
                     <div className="mb-4 flex items-center justify-between">
                       <label className="font-medium text-[#cde2f2]">Sections</label>
                       <button
@@ -541,32 +547,34 @@ export default function MentorAssessments() {
         </div>
       </main>
 
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-          <div className="w-[380px] rounded-2xl border border-white/20 bg-[#0a3558] p-8 text-center shadow-xl">
-            <i className="fa-solid fa-trash mb-4 text-3xl text-red-400" />
-            <p className="mb-6 font-medium text-white">
-              Delete {selectedIds.length} assessment{selectedIds.length === 1 ? "" : "s"}?
-            </p>
-            <div className="flex justify-center gap-4">
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="rounded-xl border border-white/30 px-6 py-2 font-medium text-[#cde2f2] hover:bg-white/10"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleDelete}
-                className="rounded-xl bg-red-600 px-6 py-2 font-medium text-white hover:bg-red-700"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <MentorModal
+        open={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        title="Delete assessments?"
+        footer={
+          <>
+            <button
+              type="button"
+              className={mentorModalBtnSecondary}
+              onClick={() => setShowDeleteConfirm(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="w-full rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 sm:w-auto"
+              onClick={handleDelete}
+            >
+              Delete
+            </button>
+          </>
+        }
+      >
+        <p>
+          This will permanently delete {selectedIds.length} assessment
+          {selectedIds.length === 1 ? "" : "s"}. This action cannot be undone.
+        </p>
+      </MentorModal>
 
       {toastMsg && (
         <div className="animate-fade-in fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-xl border border-white/20 bg-[#0a3558] px-4 py-2 text-sm text-white shadow-lg">
@@ -584,7 +592,7 @@ export default function MentorAssessments() {
             onClick={() => setShowAssignDrawer(false)}
           />
           <div className="relative flex h-full w-full max-w-md flex-col border-l border-white/15 bg-[#062946] shadow-2xl">
-            <div className={`border-b border-white/10 px-6 py-5 ${glassPanel} mx-4 mt-4 rounded-2xl border`}>
+            <div className={`mx-4 mt-4 border-b border-white/10 px-6 py-5 ${mentorGlassCardFrost}`}>
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-semibold text-white">Assign assessment</h3>
@@ -601,16 +609,14 @@ export default function MentorAssessments() {
             </div>
 
             <div className="border-b border-white/10 p-4">
-              <div className="relative">
-                <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#8ec5eb]/70" />
-                <input
-                  type="search"
-                  value={assignSearch}
-                  onChange={(e) => setAssignSearch(e.target.value)}
-                  placeholder="Search pastors by name or email…"
-                  className="w-full rounded-xl border border-white/20 bg-white/10 py-2.5 pl-9 pr-4 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/40"
-                />
-              </div>
+              <MentorSearchBar
+                variant="absolute"
+                value={assignSearch}
+                onChange={setAssignSearch}
+                placeholder="Search pastors by name or email…"
+                aria-label="Search pastors to assign"
+                className="w-full"
+              />
             </div>
 
             <div className="flex-1 space-y-2 overflow-y-auto p-4">

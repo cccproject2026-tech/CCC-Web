@@ -1,8 +1,24 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
+import PastorSearchBar from "@/app/Components/pastor/PastorSearchBar";
+import PastorFilterTabGroup from "@/app/Components/pastor/PastorFilterTabGroup";
+import {
+  pastorContainer,
+  pastorControlsRow,
+  pastorEmptyPanel,
+  pastorEyebrowDot,
+  pastorEyebrowPill,
+  pastorGlassCard,
+  pastorHeroOverlay,
+  pastorMainGradient,
+  pastorPageRoot,
+  pastorPrimaryCta,
+  pastorRoadmapDescription,
+  pastorSpinner,
+} from "@/app/Components/pastor/pastor-theme";
 import HeroBg from "@/app/Assets/assignments-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
@@ -19,6 +35,21 @@ import {
   subscribePastorAssignmentsBroadcast,
   subscribeProgressUpdated,
 } from "@/app/utils/progress-sync";
+
+const ASSESSMENT_TABS = ["All", "Due", "Not Started", "Completed", "Submitted"] as const;
+
+function assessmentTabFromSearchParam(
+  raw: string | null,
+): (typeof ASSESSMENT_TABS)[number] | null {
+  if (!raw) return null;
+  const d = decodeURIComponent(raw)
+    .trim()
+    .toLowerCase()
+    .replace(/\+/g, " ");
+  if (d === "in progress" || d === "inprogress") return "Due";
+  const match = ASSESSMENT_TABS.find((t) => t.toLowerCase() === d);
+  return match ?? null;
+}
 
 type Row = {
   id: string;
@@ -45,11 +76,17 @@ function readSessionUserId(): string | null {
 
 export default function PastorAssessments() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState("All");
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<(typeof ASSESSMENT_TABS)[number]>("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [assessments, setAssessments] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [sessionUserId] = useState<string | null>(() => readSessionUserId());
+
+  useLayoutEffect(() => {
+    const t = assessmentTabFromSearchParam(searchParams.get("tab"));
+    if (t) setActiveTab(t);
+  }, [searchParams]);
 
   const loadAssessments = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -179,24 +216,28 @@ export default function PastorAssessments() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#062946] text-white">
-        Loading assessments...
+      <div className={pastorPageRoot}>
+        <PastorHeader showFullHeader={true} />
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 py-20">
+          <div className={pastorSpinner} />
+          <p className="text-sm text-[#cde2f2]">Loading assessments…</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
+    <div className={pastorPageRoot}>
       <PastorHeader showFullHeader={true} />
 
       <section
         className="relative flex h-[200px] items-end justify-start bg-cover bg-center px-4 pb-8 md:h-[250px] md:px-8 md:pb-12 lg:px-16"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]" />
+        <div className={pastorHeroOverlay} />
         <div className="relative z-10">
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
-            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
+          <p className={pastorEyebrowPill}>
+            <span className={pastorEyebrowDot} />
             Leadership Support Network
           </p>
           <h1 className="mt-3 text-2xl font-semibold text-white md:text-4xl">Assessments</h1>
@@ -206,44 +247,34 @@ export default function PastorAssessments() {
         </div>
       </section>
 
-      <main className="relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 pb-12 pt-8 md:px-10 md:pb-20 md:pt-16 lg:px-20">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-8 flex flex-col items-stretch justify-between gap-4 md:mb-10 lg:flex-row lg:items-center">
-            <div className="relative w-full lg:w-[350px]">
-              <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[#cde2f2]" />
-              <input
-                type="text"
-                placeholder="Search"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full rounded-xl border border-white/20 bg-white/10 py-2 pl-10 pr-4 text-sm text-white shadow-sm outline-none backdrop-blur placeholder:text-[#cde2f2] focus:ring-2 focus:ring-[#8ec5eb]"
-              />
-            </div>
+      <main className={pastorMainGradient}>
+        <div className={pastorContainer}>
+          <div className={`${pastorControlsRow} md:mb-10`}>
+            <PastorSearchBar
+              variant="absolute"
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Search assessments…"
+              aria-label="Search assessments"
+              className="lg:w-[350px]"
+            />
 
-            <div className="flex overflow-x-auto rounded-xl border border-white/20 bg-white/10 shadow-sm backdrop-blur">
-              {["All", "Due", "Not Started", "Completed", "Submitted"].map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setActiveTab(tab)}
-                  className={`whitespace-nowrap px-3 py-2 text-xs font-medium transition-all md:px-5 md:text-sm ${
-                    activeTab === tab ? "bg-white text-[#0f4a76]" : "text-[#d9ebf8] hover:bg-white/15"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
+            <PastorFilterTabGroup
+              tabs={ASSESSMENT_TABS}
+              active={activeTab}
+              onChange={setActiveTab}
+              className="w-full lg:w-auto"
+            />
           </div>
 
           {filtered.length === 0 ? (
-            <p className="py-12 text-center text-sm text-[#cde2f2]">No assessments to show.</p>
+            <div className={pastorEmptyPanel}>No assessments to show.</div>
           ) : (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
               {filtered.map((item) => (
                 <div
                   key={item.id}
-                  className="flex flex-col overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg md:flex-row"
+                  className={`${pastorGlassCard} md:flex-row`}
                 >
                   <div className="relative m-4 h-[180px] w-full flex-shrink-0 md:m-5 md:h-[200px] md:w-[200px]">
                     {item.imgUrl ? (
@@ -271,7 +302,7 @@ export default function PastorAssessments() {
                       <h3 className="mb-1 text-[15px] font-semibold leading-tight text-white md:text-[17px]">
                         {item.title}
                       </h3>
-                      <p className="mb-3 text-sm text-[#cde2f2]">{item.desc}</p>
+                      <p className={`mb-3 ${pastorRoadmapDescription}`}>{item.desc}</p>
 
                       <div className="mb-3 flex items-center gap-2">
                         <span className="text-xs font-medium text-[#d9ebf8]">Status</span>
@@ -306,7 +337,7 @@ export default function PastorAssessments() {
                             `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(item.id)}`,
                           )
                         }
-                        className="rounded-lg bg-white px-4 py-2 text-xs font-semibold text-[#0f4a76] hover:bg-[#e7f1fa] md:px-5 md:text-sm"
+                        className={`${pastorPrimaryCta} px-4 text-xs md:px-5 md:text-sm`}
                       >
                         {item.button}
                       </button>

@@ -11,9 +11,15 @@ import {
   fetchRoadmapAssignmentsForUser,
   type RoadmapAssignmentUi,
 } from "@/app/Services/roadmap-assignments";
+import { pastorRoadmapDescription } from "@/app/Components/pastor/pastor-theme";
 
 function isHttpUrl(u?: string): boolean {
   return !!u && (u.startsWith("http://") || u.startsWith("https://"));
+}
+
+/** Aligns with revitalization-roadmap tab matching (handles spacing / casing from API). */
+function normalizeAssignmentStatus(raw: string): string {
+  return raw.trim().toLowerCase().replace(/[_\s]+/g, "-");
 }
 
 type AssignmentsTab = "New" | "In Progress" | "Due" | "Completed";
@@ -63,14 +69,15 @@ export default function PastorAssignments() {
         a.title.toLowerCase().includes(q) ||
         a.desc.toLowerCase().includes(q) ||
         a.parentRoadmapName.toLowerCase().includes(q);
+      const ns = normalizeAssignmentStatus(a.status);
       const matchesTab =
         activeTab === "New"
-          ? a.status === "Not Started"
+          ? ns === "not-started"
           : activeTab === "In Progress"
-            ? a.status === "In-progress"
-          : activeTab === "Due"
-            ? a.status === "Due"
-            : a.status === "Completed";
+            ? ns === "in-progress"
+            : activeTab === "Due"
+              ? ns === "due"
+              : ns === "completed";
       return matchesQ && matchesTab;
     });
   }, [assignments, activeTab, searchTerm]);
@@ -170,7 +177,7 @@ export default function PastorAssignments() {
                         <h3 className="mb-1 text-[17px] font-semibold leading-tight text-white sm:text-base">
                           {item.title}
                         </h3>
-                        <p className="mb-3 text-sm text-[#cde2f2] sm:text-xs">{item.desc}</p>
+                        <p className={`mb-3 ${pastorRoadmapDescription}`}>{item.desc}</p>
 
                         <div className="mb-3 flex items-center gap-2">
                           <span className="text-xs font-medium text-[#cde2f2] sm:text-[10px]">Status</span>

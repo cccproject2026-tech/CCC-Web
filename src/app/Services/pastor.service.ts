@@ -1,4 +1,5 @@
 import api from "./apiClient";
+import { getNotification } from "./notification.service";
 
 export const getPastorMedia = async () => {
   return api.get("/home/media");
@@ -38,9 +39,8 @@ export const cancelAppointment = (appointmentId: string) => {
   return api.patch(`/appointments/${appointmentId}/cancel`);
 };
 
-export const getNotifications = (userId: string) => {
-  return api.get(`/home/notifications?userId=${userId}`);
-};
+/** Same as director — uses axios `/api-proxy` in the browser (avoids CORS / wrong base URL). */
+export const getNotifications = (userId: string) => getNotification(userId);
 
 export const updateUser = (userId: string, payload: any) => {
   return api.patch(`/users/${userId}`, payload);

@@ -3,7 +3,8 @@ import { useEffect, useState, Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import "@fortawesome/fontawesome-free/css/all.min.css";import MentorHeader from "@/app/Components/MentorHeader";
+import "@fortawesome/fontawesome-free/css/all.min.css";
+import MentorHeader from "@/app/Components/MentorHeader";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import { apiAddFinalComment, apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetUserById } from "@/app/Services/users.service";
@@ -21,6 +22,14 @@ import {
   progressStatusChipClass,
   roadmapMatchesFilter,
 } from "@/app/Components/ProgressDashboardShared";
+import {
+  mentorGlassCardFrost,
+  mentorGlassCardRoadmap,
+  mentorMainGradient,
+  mentorPageRoot,
+  mentorSpinner,
+  mentorWarningPanel,
+} from "@/app/Components/mentor/mentor-theme";
 
 function PastorProgressPageContent() {
   const router = useRouter();
@@ -197,17 +206,17 @@ function PastorProgressPageContent() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
+      <div className={mentorPageRoot}>
         <MentorHeader showFullHeader={true} />
         <div className="flex flex-1 items-center justify-center">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+          <div className={mentorSpinner} />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
+    <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
       <header className="border-b border-[#8ec5eb]/25 bg-[#062946] px-4 py-5 sm:px-8 md:px-12">
@@ -239,10 +248,10 @@ function PastorProgressPageContent() {
         </div>
       </header>
 
-      <main className="relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-8 sm:px-8 md:px-16 md:py-10">
+      <main className={`relative z-10 flex-1 px-4 py-8 sm:px-8 md:px-16 md:py-10 ${mentorMainGradient}`}>
         <div className="mx-auto max-w-7xl">
           {!userId && (
-            <p className="mb-8 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
+            <p className={`mb-8 ${mentorWarningPanel}`}>
               Missing <code className="rounded bg-white/10 px-1">userId</code> in the URL. Open a pastor from Track
               progress first.
             </p>
@@ -250,14 +259,14 @@ function PastorProgressPageContent() {
 
           {userId && (
             <>
-              <section className="mb-8 rounded-2xl border border-[#8ec5eb]/40 bg-[#041f35]/60 p-5 shadow-lg backdrop-blur-md sm:p-7">
+              <section className={`mb-8 p-5 sm:p-7 ${mentorGlassCardFrost}`}>
                 <h2 className="mb-6 text-base font-bold text-white sm:text-lg">
                   Overall Progress — Roadmap &amp; Assessments
                 </h2>
                 <OverallProgressDonut overallPercent={progress?.overallProgress ?? 0} />
               </section>
 
-              <section className="mb-10 rounded-2xl border border-[#8ec5eb]/40 bg-[#041f35]/60 p-5 shadow-lg backdrop-blur-md sm:p-7">
+              <section className={`mb-10 p-5 sm:p-7 ${mentorGlassCardFrost}`}>
                 <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <h2 className="text-base font-bold text-white sm:text-lg">
                     Individual — Roadmap, Assessments
@@ -348,7 +357,8 @@ function PastorProgressPageContent() {
             )}
           </section>
         </div>
-      </main>      {isDrawerOpen && (
+      </main>
+      {isDrawerOpen && (
         <>
           <div
             className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
@@ -472,7 +482,7 @@ function MentorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: 
       : null;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(145deg,rgba(255,255,255,0.12)_0%,rgba(6,41,70,0.35)_100%)] shadow-lg backdrop-blur-md transition hover:border-[#8ec5eb]/25">
+    <div className={`${mentorGlassCardRoadmap} overflow-hidden`}>
       <div className="flex flex-col sm:flex-row">
         <div className="relative h-44 w-full shrink-0 sm:h-auto sm:w-1/3 sm:min-h-[200px]">
           {imgUrl ? (
@@ -527,7 +537,7 @@ function MentorAssessmentProgressCard({ assessment, onOpen }: { assessment: any;
     typeof banner === "string" && (banner.startsWith("http://") || banner.startsWith("https://"));
 
   return (
-    <div className="flex min-h-[200px] gap-4 rounded-2xl border border-white/15 bg-white/10 p-4 shadow-lg backdrop-blur-md transition hover:border-[#8ec5eb]/25">
+    <div className={`${mentorGlassCardRoadmap} min-h-[200px] gap-4 p-4`}>
       <div className="relative h-full min-h-[168px] w-[140px] shrink-0 overflow-hidden rounded-xl sm:w-[160px]">
         {isHttp ? (
           <Image
@@ -599,9 +609,12 @@ export default function PastorProgressPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen flex-col bg-[#062946]">
+        <div className={mentorPageRoot}>
           <MentorHeader showFullHeader={true} />
-          <div className="flex flex-1 items-center justify-center text-[#cde2f2]">Loading…</div>
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-[#cde2f2]">
+            <div className={mentorSpinner} />
+            <span className="text-sm">Loading…</span>
+          </div>
         </div>
       }
     >

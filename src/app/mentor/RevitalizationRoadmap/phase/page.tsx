@@ -6,6 +6,16 @@ import { useSearchParams, useRouter } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
+import MentorSearchBar from "@/app/Components/mentor/MentorSearchBar";
+import {
+  mentorBreadcrumbText,
+  mentorContainer,
+  mentorHeroOverlay,
+  mentorMainGradient,
+  mentorPageRoot,
+  mentorSpinner,
+  mentorWarningPanel,
+} from "@/app/Components/mentor/mentor-theme";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
 import { apiGetUserById } from "@/app/Services/users.service";
@@ -125,27 +135,27 @@ function PhasePageContent() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
+      <div className={mentorPageRoot}>
         <MentorHeader showFullHeader={true} />
         <div className="flex flex-1 items-center justify-center px-6 py-20">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+          <div className={mentorSpinner} />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
+    <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
       <section
         className="relative flex min-h-[200px] flex-col justify-end bg-cover bg-bottom px-6 pb-8 pt-8 text-white sm:min-h-[240px] sm:px-10 sm:pb-10 md:px-20 md:pb-12"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]" />
+        <div className={mentorHeroOverlay} />
         <div className="relative z-10 mx-auto w-full max-w-7xl">
-          <nav className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[#d9ebf8]">
-            <Link href="/mentor/RevitalizationRoadmap" className="hover:text-white">
+          <nav className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <Link href="/mentor/RevitalizationRoadmap" className={mentorBreadcrumbText}>
               Revitalization Roadmap
             </Link>
             <span className="opacity-70">&gt;</span>
@@ -153,7 +163,7 @@ function PhasePageContent() {
               <>
                 <Link
                   href={`/mentor/RevitalizationRoadmap/home?userId=${encodeURIComponent(userId)}`}
-                  className="hover:text-white"
+                  className={mentorBreadcrumbText}
                 >
                   {userName}
                 </Link>
@@ -173,16 +183,16 @@ function PhasePageContent() {
         </div>
       </section>
 
-      <main className="relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-8 sm:px-8 md:px-16 md:py-10">
-        <div className="mx-auto max-w-7xl">
+      <main className={mentorMainGradient}>
+        <div className={mentorContainer}>
           {!roadmapId && (
-            <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
+            <p className={`${mentorWarningPanel} mb-6`}>
               Missing <code className="rounded bg-white/10 px-1">roadmapId</code> in the URL. Open a phase from the pastor&apos;s roadmap list.
             </p>
           )}
 
           {roadmapId && !userId && (
-            <p className="mb-6 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
+            <p className={`${mentorWarningPanel} mb-6`}>
               Missing <code className="rounded bg-white/10 px-1">userId</code>. Task links need a pastor context — open this phase from{" "}
               <Link href="/mentor/RevitalizationRoadmap" className="font-semibold text-white underline-offset-2 hover:underline">
                 Revitalization Roadmap
@@ -191,27 +201,15 @@ function PhasePageContent() {
             </p>
           )}
 
-          <div className="mb-8 flex w-full max-w-md items-center rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 shadow-sm backdrop-blur">
-            <i className="fa-solid fa-magnifying-glass mr-3 shrink-0 text-[#8ec5eb]" />
-            <input
-              type="search"
-              placeholder="Search tasks…"
+          <div className="mb-8 max-w-md">
+            <MentorSearchBar
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-[#cde2f2] outline-none"
+              onChange={setSearchQuery}
+              placeholder="Search tasks…"
               aria-label="Search tasks"
+              showClear={!!roadmapId}
               disabled={!roadmapId}
             />
-            {searchQuery.trim() ? (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                className="shrink-0 text-white/60 hover:text-white"
-                aria-label="Clear search"
-              >
-                <i className="fa-solid fa-xmark text-sm" />
-              </button>
-            ) : null}
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
@@ -267,8 +265,8 @@ export default function PhasePage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen flex-col items-center justify-center bg-[#062946] font-[Albert_Sans] text-[#cde2f2]">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+        <div className={`${mentorPageRoot} items-center justify-center text-[#cde2f2]`}>
+          <div className={mentorSpinner} />
         </div>
       }
     >

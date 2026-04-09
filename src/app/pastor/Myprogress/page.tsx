@@ -24,6 +24,7 @@ import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
 import { apiGetAssessmentById, parseAssessmentDetailPayload } from "@/app/Services/assessment.service";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { subscribeProgressUpdated } from "@/app/utils/progress-sync";
+import { pastorRoadmapDescriptionLineClamp2 } from "@/app/Components/pastor/pastor-theme";
 
 export default function PastorMyProgressPage() {
   const router = useRouter();
@@ -319,7 +320,7 @@ function PastorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: 
         </div>
         <div className="flex flex-1 flex-col p-5">
           <h4 className="mb-1 text-[15px] font-semibold text-white">{title}</h4>
-          <p className="mb-3 line-clamp-2 text-[13px] text-[#cde2f2]/90">{desc || "—"}</p>
+          <p className={`mb-3 ${pastorRoadmapDescriptionLineClamp2}`}>{desc || "—"}</p>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <span className="text-[12px] font-medium text-[#8ec5eb]/90">Status</span>
             <span className={`rounded-full px-2 py-[3px] text-[11px] font-medium ${chip}`}>{statusLabel}</span>
@@ -375,7 +376,7 @@ function PastorAssessmentProgressCard({ assessment, onOpen }: { assessment: any;
       <div className="flex min-w-0 flex-1 flex-col justify-between">
         <div className="min-w-0 flex-1">
           <h4 className="mb-1 line-clamp-1 text-[15px] font-bold text-white">{assessment.title || "Assessment"}</h4>
-          <p className="mb-2 line-clamp-2 text-[13px] text-[#cde2f2]/90">{assessment.description || ""}</p>
+          <p className={`mb-2 ${pastorRoadmapDescriptionLineClamp2}`}>{assessment.description || ""}</p>
           <div className="mb-3">
             <div className="mb-1 flex justify-between text-[11px] text-[#8ec5eb]/80">
               <span>Sections</span>

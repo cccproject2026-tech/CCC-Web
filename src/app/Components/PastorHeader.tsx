@@ -13,7 +13,6 @@ import SearchIcon from "../Assets/search.png";
 import UserProfile from "../Assets/user-profile.png";
 import NotificationPopup from "./NotificationPopup";
 import {
-  Clipboard,
   FileText,
   FileWarning,
   UserRound,
@@ -31,6 +30,8 @@ import {
   X,
 } from "lucide-react";
 import { getNotifications, getSingleUser } from "../Services/pastor.service";
+import type { NotificationItem } from "../Services/types/home.types";
+import { mapNotificationItemToPopup, unwrapNotificationsList } from "../Services/notificationUi";
 import {
   apiGetRoadmaps,
   apiGetAssessments,
@@ -38,13 +39,6 @@ import {
   apiLogout,
 } from "../Services/api";
 import { parseAssessmentsListPayload } from "../Services/assessment.service";
-
-type PastorNotificationItem = {
-  module?: string;
-  name?: string;
-  details?: string;
-  createdAt?: string;
-};
 
 function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: boolean }) {
   const pathname = usePathname();
@@ -63,7 +57,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [profile, setProfile] = useState<any>(null);
-  const [notificationList, setNotificationList] = useState<PastorNotificationItem[]>([]);
+  const [notificationList, setNotificationList] = useState<NotificationItem[]>([]);
   const [notificationCount, setNotificationCount] = useState(0);
 
   useEffect(() => {
@@ -119,7 +113,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
     { name: "Home", path: "/pastor/home" },
     { name: "My Mentors", path: "/pastor/Mymentors" },
     { name: "Revitalization Roadmap", path: "/pastor/revitalization-roadmap" },
-    { name: "Assessments", path: "/pastor/assessments" },
+    { name: "Assessments", path: "/pastor/Assessments" },
     { name: "Progress", path: "/pastor/Myprogress" },
     { name: "Appointments", path: "/pastor/appointments" },
     { name: "Notes", path: "/pastor/notes" },
@@ -161,12 +155,14 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
     async function fetchNotifications() {
       try {
         const res = await getNotifications(userId);
-        const list = res.data?.data?.notifications || [];
-
+        const list = unwrapNotificationsList(res);
         setNotificationList(list);
-        setNotificationCount(list.length);
+        const unread = list.filter((n) => !n.isRead).length;
+        setNotificationCount(unread > 0 ? Math.min(unread, 99) : 0);
       } catch (err) {
         console.error("Error fetching notifications:", err);
+        setNotificationList([]);
+        setNotificationCount(0);
       }
     }
 
@@ -301,7 +297,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
                         {searchResults.assessments.slice(0, 4).map((item: any) => (
                           <Link
                             key={item._id || item.id}
-                            href="/pastor/assessments"
+                            href="/pastor/Assessments"
                             className="mb-1 block rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
                           >
                             {item.name || item.title || "Untitled assessment"}
@@ -374,44 +370,46 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
                   </div>
 
                   {/* Notifications List */}
-                  <div className="p-2 space-y-2">
+                  <div className="space-y-2 p-2">
+                    {notificationList.length === 0 ? (
+                      <p className="rounded-xl bg-[#F5F7FA] px-3 py-4 text-center text-[13px] text-[#7A7A7A]">
+                        No notifications yet.
+                      </p>
+                    ) : (
+                      notificationList.slice(0, 4).map((note) => {
+                        const p = mapNotificationItemToPopup(note);
+                        return (
+                          <div
+                            key={note._id}
+                            className="flex items-start justify-between rounded-xl bg-[#F5F7FA] p-3"
+                          >
+                            <div className="flex w-full items-start gap-3">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/80 bg-white">
+                                <i className={`${p.icon} text-base ${p.iconColor}`} aria-hidden />
+                              </div>
 
-                    {notificationList.slice(0, 4).map((note, i) => (
-                      <div
-                        key={i}
-                        className="flex items-start justify-between bg-[#F5F7FA] rounded-xl p-3"
-                      >
-                        <div className="flex items-start gap-3 w-full">
+                              <div className="flex min-w-0 flex-1 flex-col">
+                                <div className="flex justify-between gap-2">
+                                  <h3 className="text-[14px] font-semibold text-[#000000]">{p.title}</h3>
+                                  {!note.isRead && (
+                                    <span
+                                      className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#FFD700]"
+                                      title="Unread"
+                                    />
+                                  )}
+                                </div>
 
-                          {/* Icon based on module type */}
-                          <div className="w-6 h-6 flex items-center justify-center">
-                            {note.module === "microgrant" && (
-                              <Clipboard size={20} className="text-[#2679FF]" />
-                            )}
-                          </div>
+                                {p.subtitle ? (
+                                  <p className="mt-0.5 text-[13px] leading-snug text-[#7A7A7A]">{p.subtitle}</p>
+                                ) : null}
 
-                          <div className="flex flex-col w-full">
-                            <div className="flex justify-between">
-                              <h3 className="font-semibold text-[14px] text-[#000000]">
-                                {note.name}
-                              </h3>
-
-                              {/* Yellow Dot */}
-                              <div className="w-[8px] h-[8px] rounded-full bg-[#FFD700] mt-[2px]"></div>
+                                <p className="mt-1 text-right text-[12px] text-[#9A9A9A]">{p.time}</p>
+                              </div>
                             </div>
-
-                            <p className="text-[#7A7A7A] text-[13px] leading-snug">
-                              {note.details}
-                            </p>
-
-                            <p className="text-[#9A9A9A] text-[12px] text-right mt-1">
-                              {note?.createdAt ? new Date(note.createdAt).toLocaleString() : ""}
-                            </p>
                           </div>
-                        </div>
-                      </div>
-                    ))}
-
+                        );
+                      })
+                    )}
                   </div>
 
                 </div>

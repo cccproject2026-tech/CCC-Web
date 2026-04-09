@@ -7,6 +7,21 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import { useRouter } from "next/navigation";
 
 import MentorHeader from "@/app/Components/MentorHeader";
+import MentorSearchBar from "@/app/Components/mentor/MentorSearchBar";
+import {
+  mentorControlsRow,
+  mentorEyebrowDot,
+  mentorEyebrowPill,
+  mentorFilterStrip,
+  mentorFilterTabActive,
+  mentorFilterTabBase,
+  mentorFilterTabIdle,
+  mentorGlassCardRoadmap,
+  mentorHeroOverlay,
+  mentorMainGradient,
+  mentorPageRoot,
+  mentorSpinner,
+} from "@/app/Components/mentor/mentor-theme";
 import RoadmapHero from "@/app/Assets/roadmap-bg.png";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 
@@ -30,10 +45,6 @@ type Mentee = {
   profilePicture?: string;
   progress: number;
 };
-
-/** Match pastor revitalization-roadmap card treatment */
-const roadmapCard =
-  "flex w-full flex-col overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:flex-row";
 
 function matchesQuery(haystack: string, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -163,17 +174,17 @@ export default function RevitalizationRoadmapPage() {
   }, [roadmaps, searchQuery]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
+    <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
       <section
         className="relative flex h-[180px] items-end bg-cover bg-bottom px-6 pb-6 text-white sm:h-[200px] sm:px-10 sm:pb-8 md:h-[250px] md:px-20 md:pb-10"
         style={{ backgroundImage: `url(${RoadmapHero.src})` }}
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]" />
-        <div className="relative z-10 max-w-7xl">
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
-            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
+        <div className={mentorHeroOverlay} />
+        <div className="relative z-10 mx-auto w-full max-w-7xl">
+          <p className={mentorEyebrowPill}>
+            <span className={mentorEyebrowDot} />
             Leadership Support Network
           </p>
           <h1 className="mt-3 text-2xl font-semibold sm:text-3xl">Revitalization Roadmap</h1>
@@ -183,57 +194,36 @@ export default function RevitalizationRoadmapPage() {
         </div>
       </section>
 
-      <main className="relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-8 sm:px-8 md:px-16 md:py-10">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-8 flex flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-center">
-            <div className="flex w-full items-center rounded-xl border border-white/20 bg-white/10 px-4 py-2 shadow-sm backdrop-blur lg:max-w-md">
-              <i className="fa-solid fa-magnifying-glass mr-3 shrink-0 text-[#cde2f2]" />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={activeTab === "Pastor" ? "Search pastors…" : "Search roadmaps…"}
-                autoComplete="off"
-                className="min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-[#cde2f2] outline-none"
-                aria-label={activeTab === "Pastor" ? "Search pastors" : "Search roadmap library"}
-              />
-              {searchQuery.trim() ? (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="shrink-0 text-white/60 hover:text-white"
-                  aria-label="Clear search"
-                >
-                  <i className="fa-solid fa-xmark text-sm" />
-                </button>
-              ) : null}
-            </div>
+      <main className={mentorMainGradient}>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-8 md:px-16 md:py-10">
+          <div className={mentorControlsRow}>
+            <MentorSearchBar
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder={activeTab === "Pastor" ? "Search pastors…" : "Search roadmaps…"}
+              aria-label={activeTab === "Pastor" ? "Search pastors" : "Search roadmap library"}
+              className="max-w-none lg:max-w-md"
+            />
 
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex flex-1 items-center overflow-x-auto rounded-xl border border-white/20 bg-white/10 px-2 py-1 shadow-sm backdrop-blur lg:flex-none">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("Pastor")}
-                  className={`whitespace-nowrap rounded-md px-4 py-1.5 text-xs font-medium transition-all sm:text-sm ${
-                    activeTab === "Pastor"
-                      ? "bg-white text-[#0f4a76]"
-                      : "text-[#d9ebf8] hover:bg-white/15"
-                  }`}
-                >
-                  Pastor&apos;s roadmaps
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("Library")}
-                  className={`whitespace-nowrap rounded-md px-4 py-1.5 text-xs font-medium transition-all sm:text-sm ${
-                    activeTab === "Library"
-                      ? "bg-white text-[#0f4a76]"
-                      : "text-[#d9ebf8] hover:bg-white/15"
-                  }`}
-                >
-                  Roadmap library
-                </button>
-              </div>
+            <div className={mentorFilterStrip}>
+              <button
+                type="button"
+                onClick={() => setActiveTab("Pastor")}
+                className={`${mentorFilterTabBase} px-4 py-1.5 sm:px-4 ${
+                  activeTab === "Pastor" ? mentorFilterTabActive : mentorFilterTabIdle
+                }`}
+              >
+                Pastor&apos;s roadmaps
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab("Library")}
+                className={`${mentorFilterTabBase} px-4 py-1.5 sm:px-4 ${
+                  activeTab === "Library" ? mentorFilterTabActive : mentorFilterTabIdle
+                }`}
+              >
+                Roadmap library
+              </button>
             </div>
           </div>
 
@@ -241,7 +231,7 @@ export default function RevitalizationRoadmapPage() {
             <>
               {loading && (
                 <div className="flex justify-center py-16">
-                  <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+                  <div className={mentorSpinner} />
                 </div>
               )}
               {!loading && sessionMissing && (
@@ -272,7 +262,7 @@ export default function RevitalizationRoadmapPage() {
                       key={mentee._id}
                       type="button"
                       onClick={() => handleUserClick(mentee._id)}
-                      className={`text-left ${roadmapCard}`}
+                      className={`text-left ${mentorGlassCardRoadmap}`}
                     >
                       <div className="relative m-4 h-[180px] w-full shrink-0 sm:h-[200px] sm:w-[200px]">
                         {isHttpUrl(mentee.profilePicture) ? (
@@ -325,7 +315,7 @@ export default function RevitalizationRoadmapPage() {
             <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2">
               {roadmapLoading && (
                 <div className="col-span-full flex justify-center py-12">
-                  <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+                  <div className={mentorSpinner} />
                 </div>
               )}
               {!roadmapLoading && roadmaps.length > 0 && filteredRoadmaps.length === 0 && (
@@ -343,7 +333,7 @@ export default function RevitalizationRoadmapPage() {
                   const rid = String(roadmap._id ?? roadmap.id ?? "");
                   const imgOk = isHttpUrl(roadmap.imageUrl);
                   return (
-                    <div key={rid || roadmap.name} className={roadmapCard}>
+                    <div key={rid || roadmap.name} className={mentorGlassCardRoadmap}>
                       <div className="relative m-4 h-[180px] w-full shrink-0 sm:h-[200px] sm:w-[200px]">
                         {imgOk ? (
                           <Image

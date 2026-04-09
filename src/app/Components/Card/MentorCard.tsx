@@ -1,9 +1,7 @@
 import Image from "next/image";
 import type { StaticImageData } from "next/image";
+import { mentorGlassCardFrost } from "@/app/Components/mentor/mentor-theme";
 import { isRemoteImageSrc } from "@/app/utils/image";
-
-const glassShell =
-  "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.1)_0%,rgba(255,255,255,0.04)_100%)] backdrop-blur-xl shadow-[0_8px_40px_rgba(3,24,43,0.4)] transition-all duration-300 hover:border-white/25 hover:shadow-[0_12px_48px_rgba(3,24,43,0.45)]";
 
 type MentorCardProps = {
   image: string | StaticImageData;
@@ -29,7 +27,7 @@ export default function MentorCard({
     <div
       className={
         isGlass
-          ? `${glassShell} flex h-full flex-col p-4 sm:p-5`
+          ? `${mentorGlassCardFrost} flex h-full flex-col p-4 sm:p-5`
           : "rounded-2xl bg-white p-6 shadow-md transition-all duration-300 hover:shadow-xl"
       }
     >

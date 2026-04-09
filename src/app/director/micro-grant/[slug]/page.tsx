@@ -8,7 +8,11 @@ import MicroGrantDetailHero from "@/app/Components/Hero/MicroGrantDetailHero";
 import RoadmapJumpStartBg from "@/app/Assets/roadmap-jump-start-bg.jpg";
 import Mentor2 from "@/app/Assets/mentor2.png";
 
-import { getMicroGrantByUserId, updateMicroGrantStatus } from "@/app/Services/microGrand.service";
+import {
+  getMicroGrantByUserId,
+  unwrapMicroGrantWithUser,
+  updateMicroGrantStatus,
+} from "@/app/Services/microGrand.service";
 import { MicroGrantResponse } from "@/app/Services/types";
 
 const Page: React.FC = () => {
@@ -17,7 +21,9 @@ const Page: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   const params = useParams();
-  const userId = params?.slug as string;
+  const raw = params?.slug;
+  const userId =
+    typeof raw === "string" ? decodeURIComponent(raw) : Array.isArray(raw) ? decodeURIComponent(raw[0] ?? "") : "";
 
   /* ---------- fetch data ---------- */
   useEffect(() => {
@@ -26,7 +32,8 @@ const Page: React.FC = () => {
     const fetchData = async () => {
       try {
         const res = await getMicroGrantByUserId(userId);
-        setData(res);
+        const payload = unwrapMicroGrantWithUser(res);
+        setData(payload);
       } catch (err) {
         console.error("Failed to load application", err);
       } finally {
@@ -110,7 +117,11 @@ const Page: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1d538d] to-[#1d538d]">
       <MicroGrantDetailHero
-        title={data.application.formId.title}
+        title={
+          typeof data.application.formId === "object" && data.application.formId?.title
+            ? data.application.formId.title
+            : "Micro Grant Application"
+        }
         subtitle="Please keep in mind that the church applying for a grant must become a partner with the CCC by signing a MOU."
         backgroundImageUrl={RoadmapJumpStartBg.src}
         breadcrumbItems={[

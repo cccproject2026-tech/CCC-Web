@@ -9,7 +9,7 @@ import UserProfile from "@/app/Assets/user-profile.png";
 import {
   getAllMicroGrand,
   getMicroGrantApplicantEmail,
-  getMicroGrantApplicantUserId,
+  microGrantListDetailSlug,
   unwrapMicroGrantApplicationsList,
 } from "@/app/Services/microGrand.service";
 import type { MicroGrantApplicationResponse } from "@/app/Services/types";
@@ -173,7 +173,7 @@ const Page: React.FC = () => {
             <>
               <div className="flex flex-col gap-4">
                 {filteredCards.map((app) => {
-                  const uid = getMicroGrantApplicantUserId(app);
+                  const viewSlug = microGrantListDetailSlug(app);
                   return (
                     <MicroGrantCard
                       key={app._id}
@@ -182,7 +182,7 @@ const Page: React.FC = () => {
                       name={applicantDisplayName(app)}
                       role={churchLabel(app)}
                       date={app.createdAt ? new Date(app.createdAt).toLocaleDateString() : "—"}
-                      slug={uid}
+                      slug={viewSlug}
                     />
                   );
                 })}

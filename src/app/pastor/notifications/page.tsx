@@ -3,44 +3,23 @@ import PastorHeader from "@/app/Components/PastorHeader";
 import { useState, useEffect } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { getNotifications } from "@/app/Services/pastor.service";
-import { getCookie } from "@/app/utils/cookies";
+import { getPastorUserId } from "@/app/utils/pastor-auth";
+import { mapNotificationItemToPopup, unwrapNotificationsList } from "@/app/Services/notificationUi";
+import type { NotificationItem } from "@/app/Services/types/home.types";
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const ICON_MAP: any = {
-    microgrant: { icon: "fa-circle-check", color: "text-[#9ef0be]" },
-    roadmap: { icon: "fa-map", color: "text-[#8ec5eb]" },
-    appointment: { icon: "fa-calendar-check", color: "text-[#f7d37c]" },
-    assessment: { icon: "fa-clipboard-check", color: "text-[#b9b4ff]" },
-    assignment: { icon: "fa-file-alt", color: "text-[#ffcf9f]" },
-    general: { icon: "fa-bell", color: "text-[#cde2f2]" }
-  };
 
   useEffect(() => {
     async function loadNotifications() {
       try {
-        const storedUser = JSON.parse(getCookie("user") || "{}");
-        const userId = storedUser?.id;
+        const userId = getPastorUserId();
         if (!userId) return;
 
         const res = await getNotifications(userId);
-
-        const list = res.data?.data?.notifications || [];
-
-        // Normalize notifications for UI
-        const formatted = list.map((n: any, index: number) => ({
-          id: index + 1,
-          title: n.name,
-          desc: n.details,
-          module: n.module,
-          time: n.createdAt ? new Date(n.createdAt).toLocaleString() : "Just now",
-          icon: ICON_MAP[n.module]?.icon || "fa-bell",
-          color: ICON_MAP[n.module]?.color || "text-gray-500"
-        }));
-
-        setNotifications(formatted);
+        const list = unwrapNotificationsList(res);
+        setNotifications(list);
       } catch (err) {
         console.error("Error loading notifications:", err);
       } finally {
@@ -81,29 +60,33 @@ export default function NotificationsPage() {
 
           {/* Notification List */}
           <div className="flex flex-col gap-4">
-            {notifications.map((note) => (
-              <div
-                key={note.id}
-                className="rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-3 text-white shadow-sm transition hover:shadow-md sm:flex sm:items-start sm:justify-between sm:gap-0 sm:p-4"
-              >
-                {/* Left Section */}
-                <div className="flex items-start gap-3 sm:gap-4">
-                  <div
-                    className={`mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-base sm:text-lg ${note.color}`}
-                  >
-                    <i className={`fa-solid ${note.icon}`}></i>
+            {notifications.map((note) => {
+              const p = mapNotificationItemToPopup(note);
+              return (
+                <div
+                  key={note._id}
+                  className="rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-3 text-white shadow-sm transition hover:shadow-md sm:flex sm:items-start sm:justify-between sm:gap-0 sm:p-4"
+                >
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-base sm:text-lg">
+                      <i className={`${p.icon} ${p.iconColor}`} aria-hidden />
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="flex items-start gap-2">
+                        <p className="font-semibold text-sm">{p.title}</p>
+                        {!note.isRead && (
+                          <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#FFD700]" title="Unread" />
+                        )}
+                      </div>
+                      {p.subtitle ? <p className="mt-1 text-xs text-[#cde2f2]">{p.subtitle}</p> : null}
+                    </div>
                   </div>
 
-                  <div>
-                    <p className="font-semibold text-sm">{note.title}</p>
-                    <p className="mt-1 text-xs text-[#cde2f2]">{note.desc}</p>
-                  </div>
+                  <div className="mt-2 text-xs text-[#cde2f2] sm:mt-1 sm:text-right">{p.time}</div>
                 </div>
-
-                {/* Right Side: Time */}
-                <div className="text-xs text-[#cde2f2] sm:mt-1">{note.time}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </main>

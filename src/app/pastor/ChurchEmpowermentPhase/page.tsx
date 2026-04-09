@@ -3,6 +3,7 @@ import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
+import { pastorRoadmapDescription } from "@/app/Components/pastor/pastor-theme";
 import HeroBg from "../../Assets/self-revitalization-hero.png";
 
 // Card images
@@ -184,9 +185,7 @@ export default function ChurchEmpowermentPhasePage() {
                       {card.title}
                     </h3>
 
-                    <p className="mb-[8px] text-[13px] leading-snug text-[#cde2f2]">
-                      {card.description}
-                    </p>
+                    <p className={`mb-[8px] ${pastorRoadmapDescription}`}>{card.description}</p>
 
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <span className="text-[12px] font-medium text-[#d9ebf8]">

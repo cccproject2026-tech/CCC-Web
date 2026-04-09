@@ -215,6 +215,13 @@ function isEndDatePast(endDate?: string): boolean {
   return b < a;
 }
 
+/** Backend may send `dueDate` / snake_case instead of `endDate`. */
+function resolveItemEndDate(obj: Record<string, unknown> | undefined | null): string | undefined {
+  if (!obj || typeof obj !== "object") return undefined;
+  const v = obj.endDate ?? obj.dueDate ?? obj.due_date ?? obj.end_date;
+  return typeof v === "string" && v.trim() ? v : undefined;
+}
+
 /**
  * Aligns with mobile-style rules: completed / in-progress from steps & %,
  * "Due" mainly for overdue endDate or explicit due/blocked, not as a catch-all.
@@ -228,30 +235,33 @@ function mapNestedStatus(
   const completedSteps = Math.max(0, Number(np?.completedSteps) || 0);
   const pct = Number(np?.progressPercentage) || 0;
 
-  const npSt = String(np?.status ?? "").toLowerCase().replace(/_/g, " ");
-  const itemSt = String(itemStatus ?? "").toLowerCase().replace(/_/g, " ");
-  const parSt = String(parentProgressStatus ?? "").toLowerCase().replace(/_/g, " ");
+  const npSt = String(np?.status ?? "").toLowerCase().replace(/_/g, " ").trim();
+  const itemSt = String(itemStatus ?? "").toLowerCase().replace(/_/g, " ").trim();
+  const parSt = String(parentProgressStatus ?? "").toLowerCase().replace(/_/g, " ").trim();
   // Task document / optimistic UI can be "completed" while GET /progress still has a stale nested row.
   if (itemSt === "completed") return "Completed";
   // Meaningful item/template status must win over parent row and over stale `np` strings.
   const nonDefaultItem =
     itemSt && !itemSt.includes("not started") && itemSt !== "initial" ? itemSt : "";
-  const merged = nonDefaultItem || npSt || parSt || itemSt;
+  const merged = (nonDefaultItem || npSt || parSt || itemSt).trim();
+  const m = merged.toLowerCase();
 
   if (pct >= 100) return "Completed";
   if (totalSteps > 0 && completedSteps >= totalSteps) return "Completed";
   // Backend sometimes sends totalSteps:0 when only status/% are maintained
   if (totalSteps === 0 && completedSteps > 0 && pct >= 100) return "Completed";
-  if (merged.includes("complete")) return "Completed";
+  if (m.includes("complete")) return "Completed";
+
+  // Due before in-progress so overdue / past end-date work still appears under "Due", not only "In Progress".
+  if (m.includes("blocked") || m.includes("overdue")) return "Due";
+  if (/\bdue\b/.test(m) && !m.includes("not due")) return "Due";
+  if (isEndDatePast(endDate)) return "Due";
 
   if (totalSteps > 0 && completedSteps > 0 && completedSteps < totalSteps) return "In-progress";
   if (pct > 0 && pct < 100) return "In-progress";
-  if (merged.includes("progress")) return "In-progress";
+  if (m.includes("progress")) return "In-progress";
 
-  if (merged.includes("blocked") || merged.includes("overdue") || merged === "due") return "Due";
-  if (isEndDatePast(endDate)) return "Due";
-
-  if (!merged || merged.includes("not started") || merged === "initial") return "Not Started";
+  if (!m || m.includes("not started") || m === "initial") return "Not Started";
 
   return "Not Started";
 }
@@ -320,7 +330,7 @@ export function buildRoadmapAssignments(
         desc: rm.roadMapDetails || rm.description || "",
         status: mapNestedStatus(np, {
           itemStatus: rm.status,
-          endDate: rm.endDate,
+          endDate: resolveItemEndDate(rm as unknown as Record<string, unknown>) ?? rm.endDate,
           parentProgressStatus,
         }),
         months: rm.duration || "—",
@@ -340,7 +350,7 @@ export function buildRoadmapAssignments(
           desc: child.roadMapDetails || child.description || "",
           status: mapNestedStatus(np, {
             itemStatus: child.status,
-            endDate: child.endDate,
+            endDate: resolveItemEndDate(child as unknown as Record<string, unknown>) ?? child.endDate,
             parentProgressStatus,
           }),
           months: child.duration || rm.duration || "—",
@@ -449,7 +459,7 @@ export function mergeProgressOntoRoadmaps(
       const np = mapNestedProgressSelf(pr);
       const derived = mapNestedStatus(np, {
         itemStatus: r.status,
-        endDate: r.endDate,
+        endDate: resolveItemEndDate(r as unknown as Record<string, unknown>) ?? r.endDate,
         parentProgressStatus,
       });
       return {
@@ -469,7 +479,7 @@ export function mergeProgressOntoRoadmaps(
       const np = findNestedProgressForTask(progressNorm, rid, cid);
       const derived = mapNestedStatus(np, {
         itemStatus: child.status,
-        endDate: child.endDate,
+        endDate: resolveItemEndDate(child as unknown as Record<string, unknown>) ?? child.endDate,
         parentProgressStatus,
       });
       return {

@@ -1,16 +1,23 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import "@fortawesome/fontawesome-free/css/all.min.css";
 import { useRouter } from "next/navigation";
-import MentorHeader from "@/app/Components/MentorHeader";import { getCookie } from "@/app/utils/cookies";
+import MentorHeader from "@/app/Components/MentorHeader";
+import { getCookie } from "@/app/utils/cookies";
 import { apiSetPassword } from "@/app/Services/auth.service";
 import { apiGetUserById } from "@/app/Services/users.service";
 
 import UserProfile from "../../Assets/user-profile.png";
 import Image from "next/image";
-
-const glassPanel =
-  "rounded-2xl border border-white/15 bg-white/5 backdrop-blur-md shadow-[0_24px_56px_rgba(2,20,38,0.20)]";
+import {
+  mentorFieldLabel,
+  mentorGlassCardFrost,
+  mentorMainGradient,
+  mentorPageRoot,
+  mentorPrimaryCta,
+  mentorSecondaryCta,
+} from "@/app/Components/mentor/mentor-theme";
 
 export default function MentorChangePasswordPage() {
   const router = useRouter();
@@ -102,24 +109,21 @@ export default function MentorChangePasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white relative overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),radial-gradient(circle_at_48%_56%,rgba(111,178,246,0.12),transparent_42%),radial-gradient(circle_at_90%_80%,rgba(8,52,85,0.4),transparent_40%),linear-gradient(180deg,#041f35_0%,#062946_100%)]" />
+    <div className={mentorPageRoot}>
+      <MentorHeader showFullHeader={true} />
 
-      <div className="relative z-10">
-        <MentorHeader showFullHeader={true} />
+      <section className={`relative px-4 py-10 sm:px-8 lg:px-20 ${mentorMainGradient} flex-1`}>
+        <div className="mx-auto w-full max-w-4xl">
+          <button
+            type="button"
+            onClick={() => router.push("/mentor/profile")}
+            className={`mb-4 inline-flex items-center gap-2 ${mentorSecondaryCta}`}
+          >
+            <i className="fa-solid fa-arrow-left" aria-hidden />
+            Back to profile
+          </button>
 
-        <section className="relative px-4 py-10 sm:px-8 lg:px-20">
-          <div className="mx-auto w-full max-w-4xl">
-            <button
-              type="button"
-              onClick={() => router.push("/mentor/profile")}
-              className="mb-4 inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm text-[#cde2f2] transition hover:bg-white/15"
-            >
-              <i className="fa-solid fa-arrow-left" aria-hidden />
-              Back to profile
-            </button>
-
-            <div className={`p-6 sm:p-8 ${glassPanel}`}>
+          <div className={`p-6 sm:p-8 ${mentorGlassCardFrost}`}>
               <div className="flex items-center gap-4 mb-6">
                 <div className="relative h-12 w-12 rounded-xl overflow-hidden border border-white/15 bg-white/5">
                   <Image src={UserProfile} alt="User" fill className="object-cover" />
@@ -146,66 +150,60 @@ export default function MentorChangePasswordPage() {
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-white/80 mb-2">
-                    Current Password
-                  </label>
+                  <label className={mentorFieldLabel}>Current Password</label>
                   <input
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full rounded-md border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder:text-white/40 outline-none focus:ring-1 focus:ring-[#8ec5eb]/40"
+                    className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30"
                     placeholder="Enter current password"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">
-                      New Password
-                    </label>
+                    <label className={mentorFieldLabel}>New Password</label>
                     <input
                       type="password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full rounded-md border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder:text-white/40 outline-none focus:ring-1 focus:ring-[#8ec5eb]/40"
+                      className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30"
                       placeholder="Enter new password"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-white/80 mb-2">
-                      Confirm New Password
-                    </label>
+                    <label className={mentorFieldLabel}>Confirm New Password</label>
                     <input
                       type="password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full rounded-md border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder:text-white/40 outline-none focus:ring-1 focus:ring-[#8ec5eb]/40"
+                      className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30"
                       placeholder="Confirm new password"
                     />
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     onClick={() => router.push("/mentor/profile")}
-                    className="rounded-xl border border-white/20 bg-white/5 px-6 py-2.5 text-sm font-semibold text-white hover:bg-white/10"
+                    className={mentorSecondaryCta}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={!canSubmit}
-                    className="rounded-xl bg-[#8ec5eb]/90 px-8 py-2.5 text-sm font-semibold text-[#062946] shadow-md hover:bg-[#8ec5eb] disabled:cursor-not-allowed disabled:opacity-50"
+                    className={`${mentorPrimaryCta} disabled:cursor-not-allowed disabled:opacity-50`}
                   >
                     {submitting ? "Updating…" : "Update Password"}
                   </button>
                 </div>
               </form>
             </div>
-          </div>
-        </section>      </div>
+        </div>
+      </section>
     </div>
   );
 }

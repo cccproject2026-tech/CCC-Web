@@ -1,5 +1,6 @@
 "use client";
 import Image, { StaticImageData } from "next/image";
+import { pastorCardLight } from "@/app/Components/pastor/pastor-theme";
 
 interface PastorCardProps {
   image: StaticImageData;
@@ -26,7 +27,9 @@ export default function PastorCard({
   onViewDetails,
 }: PastorCardProps) {
   return (
-    <div className="bg-white rounded-2xl shadow-md border border-[#E5EAF1] hover:shadow-xl transition-all duration-300 overflow-hidden flex min-h-[200px]">
+    <div
+      className={`${pastorCardLight} flex min-h-[200px] hover:shadow-xl`}
+    >
       {/* Left Section - Profile Image */}
       <div className="relative w-[42%] flex-shrink-0 min-h-[200px]">
         <Image

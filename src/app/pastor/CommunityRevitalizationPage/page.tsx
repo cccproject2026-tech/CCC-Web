@@ -2,7 +2,9 @@
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import PastorHeader from "@/app/Components/PastorHeader";import HeroBg from "../../Assets/self-revitalization-hero.png";
+import PastorHeader from "@/app/Components/PastorHeader";
+import { pastorRoadmapDescriptionLight } from "@/app/Components/pastor/pastor-theme";
+import HeroBg from "../../Assets/self-revitalization-hero.png";
 
 // Card images
 import Card1 from "../../Assets/card1.png";
@@ -148,9 +150,7 @@ export default function CommunityRevitalizationPage() {
                 <div className="flex flex-col justify-between w-[60%] p-5 text-[#0B1C58]">
                   <div>
                     <h3 className="text-[15px] font-semibold mb-1">{card.title}</h3>
-                    <p className="text-[13px] text-[#6B7280] mb-2 leading-snug">
-                      {card.description}
-                    </p>
+                    <p className={`mb-2 ${pastorRoadmapDescriptionLight}`}>{card.description}</p>
 
                     <div className="flex items-center gap-2 mb-3">
                       <span className="text-[12px] text-[#6B7280] font-medium">

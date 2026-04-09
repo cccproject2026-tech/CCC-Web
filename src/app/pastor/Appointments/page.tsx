@@ -1,8 +1,22 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
-import HeroBg from "../../Assets/appointment-bg.png";
+import PastorSearchBar from "@/app/Components/pastor/PastorSearchBar";
+import {
+  pastorContainer,
+  pastorControlsRow,
+  pastorDarkSelect,
+  pastorEyebrowDot,
+  pastorEyebrowPill,
+  pastorFieldLabel,
+  pastorGlassCard,
+  pastorHeroOverlay,
+  pastorMainGradient,
+  pastorPageRoot,
+  pastorPrimaryCta,
+} from "@/app/Components/pastor/pastor-theme";
+import HeroBg from "@/app/Assets/roadmap-bg.png";
 import DuoIcon from "../../Assets/duo.png";
 import MeetIcon from "../../Assets/meet.png";
 import UserProfile from "../../Assets/user-profile.png";
@@ -12,10 +26,7 @@ import {
   apiCancelAppointment,
   apiCreateAppointment,
   apiGetAppointments,
-<<<<<<< HEAD
   apiGetMonthlyAvailability,
-=======
->>>>>>> 04847f53cb09fab35e6f32d12bdd3773e4704181
   apiGetWeeklyAvailability,
   apiGetUserSchedule,
   apiRescheduleAppointment,
@@ -50,6 +61,7 @@ export default function PastorAppointmentsPage() {
   const [filteredMentors, setFilteredMentors] = useState([]);
   const [selectedMentor, setSelectedMentor] = useState(null);
   const [search, setSearch] = useState("");
+  const [appointmentSearch, setAppointmentSearch] = useState("");
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -150,7 +162,6 @@ export default function PastorAppointmentsPage() {
         apiGetUserSchedule(userId),
         apiGetAppointments({ userId, futureOnly: true }),
       ]);
-<<<<<<< HEAD
 
       const fromSchedule =
         scheduleResult.status === "fulfilled" ? unwrapAppointmentsAxiosData(scheduleResult.value) : [];
@@ -172,25 +183,6 @@ export default function PastorAppointmentsPage() {
           if (!a?.meetingDate) return false;
           return meetingDateLocalYmd(String(a.meetingDate)) === todayYmd;
         }) as any,
-=======
-      const data = unwrapAppointmentsAxiosData(fullRes);
-      console.log("hiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", data)
-      setAppointments(data);
-      const today = new Date().toLocaleDateString("en-CA");
-      setAppointmentsToday(
-        data.filter((a: any) => {
-          if (!a?.meetingDate) return false;
-
-          const apptDate = new Date(a.meetingDate);
-          const now = new Date();
-
-          return (
-            apptDate.getFullYear() === now.getFullYear() &&
-            apptDate.getMonth() === now.getMonth() &&
-            apptDate.getDate() === now.getDate()
-          );
-        })
->>>>>>> 04847f53cb09fab35e6f32d12bdd3773e4704181
       );
 
       const nowMs = Date.now();
@@ -242,84 +234,44 @@ export default function PastorAppointmentsPage() {
     });
   };
 
-<<<<<<< HEAD
-const formatTime = (dateString) => {
-  const d = new Date(dateString);
-  return d.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-useEffect(() => {
-  async function fetchMentors() {
-    const uid = getPastorUserId();
-    if (!uid) {
-      setMentors([]);
-      setFilteredMentors([]);
-      return;
-    }
-    try {
-      const res = await apiGetAssignedUsers(uid);
-      const body = res.data as { data?: unknown };
-      const raw = Array.isArray(body?.data) ? body.data : [];
-      const list = (raw as Record<string, unknown>[]).map((m) => ({
-        ...m,
-        id: m.id ?? m._id,
-        _id: m._id ?? m.id,
-        firstName: m.firstName ?? "",
-        lastName: m.lastName ?? "",
-        role: m.role ?? "mentor",
-      }));
-      setMentors(list);
-      setFilteredMentors(list);
-    } catch (error) {
-      console.error("Error fetching mentors", error);
-      setMentors([]);
-      setFilteredMentors([]);
-=======
   const formatTime = (dateString) => {
     const d = new Date(dateString);
     return d.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
     });
-  }
+  };
+
   useEffect(() => {
     async function fetchMentors() {
+      const uid = getPastorUserId();
+      if (!uid) {
+        setMentors([]);
+        setFilteredMentors([]);
+        return;
+      }
       try {
-        const res = await getMentors();
-        const list = res.data?.data?.mentors || [];
-
+        const res = await apiGetAssignedUsers(uid);
+        const body = res.data as { data?: unknown };
+        const raw = Array.isArray(body?.data) ? body.data : [];
+        const list = (raw as Record<string, unknown>[]).map((m) => ({
+          ...m,
+          id: m.id ?? m._id,
+          _id: m._id ?? m.id,
+          firstName: m.firstName ?? "",
+          lastName: m.lastName ?? "",
+          role: m.role ?? "mentor",
+        }));
         setMentors(list);
         setFilteredMentors(list);
       } catch (error) {
         console.error("Error fetching mentors", error);
+        setMentors([]);
+        setFilteredMentors([]);
       }
->>>>>>> 04847f53cb09fab35e6f32d12bdd3773e4704181
     }
-
-<<<<<<< HEAD
-  if (drawerStep === "mentor") {
-    void fetchMentors();
-  }
-}, [drawerStep]);
-
-useEffect(() => {
-  if (!search.trim()) {
-    setFilteredMentors(mentors);
-  } else {
-    setFilteredMentors(
-      mentors.filter((m) =>
-        `${m.firstName ?? ""} ${m.lastName ?? ""} ${(m as { name?: string }).name ?? ""}`
-          .toLowerCase()
-          .includes(search.toLowerCase())
-      )
-    );
-  }
-}, [search, mentors]);
-=======
     if (drawerStep === "mentor") {
-      fetchMentors();
+      void fetchMentors();
     }
   }, [drawerStep]);
 
@@ -329,14 +281,13 @@ useEffect(() => {
     } else {
       setFilteredMentors(
         mentors.filter((m) =>
-          `${m.firstName} ${m.lastName}`
+          `${m.firstName ?? ""} ${m.lastName ?? ""} ${(m as { name?: string }).name ?? ""}`
             .toLowerCase()
-            .includes(search.toLowerCase())
-        )
+            .includes(search.toLowerCase()),
+        ),
       );
     }
   }, [search, mentors]);
->>>>>>> 04847f53cb09fab35e6f32d12bdd3773e4704181
 
   useEffect(() => {
     if (drawerStep !== "schedule" || !selectedMentor) {
@@ -344,30 +295,30 @@ useEffect(() => {
       setAvailabilityLoading(false);
       return;
     }
-<<<<<<< HEAD
     const mentorId = String(selectedMentor.id ?? selectedMentor._id ?? "").trim();
-=======
-
-    const mentorId = selectedMentor.id || selectedMentor._id;
->>>>>>> 04847f53cb09fab35e6f32d12bdd3773e4704181
     if (!mentorId) return;
 
     let cancelled = false;
     (async () => {
       try {
-<<<<<<< HEAD
+        setAvailabilityLoading(true);
         const monthStart = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
         const selectedYmdForWeek = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}`;
+        const selectedYmd = new Date(currentYear, currentMonth, selectedDate).toLocaleDateString("en-CA");
         let slots: any[] = [];
         try {
           const availRes = await apiGetMonthlyAvailability(String(mentorId), monthStart);
           slots = unwrapMonthlyAvailabilityPayload(availRes);
         } catch {
-          const legacy = await axiosInstance.get(`/appointments/availability/${mentorId}/month`, {
-            params: { year: currentYear, month: currentMonth + 1 },
-          });
-          const raw = legacy.data?.data;
-          slots = Array.isArray(raw) ? raw : [];
+          try {
+            const legacy = await axiosInstance.get(`/appointments/availability/${mentorId}/month`, {
+              params: { year: currentYear, month: currentMonth + 1 },
+            });
+            const raw = legacy.data?.data;
+            slots = Array.isArray(raw) ? raw : [];
+          } catch {
+            slots = [];
+          }
         }
         if (!slots.length) {
           try {
@@ -382,58 +333,36 @@ useEffect(() => {
             /* ignore */
           }
         }
-        if (!cancelled) setMonthlySlots(slots);
-      } catch {
-        if (!cancelled) setMonthlySlots([]);
-=======
-        setAvailabilityLoading(true);
-        const selectedDate_iso = new Date(
-          currentYear,
-          currentMonth,
-          selectedDate
-        ).toLocaleDateString("en-CA");
-        console.log("Selected date ISO:", selectedDate_iso);
-        console.log("Current year/month/date:", currentYear, currentMonth, selectedDate);
-        console.log("Date object:", new Date(currentYear, currentMonth, selectedDate));
-        console.log("Selected mentor:", selectedMentor);
-        console.log("Drawer step:", drawerStep);
 
-        const res = await apiGetWeeklyAvailability(mentorId, selectedDate_iso);
-        console.log("Full API response:", res);
-        console.log("Response data:", res.data);
-        let weekData = res.data?.data;
+        const dateSlot = slots.find((slot: any) => {
+          const ymd = slotDateToYmd(
+            slot?.date ?? slot?.day ?? slot?.calendarDate ?? slot?.meetingDate ?? slot?.dateString,
+          );
+          return ymd === selectedYmd;
+        });
 
-        // Handle different response structures
-        if (!weekData && Array.isArray(res.data)) {
-          weekData = res.data;
+        let times: string[] = [];
+        if (dateSlot?.slots?.length) {
+          times = (dateSlot.slots as any[])
+            .map((raw: any) => formatAvailabilitySlotLabel(raw))
+            .filter((s: string) => s.length > 0);
+          times = filterSlotsAfter2Hours(times, selectedYmd);
         }
 
-        console.log("Final weekData:", weekData);
+        if (!times.length) {
+          const dayData = slots.find((day: any) => day?.date === selectedYmd);
+          if (dayData && Array.isArray(dayData.slots) && dayData.slots.length > 0) {
+            const mapped = dayData.slots.map((slot: any) => {
+              const start = `${slot.startTime} ${String(slot.startPeriod || "").toLowerCase()}`;
+              const end = `${slot.endTime} ${String(slot.endPeriod || "").toLowerCase()}`;
+              return `${start.trim()} – ${end.trim()}`;
+            });
+            times = filterSlotsAfter2Hours(mapped, selectedYmd);
+          }
+        }
 
         if (!cancelled) {
-          if (weekData && Array.isArray(weekData)) {
-            // Find the object for the selected date
-            const dayData = weekData.find((day: any) => day.date === selectedDate_iso);
-            console.log("Found dayData for selected date:", dayData);
-
-            if (dayData && Array.isArray(dayData.slots) && dayData.slots.length > 0) {
-              const times = dayData.slots.map((slot: any) => {
-                const start = `${slot.startTime} ${String(slot.startPeriod || "").toLowerCase()}`;
-                const end = `${slot.endTime} ${String(slot.endPeriod || "").toLowerCase()}`;
-                return `${start} – ${end}`;
-              });
-
-              const filteredTimes = filterSlotsAfter2Hours(times, selectedDate_iso);
-
-              setAvailableTimesForBooking(filteredTimes);
-            } else {
-              console.log("No slots found for selected date");
-              setAvailableTimesForBooking([]);
-            }
-          } else {
-            console.log("No weekData or not an array");
-            setAvailableTimesForBooking([]);
-          }
+          setAvailableTimesForBooking(times);
           setAvailabilityLoading(false);
         }
       } catch (error) {
@@ -442,7 +371,6 @@ useEffect(() => {
           setAvailableTimesForBooking([]);
           setAvailabilityLoading(false);
         }
->>>>>>> 04847f53cb09fab35e6f32d12bdd3773e4704181
       }
     })();
 
@@ -457,27 +385,10 @@ useEffect(() => {
       alert("Please select a mentor");
       return;
     }
-<<<<<<< HEAD
-    const selectedYmd = new Date(currentYear, currentMonth, selectedDate).toLocaleDateString("en-CA");
-    const dateSlot = monthlySlots.find((slot: any) => {
-      const ymd = slotDateToYmd(
-        slot?.date ?? slot?.day ?? slot?.calendarDate ?? slot?.meetingDate ?? slot?.dateString,
-      );
-      return ymd === selectedYmd;
-    });
-    if (dateSlot?.slots?.length) {
-      const times = (dateSlot.slots as any[])
-        .map((raw: any) => formatAvailabilitySlotLabel(raw))
-        .filter((s: string) => s.length > 0);
-      setAvailableTimesForBooking(times);
-    } else {
-      setAvailableTimesForBooking([]);
-=======
 
     if (!selectedTime) {
       alert("Please select a time");
       return;
->>>>>>> 04847f53cb09fab35e6f32d12bdd3773e4704181
     }
 
     const userId = getPastorUserId();
@@ -640,6 +551,28 @@ useEffect(() => {
     }
   };
 
+  const filteredAppointmentsToday = useMemo(() => {
+    const q = appointmentSearch.trim().toLowerCase();
+    return (appointmentsToday as Record<string, unknown>[]).filter((a) => {
+      if (!q) return true;
+      const mentor = a.mentor as { firstName?: string; lastName?: string } | undefined;
+      const name = `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.toLowerCase();
+      const plat = String(a.platform ?? "").toLowerCase();
+      return name.includes(q) || plat.includes(q);
+    });
+  }, [appointmentsToday, appointmentSearch]);
+
+  const filteredUpcoming = useMemo(() => {
+    const q = appointmentSearch.trim().toLowerCase();
+    return (upcomingAppointments as Record<string, unknown>[]).filter((a) => {
+      if (!q) return true;
+      const mentor = a.mentor as { firstName?: string; lastName?: string } | undefined;
+      const name = `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.toLowerCase();
+      const plat = String(a.platform ?? "").toLowerCase();
+      return name.includes(q) || plat.includes(q);
+    });
+  }, [upcomingAppointments, appointmentSearch]);
+
   const handleCancelAppointment = async () => {
     if (!appointmentToCancel) return;
     const id = appointmentEntityId(appointmentToCancel);
@@ -662,56 +595,58 @@ useEffect(() => {
 
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#062946] text-white font-[Albert_Sans]">
+    <div className={pastorPageRoot}>
       <PastorHeader showFullHeader={true} />
 
-      {/* HERO SECTION */}
       <section
-        className="relative bg-cover bg-center h-[200px] md:h-[260px] flex flex-col justify-center px-4 md:px-8 lg:px-20 text-white"
+        className="
+          relative flex h-[180px] items-end bg-cover bg-bottom
+          px-6 pb-6 text-white
+          sm:h-[200px] sm:px-10 sm:pb-8
+          md:h-[250px] md:px-20 md:pb-10
+        "
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]"></div>
+        <div className={pastorHeroOverlay} />
         <div className="relative z-10">
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
-            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
+          <p className={pastorEyebrowPill}>
+            <span className={pastorEyebrowDot} />
             Leadership Support Network
           </p>
-          <h1 className="mt-3 text-2xl font-semibold tracking-wide md:text-4xl">
-            Appointments
-          </h1>
+          <h1 className="text-2xl sm:text-3xl font-semibold">Appointments</h1>
           <p className="mt-2 max-w-xl text-sm text-[#d9ebf8] md:text-base">
             Manage your scheduled sessions and upcoming mentor meetings.
           </p>
         </div>
       </section>
 
-      {/* MAIN SECTION */}
-      <main className="relative z-10 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-8 md:px-8 md:py-12 lg:px-20">
+      <main className={pastorMainGradient}>
+        <div className={pastorContainer}>
+          <div className={pastorControlsRow}>
+            <PastorSearchBar
+              value={appointmentSearch}
+              onChange={setAppointmentSearch}
+              placeholder="Search"
+              aria-label="Search appointments"
+            />
 
-        {/* SEARCH + NEW MEETING BUTTON */}
-        <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 mb-8 md:mb-10">
-          <input
-            type="text"
-            placeholder="Enter a date (dd-mm-yyyy)"
-            className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm text-white shadow-sm backdrop-blur placeholder:text-[#cde2f2] focus:outline-none focus:border-[#8ec5eb] md:w-[320px]"
-          />
-
-          <button
-            onClick={() => {
-              setDrawerOpen(true);
-              setDrawerStep("mentor");
-            }}
-            className="flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-[#0f4a76] shadow-sm transition hover:bg-[#e7f1fa]"
-          >
-            <i className="fa-solid fa-plus text-xs"></i> New Meeting
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => {
+                setDrawerOpen(true);
+                setDrawerStep("mentor");
+              }}
+              className={`flex shrink-0 items-center justify-center gap-2 ${pastorPrimaryCta}`}
+            >
+              <i className="fa-solid fa-plus text-xs" /> New Meeting
+            </button>
+          </div>
 
         {/* CALENDAR + TODAY'S APPOINTMENTS */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12">
 
           {/* LEFT — MONTHLY CALENDAR */}
-          <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-4 text-white shadow-md md:p-6">
+          <div className={`${pastorGlassCard} !flex-col p-4 text-white md:p-6`}>
             <h3 className="text-sm md:text-[15px] font-medium mb-4 flex items-center gap-2">
               <i className="fa-regular fa-calendar"></i> Monthly Meeting Calendar
             </h3>
@@ -774,20 +709,25 @@ useEffect(() => {
           {/* RIGHT — TODAY'S APPOINTMENTS */}
           <div>
             <h3 className="mb-4 text-sm font-semibold text-white md:text-[15px]">
-              You have {appointmentsToday.length} Appointments Today
+              You have {filteredAppointmentsToday.length} appointment
+              {filteredAppointmentsToday.length === 1 ? "" : "s"} today
             </h3>
 
             <div className="flex flex-col gap-4 md:gap-6">
 
-              {appointmentsToday.length === 0 && (
-                <p className="text-white/70">No appointments today</p>
+              {filteredAppointmentsToday.length === 0 && (
+                <p className="text-sm text-[#cde2f2]/90">
+                  {appointmentSearch.trim()
+                    ? "No appointments match your search for today."
+                    : "No appointments today."}
+                </p>
               )}
 
-              {appointmentsToday.map((appt) => {
-                const mentor = appt.mentor;
+              {filteredAppointmentsToday.map((appt) => {
+                const mentor = appt.mentor as { profilePicture?: string; firstName?: string; lastName?: string } | undefined;
                 const icon = getModeIcon(appt.platform);
 
-                const dateObj = new Date(appt.meetingDate);
+                const dateObj = new Date(String(appt.meetingDate ?? ""));
                 const dateStr = dateObj.toLocaleDateString("en-US", {
                   day: "2-digit",
                   month: "short",
@@ -802,7 +742,7 @@ useEffect(() => {
                 return (
                   <div
                     key={appointmentEntityId(appt)}
-                    className="relative flex flex-col items-start gap-5 rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-4 shadow-sm md:flex-row md:items-center md:p-5"
+                    className={`relative flex flex-col items-start gap-5 p-4 md:flex-row md:items-center md:p-5 ${pastorGlassCard}`}
                   >
                     {/* Icon */}
                     <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl bg-white/90 md:h-[100px] md:w-[100px]">
@@ -845,7 +785,7 @@ useEffect(() => {
                       {/* Mode */}
                       <p className="mb-3 text-[11px] text-[#d9ebf8]">
                         Mode:
-                        <span className="font-semibold text-[#8ec5eb]"> {appt.platform}</span>
+                        <span className="font-semibold text-[#8ec5eb]"> {String(appt.platform ?? "")}</span>
                       </p>
 
                       {/* Actions row */}
@@ -857,7 +797,7 @@ useEffect(() => {
                           <i className="fa-brands fa-whatsapp cursor-pointer"></i>
                         </div>
 
-                        <button className="rounded-md bg-white px-5 py-[6px] text-sm font-semibold text-[#0f4a76] hover:bg-[#e7f1fa]">
+                        <button type="button" className={pastorPrimaryCta}>
                           Details
                         </button>
                       </div>
@@ -922,6 +862,148 @@ useEffect(() => {
               })}
             </div>
           </div>
+        </div>
+
+        <section className="mt-10 border-t border-white/10 pt-10 md:mt-14 md:pt-12">
+          <h2 className="mb-4 text-base font-semibold text-white md:mb-6 md:text-lg">
+            Next appointments
+          </h2>
+
+          <div className="grid grid-cols-1 gap-6 md:gap-10 lg:grid-cols-2">
+            {filteredUpcoming.length === 0 && (
+              <p className="text-sm text-[#cde2f2]/90">
+                {appointmentSearch.trim()
+                  ? "No upcoming appointments match your search."
+                  : "No upcoming appointments."}
+              </p>
+            )}
+
+            {filteredUpcoming.map((appt) => {
+              const mode = String(appt.platform ?? "Duo");
+              const icon = getModeIcon(mode);
+              const mentor = appt.mentor as { profilePicture?: string; firstName?: string; lastName?: string } | undefined;
+
+              return (
+                <div
+                  key={appointmentEntityId(appt)}
+                  className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard}`}
+                >
+                  <div className="absolute right-3 top-3 z-20">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setMenuOpenId(
+                          menuOpenId === appointmentEntityId(appt) ? null : appointmentEntityId(appt),
+                        )
+                      }
+                      className="text-[#d9ebf8] hover:text-white"
+                    >
+                      <i className="fa-solid fa-ellipsis-vertical text-lg" />
+                    </button>
+
+                    {menuOpenId === appointmentEntityId(appt) && (
+                      <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg bg-white text-sm shadow-lg">
+                        <button
+                          type="button"
+                          className="flex w-full gap-2 px-4 py-2 hover:bg-gray-100"
+                          onClick={() => {
+                            setAppointmentToEdit(appt);
+                            setShowReschedule(true);
+                            setMenuOpenId(null);
+                          }}
+                        >
+                          <i className="fa-regular fa-calendar" /> Reschedule Meeting
+                        </button>
+
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-2 px-4 py-2 hover:bg-gray-100"
+                          onClick={() => {
+                            setAppointmentToCancel(appt);
+                            setShowCancelConfirm(true);
+                            setMenuOpenId(null);
+                          }}
+                        >
+                          <i className="fa-regular fa-calendar-xmark" />
+                          Cancel Meeting
+                        </button>
+
+                        <button
+                          type="button"
+                          className="flex w-full gap-2 px-4 py-2 hover:bg-gray-100"
+                          onClick={() => {
+                            setAppointmentToEdit(appt);
+                            setSelectedMode(appt.platform || "zoom");
+                            setShowChangeMode(true);
+                            setMenuOpenId(null);
+                          }}
+                        >
+                          <i className="fa-regular fa-pen-to-square" />
+                          Change Meeting Mode
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-white/95 md:h-[140px] md:w-[140px]">
+                    <Image src={icon} alt={String(mode)} className="h-[50px] w-[50px] md:h-[60px] md:w-[60px]" />
+                  </div>
+
+                  <div className="flex w-full flex-col text-white">
+                    <div className="mb-3 flex items-center gap-3">
+                      <Image
+                        src={mentor?.profilePicture || UserProfile}
+                        alt="Mentor"
+                        width={32}
+                        height={32}
+                        className="rounded-full border border-white/30 md:h-9 md:w-9"
+                      />
+                      <div>
+                        <h4 className="text-sm font-semibold">
+                          {mentor?.firstName} {mentor?.lastName}
+                        </h4>
+                        <p className="text-xs text-[#cde2f2]">Mentor</p>
+                      </div>
+                    </div>
+
+                    <div className="mb-3 flex flex-col flex-wrap gap-2 md:flex-row">
+                      <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-2 py-[3px] text-xs text-[#d9ebf8] md:px-3">
+                        <i className="fa-regular fa-calendar text-[#E3D247]" />
+                        <span>Date: {formatDate(String(appt.meetingDate ?? ""))}</span>
+                      </div>
+
+                      <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 py-[3px] text-xs text-[#d9ebf8]">
+                        <i className="fa-regular fa-clock text-[#24E0C2]" />
+                        <span>Time: {formatTime(String(appt.meetingDate ?? ""))}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <p className="mb-2 text-xs text-[#d9ebf8]">
+                          Mode:{" "}
+                          <span className="font-medium text-[#8ec5eb] underline underline-offset-2">
+                            {mode}
+                          </span>
+                        </p>
+
+                        <div className="flex gap-4 text-sm text-[#cde2f2]">
+                          <i className="fa-solid fa-phone cursor-pointer opacity-80 hover:opacity-100" />
+                          <i className="fa-regular fa-comment cursor-pointer opacity-80 hover:opacity-100" />
+                          <i className="fa-brands fa-whatsapp cursor-pointer opacity-80 hover:opacity-100" />
+                        </div>
+                      </div>
+
+                      <button type="button" className={pastorPrimaryCta}>
+                        Details
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
         </div>
       </main>
 
@@ -1078,353 +1160,221 @@ useEffect(() => {
       )}
 
 
-      {/* NEXT APPOINTMENT SECTION */}
-      {/* NEXT APPOINTMENT SECTION */}
-      <div className="mt-12 px-4 py-8 md:mt-16 md:px-8 md:py-12 lg:px-20">
-        <h2 className="mb-4 text-base font-semibold text-white md:mb-6 md:text-[18px]">
-          Next Appointment
-        </h2>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-10">
-
-          {upcomingAppointments.length === 0 && (
-            <p className="text-gray-500">No upcoming appointments</p>
-          )}
-
-          {upcomingAppointments.map((appt) => {
-            const mode = appt.platform || "Duo";
-            const icon = getModeIcon(mode);
-            const mentor = appt.mentor;
-
-            return (
-              <div
-                key={appointmentEntityId(appt)}
-                className="relative bg-[#0C4A85] rounded-2xl p-4 md:p-6 flex flex-col md:flex-row gap-4 md:gap-5 items-start md:items-center shadow-md"
-              >
-                {/* 3 DOT MENU BUTTON */}
-                <div className="absolute top-3 right-3 z-20">
-                  <button
-                    onClick={() =>
-                      setMenuOpenId(menuOpenId === appointmentEntityId(appt) ? null : appointmentEntityId(appt))
-                    }
-                    className="text-white/80 hover:text-white"
-                  >
-                    <i className="fa-solid fa-ellipsis-vertical text-lg"></i>
-                  </button>
-
-                  {/* 3 DOT MENU DROPDOWN */}
-                  {menuOpenId === appointmentEntityId(appt) && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white shadow-lg rounded-lg text-sm z-50">
-
-                      <button
-                        className="w-full px-4 py-2 flex gap-2 hover:bg-gray-100"
-                        onClick={() => {
-                          setAppointmentToEdit(appt);
-                          setShowReschedule(true);
-                          setMenuOpenId(null);
-                        }}
-                      >
-                        <i className="fa-regular fa-calendar"></i>
-                        Reschedule Meeting
-                      </button>
-
-                      <button
-                        className="w-full px-4 py-2 flex gap-2 hover:bg-gray-100"
-                        onClick={() => {
-                          setAppointmentToCancel(appt);
-                          setShowCancelConfirm(true);
-                          setMenuOpenId(null);
-                        }}
-                      >
-                        <i className="fa-regular fa-calendar-xmark"></i>
-                        Cancel Meeting
-                      </button>
-
-                      <button
-                        className="w-full px-4 py-2 flex gap-2 hover:bg-gray-100"
-                        onClick={() => {
-                          setAppointmentToEdit(appt);  // <-- VERY IMPORTANT
-                          setSelectedMode(appt.platform || "zoom");
-                          setShowChangeMode(true);
-                          setMenuOpenId(null);
-                        }}
-                      >
-                        <i className="fa-regular fa-pen-to-square"></i>
-                        Change Meeting Mode
-                      </button>
-
-
-                    </div>
-                  )}
-                </div>
-
-                {/* MODE ICON */}
-                <div className="bg-white rounded-xl flex items-center justify-center w-[100px] md:w-[140px] h-[100px] md:h-[140px] shrink-0">
-                  <Image
-                    src={icon}
-                    alt={mode}
-                    className="w-[50px] md:w-[60px] h-[50px] md:h-[60px]"
-                  />
-                </div>
-
-                {/* RIGHT CONTENT */}
-                <div className="flex flex-col text-white w-full">
-
-                  {/* MENTOR */}
-                  <div className="flex items-center gap-3 mb-3">
-                    <Image
-                      src={mentor?.profilePicture || UserProfile}
-                      alt="Mentor"
-                      width={32}
-                      height={32}
-                      className="rounded-full border border-white/30 md:w-9 md:h-9"
-                    />
-                    <div>
-                      <h4 className="font-semibold text-sm">
-                        {mentor?.firstName} {mentor?.lastName}
-                      </h4>
-                      <p className="text-xs text-white/70">Mentor</p>
-                    </div>
-                  </div>
-
-                  {/* DATE + TIME */}
-                  <div className="flex flex-col md:flex-row flex-wrap gap-2 mb-3">
-                    <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-2 md:px-3 py-[3px] text-xs flex items-center gap-2">
-                      <i className="fa-regular fa-calendar text-[#E3D247]"></i>
-                      <span>Date: {formatDate(appt.meetingDate)}</span>
-                    </div>
-
-                    <div className="bg-[#FFFFFF1A] border border-[#FFFFFF33] rounded-md px-3 py-[3px] text-xs flex items-center gap-2">
-                      <i className="fa-regular fa-clock text-[#24E0C2]"></i>
-                      <span>Time: {formatTime(appt.meetingDate)}</span>
-                    </div>
-                  </div>
-
-                  {/* MODE + ACTIONS */}
-                  <div className="flex justify-between items-end">
-                    <div>
-                      <p className="text-xs text-white/90 mb-2">
-                        Mode:{" "}
-                        <span className="text-[#B8D4FF] underline underline-offset-2">
-                          {mode}
-                        </span>
-                      </p>
-
-                      <div className="flex gap-4 text-white text-sm">
-                        <i className="fa-solid fa-phone opacity-80 hover:opacity-100 cursor-pointer"></i>
-                        <i className="fa-regular fa-comment opacity-80 hover:opacity-100 cursor-pointer"></i>
-                        <i className="fa-brands fa-whatsapp opacity-80 hover:opacity-100 cursor-pointer"></i>
-                      </div>
-                    </div>
-
-                    <button className="bg-[#0B1C58] hover:bg-[#122D80] transition px-6 py-[6px] rounded-md text-sm font-medium">
-                      Details
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-
-
-      {/* ✅ RIGHT DRAWER (Mentor/Schedule Steps) */}
+      {/* ✅ New Meeting — glass drawer (pastor module palette) */}
       {drawerOpen && (
-        <div className="fixed top-0 right-0 w-[440px] h-full bg-white shadow-2xl z-50 flex flex-col animate-slide-left">
-          {/* HEADER */}
-          <div className="flex justify-between items-center px-6 py-5 border-b">
-            <h2 className="text-[18px] font-semibold text-[#0B1C58] flex items-center gap-2">
+        <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-labelledby="new-meeting-drawer-title">
+          <button
+            type="button"
+            className="absolute inset-0 bg-[#041f35]/70 backdrop-blur-sm"
+            aria-label="Close panel"
+            onClick={() => setDrawerOpen(false)}
+          />
+          <div className="relative ml-auto flex h-full w-full max-w-[440px] flex-col border-l border-[#8ec5eb]/30 bg-[linear-gradient(180deg,rgba(10,52,88,0.97)_0%,rgba(4,28,48,0.99)_100%)] shadow-[-20px_0_48px_rgba(2,12,28,0.65)] animate-slide-left">
+            <div className="flex items-start justify-between gap-3 border-b border-white/15 px-6 py-5">
+              <div>
+                <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-[#8ec5eb]/90">
+                  New meeting
+                </p>
+                <h2 id="new-meeting-drawer-title" className="flex items-center gap-2 text-lg font-semibold text-white">
+                  {drawerStep === "mentor" ? (
+                    <>Choose a mentor</>
+                  ) : (
+                    <>
+                      <i className="fa-regular fa-calendar text-[#8ec5eb]" aria-hidden />
+                      Schedule
+                    </>
+                  )}
+                </h2>
+                <p className="mt-1 text-xs text-[#cde2f2]/90">
+                  {drawerStep === "mentor"
+                    ? "Select who you would like to meet with."
+                    : "Pick a date, time, and platform."}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                className="shrink-0 rounded-lg p-2 text-[#d9ebf8] transition hover:bg-white/10 hover:text-white"
+                aria-label="Close"
+              >
+                <i className="fa-solid fa-xmark text-lg" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-6">
               {drawerStep === "mentor" ? (
-                <>Choose Mentor for the Meeting</>
+                <>
+                  <div className="mb-4 max-w-none">
+                    <PastorSearchBar
+                      value={search}
+                      onChange={setSearch}
+                      placeholder="Search mentors"
+                      aria-label="Search mentors"
+                      className="max-w-none"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    {filteredMentors.map((m) => {
+                      const mid = m.id || m._id;
+                      const selected = (selectedMentor?.id || selectedMentor?._id) === mid;
+                      return (
+                        <div
+                          key={mid}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSelectedMentor(m)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setSelectedMentor(m);
+                            }
+                          }}
+                          className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 transition ${
+                            selected
+                              ? "border-[#8ec5eb]/60 bg-white/10 shadow-[0_0_0_1px_rgba(142,197,235,0.25)]"
+                              : "border-white/15 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.07]"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Image
+                              src={UserProfile}
+                              alt=""
+                              width={32}
+                              height={32}
+                              className="rounded-full ring-2 ring-white/10"
+                            />
+                            <div>
+                              <p className="text-sm font-medium text-white">
+                                {[m.firstName, m.lastName].filter(Boolean).join(" ").trim() ||
+                                  String((m as { name?: string }).name ?? "Mentor")}
+                              </p>
+                              <p className="text-xs capitalize text-[#cde2f2]/80">
+                                {String(m.role ?? "mentor").replace(/-/g, " ")}
+                              </p>
+                            </div>
+                          </div>
+                          <span
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                              selected ? "border-[#8ec5eb] bg-[#8ec5eb]" : "border-white/35"
+                            }`}
+                            aria-hidden
+                          >
+                            {selected ? <i className="fa-solid fa-check text-[10px] text-[#062946]" /> : null}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
               ) : (
                 <>
-                  <i className="fa-regular fa-calendar text-[#103C8C]"></i>
-                  Schedule a Meeting
+                  <label className={pastorFieldLabel} htmlFor="new-meeting-date">
+                    Meeting date
+                  </label>
+                  <input
+                    id="new-meeting-date"
+                    type="date"
+                    className="mb-4 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-white outline-none [color-scheme:dark] focus:border-[#8ec5eb]/60 focus:ring-2 focus:ring-[#8ec5eb]/30"
+                    value={`${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}`}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (!v) return;
+                      const [y, mo, d] = v.split("-").map((n) => parseInt(n, 10));
+                      if (!y || !mo || !d) return;
+                      setCurrentYear(y);
+                      setCurrentMonth(mo - 1);
+                      setSelectedDate(d);
+                      setSelectedTime("");
+                    }}
+                  />
+                  <p className="mb-2 text-sm font-medium text-white">
+                    Select a time
+                    <span className="ml-1 font-normal text-[#cde2f2]">
+                      ({new Date(currentYear, currentMonth, selectedDate).toLocaleDateString()})
+                    </span>
+                  </p>
+                  {availabilityLoading ? (
+                    <div className="mb-4 flex items-center justify-center py-6">
+                      <div className="flex items-center gap-2 text-xs text-[#cde2f2]">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-[#8ec5eb]" />
+                        Loading available times…
+                      </div>
+                    </div>
+                  ) : availableTimesForBooking.length === 0 ? (
+                    <p className="mb-4 text-xs text-[#cde2f2]/85">
+                      No open slots on this date. Please try another day.
+                    </p>
+                  ) : (
+                    <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3">
+                      {availableTimesForBooking.map((t: any) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setSelectedTime(t)}
+                          className={`rounded-xl border px-3 py-2.5 text-sm transition ${
+                            selectedTime === t
+                              ? "border-[#8ec5eb] bg-[#8ec5eb]/20 font-medium text-white shadow-[0_0_0_1px_rgba(142,197,235,0.35)]"
+                              : "border-white/20 bg-white/[0.06] text-[#d9ebf8] hover:border-white/35 hover:bg-white/10"
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <label className={pastorFieldLabel} htmlFor="new-meeting-platform">
+                    Platform
+                  </label>
+                  <select
+                    id="new-meeting-platform"
+                    value={schedulePlatform}
+                    onChange={(e) => setSchedulePlatform(e.target.value)}
+                    className={`${pastorDarkSelect} mb-2 text-white`}
+                  >
+                    <option value="Zoom" className="bg-[#062946] text-white">
+                      Zoom
+                    </option>
+                    <option value="Google Meet" className="bg-[#062946] text-white">
+                      Google Meet
+                    </option>
+                    <option value="Microsoft Teams" className="bg-[#062946] text-white">
+                      Microsoft Teams
+                    </option>
+                    <option value="Phone call" className="bg-[#062946] text-white">
+                      Phone call
+                    </option>
+                  </select>
                 </>
               )}
-            </h2>
-            <button
-              onClick={() => setDrawerOpen(false)}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <i className="fa-solid fa-xmark text-lg"></i>
-            </button>
-          </div>
+            </div>
 
-          {/* BODY */}
-          <div className="flex-1 overflow-y-auto px-6 py-6">
-            {drawerStep === "mentor" ? (
-              <>
-                {/* Search */}
-                <div className="relative mb-4">
-                  <i className="fa-solid fa-magnifying-glass text-gray-400 absolute left-3 top-3"></i>
-                  <input
-                    type="text"
-                    placeholder="Search"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-[#103C8C]"
-                  />
-                </div>
+            <div className="flex justify-between gap-3 border-t border-white/15 px-6 py-4">
+              <button
+                type="button"
+                onClick={() =>
+                  drawerStep === "mentor" ? setDrawerOpen(false) : setDrawerStep("mentor")
+                }
+                className="text-sm font-medium text-[#8ec5eb] transition hover:text-white"
+              >
+                {drawerStep === "mentor" ? "Cancel" : "Back"}
+              </button>
 
-
-                {/* Mentor List */}
-                <div className="space-y-2">
-                  {filteredMentors.map((m) => {
-                    const mid = m.id || m._id;
-                    return (
-                      <div
-                        key={mid}
-                        onClick={() => setSelectedMentor(m)}
-                        className={`flex items-center justify-between px-4 py-3 border rounded-md cursor-pointer ${(selectedMentor?.id || selectedMentor?._id) === mid
-                          ? "border-[#103C8C] bg-[#F3F6FF]"
-                          : "border-gray-200"
-                          }`}
-                      >
-                        {/* Left Section */}
-                        <div className="flex items-center gap-3">
-
-                          {/* Profile Picture placeholder */}
-                          <Image
-                            src={UserProfile}
-                            alt="mentor"
-                            width={32}
-                            height={32}
-                            className="rounded-full"
-                          />
-
-<<<<<<< HEAD
-      <div>
-        <p className="text-sm font-medium text-[#0B1C58]">
-          {[m.firstName, m.lastName].filter(Boolean).join(" ").trim() ||
-            String((m as { name?: string }).name ?? "Mentor")}
-        </p>
-        <p className="text-xs text-gray-500 capitalize">
-          {String(m.role ?? "mentor").replace(/-/g, " ")}
-        </p>
-      </div>
-    </div>
-=======
-                          <div>
-                            <p className="text-sm font-medium text-[#0B1C58]">
-                              {m.firstName} {m.lastName}
-                            </p>
-                            <p className="text-xs text-gray-500 capitalize">
-                              {m.role.replace("-", " ")}
-                            </p>
-                          </div>
-                        </div>
->>>>>>> 04847f53cb09fab35e6f32d12bdd3773e4704181
-
-                        {/* Radio */}
-                        <input
-                          type="radio"
-                          checked={(selectedMentor?.id || selectedMentor?._id) === mid}
-                          readOnly
-                          className="accent-[#103C8C]"
-                        />
-                      </div>
-                    );
-                  })}
-
-                </div>
-              </>
-            ) : (
-              <>
-                <label className="mb-1 block text-xs font-medium text-[#0B1C58]">
-                  Meeting date
-                </label>
-                <input
-                  type="date"
-                  className="mb-4 w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-[#0B1C58]"
-                  value={`${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}`}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (!v) return;
-                    const [y, mo, d] = v.split("-").map((n) => parseInt(n, 10));
-                    if (!y || !mo || !d) return;
-                    setCurrentYear(y);
-                    setCurrentMonth(mo - 1);
-                    setSelectedDate(d);
-                    setSelectedTime("");
-                  }}
-                />
-                <p className="text-sm font-medium mb-2 text-[#0B1C58]">
-                  Select a time ({new Date(currentYear, currentMonth, selectedDate).toLocaleDateString()})
-                </p>
-                {availabilityLoading ? (
-                  <div className="mb-4 flex items-center justify-center py-4">
-                    <div className="text-xs text-gray-500 flex items-center gap-2">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full animate-pulse"></div>
-                      Loading available times...
-                    </div>
-                  </div>
-                ) : availableTimesForBooking.length === 0 ? (
-                  <p className="mb-4 text-xs text-gray-500">
-                    No open slots on this date. Please try another day.
-                  </p>
-                ) : (
-                  <div className="mb-4 grid grid-cols-2 gap-3">
-                    {availableTimesForBooking.map((t: any) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setSelectedTime(t)}
-                        className={`rounded-md border px-3 py-2 text-sm transition ${selectedTime === t
-                          ? "border-[#103C8C] bg-[#103C8C] text-white"
-                          : "border-gray-300 text-gray-700 hover:bg-[#F8FAFF]"
-                          }`}
-                      >
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <select
-                  value={schedulePlatform}
-                  onChange={(e) => setSchedulePlatform(e.target.value)}
-                  className="mb-6 w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-1 focus:ring-[#103C8C]"
+              {drawerStep === "mentor" ? (
+                <button
+                  type="button"
+                  onClick={() => setDrawerStep("schedule")}
+                  className={pastorPrimaryCta}
                 >
-                  <option value="Zoom">Zoom</option>
-                  <option value="Google Meet">Google Meet</option>
-                  <option value="Microsoft Teams">Microsoft Teams</option>
-                  <option value="Phone call">Phone call</option>
-                </select>
-              </>
-            )}
-          </div>
-
-          {/* FOOTER */}
-          <div className="border-t px-6 py-4 flex justify-between">
-            <button
-              onClick={() =>
-                drawerStep === "mentor"
-                  ? setDrawerOpen(false)
-                  : setDrawerStep("mentor")
-              }
-              className="text-[#103C8C] font-medium text-sm"
-            >
-              {drawerStep === "mentor" ? "Cancel" : "Back"}
-            </button>
-
-            {drawerStep === "mentor" ? (
-              <button
-                onClick={() => setDrawerStep("schedule")}
-                className="bg-[#103C8C] hover:bg-[#0B2E72] text-white px-6 py-2 rounded-md text-sm font-medium"
-              >
-                Next
-              </button>
-            ) : (
-              <button
-                onClick={handleSchedule}
-                className="bg-[#103C8C] hover:bg-[#0B2E72] text-white px-6 py-2 rounded-md text-sm font-medium"
-              >
-                Schedule
-              </button>
-            )}
+                  Next
+                </button>
+              ) : (
+                <button type="button" onClick={handleSchedule} className={pastorPrimaryCta}>
+                  Schedule
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import HeroBg from "../../Assets/appointment-bg.png";
 import DuoIcon from "../../Assets/duo.png";
@@ -7,6 +8,22 @@ import MeetIcon from "../../Assets/meet.png";
 import UserProfile from "../../Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
+import MentorFilterTabGroup from "@/app/Components/mentor/MentorFilterTabGroup";
+import {
+  mentorBodyText,
+  mentorDateInputDark,
+  mentorEmptyPanel,
+  mentorGlassCardFrost,
+  mentorGlassCardRoadmap,
+  mentorHeroOverlay,
+  mentorMainGradient,
+  mentorPageRoot,
+  mentorPrimaryCta,
+  mentorSecondaryCta,
+  mentorFilterPanel,
+  mentorSelectDark,
+  mentorSpinner,
+} from "@/app/Components/mentor/mentor-theme";
 import { Appointment } from "@/app/Services/types";
 import {
   apiCancelAppointment,
@@ -26,10 +43,20 @@ import {
 import { convertToMinutes, getMentorFromCookie, isOverlapping, timeOptions } from "@/app/Services/utils/helpers";
 import { apiGetAssignedUsers } from "@/app/Services/api";
 
-export default function MentorSchedule() {
+function tabFromQueryParam(raw: string | null): "Appointments" | "Availability" | "Schedule" | null {
+  if (!raw) return null;
+  const t = raw.trim().toLowerCase();
+  if (t === "appointments") return "Appointments";
+  if (t === "availability") return "Availability";
+  if (t === "schedule") return "Schedule";
+  return null;
+}
+
+function MentorScheduleContent() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<
     "Appointments" | "Availability" | "Schedule"
-  >("Appointments");
+  >(() => tabFromQueryParam(searchParams.get("tab")) ?? "Appointments");
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerStep, setDrawerStep] = useState<1 | 2>(1);
   const [showMenu, setShowMenu] = useState<number | null>(null);
@@ -81,28 +108,41 @@ export default function MentorSchedule() {
 
   useEffect(() => {
     const mentor = getMentorFromCookie();
-
-    if (mentor?.id) {
-      setMentorId(mentor.id);
-    }
+    const id = mentor?.id ?? mentor?._id;
+    if (id) setMentorId(String(id));
   }, []);
 
+  /** Deep-link from mentor home (?tab=appointments|availability|schedule) — sync before paint + on back/forward */
+  useLayoutEffect(() => {
+    const next = tabFromQueryParam(searchParams.get("tab"));
+    if (next) setActiveTab(next);
+  }, [searchParams]);
+
   useEffect(() => {
-    if (!mentorId) return;
+    if (!mentorId) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
 
     const fetchAppointments = async () => {
       try {
         const res = await apiGetMentorAppointments(mentorId);
-        setAppointments(unwrapAppointmentsAxiosData(res));
+        if (!cancelled) setAppointments(unwrapAppointmentsAxiosData(res));
       } catch (err) {
         console.error("Failed to fetch appointments", err);
-        setAppointments([]);
+        if (!cancelled) setAppointments([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchAppointments();
+    return () => {
+      cancelled = true;
+    };
   }, [mentorId]);
 
   useEffect(() => {
@@ -453,73 +493,82 @@ export default function MentorSchedule() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white relative">
+    <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
-      {/* 🟦 HERO SECTION */}
       <section
-        className="relative h-[260px] flex flex-col justify-center px-4 md:px-20 text-white bg-cover bg-center"
+        className="relative flex min-h-[200px] flex-col justify-center bg-cover bg-center px-4 py-10 text-white sm:min-h-[240px] md:px-20"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.68)_0%,rgba(6,41,70,0.6)_50%,rgba(6,41,70,1)_100%)]" />
-        <h1 className="relative z-10 text-3xl sm:text-4xl font-semibold tracking-wide">
-          Mentor Appointments
-        </h1>
+        <div className={mentorHeroOverlay} />
+        <div className="relative z-10 max-w-4xl">
+          <h1 className="text-2xl font-semibold sm:text-3xl md:text-4xl">Mentor schedule</h1>
+          <p className={`mt-2 max-w-2xl ${mentorBodyText}`}>
+            View appointments, set weekly availability, or schedule a new meeting with an assigned pastor — same look
+            as pastor appointments.
+          </p>
+        </div>
       </section>
 
-      {/* 🟩 TAB CONTROLS */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between px-4 md:px-20 py-8 gap-5">
-        <input
-          type="text"
-          placeholder="Enter a date (dd-mm-yyyy)"
-          className="w-full sm:w-[320px] bg-white/10 border border-white/20 rounded-md px-4 py-2 text-sm text-white placeholder:text-white/50 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/40"
-        />
-        <div className="flex gap-3 flex-wrap">
-          {["Appointments", "Availability", "Schedule"].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => {
-                setActiveTab(tab as any);
-                if (tab === "Schedule") {
-                  // setDrawerStep(1);
-                  setIsDrawerOpen(true);
-                }
-              }}
-              className={`px-3 sm:px-5 py-2 text-sm rounded-md font-medium transition-all ${activeTab === tab
-                ? "bg-[#8ec5eb]/25 text-white border border-[#8ec5eb]/35 shadow-sm"
-                : "bg-white/10 text-[#cde2f2] border border-white/15 hover:bg-white/15"
-                }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-      </div>
+      <main className={`${mentorMainGradient} flex-1 px-4 pb-20 pt-8 md:px-16 lg:px-20`}>
+        <div className="mx-auto max-w-7xl">
+          <div className={`${mentorFilterPanel} mb-8`}>
+            <div className="flex flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-center">
+              <input
+                type="text"
+                placeholder="Jump to date (dd-mm-yyyy)"
+                className={`w-full max-w-none rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30 lg:max-w-sm`}
+              />
+              <MentorFilterTabGroup
+                tabs={["Appointments", "Availability", "Schedule"] as const}
+                active={activeTab}
+                onChange={(tab) => {
+                  setActiveTab(tab);
+                  if (tab === "Schedule") {
+                    setIsDrawerOpen(true);
+                    setDrawerStep(1);
+                  } else {
+                    setIsDrawerOpen(false);
+                  }
+                }}
+                aria-label="Schedule section"
+                className="w-full lg:w-auto"
+              />
+            </div>
+          </div>
 
-      {/* 🟦 TAB CONTENT */}
-      <main className="flex-1 px-4 md:px-20 pb-20">
-        {/* 🟨 APPOINTMENTS TAB */}
-        {activeTab === "Appointments" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            {/* Calendar */}
-            <div className="rounded-2xl border border-white/15 bg-white/5 p-6 text-white shadow-sm">
-              <h3 className="text-[15px] font-medium mb-4 flex items-center gap-2">
-                <i className="fa-regular fa-calendar"></i> Monthly Meeting
-                Calendar
+          {!mentorId && !loading ? (
+            <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
+              Sign in as a mentor to manage your schedule.
+            </div>
+          ) : null}
+
+          {loading && mentorId ? (
+            <div className="flex flex-col items-center justify-center gap-4 py-16">
+              <div className={mentorSpinner} />
+              <p className={`text-sm ${mentorBodyText}`}>Loading appointments…</p>
+            </div>
+          ) : null}
+
+        {mentorId && !loading && activeTab === "Appointments" && (
+          <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-12">
+            <div className={`${mentorGlassCardFrost} p-5 sm:p-6`}>
+              <h3 className="mb-4 flex items-center gap-2 text-[15px] font-medium text-white">
+                <i className="fa-regular fa-calendar text-[#8ec5eb]" /> Monthly meeting calendar
               </h3>
 
-              <div className="bg-[#103C8C] rounded-xl p-5 text-center">
-
-                {/* Month Navigation */}
-                <div className="flex justify-between items-center mb-4">
+              <div className="rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-5 text-center shadow-inner">
+                <div className="mb-4 flex items-center justify-between">
                   <button
+                    type="button"
                     onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
-                    className="text-white px-2"
+                    className="rounded-lg px-2 py-1 text-white/90 transition hover:bg-white/10"
+                    aria-label="Previous month"
                   >
                     ◀
                   </button>
 
-                  <p className="text-sm text-white/80 font-medium">
+                  <p className="text-sm font-medium text-white/90">
                     {currentDate.toLocaleString("default", {
                       month: "long",
                       year: "numeric",
@@ -527,26 +576,26 @@ export default function MentorSchedule() {
                   </p>
 
                   <button
+                    type="button"
                     onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
-                    className="text-white px-2"
+                    className="rounded-lg px-2 py-1 text-white/90 transition hover:bg-white/10"
+                    aria-label="Next month"
                   >
                     ▶
                   </button>
                 </div>
 
-                {/* Weekday Labels */}
-                <div className="grid grid-cols-7 gap-2 text-[13px] mb-2">
+                <div className="mb-2 grid grid-cols-7 gap-2 text-[13px]">
                   {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-                    <div key={`${d}-${i}`} className="font-medium text-white/70">
+                    <div key={`${d}-${i}`} className="font-medium text-[#cde2f2]/80">
                       {d}
                     </div>
                   ))}
                 </div>
 
-                {/* Calendar Days */}
                 <div className="grid grid-cols-7 gap-2 text-[13px]">
                   {calendarDays.map((day, index) => {
-                    if (!day) return <div key={index}></div>;
+                    if (!day) return <div key={index} />;
 
                     const d = new Date(year, month, day);
 
@@ -564,10 +613,11 @@ export default function MentorSchedule() {
                     return (
                       <div
                         key={index}
-                        className={`py-1 rounded-md cursor-pointer
-          ${isToday ? "bg-[#00B3FF] text-white font-bold" : ""}
-          ${hasAppointment ? "border border-yellow-400" : ""}
-          hover:bg-[#00B3FF]/40`}
+                        className={`cursor-pointer rounded-md py-1 transition ${
+                          isToday
+                            ? "bg-[#8ec5eb]/35 font-semibold text-white ring-1 ring-[#8ec5eb]/50"
+                            : "text-[#d9ebf8] hover:bg-white/10"
+                        } ${hasAppointment ? "ring-1 ring-amber-300/60" : ""}`}
                       >
                         {day}
                       </div>
@@ -577,13 +627,18 @@ export default function MentorSchedule() {
               </div>
             </div>
 
-            {/* Appointments List */}
             <div>
-              <h3 className="text-[15px] font-semibold mb-4 text-white">
-                You have {todayAppointments.length} Appointments Today
+              <h3 className="mb-4 text-[15px] font-semibold text-white">
+                Today — {todayAppointments.length} appointment
+                {todayAppointments.length === 1 ? "" : "s"}
               </h3>
 
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-5">
+                {todayAppointments.length === 0 ? (
+                  <div className={mentorEmptyPanel}>
+                    <p className={mentorBodyText}>No meetings scheduled for today.</p>
+                  </div>
+                ) : null}
                 {todayAppointments.map((appt, index) => {
                   const meetingDate = new Date(appt.meetingDate);
                   const apptKey = appointmentEntityId(appt) || String(index);
@@ -591,44 +646,45 @@ export default function MentorSchedule() {
                   return (
                     <div
                       key={apptKey}
-                      className="bg-white rounded-xl p-5 shadow-sm border border-[#E5E7EB] flex items-center gap-5 relative"
+                      className={`${mentorGlassCardRoadmap} relative items-stretch gap-0 p-4 sm:items-center sm:p-5`}
                     >
-                      <div className="bg-[#F3F6FB] w-[100px] h-[100px] rounded-xl flex items-center justify-center">
-                        <Image
-                          src={appt.platform === "zoom" ? MeetIcon : DuoIcon}
-                          alt={appt.platform}
-                          className="w-[55px] h-[55px]"
-                        />
+                      <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-0">
+                        <div className="flex h-[100px] w-[100px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
+                          <Image
+                            src={appt.platform === "zoom" ? MeetIcon : DuoIcon}
+                            alt={appt.platform}
+                            className="h-[52px] w-[52px]"
+                          />
+                        </div>
                       </div>
 
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
+                      <div className="min-w-0 flex-1 px-0 pt-4 sm:px-5 sm:pt-0">
+                        <div className="mb-2 flex items-center gap-3">
                           <Image
                             src={appt.user?.profilePicture || UserProfile}
                             alt="User"
                             width={36}
                             height={36}
-                            className="rounded-full"
+                            className="rounded-full border border-white/20"
                           />
 
                           <div>
-                            <h4 className="font-semibold text-[#0B1C58] text-sm">
+                            <h4 className="text-sm font-semibold text-white">
                               {appt.user?.firstName} {appt.user?.lastName}
                             </h4>
 
-                            <p className="text-[12px] text-gray-500">Pastor</p>
+                            <p className="text-[12px] text-[#cde2f2]/90">Pastor</p>
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-3 mb-2">
-                          <div className="flex items-center gap-2 bg-[#E8EFFB] px-3 py-[4px] rounded-md text-[12px] text-[#103C8C] font-medium">
-                            <i className="fa-regular fa-calendar text-[#103C8C]"></i>
-                            Date: {meetingDate.toLocaleDateString()}
+                        <div className="mb-2 flex flex-wrap gap-2">
+                          <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-medium text-[#d9ebf8]">
+                            <i className="fa-regular fa-calendar text-[#8ec5eb]" />
+                            {meetingDate.toLocaleDateString()}
                           </div>
 
-                          <div className="flex items-center gap-2 bg-[#E8EFFB] px-3 py-[4px] rounded-md text-[12px] text-[#103C8C] font-medium">
-                            <i className="fa-regular fa-clock text-[#103C8C]"></i>
-                            Time:{" "}
+                          <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-medium text-[#d9ebf8]">
+                            <i className="fa-regular fa-clock text-[#8ec5eb]" />
                             {meetingDate.toLocaleTimeString([], {
                               hour: "2-digit",
                               minute: "2-digit",
@@ -636,18 +692,16 @@ export default function MentorSchedule() {
                           </div>
                         </div>
 
-                        <p className="text-[12px] text-[#6B7280] mb-2">
-                          Mode:
-                          <span className="text-[#103C8C] font-semibold ml-1">
-                            {appt.platform}
-                          </span>
+                        <p className="mb-2 text-[12px] text-[#cde2f2]">
+                          Mode:{" "}
+                          <span className="font-semibold text-[#8ec5eb]">{appt.platform}</span>
                         </p>
 
-                        <div className="flex justify-between items-center">
-                          <div className="flex gap-3 text-[#103C8C] text-[14px]">
-                            <i className="fa-solid fa-phone cursor-pointer hover:text-[#0B1C58]"></i>
-                            <i className="fa-regular fa-comment cursor-pointer hover:text-[#0B1C58]"></i>
-                            <i className="fa-brands fa-whatsapp cursor-pointer hover:text-[#0B1C58]"></i>
+                        <div className="flex items-center justify-between">
+                          <div className="flex gap-3 text-[15px] text-[#8ec5eb]">
+                            <i className="fa-solid fa-phone cursor-pointer transition hover:text-white" />
+                            <i className="fa-regular fa-comment cursor-pointer transition hover:text-white" />
+                            <i className="fa-brands fa-whatsapp cursor-pointer transition hover:text-white" />
                           </div>
 
                           <div className="relative">
@@ -656,46 +710,51 @@ export default function MentorSchedule() {
                               onClick={() =>
                                 setShowMenu(showMenu === index ? null : index)
                               }
-                              className="text-[#103C8C] px-3 py-1 hover:text-[#0B2E72]"
+                              className="rounded-lg px-3 py-1 text-[#8ec5eb] transition hover:bg-white/10 hover:text-white"
+                              aria-label="Appointment actions"
                             >
-                              <i className="fa-solid fa-ellipsis-vertical"></i>
+                              <i className="fa-solid fa-ellipsis-vertical" />
                             </button>
 
                             {showMenu === index && (
-                              <div className="absolute right-0 top-8 z-10 w-[200px] rounded-md border bg-white text-sm text-[#0B1C58] shadow-md">
+                              <div className="absolute right-0 top-9 z-10 w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
                                 <button
                                   type="button"
-                                  className="w-full px-4 py-2 text-left hover:bg-[#F5F8FF]"
+                                  className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
                                   onClick={() => {
                                     setShowMenu(null);
-                                    setToastMessage("Use pastor’s calendar or reschedule from their account when supported.");
+                                    setToastMessage(
+                                      "Use pastor’s calendar or reschedule from their account when supported."
+                                    );
                                     setTimeout(() => setToastMessage(null), 4000);
                                   }}
                                 >
-                                  <i className="fa-regular fa-calendar-check mr-2 text-[#103C8C]"></i>
-                                  Reschedule Meeting
+                                  <i className="fa-regular fa-calendar-check mr-2 text-[#8ec5eb]" />
+                                  Reschedule meeting
                                 </button>
 
                                 <button
                                   type="button"
-                                  className="w-full px-4 py-2 text-left hover:bg-[#F5F8FF]"
+                                  className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
                                   onClick={() => handleCancelMentorAppointment(appt)}
                                 >
-                                  <i className="fa-regular fa-circle-xmark mr-2 text-[#B91C1C]"></i>
-                                  Cancel Meeting
+                                  <i className="fa-regular fa-circle-xmark mr-2 text-red-300" />
+                                  Cancel meeting
                                 </button>
 
                                 <button
                                   type="button"
-                                  className="w-full px-4 py-2 text-left hover:bg-[#F5F8FF]"
+                                  className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
                                   onClick={() => {
                                     setShowMenu(null);
-                                    setToastMessage("Open appointment details on web admin or ask pastor to change platform.");
+                                    setToastMessage(
+                                      "Open appointment details on web admin or ask pastor to change platform."
+                                    );
                                     setTimeout(() => setToastMessage(null), 4000);
                                   }}
                                 >
-                                  <i className="fa-regular fa-clock mr-2 text-[#0B1C58]"></i>
-                                  Change Meeting Mode
+                                  <i className="fa-regular fa-clock mr-2 text-[#cde2f2]" />
+                                  Change meeting mode
                                 </button>
                               </div>
                             )}
@@ -710,21 +769,18 @@ export default function MentorSchedule() {
           </div>
         )}
 
-        {/* 🟧 AVAILABILITY TAB */}
-        {activeTab === "Availability" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-            <div className="bg-[#0C4A85] p-6 rounded-2xl text-white shadow-md">
-              <h3 className="text-[15px] font-medium mb-5">
-                My Weekly Availability
-              </h3>
-              <div className="bg-[#103C8C] rounded-xl p-5 text-center mb-6">
-                <p className="text-sm text-white/70 mb-2">
+        {mentorId && !loading && activeTab === "Availability" && (
+          <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
+            <div className={`${mentorGlassCardFrost} p-5 text-white sm:p-6`}>
+              <h3 className="mb-5 text-[15px] font-medium">My weekly availability</h3>
+              <div className="mb-6 rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-5 text-center shadow-inner">
+                <p className="mb-2 text-sm text-[#cde2f2]">
                   {weekDates.length
                     ? weekDates[0].toLocaleDateString("default", {
-                      month: "long",
-                      year: "numeric",
-                    })
-                    : ""}
+                        month: "long",
+                        year: "numeric",
+                      })
+                    : "—"}
                 </p>
                 <div className="grid grid-cols-7 gap-2 text-[13px]">
                   {weekDates.map((date) => {
@@ -733,40 +789,38 @@ export default function MentorSchedule() {
                     return (
                       <div
                         key={date.toISOString()}
-                        className="py-2 rounded-md text-white/80 hover:bg-[#00B3FF]/40 cursor-pointer text-center"
+                        className="cursor-pointer rounded-md py-2 text-center text-[#d9ebf8] transition hover:bg-white/10"
                       >
                         <div>{day}</div>
-                        <div className="text-xs">{date.getDate()}</div>
+                        <div className="text-xs text-white/80">{date.getDate()}</div>
                       </div>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Dropdowns */}
               <div className="grid grid-cols-2 gap-4">
-                <select className="bg-white text-[#0B1C58] px-3 py-2 rounded-md text-sm">
-                  <option>60 Minutes</option>
-                  <option>30 Minutes</option>
+                <select className={mentorSelectDark}>
+                  <option className="bg-[#062946]">60 Minutes</option>
+                  <option className="bg-[#062946]">30 Minutes</option>
                 </select>
-                <select className="bg-white text-[#0B1C58] px-3 py-2 rounded-md text-sm">
-                  <option>5</option>
-                  <option>10</option>
+                <select className={mentorSelectDark}>
+                  <option className="bg-[#062946]">5</option>
+                  <option className="bg-[#062946]">10</option>
                 </select>
-                <select className="bg-white text-[#0B1C58] px-3 py-2 rounded-md text-sm">
-                  <option>2 Days</option>
-                  <option>1 Day</option>
+                <select className={mentorSelectDark}>
+                  <option className="bg-[#062946]">2 Days</option>
+                  <option className="bg-[#062946]">1 Day</option>
                 </select>
-                <select className="bg-white text-[#0B1C58] px-3 py-2 rounded-md text-sm">
-                  <option>Zoom</option>
-                  <option>Google Meet</option>
+                <select className={mentorSelectDark}>
+                  <option className="bg-[#062946]">Zoom</option>
+                  <option className="bg-[#062946]">Google Meet</option>
                 </select>
               </div>
             </div>
 
-            {/* Available Hours */}
             <div className="text-white">
-              <h3 className="text-[15px] font-medium mb-3">Available Hours</h3>
+              <h3 className="mb-3 text-[15px] font-medium">Available hours</h3>
               {[
                 { label: "Sunday", index: 0 },
                 { label: "Monday", index: 1 },
@@ -779,7 +833,6 @@ export default function MentorSchedule() {
 
                 const dayData = availability.find((d) => d.day === dayObj.index);
                 const slots = dayData?.slots || [];
-                const firstSlot = slots[0];
 
                 return (
                   <div
@@ -798,16 +851,16 @@ export default function MentorSchedule() {
                           )
                         );
                       }}
-                      className="accent-[#103C8C]"
+                      className="accent-[#8ec5eb]"
                     />
 
-                    <p className="w-[100px]">{dayObj.label}</p>
+                    <p className="w-[100px] text-[#d9ebf8]">{dayObj.label}</p>
 
                     {slots.map((slot, slotIndex) => (
                       <div key={slotIndex} className="flex gap-3">
 
                         <select
-                          className="bg-white text-[#0B1C58] rounded-md text-xs px-2 py-1"
+                          className={`${mentorSelectDark} max-w-[140px] px-2 py-1.5 text-xs`}
                           value={`${slot.startTime}-${slot.startPeriod}`}
                           onChange={(e) => {
                             const [time, period] = e.target.value.split("-");
@@ -835,10 +888,10 @@ export default function MentorSchedule() {
                           ))}
                         </select>
 
-                        <span>to</span>
+                        <span className="text-[#cde2f2]">to</span>
 
                         <select
-                          className="bg-white text-[#0B1C58] rounded-md text-xs px-2 py-1"
+                          className={`${mentorSelectDark} max-w-[140px] px-2 py-1.5 text-xs`}
                           value={`${slot.endTime}-${slot.endPeriod}`}
                           onChange={(e) => {
                             const [time, period] = e.target.value.split("-");
@@ -870,7 +923,8 @@ export default function MentorSchedule() {
                     ))}
 
                     <button
-                      className="bg-white text-[#103C8C] text-xs px-3 py-[4px] rounded-md ml-2"
+                      type="button"
+                      className={`${mentorSecondaryCta} ml-2 px-3 py-1.5 text-xs`}
                       onClick={() => {
                         const lastSlot = slots[slots.length - 1];
 
@@ -910,100 +964,130 @@ export default function MentorSchedule() {
 
               <div className="mt-6">
                 <button
+                  type="button"
                   onClick={handleSaveAvailability}
-                  className="bg-white text-[#103C8C] px-6 py-2 rounded-md font-medium"
+                  className={mentorPrimaryCta}
                 >
-                  Submit
+                  Save availability
                 </button>
               </div>
             </div>
           </div>
         )}
+
+        {mentorId && !loading && activeTab === "Schedule" && !isDrawerOpen && (
+          <div className={mentorEmptyPanel}>
+            <p className={`${mentorBodyText} mb-4`}>
+              Open the panel on the right to pick an assigned pastor and choose a time — or tap{" "}
+              <span className="font-semibold text-white">Schedule</span> in the tabs above.
+            </p>
+            <button
+              type="button"
+              className={mentorPrimaryCta}
+              onClick={() => {
+                setDrawerStep(1);
+                setIsDrawerOpen(true);
+              }}
+            >
+              New meeting
+            </button>
+          </div>
+        )}
+        </div>
       </main>
 
-      {/* 🟩 SCHEDULE DRAWER */}
       {activeTab === "Schedule" && isDrawerOpen && (
         <>
           <div
-            className="fixed inset-0 bg-black/30 backdrop-blur-[1px] z-40"
+            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
             onClick={() => setIsDrawerOpen(false)}
+            aria-hidden
           />
-          <div className="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-[#062946] text-white z-50 border-l border-white/15 shadow-2xl transition-transform duration-300">
-            {/* Step 1: Select Pastor/Director */}
+          <div className="fixed right-0 top-0 z-50 h-full w-full border-l border-white/15 bg-[#041f35] text-white shadow-2xl sm:max-w-[480px] sm:w-[480px]">
             {drawerStep === 1 && (
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-lg font-semibold">New Meeting</h2>
+              <div className="flex h-full flex-col p-6">
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">New meeting</h2>
                   <button
+                    type="button"
                     onClick={() => setIsDrawerOpen(false)}
-                    className="text-gray-400 hover:text-[#103C8C]"
+                    className="rounded-lg p-2 text-[#cde2f2] transition hover:bg-white/10 hover:text-white"
+                    aria-label="Close"
                   >
-                    <i className="fa-solid fa-xmark text-xl"></i>
+                    <i className="fa-solid fa-xmark text-xl" />
                   </button>
                 </div>
 
-                {/* Tabs */}
-                <div className="flex gap-3 mb-4">
-                  <button className="bg-[#103C8C] text-white text-sm font-medium px-4 py-2 rounded-md">
+                <div className="mb-4 flex gap-2">
+                  <button
+                    type="button"
+                    className="rounded-lg bg-white/15 px-4 py-2 text-sm font-medium text-white ring-1 ring-[#8ec5eb]/40"
+                  >
                     Pastor
                   </button>
-                  <button className="bg-white border border-[#103C8C] text-[#103C8C] text-sm font-medium px-4 py-2 rounded-md">
+                  <button
+                    type="button"
+                    className="rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-[#cde2f2] transition hover:bg-white/10"
+                    disabled
+                  >
                     Director
                   </button>
                 </div>
 
-                {/* Search */}
                 <input
                   type="text"
                   placeholder="Search"
-                  className="w-full border border-[#D1D5DB] rounded-md px-4 py-2 text-sm mb-4"
+                  className="mb-4 w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30"
                 />
 
-                {/* List */}
-                <div className="flex flex-col gap-3 overflow-y-auto max-h-[380px]">
+                <div className="flex max-h-[min(380px,50vh)] flex-col gap-3 overflow-y-auto pr-1">
                   {pastors.length === 0 && (
-                    <p className="text-sm text-gray-500 px-2 py-4">No assigned pastors found.</p>
+                    <p className={`px-2 py-4 text-sm ${mentorBodyText}`}>No assigned pastors found.</p>
                   )}
                   {pastors.map((pastor: any) => {
                     const pastorId = pastor._id || pastor.id;
                     const isSelected = (selectedPastor?._id || selectedPastor?.id) === pastorId;
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={pastorId}
                         onClick={() => setSelectedPastor(pastor)}
-                        className={`flex items-center justify-between gap-4 rounded-md border px-4 py-2 cursor-pointer transition ${
+                        className={`flex w-full items-center justify-between gap-4 rounded-xl border px-4 py-3 text-left transition ${
                           isSelected
-                            ? "border-[#103C8C] bg-[#F3F6FF]"
-                            : "border-gray-200 hover:bg-[#F5F8FF]"
+                            ? "border-[#8ec5eb]/45 bg-[#8ec5eb]/15"
+                            : "border-white/15 bg-white/5 hover:border-white/25 hover:bg-white/10"
                         }`}
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
                           <Image
                             src={pastor.profilePicture || UserProfile}
-                            alt="User"
+                            alt=""
                             width={36}
                             height={36}
-                            className="rounded-full"
+                            className="shrink-0 rounded-full border border-white/20"
                           />
-                          <span className="font-medium text-sm">
+                          <span className="truncate text-sm font-medium text-white">
                             {pastor.firstName} {pastor.lastName}
                           </span>
                         </div>
-                        <input type="radio" checked={isSelected} readOnly className="accent-[#103C8C]" />
-                      </div>
+                        <input
+                          type="radio"
+                          checked={isSelected}
+                          readOnly
+                          className="accent-[#8ec5eb]"
+                          aria-hidden
+                        />
+                      </button>
                     );
                   })}
                 </div>
 
-                {/* Buttons */}
-                <div className="flex justify-end gap-4 mt-6">
-                  <button
-                    onClick={() => setIsDrawerOpen(false)}
-                    className="border border-[#103C8C] text-[#103C8C] text-sm font-medium px-6 py-[6px] rounded-md"
-                  >
+                <div className="mt-auto flex justify-end gap-3 border-t border-white/10 pt-6">
+                  <button type="button" onClick={() => setIsDrawerOpen(false)} className={mentorSecondaryCta}>
                     Cancel
                   </button>
                   <button
+                    type="button"
                     onClick={() => {
                       if (!selectedPastor) {
                         setToastMessage("Please select a pastor first");
@@ -1012,7 +1096,7 @@ export default function MentorSchedule() {
                       }
                       setDrawerStep(2);
                     }}
-                    className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm font-medium px-8 py-[6px] rounded-md"
+                    className={mentorPrimaryCta}
                   >
                     Next
                   </button>
@@ -1020,111 +1104,82 @@ export default function MentorSchedule() {
               </div>
             )}
 
-            {/* Step 2: Schedule Meeting */}
             {drawerStep === 2 && (
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-lg font-semibold flex items-center gap-2">
-                    <i className="fa-regular fa-calendar-days text-[#103C8C]"></i>
-                    Schedule a Meeting
+              <div className="flex h-full flex-col p-6">
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold">
+                    <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
+                    Schedule a meeting
                   </h2>
                   <button
+                    type="button"
                     onClick={() => setIsDrawerOpen(false)}
-                    className="text-gray-400 hover:text-[#103C8C]"
+                    className="rounded-lg p-2 text-[#cde2f2] transition hover:bg-white/10 hover:text-white"
+                    aria-label="Close"
                   >
-                    <i className="fa-solid fa-xmark text-xl"></i>
+                    <i className="fa-solid fa-xmark text-xl" />
                   </button>
                 </div>
 
-                {/* Calendar */}
-                <div className="bg-[#0C4A85] text-white rounded-xl p-5 mb-6 text-center">
-                  <p className="text-sm mb-2 text-white/70">Select Date</p>
+                <div className="mb-6 rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-5 text-center">
+                  <p className="mb-2 text-sm text-[#cde2f2]">Select date</p>
                   <input
                     type="date"
                     value={meetingDate}
                     onChange={(e) => setMeetingDate(e.target.value)}
-                    className="w-full rounded-md border border-white/30 bg-transparent px-3 py-2 text-sm text-white"
+                    className={mentorDateInputDark}
                   />
                 </div>
 
-                {/* Times */}
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                  <button
-                    onClick={() => setSelectedSlot("09:00 am - 10:00 am")}
-                    className={`border text-sm font-medium px-3 py-2 rounded-md ${
-                      selectedSlot === "09:00 am - 10:00 am"
-                        ? "bg-[#103C8C] text-white border-[#103C8C]"
-                        : "border-[#103C8C] text-[#103C8C] hover:bg-[#F5F8FF]"
-                    }`}
-                  >
-                    09:00 am - 10:00 am
-                  </button>
-                  <button
-                    onClick={() => setSelectedSlot("11:00 am - 12:00 pm")}
-                    className={`border text-sm font-medium px-3 py-2 rounded-md ${
-                      selectedSlot === "11:00 am - 12:00 pm"
-                        ? "bg-[#103C8C] text-white border-[#103C8C]"
-                        : "border-[#103C8C] text-[#103C8C] hover:bg-[#F5F8FF]"
-                    }`}
-                  >
-                    11:00 am - 12:00 pm
-                  </button>
-                  <button
-                    onClick={() => setSelectedSlot("01:00 pm - 02:00 pm")}
-                    className={`border text-sm font-medium px-3 py-2 rounded-md ${
-                      selectedSlot === "01:00 pm - 02:00 pm"
-                        ? "bg-[#103C8C] text-white border-[#103C8C]"
-                        : "border-[#103C8C] text-[#103C8C] hover:bg-[#F5F8FF]"
-                    }`}
-                  >
-                    01:00 pm - 02:00 pm
-                  </button>
-                  <button
-                    onClick={() => setSelectedSlot("03:00 pm - 04:00 pm")}
-                    className={`border text-sm font-medium px-3 py-2 rounded-md ${
-                      selectedSlot === "03:00 pm - 04:00 pm"
-                        ? "bg-[#103C8C] text-white border-[#103C8C]"
-                        : "border-[#103C8C] text-[#103C8C] hover:bg-[#F5F8FF]"
-                    }`}
-                  >
-                    03:00 pm - 04:00 pm
-                  </button>
-                  <button
-                    onClick={() => setSelectedSlot("05:00 pm - 06:00 pm")}
-                    className={`border text-sm font-medium px-3 py-2 rounded-md ${
-                      selectedSlot === "05:00 pm - 06:00 pm"
-                        ? "bg-[#103C8C] text-white border-[#103C8C]"
-                        : "border-[#103C8C] text-[#103C8C] hover:bg-[#F5F8FF]"
-                    }`}
-                  >
-                    05:00 pm - 06:00 pm
-                  </button>
+                <div className="mb-6 grid grid-cols-2 gap-3">
+                  {(
+                    [
+                      "09:00 am - 10:00 am",
+                      "11:00 am - 12:00 pm",
+                      "01:00 pm - 02:00 pm",
+                      "03:00 pm - 04:00 pm",
+                      "05:00 pm - 06:00 pm",
+                    ] as const
+                  ).map((label) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => setSelectedSlot(label)}
+                      className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition ${
+                        selectedSlot === label
+                          ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20 text-white ring-1 ring-[#8ec5eb]/40"
+                          : "border-white/20 bg-white/5 text-[#cde2f2] hover:border-white/30 hover:bg-white/10"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
 
-                {/* Preferred meeting option */}
                 <select
                   value={selectedPlatform}
                   onChange={(e) => setSelectedPlatform(e.target.value)}
-                  className="mb-8 w-full rounded-md border border-[#D1D5DB] px-3 py-2 text-sm text-[#0B1C58]"
+                  className={`${mentorSelectDark} mb-8`}
                 >
-                  <option value="zoom">Zoom</option>
-                  <option value="google meet">Google Meet</option>
-                  <option value="teams">Microsoft Teams</option>
-                  <option value="phone">Phone</option>
+                  <option className="bg-[#062946]" value="zoom">
+                    Zoom
+                  </option>
+                  <option className="bg-[#062946]" value="google meet">
+                    Google Meet
+                  </option>
+                  <option className="bg-[#062946]" value="teams">
+                    Microsoft Teams
+                  </option>
+                  <option className="bg-[#062946]" value="phone">
+                    Phone
+                  </option>
                 </select>
 
-                {/* Buttons */}
-                <div className="flex justify-end gap-4">
-                  <button
-                    onClick={() => setIsDrawerOpen(false)}
-                    className="border border-[#103C8C] text-[#103C8C] text-sm font-medium px-6 py-[6px] rounded-md"
-                  >
+                <div className="mt-auto flex justify-end gap-3 border-t border-white/10 pt-6">
+                  <button type="button" onClick={() => setIsDrawerOpen(false)} className={mentorSecondaryCta}>
                     Cancel
                   </button>
-                  <button
-                    onClick={handleCreateAppointment}
-                    className="bg-[#103C8C] hover:bg-[#0B2E72] text-white text-sm font-medium px-8 py-[6px] rounded-md"
-                  >
+                  <button type="button" onClick={handleCreateAppointment} className={mentorPrimaryCta}>
                     Schedule
                   </button>
                 </div>
@@ -1134,19 +1189,35 @@ export default function MentorSchedule() {
         </>
       )}
 
-      {/* ✅ SUCCESS TOAST */}
-      {toastMessage && (
-        <div className="fixed inset-0 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-xl shadow-lg px-10 py-5 flex items-center gap-3 animate-fade-in">
-            <div className="text-red-500 text-2xl">
-              <i className="fa-solid fa-circle-exclamation"></i>
-            </div>
-            <p className="text-[#0B1C58] font-medium text-[15px]">
-              {toastMessage}
-            </p>
+      {toastMessage ? (
+        <div
+          className="fixed bottom-6 right-4 z-[60] max-w-md rounded-2xl border border-white/20 bg-[#0a3558]/95 px-5 py-4 shadow-2xl backdrop-blur-md sm:right-8"
+          role="status"
+        >
+          <div className="flex items-start gap-3">
+            <i className="fa-solid fa-circle-info mt-0.5 text-lg text-[#8ec5eb]" aria-hidden />
+            <p className="text-[15px] font-medium leading-snug text-white">{toastMessage}</p>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
+  );
+}
+
+export default function MentorSchedule() {
+  return (
+    <Suspense
+      fallback={
+        <div className={mentorPageRoot}>
+          <MentorHeader showFullHeader />
+          <div className={`flex flex-1 flex-col items-center justify-center gap-4 py-24 ${mentorMainGradient}`}>
+            <div className={mentorSpinner} />
+            <p className={`text-sm ${mentorBodyText}`}>Loading schedule…</p>
+          </div>
+        </div>
+      }
+    >
+      <MentorScheduleContent />
+    </Suspense>
   );
 }

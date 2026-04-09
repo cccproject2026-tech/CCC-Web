@@ -26,6 +26,7 @@ import {
   unwrapProgressData,
   type RoadmapAssignmentUi,
 } from "@/app/Services/roadmap-assignments";
+import { pastorRoadmapDescriptionOverview } from "@/app/Components/pastor/pastor-theme";
 import type { ProgressResponse } from "@/app/Services/types/progress.types";
 import { getCookie } from "@/app/utils/cookies";
 import { emitProgressUpdated } from "@/app/utils/progress-sync";
@@ -1018,7 +1019,7 @@ function JumpStartContent() {
                 {description && (
                   <div className="mb-6 rounded-lg border border-white/20 bg-white/10 p-4">
                     <h3 className="text-sm font-semibold text-white mb-2">Description</h3>
-                    <p className="text-white/90 text-sm leading-relaxed whitespace-pre-line">{description}</p>
+                    <p className={pastorRoadmapDescriptionOverview}>{description}</p>
                   </div>
                 )}
 

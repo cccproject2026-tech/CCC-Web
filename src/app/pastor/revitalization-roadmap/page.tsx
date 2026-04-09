@@ -1,9 +1,26 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useLayoutEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
+import PastorSearchBar from "@/app/Components/pastor/PastorSearchBar";
+import PastorFilterTabGroup from "@/app/Components/pastor/PastorFilterTabGroup";
+import {
+  pastorContainer,
+  pastorControlsRow,
+  pastorEmptyPanel,
+  pastorEyebrowDot,
+  pastorEyebrowPill,
+  pastorGlassCard,
+  pastorHeroOverlay,
+  pastorIconButton,
+  pastorMainGradient,
+  pastorPageRoot,
+  pastorPrimaryCta,
+  pastorRoadmapDescriptionPre,
+  pastorSpinner,
+} from "@/app/Components/pastor/pastor-theme";
 import PhaseImg from "@/app/Assets/phase-img.png";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -34,6 +51,23 @@ interface PhaseCard {
 
 const TABS: TabKey[] = ["All", "Due", "In Progress", "Not Started", "Completed"];
 
+function tabKeyFromSearchParam(raw: string | null): TabKey | null {
+  if (!raw) return null;
+  const d = decodeURIComponent(raw)
+    .trim()
+    .toLowerCase()
+    .replace(/\+/g, " ");
+  const map: Record<string, TabKey> = {
+    all: "All",
+    due: "Due",
+    "in progress": "In Progress",
+    inprogress: "In Progress",
+    "not started": "Not Started",
+    completed: "Completed",
+  };
+  return map[d] ?? null;
+}
+
 function formatStatusDisplay(status: UiStatus): string {
   if (status === "In-progress") return "In Progress";
   return status;
@@ -42,6 +76,7 @@ function formatStatusDisplay(status: UiStatus): string {
 export default function RevitalizationRoadmap() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabKey>("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [phases, setPhases] = useState<PhaseCard[]>([]);
@@ -114,6 +149,11 @@ export default function RevitalizationRoadmap() {
     }
   }, []);
 
+  useLayoutEffect(() => {
+    const t = tabKeyFromSearchParam(searchParams.get("tab"));
+    if (t) setActiveTab(t);
+  }, [searchParams]);
+
   useEffect(() => {
     fetchRoadmaps();
 
@@ -152,10 +192,10 @@ export default function RevitalizationRoadmap() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#062946] text-white">
+      <div className={pastorPageRoot}>
         <PastorHeader showFullHeader={true} />
         <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+          <div className={pastorSpinner} />
           <p className="text-sm text-[#cde2f2]">Loading your roadmap...</p>
         </div>
       </div>
@@ -166,7 +206,7 @@ export default function RevitalizationRoadmap() {
     const showLogin =
       /sign in|log in|session|not found/i.test(error) && !/Unable to fetch/i.test(error);
     return (
-      <div className="min-h-screen bg-[#062946] text-white">
+      <div className={pastorPageRoot}>
         <PastorHeader showFullHeader={true} />
         <div className="flex min-h-[70vh] items-center justify-center px-4">
           <div className="max-w-xl rounded-2xl border border-red-400/25 bg-red-500/10 p-5 text-center">
@@ -192,24 +232,23 @@ export default function RevitalizationRoadmap() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">
+    <div className={pastorPageRoot}>
       <PastorHeader showFullHeader={true} />
 
       {/* HERO SECTION */}
       <section
         className="
-          relative bg-cover bg-bottom text-white 
-          h-[180px] sm:h-[200px] md:h-[250px]
-          flex items-end 
-          pb-6 sm:pb-8 md:pb-10 
-          px-6 sm:px-10 md:px-20
+          relative flex h-[180px] items-end bg-cover bg-bottom
+          px-6 pb-6 text-white
+          sm:h-[200px] sm:px-10 sm:pb-8
+          md:h-[250px] md:px-20 md:pb-10
         "
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]"></div>
+        <div className={pastorHeroOverlay} />
         <div className="relative z-10">
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
-            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
+          <p className={pastorEyebrowPill}>
+            <span className={pastorEyebrowDot} />
             Leadership Support Network
           </p>
           <h1 className="text-2xl sm:text-3xl font-semibold">
@@ -222,66 +261,44 @@ export default function RevitalizationRoadmap() {
       </section>
 
       {/* MAIN CONTENT */}
-      <main className="relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 sm:px-8 md:px-16 py-8 md:py-10">
-        <div className="max-w-7xl mx-auto">
+      <main className={pastorMainGradient}>
+        <div className={pastorContainer}>
           {/* Top Controls */}
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 mb-8">
-            <div className="flex items-center rounded-xl border border-white/20 bg-white/10 px-4 py-2 shadow-sm backdrop-blur w-full lg:max-w-md">
-              <i className="fa-solid fa-magnifying-glass mr-3 text-[#cde2f2]"></i>
-              <input
-                type="text"
-                placeholder="Search roadmaps..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="flex-1 bg-transparent text-sm text-white placeholder:text-[#cde2f2] outline-none"
-              />
-            </div>
+          <div className={pastorControlsRow}>
+            <PastorSearchBar
+              value={searchTerm}
+              onChange={setSearchTerm}
+              placeholder="Search"
+              aria-label="Search roadmaps"
+            />
 
-            <div className="flex items-center gap-3 w-full lg:w-auto">
-              <div className="flex items-center rounded-xl border border-white/20 bg-white/10 px-2 py-1 overflow-x-auto shadow-sm backdrop-blur flex-1 lg:flex-none">
-                {TABS.map(
-                  (tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab)}
-                      className={`px-3 lg:px-4 py-1.5 whitespace-nowrap text-xs lg:text-sm font-medium rounded-md transition-all ${
-                        activeTab === tab
-                          ? "bg-white text-[#0f4a76]"
-                          : "text-[#d9ebf8] hover:bg-white/15"
-                      }`}
-                    >
-                      {tab}
-                    </button>
-                  )
-                )}
-              </div>
+            <div className="flex w-full items-center gap-3 lg:w-auto">
+              <PastorFilterTabGroup tabs={TABS} active={activeTab} onChange={setActiveTab} className="flex-1" />
 
               <button
                 type="button"
                 onClick={() => fetchRoadmaps()}
-                className="h-9 w-9 shrink-0 rounded-full border border-white/20 bg-white/10 text-[#d9ebf8] shadow-sm transition hover:bg-white/20"
+                className={pastorIconButton}
                 aria-label="Refresh roadmap"
                 title="Refresh roadmap"
               >
-                <i className="fa-solid fa-rotate-right text-sm"></i>
+                <i className="fa-solid fa-rotate-right text-sm" />
               </button>
             </div>
           </div>
 
           {phases.length === 0 ? (
-            <div className="rounded-2xl border border-white/15 bg-white/5 p-8 text-center text-[#cde2f2]">
+            <div className={pastorEmptyPanel}>
               No roadmap assignments found. Please contact your administrator.
             </div>
           ) : filteredPhases.length === 0 ? (
-            <div className="rounded-2xl border border-white/15 bg-white/5 p-8 text-center text-[#cde2f2]">
-              No roadmaps match this filter.
-            </div>
+            <div className={pastorEmptyPanel}>No roadmaps match this filter.</div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
+            <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2">
               {filteredPhases.map((phase) => (
                 <div
                   key={`${phase.parentRoadmapId || "parent"}-${phase.id}`}
-                  className="flex flex-col overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] shadow-md transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:flex-row"
+                  className={pastorGlassCard}
                 >
                   <div className="relative w-full sm:w-[180px] md:w-[200px] h-[180px] md:h-[200px] flex-shrink-0 m-4">
                     <Image
@@ -301,16 +318,14 @@ export default function RevitalizationRoadmap() {
                       <h3 className="mb-1 text-[16px] font-semibold text-white md:text-[17px]">
                         {phase.title}
                       </h3>
-                      <p className="mb-3 text-sm text-[#cde2f2]">
-                        {phase.description}
-                      </p>
+                      <p className={`mb-3 ${pastorRoadmapDescriptionPre}`}>{phase.description}</p>
 
-                      <div className="flex items-center gap-2 mb-3">
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
                         <span className="text-xs font-medium text-[#d9ebf8]">
                           Status
                         </span>
                         <span
-                          className={`text-xs font-medium px-2 py-[2px] rounded ${
+                          className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${
                             phase.status === "Completed"
                               ? "bg-[#d8fff2] text-[#00A878]"
                               : phase.status === "In-progress"
@@ -336,14 +351,10 @@ export default function RevitalizationRoadmap() {
                         </div>
                       )}
 
-                      <div>
-                        <p className="text-[12px] text-[#d9ebf8]">
-                          Completion Time
-                        </p>
-                        <p className="text-sm font-medium text-white">
-                          {phase.months}
-                        </p>
-                      </div>
+                      <p className="text-sm text-[#d9ebf8]">
+                        Completion Time{" "}
+                        <span className="font-semibold text-white">{phase.months}</span>
+                      </p>
                     </div>
 
                     <div className="flex justify-end mt-3 sm:mt-0">
@@ -364,7 +375,7 @@ export default function RevitalizationRoadmap() {
                             : `/pastor/jumpstart?id=${phase.id}`;
                           router.push(href);
                         }}
-                        className="rounded-lg bg-white px-5 py-2 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa]"
+                        className={pastorPrimaryCta}
                       >
                         View
                       </button>

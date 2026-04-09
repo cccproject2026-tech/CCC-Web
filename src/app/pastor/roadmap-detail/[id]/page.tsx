@@ -4,6 +4,10 @@ import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
 import {
+  pastorRoadmapDescriptionLight,
+  pastorRoadmapDescriptionOnBluePanel,
+} from "@/app/Components/pastor/pastor-theme";
+import {
   apiGetRoadmapById,
   apiUpdateRoadmapData,
   apiUploadRoadmapFile,
@@ -224,7 +228,7 @@ export default function RoadmapDetailPage() {
             <h3 className="text-[14px] md:text-[15px] font-semibold leading-snug mb-[6px]">
               {subRoadmap.name}
             </h3>
-            <p className="text-[12px] md:text-[13px] text-[#6B7280] leading-snug mb-[8px]">
+            <p className={`mb-[8px] ${pastorRoadmapDescriptionLight}`}>
               {subRoadmap.description ||
                 subRoadmap.roadMapDetails ||
                 "Complete this roadmap component as part of your journey."}
@@ -517,7 +521,7 @@ export default function RoadmapDetailPage() {
             {/* Roadmap Section */}
             <div className="mb-6">
               <h3 className="text-sm font-semibold mb-2">Roadmap</h3>
-              <div className="border border-[#5A8DCB] rounded-md p-3 text-sm bg-transparent text-white/90">
+              <div className={`border border-[#5A8DCB] rounded-md bg-transparent p-3 ${pastorRoadmapDescriptionOnBluePanel}`}>
                 {subRoadmap.roadMapDetails}
               </div>
             </div>
@@ -525,7 +529,7 @@ export default function RoadmapDetailPage() {
             {/* Description Section */}
             <div className="mb-6">
               <h3 className="text-sm font-semibold mb-2">Description</h3>
-              <div className="border border-[#5A8DCB] rounded-md p-3 text-sm text-white/90 bg-transparent">
+              <div className={`border border-[#5A8DCB] rounded-md bg-transparent p-3 ${pastorRoadmapDescriptionOnBluePanel}`}>
                 {subRoadmap.description}
               </div>
             </div>
@@ -654,7 +658,7 @@ export default function RoadmapDetailPage() {
                         <h3 className="text-sm font-semibold text-white mb-2">
                           Roadmap
                         </h3>
-                        <p className="bg-[#22A0CA]/50 text-white text-sm px-4 py-2 rounded-md">
+                        <p className={`rounded-md bg-[#22A0CA]/50 px-4 py-2 ${pastorRoadmapDescriptionOnBluePanel}`}>
                           {roadmap.roadMapDetails}
                         </p>
                       </div>
@@ -663,7 +667,7 @@ export default function RoadmapDetailPage() {
                         <h3 className="text-sm font-semibold text-white mb-3">
                           Description
                         </h3>
-                        <div className="text-sm text-white/90 space-y-2">
+                        <div className={`space-y-2 ${pastorRoadmapDescriptionOnBluePanel}`}>
                           {roadmap.description
                             .split("\n")
                             .map((item, index) => (
@@ -1124,10 +1128,10 @@ export default function RoadmapDetailPage() {
             <h3 className="text-lg font-semibold text-white mb-4">
               Roadmap Details
             </h3>
-            <p className="bg-[#22A0CA]/50 text-white text-sm px-4 py-2 rounded-md mb-4">
+            <p className={`mb-4 rounded-md bg-[#22A0CA]/50 px-4 py-2 ${pastorRoadmapDescriptionOnBluePanel}`}>
               {roadmap.roadMapDetails}
             </p>
-            <div className="text-sm text-white/90 space-y-2">
+            <div className={`space-y-2 ${pastorRoadmapDescriptionOnBluePanel}`}>
               {roadmap.description.split("\n").map((item, index) => (
                 <div key={index}>{item}</div>
               ))}

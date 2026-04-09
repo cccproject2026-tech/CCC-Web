@@ -3,16 +3,30 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import MentorHeader from "@/app/Components/MentorHeader";import HeroBg from "@/app/Assets/assignments-bg.png";
+import "@fortawesome/fontawesome-free/css/all.min.css";
+import MentorHeader from "@/app/Components/MentorHeader";
+import HeroBg from "@/app/Assets/assignments-bg.png";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
+import MentorFilterTabGroup from "@/app/Components/mentor/MentorFilterTabGroup";
+import MentorSearchBar from "@/app/Components/mentor/MentorSearchBar";
+import {
+  mentorBodyText,
+  mentorControlsRow,
+  mentorFilterPanel,
+  mentorGlassCardRoadmap,
+  mentorHeroOverlay,
+  mentorMainGradient,
+  mentorPageRoot,
+  mentorPrimaryCta,
+  mentorSpinner,
+  mentorWarningPanel,
+  mentorEmptyPanel,
+} from "@/app/Components/mentor/mentor-theme";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 import {
   fetchRoadmapAssignmentsForUser,
   type RoadmapAssignmentUi,
 } from "@/app/Services/roadmap-assignments";
-
-const glassPanel =
-  "rounded-2xl border border-white/15 bg-white/5 backdrop-blur-md shadow-[0_24px_56px_rgba(2,20,38,0.18)]";
 
 function isHttpUrl(u?: string): boolean {
   return !!u && (u.startsWith("http://") || u.startsWith("https://"));
@@ -71,69 +85,53 @@ export default function MentorAssignmentsPage() {
   }, [assignments, activeTab, searchTerm]);
 
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden bg-[#062946] font-[Albert_Sans] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)]" />
+    <div className={mentorPageRoot}>
+      <MentorHeader showFullHeader={true} />
 
-      <div className="relative z-10">
-        <MentorHeader showFullHeader={true} />
+      <section
+        className="relative overflow-hidden bg-cover bg-top px-4 pb-10 pt-4 sm:px-8 lg:px-20"
+        style={{ backgroundImage: `url(${HeroBg.src})` }}
+      >
+        <div className={mentorHeroOverlay} />
+        <div className="relative z-10 mx-auto w-full max-w-7xl">
+          <h1 className="text-2xl font-semibold sm:text-3xl">Assignments</h1>
+          <p className={`mt-2 ${mentorBodyText}`}>Roadmap tasks from your assigned program (API).</p>
+        </div>
+      </section>
 
-        <section
-          className="relative overflow-hidden bg-cover bg-top px-4 pb-10 pt-4 sm:px-8 lg:px-20"
-          style={{ backgroundImage: `url(${HeroBg.src})` }}
-        >
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.75)_0%,rgba(6,41,70,0.6)_45%,rgba(6,41,70,1)_100%)]" />
-          <div className="relative z-10 mx-auto w-full max-w-7xl">
-            <h1 className="text-2xl font-semibold sm:text-3xl">Assignments</h1>
-            <p className="mt-2 text-sm text-[#cde2f2]">Roadmap tasks from your assigned program (API).</p>
-          </div>
-        </section>
+      <main className={`flex-1 px-4 pb-16 sm:px-8 lg:px-20 ${mentorMainGradient}`}>
+        <div className="mx-auto max-w-7xl">
+          {error && <p className={`mb-4 ${mentorWarningPanel}`}>{error}</p>}
 
-        <main className="flex-1 px-4 pb-16 sm:px-8 lg:px-20">
-          <div className="mx-auto max-w-7xl">
-            {error && (
-              <p className="mb-4 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-50">
-                {error}
-              </p>
-            )}
-
-            <div className={`mb-8 ${glassPanel} p-4 sm:p-5`}>
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div className="relative md:w-[380px]">
-                  <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-white/60" />
-                  <input
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search assignments..."
-                    className="w-full rounded-xl border border-white/20 bg-white/10 py-2.5 pl-11 pr-4 text-sm text-white outline-none placeholder:text-white/60 focus:border-[#8ec5eb]/60"
-                  />
-                </div>
-
-                <div className="flex overflow-hidden rounded-xl border border-white/20 bg-white/10 shadow-sm">
-                  {(["New", "Due", "Completed"] as const).map((tab) => {
-                    const isActive = activeTab === tab;
-                    return (
-                      <button
-                        key={tab}
-                        type="button"
-                        onClick={() => setActiveTab(tab)}
-                        className={`px-4 py-2 text-sm font-semibold transition ${
-                          isActive ? "bg-[#8ec5eb]/20 text-white" : "text-[#cde2f2] hover:bg-white/10"
-                        }`}
-                      >
-                        {tab}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+          <div className={`${mentorFilterPanel} mb-8`}>
+            <div className={mentorControlsRow}>
+              <MentorSearchBar
+                variant="absolute"
+                value={searchTerm}
+                onChange={setSearchTerm}
+                placeholder="Search assignments..."
+                aria-label="Search assignments"
+                className="w-full md:max-w-md"
+              />
+              <MentorFilterTabGroup
+                tabs={["New", "Due", "Completed"] as const}
+                active={activeTab}
+                onChange={setActiveTab}
+                aria-label="Assignment status"
+                className="w-full md:w-auto"
+              />
             </div>
+          </div>
 
-            {loading && (
-              <div className="py-16 text-center text-sm text-[#cde2f2]">Loading assignments…</div>
-            )}
+          {loading && (
+            <div className="flex flex-col items-center gap-3 py-16">
+              <div className={mentorSpinner} />
+              <p className={`text-sm ${mentorBodyText}`}>Loading assignments…</p>
+            </div>
+          )}
 
             {!loading && filtered.length === 0 && (
-              <div className="py-14 text-center text-white/80">No assignments found for this filter.</div>
+              <div className={mentorEmptyPanel}>No assignments found for this filter.</div>
             )}
 
             {!loading && filtered.length > 0 && (
@@ -143,7 +141,7 @@ export default function MentorAssignmentsPage() {
                   return (
                     <div
                       key={`${a.parentRoadmapId}-${a.id}`}
-                      className="rounded-2xl border border-white/15 bg-white/5 p-5 transition hover:bg-white/10"
+                      className={`${mentorGlassCardRoadmap} flex-col p-5 sm:flex-col`}
                     >
                       <div className="flex gap-4">
                         <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-white/15">
@@ -175,7 +173,7 @@ export default function MentorAssignmentsPage() {
                         <p className="text-xs text-white/60">Months {a.months}</p>
                         <button
                           type="button"
-                          className="rounded-xl bg-[#8ec5eb]/90 px-4 py-2 text-sm font-semibold text-[#062946] hover:bg-[#8ec5eb]"
+                          className={`${mentorPrimaryCta} px-4 py-2 text-sm`}
                           onClick={() =>
                             router.push(
                               `/mentor/RevitalizationRoadmap/task?roadmapId=${encodeURIComponent(a.parentRoadmapId)}&taskId=${encodeURIComponent(a.id)}&userId=${encodeURIComponent(mentorUserId)}`,
@@ -190,8 +188,8 @@ export default function MentorAssignmentsPage() {
                 })}
               </div>
             )}
-          </div>
-        </main>      </div>
+        </div>
+      </main>
     </div>
   );
 }
