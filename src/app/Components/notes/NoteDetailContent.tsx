@@ -6,6 +6,7 @@ import { isAxiosError } from "axios";
 import MentorHeader from "@/app/Components/MentorHeader";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
+import { directorGlassCard, directorPageRoot } from "@/app/director/directorUi";
 import {
   deleteNoteSafe,
   fetchNoteById,
@@ -20,7 +21,7 @@ import {
 } from "./notesUtils";
 import { useNotesSession } from "./useNotesSession";
 
-const glassPanel =
+const glassPanelPastor =
   "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.88)_0%,rgba(10,53,88,0.94)_100%)] shadow-[0_20px_50px_rgba(2,20,38,0.35)]";
 
 function extractApiErrorMessage(err: unknown): string {
@@ -49,8 +50,10 @@ export default function NoteDetailContent({
 }) {
   const router = useRouter();
   const basePath = notesBasePath(variant);
-  const Header = variant === "mentor" ? MentorHeader : PastorHeader;
+  const Header =
+    variant === "mentor" ? MentorHeader : variant === "pastor" ? PastorHeader : null;
   const { userId, displayName } = useNotesSession(variant);
+  const glassPanel = variant === "director" ? directorGlassCard : glassPanelPastor;
 
   const [note, setNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
@@ -132,13 +135,23 @@ export default function NoteDetailContent({
     }
   };
 
-  return (
-    <div className="relative flex min-h-screen flex-col bg-transparent font-[Albert_Sans] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(141,211,243,0.16),transparent_40%),linear-gradient(180deg,#041f35_0%,#062946_100%)]" />
-      <div className="relative z-10 flex min-h-screen flex-col">
-        <Header showFullHeader />
+  const MainTag = variant === "director" ? "div" : "main";
 
-        <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+  return (
+    <div
+      className={
+        variant === "director"
+          ? directorPageRoot
+          : "relative flex min-h-screen flex-col bg-transparent font-[Albert_Sans] text-white"
+      }
+    >
+      {variant !== "director" ? (
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(141,211,243,0.16),transparent_40%),linear-gradient(180deg,#041f35_0%,#062946_100%)]" />
+      ) : null}
+      <div className="relative z-10 flex min-h-screen flex-col">
+        {Header ? <Header showFullHeader /> : null}
+
+        <MainTag className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <button
@@ -233,9 +246,9 @@ export default function NoteDetailContent({
               </>
             )}
           </div>
-        </main>
+        </MainTag>
 
-        <PastorFooter />
+        {variant === "pastor" ? <PastorFooter /> : null}
       </div>
     </div>
   );

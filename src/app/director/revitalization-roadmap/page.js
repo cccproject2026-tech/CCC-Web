@@ -10,11 +10,30 @@ import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
 import Card1 from "../../Assets/card1.png";
-import { apiGetRoadmaps, apiGetMentorList, apiGetOverallProgress, apiDeleteRoadmap } from "@/app/Services/api";
+import {
+  apiGetRoadmaps,
+  apiGetMentorList,
+  apiGetOverallProgress,
+  apiDeleteRoadmap,
+} from "@/app/Services/api";
 import { unwrapRoadmapsList } from "@/app/Services/roadmap-assignments";
 import DirectorHero from "../DirectorHero";
-import { directorGlassCard, directorInputClass, directorPageRoot } from "../directorUi";
+import {
+  directorBtnPrimary,
+  directorBtnSecondary,
+  directorGlassCard,
+  directorPageContainer,
+  directorPageRoot,
+  directorSpinner,
+} from "../directorUi";
+import { DirectorFilterSection } from "../ui";
+import SearchBar from "@/app/Components/SearchBar";
 
+/** Dark glass dropdown panels (matches director shell). */
+const glassPopover =
+  "absolute z-[60] mt-2 min-w-[240px] rounded-xl border border-white/15 bg-[#041f35]/95 p-4 shadow-2xl backdrop-blur-xl";
+const glassTrigger =
+  "inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-white/15";
 
 export default function RevitalizationRoadmapPage() {
   const router = useRouter();
@@ -35,6 +54,11 @@ export default function RevitalizationRoadmapPage() {
   const [loadingMentors, setLoadingMentors] = useState(false);
   const [pastorProgressList, setPastorProgressList] = useState([]);
   const [loadingPastors, setLoadingPastors] = useState(false);
+
+  useEffect(() => {
+    setShowSortPopup(false);
+    setShowFilterPopup(false);
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab !== "mentors" || mentorsList.length > 0) return;
@@ -78,7 +102,6 @@ export default function RevitalizationRoadmapPage() {
       try {
         setLoadingRoadmaps(true);
         const res = await apiGetRoadmaps();
-        /** Handles raw arrays, { data }, { roadmaps }, nested envelopes, etc. */
         const list = unwrapRoadmapsList(res);
         const mapped = list.map((item) => ({
           id: item._id,
@@ -97,20 +120,12 @@ export default function RevitalizationRoadmapPage() {
     fetchRoadmaps();
   }, []);
 
-
-  // Close popups when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (
-        sortPopupRef.current &&
-        !sortPopupRef.current.contains(event.target)
-      ) {
+      if (sortPopupRef.current && !sortPopupRef.current.contains(event.target)) {
         setShowSortPopup(false);
       }
-      if (
-        filterPopupRef.current &&
-        !filterPopupRef.current.contains(event.target)
-      ) {
+      if (filterPopupRef.current && !filterPopupRef.current.contains(event.target)) {
         setShowFilterPopup(false);
       }
     };
@@ -127,11 +142,8 @@ export default function RevitalizationRoadmapPage() {
         ...prev,
         [filterKey]: !prev[filterKey],
       };
-
-      // Update filter count
       const activeFilters = Object.values(newFilters).filter(Boolean).length;
       setFilterCount(activeFilters);
-
       return newFilters;
     });
   };
@@ -160,11 +172,16 @@ export default function RevitalizationRoadmapPage() {
     setShowFilterPopup(false);
   };
 
+  const tabBtn = (isActive) =>
+    isActive
+      ? "border-[#8ec5eb]/40 bg-[#8ec5eb]/20 text-white ring-1 ring-[#8ec5eb]/35"
+      : "border-white/15 bg-white/5 text-white/80 hover:border-white/25 hover:bg-white/10";
+
   return (
     <div className={directorPageRoot}>
       <DirectorHero
         title="Revitalization Roadmap"
-        subtitle="Track and manage church revitalization phases."
+        subtitle="Library, mentors, and pastor progress — unified for directors."
         image={HeroBg}
         breadcrumbItems={[
           { label: "Home", href: "/director/home" },
@@ -173,92 +190,72 @@ export default function RevitalizationRoadmapPage() {
       />
 
       <main className="flex-1 pb-12">
-        <div className="mx-auto max-w-7xl">
-          <div className={`mb-8 p-6 ${directorGlassCard}`}>
-            <div className="flex flex-col md:flex-row gap-4 items-center">
-              {/* Search Bar */}
-              <div className="flex-1">
-                <div className="relative">
-                  <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-[#8ec5eb]/70"></i>
-                  <input
-                    type="text"
-                    placeholder="Search"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className={`${directorInputClass} pl-11`}
-                  />
-                </div>
+        <div className={`${directorPageContainer} max-w-7xl`}>
+          <DirectorFilterSection className="!p-5 sm:!p-6">
+            <div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0 w-full lg:max-w-md">
+                <SearchBar
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Search roadmaps, mentors, or pastors…"
+                  variant="dark"
+                  className="w-full"
+                />
               </div>
 
-              {/* Tab Navigation */}
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => setActiveTab("roadmap-library")}
-                  className={`rounded-lg px-6 py-3 text-[14px] font-semibold transition-all ${
-                    activeTab === "roadmap-library"
-                      ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/40"
-                      : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
-                  }`}
+                  className={`rounded-lg border px-4 py-2.5 text-[13px] font-semibold transition-all sm:px-5 sm:text-[14px] ${tabBtn(activeTab === "roadmap-library")}`}
                 >
-                  Roadmap Library
+                  Roadmap library
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab("mentors")}
-                  className={`rounded-lg px-6 py-3 text-[14px] font-semibold transition-all ${
-                    activeTab === "mentors"
-                      ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/40"
-                      : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
-                  }`}
+                  className={`rounded-lg border px-4 py-2.5 text-[13px] font-semibold transition-all sm:px-5 sm:text-[14px] ${tabBtn(activeTab === "mentors")}`}
                 >
                   Mentors
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab("pastor-roadmaps")}
-                  className={`rounded-lg px-6 py-3 text-[14px] font-semibold transition-all ${
-                    activeTab === "pastor-roadmaps"
-                      ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/40"
-                      : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
-                  }`}
+                  className={`rounded-lg border px-4 py-2.5 text-[13px] font-semibold transition-all sm:px-5 sm:text-[14px] ${tabBtn(activeTab === "pastor-roadmaps")}`}
                 >
-                  Pastor's Roadmaps
+                  Pastor roadmaps
                 </button>
                 <button
                   type="button"
                   onClick={() => router.push("/director/pastor-assignments")}
-                  className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/10 px-6 py-3 text-[14px] font-semibold text-white transition hover:bg-[#8ec5eb]/20"
+                  className={directorBtnSecondary}
                 >
-                  <i className="fa-solid fa-share-nodes"></i>
-                  Assign
+                  <i className="fa-solid fa-share-nodes text-sm" />
+                  <span>Assign</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => router.push("/director/revitalization-roadmap/create")}
-                  className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-6 py-3 text-[14px] font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                  className={directorBtnPrimary}
                 >
-                  <i className="fa-solid fa-plus"></i>
-                  New Roadmap
+                  <i className="fa-solid fa-plus text-sm" />
+                  <span>New roadmap</span>
                 </button>
               </div>
             </div>
-          </div>
+          </DirectorFilterSection>
 
-          {/* Content Based on Active Tab */}
           {activeTab === "roadmap-library" && (
             <div>
               {loadingRoadmaps ? (
-                <div className="flex justify-center py-12">
-                  <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                <div className="flex justify-center py-16">
+                  <div className={directorSpinner} />
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
                   {roadmapLibrary
                     .filter((r) =>
-                      r.title
-                        .toLowerCase()
-                        .includes((searchQuery || "").trim().toLowerCase())
+                      r.title.toLowerCase().includes((searchQuery || "").trim().toLowerCase())
                     )
                     .map((roadmap) => (
                       <RoadmapCard
@@ -270,26 +267,22 @@ export default function RevitalizationRoadmapPage() {
                         description={roadmap.description}
                         completionTime={roadmap.completionTime}
                         onView={() =>
-                          router.push(
-                            `/director/pastor-assignments/roadmap/${roadmap.id}`
-                          )
+                          router.push(`/director/pastor-assignments/roadmap/${roadmap.id}`)
                         }
                         onEdit={() =>
                           router.push(
-                            `/director/pastor-assignments/roadmap/${roadmap.id}`
+                            `/director/pastor-assignments/roadmap/${roadmap.id}?edit=1`
                           )
                         }
                         onDelete={() => handleDeleteRoadmap(roadmap.id)}
                       />
                     ))}
                   {roadmapLibrary.filter((r) =>
-                    r.title
-                      .toLowerCase()
-                      .includes((searchQuery || "").trim().toLowerCase())
+                    r.title.toLowerCase().includes((searchQuery || "").trim().toLowerCase())
                   ).length === 0 && (
-                    <p className="text-white/70 col-span-2">
+                    <p className="col-span-2 py-8 text-center text-[15px] text-white/70">
                       {roadmapLibrary.length === 0
-                        ? "No roadmaps yet. Create one with New Roadmap."
+                        ? "No roadmaps yet. Create one with New roadmap."
                         : "No roadmaps match your search."}
                     </p>
                   )}
@@ -301,221 +294,175 @@ export default function RevitalizationRoadmapPage() {
           {activeTab === "mentors" && (
             <div>
               {loadingMentors ? (
-                <div className="flex justify-center py-12">
-                  <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                <div className="flex justify-center py-16">
+                  <div className={directorSpinner} />
                 </div>
               ) : (
-              <>
-              {/* Mentor Avatars */}
-              <FeaturedAvatars
-                items={mentorsList.map((mentor, idx) => {
-                  const defaultImages = [Mentor1, Mentor2, Mentor3];
-                  return {
-                    id: mentor._id || mentor.id,
-                    name: `${mentor.firstName} ${mentor.lastName}`,
-                    img: mentor.profilePicture || defaultImages[idx % defaultImages.length],
-                  };
-                })}
-                gapClass="gap-4"
-                nameClass="text-sm text-white"
-                className="mb-6"
-                showGradientBorder={false}
-              />
+                <>
+                  <FeaturedAvatars
+                    items={mentorsList.map((mentor, idx) => {
+                      const defaultImages = [Mentor1, Mentor2, Mentor3];
+                      return {
+                        id: mentor._id || mentor.id,
+                        name: `${mentor.firstName} ${mentor.lastName}`,
+                        img: mentor.profilePicture || defaultImages[idx % defaultImages.length],
+                      };
+                    })}
+                    gapClass="gap-4"
+                    nameClass="text-sm text-white/90"
+                    className="mb-6"
+                    showGradientBorder={false}
+                  />
 
-              {/* Sort and Filter */}
-              <div className="flex justify-between items-center mb-6">
-                <div
-                  className="flex items-center gap-4 relative"
-                  ref={sortPopupRef}
-                >
-                  <button
-                    onClick={() => setShowSortPopup(!showSortPopup)}
-                    className="bg-white border-2 border-gray-200 rounded-lg px-4 py-2 text-gray-700 font-semibold text-[14px] focus:outline-none focus:border-[#2E3B8E] hover:bg-gray-50 transition-all flex items-center gap-2"
+                  <div
+                    className={`mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between ${directorGlassCard} p-4 sm:p-5`}
                   >
-                    <span>
-                      {sortBy === "least-mentees"
-                        ? "Least Mentees"
-                        : "Most Mentees"}
-                    </span>
-                    <i className="fa-solid fa-chevron-down text-gray-600 text-xs"></i>
-                  </button>
-
-                  {/* Sort Popup */}
-                  {showSortPopup && (
-                    <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-4 min-w-[250px] z-50">
-                      <h3 className="text-[14px] font-bold text-gray-900 mb-3">
-                        Sort Mentees popup 15
-                      </h3>
-
-                      {/* Radio Options */}
-                      <div className="space-y-3 mb-4">
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="sort"
-                            value="least-mentees"
-                            checked={sortBy === "least-mentees"}
-                            onChange={(e) => {
-                              setSortBy(e.target.value);
-                              setShowSortPopup(false);
-                            }}
-                            className="w-4 h-4 text-[#2E3B8E] focus:ring-[#2E3B8E]"
-                          />
-                          <span className="text-[14px] text-gray-700">
-                            Least number of Mentees
-                          </span>
-                        </label>
-
-                        <label className="flex items-center gap-3 cursor-pointer">
-                          <input
-                            type="radio"
-                            name="sort"
-                            value="most-mentees"
-                            checked={sortBy === "most-mentees"}
-                            onChange={(e) => {
-                              setSortBy(e.target.value);
-                              setShowSortPopup(false);
-                            }}
-                            className="w-4 h-4 text-[#2E3B8E] focus:ring-[#2E3B8E]"
-                          />
-                          <span className="text-[14px] text-gray-700">
-                            Most number of Mentees
-                          </span>
-                        </label>
-                      </div>
-
-                      {/* Clear Sort Button */}
+                    <div className="relative flex items-center gap-3" ref={sortPopupRef}>
                       <button
-                        onClick={handleClearSort}
-                        className="text-[#2E3B8E] text-[14px] font-semibold hover:underline"
+                        type="button"
+                        onClick={() => setShowSortPopup(!showSortPopup)}
+                        className={glassTrigger}
                       >
-                        Clear Sort
+                        <span>
+                          {sortBy === "least-mentees" ? "Least mentees" : "Most mentees"}
+                        </span>
+                        <i className="fa-solid fa-chevron-down text-xs text-white/60" />
                       </button>
+
+                      {showSortPopup && (
+                        <div className={`${glassPopover} left-0 top-full`}>
+                          <h3 className="mb-3 text-[13px] font-bold uppercase tracking-wide text-[#8ec5eb]">
+                            Sort by mentee count
+                          </h3>
+                          <div className="mb-4 space-y-3">
+                            <label className="flex cursor-pointer items-center gap-3">
+                              <input
+                                type="radio"
+                                name="sort"
+                                value="least-mentees"
+                                checked={sortBy === "least-mentees"}
+                                onChange={(e) => {
+                                  setSortBy(e.target.value);
+                                  setShowSortPopup(false);
+                                }}
+                                className="h-4 w-4 border-white/30 bg-white/10 text-[#8ec5eb] focus:ring-[#8ec5eb]/40"
+                              />
+                              <span className="text-[14px] text-white/90">Least mentees</span>
+                            </label>
+                            <label className="flex cursor-pointer items-center gap-3">
+                              <input
+                                type="radio"
+                                name="sort"
+                                value="most-mentees"
+                                checked={sortBy === "most-mentees"}
+                                onChange={(e) => {
+                                  setSortBy(e.target.value);
+                                  setShowSortPopup(false);
+                                }}
+                                className="h-4 w-4 border-white/30 bg-white/10 text-[#8ec5eb] focus:ring-[#8ec5eb]/40"
+                              />
+                              <span className="text-[14px] text-white/90">Most mentees</span>
+                            </label>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleClearSort}
+                            className="text-[13px] font-semibold text-[#8ec5eb] transition hover:text-white"
+                          >
+                            Clear sort
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
 
-                <div className="relative" ref={filterPopupRef}>
-                  <button
-                    onClick={() => setShowFilterPopup(!showFilterPopup)}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 rounded-lg text-gray-700 font-semibold text-[14px] hover:bg-gray-50 transition-all"
-                  >
-                    <i className="fa-solid fa-filter text-gray-700"></i>
-                    <span>Filter</span>
-                    <span className="bg-yellow-400 text-black text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                      {filterCount}
-                    </span>
-                    <i className="fa-solid fa-chevron-down text-gray-600 text-xs"></i>
-                  </button>
-
-                  {/* Filter Popup */}
-                  {showFilterPopup && (
-                    <div className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-4 min-w-[200px] z-50">
-                      <h3 className="text-[14px] font-bold text-gray-900 mb-3">
-                        Filter
-                      </h3>
-
-                      {/* Filter Options */}
-                      <div className="space-y-3 mb-4">
-                        <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-[14px] text-gray-700">
-                            Country
-                          </span>
-                          <button
-                            onClick={() => handleToggleFilter("country")}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                              filters.country
-                                ? "bg-[#2E3B8E] border-[#2E3B8E]"
-                                : "bg-white border-gray-300"
-                            }`}
-                          >
-                            {filters.country && (
-                              <i className="fa-solid fa-check text-white text-xs"></i>
-                            )}
-                          </button>
-                        </label>
-
-                        <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-[14px] text-gray-700">
-                            State
-                          </span>
-                          <button
-                            onClick={() => handleToggleFilter("state")}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                              filters.state
-                                ? "bg-[#2E3B8E] border-[#2E3B8E]"
-                                : "bg-white border-gray-300"
-                            }`}
-                          >
-                            {filters.state && (
-                              <i className="fa-solid fa-check text-white text-xs"></i>
-                            )}
-                          </button>
-                        </label>
-
-                        <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-[14px] text-gray-700">
-                            Conference
-                          </span>
-                          <button
-                            onClick={() => handleToggleFilter("conference")}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                              filters.conference
-                                ? "bg-[#2E3B8E] border-[#2E3B8E]"
-                                : "bg-white border-gray-300"
-                            }`}
-                          >
-                            {filters.conference && (
-                              <i className="fa-solid fa-check text-white text-xs"></i>
-                            )}
-                          </button>
-                        </label>
-                      </div>
-
-                      {/* Clear Filter Button */}
+                    <div className="relative sm:ml-auto" ref={filterPopupRef}>
                       <button
-                        onClick={handleClearFilter}
-                        className="text-[#2E3B8E] text-[14px] font-semibold hover:underline"
+                        type="button"
+                        onClick={() => setShowFilterPopup(!showFilterPopup)}
+                        className={glassTrigger}
                       >
-                        Clear Filter
+                        <i className="fa-solid fa-filter text-[#8ec5eb]" />
+                        <span>Filter</span>
+                        <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/20 px-1.5 text-[11px] font-bold text-[#cde2f2]">
+                          {filterCount}
+                        </span>
+                        <i className="fa-solid fa-chevron-down text-xs text-white/60" />
                       </button>
-                    </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Mentor Cards Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {mentorsList
-                  .filter((m) =>
-                    `${m.firstName} ${m.lastName}`
-                      .toLowerCase()
-                      .includes(searchQuery.toLowerCase())
-                  )
-                  .sort((a, b) => {
-                    const aC = a.assignedId?.length || 0;
-                    const bC = b.assignedId?.length || 0;
-                    return sortBy === "most-mentees" ? bC - aC : aC - bC;
-                  })
-                  .map((mentor, idx) => {
-                    const defaultImages = [Mentor1, Mentor2, Mentor3];
-                    const fallback = defaultImages[idx % defaultImages.length];
-                    return (
-                    <MentorCard
-                      key={mentor._id || mentor.id}
-                      image={mentor.profilePicture || fallback}
-                      name={`${mentor.firstName} ${mentor.lastName}`}
-                      role={mentor.role || "Mentor"}
-                      menteeCount={mentor.assignedId?.length || 0}
-                      onViewDetails={() => router.push(`/director/mentors/profile/${mentor._id || mentor.id}`)}
-                    />
-                  );})
-                }
-                {mentorsList.length === 0 && (
-                  <p className="text-white/70 col-span-4">No mentors found.</p>
-                )}
-              </div>
-              </>
+                      {showFilterPopup && (
+                        <div className={`${glassPopover} right-0 top-full`}>
+                          <h3 className="mb-3 text-[13px] font-bold uppercase tracking-wide text-[#8ec5eb]">
+                            Filter
+                          </h3>
+                          <div className="mb-4 space-y-3">
+                            {["country", "state", "conference"].map((key) => (
+                              <label
+                                key={key}
+                                className="flex cursor-pointer items-center justify-between gap-4"
+                              >
+                                <span className="text-[14px] capitalize text-white/90">{key}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleFilter(key)}
+                                  className={`flex h-5 w-5 items-center justify-center rounded border-2 transition-all ${
+                                    filters[key]
+                                      ? "border-[#8ec5eb] bg-[#8ec5eb]/40"
+                                      : "border-white/25 bg-white/5"
+                                  }`}
+                                >
+                                  {filters[key] && (
+                                    <i className="fa-solid fa-check text-[10px] text-white" />
+                                  )}
+                                </button>
+                              </label>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleClearFilter}
+                            className="text-[13px] font-semibold text-[#8ec5eb] transition hover:text-white"
+                          >
+                            Clear filter
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {mentorsList
+                      .filter((m) =>
+                        `${m.firstName} ${m.lastName}`
+                          .toLowerCase()
+                          .includes((searchQuery || "").toLowerCase())
+                      )
+                      .sort((a, b) => {
+                        const aC = a.assignedId?.length || 0;
+                        const bC = b.assignedId?.length || 0;
+                        return sortBy === "most-mentees" ? bC - aC : aC - bC;
+                      })
+                      .map((mentor, idx) => {
+                        const defaultImages = [Mentor1, Mentor2, Mentor3];
+                        const fallback = defaultImages[idx % defaultImages.length];
+                        return (
+                          <MentorCard
+                            key={mentor._id || mentor.id}
+                            variant="glass"
+                            image={mentor.profilePicture || fallback}
+                            name={`${mentor.firstName} ${mentor.lastName}`}
+                            role={mentor.role || "Mentor"}
+                            menteeCount={mentor.assignedId?.length || 0}
+                            onViewDetails={() =>
+                              router.push(`/director/mentors/profile/${mentor._id || mentor.id}`)
+                            }
+                          />
+                        );
+                      })}
+                    {mentorsList.length === 0 && (
+                      <p className="col-span-full py-8 text-center text-white/70">No mentors found.</p>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -523,151 +470,118 @@ export default function RevitalizationRoadmapPage() {
           {activeTab === "pastor-roadmaps" && (
             <div>
               {loadingPastors ? (
-                <div className="flex justify-center py-12">
-                  <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                <div className="flex justify-center py-16">
+                  <div className={directorSpinner} />
                 </div>
               ) : (
-              <>
-              {/* Featured Avatars */}
-              <FeaturedAvatars
-                items={pastorProgressList.map((pastor, idx) => {
-                  const defaultImages = [Mentor1, Mentor2, Mentor3];
-                  return {
-                    id: pastor.userId,
-                    name: `${pastor.firstName} ${pastor.lastName}`,
-                    img: pastor.profilePicture || defaultImages[idx % defaultImages.length],
-                  };
-                })}
-                gapClass="gap-4"
-                nameClass="text-sm text-white"
-                className="mb-6"
-                showGradientBorder={false}
-              />
+                <>
+                  <FeaturedAvatars
+                    items={pastorProgressList.map((pastor, idx) => {
+                      const defaultImages = [Mentor1, Mentor2, Mentor3];
+                      return {
+                        id: pastor.userId,
+                        name: `${pastor.firstName} ${pastor.lastName}`,
+                        img: pastor.profilePicture || defaultImages[idx % defaultImages.length],
+                      };
+                    })}
+                    gapClass="gap-4"
+                    nameClass="text-sm text-white/90"
+                    className="mb-6"
+                    showGradientBorder={false}
+                  />
 
-              {/* Horizontal Line */}
-              <div className="h-px bg-white/30 mb-6"></div>
+                  <div className="mb-6 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 
-              {/* Filter */}
-              <div className="flex justify-end items-center mb-6">
-                <div className="relative" ref={filterPopupRef}>
-                  <button
-                    onClick={() => setShowFilterPopup(!showFilterPopup)}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-gray-200 rounded-lg text-gray-700 font-semibold text-[14px] hover:bg-gray-50 transition-all"
-                  >
-                    <i className="fa-solid fa-filter text-gray-700"></i>
-                    <span>Filter</span>
-                    <span className="bg-yellow-400 text-black text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                      {filterCount}
-                    </span>
-                    <i className="fa-solid fa-chevron-down text-gray-600 text-xs"></i>
-                  </button>
-
-                  {/* Filter Popup */}
-                  {showFilterPopup && (
-                    <div className="absolute top-full right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-200 p-4 min-w-[200px] z-50">
-                      <h3 className="text-[14px] font-bold text-gray-900 mb-3">
-                        Filter
-                      </h3>
-
-                      {/* Filter Options */}
-                      <div className="space-y-3 mb-4">
-                        <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-[14px] text-gray-700">
-                            Country
-                          </span>
-                          <button
-                            onClick={() => handleToggleFilter("country")}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                              filters.country
-                                ? "bg-[#2E3B8E] border-[#2E3B8E]"
-                                : "bg-white border-gray-300"
-                            }`}
-                          >
-                            {filters.country && (
-                              <i className="fa-solid fa-check text-white text-xs"></i>
-                            )}
-                          </button>
-                        </label>
-
-                        <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-[14px] text-gray-700">
-                            State
-                          </span>
-                          <button
-                            onClick={() => handleToggleFilter("state")}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                              filters.state
-                                ? "bg-[#2E3B8E] border-[#2E3B8E]"
-                                : "bg-white border-gray-300"
-                            }`}
-                          >
-                            {filters.state && (
-                              <i className="fa-solid fa-check text-white text-xs"></i>
-                            )}
-                          </button>
-                        </label>
-
-                        <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-[14px] text-gray-700">
-                            Conference
-                          </span>
-                          <button
-                            onClick={() => handleToggleFilter("conference")}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                              filters.conference
-                                ? "bg-[#2E3B8E] border-[#2E3B8E]"
-                                : "bg-white border-gray-300"
-                            }`}
-                          >
-                            {filters.conference && (
-                              <i className="fa-solid fa-check text-white text-xs"></i>
-                            )}
-                          </button>
-                        </label>
-                      </div>
-
-                      {/* Clear Filter Button */}
+                  <div className="mb-6 flex justify-end">
+                    <div className="relative" ref={filterPopupRef}>
                       <button
-                        onClick={handleClearFilter}
-                        className="text-[#2E3B8E] text-[14px] font-semibold hover:underline"
+                        type="button"
+                        onClick={() => setShowFilterPopup(!showFilterPopup)}
+                        className={glassTrigger}
                       >
-                        Clear Filter
+                        <i className="fa-solid fa-filter text-[#8ec5eb]" />
+                        <span>Filter</span>
+                        <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/20 px-1.5 text-[11px] font-bold text-[#cde2f2]">
+                          {filterCount}
+                        </span>
+                        <i className="fa-solid fa-chevron-down text-xs text-white/60" />
                       </button>
-                    </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Pastor Cards Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {pastorProgressList
-                  .filter((p) =>
-                    `${p.firstName} ${p.lastName}`
-                      .toLowerCase()
-                      .includes(searchQuery.toLowerCase())
-                  )
-                  .map((pastor, idx) => {
-                    const defaultImages = [Mentor1, Mentor2, Mentor3];
-                    const fallback = defaultImages[idx % defaultImages.length];
-                    return (
-                      <PastorCard
-                        key={pastor.userId}
-                        image={pastor.profilePicture || fallback}
-                        name={`${pastor.firstName} ${pastor.lastName}`}
-                        description={`${pastor.completedRoadmaps || 0}/${pastor.totalRoadmaps || 0} roadmaps completed`}
-                        phase="Roadmap Progress"
-                        progress={pastor.overallRoadmapProgress || 0}
-                        onViewDetails={() => {
-                          router.push("/director/revitalization-roadmap/home");
-                        }}
-                      />
-                    );
-                  })}
-                {pastorProgressList.length === 0 && (
-                  <p className="text-white/70 col-span-2">No pastor progress found.</p>
-                )}
-              </div>
-              </>
+                      {showFilterPopup && (
+                        <div className={`${glassPopover} right-0 top-full`}>
+                          <h3 className="mb-3 text-[13px] font-bold uppercase tracking-wide text-[#8ec5eb]">
+                            Filter
+                          </h3>
+                          <div className="mb-4 space-y-3">
+                            {["country", "state", "conference"].map((key) => (
+                              <label
+                                key={key}
+                                className="flex cursor-pointer items-center justify-between gap-4"
+                              >
+                                <span className="text-[14px] capitalize text-white/90">{key}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleFilter(key)}
+                                  className={`flex h-5 w-5 items-center justify-center rounded border-2 transition-all ${
+                                    filters[key]
+                                      ? "border-[#8ec5eb] bg-[#8ec5eb]/40"
+                                      : "border-white/25 bg-white/5"
+                                  }`}
+                                >
+                                  {filters[key] && (
+                                    <i className="fa-solid fa-check text-[10px] text-white" />
+                                  )}
+                                </button>
+                              </label>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleClearFilter}
+                            className="text-[13px] font-semibold text-[#8ec5eb] transition hover:text-white"
+                          >
+                            Clear filter
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
+                    {pastorProgressList
+                      .filter((p) =>
+                        `${p.firstName} ${p.lastName}`
+                          .toLowerCase()
+                          .includes((searchQuery || "").toLowerCase())
+                      )
+                      .map((pastor, idx) => {
+                        const defaultImages = [Mentor1, Mentor2, Mentor3];
+                        const fallback = defaultImages[idx % defaultImages.length];
+                        const pid = pastor.userId || pastor._id || pastor.id;
+                        return (
+                          <PastorCard
+                            key={pid || idx}
+                            variant="glass"
+                            image={pastor.profilePicture || fallback}
+                            name={`${pastor.firstName} ${pastor.lastName}`}
+                            description={`${pastor.completedRoadmaps || 0}/${pastor.totalRoadmaps || 0} roadmaps completed`}
+                            phase="Roadmap progress"
+                            progress={pastor.overallRoadmapProgress || 0}
+                            onViewDetails={() => {
+                              if (pid) {
+                                router.push(`/director/mentees/profile/${pid}`);
+                              }
+                            }}
+                          />
+                        );
+                      })}
+                    {pastorProgressList.length === 0 && (
+                      <p className="col-span-2 py-8 text-center text-white/70">
+                        No pastor progress found.
+                      </p>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           )}

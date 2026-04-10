@@ -26,13 +26,11 @@ import {
   apiGetPastors,
   apiCreateUser,
   apiGetUserById,
-  apiGetOverallProgress,
   apiGetAllUsers,
   Appointment,
   Interest,
   MentorPastor,
   User,
-  UserOverallProgress,
 } from "@/app/Services/api";
 import { getPastorMedia } from "@/app/Services/pastor.service";
 import { getGreeting } from "@/app/Services/utils/helpers";
@@ -114,10 +112,7 @@ export default function DirectorHome() {
   const [mentorsLoading, setMentorsLoading] = useState(true);
   const [pastorsLoading, setPastorsLoading] = useState(true);
   const [overviewLoading, setOverviewLoading] = useState(true);
-  const [networkProgressRows, setNetworkProgressRows] = useState<UserOverallProgress[]>([]);
-  const [networkProgressLoading, setNetworkProgressLoading] = useState(true);
   const [completedPastorsCount, setCompletedPastorsCount] = useState<number | null>(null);
-  const [roadmapFilterTab, setRoadmapFilterTab] = useState<0 | 1 | 2>(0);
   const [addUserLoading, setAddUserLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [mediaList, setMediaList] = useState<
@@ -196,7 +191,6 @@ export default function DirectorHome() {
   useEffect(() => {
     const fetchAllData = async () => {
       const uid = resolvedUserId;
-      setNetworkProgressLoading(true);
 
       const results = await Promise.allSettled([
         apiGetTodaysAppointments(uid || undefined),
@@ -209,7 +203,6 @@ export default function DirectorHome() {
           includeUsers: false,
         }),
         uid ? apiGetUserById(uid) : Promise.resolve(null),
-        apiGetOverallProgress(),
         apiGetAllUsers({ role: "pastor", hasCompleted: true, limit: 1 }),
       ]);
 
@@ -268,19 +261,9 @@ export default function DirectorHome() {
         setUser(null);
       }
 
-      // Network-wide progress rows (mentors & pastors) for snapshot list
-      if (results[6].status === 'fulfilled') {
-        const rows = results[6].value.data?.data;
-        setNetworkProgressRows(Array.isArray(rows) ? rows : []);
-      } else {
-        console.error('Error fetching network progress:', results[6].reason);
-        setNetworkProgressRows([]);
-      }
-      setNetworkProgressLoading(false);
-
       // Completed-course count (pastors marked completed)
-      if (results[7].status === 'fulfilled') {
-        const body = results[7].value.data?.data;
+      if (results[6].status === 'fulfilled') {
+        const body = results[6].value.data?.data;
         const total =
           typeof body?.total === 'number'
             ? body.total
@@ -289,7 +272,7 @@ export default function DirectorHome() {
               : 0;
         setCompletedPastorsCount(total);
       } else {
-        console.error('Error fetching completed pastors count:', results[7].reason);
+        console.error('Error fetching completed pastors count:', results[6].reason);
         setCompletedPastorsCount(null);
       }
     };
@@ -376,20 +359,6 @@ export default function DirectorHome() {
     user?.firstName || cookieUser?.firstName
       ? `${user?.firstName ?? cookieUser?.firstName ?? ""} ${user?.lastName ?? cookieUser?.lastName ?? ""}, Welcome Aboard!`
       : "Welcome Aboard!";
-
-  const roadmapSnapshotRows = useMemo(() => {
-    const rows = networkProgressRows;
-    if (roadmapFilterTab === 1) {
-      return rows.filter((r) => (r.role || "").toLowerCase() === "pastor");
-    }
-    if (roadmapFilterTab === 2) {
-      return rows.filter((r) => {
-        const role = (r.role || "").toLowerCase();
-        return role === "mentor" || role === "field-mentor";
-      });
-    }
-    return rows;
-  }, [networkProgressRows, roadmapFilterTab]);
 
   return (
     <div className={directorPageRoot}>
@@ -612,78 +581,6 @@ export default function DirectorHome() {
         )}
       </section>
 
-      {/* Today's roadmap list */}
-      <section className="mt-10">
-        <div className={`p-5 sm:p-6 lg:p-8 ${glassCard}`}>
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-lg font-semibold">Today&apos;s Roadmap List</h3>
-            <div className="flex w-full rounded-xl border border-white/10 bg-white/5 p-1 sm:w-auto">
-              {(["All", "Roadmap", "Survey"] as const).map((tab, index) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setRoadmapFilterTab(index as 0 | 1 | 2)}
-                  className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium sm:flex-none ${
-                    roadmapFilterTab === index
-                      ? "bg-[#8ec5eb]/20 text-white"
-                      : "text-white/55 hover:text-white/85"
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {networkProgressLoading ? (
-              <p className="rounded-xl border border-white/10 bg-white/[0.05] px-5 py-6 text-center text-sm text-white/55">
-                Loading roadmap activity…
-              </p>
-            ) : roadmapSnapshotRows.length === 0 ? (
-              <p className="rounded-xl border border-white/10 bg-white/[0.05] px-5 py-6 text-center text-sm text-white/55">
-                No progress records for this filter.
-              </p>
-            ) : (
-              roadmapSnapshotRows.slice(0, 8).map((row) => {
-                const roleLabel = (row.role || "user").replace(/-/g, " ");
-                const pct = Math.round(row.overallProgress ?? 0);
-                return (
-                  <button
-                    key={row.userId}
-                    type="button"
-                    onClick={() => router.push(`/director/track-progress/${row.userId}`)}
-                    className="flex w-full items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.05] px-5 py-3 text-left transition hover:border-white/20 hover:bg-white/[0.08]"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium capitalize text-white">
-                        {roleLabel} · {pct}% overall
-                      </p>
-                      <p className="text-xs text-white/60">
-                        {"Roadmaps & assessments combined progress"}
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-sm text-white/80">
-                      {row.firstName} {row.lastName}
-                    </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
-
-          <div className="mt-6 flex justify-end">
-            <button
-              type="button"
-              onClick={() => router.push("/director/revitalization-roadmap/create")}
-              className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-5 py-2 text-sm font-medium text-white transition hover:bg-[#8ec5eb]/25"
-            >
-              View Roadmap
-            </button>
-          </div>
-        </div>
-      </section>
-
       {/* New Interests Section */}
       <section className="mt-10 py-10">
         <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2 lg:gap-12">
@@ -880,7 +777,7 @@ export default function DirectorHome() {
                     onViewDetails={() =>
                       isMentor
                         ? router.push(`/director/mentors/profile/${personId}`)
-                        : router.push(`/director/mentees/profile?id=${personId}`)
+                        : router.push(`/director/mentees/profile/${personId}`)
                     }
                   />
                 );

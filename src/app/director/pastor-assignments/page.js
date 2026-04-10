@@ -3,10 +3,15 @@ import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DirectorHero from "../DirectorHero";
 import {
+  directorBtnPrimary,
+  directorBtnSecondary,
   directorGlassCard,
-  directorInputClass,
+  directorPageContainer,
   directorPageRoot,
+  directorToastClass,
 } from "../directorUi";
+import { DirectorFilterSection } from "../ui";
+import SearchBar from "@/app/Components/SearchBar";
 import AssignmentCard from "@/app/Components/AssignmentCard";
 import AssignRoadmapModal from "@/app/Components/AssignRoadmapModal";
 import ConfirmModal from "@/app/Components/ConfirmModal";
@@ -23,6 +28,8 @@ export default function PastorAssignmentsPage() {
   const [loading, setLoading] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  /** Roadmap ids targeted by the delete confirmation (bulk selection or single card). */
+  const [idsToDelete, setIdsToDelete] = useState([]);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [toast, setToast] = useState(null);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -59,22 +66,30 @@ export default function PastorAssignmentsPage() {
 
   const handleDeleteClick = () => {
     if (selectedAssignments.length > 0) {
+      setIdsToDelete([...selectedAssignments]);
       setShowDeleteModal(true);
     }
   };
 
+  const handleCardDelete = (id) => {
+    setIdsToDelete([id]);
+    setShowDeleteModal(true);
+  };
+
   const handleConfirmDelete = async () => {
+    if (idsToDelete.length === 0) return;
     try {
-      await Promise.all(selectedAssignments.map((id) => apiDeleteRoadmap(id)));
-      setRoadmaps((prev) => prev.filter((r) => !selectedAssignments.includes(r.id)));
+      await Promise.all(idsToDelete.map((id) => apiDeleteRoadmap(id)));
+      setRoadmaps((prev) => prev.filter((r) => !idsToDelete.includes(r.id)));
       setToast(
-        `Deleted ${selectedAssignments.length} roadmap${selectedAssignments.length > 1 ? "s" : ""} successfully`
+        `Deleted ${idsToDelete.length} roadmap${idsToDelete.length > 1 ? "s" : ""} successfully`
       );
       setTimeout(() => setToast(null), 2000);
     } catch (err) {
       console.error("Error deleting roadmaps:", err);
     } finally {
       setShowDeleteModal(false);
+      setIdsToDelete([]);
       setSelectedAssignments([]);
       setIsSelectionMode(false);
     }
@@ -132,30 +147,22 @@ export default function PastorAssignmentsPage() {
       />
 
       <section className="relative py-6 md:py-8">
-        <div className="mx-auto max-w-[1400px]">
-          {/* Search Bar and Action Buttons */}
-          <div
-            className={`mb-8 flex flex-col items-stretch justify-between gap-4 p-5 sm:flex-row sm:items-center ${directorGlassCard}`}
-          >
+        <div className={directorPageContainer}>
+          <DirectorFilterSection>
             <div className="relative w-full flex-1 sm:max-w-md">
-              <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-[#8ec5eb]/70" />
-              <input
-                type="text"
+              <SearchBar
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={setSearchQuery}
                 placeholder="Search roadmaps…"
-                className={`${directorInputClass} pl-11 text-[15px]`}
+                variant="dark"
+                className="w-full"
               />
             </div>
 
             <div className="flex flex-wrap gap-3">
               {!isSelectionMode ? (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => setIsSelectionMode(true)}
-                    className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-6 py-3 text-[15px] font-semibold text-white shadow-md transition hover:bg-white/15"
-                  >
+                  <button type="button" onClick={() => setIsSelectionMode(true)} className={directorBtnSecondary}>
                     <i className="fa-regular fa-square-check" />
                     <span>Select</span>
                   </button>
@@ -164,24 +171,20 @@ export default function PastorAssignmentsPage() {
                     onClick={() =>
                       router.push("/director/pastor-assignments/create")
                     }
-                    className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-3 text-[15px] font-semibold text-white shadow-md transition hover:bg-[#8ec5eb]/25"
+                    className={directorBtnPrimary}
                   >
                     <i className="fa-solid fa-plus" />
                     <span>Add</span>
                   </button>
                 </>
               ) : (
-                <button
-                  type="button"
-                  onClick={exitSelection}
-                  className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-6 py-3 text-[15px] font-semibold text-white/90 transition hover:bg-white/15"
-                >
+                <button type="button" onClick={exitSelection} className={directorBtnSecondary}>
                   <i className="fa-solid fa-xmark" />
                   <span>Cancel</span>
                 </button>
               )}
             </div>
-          </div>
+          </DirectorFilterSection>
 
           {/* Selection Mode Bar */}
           {isSelectionMode && selectedAssignments.length > 0 && (
@@ -239,6 +242,10 @@ export default function PastorAssignmentsPage() {
                       `/director/pastor-assignments/roadmap/${roadmap.id}`
                     )
                   }
+                  onEdit={(id) =>
+                    router.push(`/director/pastor-assignments/roadmap/${id}?edit=1`)
+                  }
+                  onDelete={handleCardDelete}
                   onOptionsClick={handleOptionsClick}
                   isSelected={selectedAssignments.includes(roadmap.id)}
                   onSelect={toggleSelection}
@@ -253,7 +260,7 @@ export default function PastorAssignmentsPage() {
       {/* Toast */}
       {toast && (
         <div className="fixed top-6 right-6 z-[100] animate-fade-in">
-          <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3 border border-gray-100">
+          <div className={directorToastClass}>
             <i className="fa-solid fa-circle-check text-green-500 text-xl"></i>
             <span className="text-[#2E3B8E] font-semibold text-[15px]">{toast}</span>
           </div>
@@ -277,10 +284,13 @@ export default function PastorAssignmentsPage() {
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
+        onClose={() => {
+          setShowDeleteModal(false);
+          setIdsToDelete([]);
+        }}
         onConfirm={handleConfirmDelete}
-        title={`Delete ${selectedAssignments.length} Roadmap${selectedAssignments.length > 1 ? "s" : ""}?`}
-        message={`Are you sure you want to delete ${selectedAssignments.length} roadmap${selectedAssignments.length > 1 ? "s" : ""}? This action cannot be undone.`}
+        title={`Delete ${idsToDelete.length} Roadmap${idsToDelete.length > 1 ? "s" : ""}?`}
+        message={`Are you sure you want to delete ${idsToDelete.length} roadmap${idsToDelete.length > 1 ? "s" : ""}? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
         confirmColor="bg-red-600 hover:bg-red-700"

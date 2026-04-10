@@ -1,30 +1,74 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { isAxiosError } from "axios";
-import AppHero from "@/app/Components/Hero/AppHero";
+import DirectorHero from "@/app/director/DirectorHero";
+import {
+  directorBtnPrimary,
+  directorGlassCard,
+  directorPageContainer,
+  directorPageRoot,
+  directorSpinner,
+  directorToastClass,
+} from "@/app/director/directorUi";
 import ConfirmModal from "@/app/Components/ConfirmModal";
+import AssignMenteesModal from "@/app/Components/AssignMenteesModal";
 import MentorBg from "@/app/Assets/mentor-bg.png";
 import Mentor1 from "@/app/Assets/mentor1.png";
 import ProfileForm from "@/app/Components/ProfileForm";
-import { apiDeleteUser, apiGetUserById } from "@/app/Services/users.service";
+import {
+  apiDeleteUser,
+  apiGetUserById,
+  apiGetAssignedUsers,
+} from "@/app/Services/users.service";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { isRemoteImageSrc } from "@/app/utils/image";
+
+type AssignedMenteeRow = {
+  id: string;
+  name: string;
+  church: string;
+  progress: number;
+};
+
+function normalizeAssignedIds(user: any): string[] {
+  const raw = user?.assignedId ?? user?.assignedIds;
+  if (!Array.isArray(raw)) return [];
+  return raw.map((x: unknown) => String(x));
+}
+
+async function rowsWithProgress(rows: AssignedMenteeRow[]): Promise<AssignedMenteeRow[]> {
+  const results = await Promise.all(
+    rows.map(async (row) => {
+      try {
+        const res = await apiGetUserProgress(row.id);
+        const pct = Math.round(res.data?.data?.overallProgress ?? 0);
+        return { ...row, progress: pct };
+      } catch {
+        return row;
+      }
+    }),
+  );
+  return results;
+}
 
 export default function MentorProfilePage() {
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
-  const [showOptionsMenu, setShowOptionsMenu] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     variant: "success" | "error";
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [assignedLoading, setAssignedLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [assignedMentees, setAssignedMentees] = useState<AssignedMenteeRow[]>([]);
+  const [assignedIds, setAssignedIds] = useState<string[]>([]);
 
-  // Profile state populated from API
   const [mentorData, setMentorData] = useState({
     firstName: "",
     lastName: "",
@@ -41,76 +85,93 @@ export default function MentorProfilePage() {
     },
   });
 
-  useEffect(() => {
+  const loadAssignedMentees = useCallback(async (mentorUserId: string) => {
+    setAssignedLoading(true);
+    try {
+      const res = await apiGetAssignedUsers(mentorUserId);
+      const users = res.data?.data ?? [];
+      const baseRows: AssignedMenteeRow[] = users.map((u: any) => {
+        const church =
+          u.churchDetails?.[0]?.churchName ??
+          u.churchDetails?.[0]?.name ??
+          u.title ??
+          "—";
+        return {
+          id: String(u.id ?? u._id ?? ""),
+          name:
+            `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email || "User",
+          church,
+          progress: Math.round(
+            typeof u.progressPercentage === "number" ? u.progressPercentage : 0,
+          ),
+        };
+      });
+      const withProgress = await rowsWithProgress(baseRows);
+      setAssignedMentees(withProgress);
+    } catch (e) {
+      console.error("Failed to load assigned mentees", e);
+      setAssignedMentees([]);
+    } finally {
+      setAssignedLoading(false);
+    }
+  }, []);
+
+  const fetchProfile = useCallback(async (opts?: { silent?: boolean }) => {
     if (!id) return;
-    const fetchProfile = async () => {
-      try {
-        setLoading(true);
-        const res = await apiGetUserById(id);
-        const user = res.data.data;
-        const interest = user?.interest;
-        setMentorData({
-          firstName: user.firstName ?? "",
-          lastName: user.lastName ?? "",
-          role: user.role ?? "",
-          phoneNumber: user.phoneNumber ?? "",
-          email: user.email ?? "",
-          profilePicture: user.profilePicture ?? null,
-          totalMentees: user.assignedId?.length ?? 0,
-          otherInfo: {
-            title: interest?.title ?? "",
-            yearsInMinistry: interest?.yearsInMinistry ?? "",
-            conference: interest?.conference ?? "",
-            bio: interest?.comments ?? "",
-          },
-        });
-      } catch (err) {
-        console.error("Failed to fetch mentor profile", err);
-      } finally {
-        setLoading(false);
+    const silent = opts?.silent === true;
+    if (!silent) setProfileError(null);
+    try {
+      if (!silent) setLoading(true);
+      const res = await apiGetUserById(id);
+      const user = res.data.data;
+      const interest = user?.interest;
+      const ids = normalizeAssignedIds(user);
+      setAssignedIds(ids);
+      setMentorData({
+        firstName: user.firstName ?? "",
+        lastName: user.lastName ?? "",
+        role: user.role ?? "",
+        phoneNumber: user.phoneNumber ?? "",
+        email: user.email ?? "",
+        profilePicture: user.profilePicture ?? null,
+        totalMentees: ids.length,
+        otherInfo: {
+          title: interest?.title ?? "",
+          yearsInMinistry: interest?.yearsInMinistry ?? "",
+          conference: interest?.conference ?? "",
+          bio: interest?.comments ?? "",
+        },
+      });
+    } catch (err) {
+      console.error("Failed to fetch mentor profile", err);
+      if (!silent) {
+        setProfileError("Could not load this mentor. Check your connection and try again.");
       }
-    };
-    fetchProfile();
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, [id]);
 
-  const optionsMenuItems = [
-    {
-      icon: "fa-solid fa-users",
-      label: "View Assigned Mentees",
-      color: "text-blue-600",
-    },
-    {
-      icon: "fa-regular fa-note-sticky",
-      label: "Notes",
-      color: "text-orange-500",
-    },
-    {
-      icon: "fa-solid fa-clipboard-check",
-      label: "Assessments",
-      color: "text-purple-600",
-    },
-    {
-      icon: "fa-solid fa-file-lines",
-      label: "Assignment History",
-      color: "text-blue-500",
-    },
-    {
-      icon: "fa-solid fa-chart-line",
-      label: "Performance Report",
-      color: "text-red-500",
-    },
-    {
-      icon: "fa-regular fa-calendar",
-      label: "Schedule Meeting",
-      color: "text-indigo-600",
-    },
-  ];
+  useEffect(() => {
+    void fetchProfile();
+  }, [fetchProfile]);
 
-  const assignedMentees = [
-    { id: 1, name: "John Ross", church: "Loma Linda Church", progress: 65 },
-    { id: 2, name: "Robert Smith", church: "Grace Community", progress: 80 },
-    { id: 3, name: "Michael Brown", church: "Hope Church", progress: 45 },
-  ];
+  useEffect(() => {
+    if (!id || loading || profileError) return;
+    void loadAssignedMentees(id);
+  }, [id, loading, profileError, loadAssignedMentees]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const refreshAfterAssign = useCallback(async () => {
+    if (!id) return;
+    await fetchProfile({ silent: true });
+    await loadAssignedMentees(id);
+  }, [id, fetchProfile, loadAssignedMentees]);
 
   const handleDeleteProfile = async () => {
     if (!id) {
@@ -135,12 +196,60 @@ export default function MentorProfilePage() {
     }
   };
 
+  const phoneDigits = mentorData.phoneNumber.replace(/\D/g, "");
+  const mailtoHref = mentorData.email.trim()
+    ? `mailto:${encodeURIComponent(mentorData.email.trim())}`
+    : undefined;
+  const telHref = phoneDigits ? `tel:${phoneDigits}` : undefined;
+  const whatsappHref =
+    phoneDigits.length >= 10
+      ? `https://wa.me/${phoneDigits.replace(/^0+/, "")}`
+      : undefined;
+  const smsHref = phoneDigits ? `sms:${phoneDigits}` : undefined;
+
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
-        <AppHero title="Mentor Profile" backgroundImageUrl={MentorBg.src} />
-        <div className="flex justify-center items-center py-32">
-          <div className="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+      <div className={directorPageRoot}>
+        <DirectorHero
+          title="Mentor Profile"
+          subtitle="Loading profile…"
+          image={MentorBg}
+          breadcrumbItems={[
+            { label: "Home", href: "/director/home" },
+            { label: "Mentors", href: "/director/mentors" },
+            { label: "Profile" },
+          ]}
+        />
+        <div className="flex flex-col items-center justify-center gap-4 py-24">
+          <div className={directorSpinner} />
+          <p className="text-sm text-white/70">Loading mentor…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (profileError) {
+    return (
+      <div className={directorPageRoot}>
+        <DirectorHero
+          title="Mentor Profile"
+          subtitle="Something went wrong"
+          image={MentorBg}
+          breadcrumbItems={[
+            { label: "Home", href: "/director/home" },
+            { label: "Mentors", href: "/director/mentors" },
+            { label: "Profile" },
+          ]}
+        />
+        <div className={`mx-auto max-w-lg px-4 py-16 text-center ${directorPageContainer}`}>
+          <p className="mb-6 text-white/85">{profileError}</p>
+          <button
+            type="button"
+            onClick={() => void fetchProfile()}
+            className={directorBtnPrimary}
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -149,216 +258,282 @@ export default function MentorProfilePage() {
   const fullName = `${mentorData.firstName} ${mentorData.lastName}`.trim();
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
-      <AppHero
+    <div className={directorPageRoot}>
+      <DirectorHero
         title={fullName || "Mentor Profile"}
-        backgroundImageUrl={MentorBg.src}
+        subtitle={mentorData.role ? `${mentorData.role}` : "Mentor details and assigned mentees"}
+        image={MentorBg}
         breadcrumbItems={[
+          { label: "Home", href: "/director/home" },
           { label: "Mentors", href: "/director/mentors" },
-          { label: fullName },
+          { label: fullName || "Profile" },
         ]}
       />
 
-      {/* Profile Content */}
-      <section className="px-6 md:px-12 lg:px-20 py-10 bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
-        <div className="max-w-[1400px] mx-auto flex gap-8">
-          {/* Left Sidebar - Profile Card */}
-          <div className="w-[300px] flex-shrink-0">
-            <div className="bg-white rounded-xl p-6 shadow-lg">
-              {/* Profile Image */}
-              <div className="flex flex-col items-center mb-6">
-                <div className="w-[140px] h-[140px] rounded-full overflow-hidden bg-gray-100 mb-4">
-                  <Image
-                    src={mentorData.profilePicture || Mentor1}
-                    alt={fullName}
-                    width={140}
-                    height={140}
-                    unoptimized={isRemoteImageSrc(
-                      mentorData.profilePicture || "",
-                    )}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <h3 className="text-[18px] font-bold text-[#1A2E7A] text-center">
-                  {fullName}
-                </h3>
-                <p className="text-[13px] text-gray-500 mb-1">
-                  {mentorData.role}
-                </p>
-                <div className="flex items-center gap-1 text-[12px] text-gray-400">
-                  <i className="fa-solid fa-award text-yellow-500"></i>
-                  <span className="capitalize">{mentorData.role}</span>
-                </div>
-              </div>
-
-              {/* Contact Icons */}
-              <div className="flex items-center justify-center gap-4 text-[#2E3B8E] text-[18px] mb-6 pb-6 border-b border-gray-200">
-                <button className="hover:opacity-70 transition">
-                  <i className="fa-regular fa-envelope"></i>
-                </button>
-                <button className="hover:opacity-70 transition">
-                  <i className="fa-regular fa-comment"></i>
-                </button>
-                <button className="hover:opacity-70 transition">
-                  <i className="fa-brands fa-whatsapp"></i>
-                </button>
-                <button className="hover:opacity-70 transition">
-                  <i className="fa-solid fa-phone"></i>
-                </button>
-              </div>
-
-              {/* Stats */}
-              <div className="mb-6 pb-6 border-b border-gray-200 space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-[13px] text-gray-600 font-semibold">Total Mentees</span>
-                  <span className="text-[16px] text-gray-900 font-bold">{mentorData.totalMentees}</span>
-                </div>
-                {mentorData.otherInfo.conference && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-[13px] text-gray-600 font-semibold">Conference</span>
-                    <span className="text-[13px] text-gray-800 font-medium">{mentorData.otherInfo.conference}</span>
+      <section className="relative pb-12 pt-2">
+        <div className={`${directorPageContainer} px-4 sm:px-0`}>
+          <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+            {/* Sidebar */}
+            <aside className="w-full shrink-0 lg:max-w-[320px]">
+              <div className={`p-6 sm:p-8 ${directorGlassCard}`}>
+                <div className="mb-6 flex flex-col items-center">
+                  <div className="mb-4 h-[140px] w-[140px] overflow-hidden rounded-full border border-white/20 bg-white/10">
+                    <Image
+                      src={mentorData.profilePicture || Mentor1}
+                      alt={fullName}
+                      width={140}
+                      height={140}
+                      unoptimized={isRemoteImageSrc(mentorData.profilePicture || "")}
+                      className="h-full w-full object-cover"
+                    />
                   </div>
-                )}
-                {mentorData.otherInfo.yearsInMinistry && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-[13px] text-gray-600 font-semibold">Years in Ministry</span>
-                    <span className="text-[13px] text-gray-800 font-medium">{mentorData.otherInfo.yearsInMinistry}</span>
+                  <h3 className="text-center text-lg font-semibold text-white sm:text-xl">
+                    {fullName || "—"}
+                  </h3>
+                  <p className="mt-1 text-[13px] capitalize text-white/65">{mentorData.role}</p>
+                  <div className="mt-2 flex items-center gap-1.5 text-[12px] text-[#8ec5eb]/90">
+                    <i className="fa-solid fa-award" />
+                    <span className="capitalize">{mentorData.role}</span>
                   </div>
-                )}
-              </div>
-
-              {/* Bio */}
-              <div className="mb-6">
-                <h4 className="text-[13px] font-semibold text-gray-600 mb-3">
-                  About
-                </h4>
-                <p className="text-[12px] text-gray-600 leading-relaxed">
-                  {mentorData.otherInfo.bio}
-                </p>
-              </div>
-
-              {/* Assign Mentees Button */}
-              <button className="w-full py-3 bg-[#1F2A6E] text-white rounded-lg text-[14px] font-semibold hover:bg-[#2E3B8E] transition-all shadow-md flex items-center justify-center gap-2">
-                <i className="fa-solid fa-user-plus"></i>
-                <span>Assign New Mentees</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Right Content - Information & Assigned Mentees */}
-          <div className="flex-1 space-y-6">
-            <ProfileForm
-              title="Personal Information"
-              headerActions={
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setShowDeleteModal(true)}
-                    className="px-4 py-2 bg-white border-2 border-red-500 text-red-500 rounded-lg text-[13px] font-semibold hover:bg-red-50 transition-all flex items-center gap-2"
-                  >
-                    <i className="fa-regular fa-trash-can"></i>
-                    Delete Profile
-                  </button>
-                  <button
-                    onClick={() =>
-                      router.push(`/director/mentors/profile/edit`)
-                    }
-                    className="px-4 py-2 bg-white border-2 border-blue-600 text-blue-600 rounded-lg text-[13px] font-semibold hover:bg-blue-50 transition-all flex items-center gap-2"
-                  >
-                    <i className="fa-regular fa-pen-to-square"></i>
-                    Edit Profile
-                  </button>
                 </div>
-              }
-              personal={{
-                firstName: mentorData.firstName,
-                lastName: mentorData.lastName,
-                phoneNumber: mentorData.phoneNumber,
-                email: mentorData.email,
-              }}
-              other={{
-                title: mentorData.otherInfo.title,
-                yearsInMinistry: mentorData.otherInfo.yearsInMinistry,
-                conference: mentorData.otherInfo.conference,
-                communityServiceProjects: "",
-              }}
-              showInterests={false}
-              showComments={false}
-            />
-            {/* Assigned Mentees Section */}
-            <div className="bg-white rounded-xl p-8 shadow-lg">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-[22px] font-bold text-[#1A2E7A]">
-                  Assigned Mentees ({assignedMentees.length})
-                </h2>
-                <Link
-                  href="/director/mentees"
-                  className="text-[14px] text-blue-600 hover:underline font-semibold"
+
+                <div className="mb-6 flex items-center justify-center gap-4 border-b border-white/10 pb-6 text-lg text-[#8ec5eb]">
+                  {mailtoHref ? (
+                    <a
+                      href={mailtoHref}
+                      className="transition hover:opacity-80"
+                      aria-label="Email"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <i className="fa-regular fa-envelope" />
+                    </a>
+                  ) : (
+                    <span className="cursor-not-allowed opacity-40" title="No email" aria-hidden>
+                      <i className="fa-regular fa-envelope" />
+                    </span>
+                  )}
+                  {smsHref ? (
+                    <a href={smsHref} className="transition hover:opacity-80" aria-label="Text message">
+                      <i className="fa-regular fa-comment" />
+                    </a>
+                  ) : (
+                    <span className="cursor-not-allowed opacity-40" title="No phone" aria-hidden>
+                      <i className="fa-regular fa-comment" />
+                    </span>
+                  )}
+                  {whatsappHref ? (
+                    <a
+                      href={whatsappHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="transition hover:opacity-80"
+                      aria-label="WhatsApp"
+                    >
+                      <i className="fa-brands fa-whatsapp" />
+                    </a>
+                  ) : (
+                    <span className="cursor-not-allowed opacity-40" title="Add phone for WhatsApp" aria-hidden>
+                      <i className="fa-brands fa-whatsapp" />
+                    </span>
+                  )}
+                  {telHref ? (
+                    <a href={telHref} className="transition hover:opacity-80" aria-label="Call">
+                      <i className="fa-solid fa-phone" />
+                    </a>
+                  ) : (
+                    <span className="cursor-not-allowed opacity-40" title="No phone" aria-hidden>
+                      <i className="fa-solid fa-phone" />
+                    </span>
+                  )}
+                </div>
+
+                <div className="mb-6 space-y-4 border-b border-white/10 pb-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[13px] font-semibold text-white/75">Total mentees</span>
+                    <span className="text-base font-bold text-white">{mentorData.totalMentees}</span>
+                  </div>
+                  {mentorData.otherInfo.conference ? (
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-[13px] font-semibold text-white/75">Conference</span>
+                      <span className="max-w-[60%] text-right text-[13px] text-white/90">
+                        {mentorData.otherInfo.conference}
+                      </span>
+                    </div>
+                  ) : null}
+                  {mentorData.otherInfo.yearsInMinistry ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[13px] font-semibold text-white/75">Years in ministry</span>
+                      <span className="text-[13px] text-white/90">
+                        {mentorData.otherInfo.yearsInMinistry}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mb-6">
+                  <h4 className="mb-2 text-[13px] font-semibold text-white/85">About</h4>
+                  <p className="text-[13px] leading-relaxed text-white/60">
+                    {mentorData.otherInfo.bio?.trim() ? mentorData.otherInfo.bio : "No bio provided."}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAssignModal(true)}
+                  className={`${directorBtnPrimary} w-full justify-center`}
                 >
-                  View All
-                </Link>
+                  <i className="fa-solid fa-user-plus" />
+                  <span>Assign mentees</span>
+                </button>
+              </div>
+            </aside>
+
+            {/* Main */}
+            <div className="min-w-0 flex-1 space-y-8">
+              <div className={`overflow-hidden rounded-2xl ${directorGlassCard}`}>
+                <ProfileForm
+                  title="Personal information"
+                  headerActions={
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteModal(true)}
+                        className="inline-flex items-center gap-2 rounded-lg border border-red-400/40 bg-red-500/15 px-3 py-2 text-[13px] font-semibold text-red-200 transition hover:bg-red-500/25 sm:px-4"
+                      >
+                        <i className="fa-regular fa-trash-can" />
+                        Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          router.push(
+                            id
+                              ? `/director/mentors/profile/${id}/edit`
+                              : "/director/mentors/profile/edit",
+                          )
+                        }
+                        className="inline-flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-[#8ec5eb]/25 sm:px-4"
+                      >
+                        <i className="fa-regular fa-pen-to-square" />
+                        Edit profile
+                      </button>
+                    </div>
+                  }
+                  personal={{
+                    firstName: mentorData.firstName,
+                    lastName: mentorData.lastName,
+                    phoneNumber: mentorData.phoneNumber,
+                    email: mentorData.email,
+                  }}
+                  other={{
+                    title: mentorData.otherInfo.title,
+                    yearsInMinistry: mentorData.otherInfo.yearsInMinistry,
+                    conference: mentorData.otherInfo.conference,
+                    communityServiceProjects: "",
+                  }}
+                  showInterests={false}
+                  showComments={false}
+                />
               </div>
 
-              <div className="space-y-4">
-                {assignedMentees.map((mentee) => (
-                  <div
-                    key={mentee.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all"
+              <div className={`p-6 sm:p-8 ${directorGlassCard}`}>
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 className="text-lg font-semibold text-white sm:text-xl">
+                    Assigned mentees ({assignedMentees.length})
+                  </h2>
+                  <Link
+                    href="/director/mentees"
+                    className="text-sm font-semibold text-[#8ec5eb] transition hover:text-[#cde2f2]"
                   >
-                    <div className="flex-1">
-                      <h4 className="text-[15px] font-semibold text-gray-900">
-                        {mentee.name}
-                      </h4>
-                      <p className="text-[13px] text-gray-500">
-                        {mentee.church}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="text-[12px] text-gray-500">Progress</p>
-                        <p className="text-[16px] font-bold text-green-600">
-                          {mentee.progress}%
-                        </p>
-                      </div>
-                      <Link
-                        href="/director/mentees/profile"
-                        className="px-4 py-2 bg-[#1F2A6E] text-white rounded-lg text-[12px] font-semibold hover:bg-[#2E3B8E] transition-all"
-                      >
-                        View Profile
-                      </Link>
-                    </div>
+                    View all mentees
+                  </Link>
+                </div>
+
+                {assignedLoading ? (
+                  <div className="flex justify-center py-12">
+                    <div className={directorSpinner} />
                   </div>
-                ))}
+                ) : assignedMentees.length === 0 ? (
+                  <p className="rounded-xl border border-white/10 bg-white/[0.05] px-5 py-8 text-center text-sm text-white/55">
+                    No mentees assigned yet. Use &quot;Assign mentees&quot; to add pastors.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {assignedMentees.map((mentee) => (
+                      <div
+                        key={mentee.id}
+                        className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.05] p-4 transition hover:border-white/20 hover:bg-white/[0.08] sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-[15px] font-semibold text-white">{mentee.name}</h4>
+                          <p className="text-[13px] text-white/55">{mentee.church}</p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-4 sm:justify-end">
+                          <div className="text-left sm:text-right">
+                            <p className="text-[11px] uppercase tracking-wide text-white/45">
+                              Progress
+                            </p>
+                            <p className="text-base font-bold text-[#8ec5eb]">{mentee.progress}%</p>
+                          </div>
+                          <Link
+                            href={`/director/mentees/profile/${encodeURIComponent(mentee.id)}`}
+                            className="inline-flex items-center justify-center rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/25 sm:text-sm"
+                          >
+                            View profile
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Toast Notification */}
+      <AssignMenteesModal
+        isOpen={showAssignModal}
+        onClose={() => setShowAssignModal(false)}
+        mentor={
+          id
+            ? {
+                id,
+                name: fullName || "Mentor",
+                assignedIds,
+              }
+            : null
+        }
+        onSuccess={async (message) => {
+          setToast({ message, variant: "success" });
+          setShowAssignModal(false);
+          await refreshAfterAssign();
+        }}
+        onError={(message) => setToast({ message, variant: "error" })}
+      />
+
       {toast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-fade-in">
-          <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3 border border-gray-100 max-w-[min(90vw,28rem)]">
+        <div className="fixed left-1/2 top-20 z-[110] max-w-[min(90vw,28rem)] -translate-x-1/2 animate-fade-in">
+          <div className={directorToastClass}>
             <i
               className={`fa-solid text-xl ${
                 toast.variant === "success"
                   ? "fa-circle-check text-green-500"
                   : "fa-circle-exclamation text-red-500"
               }`}
-            ></i>
-            <span className="text-[#2E3B8E] font-semibold text-[15px]">
-              {toast.message}
-            </span>
+            />
+            <span className="font-semibold text-gray-800">{toast.message}</span>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleDeleteProfile}
-        title="Delete Mentor Profile"
-        message="Are you sure you want to delete this mentor profile? This will unassign all mentees and cannot be undone."
+        title="Delete mentor profile"
+        message="This will remove the mentor and unassign mentees. This cannot be undone."
         confirmText="Delete"
         pendingConfirmText="Deleting…"
         cancelText="Cancel"
@@ -366,34 +541,6 @@ export default function MentorProfilePage() {
         icon="fa-solid fa-trash-can"
         iconColor="text-red-500 bg-red-100"
       />
-
-      {/* Edit Modal */}
-      {showEditModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
-          <div className="bg-white rounded-xl p-8 max-w-md w-full shadow-2xl">
-            <h3 className="text-[22px] font-bold text-gray-900 mb-4">
-              Edit Mentor Profile
-            </h3>
-            <p className="text-[14px] text-gray-600 mb-6">
-              Edit profile functionality will be implemented here.
-            </p>
-            <button
-              onClick={() => setShowEditModal(false)}
-              className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg text-[14px] font-semibold hover:bg-blue-700 transition-all"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Click outside to close options menu */}
-      {showOptionsMenu && (
-        <div
-          className="fixed inset-0 z-40"
-          onClick={() => setShowOptionsMenu(false)}
-        ></div>
-      )}
     </div>
   );
 }

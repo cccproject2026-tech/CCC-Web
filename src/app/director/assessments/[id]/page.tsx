@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import AppHeader from "@/app/Components/Header/AppHeader";
-import AppFooter from "@/app/Components/AppFooter";
+import DirectorHero from "../../DirectorHero";
+import AssessmentBg from "../../../Assets/assessment-bg.png";
+import { directorGlassCard, directorPageRoot, directorSpinner } from "../../directorUi";
 import {
   apiGetAssessmentById,
   apiUpdateInstructions,
@@ -23,6 +24,7 @@ export default function ViewEditAssessmentPage() {
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [selectedChoices, setSelectedChoices] = useState<number[]>([]);
   const [assessment, setAssessment] = useState<any>(null);
+  const [loadError, setLoadError] = useState(false);
 
   // Modals
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);
@@ -49,11 +51,13 @@ export default function ViewEditAssessmentPage() {
     if (!params?.id) return;
 
     const fetchAssessment = async () => {
+      setLoadError(false);
       try {
         const res = await apiGetAssessmentById(params.id as string);
         const raw = parseAssessmentDetailPayload(res.data);
         if (!raw) {
           console.error("Invalid assessment payload");
+          setLoadError(true);
           return;
         }
         const mapped = mapAssessmentFromApi(raw);
@@ -67,6 +71,7 @@ export default function ViewEditAssessmentPage() {
         }
       } catch (error) {
         console.error("Failed to fetch assessment", error);
+        setLoadError(true);
       }
     };
 
@@ -194,67 +199,113 @@ export default function ViewEditAssessmentPage() {
     (l) => l.id === currentLayerId
   );
 
-  return (
-    <div className="min-h-screen flex flex-col bg-[#2876AC]">
-      <section className="relative py-10 px-4 sm:px-6 md:px-12 lg:px-20 flex-1">
-        <div className="max-w-[1600px] mx-auto flex gap-6 h-full">
-          {/* Left Sidebar - Sections */}
-          <div className="w-80 flex-shrink-0 space-y-3">
-            <div className="flex items-center gap-3 mb-4">
+  if (!assessment) {
+    return (
+      <div className={directorPageRoot}>
+        <DirectorHero
+          title="Assessment"
+          subtitle={loadError ? "Could not load this assessment." : "Loading survey builder…"}
+          image={AssessmentBg}
+          breadcrumbItems={[
+            { label: "Home", href: "/director/home" },
+            { label: "Assessments", href: "/director/assessments" },
+            { label: loadError ? "Error" : "…" },
+          ]}
+        />
+        <section className="flex flex-1 flex-col items-center justify-center gap-6 px-4 pb-16 pt-4">
+          {loadError ? (
+            <>
+              <p className="text-center text-white/80">Check the link or try again from the list.</p>
               <button
+                type="button"
+                onClick={() => router.push("/director/assessments")}
+                className="rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+              >
+                Back to assessments
+              </button>
+            </>
+          ) : (
+            <div className={directorSpinner} />
+          )}
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div className={directorPageRoot}>
+      <DirectorHero
+        title={assessment.name || "Edit assessment"}
+        subtitle="Sections, layers, choices, and instructions — save when done."
+        image={AssessmentBg}
+        breadcrumbItems={[
+          { label: "Home", href: "/director/home" },
+          { label: "Assessments", href: "/director/assessments" },
+          { label: assessment.name || "Edit" },
+        ]}
+      />
+
+      <section className="relative flex-1 px-0 pb-10 pt-2 sm:px-2">
+        <div className="mx-auto flex h-full max-w-[1600px] flex-col gap-6 lg:flex-row lg:gap-8">
+          {/* Left Sidebar - Sections */}
+          <div className={`w-full flex-shrink-0 space-y-3 lg:w-80 ${directorGlassCard} p-4`}>
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
                 onClick={() => setShowAddSectionModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 shadow-md text-sm"
+                className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
               >
                 <i className="fa-solid fa-plus"></i>
                 Section
               </button>
               <button
+                type="button"
                 onClick={() => setShowInstructionsModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-transparent text-white rounded-lg font-semibold border-2 border-white/40 hover:border-white/60 hover:bg-white/10 text-sm"
+                className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
               >
                 <i className="fa-solid fa-pen-to-square"></i>
-                Edit Next Section
+                Instructions
               </button>
             </div>
 
             {sections.map((section, index) => (
               <div
                 key={section.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => setSelectedSection(section.id)}
-                className={`p-4 rounded-xl cursor-pointer transition-all border-2 ${selectedSection === section.id
-                  ? "bg-[#1F2A6E] text-white border-[#1F2A6E]"
-                  : "bg-white text-gray-900 border-white hover:border-gray-200"
-                  }`}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelectedSection(section.id);
+                  }
+                }}
+                className={`cursor-pointer rounded-xl border-2 p-4 transition-all ${
+                  selectedSection === section.id
+                    ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/15 text-white"
+                    : "border-white/10 bg-white/5 text-white/90 hover:border-white/25 hover:bg-white/10"
+                }`}
               >
                 <div className="mb-2">
-                  <span
-                    className={`text-xs font-bold px-2 py-1 rounded ${selectedSection === section.id
-                      ? "bg-[#2876AC] text-white"
-                      : "bg-[#2876AC] text-white"
-                      }`}
-                  >
+                  <span className="rounded bg-[#8ec5eb]/25 px-2 py-1 text-xs font-bold text-[#cde2f2]">
                     Section {index + 1}
                   </span>
                 </div>
-                <h3 className="font-semibold text-sm leading-tight">
-                  {section.name}
-                </h3>
-                {section.description && (
-                  <p className="text-xs mt-1 opacity-70">
-                    {section.description}
-                  </p>
-                )}
+                <h3 className="text-sm font-semibold leading-tight">{section.name}</h3>
+                {section.description ? (
+                  <p className="mt-1 text-xs text-white/60">{section.description}</p>
+                ) : null}
               </div>
             ))}
           </div>
 
           {/* Main Content Area */}
-          <div className="flex-1">
+          <div className={`min-w-0 flex-1 ${directorGlassCard} p-5 sm:p-6`}>
             {selectedSectionData ? (
               <>
                 {/* Help Text */}
-                <div className="bg-[#2E5A8E] border border-white/30 rounded-lg p-4 mb-6">
-                  <p className="text-white text-sm">
+                <div className="mb-6 rounded-lg border border-white/15 bg-white/5 p-4">
+                  <p className="text-sm text-white/85">
                     Choose the option that best matches how you feel and who you
                     are, as this self-assessment helps you understand yourself
                     better. Your accuracy allows us to provide the best support
@@ -263,21 +314,23 @@ export default function ViewEditAssessmentPage() {
                 </div>
 
                 {/* Divider and Action Buttons */}
-                <div className="border-t border-white/20 mb-6"></div>
+                <div className="mb-6 border-t border-white/15" />
 
-                <div className="flex justify-end gap-2 mb-6">
+                <div className="mb-6 flex justify-end gap-2">
                   {!isSelectionMode ? (
                     <>
                       <button
+                        type="button"
                         onClick={() => setIsSelectionMode(true)}
-                        className="px-5 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 text-sm flex items-center gap-2 shadow-md"
+                        className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
                       >
                         <i className="fa-solid fa-check-square"></i>
                         Select
                       </button>
                       <button
+                        type="button"
                         onClick={() => setShowAddLayerModal(true)}
-                        className="px-5 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 text-sm flex items-center gap-2 shadow-md"
+                        className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
                       >
                         <i className="fa-solid fa-layer-group"></i>
                         Layer
@@ -285,26 +338,29 @@ export default function ViewEditAssessmentPage() {
                     </>
                   ) : (
                     <>
-                      <span className="text-white font-semibold flex items-center">
+                      <span className="flex items-center font-semibold text-white">
                         {selectedChoices.length} Selected
                       </span>
                       <button
+                        type="button"
                         onClick={handleDeleteSelected}
                         disabled={selectedChoices.length === 0}
-                        className={`px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 ${selectedChoices.length > 0
-                          ? "bg-white text-red-600 hover:bg-red-50"
-                          : "bg-white/20 text-white/50 cursor-not-allowed"
-                          }`}
+                        className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${
+                          selectedChoices.length > 0
+                            ? "border border-red-400/40 bg-red-500/20 text-red-100 hover:bg-red-500/30"
+                            : "cursor-not-allowed border border-white/10 bg-white/5 text-white/40"
+                        }`}
                       >
                         <i className="fa-solid fa-trash"></i>
                         Delete
                       </button>
                       <button
+                        type="button"
                         onClick={() => {
                           setIsSelectionMode(false);
                           setSelectedChoices([]);
                         }}
-                        className="px-4 py-2 bg-white/20 text-white rounded-lg font-semibold hover:bg-white/30 text-sm border border-white/30"
+                        className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
                       >
                         Cancel
                       </button>
@@ -317,18 +373,17 @@ export default function ViewEditAssessmentPage() {
                   {selectedSectionData.layers.map((layer, layerIdx) => (
                     <div
                       key={layer.id}
-                      className="bg-[#2E5A8E]/50 border-2 border-[#4A6FA5] rounded-xl p-5"
+                      className="rounded-xl border border-white/15 bg-white/5 p-5"
                     >
                       <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-white font-semibold">
-                          {/* Layer name is not displayed as per Figma */}
-                        </h3>
+                        <h3 className="font-semibold text-white">Layer {layerIdx + 1}</h3>
                         <button
+                          type="button"
                           onClick={() => {
                             setCurrentLayerId(layer.id);
                             setShowRecommendationsModal(true);
                           }}
-                          className="px-4 py-2 bg-[#5C7CFA] text-white rounded-lg font-semibold hover:bg-[#4C6CDF] text-sm flex items-center gap-2 shadow-md"
+                          className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
                         >
                           <i className="fa-solid fa-pen-to-square"></i>
                           Edit Recommendations
@@ -339,15 +394,11 @@ export default function ViewEditAssessmentPage() {
                         {layer.choices.map((choice, choiceIdx) => (
                           <div
                             key={choiceIdx}
-                            className={`bg-[#4A6FA5] border rounded-lg p-3 text-white flex items-center gap-3 transition-all ${selectedChoices.includes(
-                              layerIdx * 10 + choiceIdx
-                            )
-                              ? "border-white ring-2 ring-white"
-                              : "border-[#5A7FB5]"
-                              } ${isSelectionMode
-                                ? "cursor-pointer hover:border-white"
-                                : ""
-                              }`}
+                            className={`flex items-center gap-3 rounded-lg border p-3 text-white transition-all ${
+                              selectedChoices.includes(layerIdx * 10 + choiceIdx)
+                                ? "border-[#8ec5eb] ring-2 ring-[#8ec5eb]/40"
+                                : "border-white/15 bg-white/5"
+                            } ${isSelectionMode ? "cursor-pointer hover:border-[#8ec5eb]/50" : ""}`}
                             onClick={() =>
                               isSelectionMode &&
                               handleSelectChoice(layerIdx * 10 + choiceIdx)
@@ -374,7 +425,10 @@ export default function ViewEditAssessmentPage() {
                       </div>
 
                       <div className="flex justify-end">
-                        <button className="px-4 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 text-sm flex items-center gap-2 shadow-md">
+                        <button
+                          type="button"
+                          className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+                        >
                           <i className="fa-solid fa-plus"></i>
                           Choice
                         </button>
@@ -384,12 +438,10 @@ export default function ViewEditAssessmentPage() {
                 </div>
               </>
             ) : (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center text-white">
-                  <i className="fa-solid fa-list-check text-6xl mb-4 opacity-50"></i>
-                  <p className="text-xl font-semibold">
-                    Select a section to view
-                  </p>
+              <div className="flex h-full min-h-[200px] items-center justify-center">
+                <div className="text-center text-white/80">
+                  <i className="fa-solid fa-list-check mb-4 text-5xl opacity-40"></i>
+                  <p className="text-lg font-semibold">Select a section to view</p>
                 </div>
               </div>
             )}
@@ -397,18 +449,20 @@ export default function ViewEditAssessmentPage() {
         </div>
 
         {/* Bottom Action Buttons */}
-        <div className="flex justify-end gap-4 mt-6">
+        <div className="mx-auto mt-8 flex max-w-[1600px] flex-wrap justify-end gap-4 px-0">
           <button
+            type="button"
             onClick={() => router.push("/director/assessments")}
-            className="px-10 py-3 bg-white text-gray-700 rounded-lg font-semibold hover:bg-gray-100 shadow-md"
+            className="rounded-xl border border-white/25 bg-white/10 px-8 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleSaveChanges}
-            className="px-10 py-3 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E] shadow-md"
+            className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-8 py-3 text-sm font-semibold text-white shadow-[0_0_0_1px_rgba(142,197,235,0.15)] transition hover:bg-[#8ec5eb]/30"
           >
-            Save Changes
+            Save changes
           </button>
         </div>
       </section>
@@ -834,7 +888,6 @@ export default function ViewEditAssessmentPage() {
         </div>
       )}
 
-      <AppFooter />
     </div>
   );
 }

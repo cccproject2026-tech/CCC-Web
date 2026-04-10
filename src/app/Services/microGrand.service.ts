@@ -1,3 +1,4 @@
+import { isAxiosError } from "axios";
 import axiosInstance from "./config/axios-instance";
 import type {
   MicroGrantForm,
@@ -117,4 +118,111 @@ export function getMicroGrantApplicantEmail(app: MicroGrantApplicationResponse):
 /** Prefer applicant user id for detail URL; fall back to application id if the list row has no user ref. */
 export function microGrantListDetailSlug(app: MicroGrantApplicationResponse): string | undefined {
   return getMicroGrantApplicantUserId(app) ?? (app._id ? String(app._id) : undefined);
+}
+
+/** Normalize list/API `supportingDocs` (strings or `{ name, url }`) for UI. */
+export function normalizeMicroGrantSupportingDocs(
+  raw: unknown,
+): { name: string; url: string }[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((doc, idx) => {
+    if (typeof doc === "string") {
+      const looksUrl = /^https?:\/\//i.test(doc);
+      return {
+        name: looksUrl ? `Document ${idx + 1}` : doc,
+        url: looksUrl ? doc : "#",
+      };
+    }
+    if (doc && typeof doc === "object") {
+      const o = doc as { name?: string; url?: string };
+      const url = typeof o.url === "string" ? o.url : "#";
+      const name =
+        typeof o.name === "string" && o.name ? o.name : `Document ${idx + 1}`;
+      return { name, url };
+    }
+    return { name: `Document ${idx + 1}`, url: "#" };
+  });
+}
+
+function buildMicroGrantDetailFromListApplication(
+  app: MicroGrantApplicationResponse,
+): MicroGrantWithUserResponse | null {
+  const uid = getMicroGrantApplicantUserId(app);
+  if (!uid) return null;
+  const u = app.userId;
+  let email = "—";
+  let role = "pastor";
+  if (u && typeof u === "object") {
+    const o = u as { email?: string; role?: string };
+    if (typeof o.email === "string" && o.email) email = o.email;
+    if (typeof o.role === "string" && o.role) role = o.role;
+  }
+  const answers =
+    app.answers && typeof app.answers === "object" && !Array.isArray(app.answers)
+      ? (app.answers as Record<string, string>)
+      : {};
+  return {
+    user: { _id: uid, email, role },
+    application: {
+      ...app,
+      answers,
+      supportingDocs: Array.isArray(app.supportingDocs) ? app.supportingDocs : [],
+    },
+  };
+}
+
+/**
+ * Detail route may use applicant user id or application `_id` (see `microGrantListDetailSlug`).
+ * GET `/microgrant/application/:userId` only accepts user id — resolve application id via list + retry.
+ */
+export async function loadMicroGrantDetailBySlug(
+  slug: string,
+): Promise<MicroGrantWithUserResponse | null> {
+  const s = slug.trim();
+  if (!s) return null;
+
+  let firstError: unknown;
+  try {
+    const res = await getMicroGrantByUserId(s);
+    const u = unwrapMicroGrantWithUser(res);
+    if (u) return u;
+  } catch (e) {
+    firstError = e;
+    if (isAxiosError(e) && e.response?.status === 401) throw e;
+  }
+
+  try {
+    const listRes = await getAllMicroGrand();
+    const list = unwrapMicroGrantApplicationsList(listRes);
+
+    const byAppId = list.find((a) => String(a._id) === s);
+    if (byAppId) {
+      const uid = getMicroGrantApplicantUserId(byAppId);
+      if (uid && uid !== s) {
+        try {
+          const res2 = await getMicroGrantByUserId(uid);
+          const u2 = unwrapMicroGrantWithUser(res2);
+          if (u2) return u2;
+        } catch (e) {
+          if (isAxiosError(e) && e.response?.status === 401) throw e;
+        }
+      }
+      const built = buildMicroGrantDetailFromListApplication(byAppId);
+      if (built) return built;
+    }
+
+    const byUserInList = list.find((a) => getMicroGrantApplicantUserId(a) === s);
+    if (byUserInList) {
+      const built = buildMicroGrantDetailFromListApplication(byUserInList);
+      if (built) return built;
+    }
+  } catch (e) {
+    if (isAxiosError(e) && e.response?.status === 401) throw e;
+    console.error("loadMicroGrantDetailBySlug list fallback", e);
+  }
+
+  if (firstError && process.env.NODE_ENV === "development") {
+    console.warn("loadMicroGrantDetailBySlug: direct fetch failed, slug=", s, firstError);
+  }
+  return null;
 }

@@ -22,6 +22,7 @@ import {
   mentorMainGradient,
   mentorPageRoot,
 } from "@/app/Components/mentor/mentor-theme";
+import { directorGlassCard, directorPageRoot } from "@/app/director/directorUi";
 
 const glassPanelPastor =
   "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.88)_0%,rgba(10,53,88,0.94)_100%)] shadow-[0_20px_50px_rgba(2,20,38,0.35)]";
@@ -46,7 +47,8 @@ function extractApiErrorMessage(err: unknown): string {
 export default function NotesPageContent({ variant }: { variant: NotesVariant }) {
   const router = useRouter();
   const basePath = notesBasePath(variant);
-  const Header = variant === "mentor" ? MentorHeader : PastorHeader;
+  const Header =
+    variant === "mentor" ? MentorHeader : variant === "pastor" ? PastorHeader : null;
 
   const [tab, setTab] = useState<"new" | "previous">("new");
   const [notes, setNotes] = useState<Note[]>([]);
@@ -88,7 +90,12 @@ export default function NotesPageContent({ variant }: { variant: NotesVariant })
     loadNotes();
   }, [loadNotes]);
 
-  const glassPanel = variant === "mentor" ? mentorGlassCardFrost : glassPanelPastor;
+  const glassPanel =
+    variant === "mentor"
+      ? mentorGlassCardFrost
+      : variant === "director"
+        ? directorGlassCard
+        : glassPanelPastor;
 
   const handleSave = async () => {
     if (!userId) {
@@ -119,27 +126,30 @@ export default function NotesPageContent({ variant }: { variant: NotesVariant })
     }
   };
 
+  const mainClass =
+    variant === "mentor"
+      ? `mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-10 ${mentorMainGradient}`
+      : "mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-10";
+
+  const MainTag = variant === "director" ? "div" : "main";
+
   return (
     <div
       className={
         variant === "mentor"
           ? mentorPageRoot
-          : "relative flex min-h-screen flex-col bg-transparent font-[Albert_Sans] text-white"
+          : variant === "director"
+            ? directorPageRoot
+            : "relative flex min-h-screen flex-col bg-transparent font-[Albert_Sans] text-white"
       }
     >
       {variant === "pastor" ? (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(141,211,243,0.16),transparent_40%),linear-gradient(180deg,#041f35_0%,#062946_100%)]" />
       ) : null}
       <div className="relative z-10 flex min-h-screen flex-col">
-        <Header showFullHeader />
+        {Header ? <Header showFullHeader /> : null}
 
-        <main
-          className={
-            variant === "mentor"
-              ? `mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-10 ${mentorMainGradient}`
-              : "mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-10"
-          }
-        >
+        <MainTag className={mainClass}>
           {/* Page header — Notes title + user pill (reference design) */}
           <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-3">
@@ -276,7 +286,7 @@ export default function NotesPageContent({ variant }: { variant: NotesVariant })
               )}
             </>
           )}
-        </main>
+        </MainTag>
 
         {variant === "pastor" ? <PastorFooter /> : null}
       </div>

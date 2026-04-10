@@ -1,5 +1,7 @@
 "use client";
 
+import { directorSearchInputClass, directorSearchIconClass } from "@/app/director/directorUi";
+
 interface SearchBarProps {
   value: string;
   onChange: (value: string) => void;
@@ -18,12 +20,12 @@ export default function SearchBar({
 }: SearchBarProps) {
   const inputClass =
     variant === "dark"
-      ? "w-full rounded-lg border border-white/20 bg-white/10 px-4 py-3 pl-11 text-[15px] text-white placeholder:text-white/45 outline-none focus:border-[#8ec5eb]/50 focus:ring-1 focus:ring-[#8ec5eb]/30"
-      : "w-full px-4 py-3 pl-11 rounded-lg bg-white text-[#1A2E7A] placeholder-gray-400 outline-none shadow-md text-[15px]";
+      ? directorSearchInputClass
+      : "w-full rounded-lg bg-white px-4 py-3 pl-11 text-[15px] text-[#1A2E7A] shadow-md outline-none placeholder:text-gray-400";
   const iconClass =
     variant === "dark"
-      ? "fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-[#8ec5eb]/70 text-sm"
-      : "fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm";
+      ? `${directorSearchIconClass}`
+      : "fa-solid fa-magnifying-glass pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400";
 
   return (
     <div className={`relative ${className}`}>

@@ -1,7 +1,7 @@
 import { getCookie } from "@/app/utils/cookies";
 import type { Note } from "@/app/Services/types/users.types";
 
-export type NotesVariant = "mentor" | "pastor";
+export type NotesVariant = "mentor" | "pastor" | "director";
 
 function pickUserId(u: Record<string, unknown>): string | null {
   const raw = (u._id ?? u.id ?? u.userId) as string | undefined;
@@ -48,9 +48,10 @@ export function getNotesSession(variant: NotesVariant): {
       };
     }
     const u = JSON.parse(raw) as Record<string, unknown>;
+    const defaultName = variant === "director" ? "Director" : "User";
     return {
       userId: explicitId || pickUserId(u),
-      displayName: displayNameFromUser(u) || "User",
+      displayName: displayNameFromUser(u) || defaultName,
     };
   } catch {
     return {
@@ -89,5 +90,7 @@ export function formatNoteTimestamp(iso: string): string {
 }
 
 export function notesBasePath(variant: NotesVariant): string {
-  return variant === "mentor" ? "/mentor/notes" : "/pastor/notes";
+  if (variant === "mentor") return "/mentor/notes";
+  if (variant === "director") return "/director/notes";
+  return "/pastor/notes";
 }
