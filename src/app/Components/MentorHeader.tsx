@@ -160,6 +160,7 @@ export default function MentorHeader({ showFullHeader = false }) {
   const profileMenu = [
     { icon: <User size={18} />, label: "Profile", path: "/mentor/profile" },
     { icon: <Award size={18} />, label: "Certificates", path: "/mentor/certificates" },
+    { icon: <Clipboard size={18} />, label: "Mentorship Sessions", path: "/mentor/mentoring-session" },
     { icon: <File size={18} />, label: "Assignments", path: "/mentor/assignments" },
     { icon: <Trophy size={18} />, label: "Micro Grand", path: "/mentor/micro-grant" },
     { icon: <FolderOpen size={18} />, label: "Documents", path: "/mentor/documents" },
@@ -389,7 +390,7 @@ export default function MentorHeader({ showFullHeader = false }) {
 
                             // 2️⃣ Handle logout action
                             if (item.action === "logout") {
-                              void apiLogout().catch(() => {});
+                              void apiLogout().catch(() => { });
                               clearAllCookies();
                               router.push("/mentor/login");
                               return;

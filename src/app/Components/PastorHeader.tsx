@@ -28,6 +28,7 @@ import {
   UserX,
   Menu,
   X,
+  Clipboard,
 } from "lucide-react";
 import { getNotifications, getSingleUser } from "../Services/pastor.service";
 import type { NotificationItem } from "../Services/types/home.types";
@@ -123,6 +124,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
   const profileMenu = [
     { icon: <User size={18} />, label: "Profile", path: "/pastor/profile" },
     { icon: <Award size={18} />, label: "Certificates", path: "/pastor/Certificates" },
+    { icon: <Clipboard size={18} />, label: "Mentorship Sessions", path: "/pastor/mentoring-session" },
     { icon: <File size={18} />, label: "Assignments", path: "/pastor/Assignments" },
     { icon: <Trophy size={18} />, label: "Micro Grant", path: "/pastor/MicroGrantApplication" },
     { icon: <FolderOpen size={18} />, label: "Documents", path: "/pastor/Documents" },
@@ -460,7 +462,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
                         <button
                           onClick={() => {
                             if (item.label === "Log out") {
-                              void apiLogout().catch(() => {});
+                              void apiLogout().catch(() => { });
                               clearAllCookies();
                               router.push("/pastor/login");
                               return;
