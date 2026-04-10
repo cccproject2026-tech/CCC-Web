@@ -353,7 +353,7 @@ export default function CourseCompletedPage() {
             >
               {/* Image with relative positioning for "New" badge - Clickable */}
               <Link
-                href={`/director/mentees/profile?id=${p.id}`}
+                href={`/director/mentees/profile/${p.id}`}
                 className="relative w-[120px] h-[120px] overflow-hidden rounded-xl bg-gray-100 flex-shrink-0 cursor-pointer"
               >
                 <Image
@@ -372,7 +372,7 @@ export default function CourseCompletedPage() {
               <div className="flex-1 flex flex-col justify-between min-h-[120px]">
                 <div>
                   <Link
-                    href={`/director/mentees/profile?id=${p.id}`}
+                    href={`/director/mentees/profile/${p.id}`}
                     className="mb-1 flex items-center gap-2 transition-opacity hover:opacity-80"
                   >
                     <h3 className="text-[16px] font-bold text-white">

@@ -9,8 +9,8 @@ import RoadmapJumpStartBg from "@/app/Assets/roadmap-jump-start-bg.jpg";
 import Mentor2 from "@/app/Assets/mentor2.png";
 
 import {
-  getMicroGrantByUserId,
-  unwrapMicroGrantWithUser,
+  loadMicroGrantDetailBySlug,
+  normalizeMicroGrantSupportingDocs,
   updateMicroGrantStatus,
 } from "@/app/Services/microGrand.service";
 import { MicroGrantResponse } from "@/app/Services/types";
@@ -31,8 +31,7 @@ const Page: React.FC = () => {
 
     const fetchData = async () => {
       try {
-        const res = await getMicroGrantByUserId(userId);
-        const payload = unwrapMicroGrantWithUser(res);
+        const payload = await loadMicroGrantDetailBySlug(userId);
         setData(payload);
       } catch (err) {
         console.error("Failed to load application", err);
@@ -75,6 +74,9 @@ const Page: React.FC = () => {
       </div>
     );
   }
+
+  const answers = data.application.answers ?? {};
+  const supportingDocs = normalizeMicroGrantSupportingDocs(data.application.supportingDocs);
 
   /* ---------- right card (same design, dynamic) ---------- */
   const rightCard: ReactNode = (
@@ -184,7 +186,7 @@ const Page: React.FC = () => {
                 * Indicates required question
               </p>
 
-              {Object.entries(data.application.answers).map(
+              {Object.entries(answers).map(
                 ([label, value]) => (
                   <div key={label}>
                     <label className="block text-sm font-semibold mb-2">
@@ -207,12 +209,12 @@ const Page: React.FC = () => {
                   Supporting Documents
                 </label>
 
-                {data.application.supportingDocs.length === 0 ? (
+                {supportingDocs.length === 0 ? (
                   <p className="text-sm text-gray-300">
                     No documents uploaded
                   </p>
                 ) : (
-                  data.application.supportingDocs.map((doc, idx) => (
+                  supportingDocs.map((doc, idx) => (
                     <div
                       key={idx}
                       className="bg-white rounded-lg p-4 flex justify-between items-center shadow-md mb-3"

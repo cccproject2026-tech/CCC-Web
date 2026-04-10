@@ -10,7 +10,7 @@ export function useNotesSession(variant: NotesVariant) {
 
   useEffect(() => {
     if (getCookie("userId")) return;
-    const raw = getCookie(variant === "mentor" ? "mentor" : "user");
+    const raw = getCookie(variant === "mentor" ? "mentor" : "user"); // pastor + director
     if (!raw) return;
     try {
       const u = JSON.parse(raw) as { _id?: string; id?: string };

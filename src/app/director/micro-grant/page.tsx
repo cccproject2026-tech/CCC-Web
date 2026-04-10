@@ -2,7 +2,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import DirectorHero from "../DirectorHero";
-import { directorGlassCard, directorInputClass, directorPageRoot } from "../directorUi";
+import { directorBtnSecondary, directorPageContainer, directorPageRoot } from "../directorUi";
+import { DirectorFilterSection } from "../ui";
+import SearchBar from "@/app/Components/SearchBar";
 import MicroGrantCard from "@/app/Components/Card/MicroGrantCard";
 import MicroGrantBg from "../../Assets/micro-grant.jpg";
 import UserProfile from "@/app/Assets/user-profile.png";
@@ -109,19 +111,17 @@ const Page: React.FC = () => {
       />
 
       <section className="relative flex-1 px-4 pb-12 sm:px-6 md:px-12 lg:px-20">
-        <div className="mx-auto max-w-[1400px]">
-          <div className={`mb-8 p-4 sm:p-5 ${directorGlassCard}`}>
-            <div className="flex flex-col items-stretch justify-between gap-4 md:flex-row md:items-center">
-              <div className="relative w-full flex-1 md:max-w-md">
-                <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-[#8ec5eb]/70"></i>
-                <input
-                  type="text"
-                  placeholder="Search by name, email, or church"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`${directorInputClass} pl-11`}
-                />
-              </div>
+        <div className={directorPageContainer}>
+          <DirectorFilterSection className="!mb-8 !p-4 sm:!p-5">
+            <div className="relative w-full flex-1 md:max-w-md">
+              <SearchBar
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search by name, email, or church"
+                variant="dark"
+                className="w-full"
+              />
+            </div>
 
               <div className="flex flex-wrap items-center gap-3">
                 <div className="inline-flex h-10 items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-1">
@@ -149,14 +149,13 @@ const Page: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => router.push("/director/micro-grant/edit")}
-                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15"
+                  className={`${directorBtnSecondary} h-10 px-4 py-0 text-sm`}
                 >
                   <i className="fa-solid fa-pencil text-sm"></i>
                   Edit form
                 </button>
               </div>
-            </div>
-          </div>
+          </DirectorFilterSection>
 
           {fetchError ? (
             <p className="mb-4 rounded-lg border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">

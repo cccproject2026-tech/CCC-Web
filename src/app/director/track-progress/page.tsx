@@ -2,7 +2,9 @@
 import { useEffect, useMemo, useState } from "react";
 import ProgressCard from "@/app/Components/Card/ProgressCard";
 import DirectorHero from "../DirectorHero";
-import { directorGlassCard, directorInputClass, directorPageRoot } from "../directorUi";
+import { directorGlassCard, directorPageContainer, directorPageRoot } from "../directorUi";
+import { DirectorFilterSection } from "../ui";
+import SearchBar from "@/app/Components/SearchBar";
 import ProgressBg from "../../Assets/progress-bg.jpg";
 import Mentor1 from "../../Assets/mentor1.png";
 import {
@@ -44,7 +46,7 @@ export default function TrackProgressPage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    apiGetOverallProgress()
+    apiGetOverallProgress(["mentor", "pastor"])
       .then((res) => {
         const rows = unwrapOverallProgressList(res);
         const normalized = rows.map(normalizeRow).filter((x): x is ProgressListItem => x != null);
@@ -94,19 +96,17 @@ export default function TrackProgressPage() {
       />
 
       <section className="relative flex-1 px-4 pb-12 sm:px-6 md:px-12 lg:px-20">
-        <div className="mx-auto max-w-[1400px]">
-          <div className={`mb-8 p-4 sm:p-5 ${directorGlassCard}`}>
-            <div className="flex flex-col items-stretch justify-between gap-4 md:flex-row md:items-center">
-              <div className="relative w-full flex-1 md:max-w-md">
-                <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-[#8ec5eb]/70" />
-                <input
-                  type="text"
-                  placeholder="Search by name, role, or id"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`${directorInputClass} pl-11`}
-                />
-              </div>
+        <div className={directorPageContainer}>
+          <DirectorFilterSection className="!p-4 sm:!p-5">
+            <div className="relative w-full flex-1 md:max-w-md">
+              <SearchBar
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search by name, role, or id"
+                variant="dark"
+                className="w-full"
+              />
+            </div>
 
               <div className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-1">
                 {[
@@ -128,8 +128,7 @@ export default function TrackProgressPage() {
                   </button>
                 ))}
               </div>
-            </div>
-          </div>
+          </DirectorFilterSection>
 
           {loading ? (
             <div className="flex flex-col items-center justify-center gap-4 py-20">

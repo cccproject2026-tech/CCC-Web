@@ -19,11 +19,23 @@ export function parseAssessmentsListPayload(body: unknown): AssessmentResponse[]
     const o = body as Record<string, unknown>;
     if (Array.isArray(o.data)) return o.data as AssessmentResponse[];
     if (Array.isArray(o.assessments)) return o.assessments as AssessmentResponse[];
-    if (o.data && typeof o.data === "object") {
+    if (Array.isArray(o.results)) return o.results as AssessmentResponse[];
+    if (Array.isArray(o.items)) return o.items as AssessmentResponse[];
+    if (o.data && typeof o.data === "object" && !Array.isArray(o.data)) {
       const d = o.data as Record<string, unknown>;
       if (Array.isArray(d.assessments)) return d.assessments as AssessmentResponse[];
       if (Array.isArray(d.items)) return d.items as AssessmentResponse[];
       if (Array.isArray(d.rows)) return d.rows as AssessmentResponse[];
+      if (Array.isArray(d.list)) return d.list as AssessmentResponse[];
+      if (Array.isArray(d.data)) return d.data as AssessmentResponse[];
+      if (Array.isArray(d.results)) return d.results as AssessmentResponse[];
+      /** Nested e.g. { data: { data: [...] } } */
+      if (d.data && typeof d.data === "object") {
+        const inner = d.data as Record<string, unknown>;
+        if (Array.isArray(inner.assessments)) return inner.assessments as AssessmentResponse[];
+        if (Array.isArray(inner.items)) return inner.items as AssessmentResponse[];
+        if (Array.isArray(inner.data)) return inner.data as AssessmentResponse[];
+      }
     }
   }
   return [];
@@ -161,9 +173,15 @@ export function flattenAssignedAssessmentRow(item: unknown): FlatAssignedAssessm
 export const apiCreateAssessment = (payload: CreateAssessmentPayload) =>
   axiosInstance.post<{ success: boolean; data: AssessmentResponse }>("/assessments", payload);
 
+/** List calls can be slow on large datasets; avoid default 10s axios timeout. */
+const GET_ASSESSMENTS_TIMEOUT_MS = 60_000;
+
 // GET /assessment?search=
 export const apiGetAssessments = (params?: { search?: string }) =>
-  axiosInstance.get<{ success: boolean; data: AssessmentResponse[] }>("/assessment", { params });
+  axiosInstance.get<{ success: boolean; data: AssessmentResponse[] }>("/assessment", {
+    params,
+    timeout: GET_ASSESSMENTS_TIMEOUT_MS,
+  });
 
 // GET /assessment/:id
 export const apiGetAssessmentById = (id: string) => {

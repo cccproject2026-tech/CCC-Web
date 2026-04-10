@@ -19,9 +19,15 @@ import type {
 export const apiCreateUser = (payload: CreateUserPayload) =>
   axiosInstance.post<{ success: boolean; data: UserResponse }>("/users", payload);
 
+/** Default axios timeout is 10s; user lists are often slower (large DB / cold API). */
+const GET_USERS_TIMEOUT_MS = 60_000;
+
 // GET /users?role=&status=&page=&limit=&search=&roleMatch=
 export const apiGetAllUsers = (params?: GetUsersParams) =>
-  axiosInstance.get<{ success: boolean; data: GetUsersResponse }>("/users", { params });
+  axiosInstance.get<{ success: boolean; data: GetUsersResponse }>("/users", {
+    params,
+    timeout: GET_USERS_TIMEOUT_MS,
+  });
 
 // GET /users/check-status/:id
 export const apiCheckUserStatus = (id: string) =>
@@ -140,3 +146,14 @@ export const apiInviteFieldMentor = (payload: InviteFieldMentorPayload) =>
 // POST /users/accept-invitation
 export const apiAcceptInvitation = (payload: AcceptInvitationPayload) =>
   axiosInstance.post<{ success: boolean; message: string }>("/users/accept-invitation", payload);
+
+/** Normalize GET `/users/:id` — envelope shapes differ by deploy/version. */
+export function unwrapUserResponse(res: { data?: unknown }): UserResponse | null {
+  const root = res?.data;
+  if (root == null || typeof root !== "object") return null;
+  const r = root as Record<string, unknown>;
+  const inner = r.data;
+  if (inner && typeof inner === "object") return inner as UserResponse;
+  if (r._id != null || typeof r.email === "string") return r as unknown as UserResponse;
+  return null;
+}

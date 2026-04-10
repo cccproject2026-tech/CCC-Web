@@ -8,8 +8,11 @@ import {
   directorGlassCard,
   directorGlassCardHover,
   directorInputClass,
+  directorPageContainer,
   directorPageRoot,
 } from "../directorUi";
+import { DirectorFilterSection } from "../ui";
+import SearchBar from "@/app/Components/SearchBar";
 import { apiGetAllInterests } from "@/app/Services/interests.service";
 import { Interest, InterestStatus } from "@/app/Services/types";
 
@@ -245,21 +248,19 @@ export default function InterestReceivedPage() {
       />
 
       <section className="pb-10">
-        <div className="mx-auto max-w-[1400px]">
-          <div className={`mb-8 p-6 ${directorGlassCard}`}>
-            <div className="flex flex-col items-center gap-4 md:flex-row">
-              <div className="relative w-full flex-1">
-                <i className="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8ec5eb]/80" />
-                <input
-                  type="text"
-                  placeholder="Search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className={`${directorInputClass} pl-11`}
-                />
-              </div>
+        <div className={directorPageContainer}>
+          <DirectorFilterSection className="!p-6">
+            <div className="relative w-full flex-1">
+              <SearchBar
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search by name, email, or country…"
+                variant="dark"
+                className="w-full"
+              />
+            </div>
 
-              <div className="flex flex-wrap justify-center gap-2">
+              <div className="flex flex-wrap justify-center gap-2 md:justify-end">
                 <button
                   type="button"
                   onClick={() => setActiveTab("new")}
@@ -357,8 +358,7 @@ export default function InterestReceivedPage() {
                 </select>
                 <i className="fa-solid fa-chevron-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/50" />
               </div>
-            </div>
-          </div>
+          </DirectorFilterSection>
 
           {selectedPastors.length > 0 && (
             <div className={`mb-6 p-4 ${directorGlassCard}`}>

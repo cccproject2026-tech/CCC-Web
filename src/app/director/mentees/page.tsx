@@ -527,7 +527,7 @@ export default function MenteesPage() {
               description={m.description}
               image={m.img}
               variant="glass"
-              profileLink={`/director/mentees/profile?id=${m.id}`}
+              profileLink={`/director/mentees/profile/${m.id}`}
               progress={
                 m.progress !== undefined
                   ? { phase: m.phase, value: m.progress }

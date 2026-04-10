@@ -1,13 +1,17 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/Header/AppHeader";import AppHero from "@/app/Components/Hero/AppHero";
+import AppHeader from "@/app/Components/Header/AppHeader";
+import AppHero from "@/app/Components/Hero/AppHero";
 import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import Card1 from "@/app/Assets/card1.png";
 import Card2 from "@/app/Assets/card2.png";
 import Card3 from "@/app/Assets/card3.png";
 import Card4 from "@/app/Assets/card4.png";
+import { directorPageContainer, directorPageRoot } from "@/app/director/directorUi";
+import { DirectorFilterSection } from "@/app/director/ui";
+import SearchBar from "@/app/Components/SearchBar";
 
 export default function RevitalizationRoadmapHome() {
   const router = useRouter();
@@ -149,7 +153,7 @@ export default function RevitalizationRoadmapHome() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1b598f] to-[#2876AC]">
+    <div className={`min-h-screen ${directorPageRoot}`}>
       {/* Hero Section with Breadcrumbs */}
       <AppHero
         title="Revitalization Roadmap"
@@ -169,31 +173,30 @@ export default function RevitalizationRoadmapHome() {
       </AppHero>
 
       {/* Main Content */}
-      <main className="flex-1 px-6 md:px-12 lg:px-20 py-10">
-        <div className="max-w-7xl mx-auto">
-          {/* Search Bar Section */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="relative flex-1 max-w-md">
-              <i className="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
-              <input
-                type="text"
-                placeholder="Search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-white border-2 border-gray-200 rounded-lg focus:outline-none focus:border-[#2E3B8E] text-gray-900 placeholder-gray-400"
-              />
-            </div>
+      <main className="flex-1 px-6 py-10 md:px-12 lg:px-20">
+        <div className={`${directorPageContainer} max-w-7xl`}>
+          <DirectorFilterSection bare className="!mb-8">
+            <div className="flex w-full flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="w-full min-w-0 max-w-md flex-1">
+                <SearchBar
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Search phases…"
+                  variant="dark"
+                  className="w-full"
+                />
+              </div>
 
-            {/* Three dots menu - positioned to the right */}
-            <div className="ml-4 relative">
+            <div className="relative shrink-0 sm:ml-4">
               <button
                 ref={buttonRef}
                 onClick={() =>
                   setShowExpectedOutcomePopup(!showExpectedOutcomePopup)
                 }
-                className="bg-white  border-2 border-white rounded-lg px-4 py-3 transition-all flex items-center justify-center"
+                type="button"
+                className="flex items-center justify-center rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-[#8ec5eb] transition hover:bg-white/15"
               >
-                <i className="fa-solid fa-ellipsis-vertical text-[#1F2A6E] text-lg"></i>
+                <i className="fa-solid fa-ellipsis-vertical text-lg" />
               </button>
 
               {/* Expected Outcome Popup */}
@@ -227,7 +230,8 @@ export default function RevitalizationRoadmapHome() {
                 </div>
               )}
             </div>
-          </div>
+            </div>
+          </DirectorFilterSection>
 
           {/* Roadmap Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -250,6 +254,7 @@ export default function RevitalizationRoadmapHome() {
             ))}
           </div>
         </div>
-      </main>    </div>
+      </main>
+    </div>
   );
 }

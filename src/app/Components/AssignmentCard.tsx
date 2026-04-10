@@ -14,6 +14,10 @@ interface AssignmentCardProps {
   image: any;
   onView: () => void;
   onOptionsClick: (id: number | string) => void;
+  /** Opens roadmap detail / edit flow (same destination as roadmap library Edit). */
+  onEdit?: (id: number | string) => void;
+  /** Single-card delete; parent should confirm and call API. */
+  onDelete?: (id: number | string) => void;
   isSelected?: boolean;
   onSelect?: (id: number | string) => void;
   showCheckbox?: boolean;
@@ -28,6 +32,8 @@ export default function AssignmentCard({
   image,
   onView,
   onOptionsClick,
+  onEdit,
+  onDelete,
   isSelected = false,
   onSelect,
   showCheckbox = false,
@@ -151,7 +157,10 @@ export default function AssignmentCard({
               <span>Assign to</span>
             </button>
             <button
-              onClick={() => setShowMenu(false)}
+              onClick={() => {
+                setShowMenu(false);
+                onEdit?.(id);
+              }}
               className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-[14px] transition-all ${
                 isGlass
                   ? "text-white/90 hover:bg-white/10"
@@ -164,7 +173,10 @@ export default function AssignmentCard({
               <span>Edit</span>
             </button>
             <button
-              onClick={() => setShowMenu(false)}
+              onClick={() => {
+                setShowMenu(false);
+                onDelete?.(id);
+              }}
               className={`flex w-full items-center gap-3 px-4 py-2.5 text-left text-[14px] transition-all ${
                 isGlass
                   ? "text-red-300 hover:bg-red-500/10"

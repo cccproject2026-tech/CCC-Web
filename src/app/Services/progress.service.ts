@@ -94,3 +94,67 @@ export const apiDeleteFinalComment = (payload: DeleteFinalCommentPayload) =>
     "/progress/final-comments",
     { data: payload },
   );
+
+/** Normalize GET `/progress/overview/all` — envelope shapes differ by deploy/version. */
+export function unwrapOverallProgressList(res: { data?: unknown }): UserOverallProgress[] {
+  const body = res?.data as Record<string, unknown> | unknown[] | null | undefined;
+  if (body == null) return [];
+  if (Array.isArray(body)) return body as UserOverallProgress[];
+
+  const inner = body.data;
+  if (Array.isArray(inner)) return inner as UserOverallProgress[];
+  if (inner && typeof inner === "object") {
+    const o = inner as Record<string, unknown>;
+    for (const key of ["users", "items", "records", "data"] as const) {
+      const arr = o[key];
+      if (Array.isArray(arr)) return arr as UserOverallProgress[];
+    }
+  }
+  for (const key of ["users", "items", "records"] as const) {
+    const arr = body[key];
+    if (Array.isArray(arr)) return arr as UserOverallProgress[];
+  }
+  return [];
+}
+
+/**
+ * Row `userId` may be a string id or a populated `{ _id }` (some API versions).
+ */
+export function extractUserIdFromOverallProgressRow(
+  item: UserOverallProgress | Record<string, unknown>,
+): string | undefined {
+  const u = (item as Record<string, unknown>).userId as unknown;
+  if (typeof u === "string" && u.trim()) return u.trim();
+  if (u && typeof u === "object" && "_id" in (u as object)) {
+    const id = (u as { _id?: string })._id;
+    if (id != null && String(id).trim() !== "") return String(id);
+  }
+  const id = (item as Record<string, unknown>)._id;
+  if (typeof id === "string" && id.trim()) return id.trim();
+  return undefined;
+}
+
+/** Normalize GET `/progress/:userId` — envelope shapes differ by deploy/version. */
+export function unwrapUserProgressDetail(res: { data?: unknown }): ProgressResponse | null {
+  const root = res?.data;
+  if (root == null || typeof root !== "object") return null;
+  const r = root as Record<string, unknown>;
+  const inner = r.data;
+  if (inner === null) return null;
+  if (inner && typeof inner === "object") {
+    const p = inner as Record<string, unknown>;
+    const nested = p.data ?? p.progress;
+    if (nested && typeof nested === "object") return nested as ProgressResponse;
+    return inner as ProgressResponse;
+  }
+  if (
+    "roadmaps" in r ||
+    "assessments" in r ||
+    "overallProgress" in r ||
+    "userId" in r ||
+    "_id" in r
+  ) {
+    return r as unknown as ProgressResponse;
+  }
+  return null;
+}
