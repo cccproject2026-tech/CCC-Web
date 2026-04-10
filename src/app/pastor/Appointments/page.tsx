@@ -162,22 +162,9 @@ export default function PastorAppointmentsPage() {
         apiGetUserSchedule(userId),
         apiGetAppointments({ userId, futureOnly: true }),
       ]);
-
-      const fromSchedule =
-        scheduleResult.status === "fulfilled" ? unwrapAppointmentsAxiosData(scheduleResult.value) : [];
-      const fromUpcomingEndpoint =
-        upcomingResult.status === "fulfilled" ? unwrapAppointmentsAxiosData(upcomingResult.value) : [];
-
-      const merged = new Map<string, Record<string, unknown>>();
-      for (const a of [...fromSchedule, ...fromUpcomingEndpoint]) {
-        const id = appointmentEntityId(a as { _id?: string; id?: string });
-        if (id) merged.set(id, a as Record<string, unknown>);
-      }
-      const data = Array.from(merged.values());
-
-      setAppointments(data as any);
-
-      const todayYmd = new Date().toLocaleDateString("en-CA");
+      const data = unwrapAppointmentsAxiosData(fullRes);
+      setAppointments(data);
+      const today = new Date().toLocaleDateString("en-CA");
       setAppointmentsToday(
         data.filter((a: any) => {
           if (!a?.meetingDate) return false;

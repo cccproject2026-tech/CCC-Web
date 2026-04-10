@@ -328,6 +328,11 @@ export const apiDeleteExtrasDocumentFile = (
     params: { userId, uploadBatchId, fileUrl, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
   });
 
+// ─── Mentoring Sessions ────────────────────────────────────────────────────────
+
+// GET /roadmaps/sessions/:userId
+export const apiGetMentorshipSessions = (userId: string) =>
+  axiosInstance.get(`/roadmaps/sessions/${userId}`);
 // ─── Legacy aliases ───────────────────────────────────────────────────────────
 /** @deprecated use apiUpdateRoadmap */
 export const apiUpdateRoadmapData = apiUpdateRoadmap;

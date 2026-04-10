@@ -85,3 +85,15 @@ export const apiGetWeeklyAvailability = (mentorId: string, date: string) =>
 // GET /appointments/availability/:mentorId/month?date=
 export const apiGetMonthlyAvailability = (mentorId: string, date: string) =>
   axiosInstance.get(`/appointments/availability/${mentorId}/month`, { params: { date } });
+
+// ─── Transcript Summary ─────────────────────────────────────────────────────────
+
+// GET /appointments/:appointmentId/transcript-summary
+export const apiGetTranscriptSummary = (appointmentId: string) =>
+  axiosInstance.get(`/appointments/${appointmentId}/transcript-summary`);
+
+// POST /appointments/:appointmentId/transcript-summary (generate/refresh)
+export const apiGenerateTranscriptSummary = (appointmentId: string, refresh: boolean = false) =>
+  axiosInstance.post(`/appointments/${appointmentId}/transcript-summary`, null, {
+    params: { refresh: refresh ? 'true' : 'false' }
+  });

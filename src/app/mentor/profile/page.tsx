@@ -237,6 +237,7 @@ export default function MentorProfile() {
             >
               <i className="fa-solid fa-paperclip text-[#8ec5eb]" /> Upload documents
             </button>
+
           </div>
 
           <div className={`${mentorGlassCardFrost} min-w-0 flex-1 p-6 md:p-8`}>
