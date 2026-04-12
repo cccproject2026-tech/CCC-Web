@@ -173,7 +173,7 @@ function MentorScheduleContent() {
         const res = await apiGetWeeklyAvailability(mentorId, date);
         const raw = res.data?.data ?? res.data;
         const data = Array.isArray(raw) ? raw : [];
-
+        console.log(res)
         setWeeklyAvailability(data);
 
         if (data.length === 0) {
@@ -200,19 +200,19 @@ function MentorScheduleContent() {
             slots:
               Array.isArray(d.slots) && d.slots.length > 0
                 ? d.slots.map((s: any) => ({
-                    startTime: s.startTime || s.start?.split(":")?.slice(0, 2).join(":") || "09:00",
-                    startPeriod: s.startPeriod || "AM",
-                    endTime: s.endTime || s.end?.split(":")?.slice(0, 2).join(":") || "05:00",
-                    endPeriod: s.endPeriod || "PM",
-                  }))
+                  startTime: s.startTime || s.start?.split(":")?.slice(0, 2).join(":") || "09:00",
+                  startPeriod: s.startPeriod || "AM",
+                  endTime: s.endTime || s.end?.split(":")?.slice(0, 2).join(":") || "05:00",
+                  endPeriod: s.endPeriod || "PM",
+                }))
                 : [
-                    {
-                      startTime: "09:00",
-                      startPeriod: "AM",
-                      endTime: "05:00",
-                      endPeriod: "PM",
-                    },
-                  ],
+                  {
+                    startTime: "09:00",
+                    startPeriod: "AM",
+                    endTime: "05:00",
+                    endPeriod: "PM",
+                  },
+                ],
           }));
 
           setAvailability(formatted);
@@ -410,19 +410,19 @@ function MentorScheduleContent() {
           slots:
             Array.isArray(d.slots) && d.slots.length > 0
               ? d.slots.map((s: any) => ({
-                  startTime: s.startTime || "09:00",
-                  startPeriod: s.startPeriod || "AM",
-                  endTime: s.endTime || "05:00",
-                  endPeriod: s.endPeriod || "PM",
-                }))
+                startTime: s.startTime || "09:00",
+                startPeriod: s.startPeriod || "AM",
+                endTime: s.endTime || "05:00",
+                endPeriod: s.endPeriod || "PM",
+              }))
               : [
-                  {
-                    startTime: "09:00",
-                    startPeriod: "AM",
-                    endTime: "05:00",
-                    endPeriod: "PM",
-                  },
-                ],
+                {
+                  startTime: "09:00",
+                  startPeriod: "AM",
+                  endTime: "05:00",
+                  endPeriod: "PM",
+                },
+              ],
         }));
         setAvailability(formatted);
       }
@@ -550,449 +550,448 @@ function MentorScheduleContent() {
             </div>
           ) : null}
 
-        {mentorId && !loading && activeTab === "Appointments" && (
-          <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-12">
-            <div className={`${mentorGlassCardFrost} p-5 sm:p-6`}>
-              <h3 className="mb-4 flex items-center gap-2 text-[15px] font-medium text-white">
-                <i className="fa-regular fa-calendar text-[#8ec5eb]" /> Monthly meeting calendar
-              </h3>
+          {mentorId && !loading && activeTab === "Appointments" && (
+            <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-12">
+              <div className={`${mentorGlassCardFrost} p-5 sm:p-6`}>
+                <h3 className="mb-4 flex items-center gap-2 text-[15px] font-medium text-white">
+                  <i className="fa-regular fa-calendar text-[#8ec5eb]" /> Monthly meeting calendar
+                </h3>
 
-              <div className="rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-5 text-center shadow-inner">
-                <div className="mb-4 flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
-                    className="rounded-lg px-2 py-1 text-white/90 transition hover:bg-white/10"
-                    aria-label="Previous month"
-                  >
-                    ◀
-                  </button>
-
-                  <p className="text-sm font-medium text-white/90">
-                    {currentDate.toLocaleString("default", {
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </p>
-
-                  <button
-                    type="button"
-                    onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
-                    className="rounded-lg px-2 py-1 text-white/90 transition hover:bg-white/10"
-                    aria-label="Next month"
-                  >
-                    ▶
-                  </button>
-                </div>
-
-                <div className="mb-2 grid grid-cols-7 gap-2 text-[13px]">
-                  {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-                    <div key={`${d}-${i}`} className="font-medium text-[#cde2f2]/80">
-                      {d}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-7 gap-2 text-[13px]">
-                  {calendarDays.map((day, index) => {
-                    if (!day) return <div key={index} />;
-
-                    const d = new Date(year, month, day);
-
-                    const dateStr = `${d.getFullYear()}-${String(
-                      d.getMonth() + 1
-                    ).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-                    const hasAppointment = appointmentDates.includes(dateStr);
-
-                    const isToday =
-                      day === new Date().getDate() &&
-                      month === new Date().getMonth() &&
-                      year === new Date().getFullYear();
-
-                    return (
-                      <div
-                        key={index}
-                        className={`cursor-pointer rounded-md py-1 transition ${
-                          isToday
-                            ? "bg-[#8ec5eb]/35 font-semibold text-white ring-1 ring-[#8ec5eb]/50"
-                            : "text-[#d9ebf8] hover:bg-white/10"
-                        } ${hasAppointment ? "ring-1 ring-amber-300/60" : ""}`}
-                      >
-                        {day}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="mb-4 text-[15px] font-semibold text-white">
-                Today — {todayAppointments.length} appointment
-                {todayAppointments.length === 1 ? "" : "s"}
-              </h3>
-
-              <div className="flex flex-col gap-5">
-                {todayAppointments.length === 0 ? (
-                  <div className={mentorEmptyPanel}>
-                    <p className={mentorBodyText}>No meetings scheduled for today.</p>
-                  </div>
-                ) : null}
-                {todayAppointments.map((appt, index) => {
-                  const meetingDate = new Date(appt.meetingDate);
-                  const apptKey = appointmentEntityId(appt) || String(index);
-
-                  return (
-                    <div
-                      key={apptKey}
-                      className={`${mentorGlassCardRoadmap} relative items-stretch gap-0 p-4 sm:items-center sm:p-5`}
+                <div className="rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-5 text-center shadow-inner">
+                  <div className="mb-4 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
+                      className="rounded-lg px-2 py-1 text-white/90 transition hover:bg-white/10"
+                      aria-label="Previous month"
                     >
-                      <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-0">
-                        <div className="flex h-[100px] w-[100px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
-                          <Image
-                            src={appt.platform === "zoom" ? MeetIcon : DuoIcon}
-                            alt={appt.platform}
-                            className="h-[52px] w-[52px]"
-                          />
-                        </div>
-                      </div>
+                      ◀
+                    </button>
 
-                      <div className="min-w-0 flex-1 px-0 pt-4 sm:px-5 sm:pt-0">
-                        <div className="mb-2 flex items-center gap-3">
-                          <Image
-                            src={appt.user?.profilePicture || UserProfile}
-                            alt="User"
-                            width={36}
-                            height={36}
-                            className="rounded-full border border-white/20"
-                          />
-
-                          <div>
-                            <h4 className="text-sm font-semibold text-white">
-                              {appt.user?.firstName} {appt.user?.lastName}
-                            </h4>
-
-                            <p className="text-[12px] text-[#cde2f2]/90">Pastor</p>
-                          </div>
-                        </div>
-
-                        <div className="mb-2 flex flex-wrap gap-2">
-                          <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-medium text-[#d9ebf8]">
-                            <i className="fa-regular fa-calendar text-[#8ec5eb]" />
-                            {meetingDate.toLocaleDateString()}
-                          </div>
-
-                          <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-medium text-[#d9ebf8]">
-                            <i className="fa-regular fa-clock text-[#8ec5eb]" />
-                            {meetingDate.toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </div>
-                        </div>
-
-                        <p className="mb-2 text-[12px] text-[#cde2f2]">
-                          Mode:{" "}
-                          <span className="font-semibold text-[#8ec5eb]">{appt.platform}</span>
-                        </p>
-
-                        <div className="flex items-center justify-between">
-                          <div className="flex gap-3 text-[15px] text-[#8ec5eb]">
-                            <i className="fa-solid fa-phone cursor-pointer transition hover:text-white" />
-                            <i className="fa-regular fa-comment cursor-pointer transition hover:text-white" />
-                            <i className="fa-brands fa-whatsapp cursor-pointer transition hover:text-white" />
-                          </div>
-
-                          <div className="relative">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setShowMenu(showMenu === index ? null : index)
-                              }
-                              className="rounded-lg px-3 py-1 text-[#8ec5eb] transition hover:bg-white/10 hover:text-white"
-                              aria-label="Appointment actions"
-                            >
-                              <i className="fa-solid fa-ellipsis-vertical" />
-                            </button>
-
-                            {showMenu === index && (
-                              <div className="absolute right-0 top-9 z-10 w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
-                                <button
-                                  type="button"
-                                  className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
-                                  onClick={() => {
-                                    setShowMenu(null);
-                                    setToastMessage(
-                                      "Use pastor’s calendar or reschedule from their account when supported."
-                                    );
-                                    setTimeout(() => setToastMessage(null), 4000);
-                                  }}
-                                >
-                                  <i className="fa-regular fa-calendar-check mr-2 text-[#8ec5eb]" />
-                                  Reschedule meeting
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
-                                  onClick={() => handleCancelMentorAppointment(appt)}
-                                >
-                                  <i className="fa-regular fa-circle-xmark mr-2 text-red-300" />
-                                  Cancel meeting
-                                </button>
-
-                                <button
-                                  type="button"
-                                  className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
-                                  onClick={() => {
-                                    setShowMenu(null);
-                                    setToastMessage(
-                                      "Open appointment details on web admin or ask pastor to change platform."
-                                    );
-                                    setTimeout(() => setToastMessage(null), 4000);
-                                  }}
-                                >
-                                  <i className="fa-regular fa-clock mr-2 text-[#cde2f2]" />
-                                  Change meeting mode
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {mentorId && !loading && activeTab === "Availability" && (
-          <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
-            <div className={`${mentorGlassCardFrost} p-5 text-white sm:p-6`}>
-              <h3 className="mb-5 text-[15px] font-medium">My weekly availability</h3>
-              <div className="mb-6 rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-5 text-center shadow-inner">
-                <p className="mb-2 text-sm text-[#cde2f2]">
-                  {weekDates.length
-                    ? weekDates[0].toLocaleDateString("default", {
+                    <p className="text-sm font-medium text-white/90">
+                      {currentDate.toLocaleString("default", {
                         month: "long",
                         year: "numeric",
-                      })
-                    : "—"}
-                </p>
-                <div className="grid grid-cols-7 gap-2 text-[13px]">
-                  {weekDates.map((date) => {
-                    const day = date.toLocaleDateString("default", { weekday: "short" });
-
-                    return (
-                      <div
-                        key={date.toISOString()}
-                        className="cursor-pointer rounded-md py-2 text-center text-[#d9ebf8] transition hover:bg-white/10"
-                      >
-                        <div>{day}</div>
-                        <div className="text-xs text-white/80">{date.getDate()}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <select className={mentorSelectDark}>
-                  <option className="bg-[#062946]">60 Minutes</option>
-                  <option className="bg-[#062946]">30 Minutes</option>
-                </select>
-                <select className={mentorSelectDark}>
-                  <option className="bg-[#062946]">5</option>
-                  <option className="bg-[#062946]">10</option>
-                </select>
-                <select className={mentorSelectDark}>
-                  <option className="bg-[#062946]">2 Days</option>
-                  <option className="bg-[#062946]">1 Day</option>
-                </select>
-                <select className={mentorSelectDark}>
-                  <option className="bg-[#062946]">Zoom</option>
-                  <option className="bg-[#062946]">Google Meet</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="text-white">
-              <h3 className="mb-3 text-[15px] font-medium">Available hours</h3>
-              {[
-                { label: "Sunday", index: 0 },
-                { label: "Monday", index: 1 },
-                { label: "Tuesday", index: 2 },
-                { label: "Wednesday", index: 3 },
-                { label: "Thursday", index: 4 },
-                { label: "Friday", index: 5 },
-                { label: "Saturday", index: 6 }
-              ].map((dayObj) => {
-
-                const dayData = availability.find((d) => d.day === dayObj.index);
-                const slots = dayData?.slots || [];
-
-                return (
-                  <div
-                    key={dayObj.label}
-                    className="flex items-center gap-3 mb-3 border-b border-white/20 pb-2"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={availability.find(d => d.day === dayObj.index)?.enabled || false}
-                      onChange={() => {
-                        setAvailability(prev =>
-                          prev.map(d =>
-                            d.day === dayObj.index
-                              ? { ...d, enabled: !d.enabled }
-                              : d
-                          )
-                        );
-                      }}
-                      className="accent-[#8ec5eb]"
-                    />
-
-                    <p className="w-[100px] text-[#d9ebf8]">{dayObj.label}</p>
-
-                    {slots.map((slot, slotIndex) => (
-                      <div key={slotIndex} className="flex gap-3">
-
-                        <select
-                          className={`${mentorSelectDark} max-w-[140px] px-2 py-1.5 text-xs`}
-                          value={`${slot.startTime}-${slot.startPeriod}`}
-                          onChange={(e) => {
-                            const [time, period] = e.target.value.split("-");
-
-                            setAvailability(prev =>
-                              prev.map(d =>
-                                d.day === dayObj.index
-                                  ? {
-                                    ...d,
-                                    slots: d.slots.map((s, i) =>
-                                      i === slotIndex
-                                        ? { ...s, startTime: time, startPeriod: period }
-                                        : s
-                                    )
-                                  }
-                                  : d
-                              )
-                            );
-                          }}
-                        >
-                          {timeOptions.map(t => (
-                            <option key={`${t.time}-${t.period}`} value={`${t.time}-${t.period}`}>
-                              {t.label}
-                            </option>
-                          ))}
-                        </select>
-
-                        <span className="text-[#cde2f2]">to</span>
-
-                        <select
-                          className={`${mentorSelectDark} max-w-[140px] px-2 py-1.5 text-xs`}
-                          value={`${slot.endTime}-${slot.endPeriod}`}
-                          onChange={(e) => {
-                            const [time, period] = e.target.value.split("-");
-
-                            setAvailability(prev =>
-                              prev.map(d =>
-                                d.day === dayObj.index
-                                  ? {
-                                    ...d,
-                                    slots: d.slots.map((s, i) =>
-                                      i === slotIndex
-                                        ? { ...s, endTime: time, endPeriod: period }
-                                        : s
-                                    )
-                                  }
-                                  : d
-                              )
-                            );
-                          }}
-                        >
-                          {timeOptions.map(t => (
-                            <option key={`${t.time}-${t.period}`} value={`${t.time}-${t.period}`}>
-                              {t.label}
-                            </option>
-                          ))}
-                        </select>
-
-                      </div>
-                    ))}
+                      })}
+                    </p>
 
                     <button
                       type="button"
-                      className={`${mentorSecondaryCta} ml-2 px-3 py-1.5 text-xs`}
-                      onClick={() => {
-                        const lastSlot = slots[slots.length - 1];
-
-                        const start = convertToMinutes(lastSlot.endTime, lastSlot.endPeriod);
-                        const end = start + 60;
-
-                        if (end > 24 * 60) {
-                          setToastMessage("Cannot add more slots in this day");
-                          setTimeout(() => setToastMessage(null), 3000);
-                          return;
-                        }
-
-                        const newSlot = {
-                          startTime: "09:00",
-                          startPeriod: "AM",
-                          endTime: "10:00",
-                          endPeriod: "AM",
-                        };
-
-                        setAvailability((prev) =>
-                          prev.map((d) =>
-                            d.day === dayObj.index
-                              ? {
-                                ...d,
-                                slots: [...d.slots, newSlot],
-                              }
-                              : d
-                          )
-                        );
-                      }}
+                      onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
+                      className="rounded-lg px-2 py-1 text-white/90 transition hover:bg-white/10"
+                      aria-label="Next month"
                     >
-                      + Add
+                      ▶
                     </button>
                   </div>
-                );
-              })}
 
-              <div className="mt-6">
-                <button
-                  type="button"
-                  onClick={handleSaveAvailability}
-                  className={mentorPrimaryCta}
-                >
-                  Save availability
-                </button>
+                  <div className="mb-2 grid grid-cols-7 gap-2 text-[13px]">
+                    {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+                      <div key={`${d}-${i}`} className="font-medium text-[#cde2f2]/80">
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-2 text-[13px]">
+                    {calendarDays.map((day, index) => {
+                      if (!day) return <div key={index} />;
+
+                      const d = new Date(year, month, day);
+
+                      const dateStr = `${d.getFullYear()}-${String(
+                        d.getMonth() + 1
+                      ).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+                      const hasAppointment = appointmentDates.includes(dateStr);
+
+                      const isToday =
+                        day === new Date().getDate() &&
+                        month === new Date().getMonth() &&
+                        year === new Date().getFullYear();
+
+                      return (
+                        <div
+                          key={index}
+                          className={`cursor-pointer rounded-md py-1 transition ${isToday
+                            ? "bg-[#8ec5eb]/35 font-semibold text-white ring-1 ring-[#8ec5eb]/50"
+                            : "text-[#d9ebf8] hover:bg-white/10"
+                            } ${hasAppointment ? "ring-1 ring-amber-300/60" : ""}`}
+                        >
+                          {day}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="mb-4 text-[15px] font-semibold text-white">
+                  Today — {todayAppointments.length} appointment
+                  {todayAppointments.length === 1 ? "" : "s"}
+                </h3>
+
+                <div className="flex flex-col gap-5">
+                  {todayAppointments.length === 0 ? (
+                    <div className={mentorEmptyPanel}>
+                      <p className={mentorBodyText}>No meetings scheduled for today.</p>
+                    </div>
+                  ) : null}
+                  {todayAppointments.map((appt, index) => {
+                    const meetingDate = new Date(appt.meetingDate);
+                    const apptKey = appointmentEntityId(appt) || String(index);
+
+                    return (
+                      <div
+                        key={apptKey}
+                        className={`${mentorGlassCardRoadmap} relative items-stretch gap-0 p-4 sm:items-center sm:p-5`}
+                      >
+                        <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-0">
+                          <div className="flex h-[100px] w-[100px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
+                            <Image
+                              src={appt.platform === "zoom" ? MeetIcon : DuoIcon}
+                              alt={appt.platform}
+                              className="h-[52px] w-[52px]"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="min-w-0 flex-1 px-0 pt-4 sm:px-5 sm:pt-0">
+                          <div className="mb-2 flex items-center gap-3">
+                            <Image
+                              src={appt.user?.profilePicture || UserProfile}
+                              alt="User"
+                              width={36}
+                              height={36}
+                              className="rounded-full border border-white/20"
+                            />
+
+                            <div>
+                              <h4 className="text-sm font-semibold text-white">
+                                {appt.user?.firstName} {appt.user?.lastName}
+                              </h4>
+
+                              <p className="text-[12px] text-[#cde2f2]/90">Pastor</p>
+                            </div>
+                          </div>
+
+                          <div className="mb-2 flex flex-wrap gap-2">
+                            <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-medium text-[#d9ebf8]">
+                              <i className="fa-regular fa-calendar text-[#8ec5eb]" />
+                              {meetingDate.toLocaleDateString()}
+                            </div>
+
+                            <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-medium text-[#d9ebf8]">
+                              <i className="fa-regular fa-clock text-[#8ec5eb]" />
+                              {meetingDate.toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </div>
+                          </div>
+
+                          <p className="mb-2 text-[12px] text-[#cde2f2]">
+                            Mode:{" "}
+                            <span className="font-semibold text-[#8ec5eb]">{appt.platform}</span>
+                          </p>
+
+                          <div className="flex items-center justify-between">
+                            <div className="flex gap-3 text-[15px] text-[#8ec5eb]">
+                              <i className="fa-solid fa-phone cursor-pointer transition hover:text-white" />
+                              <i className="fa-regular fa-comment cursor-pointer transition hover:text-white" />
+                              <i className="fa-brands fa-whatsapp cursor-pointer transition hover:text-white" />
+                            </div>
+
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setShowMenu(showMenu === index ? null : index)
+                                }
+                                className="rounded-lg px-3 py-1 text-[#8ec5eb] transition hover:bg-white/10 hover:text-white"
+                                aria-label="Appointment actions"
+                              >
+                                <i className="fa-solid fa-ellipsis-vertical" />
+                              </button>
+
+                              {showMenu === index && (
+                                <div className="absolute right-0 top-9 z-10 w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                                  <button
+                                    type="button"
+                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                                    onClick={() => {
+                                      setShowMenu(null);
+                                      setToastMessage(
+                                        "Use pastor’s calendar or reschedule from their account when supported."
+                                      );
+                                      setTimeout(() => setToastMessage(null), 4000);
+                                    }}
+                                  >
+                                    <i className="fa-regular fa-calendar-check mr-2 text-[#8ec5eb]" />
+                                    Reschedule meeting
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                                    onClick={() => handleCancelMentorAppointment(appt)}
+                                  >
+                                    <i className="fa-regular fa-circle-xmark mr-2 text-red-300" />
+                                    Cancel meeting
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                                    onClick={() => {
+                                      setShowMenu(null);
+                                      setToastMessage(
+                                        "Open appointment details on web admin or ask pastor to change platform."
+                                      );
+                                      setTimeout(() => setToastMessage(null), 4000);
+                                    }}
+                                  >
+                                    <i className="fa-regular fa-clock mr-2 text-[#cde2f2]" />
+                                    Change meeting mode
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {mentorId && !loading && activeTab === "Schedule" && !isDrawerOpen && (
-          <div className={mentorEmptyPanel}>
-            <p className={`${mentorBodyText} mb-4`}>
-              Open the panel on the right to pick an assigned pastor and choose a time — or tap{" "}
-              <span className="font-semibold text-white">Schedule</span> in the tabs above.
-            </p>
-            <button
-              type="button"
-              className={mentorPrimaryCta}
-              onClick={() => {
-                setDrawerStep(1);
-                setIsDrawerOpen(true);
-              }}
-            >
-              New meeting
-            </button>
-          </div>
-        )}
+          {mentorId && !loading && activeTab === "Availability" && (
+            <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
+              <div className={`${mentorGlassCardFrost} p-5 text-white sm:p-6`}>
+                <h3 className="mb-5 text-[15px] font-medium">My weekly availability</h3>
+                <div className="mb-6 rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-5 text-center shadow-inner">
+                  <p className="mb-2 text-sm text-[#cde2f2]">
+                    {weekDates.length
+                      ? weekDates[0].toLocaleDateString("default", {
+                        month: "long",
+                        year: "numeric",
+                      })
+                      : "—"}
+                  </p>
+                  <div className="grid grid-cols-7 gap-2 text-[13px]">
+                    {weekDates.map((date) => {
+                      const day = date.toLocaleDateString("default", { weekday: "short" });
+
+                      return (
+                        <div
+                          key={date.toISOString()}
+                          className="cursor-pointer rounded-md py-2 text-center text-[#d9ebf8] transition hover:bg-white/10"
+                        >
+                          <div>{day}</div>
+                          <div className="text-xs text-white/80">{date.getDate()}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <select className={mentorSelectDark}>
+                    <option className="bg-[#062946]">60 Minutes</option>
+                    <option className="bg-[#062946]">30 Minutes</option>
+                  </select>
+                  <select className={mentorSelectDark}>
+                    <option className="bg-[#062946]">5</option>
+                    <option className="bg-[#062946]">10</option>
+                  </select>
+                  <select className={mentorSelectDark}>
+                    <option className="bg-[#062946]">2 Days</option>
+                    <option className="bg-[#062946]">1 Day</option>
+                  </select>
+                  <select className={mentorSelectDark}>
+                    <option className="bg-[#062946]">Zoom</option>
+                    <option className="bg-[#062946]">Google Meet</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="text-white">
+                <h3 className="mb-3 text-[15px] font-medium">Available hours</h3>
+                {[
+                  { label: "Sunday", index: 0 },
+                  { label: "Monday", index: 1 },
+                  { label: "Tuesday", index: 2 },
+                  { label: "Wednesday", index: 3 },
+                  { label: "Thursday", index: 4 },
+                  { label: "Friday", index: 5 },
+                  { label: "Saturday", index: 6 }
+                ].map((dayObj) => {
+
+                  const dayData = availability.find((d) => d.day === dayObj.index);
+                  const slots = dayData?.slots || [];
+
+                  return (
+                    <div
+                      key={dayObj.label}
+                      className="flex items-center gap-3 mb-3 border-b border-white/20 pb-2"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={availability.find(d => d.day === dayObj.index)?.enabled || false}
+                        onChange={() => {
+                          setAvailability(prev =>
+                            prev.map(d =>
+                              d.day === dayObj.index
+                                ? { ...d, enabled: !d.enabled }
+                                : d
+                            )
+                          );
+                        }}
+                        className="accent-[#8ec5eb]"
+                      />
+
+                      <p className="w-[100px] text-[#d9ebf8]">{dayObj.label}</p>
+
+                      {slots.map((slot, slotIndex) => (
+                        <div key={slotIndex} className="flex gap-3">
+
+                          <select
+                            className={`${mentorSelectDark} max-w-[140px] px-2 py-1.5 text-xs`}
+                            value={`${slot.startTime}-${slot.startPeriod}`}
+                            onChange={(e) => {
+                              const [time, period] = e.target.value.split("-");
+
+                              setAvailability(prev =>
+                                prev.map(d =>
+                                  d.day === dayObj.index
+                                    ? {
+                                      ...d,
+                                      slots: d.slots.map((s, i) =>
+                                        i === slotIndex
+                                          ? { ...s, startTime: time, startPeriod: period }
+                                          : s
+                                      )
+                                    }
+                                    : d
+                                )
+                              );
+                            }}
+                          >
+                            {timeOptions.map(t => (
+                              <option key={`${t.time}-${t.period}`} value={`${t.time}-${t.period}`}>
+                                {t.label}
+                              </option>
+                            ))}
+                          </select>
+
+                          <span className="text-[#cde2f2]">to</span>
+
+                          <select
+                            className={`${mentorSelectDark} max-w-[140px] px-2 py-1.5 text-xs`}
+                            value={`${slot.endTime}-${slot.endPeriod}`}
+                            onChange={(e) => {
+                              const [time, period] = e.target.value.split("-");
+
+                              setAvailability(prev =>
+                                prev.map(d =>
+                                  d.day === dayObj.index
+                                    ? {
+                                      ...d,
+                                      slots: d.slots.map((s, i) =>
+                                        i === slotIndex
+                                          ? { ...s, endTime: time, endPeriod: period }
+                                          : s
+                                      )
+                                    }
+                                    : d
+                                )
+                              );
+                            }}
+                          >
+                            {timeOptions.map(t => (
+                              <option key={`${t.time}-${t.period}`} value={`${t.time}-${t.period}`}>
+                                {t.label}
+                              </option>
+                            ))}
+                          </select>
+
+                        </div>
+                      ))}
+
+                      <button
+                        type="button"
+                        className={`${mentorSecondaryCta} ml-2 px-3 py-1.5 text-xs`}
+                        onClick={() => {
+                          const lastSlot = slots[slots.length - 1];
+
+                          const start = convertToMinutes(lastSlot.endTime, lastSlot.endPeriod);
+                          const end = start + 60;
+
+                          if (end > 24 * 60) {
+                            setToastMessage("Cannot add more slots in this day");
+                            setTimeout(() => setToastMessage(null), 3000);
+                            return;
+                          }
+
+                          const newSlot = {
+                            startTime: "09:00",
+                            startPeriod: "AM",
+                            endTime: "10:00",
+                            endPeriod: "AM",
+                          };
+
+                          setAvailability((prev) =>
+                            prev.map((d) =>
+                              d.day === dayObj.index
+                                ? {
+                                  ...d,
+                                  slots: [...d.slots, newSlot],
+                                }
+                                : d
+                            )
+                          );
+                        }}
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  );
+                })}
+
+                <div className="mt-6">
+                  <button
+                    type="button"
+                    onClick={handleSaveAvailability}
+                    className={mentorPrimaryCta}
+                  >
+                    Save availability
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {mentorId && !loading && activeTab === "Schedule" && !isDrawerOpen && (
+            <div className={mentorEmptyPanel}>
+              <p className={`${mentorBodyText} mb-4`}>
+                Open the panel on the right to pick an assigned pastor and choose a time — or tap{" "}
+                <span className="font-semibold text-white">Schedule</span> in the tabs above.
+              </p>
+              <button
+                type="button"
+                className={mentorPrimaryCta}
+                onClick={() => {
+                  setDrawerStep(1);
+                  setIsDrawerOpen(true);
+                }}
+              >
+                New meeting
+              </button>
+            </div>
+          )}
         </div>
       </main>
 
@@ -1052,11 +1051,10 @@ function MentorScheduleContent() {
                         type="button"
                         key={pastorId}
                         onClick={() => setSelectedPastor(pastor)}
-                        className={`flex w-full items-center justify-between gap-4 rounded-xl border px-4 py-3 text-left transition ${
-                          isSelected
-                            ? "border-[#8ec5eb]/45 bg-[#8ec5eb]/15"
-                            : "border-white/15 bg-white/5 hover:border-white/25 hover:bg-white/10"
-                        }`}
+                        className={`flex w-full items-center justify-between gap-4 rounded-xl border px-4 py-3 text-left transition ${isSelected
+                          ? "border-[#8ec5eb]/45 bg-[#8ec5eb]/15"
+                          : "border-white/15 bg-white/5 hover:border-white/25 hover:bg-white/10"
+                          }`}
                       >
                         <div className="flex min-w-0 items-center gap-3">
                           <Image
@@ -1145,11 +1143,10 @@ function MentorScheduleContent() {
                       key={label}
                       type="button"
                       onClick={() => setSelectedSlot(label)}
-                      className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition ${
-                        selectedSlot === label
-                          ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20 text-white ring-1 ring-[#8ec5eb]/40"
-                          : "border-white/20 bg-white/5 text-[#cde2f2] hover:border-white/30 hover:bg-white/10"
-                      }`}
+                      className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition ${selectedSlot === label
+                        ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20 text-white ring-1 ring-[#8ec5eb]/40"
+                        : "border-white/20 bg-white/5 text-[#cde2f2] hover:border-white/30 hover:bg-white/10"
+                        }`}
                     >
                       {label}
                     </button>
