@@ -603,20 +603,34 @@ export default function PastorDashboard() {
               </div>
               <p className="text-sm text-[#cde2f2]">Sessions, notes, progress, and roadmap.</p>
               <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {pastorQuickLinks.map((q) => (
-                  <Link
-                    key={q.href}
-                    href={q.href}
-                    prefetch
-                    className={`flex flex-col items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 py-6 text-center transition hover:bg-white/10 sm:gap-3 sm:py-8 ${innerTileHover}`}
-                  >
-                    <i className={`${q.icon} text-xl text-[#8ec5eb] sm:text-2xl`} aria-hidden />
-                    <span className="text-[11px] font-medium leading-tight text-white/90 sm:text-xs">
-                      <span className="block">{q.line1}</span>
-                      <span className="block">{q.line2}</span>
-                    </span>
-                  </Link>
-                ))}
+                {pastorQuickLinks.map((q) =>
+                  q.href === "/pastor/mentoring-session" ? (
+                    <button
+                      key={q.href}
+                      type="button"
+                      className={`flex flex-col items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 py-6 text-center transition hover:bg-white/10 sm:gap-3 sm:py-8 ${innerTileHover}`}
+                    >
+                      <i className={`${q.icon} text-xl text-[#8ec5eb] sm:text-2xl`} aria-hidden />
+                      <span className="text-[11px] font-medium leading-tight text-white/90 sm:text-xs">
+                        <span className="block">{q.line1}</span>
+                        <span className="block">{q.line2}</span>
+                      </span>
+                    </button>
+                  ) : (
+                    <Link
+                      key={q.href}
+                      href={q.href}
+                      prefetch
+                      className={`flex flex-col items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 py-6 text-center transition hover:bg-white/10 sm:gap-3 sm:py-8 ${innerTileHover}`}
+                    >
+                      <i className={`${q.icon} text-xl text-[#8ec5eb] sm:text-2xl`} aria-hidden />
+                      <span className="text-[11px] font-medium leading-tight text-white/90 sm:text-xs">
+                        <span className="block">{q.line1}</span>
+                        <span className="block">{q.line2}</span>
+                      </span>
+                    </Link>
+                  ),
+                )}
               </div>
             </div>
           </section>
