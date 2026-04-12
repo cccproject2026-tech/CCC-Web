@@ -22,6 +22,12 @@ import {
 } from "@/app/Services/assessment.service";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { pastorMainGradient, pastorPageRoot } from "@/app/Components/pastor/pastor-theme";
+import DashboardFocusModal from "@/app/Components/dashboard/DashboardFocusModal";
+import {
+  loadPastorFocusSections,
+  type PastorFocusInput,
+} from "@/app/utils/dashboard-focus/pastor-focus";
+import type { DashboardFocusSection } from "@/app/utils/dashboard-focus/types";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 type Mentor = {
@@ -33,15 +39,8 @@ type Mentor = {
   role: string;
 };
 
-/**
- * Dashboard “Things to Focus On” — each href loads a page that fetches its own data:
- * - Appointments → pastor schedule APIs
- * - My Mentors → assigned mentors
- * - Assessments → assigned assessments list
- */
+/** Help row — same destinations as before (web has no separate “contact-information” route). */
 const FOCUS_HREF = {
-  todayAppointments: "/pastor/Appointments",
-  otherAppointments: "/pastor/Appointments",
   myMentors: "/pastor/Mymentors",
   assessments: "/pastor/Assessments?tab=Due",
 } as const;
@@ -62,16 +61,6 @@ function readPastorUserId(): string | null {
   }
 }
 
-const isToday = (dateString: string) => {
-  const today = new Date();
-  const date = new Date(dateString);
-  return (
-    date.getDate() === today.getDate() &&
-    date.getMonth() === today.getMonth() &&
-    date.getFullYear() === today.getFullYear()
-  );
-};
-
 function appointmentMeetingDate(a: unknown): string {
   if (!a || typeof a !== "object") return "";
   const o = a as Record<string, unknown>;
@@ -88,7 +77,6 @@ export default function PastorDashboard() {
   const [loadingMentors, setLoadingMentors] = useState(false);
   const [mentorsError, setMentorsError] = useState<string | null>(null);
   const [appointments, setAppointments] = useState<any[]>([]);
-  const [activeAssessmentCount, setActiveAssessmentCount] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchMentors = async () => {
@@ -172,11 +160,69 @@ export default function PastorDashboard() {
   }, []);
 
   const [roadmaps, setRoadmaps] = useState<any[]>([]);
+  const [roadmapsFull, setRoadmapsFull] = useState<any[]>([]);
   const [overallProgress, setOverallProgress] = useState<number | null>(null);
+  const [pastorFocusSections, setPastorFocusSections] = useState<DashboardFocusSection[]>([]);
+  const [pastorFocusLoading, setPastorFocusLoading] = useState(false);
+  const [pastorAssessmentRows, setPastorAssessmentRows] = useState<PastorFocusInput["assessments"]>([]);
+  const [focusModalOpen, setFocusModalOpen] = useState(false);
+  const [focusModalSectionId, setFocusModalSectionId] = useState<string | null>(null);
+  const [focusModalTitle, setFocusModalTitle] = useState<string | undefined>(undefined);
+
+  const mentorNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const x of mentors) {
+      m.set(x.id, `${x.firstName} ${x.lastName}`.trim());
+    }
+    return m;
+  }, [mentors]);
+
+  const focusTiles = useMemo(
+    () =>
+      [
+        {
+          icon: "fa-regular fa-calendar-check",
+          line1: "Today's",
+          line2: "Meetings",
+          sheetTitle: "Today's Meetings",
+          sectionId: "meetings",
+        },
+        {
+          icon: "fa-solid fa-layer-group",
+          line1: "In Progress",
+          line2: "Roadmaps",
+          sheetTitle: "Roadmap Phases",
+          sectionId: "roadmaps",
+        },
+        {
+          icon: "fa-regular fa-file-lines",
+          line1: "In Progress",
+          line2: "Assessments",
+          sheetTitle: "In Progress Assessments",
+          sectionId: "assessments",
+        },
+        {
+          icon: "fa-regular fa-comments",
+          line1: "Mentor",
+          line2: "Comments",
+          sheetTitle: "Mentor Comments",
+          sectionId: "mentor-feedback",
+        },
+      ] as const,
+    [],
+  );
+
+  const displayedPastorFocusSections = useMemo(() => {
+    if (!focusModalSectionId) return pastorFocusSections;
+    if (focusModalSectionId === "meetings") {
+      return pastorFocusSections.filter((s) => s.id === "meetings" || s.id === "meetings-month");
+    }
+    return pastorFocusSections.filter((s) => s.id === focusModalSectionId);
+  }, [focusModalSectionId, pastorFocusSections]);
 
   const refreshAssessmentCount = useCallback(async () => {
     if (!pastorUserId) {
-      setActiveAssessmentCount(null);
+      setPastorAssessmentRows([]);
       return;
     }
     try {
@@ -188,7 +234,7 @@ export default function PastorDashboard() {
       const progressData = unwrapProgressData(progressRes);
       const assessmentProgress = progressData?.assessments || [];
 
-      let active = 0;
+      const rows: PastorFocusInput["assessments"] = [];
       for (const item of list) {
         const flat = flattenAssignedAssessmentRow(item);
         if (!flat) continue;
@@ -210,11 +256,17 @@ export default function PastorDashboard() {
           ps === "due"
         )
           status = "Due";
-        if (status === "Due" || status === "Not Started") active++;
+        rows.push({
+          id: aid,
+          title: String(flat.assessment.name ?? flat.assessment.title ?? "Assessment"),
+          description: String(flat.assessment.description ?? ""),
+          dueDate: flat.dueDate,
+          status,
+        });
       }
-      setActiveAssessmentCount(active);
+      setPastorAssessmentRows(rows);
     } catch {
-      setActiveAssessmentCount(null);
+      setPastorAssessmentRows([]);
     }
   }, [pastorUserId]);
 
@@ -223,6 +275,7 @@ export default function PastorDashboard() {
     try {
       const res = await apiGetRoadmapsByUser(pastorUserId);
       const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
+      setRoadmapsFull(Array.isArray(data) ? data : []);
       const mapped = data.map((item: any) => ({
         id: item._id,
         title: item.name,
@@ -284,63 +337,39 @@ export default function PastorDashboard() {
     };
   }, [pastorUserId, refreshRoadmapsAndProgress, refreshAssessmentCount]);
 
-  const todaysAppointments = useMemo(
-    () =>
-      appointments.filter((a) => {
-        const d = appointmentMeetingDate(a);
-        return d && !Number.isNaN(Date.parse(d)) && isToday(d);
-      }),
-    [appointments],
-  );
+  useEffect(() => {
+    if (!pastorUserId) {
+      setPastorFocusSections([]);
+      return;
+    }
+    let cancelled = false;
+    setPastorFocusLoading(true);
+    void loadPastorFocusSections({
+      pastorUserId,
+      appointments,
+      mentorNameById,
+      roadmaps: roadmapsFull as PastorFocusInput["roadmaps"],
+      assessments: pastorAssessmentRows,
+    })
+      .then((sections) => {
+        if (!cancelled) setPastorFocusSections(sections);
+      })
+      .catch(() => {
+        if (!cancelled) setPastorFocusSections([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPastorFocusLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pastorUserId, appointments, mentorNameById, roadmapsFull, pastorAssessmentRows]);
 
-  const otherUpcomingCount = useMemo(() => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    return appointments.filter((a) => {
-      const raw = appointmentMeetingDate(a);
-      if (!raw || Number.isNaN(Date.parse(raw))) return false;
-      const d = new Date(raw);
-      return !isToday(raw) && d >= start;
-    }).length;
-  }, [appointments]);
-
-  const focusItems = useMemo(
-    () => [
-      {
-        label: "Today's Meetings",
-        shortLabel: "Today",
-        icon: "fa-regular fa-calendar-check",
-        href: FOCUS_HREF.todayAppointments,
-        count: todaysAppointments.length,
-        ariaLabel: "Open appointments — today's meetings",
-      },
-      {
-        label: "Other Upcoming Meetings",
-        shortLabel: "Upcoming",
-        icon: "fa-solid fa-layer-group",
-        href: FOCUS_HREF.otherAppointments,
-        count: otherUpcomingCount,
-        ariaLabel: "Open appointments — upcoming schedule",
-      },
-      {
-        label: "My Mentors",
-        shortLabel: "Mentors",
-        icon: "fa-regular fa-comments",
-        href: FOCUS_HREF.myMentors,
-        count: mentors.length,
-        ariaLabel: "Open my mentors — assigned mentors",
-      },
-      {
-        label: "Open Assessments",
-        shortLabel: "Assessments",
-        icon: "fa-regular fa-file-lines",
-        href: FOCUS_HREF.assessments,
-        count: activeAssessmentCount,
-        ariaLabel: "Open assessments — due and open items",
-      },
-    ],
-    [todaysAppointments.length, otherUpcomingCount, mentors.length, activeAssessmentCount],
-  );
+  const openThingsToFocusModal = useCallback((opts?: { sectionId?: string; title?: string }) => {
+    setFocusModalSectionId(opts?.sectionId ?? null);
+    setFocusModalTitle(opts?.title);
+    setFocusModalOpen(true);
+  }, []);
 
   const [currentTime, setCurrentTime] = useState("");
 
@@ -452,27 +481,7 @@ export default function PastorDashboard() {
 
       <main className={pastorMainGradient}>
         <div className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-6 sm:px-8 lg:px-20">
-          <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible">
-            {focusItems.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                aria-label={item.ariaLabel}
-                prefetch
-                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-left text-xs font-medium text-white/90 backdrop-blur-sm transition hover:border-[#8ec5eb]/40 hover:bg-white/10 sm:text-sm"
-              >
-                <span className="hidden sm:inline">{item.label}</span>
-                <span className="sm:hidden">{item.shortLabel}</span>
-                {item.count != null ? (
-                  <span className="rounded-full bg-[#8ec5eb]/25 px-2 py-0.5 text-[10px] font-bold text-white tabular-nums">
-                    {item.count > 99 ? "99+" : item.count}
-                  </span>
-                ) : null}
-              </Link>
-            ))}
-          </div>
-
-          <section className="mt-8">
+          <section className="mt-2 sm:mt-4">
             <div className={`p-5 sm:p-6 lg:p-8 ${pastorFocusGlass}`}>
               <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10">
@@ -487,26 +496,24 @@ export default function PastorDashboard() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-                {focusItems.map((item) => (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    aria-label={item.ariaLabel}
-                    prefetch
+                {focusTiles.map((tile) => (
+                  <button
+                    key={tile.sectionId}
+                    type="button"
+                    onClick={() =>
+                      openThingsToFocusModal({
+                        sectionId: tile.sectionId,
+                        title: tile.sheetTitle,
+                      })
+                    }
                     className={`flex min-h-[120px] flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-center ${innerTileHover}`}
                   >
-                    <i className={`${item.icon} text-2xl text-[#8ec5eb]`} />
-                    <span className="text-xs font-medium leading-snug text-white/90 sm:text-sm">
-                      {item.label}
+                    <i className={`${tile.icon} text-2xl text-[#8ec5eb]`} />
+                    <span className="text-xs font-medium leading-tight text-white/90 sm:text-sm">
+                      <span className="block">{tile.line1}</span>
+                      <span className="block">{tile.line2}</span>
                     </span>
-                    {item.count != null ? (
-                      <span className="rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-[#8ec5eb]">
-                        {item.count > 99 ? "99+" : item.count}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-white/40">…</span>
-                    )}
-                  </Link>
+                  </button>
                 ))}
               </div>
             </div>
@@ -566,23 +573,47 @@ export default function PastorDashboard() {
                 </div>
                 <h3 className="text-2xl font-semibold">Quick Links</h3>
               </div>
-              <p className="text-sm text-[#cde2f2]">Roadmap, mentors, progress, and notes.</p>
+              <p className="text-sm text-[#cde2f2]">Sessions, notes, progress, and roadmap.</p>
               <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <Link
+                  href="/pastor/mentoring-session"
+                  prefetch
+                  className={`rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10 ${innerTileHover}`}
+                >
+                  <p className="text-sm font-medium leading-snug">
+                    Mentorship
+                    <br />
+                    Sessions
+                  </p>
+                </Link>
+                <Link
+                  href="/pastor/notes"
+                  prefetch
+                  className={`rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10 ${innerTileHover}`}
+                >
+                  <p className="text-sm font-medium leading-snug">
+                    Personal
+                    <br />
+                    Notes
+                  </p>
+                </Link>
+                <Link href="/pastor/Myprogress" prefetch className={`rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10 ${innerTileHover}`}>
+                  <p className="text-sm font-medium leading-snug">
+                    Progress
+                    <br />
+                    Tracker
+                  </p>
+                </Link>
                 <Link
                   href="/pastor/revitalization-roadmap?tab=In%20Progress"
                   prefetch
                   className={`rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10 ${innerTileHover}`}
                 >
-                  <p className="text-sm font-medium">Roadmap Phases</p>
-                </Link>
-                <Link href="/pastor/Mymentors" prefetch className={`rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10 ${innerTileHover}`}>
-                  <p className="text-sm font-medium">My Mentors</p>
-                </Link>
-                <Link href="/pastor/Myprogress" prefetch className={`rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10 ${innerTileHover}`}>
-                  <p className="text-sm font-medium">Progress Tracker</p>
-                </Link>
-                <Link href="/pastor/Assessments" prefetch className={`rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10 ${innerTileHover}`}>
-                  <p className="text-sm font-medium">Assessments</p>
+                  <p className="text-sm font-medium leading-snug">
+                    Roadmap
+                    <br />
+                    Phases
+                  </p>
                 </Link>
               </div>
             </div>
@@ -599,6 +630,26 @@ export default function PastorDashboard() {
           )}
         </div>
       </main>
+
+      <DashboardFocusModal
+        open={focusModalOpen}
+        onClose={() => setFocusModalOpen(false)}
+        title={focusModalTitle}
+        sections={displayedPastorFocusSections}
+        isLoading={pastorFocusLoading && pastorFocusSections.length === 0}
+        footer={
+          focusModalSectionId === "meetings" ? (
+            <Link
+              href="/pastor/Appointments"
+              prefetch
+              onClick={() => setFocusModalOpen(false)}
+              className="block w-full rounded-xl bg-[#8ec5eb] py-3 text-center text-sm font-semibold text-[#062946] transition hover:bg-[#b8ddf5]"
+            >
+              View appointments
+            </Link>
+          ) : undefined
+        }
+      />
     </div>
   );
 }
