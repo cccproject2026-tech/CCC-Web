@@ -48,6 +48,34 @@ const FOCUS_HREF = {
 const innerTileHover =
   "transition-all duration-300 hover:border-white/25 hover:bg-white/[0.08] hover:shadow-[0_12px_48px_rgba(3,24,43,0.45)]";
 
+/** Quick Links — same icon vocabulary as mentor home where routes align. */
+const pastorQuickLinks = [
+  {
+    icon: "fa-regular fa-calendar",
+    line1: "Mentorship",
+    line2: "Sessions",
+    href: "/pastor/mentoring-session",
+  },
+  {
+    icon: "fa-regular fa-file-lines",
+    line1: "Personal",
+    line2: "Notes",
+    href: "/pastor/notes",
+  },
+  {
+    icon: "fa-solid fa-chart-line",
+    line1: "Progress",
+    line2: "Tracker",
+    href: "/pastor/Myprogress",
+  },
+  {
+    icon: "fa-solid fa-layer-group",
+    line1: "Roadmap",
+    line2: "Phases",
+    href: "/pastor/revitalization-roadmap?tab=In%20Progress",
+  },
+] as const;
+
 const pastorFocusGlass =
   "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] backdrop-blur-md";
 
@@ -575,46 +603,20 @@ export default function PastorDashboard() {
               </div>
               <p className="text-sm text-[#cde2f2]">Sessions, notes, progress, and roadmap.</p>
               <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <Link
-                  href="/pastor/mentoring-session"
-                  prefetch
-                  className={`rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10 ${innerTileHover}`}
-                >
-                  <p className="text-sm font-medium leading-snug">
-                    Mentorship
-                    <br />
-                    Sessions
-                  </p>
-                </Link>
-                <Link
-                  href="/pastor/notes"
-                  prefetch
-                  className={`rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10 ${innerTileHover}`}
-                >
-                  <p className="text-sm font-medium leading-snug">
-                    Personal
-                    <br />
-                    Notes
-                  </p>
-                </Link>
-                <Link href="/pastor/Myprogress" prefetch className={`rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10 ${innerTileHover}`}>
-                  <p className="text-sm font-medium leading-snug">
-                    Progress
-                    <br />
-                    Tracker
-                  </p>
-                </Link>
-                <Link
-                  href="/pastor/revitalization-roadmap?tab=In%20Progress"
-                  prefetch
-                  className={`rounded-xl border border-white/15 bg-white/5 p-4 text-left transition hover:bg-white/10 ${innerTileHover}`}
-                >
-                  <p className="text-sm font-medium leading-snug">
-                    Roadmap
-                    <br />
-                    Phases
-                  </p>
-                </Link>
+                {pastorQuickLinks.map((q) => (
+                  <Link
+                    key={q.href}
+                    href={q.href}
+                    prefetch
+                    className={`flex flex-col items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 py-6 text-center transition hover:bg-white/10 sm:gap-3 sm:py-8 ${innerTileHover}`}
+                  >
+                    <i className={`${q.icon} text-xl text-[#8ec5eb] sm:text-2xl`} aria-hidden />
+                    <span className="text-[11px] font-medium leading-tight text-white/90 sm:text-xs">
+                      <span className="block">{q.line1}</span>
+                      <span className="block">{q.line2}</span>
+                    </span>
+                  </Link>
+                ))}
               </div>
             </div>
           </section>
