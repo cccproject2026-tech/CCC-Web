@@ -530,11 +530,11 @@ export default function MentorMentoringSessionPage() {
                                                                             onClick={async () => {
                                                                                 setConfirm({ kind: "complete", session });
                                                                             }}
-                                                                            disabled={session.status === "COMPLETED" || actionLoading[session.appointmentId] !== null}
+                                                                            disabled={session.status === "COMPLETED" || actionLoading[session.appointmentId] != null}
                                                                             className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition border ${session.status === "COMPLETED"
                                                                                 ? "bg-white/5 text-white/40 border-white/10 cursor-not-allowed"
                                                                                 : "bg-green-500/20 text-green-200 border-green-400/30 hover:bg-green-500/25"
-                                                                                } ${actionLoading[session.appointmentId] !== null ? "opacity-60 cursor-not-allowed" : ""}`}
+                                                                                } ${actionLoading[session.appointmentId] != null ? "opacity-60 cursor-not-allowed" : ""}`}
                                                                         >
                                                                             {actionLoading[session.appointmentId] === "complete" ? (
                                                                                 <>
@@ -553,8 +553,8 @@ export default function MentorMentoringSessionPage() {
                                                                             onClick={async () => {
                                                                                 setConfirm({ kind: "redo", session });
                                                                             }}
-                                                                            disabled={actionLoading[session.appointmentId] !== null}
-                                                                            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition border bg-white/5 text-white/80 border-white/15 hover:bg-white/10 ${actionLoading[session.appointmentId] !== null ? "opacity-60 cursor-not-allowed" : ""}`}
+                                                                            disabled={actionLoading[session.appointmentId] != null}
+                                                                            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition border bg-white/5 text-white/80 border-white/15 hover:bg-white/10 ${actionLoading[session.appointmentId] != null ? "opacity-60 cursor-not-allowed" : ""}`}
                                                                         >
                                                                             {actionLoading[session.appointmentId] === "redo" ? (
                                                                                 <>
