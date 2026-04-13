@@ -89,3 +89,28 @@ export const filterSlotsAfter2Hours = (slots: string[], selectedDateISO: string)
         }
     });
 };
+
+export const getDurationLabel = (slot: any) => {
+    const start = convertToMinutes(slot.startTime, slot.startPeriod);
+    const end = convertToMinutes(slot.endTime, slot.endPeriod);
+
+    const diff = end - start;
+    if (diff <= 0) return "";
+
+    const hrs = Math.floor(diff / 60);
+    const mins = diff % 60;
+
+    if (hrs && mins) return `${hrs}h ${mins}m`;
+    if (hrs) return `${hrs} hr`;
+    return `${mins} min`;
+};
+
+export const formatTime = (time: string, period: string) => {
+    const [h, m] = time.split(":");
+    let hour = parseInt(h);
+
+    if (hour > 12) hour -= 12;
+    if (hour === 0) hour = 12;
+
+    return `${hour}:${m} ${period}`;
+};

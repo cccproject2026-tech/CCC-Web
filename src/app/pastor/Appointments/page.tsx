@@ -78,9 +78,9 @@ export default function PastorAppointmentsPage() {
   const [schedulePlatform, setSchedulePlatform] = useState("Zoom");
   const [availableTimesForBooking, setAvailableTimesForBooking] = useState<any[]>([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
-
-
-
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
 
 
@@ -162,9 +162,9 @@ export default function PastorAppointmentsPage() {
         apiGetUserSchedule(userId),
         apiGetAppointments({ userId, futureOnly: true }),
       ]);
-      const data = unwrapAppointmentsAxiosData(fullRes);
+      const data = unwrapAppointmentsAxiosData(scheduleResult.value);
       setAppointments(data);
-      const today = new Date().toLocaleDateString("en-CA");
+      const todayYmd = new Date().toLocaleDateString("en-CA");
       setAppointmentsToday(
         data.filter((a: any) => {
           if (!a?.meetingDate) return false;
@@ -364,25 +364,28 @@ export default function PastorAppointmentsPage() {
     return () => {
       cancelled = true;
     };
-  }, [drawerStep, selectedMentor, currentYear, currentMonth, selectedDate]);
+  }, [drawerStep, selectedMentor, currentYear, currentMonth, selectedDate, availabilityRefreshKey]);
 
   const handleSchedule = async () => {
+    if (isScheduling) return;
     const mid = selectedMentor?.id || selectedMentor?._id;
     if (!mid) {
-      alert("Please select a mentor");
+      setToastMessage("Please select a mentor");
       return;
     }
 
     if (!selectedTime) {
-      alert("Please select a time");
+      setToastMessage("Please select a time");
       return;
     }
 
     const userId = getPastorUserId();
     if (!userId) {
-      alert("Please sign in again.");
+      setToastMessage("Please sign in again.");
       return;
     }
+
+    setIsScheduling(true);
 
     const yyyyMmDd = new Date(currentYear, currentMonth, selectedDate).toLocaleDateString("en-CA");
     const meetingDateISO = parseSlotStartToIso(yyyyMmDd, selectedTime);
@@ -398,13 +401,14 @@ export default function PastorAppointmentsPage() {
     try {
       await apiCreateAppointment(payload);
 
+      setAvailabilityRefreshKey(prev => prev + 1);
       setDrawerOpen(false);
       setShowPopup(true);
       setSelectedTime("");
       await refreshAppointmentLists();
     } catch (error) {
       console.error("Error scheduling appointment:", error);
-      alert("Failed to schedule appointment.");
+      setToastMessage("Failed to schedule appointment.");
     }
   };
   const handleReschedule = async () => {
@@ -412,7 +416,7 @@ export default function PastorAppointmentsPage() {
     const id = appointmentEntityId(appointmentToEdit);
     if (!id) return;
     if (!rescheduleTime) {
-      alert("Please select a time");
+      setToastMessage("Please select a time");
       return;
     }
 
@@ -432,7 +436,7 @@ export default function PastorAppointmentsPage() {
       await refreshAppointmentLists();
     } catch (err) {
       console.error("Reschedule API error:", err);
-      alert("Failed to reschedule appointment");
+      setToastMessage("Failed to reschedule appointment");
     }
   };
 
@@ -534,7 +538,7 @@ export default function PastorAppointmentsPage() {
       await refreshAppointmentLists();
     } catch (err) {
       console.error("Change meeting mode error:", err);
-      alert("Failed to update meeting mode");
+      setToastMessage("Failed to update meeting mode");
     }
   };
 
@@ -574,7 +578,7 @@ export default function PastorAppointmentsPage() {
       setTimeout(() => setShowCancelSuccess(false), 2000);
     } catch (error) {
       console.error("Cancel API error:", error);
-      alert("Failed to cancel appointment");
+      setToastMessage("Failed to cancel appointment");
     }
   };
 
@@ -629,63 +633,221 @@ export default function PastorAppointmentsPage() {
             </button>
           </div>
 
-        {/* CALENDAR + TODAY'S APPOINTMENTS */}
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12">
+          {/* CALENDAR + TODAY'S APPOINTMENTS */}
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12">
 
-          {/* LEFT — MONTHLY CALENDAR */}
-          <div className={`${pastorGlassCard} !flex-col p-4 text-white md:p-6`}>
-            <h3 className="text-sm md:text-[15px] font-medium mb-4 flex items-center gap-2">
-              <i className="fa-regular fa-calendar"></i> Monthly Meeting Calendar
-            </h3>
+            {/* LEFT — MONTHLY CALENDAR */}
+            <div className={`${pastorGlassCard} !flex-col p-4 text-white md:p-6`}>
+              <h3 className="text-sm md:text-[15px] font-medium mb-4 flex items-center gap-2">
+                <i className="fa-regular fa-calendar"></i> Monthly Meeting Calendar
+              </h3>
 
-            {/* Calendar Box */}
-            <div className="rounded-xl border border-white/15 bg-white/10 p-4 text-center backdrop-blur md:p-5">
+              {/* Calendar Box */}
+              <div className="rounded-xl border border-white/15 bg-white/10 p-4 text-center backdrop-blur md:p-5">
 
-              {/* Calendar Header */}
-              <div className="flex justify-between items-center mb-3">
-                <button onClick={handlePrevMonth} className="text-white/70 hover:text-white">
-                  <i className="fa-solid fa-chevron-left"></i>
-                </button>
+                {/* Calendar Header */}
+                <div className="flex justify-between items-center mb-3">
+                  <button onClick={handlePrevMonth} className="text-white/70 hover:text-white">
+                    <i className="fa-solid fa-chevron-left"></i>
+                  </button>
 
-                <p className="text-sm md:text-base font-semibold">
-                  {new Date(currentYear, currentMonth).toLocaleString("en-US", {
-                    month: "long",
-                    year: "numeric",
+                  <p className="text-sm md:text-base font-semibold">
+                    {new Date(currentYear, currentMonth).toLocaleString("en-US", {
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+
+                  <button onClick={handleNextMonth} className="text-white/70 hover:text-white">
+                    <i className="fa-solid fa-chevron-right"></i>
+                  </button>
+                </div>
+
+                {/* Week days */}
+                <div className="grid grid-cols-7 gap-1 md:gap-2 text-xs md:text-[13px] mb-1">
+                  {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+                    <div key={i} className="font-medium text-white/70 py-1">{d}</div>
+                  ))}
+                </div>
+
+                {/* Calendar Dates */}
+                <div className="grid grid-cols-7 gap-1 md:gap-2 text-xs md:text-[14px]">
+                  {Array(getFirstDayOfMonth(currentMonth, currentYear))
+                    .fill(null)
+                    .map((_, i) => (<div key={i}></div>))}
+
+                  {Array.from({ length: getDaysInMonth(currentMonth, currentYear) }).map((_, i) => {
+                    const day = i + 1;
+                    const isSelected = day === selectedDate;
+
+                    return (
+                      <div
+                        key={i}
+                        onClick={() => setSelectedDate(day)}
+                        className={`py-1 rounded-md cursor-pointer transition ${isSelected
+                          ? "bg-[#00B3FF] text-white font-bold"
+                          : "text-white/80 hover:bg-[#00B3FF]/40"
+                          }`}
+                      >
+                        {day}
+                      </div>
+                    );
                   })}
-                </p>
-
-                <button onClick={handleNextMonth} className="text-white/70 hover:text-white">
-                  <i className="fa-solid fa-chevron-right"></i>
-                </button>
+                </div>
               </div>
+            </div>
 
-              {/* Week days */}
-              <div className="grid grid-cols-7 gap-1 md:gap-2 text-xs md:text-[13px] mb-1">
-                {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-                  <div key={i} className="font-medium text-white/70 py-1">{d}</div>
-                ))}
-              </div>
+            {/* RIGHT — TODAY'S APPOINTMENTS */}
+            <div>
+              <h3 className="mb-4 text-sm font-semibold text-white md:text-[15px]">
+                You have {filteredAppointmentsToday.length} appointment
+                {filteredAppointmentsToday.length === 1 ? "" : "s"} today
+              </h3>
 
-              {/* Calendar Dates */}
-              <div className="grid grid-cols-7 gap-1 md:gap-2 text-xs md:text-[14px]">
-                {Array(getFirstDayOfMonth(currentMonth, currentYear))
-                  .fill(null)
-                  .map((_, i) => (<div key={i}></div>))}
+              <div className="flex flex-col gap-4 md:gap-6">
 
-                {Array.from({ length: getDaysInMonth(currentMonth, currentYear) }).map((_, i) => {
-                  const day = i + 1;
-                  const isSelected = day === selectedDate;
+                {filteredAppointmentsToday.length === 0 && (
+                  <p className="text-sm text-[#cde2f2]/90">
+                    {appointmentSearch.trim()
+                      ? "No appointments match your search for today."
+                      : "No appointments today."}
+                  </p>
+                )}
+
+                {filteredAppointmentsToday.map((appt) => {
+                  const mentor = appt.mentor as { profilePicture?: string; firstName?: string; lastName?: string } | undefined;
+                  const icon = getModeIcon(appt.platform);
+
+                  const dateObj = new Date(String(appt.meetingDate ?? ""));
+                  const dateStr = dateObj.toLocaleDateString("en-US", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "2-digit",
+                  });
+
+                  const timeStr = dateObj.toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  });
 
                   return (
                     <div
-                      key={i}
-                      onClick={() => setSelectedDate(day)}
-                      className={`py-1 rounded-md cursor-pointer transition ${isSelected
-                        ? "bg-[#00B3FF] text-white font-bold"
-                        : "text-white/80 hover:bg-[#00B3FF]/40"
-                        }`}
+                      key={appointmentEntityId(appt)}
+                      className={`relative flex flex-col items-start gap-5 p-4 md:flex-row md:items-center md:p-5 ${pastorGlassCard}`}
                     >
-                      {day}
+                      {/* Icon */}
+                      <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl bg-white/90 md:h-[100px] md:w-[100px]">
+                        <Image src={icon} alt="mode" className="w-[45px] md:w-[55px]" />
+                      </div>
+
+                      {/* Details */}
+                      <div className="flex-1">
+
+                        {/* Mentor Row */}
+                        <div className="flex items-center gap-3 mb-2">
+                          <Image
+                            src={mentor?.profilePicture || UserProfile}
+                            width={32}
+                            height={32}
+                            alt="mentor"
+                            className="rounded-full"
+                          />
+                          <div>
+                            <h4 className="text-sm font-semibold text-white">
+                              {mentor?.firstName} {mentor?.lastName}
+                            </h4>
+                            <p className="text-[11px] text-[#cde2f2]">Mentor</p>
+                          </div>
+                        </div>
+
+                        {/* Date/Time */}
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 py-[4px] text-[11px] font-medium text-[#d9ebf8]">
+                            <i className="fa-regular fa-calendar"></i>
+                            Date: {dateStr}
+                          </div>
+
+                          <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 py-[4px] text-[11px] font-medium text-[#d9ebf8]">
+                            <i className="fa-regular fa-clock"></i>
+                            Time: {timeStr}
+                          </div>
+                        </div>
+
+                        {/* Mode */}
+                        <p className="mb-3 text-[11px] text-[#d9ebf8]">
+                          Mode:
+                          <span className="font-semibold text-[#8ec5eb]"> {String(appt.platform ?? "")}</span>
+                        </p>
+
+                        {/* Actions row */}
+                        <div className="flex justify-between items-center">
+
+                          <div className="flex gap-4 text-sm text-[#8ec5eb]">
+                            <i className="fa-solid fa-phone cursor-pointer"></i>
+                            <i className="fa-regular fa-comment cursor-pointer"></i>
+                            <i className="fa-brands fa-whatsapp cursor-pointer"></i>
+                          </div>
+
+                          <button type="button" className={pastorPrimaryCta}>
+                            Details
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* 3 DOT MENU */}
+                      <div className="absolute top-3 right-3">
+                        <button
+                          onClick={() =>
+                            setMenuOpenId(menuOpenId === appointmentEntityId(appt) ? null : appointmentEntityId(appt))
+                          }
+                          className="text-[#d9ebf8] hover:text-white"
+                        >
+                          <i className="fa-solid fa-ellipsis-vertical"></i>
+                        </button>
+
+                        {menuOpenId === appointmentEntityId(appt) && (
+                          <div className="absolute right-0 mt-2 w-48 bg-white shadow-lg rounded-lg text-sm z-50">
+
+                            <button
+                              className="w-full px-4 py-2 flex gap-2 hover:bg-gray-100"
+                              onClick={() => {
+                                setAppointmentToEdit(appt);
+                                setShowReschedule(true);
+                                setMenuOpenId(null);
+                              }}
+                            >
+                              <i className="fa-regular fa-calendar"></i> Reschedule Meeting
+                            </button>
+
+                            <button
+                              className="w-full px-4 py-2 flex items-center gap-2 hover:bg-gray-100"
+                              onClick={() => {
+                                setAppointmentToCancel(appt);
+                                setShowCancelConfirm(true);
+                                setMenuOpenId(null);
+                              }}
+                            >
+                              <i className="fa-regular fa-calendar-xmark"></i>
+                              Cancel Meeting
+                            </button>
+
+                            <button
+                              className="w-full px-4 py-2 flex gap-2 hover:bg-gray-100"
+                              onClick={() => {
+                                setAppointmentToEdit(appt);  // <-- VERY IMPORTANT
+                                setSelectedMode(appt.platform || "zoom");
+                                setShowChangeMode(true);
+                                setMenuOpenId(null);
+                              }}
+                            >
+                              <i className="fa-regular fa-pen-to-square"></i>
+                              Change Meeting Mode
+                            </button>
+
+
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -693,95 +855,134 @@ export default function PastorAppointmentsPage() {
             </div>
           </div>
 
-          {/* RIGHT — TODAY'S APPOINTMENTS */}
-          <div>
-            <h3 className="mb-4 text-sm font-semibold text-white md:text-[15px]">
-              You have {filteredAppointmentsToday.length} appointment
-              {filteredAppointmentsToday.length === 1 ? "" : "s"} today
-            </h3>
+          <section className="mt-10 border-t border-white/10 pt-10 md:mt-14 md:pt-12">
+            <h2 className="mb-4 text-base font-semibold text-white md:mb-6 md:text-lg">
+              Next appointments
+            </h2>
 
-            <div className="flex flex-col gap-4 md:gap-6">
-
-              {filteredAppointmentsToday.length === 0 && (
+            <div className="grid grid-cols-1 gap-6 md:gap-10 lg:grid-cols-2">
+              {filteredUpcoming.length === 0 && (
                 <p className="text-sm text-[#cde2f2]/90">
                   {appointmentSearch.trim()
-                    ? "No appointments match your search for today."
-                    : "No appointments today."}
+                    ? "No upcoming appointments match your search."
+                    : "No upcoming appointments."}
                 </p>
               )}
 
-              {filteredAppointmentsToday.map((appt) => {
+              {filteredUpcoming.map((appt) => {
+                const mode = String(appt.platform ?? "Duo");
+                const icon = getModeIcon(mode);
                 const mentor = appt.mentor as { profilePicture?: string; firstName?: string; lastName?: string } | undefined;
-                const icon = getModeIcon(appt.platform);
-
-                const dateObj = new Date(String(appt.meetingDate ?? ""));
-                const dateStr = dateObj.toLocaleDateString("en-US", {
-                  day: "2-digit",
-                  month: "short",
-                  year: "2-digit",
-                });
-
-                const timeStr = dateObj.toLocaleTimeString("en-US", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                });
 
                 return (
                   <div
                     key={appointmentEntityId(appt)}
-                    className={`relative flex flex-col items-start gap-5 p-4 md:flex-row md:items-center md:p-5 ${pastorGlassCard}`}
+                    className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard}`}
                   >
-                    {/* Icon */}
-                    <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl bg-white/90 md:h-[100px] md:w-[100px]">
-                      <Image src={icon} alt="mode" className="w-[45px] md:w-[55px]" />
+                    <div className="absolute right-3 top-3 z-20">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setMenuOpenId(
+                            menuOpenId === appointmentEntityId(appt) ? null : appointmentEntityId(appt),
+                          )
+                        }
+                        className="text-[#d9ebf8] hover:text-white"
+                      >
+                        <i className="fa-solid fa-ellipsis-vertical text-lg" />
+                      </button>
+
+                      {menuOpenId === appointmentEntityId(appt) && (
+                        <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg bg-white text-sm shadow-lg">
+                          <button
+                            type="button"
+                            className="flex w-full gap-2 px-4 py-2 hover:bg-gray-100"
+                            onClick={() => {
+                              setAppointmentToEdit(appt);
+                              setShowReschedule(true);
+                              setMenuOpenId(null);
+                            }}
+                          >
+                            <i className="fa-regular fa-calendar" /> Reschedule Meeting
+                          </button>
+
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 px-4 py-2 hover:bg-gray-100"
+                            onClick={() => {
+                              setAppointmentToCancel(appt);
+                              setShowCancelConfirm(true);
+                              setMenuOpenId(null);
+                            }}
+                          >
+                            <i className="fa-regular fa-calendar-xmark" />
+                            Cancel Meeting
+                          </button>
+
+                          <button
+                            type="button"
+                            className="flex w-full gap-2 px-4 py-2 hover:bg-gray-100"
+                            onClick={() => {
+                              setAppointmentToEdit(appt);
+                              setSelectedMode(appt.platform || "zoom");
+                              setShowChangeMode(true);
+                              setMenuOpenId(null);
+                            }}
+                          >
+                            <i className="fa-regular fa-pen-to-square" />
+                            Change Meeting Mode
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Details */}
-                    <div className="flex-1">
+                    <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-white/95 md:h-[140px] md:w-[140px]">
+                      <Image src={icon} alt={String(mode)} className="h-[50px] w-[50px] md:h-[60px] md:w-[60px]" />
+                    </div>
 
-                      {/* Mentor Row */}
-                      <div className="flex items-center gap-3 mb-2">
+                    <div className="flex w-full flex-col text-white">
+                      <div className="mb-3 flex items-center gap-3">
                         <Image
                           src={mentor?.profilePicture || UserProfile}
+                          alt="Mentor"
                           width={32}
                           height={32}
-                          alt="mentor"
-                          className="rounded-full"
+                          className="rounded-full border border-white/30 md:h-9 md:w-9"
                         />
                         <div>
-                          <h4 className="text-sm font-semibold text-white">
+                          <h4 className="text-sm font-semibold">
                             {mentor?.firstName} {mentor?.lastName}
                           </h4>
-                          <p className="text-[11px] text-[#cde2f2]">Mentor</p>
+                          <p className="text-xs text-[#cde2f2]">Mentor</p>
                         </div>
                       </div>
 
-                      {/* Date/Time */}
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 py-[4px] text-[11px] font-medium text-[#d9ebf8]">
-                          <i className="fa-regular fa-calendar"></i>
-                          Date: {dateStr}
+                      <div className="mb-3 flex flex-col flex-wrap gap-2 md:flex-row">
+                        <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-2 py-[3px] text-xs text-[#d9ebf8] md:px-3">
+                          <i className="fa-regular fa-calendar text-[#E3D247]" />
+                          <span>Date: {formatDate(String(appt.meetingDate ?? ""))}</span>
                         </div>
 
-                        <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 py-[4px] text-[11px] font-medium text-[#d9ebf8]">
-                          <i className="fa-regular fa-clock"></i>
-                          Time: {timeStr}
+                        <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 py-[3px] text-xs text-[#d9ebf8]">
+                          <i className="fa-regular fa-clock text-[#24E0C2]" />
+                          <span>Time: {formatTime(String(appt.meetingDate ?? ""))}</span>
                         </div>
                       </div>
 
-                      {/* Mode */}
-                      <p className="mb-3 text-[11px] text-[#d9ebf8]">
-                        Mode:
-                        <span className="font-semibold text-[#8ec5eb]"> {String(appt.platform ?? "")}</span>
-                      </p>
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <p className="mb-2 text-xs text-[#d9ebf8]">
+                            Mode:{" "}
+                            <span className="font-medium text-[#8ec5eb] underline underline-offset-2">
+                              {mode}
+                            </span>
+                          </p>
 
-                      {/* Actions row */}
-                      <div className="flex justify-between items-center">
-
-                        <div className="flex gap-4 text-sm text-[#8ec5eb]">
-                          <i className="fa-solid fa-phone cursor-pointer"></i>
-                          <i className="fa-regular fa-comment cursor-pointer"></i>
-                          <i className="fa-brands fa-whatsapp cursor-pointer"></i>
+                          <div className="flex gap-4 text-sm text-[#cde2f2]">
+                            <i className="fa-solid fa-phone cursor-pointer opacity-80 hover:opacity-100" />
+                            <i className="fa-regular fa-comment cursor-pointer opacity-80 hover:opacity-100" />
+                            <i className="fa-brands fa-whatsapp cursor-pointer opacity-80 hover:opacity-100" />
+                          </div>
                         </div>
 
                         <button type="button" className={pastorPrimaryCta}>
@@ -789,208 +990,11 @@ export default function PastorAppointmentsPage() {
                         </button>
                       </div>
                     </div>
-
-                    {/* 3 DOT MENU */}
-                    <div className="absolute top-3 right-3">
-                      <button
-                        onClick={() =>
-                          setMenuOpenId(menuOpenId === appointmentEntityId(appt) ? null : appointmentEntityId(appt))
-                        }
-                        className="text-[#d9ebf8] hover:text-white"
-                      >
-                        <i className="fa-solid fa-ellipsis-vertical"></i>
-                      </button>
-
-                      {menuOpenId === appointmentEntityId(appt) && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white shadow-lg rounded-lg text-sm z-50">
-
-                          <button
-                            className="w-full px-4 py-2 flex gap-2 hover:bg-gray-100"
-                            onClick={() => {
-                              setAppointmentToEdit(appt);
-                              setShowReschedule(true);
-                              setMenuOpenId(null);
-                            }}
-                          >
-                            <i className="fa-regular fa-calendar"></i> Reschedule Meeting
-                          </button>
-
-                          <button
-                            className="w-full px-4 py-2 flex items-center gap-2 hover:bg-gray-100"
-                            onClick={() => {
-                              setAppointmentToCancel(appt);
-                              setShowCancelConfirm(true);
-                              setMenuOpenId(null);
-                            }}
-                          >
-                            <i className="fa-regular fa-calendar-xmark"></i>
-                            Cancel Meeting
-                          </button>
-
-                          <button
-                            className="w-full px-4 py-2 flex gap-2 hover:bg-gray-100"
-                            onClick={() => {
-                              setAppointmentToEdit(appt);  // <-- VERY IMPORTANT
-                              setSelectedMode(appt.platform || "zoom");
-                              setShowChangeMode(true);
-                              setMenuOpenId(null);
-                            }}
-                          >
-                            <i className="fa-regular fa-pen-to-square"></i>
-                            Change Meeting Mode
-                          </button>
-
-
-                        </div>
-                      )}
-                    </div>
                   </div>
                 );
               })}
             </div>
-          </div>
-        </div>
-
-        <section className="mt-10 border-t border-white/10 pt-10 md:mt-14 md:pt-12">
-          <h2 className="mb-4 text-base font-semibold text-white md:mb-6 md:text-lg">
-            Next appointments
-          </h2>
-
-          <div className="grid grid-cols-1 gap-6 md:gap-10 lg:grid-cols-2">
-            {filteredUpcoming.length === 0 && (
-              <p className="text-sm text-[#cde2f2]/90">
-                {appointmentSearch.trim()
-                  ? "No upcoming appointments match your search."
-                  : "No upcoming appointments."}
-              </p>
-            )}
-
-            {filteredUpcoming.map((appt) => {
-              const mode = String(appt.platform ?? "Duo");
-              const icon = getModeIcon(mode);
-              const mentor = appt.mentor as { profilePicture?: string; firstName?: string; lastName?: string } | undefined;
-
-              return (
-                <div
-                  key={appointmentEntityId(appt)}
-                  className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard}`}
-                >
-                  <div className="absolute right-3 top-3 z-20">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setMenuOpenId(
-                          menuOpenId === appointmentEntityId(appt) ? null : appointmentEntityId(appt),
-                        )
-                      }
-                      className="text-[#d9ebf8] hover:text-white"
-                    >
-                      <i className="fa-solid fa-ellipsis-vertical text-lg" />
-                    </button>
-
-                    {menuOpenId === appointmentEntityId(appt) && (
-                      <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg bg-white text-sm shadow-lg">
-                        <button
-                          type="button"
-                          className="flex w-full gap-2 px-4 py-2 hover:bg-gray-100"
-                          onClick={() => {
-                            setAppointmentToEdit(appt);
-                            setShowReschedule(true);
-                            setMenuOpenId(null);
-                          }}
-                        >
-                          <i className="fa-regular fa-calendar" /> Reschedule Meeting
-                        </button>
-
-                        <button
-                          type="button"
-                          className="flex w-full items-center gap-2 px-4 py-2 hover:bg-gray-100"
-                          onClick={() => {
-                            setAppointmentToCancel(appt);
-                            setShowCancelConfirm(true);
-                            setMenuOpenId(null);
-                          }}
-                        >
-                          <i className="fa-regular fa-calendar-xmark" />
-                          Cancel Meeting
-                        </button>
-
-                        <button
-                          type="button"
-                          className="flex w-full gap-2 px-4 py-2 hover:bg-gray-100"
-                          onClick={() => {
-                            setAppointmentToEdit(appt);
-                            setSelectedMode(appt.platform || "zoom");
-                            setShowChangeMode(true);
-                            setMenuOpenId(null);
-                          }}
-                        >
-                          <i className="fa-regular fa-pen-to-square" />
-                          Change Meeting Mode
-                        </button>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-white/95 md:h-[140px] md:w-[140px]">
-                    <Image src={icon} alt={String(mode)} className="h-[50px] w-[50px] md:h-[60px] md:w-[60px]" />
-                  </div>
-
-                  <div className="flex w-full flex-col text-white">
-                    <div className="mb-3 flex items-center gap-3">
-                      <Image
-                        src={mentor?.profilePicture || UserProfile}
-                        alt="Mentor"
-                        width={32}
-                        height={32}
-                        className="rounded-full border border-white/30 md:h-9 md:w-9"
-                      />
-                      <div>
-                        <h4 className="text-sm font-semibold">
-                          {mentor?.firstName} {mentor?.lastName}
-                        </h4>
-                        <p className="text-xs text-[#cde2f2]">Mentor</p>
-                      </div>
-                    </div>
-
-                    <div className="mb-3 flex flex-col flex-wrap gap-2 md:flex-row">
-                      <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-2 py-[3px] text-xs text-[#d9ebf8] md:px-3">
-                        <i className="fa-regular fa-calendar text-[#E3D247]" />
-                        <span>Date: {formatDate(String(appt.meetingDate ?? ""))}</span>
-                      </div>
-
-                      <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 py-[3px] text-xs text-[#d9ebf8]">
-                        <i className="fa-regular fa-clock text-[#24E0C2]" />
-                        <span>Time: {formatTime(String(appt.meetingDate ?? ""))}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-end justify-between">
-                      <div>
-                        <p className="mb-2 text-xs text-[#d9ebf8]">
-                          Mode:{" "}
-                          <span className="font-medium text-[#8ec5eb] underline underline-offset-2">
-                            {mode}
-                          </span>
-                        </p>
-
-                        <div className="flex gap-4 text-sm text-[#cde2f2]">
-                          <i className="fa-solid fa-phone cursor-pointer opacity-80 hover:opacity-100" />
-                          <i className="fa-regular fa-comment cursor-pointer opacity-80 hover:opacity-100" />
-                          <i className="fa-brands fa-whatsapp cursor-pointer opacity-80 hover:opacity-100" />
-                        </div>
-                      </div>
-
-                      <button type="button" className={pastorPrimaryCta}>
-                        Details
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+          </section>
         </div>
       </main>
 
@@ -1217,11 +1221,10 @@ export default function PastorAppointmentsPage() {
                               setSelectedMentor(m);
                             }
                           }}
-                          className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 transition ${
-                            selected
-                              ? "border-[#8ec5eb]/60 bg-white/10 shadow-[0_0_0_1px_rgba(142,197,235,0.25)]"
-                              : "border-white/15 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.07]"
-                          }`}
+                          className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 transition ${selected
+                            ? "border-[#8ec5eb]/60 bg-white/10 shadow-[0_0_0_1px_rgba(142,197,235,0.25)]"
+                            : "border-white/15 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.07]"
+                            }`}
                         >
                           <div className="flex items-center gap-3">
                             <Image
@@ -1242,9 +1245,8 @@ export default function PastorAppointmentsPage() {
                             </div>
                           </div>
                           <span
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
-                              selected ? "border-[#8ec5eb] bg-[#8ec5eb]" : "border-white/35"
-                            }`}
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${selected ? "border-[#8ec5eb] bg-[#8ec5eb]" : "border-white/35"
+                              }`}
                             aria-hidden
                           >
                             {selected ? <i className="fa-solid fa-check text-[10px] text-[#062946]" /> : null}
@@ -1299,11 +1301,10 @@ export default function PastorAppointmentsPage() {
                           key={t}
                           type="button"
                           onClick={() => setSelectedTime(t)}
-                          className={`rounded-xl border px-3 py-2.5 text-sm transition ${
-                            selectedTime === t
-                              ? "border-[#8ec5eb] bg-[#8ec5eb]/20 font-medium text-white shadow-[0_0_0_1px_rgba(142,197,235,0.35)]"
-                              : "border-white/20 bg-white/[0.06] text-[#d9ebf8] hover:border-white/35 hover:bg-white/10"
-                          }`}
+                          className={`rounded-xl border px-3 py-2.5 text-sm transition ${selectedTime === t
+                            ? "border-[#8ec5eb] bg-[#8ec5eb]/20 font-medium text-white shadow-[0_0_0_1px_rgba(142,197,235,0.35)]"
+                            : "border-white/20 bg-white/[0.06] text-[#d9ebf8] hover:border-white/35 hover:bg-white/10"
+                            }`}
                         >
                           {t}
                         </button>
@@ -1357,8 +1358,20 @@ export default function PastorAppointmentsPage() {
                   Next
                 </button>
               ) : (
-                <button type="button" onClick={handleSchedule} className={pastorPrimaryCta}>
-                  Schedule
+                <button
+                  type="button"
+                  onClick={handleSchedule}
+                  disabled={isScheduling}
+                  className={`${pastorPrimaryCta} ${isScheduling ? "opacity-70 cursor-not-allowed" : ""}`}
+                >
+                  {isScheduling ? (
+                    <span className="flex items-center gap-2">
+                      <i className="fa-solid fa-spinner fa-spin"></i>
+                      Scheduling...
+                    </span>
+                  ) : (
+                    "Schedule"
+                  )}
                 </button>
               )}
             </div>
@@ -1490,7 +1503,17 @@ export default function PastorAppointmentsPage() {
         </div>
       )}
 
-
+      {toastMessage ? (
+        <div
+          className="fixed bottom-6 right-4 z-[60] max-w-md rounded-2xl border border-white/20 bg-[#0a3558]/95 px-5 py-4 shadow-2xl backdrop-blur-md sm:right-8"
+          role="status"
+        >
+          <div className="flex items-start gap-3">
+            <i className="fa-solid fa-circle-info mt-0.5 text-lg text-[#8ec5eb]" aria-hidden />
+            <p className="text-[15px] font-medium leading-snug text-white">{toastMessage}</p>
+          </div>
+        </div>
+      ) : null}
 
 
     </div>
