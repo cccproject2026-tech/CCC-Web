@@ -4,33 +4,18 @@ import Cookies from "js-cookie";
 import MentorHeader from "@/app/Components/MentorHeader";
 import HeroBg from "../../Assets/progress-bg.png";
 import {
-    apiCompleteMentorshipSession,
-    apiGetMentorshipSessions,
     apiGetMentorshipSessionsNormalized,
-    apiRedoMentorshipSession,
 } from "@/app/Services/roadmaps.service";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import Image from "next/image";
-import { parseTranscript, STATIC_SUMMARY, STATIC_TRANSCRIPT } from "./utils/transcript";
-import ConfirmModal from "@/app/Components/ui/ConfirmModal";
-import { useToast } from "@/app/Components/ui/Toast";
-import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
 import SessionProgressHeader from "@/app/Components/mentorship-sessions/SessionProgressHeader";
 import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStatusBadge";
-import { apiGenerateTranscriptSummary } from "@/app/Services/appointments.service";
-import {
-    appointmentPlatformLabel,
-    formatMeetingIdForDisplay,
-    getAppointmentJoinUrl,
-    parseGoogleMeetCodeFromUrl,
-    parseZoomMeetingIdFromUrl,
-    truncateMiddle,
-    zoomUrlHasPasscodeQuery,
-} from "@/app/utils/meetingLinkDetails";
 import { formatSessionTime, getNextSessionId } from "./utils/sessionFlow";
+import { useRouter } from "next/navigation";
 
 type MentoringSession = {
+    id: string;
     sessionNumber: number;
     title: string;
     status: "COMPLETED" | "CANCELLED" | "MISSED" | "SCHEDULED";
@@ -39,25 +24,6 @@ type MentoringSession = {
     pastorNote: string;
     appointmentId: string;
     pastorId: string;
-    /** optional backend flag (used on mobile pastor detail accordions) */
-    isRedo?: boolean;
-    meetingLink?: string;
-    platform?: string;
-};
-
-type TranscriptSummary = {
-    appointmentId: string;
-    transcript?: string;
-    summary?: {
-        overview?: string;
-        keyPoints?: string[];
-        advice?: string[];
-        actionItems?: string[];
-        nextFocus?: string[];
-    };
-    generatedAt?: string;
-    model?: string;
-    cached?: boolean;
 };
 
 type PastorSessions = {
@@ -68,21 +34,17 @@ type PastorSessions = {
 };
 
 export default function MentorMentoringSessionPage() {
-    const toast = useToast();
+    const router = useRouter();
     const [filterStatus, setFilterStatus] = useState("All");
     const [search, setSearch] = useState("");
     const [groupedSessions, setGroupedSessions] = useState<PastorSessions[]>([]);
     const [selectedPastorId, setSelectedPastorId] = useState<string | null>(null);
-    const [expandedId, setExpandedId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [transcripts, setTranscripts] = useState<Record<string, TranscriptSummary>>({});
-    const [transcriptLoading, setTranscriptLoading] = useState<Record<string, boolean>>({});
-    const [activeTab, setActiveTab] = useState<"transcript" | "summary">("transcript");
-    const [actionLoading, setActionLoading] = useState<Record<string, "complete" | "redo" | null>>({});
-    const [confirm, setConfirm] = useState<{ kind: "complete" | "redo"; session: MentoringSession } | null>(null);
+    const [refetchTick, setRefetchTick] = useState(0);
 
     useEffect(() => {
+        let mounted = true;
         const fetchSessions = async () => {
             try {
                 setLoading(true);
@@ -136,42 +98,24 @@ export default function MentorMentoringSessionPage() {
                         }
                     }
                 }
-                console.log(groupedData)
-                setGroupedSessions(groupedData);
+                if (mounted) setGroupedSessions(groupedData);
             } catch (err: unknown) {
                 const errorMessage = err instanceof Error ? err.message : "Failed to fetch mentoring sessions";
-                setError(errorMessage);
+                if (mounted) setError(errorMessage);
                 console.error("Error fetching mentoring sessions:", err);
             } finally {
-                setLoading(false);
+                if (mounted) setLoading(false);
             }
         };
 
         fetchSessions();
-    }, []);
-
-    const refreshPastorSessions = async (pastorId: string) => {
-        const pastorSessions = (await apiGetMentorshipSessionsNormalized(pastorId)).map((s) => ({
-            ...s,
-            pastorId,
-        })) as any as MentoringSession[];
-        setGroupedSessions((prev) =>
-            prev.map((g) => (g.pastorId === pastorId ? { ...g, sessions: pastorSessions } : g)),
-        );
-    };
-
-    const withActionLoading = async (
-        appointmentId: string,
-        kind: "complete" | "redo",
-        fn: () => Promise<void>,
-    ) => {
-        setActionLoading((prev) => ({ ...prev, [appointmentId]: kind }));
-        try {
-            await fn();
-        } finally {
-            setActionLoading((prev) => ({ ...prev, [appointmentId]: null }));
-        }
-    };
+        const onFocus = () => setRefetchTick((x) => x + 1);
+        window.addEventListener("focus", onFocus);
+        return () => {
+            mounted = false;
+            window.removeEventListener("focus", onFocus);
+        };
+    }, [refetchTick]);
 
     const filteredGroupedSessions = groupedSessions.map(group => ({
         ...group,
@@ -186,79 +130,8 @@ export default function MentorMentoringSessionPage() {
         })
     })).filter(group => group.sessions.length > 0);
 
-    // const fetchTranscriptSummary = async (appointmentId: string) => {
-    //     // If already fetched, don't fetch again
-    //     if (transcripts[appointmentId]) {
-    //         return;
-    //     }
-
-    //     try {
-    //         setTranscriptLoading(prev => ({ ...prev, [appointmentId]: true }));
-    //         const response = await apiGenerateTranscriptSummary(appointmentId, false);
-    //         const summary = response.data?.data;
-
-    //         setTranscripts(prev => ({
-    //             ...prev,
-    //             [appointmentId]: summary
-    //         }));
-    //     } catch (err) {
-    //         console.error(`Error fetching transcript for appointment ${appointmentId}:`, err);
-    //         setTranscripts(prev => ({
-    //             ...prev,
-    //             [appointmentId]: {
-    //                 appointmentId,
-    //                 summary: "Failed to load transcript summary"
-    //             }
-    //         }));
-    //     } finally {
-    //         setTranscriptLoading(prev => ({ ...prev, [appointmentId]: false }));
-    //     }
-    // };
-
-    const fetchTranscriptSummary = async (appointmentId: string) => {
-        if (transcripts[appointmentId]) return;
-
-        try {
-            setTranscriptLoading(prev => ({ ...prev, [appointmentId]: true }));
-
-            const res = await apiGenerateTranscriptSummary(appointmentId, false);
-            const data = res.data?.data ?? res.data;
-            setTranscripts(prev => ({
-                ...prev,
-                [appointmentId]: {
-                    appointmentId,
-                    transcript: data?.transcript ?? STATIC_TRANSCRIPT,
-                    summary: data?.summary ?? STATIC_SUMMARY,
-                    generatedAt: data?.generatedAt ?? new Date().toISOString(),
-                    model: data?.model,
-                    cached: !!data?.cached,
-                }
-            }));
-
-        } catch (err) {
-            toast.show({ kind: "error", title: "Failed to load transcript", subtitle: extractApiErrorMessage(err) });
-            setTranscripts(prev => ({
-                ...prev,
-                [appointmentId]: {
-                    appointmentId,
-                    transcript: STATIC_TRANSCRIPT,
-                    summary: STATIC_SUMMARY,
-                    cached: true
-                }
-            }));
-        } finally {
-            setTranscriptLoading(prev => ({ ...prev, [appointmentId]: false }));
-        }
-    };
-
-    const handleExpandSession = (appointmentId: string, maybeFetchForAppointmentId?: string) => {
-        if (expandedId === appointmentId) {
-            setExpandedId(null);
-        } else {
-            setExpandedId(appointmentId);
-            // Fetch transcript when expanding
-            if (maybeFetchForAppointmentId) fetchTranscriptSummary(maybeFetchForAppointmentId);
-        }
+    const handleViewDetails = (session: MentoringSession) => {
+        router.push(`/mentor/mentoring-session/${encodeURIComponent(session.id)}?pastorId=${encodeURIComponent(session.pastorId)}`);
     };
 
     const selectedGroup = selectedPastorId ? groupedSessions.find(g => g.pastorId === selectedPastorId) : undefined;
@@ -300,46 +173,6 @@ export default function MentorMentoringSessionPage() {
 
             {/* MAIN SECTION - TWO PANEL LAYOUT */}
             <main className="flex-1 px-4 md:px-20 py-10">
-                <ConfirmModal
-                    open={!!confirm}
-                    kind={confirm?.kind ?? "complete"}
-                    title={confirm?.kind === "redo" ? "Redo this session?" : "Complete this session?"}
-                    body={confirm?.kind === "redo"
-                        ? "This marks the session for redo. You can continue when ready."
-                        : "Mark this session as completed? This cannot be undone from here."}
-                    confirmText={confirm?.kind === "redo" ? "Redo" : "Complete"}
-                    onCancel={() => setConfirm(null)}
-                    onConfirm={async () => {
-                        if (!confirm) return;
-                        const { kind, session } = confirm;
-                        setConfirm(null);
-                        const apptId = session.appointmentId;
-                        if (!apptId) {
-                            toast.show({ kind: "error", title: "Missing appointment ID" });
-                            return;
-                        }
-                        if (kind === "complete") {
-                            await withActionLoading(apptId, "complete", async () => {
-                                await apiCompleteMentorshipSession(apptId);
-                                toast.show({ kind: "success", title: "Session completed" });
-                                await refreshPastorSessions(session.pastorId);
-                            }).catch((err) => {
-                                toast.show({ kind: "error", title: "Cannot complete session", subtitle: extractApiErrorMessage(err) });
-                            });
-                        } else {
-                            await withActionLoading(apptId, "redo", async () => {
-                                await apiRedoMentorshipSession(apptId);
-                                toast.show({ kind: "success", title: "Redo scheduled" });
-                                setExpandedId(null);
-                                await refreshPastorSessions(session.pastorId);
-                            }).catch((err) => {
-                                toast.show({ kind: "error", title: "Cannot redo session", subtitle: extractApiErrorMessage(err) });
-                            });
-                        }
-                    }}
-                    busy={false}
-                />
-
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
                         <div className="text-center">
@@ -369,7 +202,6 @@ export default function MentorMentoringSessionPage() {
                                                 key={group.pastorId}
                                                 onClick={() => {
                                                     setSelectedPastorId(group.pastorId);
-                                                    setExpandedId(null);
                                                 }}
                                                 className={`w-full text-left px-4 py-3 rounded-lg transition border ${selectedPastorId === group.pastorId
                                                     ? "bg-[#8ec5eb]/25 border-[#8ec5eb]/35 text-white"
@@ -470,277 +302,33 @@ export default function MentorMentoringSessionPage() {
                                                             key={session.appointmentId}
                                                             className="group rounded-2xl border border-white/15 bg-white/5 backdrop-blur-sm transition hover:border-[#8ec5eb]/30 hover:bg-white/10"
                                                         >
-                                                            {/* HEADER - CLICKABLE */}
-                                                            <button
-                                                                onClick={() => handleExpandSession(session.appointmentId, session.appointmentId)}
-                                                                className="w-full px-6 py-4 text-left"
-                                                            >
-                                                                <div className="flex items-center justify-between">
-                                                                    <div className="flex items-center gap-4 flex-1">
-                                                                        {/* SESSION INFO */}
-                                                                        <div className="flex-1">
-                                                                            <div className="flex items-center gap-2">
-                                                                                <h3 className="font-semibold text-base">
-                                                                                    {session.title}
-                                                                                </h3>
-                                                                                {session.isRedo ? (
-                                                                                    <span className="rounded-md bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-300 border border-yellow-400/30">
-                                                                                        Redo
-                                                                                    </span>
-                                                                                ) : null}
-                                                                                {(session.appointmentId ?? `${session.sessionNumber}`) === nextSessionId ? (
-                                                                                    <span className="rounded-md bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-200 border border-yellow-400/30">
-                                                                                        Current
-                                                                                    </span>
-                                                                                ) : null}
-                                                                            </div>
-                                                                            <p className="mt-1 text-sm text-white/60">
-                                                                                {new Date(session.scheduledDate).toLocaleDateString("en-US", {
-                                                                                    weekday: "short",
-                                                                                    year: "numeric",
-                                                                                    month: "short",
-                                                                                    day: "numeric",
-                                                                                })}{" "}
-                                                                                at {new Date(session.scheduledDate).toLocaleTimeString("en-US", {
-                                                                                    hour: "2-digit",
-                                                                                    minute: "2-digit",
-                                                                                    hour12: true
-                                                                                })}
-                                                                            </p>
+                                                            <button onClick={() => handleViewDetails(session)} className="w-full px-6 py-4 text-left">
+                                                                <div className="flex items-center justify-between gap-4">
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <h3 className="truncate font-semibold text-base">{session.title}</h3>
+                                                                            {session.id === nextSessionId ? (
+                                                                                <span className="shrink-0 rounded-md bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-200 border border-yellow-400/30">
+                                                                                    Current
+                                                                                </span>
+                                                                            ) : null}
                                                                         </div>
-
-                                                                        {/* STATUS BADGE */}
-                                                                        <SessionStatusBadge status={session.status} compact />
+                                                                        <p className="mt-1 text-sm text-white/60">
+                                                                            {new Date(session.scheduledDate).toLocaleDateString("en-US", {
+                                                                                weekday: "short",
+                                                                                year: "numeric",
+                                                                                month: "short",
+                                                                                day: "numeric",
+                                                                            })}{" "}
+                                                                            · {formatSessionTime(session.scheduledDate) || "Time TBD"}
+                                                                        </p>
                                                                     </div>
-
-                                                                    {/* EXPAND ARROW */}
-                                                                    <i
-                                                                        className={`fas fa-chevron-down ml-4 text-[#8ec5eb] transition ${expandedId === session.appointmentId ? "rotate-180" : ""
-                                                                            }`}
-                                                                    />
+                                                                    <div className="shrink-0 flex items-center gap-3">
+                                                                        <SessionStatusBadge status={session.status} compact />
+                                                                        <i className="fas fa-chevron-right text-white/40" />
+                                                                    </div>
                                                                 </div>
                                                             </button>
-
-                                                            {/* EXPANDED DETAILS */}
-                                                            {expandedId === session.appointmentId && (
-                                                                <div className="border-t border-white/10 px-6 py-4">
-                                                                    {/* ACTIONS (Mobile parity) */}
-                                                                    <div className="mb-6 flex flex-wrap gap-3">
-                                                                        <button
-                                                                            onClick={async () => {
-                                                                                setConfirm({ kind: "complete", session });
-                                                                            }}
-                                                                            disabled={session.status === "COMPLETED" || actionLoading[session.appointmentId] != null}
-                                                                            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition border ${session.status === "COMPLETED"
-                                                                                ? "bg-white/5 text-white/40 border-white/10 cursor-not-allowed"
-                                                                                : "bg-green-500/20 text-green-200 border-green-400/30 hover:bg-green-500/25"
-                                                                                } ${actionLoading[session.appointmentId] != null ? "opacity-60 cursor-not-allowed" : ""}`}
-                                                                        >
-                                                                            {actionLoading[session.appointmentId] === "complete" ? (
-                                                                                <>
-                                                                                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-green-200 border-t-transparent" />
-                                                                                    Completing...
-                                                                                </>
-                                                                            ) : (
-                                                                                <>
-                                                                                    <i className="fas fa-check" />
-                                                                                    {session.status === "COMPLETED" ? "Completed" : "Mark as Completed"}
-                                                                                </>
-                                                                            )}
-                                                                        </button>
-
-                                                                        <button
-                                                                            onClick={async () => {
-                                                                                setConfirm({ kind: "redo", session });
-                                                                            }}
-                                                                            disabled={actionLoading[session.appointmentId] != null}
-                                                                            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition border bg-white/5 text-white/80 border-white/15 hover:bg-white/10 ${actionLoading[session.appointmentId] != null ? "opacity-60 cursor-not-allowed" : ""}`}
-                                                                        >
-                                                                            {actionLoading[session.appointmentId] === "redo" ? (
-                                                                                <>
-                                                                                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-transparent" />
-                                                                                    Scheduling...
-                                                                                </>
-                                                                            ) : (
-                                                                                <>
-                                                                                    <i className="fas fa-rotate-right" />
-                                                                                    Schedule Repeat Session
-                                                                                </>
-                                                                            )}
-                                                                        </button>
-                                                                    </div>
-
-                                                                    {/* JOIN MEETING (Mobile parity) */}
-                                                                    {(() => {
-                                                                        const meetingLink = session.meetingLink || (session.platform ? getAppointmentJoinUrl({ meetingLink: session.meetingLink, platform: session.platform } as any) : null);
-                                                                        const link = meetingLink?.trim() || "";
-                                                                        if (!link) return null;
-                                                                        const platform = (session.platform || "zoom") as any;
-                                                                        const zoomId = platform === "zoom" ? parseZoomMeetingIdFromUrl(link) : undefined;
-                                                                        const meetCode = platform === "google-meet" ? parseGoogleMeetCodeFromUrl(link) : undefined;
-                                                                        const hasZoomPasscode = platform === "zoom" && zoomUrlHasPasscodeQuery(link);
-                                                                        return (
-                                                                            <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
-                                                                                <div className="text-xs font-semibold text-white/60 mb-2">Meeting details</div>
-                                                                                <div className="space-y-2 text-sm">
-                                                                                    <div className="flex justify-between gap-3">
-                                                                                        <span className="text-white/60">Platform</span>
-                                                                                        <span className="text-white/90">{appointmentPlatformLabel(platform)}</span>
-                                                                                    </div>
-                                                                                    {zoomId ? (
-                                                                                        <div className="flex justify-between gap-3">
-                                                                                            <span className="text-white/60">Meeting ID</span>
-                                                                                            <span className="text-white/90 font-mono">{formatMeetingIdForDisplay(zoomId)}</span>
-                                                                                        </div>
-                                                                                    ) : null}
-                                                                                    {meetCode ? (
-                                                                                        <div className="flex justify-between gap-3">
-                                                                                            <span className="text-white/60">Meet code</span>
-                                                                                            <span className="text-white/90 font-mono">{meetCode}</span>
-                                                                                        </div>
-                                                                                    ) : null}
-                                                                                    {hasZoomPasscode ? (
-                                                                                        <div className="text-xs text-white/50">Passcode included — will be applied automatically</div>
-                                                                                    ) : null}
-                                                                                    <div className="flex items-start justify-between gap-3">
-                                                                                        <span className="text-white/60">Link</span>
-                                                                                        <span className="text-white/80 break-all text-right">{truncateMiddle(link, 56)}</span>
-                                                                                    </div>
-                                                                                </div>
-                                                                                <button
-                                                                                    type="button"
-                                                                                    onClick={() => window.open(link, "_blank", "noopener,noreferrer")}
-                                                                                    className="mt-3 w-full rounded-xl bg-white text-[#062946] py-2 font-semibold hover:bg-white/90"
-                                                                                >
-                                                                                    Join meeting
-                                                                                </button>
-                                                                            </div>
-                                                                        );
-                                                                    })()}
-
-                                                                    {/* TAB BUTTONS */}
-                                                                    <div className="flex gap-3 mb-6 border-b border-white/10 pb-3">
-                                                                        <button
-                                                                            onClick={() => setActiveTab("transcript")}
-                                                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeTab === "transcript"
-                                                                                ? "bg-[#8ec5eb]/25 text-[#8ec5eb] border border-[#8ec5eb]/35"
-                                                                                : "bg-white/5 text-white/70 border border-white/10 hover:bg-white/10"
-                                                                                }`}
-                                                                        >
-                                                                            <i className="fas fa-file-alt mr-2"></i>Transcript
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={() => setActiveTab("summary")}
-                                                                            className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeTab === "summary"
-                                                                                ? "bg-[#8ec5eb]/25 text-[#8ec5eb] border border-[#8ec5eb]/35"
-                                                                                : "bg-white/5 text-white/70 border border-white/10 hover:bg-white/10"
-                                                                                }`}
-                                                                        >
-                                                                            <i className="fas fa-list-check mr-2"></i>Summary
-                                                                        </button>
-                                                                    </div>
-                                                                    {/* TRANSCRIPT TAB */}
-                                                                    {activeTab === "transcript" && (
-                                                                        <div>
-                                                                            {transcriptLoading[session.appointmentId] ? (
-                                                                                <div className="flex items-center justify-center py-8">
-                                                                                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#8ec5eb] border-t-transparent"></div>
-                                                                                </div>
-                                                                            ) : transcripts[session.appointmentId]?.transcript ? (
-                                                                                <div className="space-y-4">
-                                                                                    {parseTranscript(transcripts[session.appointmentId].transcript || "").map((msg: any) => (
-                                                                                        <div
-                                                                                            key={msg.id}
-                                                                                            className={`flex ${msg.isMentor ? "justify-start" : "justify-end"}`}
-                                                                                        >
-                                                                                            <div
-                                                                                                className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-md
-                            ${msg.isMentor
-                                                                                                        ? "bg-[#0f3b5f] text-white border border-[#8ec5eb]/30"
-                                                                                                        : "bg-[#8ec5eb] text-[#062946]"
-                                                                                                    }`}
-                                                                                            >
-                                                                                                <p className="text-xs font-semibold mb-1 opacity-70">
-                                                                                                    {msg.speaker}
-                                                                                                </p>
-                                                                                                <p className="leading-relaxed whitespace-pre-wrap">
-                                                                                                    {msg.message}
-                                                                                                </p>
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    ))}
-                                                                                </div>
-                                                                            ) : (
-                                                                                <div className="rounded-lg bg-white/5 p-4 border border-white/10 text-center">
-                                                                                    <p className="text-sm text-white/50">No transcript available</p>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-
-                                                                    {/* SUMMARY TAB */}
-                                                                    {activeTab === "summary" && (
-                                                                        <div>
-                                                                            {transcriptLoading[session.appointmentId] ? (
-                                                                                <div className="flex items-center justify-center py-8">
-                                                                                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#8ec5eb] border-t-transparent"></div>
-                                                                                </div>
-                                                                            ) : transcripts[session.appointmentId]?.summary ? (
-                                                                                <div className="space-y-6">
-
-                                                                                    <div className="rounded-xl bg-white/5 p-4 border border-[#8ec5eb]/20">
-                                                                                        <h4 className="font-semibold mb-2 text-[#8ec5eb]">Overview</h4>
-                                                                                        <p className="text-sm text-white/70">
-                                                                                            {transcripts[session.appointmentId].summary?.overview}
-                                                                                        </p>
-                                                                                    </div>
-
-                                                                                    <div className="rounded-xl bg-white/5 p-4 border border-white/10">
-                                                                                        <h4 className="font-semibold mb-2">Key Points</h4>
-                                                                                        <ul className="list-disc list-inside text-sm text-white/70 space-y-1">
-                                                                                            {transcripts[session.appointmentId].summary?.keyPoints?.map((item: string, i: number) => (
-                                                                                                <li key={i}>{item}</li>
-                                                                                            ))}
-                                                                                        </ul>
-                                                                                    </div>
-
-                                                                                    <div className="rounded-xl bg-white/5 p-4 border border-white/10">
-                                                                                        <h4 className="font-semibold mb-2">Advice</h4>
-                                                                                        <ul className="list-disc list-inside text-sm text-white/70 space-y-1">
-                                                                                            {transcripts[session.appointmentId].summary?.advice?.map((item: string, i: number) => (
-                                                                                                <li key={i}>{item}</li>
-                                                                                            ))}
-                                                                                        </ul>
-                                                                                    </div>
-
-                                                                                    <div className="rounded-xl bg-white/5 p-4 border border-white/10">
-                                                                                        <h4 className="font-semibold mb-2">Action Items</h4>
-                                                                                        <ul className="list-disc list-inside text-sm text-white/70 space-y-1">
-                                                                                            {transcripts[session.appointmentId].summary?.actionItems?.map((item: string, i: number) => (
-                                                                                                <li key={i}>{item}</li>
-                                                                                            ))}
-                                                                                        </ul>
-                                                                                    </div>
-
-                                                                                    <div className="rounded-xl bg-white/5 p-4 border border-white/10">
-                                                                                        <h4 className="font-semibold mb-2">Next Focus</h4>
-                                                                                        <ul className="list-disc list-inside text-sm text-white/70 space-y-1">
-                                                                                            {transcripts[session.appointmentId].summary?.nextFocus?.map((item: string, i: number) => (
-                                                                                                <li key={i}>{item}</li>
-                                                                                            ))}
-                                                                                        </ul>
-                                                                                    </div>
-
-                                                                                </div>
-                                                                            ) : (
-                                                                                <div className="rounded-lg bg-white/5 p-4 border border-white/10 text-center">
-                                                                                    <p className="text-sm text-white/50">No summary available</p>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            )}
                                                         </div>
                                                     ))}
                                                 </div>

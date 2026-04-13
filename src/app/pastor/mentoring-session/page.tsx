@@ -3,11 +3,15 @@ import { useState, useEffect } from "react";
 import Cookies from "js-cookie";
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/progress-bg.png";
-import { apiGetMentorshipSessions } from "@/app/Services/roadmaps.service";
+import { apiGetMentorshipSessionsNormalized } from "@/app/Services/roadmaps.service";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import { parseTranscript, STATIC_SUMMARY, STATIC_TRANSCRIPT } from "./utils/transcript";
+import SessionProgressHeader from "@/app/Components/mentorship-sessions/SessionProgressHeader";
+import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStatusBadge";
+import { formatSessionTime, getNextSessionId } from "./utils/sessionFlow";
+import { useRouter } from "next/navigation";
 
 type MentoringSession = {
+    id: string;
     sessionNumber: number;
     title: string;
     status: "COMPLETED" | "CANCELLED" | "SCHEDULED";
@@ -15,15 +19,6 @@ type MentoringSession = {
     mentorNote: string;
     pastorNote: string;
     appointmentId: string;
-};
-
-type TranscriptSummary = {
-    appointmentId: string;
-    transcript?: string;
-    summary?: string;
-    generatedAt?: string;
-    model?: string;
-    cached?: boolean;
 };
 
 const SESSION_FLOW = [
@@ -42,17 +37,16 @@ const SESSION_FLOW = [
 ];
 
 export default function PastorMentoringSessionPage() {
+    const router = useRouter();
     const [filterStatus, setFilterStatus] = useState("All");
     const [search, setSearch] = useState("");
     const [sessions, setSessions] = useState<MentoringSession[]>([]);
-    const [expandedId, setExpandedId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [transcripts, setTranscripts] = useState<Record<string, TranscriptSummary>>({});
-    const [transcriptLoading, setTranscriptLoading] = useState<Record<string, boolean>>({});
-    const [activeTab, setActiveTab] = useState<"transcript" | "summary">("transcript");
+    const [refetchTick, setRefetchTick] = useState(0);
 
     useEffect(() => {
+        let mounted = true;
         const fetchSessions = async () => {
             try {
                 setLoading(true);
@@ -76,21 +70,25 @@ export default function PastorMentoringSessionPage() {
                 }
 
                 // Fetch sessions for this pastor
-                const sessionsResponse = await apiGetMentorshipSessions(pastorId);
-                const pastorSessions = sessionsResponse.data || [];
-                console.log("first", pastorSessions)
-                setSessions(pastorSessions);
+                const pastorSessions = await apiGetMentorshipSessionsNormalized(pastorId);
+                if (mounted) setSessions(pastorSessions as any as MentoringSession[]);
             } catch (err: unknown) {
                 const errorMessage = err instanceof Error ? err.message : "Failed to fetch mentoring sessions";
-                setError(errorMessage);
+                if (mounted) setError(errorMessage);
                 console.error("Error fetching mentoring sessions:", err);
             } finally {
-                setLoading(false);
+                if (mounted) setLoading(false);
             }
         };
 
         fetchSessions();
-    }, []);
+        const onFocus = () => setRefetchTick((x) => x + 1);
+        window.addEventListener("focus", onFocus);
+        return () => {
+            mounted = false;
+            window.removeEventListener("focus", onFocus);
+        };
+    }, [refetchTick]);
 
     const filteredSessions = sessions.filter((session) => {
         if (filterStatus === "Completed") return session.status === "COMPLETED";
@@ -114,106 +112,10 @@ export default function PastorMentoringSessionPage() {
         return "Unknown Phase";
     };
 
-    // const fetchTranscriptSummary = async (appointmentId: string) => {
-    //     // If already fetched, don't fetch again
-    //     if (transcripts[appointmentId]) {
-    //         return;
-    //     }
-
-    //     try {
-    //         setTranscriptLoading(prev => ({ ...prev, [appointmentId]: true }));
-    //         const response = await apiGenerateTranscriptSummary(appointmentId, false);
-    //         const summary = response.data;
-
-    //         if (!summary) {
-    //             console.warn("Transcript API returned empty. Using static fallback.");
-    //         }
-
-    //         setTranscripts(prev => ({
-    //             ...prev,
-    //             [appointmentId]: summary ?? {
-    //                 appointmentId,
-    //                 transcript: STATIC_TRANSCRIPT,
-    //                 summary: STATIC_SUMMARY
-    //             }
-    //         }));
-    //     } catch (err) {
-    //         console.error(`Error fetching transcript for appointment ${appointmentId}:`, err);
-    //         setTranscripts(prev => ({
-    //             ...prev,
-    //             [appointmentId]: {
-    //                 appointmentId,
-    //                 summary: "Failed to load transcript summary"
-    //             }
-    //         }));
-    //     } finally {
-    //         setTranscriptLoading(prev => ({ ...prev, [appointmentId]: false }));
-    //     }
-    // };
-
-    const fetchTranscriptSummary = async (appointmentId: string) => {
-        // Prevent refetch
-        if (transcripts[appointmentId]) return;
-
-        try {
-            setTranscriptLoading(prev => ({ ...prev, [appointmentId]: true }));
-
-            setTranscripts(prev => ({
-                ...prev,
-                [appointmentId]: {
-                    appointmentId,
-                    transcript: STATIC_TRANSCRIPT,
-                    summary: STATIC_SUMMARY,
-                    cached: true
-                }
-            }));
-
-        } catch (err) {
-            console.error(`Static transcript load failed for ${appointmentId}`, err);
-        } finally {
-            setTranscriptLoading(prev => ({ ...prev, [appointmentId]: false }));
-        }
-    };
-
-    const handleExpandSession = (appointmentId: string) => {
-        if (expandedId === appointmentId) {
-            setExpandedId(null);
-        } else {
-            setExpandedId(appointmentId);
-            // Fetch transcript when expanding
-            fetchTranscriptSummary(appointmentId);
-        }
-    };
-
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case "COMPLETED":
-                return "bg-[#8ec5eb]/25 text-[#8ec5eb] border border-[#8ec5eb]/35";
-            case "CANCELLED":
-                return "bg-red-500/25 text-red-300 border border-red-400/35";
-            case "MISSED":
-                return "bg-yellow-500/25 text-yellow-300 border border-yellow-400/35";
-            case "SCHEDULED":
-                return "bg-blue-500/25 text-blue-300 border border-blue-400/35";
-            default:
-                return "bg-white/10 text-white/70";
-        }
-    };
-
-    const getStatusIcon = (status: string) => {
-        switch (status) {
-            case "COMPLETED":
-                return "fas fa-check-circle text-green-600";
-            case "CANCELLED":
-                return "fas fa-times-circle text-red-600";
-            case "MISSED":
-                return "fas fa-exclamation-circle text-yellow-600";
-            case "SCHEDULED":
-                return "fas fa-calendar text-blue-600";
-            default:
-                return "fas fa-circle text-gray-600";
-        }
-    };
+    const sortedSessions = [...sessions].sort((a, b) => a.sessionNumber - b.sessionNumber);
+    const nextSessionId = getNextSessionId(
+        sortedSessions.map((s) => ({ id: s.id, status: s.status as any, scheduledDate: s.scheduledDate })),
+    );
 
     return (
         <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
@@ -283,14 +185,14 @@ export default function PastorMentoringSessionPage() {
                     </div>
                 ) : visible.length > 0 ? (
                     <div className="space-y-4">
+                        <SessionProgressHeader sessions={sortedSessions as any} />
                         {visible.map((session) => (
                             <div
-                                key={session.appointmentId}
+                                key={session.id}
                                 className="group rounded-2xl border border-white/15 bg-white/5 backdrop-blur-sm transition hover:border-[#8ec5eb]/30 hover:bg-white/10"
                             >
-                                {/* HEADER - CLICKABLE */}
                                 <button
-                                    onClick={() => handleExpandSession(session.appointmentId)}
+                                    onClick={() => router.push(`/pastor/mentoring-session/${encodeURIComponent(session.id)}`)}
                                     className="w-full px-6 py-4 text-left"
                                 >
                                     <div className="flex items-center justify-between">
@@ -304,6 +206,11 @@ export default function PastorMentoringSessionPage() {
                                                     <span className="text-xs text-white/40">
                                                         Session {session.sessionNumber}
                                                     </span>
+                                                    {session.id === nextSessionId ? (
+                                                        <span className="rounded-md bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-200 border border-yellow-400/30">
+                                                            Current
+                                                        </span>
+                                                    ) : null}
                                                 </div>
                                                 <p className="text-xs text-white/50 mb-2">
                                                     {getPhaseInfo(session.sessionNumber)}
@@ -315,164 +222,17 @@ export default function PastorMentoringSessionPage() {
                                                         month: "short",
                                                         day: "numeric",
                                                     })}{" "}
-                                                    at {new Date(session.scheduledDate).toLocaleTimeString("en-US", {
-                                                        hour: "2-digit",
-                                                        minute: "2-digit",
-                                                        hour12: true
-                                                    })}
+                                                    · {formatSessionTime(session.scheduledDate) || "Time TBD"}
                                                 </p>
                                             </div>
 
                                             {/* STATUS BADGE */}
-                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(session.status)}`}>
-                                                {session.status.charAt(0).toUpperCase() + session.status.slice(1).toLowerCase()}
-                                            </span>
+                                            <SessionStatusBadge status={session.status} compact />
                                         </div>
 
-                                        {/* EXPAND ARROW */}
-                                        <i
-                                            className={`fas fa-chevron-down ml-4 text-[#8ec5eb] transition ${expandedId === session.appointmentId ? "rotate-180" : ""
-                                                }`}
-                                        />
+                                        <i className="fas fa-chevron-right ml-4 text-white/40" />
                                     </div>
                                 </button>
-
-                                {/* EXPANDED DETAILS */}
-                                {expandedId === session.appointmentId && (
-                                    <div className="border-t border-white/10 px-6 py-4">
-                                        {/* TAB BUTTONS */}
-                                        <div className="flex gap-3 mb-6 border-b border-white/10 pb-3">
-                                            <button
-                                                onClick={() => setActiveTab("transcript")}
-                                                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeTab === "transcript"
-                                                    ? "bg-[#8ec5eb]/25 text-[#8ec5eb] border border-[#8ec5eb]/35"
-                                                    : "bg-white/5 text-white/70 border border-white/10 hover:bg-white/10"
-                                                    }`}
-                                            >
-                                                <i className="fas fa-file-alt mr-2"></i>Transcript
-                                            </button>
-                                            <button
-                                                onClick={() => setActiveTab("summary")}
-                                                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${activeTab === "summary"
-                                                    ? "bg-[#8ec5eb]/25 text-[#8ec5eb] border border-[#8ec5eb]/35"
-                                                    : "bg-white/5 text-white/70 border border-white/10 hover:bg-white/10"
-                                                    }`}
-                                            >
-                                                <i className="fas fa-list-check mr-2"></i>Summary
-                                            </button>
-                                        </div>
-
-                                        {/* TRANSCRIPT TAB */}
-                                        {activeTab === "transcript" && (
-                                            <div>
-                                                {transcriptLoading[session.appointmentId] ? (
-                                                    <div className="flex items-center justify-center py-8">
-                                                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#8ec5eb] border-t-transparent"></div>
-                                                    </div>
-                                                ) : transcripts[session.appointmentId]?.transcript ? (
-                                                    <div className="space-y-4">
-                                                        {parseTranscript(transcripts[session.appointmentId].transcript || "").map((msg: any) => (
-                                                            <div
-                                                                key={msg.id}
-                                                                className={`flex ${msg.isMentor ? "justify-start" : "justify-end"}`}
-                                                            >
-                                                                <div
-                                                                    className={`max-w-[75%] rounded-2xl px-4 py-3 text-sm shadow-md
-                            ${msg.isMentor
-                                                                            ? "bg-[#0f3b5f] text-white border border-[#8ec5eb]/30"
-                                                                            : "bg-[#8ec5eb] text-[#062946]"
-                                                                        }`}
-                                                                >
-                                                                    <p className="text-xs font-semibold mb-1 opacity-70">
-                                                                        {msg.speaker}
-                                                                    </p>
-                                                                    <p className="leading-relaxed whitespace-pre-wrap">
-                                                                        {msg.message}
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <div className="rounded-lg bg-white/5 p-4 border border-white/10 text-center">
-                                                        <p className="text-sm text-white/50">
-                                                            No transcript available
-                                                        </p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-
-                                        {/* SUMMARY TAB */}
-                                        {activeTab === "summary" && (
-                                            <div>
-                                                {transcriptLoading[session.appointmentId] ? (
-                                                    <div className="flex items-center justify-center py-8">
-                                                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#8ec5eb] border-t-transparent"></div>
-                                                    </div>
-                                                ) : transcripts[session.appointmentId]?.summary ? (
-                                                    <div className="space-y-6">
-
-                                                        {/* Overview */}
-                                                        <div className="rounded-xl bg-white/5 p-4 border border-[#8ec5eb]/20">
-                                                            <h4 className="font-semibold mb-2 text-[#8ec5eb]">Overview</h4>
-                                                            <p className="text-sm text-white/70">
-                                                                {transcripts[session.appointmentId].summary?.overview}
-                                                            </p>
-                                                        </div>
-
-                                                        {/* Key Points */}
-                                                        <div className="rounded-xl bg-white/5 p-4 border border-white/10">
-                                                            <h4 className="font-semibold mb-2">Key Points</h4>
-                                                            <ul className="list-disc list-inside text-sm text-white/70 space-y-1">
-                                                                {transcripts[session.appointmentId].summary?.keyPoints?.map((item: string, i: number) => (
-                                                                    <li key={i}>{item}</li>
-                                                                ))}
-                                                            </ul>
-                                                        </div>
-
-                                                        {/* Advice */}
-                                                        <div className="rounded-xl bg-white/5 p-4 border border-white/10">
-                                                            <h4 className="font-semibold mb-2">Advice</h4>
-                                                            <ul className="list-disc list-inside text-sm text-white/70 space-y-1">
-                                                                {transcripts[session.appointmentId].summary?.advice?.map((item: string, i: number) => (
-                                                                    <li key={i}>{item}</li>
-                                                                ))}
-                                                            </ul>
-                                                        </div>
-
-                                                        {/* Action Items */}
-                                                        <div className="rounded-xl bg-white/5 p-4 border border-white/10">
-                                                            <h4 className="font-semibold mb-2">Action Items</h4>
-                                                            <ul className="list-disc list-inside text-sm text-white/70 space-y-1">
-                                                                {transcripts[session.appointmentId].summary?.actionItems?.map((item: string, i: number) => (
-                                                                    <li key={i}>{item}</li>
-                                                                ))}
-                                                            </ul>
-                                                        </div>
-
-                                                        {/* Next Focus */}
-                                                        <div className="rounded-xl bg-white/5 p-4 border border-white/10">
-                                                            <h4 className="font-semibold mb-2">Next Focus</h4>
-                                                            <ul className="list-disc list-inside text-sm text-white/70 space-y-1">
-                                                                {transcripts[session.appointmentId].summary?.nextFocus?.map((item: string, i: number) => (
-                                                                    <li key={i}>{item}</li>
-                                                                ))}
-                                                            </ul>
-                                                        </div>
-
-                                                    </div>
-                                                ) : (
-                                                    <div className="rounded-lg bg-white/5 p-4 border border-white/10 text-center">
-                                                        <p className="text-sm text-white/50">
-                                                            No summary available
-                                                        </p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
                             </div>
                         ))}
                     </div>
