@@ -3,11 +3,32 @@ import { useState, useEffect } from "react";
 import Cookies from "js-cookie";
 import MentorHeader from "@/app/Components/MentorHeader";
 import HeroBg from "../../Assets/progress-bg.png";
-import { apiGetMentorshipSessions } from "@/app/Services/roadmaps.service";
+import {
+    apiCompleteMentorshipSession,
+    apiGetMentorshipSessions,
+    apiGetMentorshipSessionsNormalized,
+    apiRedoMentorshipSession,
+} from "@/app/Services/roadmaps.service";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import Image from "next/image";
 import { parseTranscript, STATIC_SUMMARY, STATIC_TRANSCRIPT } from "./utils/transcript";
+import ConfirmModal from "@/app/Components/ui/ConfirmModal";
+import { useToast } from "@/app/Components/ui/Toast";
+import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
+import SessionProgressHeader from "@/app/Components/mentorship-sessions/SessionProgressHeader";
+import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStatusBadge";
+import { apiGenerateTranscriptSummary } from "@/app/Services/appointments.service";
+import {
+    appointmentPlatformLabel,
+    formatMeetingIdForDisplay,
+    getAppointmentJoinUrl,
+    parseGoogleMeetCodeFromUrl,
+    parseZoomMeetingIdFromUrl,
+    truncateMiddle,
+    zoomUrlHasPasscodeQuery,
+} from "@/app/utils/meetingLinkDetails";
+import { formatSessionTime, getNextSessionId } from "./utils/sessionFlow";
 
 type MentoringSession = {
     sessionNumber: number;
@@ -18,12 +39,22 @@ type MentoringSession = {
     pastorNote: string;
     appointmentId: string;
     pastorId: string;
+    /** optional backend flag (used on mobile pastor detail accordions) */
+    isRedo?: boolean;
+    meetingLink?: string;
+    platform?: string;
 };
 
 type TranscriptSummary = {
     appointmentId: string;
     transcript?: string;
-    summary?: string;
+    summary?: {
+        overview?: string;
+        keyPoints?: string[];
+        advice?: string[];
+        actionItems?: string[];
+        nextFocus?: string[];
+    };
     generatedAt?: string;
     model?: string;
     cached?: boolean;
@@ -37,6 +68,7 @@ type PastorSessions = {
 };
 
 export default function MentorMentoringSessionPage() {
+    const toast = useToast();
     const [filterStatus, setFilterStatus] = useState("All");
     const [search, setSearch] = useState("");
     const [groupedSessions, setGroupedSessions] = useState<PastorSessions[]>([]);
@@ -47,6 +79,8 @@ export default function MentorMentoringSessionPage() {
     const [transcripts, setTranscripts] = useState<Record<string, TranscriptSummary>>({});
     const [transcriptLoading, setTranscriptLoading] = useState<Record<string, boolean>>({});
     const [activeTab, setActiveTab] = useState<"transcript" | "summary">("transcript");
+    const [actionLoading, setActionLoading] = useState<Record<string, "complete" | "redo" | null>>({});
+    const [confirm, setConfirm] = useState<{ kind: "complete" | "redo"; session: MentoringSession } | null>(null);
 
     useEffect(() => {
         const fetchSessions = async () => {
@@ -85,11 +119,10 @@ export default function MentorMentoringSessionPage() {
                 for (const pastor of assignedPastors) {
                     if (pastor._id) {
                         try {
-                            const sessionsResponse = await apiGetMentorshipSessions(pastor._id);
-                            const pastorSessions = (sessionsResponse.data || []).map((session: any) => ({
-                                ...session,
-                                pastorId: pastor._id
-                            }));
+                            const pastorSessions = (await apiGetMentorshipSessionsNormalized(pastor._id)).map((s) => ({
+                                ...s,
+                                pastorId: pastor._id,
+                            })) as any as MentoringSession[];
                             if (pastorSessions.length > 0) {
                                 groupedData.push({
                                     pastorId: pastor._id,
@@ -116,6 +149,29 @@ export default function MentorMentoringSessionPage() {
 
         fetchSessions();
     }, []);
+
+    const refreshPastorSessions = async (pastorId: string) => {
+        const pastorSessions = (await apiGetMentorshipSessionsNormalized(pastorId)).map((s) => ({
+            ...s,
+            pastorId,
+        })) as any as MentoringSession[];
+        setGroupedSessions((prev) =>
+            prev.map((g) => (g.pastorId === pastorId ? { ...g, sessions: pastorSessions } : g)),
+        );
+    };
+
+    const withActionLoading = async (
+        appointmentId: string,
+        kind: "complete" | "redo",
+        fn: () => Promise<void>,
+    ) => {
+        setActionLoading((prev) => ({ ...prev, [appointmentId]: kind }));
+        try {
+            await fn();
+        } finally {
+            setActionLoading((prev) => ({ ...prev, [appointmentId]: null }));
+        }
+    };
 
     const filteredGroupedSessions = groupedSessions.map(group => ({
         ...group,
@@ -165,49 +221,52 @@ export default function MentorMentoringSessionPage() {
         try {
             setTranscriptLoading(prev => ({ ...prev, [appointmentId]: true }));
 
-            // 🔴 TEMP STATIC DATA
+            const res = await apiGenerateTranscriptSummary(appointmentId, false);
+            const data = res.data?.data ?? res.data;
+            setTranscripts(prev => ({
+                ...prev,
+                [appointmentId]: {
+                    appointmentId,
+                    transcript: data?.transcript ?? STATIC_TRANSCRIPT,
+                    summary: data?.summary ?? STATIC_SUMMARY,
+                    generatedAt: data?.generatedAt ?? new Date().toISOString(),
+                    model: data?.model,
+                    cached: !!data?.cached,
+                }
+            }));
+
+        } catch (err) {
+            toast.show({ kind: "error", title: "Failed to load transcript", subtitle: extractApiErrorMessage(err) });
             setTranscripts(prev => ({
                 ...prev,
                 [appointmentId]: {
                     appointmentId,
                     transcript: STATIC_TRANSCRIPT,
                     summary: STATIC_SUMMARY,
-                    generatedAt: new Date().toISOString(),
                     cached: true
                 }
             }));
-
-        } catch (err) {
-            console.error(`Static transcript load failed for ${appointmentId}`, err);
         } finally {
             setTranscriptLoading(prev => ({ ...prev, [appointmentId]: false }));
         }
     };
 
-    const handleExpandSession = (appointmentId: string) => {
+    const handleExpandSession = (appointmentId: string, maybeFetchForAppointmentId?: string) => {
         if (expandedId === appointmentId) {
             setExpandedId(null);
         } else {
             setExpandedId(appointmentId);
             // Fetch transcript when expanding
-            fetchTranscriptSummary(appointmentId);
+            if (maybeFetchForAppointmentId) fetchTranscriptSummary(maybeFetchForAppointmentId);
         }
     };
 
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case "COMPLETED":
-                return "bg-[#8ec5eb]/25 text-[#8ec5eb] border border-[#8ec5eb]/35";
-            case "CANCELLED":
-                return "bg-red-500/25 text-red-300 border border-red-400/35";
-            case "MISSED":
-                return "bg-yellow-500/25 text-yellow-300 border border-yellow-400/35";
-            case "SCHEDULED":
-                return "bg-blue-500/25 text-blue-300 border border-blue-400/35";
-            default:
-                return "bg-white/10 text-white/70";
-        }
-    };
+    const selectedGroup = selectedPastorId ? groupedSessions.find(g => g.pastorId === selectedPastorId) : undefined;
+    const sessionsForPastor = selectedGroup?.sessions ?? [];
+    const sortedSessions = [...sessionsForPastor].sort((a, b) => a.sessionNumber - b.sessionNumber);
+    const nextSessionId = getNextSessionId(
+        sortedSessions.map((s) => ({ id: s.appointmentId ?? `${s.sessionNumber}`, status: s.status, scheduledDate: s.scheduledDate })),
+    );
 
     return (
         <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
@@ -221,15 +280,66 @@ export default function MentorMentoringSessionPage() {
                 <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.68)_0%,rgba(6,41,70,0.6)_50%,rgba(6,41,70,1)_100%)]" />
 
                 <div className="relative z-10 mx-auto w-full max-w-6xl">
-                    <h1 className="text-2xl font-semibold sm:text-3xl">Mentoring Sessions</h1>
-                    <p className="mt-2 text-sm text-[#cde2f2]">
-                        Monitor your mentoring appointment history and session details.
-                    </p>
+                    <div className="flex items-start justify-between gap-3">
+                        <div>
+                            <h1 className="text-2xl font-semibold sm:text-3xl">Mentoring Sessions</h1>
+                            <p className="mt-2 text-sm text-[#cde2f2]">
+                                Monitor your mentoring appointment history and session details.
+                            </p>
+                        </div>
+                        <a
+                            href="/mentor/mentoring-session/insights"
+                            className="mt-1 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 hover:bg-white/10"
+                        >
+                            <i className="fas fa-chart-line" />
+                            Insights
+                        </a>
+                    </div>
                 </div>
             </section>
 
             {/* MAIN SECTION - TWO PANEL LAYOUT */}
             <main className="flex-1 px-4 md:px-20 py-10">
+                <ConfirmModal
+                    open={!!confirm}
+                    kind={confirm?.kind ?? "complete"}
+                    title={confirm?.kind === "redo" ? "Redo this session?" : "Complete this session?"}
+                    body={confirm?.kind === "redo"
+                        ? "This marks the session for redo. You can continue when ready."
+                        : "Mark this session as completed? This cannot be undone from here."}
+                    confirmText={confirm?.kind === "redo" ? "Redo" : "Complete"}
+                    onCancel={() => setConfirm(null)}
+                    onConfirm={async () => {
+                        if (!confirm) return;
+                        const { kind, session } = confirm;
+                        setConfirm(null);
+                        const apptId = session.appointmentId;
+                        if (!apptId) {
+                            toast.show({ kind: "error", title: "Missing appointment ID" });
+                            return;
+                        }
+                        if (kind === "complete") {
+                            await withActionLoading(apptId, "complete", async () => {
+                                await apiCompleteMentorshipSession(apptId);
+                                toast.show({ kind: "success", title: "Session completed" });
+                                await refreshPastorSessions(session.pastorId);
+                            }).catch((err) => {
+                                toast.show({ kind: "error", title: "Cannot complete session", subtitle: extractApiErrorMessage(err) });
+                            });
+                        } else {
+                            await withActionLoading(apptId, "redo", async () => {
+                                await apiRedoMentorshipSession(apptId);
+                                toast.show({ kind: "success", title: "Redo scheduled" });
+                                setExpandedId(null);
+                                await refreshPastorSessions(session.pastorId);
+                            }).catch((err) => {
+                                toast.show({ kind: "error", title: "Cannot redo session", subtitle: extractApiErrorMessage(err) });
+                            });
+                        }
+                    }}
+                    busy={false}
+                />
+
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
                         <div className="text-center">
@@ -319,6 +429,9 @@ export default function MentorMentoringSessionPage() {
                                                 </p>
                                             </div>
 
+                                            {/* PROGRESS HEADER (Mobile parity) */}
+                                            <SessionProgressHeader sessions={sortedSessions.map((s) => ({ ...s, id: s.appointmentId ?? `${s.sessionNumber}` })) as any} />
+
                                             {/* SEARCH BAR */}
                                             <div className="mb-6">
                                                 <div className="relative">
@@ -359,16 +472,28 @@ export default function MentorMentoringSessionPage() {
                                                         >
                                                             {/* HEADER - CLICKABLE */}
                                                             <button
-                                                                onClick={() => handleExpandSession(session.appointmentId)}
+                                                                onClick={() => handleExpandSession(session.appointmentId, session.appointmentId)}
                                                                 className="w-full px-6 py-4 text-left"
                                                             >
                                                                 <div className="flex items-center justify-between">
                                                                     <div className="flex items-center gap-4 flex-1">
                                                                         {/* SESSION INFO */}
                                                                         <div className="flex-1">
-                                                                            <h3 className="font-semibold text-base">
-                                                                                {session.title}
-                                                                            </h3>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <h3 className="font-semibold text-base">
+                                                                                    {session.title}
+                                                                                </h3>
+                                                                                {session.isRedo ? (
+                                                                                    <span className="rounded-md bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-300 border border-yellow-400/30">
+                                                                                        Redo
+                                                                                    </span>
+                                                                                ) : null}
+                                                                                {(session.appointmentId ?? `${session.sessionNumber}`) === nextSessionId ? (
+                                                                                    <span className="rounded-md bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-200 border border-yellow-400/30">
+                                                                                        Current
+                                                                                    </span>
+                                                                                ) : null}
+                                                                            </div>
                                                                             <p className="mt-1 text-sm text-white/60">
                                                                                 {new Date(session.scheduledDate).toLocaleDateString("en-US", {
                                                                                     weekday: "short",
@@ -385,9 +510,7 @@ export default function MentorMentoringSessionPage() {
                                                                         </div>
 
                                                                         {/* STATUS BADGE */}
-                                                                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(session.status)}`}>
-                                                                            {session.status.charAt(0).toUpperCase() + session.status.slice(1).toLowerCase()}
-                                                                        </span>
+                                                                        <SessionStatusBadge status={session.status} compact />
                                                                     </div>
 
                                                                     {/* EXPAND ARROW */}
@@ -401,6 +524,100 @@ export default function MentorMentoringSessionPage() {
                                                             {/* EXPANDED DETAILS */}
                                                             {expandedId === session.appointmentId && (
                                                                 <div className="border-t border-white/10 px-6 py-4">
+                                                                    {/* ACTIONS (Mobile parity) */}
+                                                                    <div className="mb-6 flex flex-wrap gap-3">
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                setConfirm({ kind: "complete", session });
+                                                                            }}
+                                                                            disabled={session.status === "COMPLETED" || actionLoading[session.appointmentId] !== null}
+                                                                            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition border ${session.status === "COMPLETED"
+                                                                                ? "bg-white/5 text-white/40 border-white/10 cursor-not-allowed"
+                                                                                : "bg-green-500/20 text-green-200 border-green-400/30 hover:bg-green-500/25"
+                                                                                } ${actionLoading[session.appointmentId] !== null ? "opacity-60 cursor-not-allowed" : ""}`}
+                                                                        >
+                                                                            {actionLoading[session.appointmentId] === "complete" ? (
+                                                                                <>
+                                                                                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-green-200 border-t-transparent" />
+                                                                                    Completing...
+                                                                                </>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <i className="fas fa-check" />
+                                                                                    {session.status === "COMPLETED" ? "Completed" : "Mark as Completed"}
+                                                                                </>
+                                                                            )}
+                                                                        </button>
+
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                setConfirm({ kind: "redo", session });
+                                                                            }}
+                                                                            disabled={actionLoading[session.appointmentId] !== null}
+                                                                            className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition border bg-white/5 text-white/80 border-white/15 hover:bg-white/10 ${actionLoading[session.appointmentId] !== null ? "opacity-60 cursor-not-allowed" : ""}`}
+                                                                        >
+                                                                            {actionLoading[session.appointmentId] === "redo" ? (
+                                                                                <>
+                                                                                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/70 border-t-transparent" />
+                                                                                    Scheduling...
+                                                                                </>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <i className="fas fa-rotate-right" />
+                                                                                    Schedule Repeat Session
+                                                                                </>
+                                                                            )}
+                                                                        </button>
+                                                                    </div>
+
+                                                                    {/* JOIN MEETING (Mobile parity) */}
+                                                                    {(() => {
+                                                                        const meetingLink = session.meetingLink || (session.platform ? getAppointmentJoinUrl({ meetingLink: session.meetingLink, platform: session.platform } as any) : null);
+                                                                        const link = meetingLink?.trim() || "";
+                                                                        if (!link) return null;
+                                                                        const platform = (session.platform || "zoom") as any;
+                                                                        const zoomId = platform === "zoom" ? parseZoomMeetingIdFromUrl(link) : undefined;
+                                                                        const meetCode = platform === "google-meet" ? parseGoogleMeetCodeFromUrl(link) : undefined;
+                                                                        const hasZoomPasscode = platform === "zoom" && zoomUrlHasPasscodeQuery(link);
+                                                                        return (
+                                                                            <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+                                                                                <div className="text-xs font-semibold text-white/60 mb-2">Meeting details</div>
+                                                                                <div className="space-y-2 text-sm">
+                                                                                    <div className="flex justify-between gap-3">
+                                                                                        <span className="text-white/60">Platform</span>
+                                                                                        <span className="text-white/90">{appointmentPlatformLabel(platform)}</span>
+                                                                                    </div>
+                                                                                    {zoomId ? (
+                                                                                        <div className="flex justify-between gap-3">
+                                                                                            <span className="text-white/60">Meeting ID</span>
+                                                                                            <span className="text-white/90 font-mono">{formatMeetingIdForDisplay(zoomId)}</span>
+                                                                                        </div>
+                                                                                    ) : null}
+                                                                                    {meetCode ? (
+                                                                                        <div className="flex justify-between gap-3">
+                                                                                            <span className="text-white/60">Meet code</span>
+                                                                                            <span className="text-white/90 font-mono">{meetCode}</span>
+                                                                                        </div>
+                                                                                    ) : null}
+                                                                                    {hasZoomPasscode ? (
+                                                                                        <div className="text-xs text-white/50">Passcode included — will be applied automatically</div>
+                                                                                    ) : null}
+                                                                                    <div className="flex items-start justify-between gap-3">
+                                                                                        <span className="text-white/60">Link</span>
+                                                                                        <span className="text-white/80 break-all text-right">{truncateMiddle(link, 56)}</span>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => window.open(link, "_blank", "noopener,noreferrer")}
+                                                                                    className="mt-3 w-full rounded-xl bg-white text-[#062946] py-2 font-semibold hover:bg-white/90"
+                                                                                >
+                                                                                    Join meeting
+                                                                                </button>
+                                                                            </div>
+                                                                        );
+                                                                    })()}
+
                                                                     {/* TAB BUTTONS */}
                                                                     <div className="flex gap-3 mb-6 border-b border-white/10 pb-3">
                                                                         <button

@@ -333,6 +333,116 @@ export const apiDeleteExtrasDocumentFile = (
 // GET /roadmaps/sessions/:userId
 export const apiGetMentorshipSessions = (userId: string) =>
   axiosInstance.get(`/roadmaps/sessions/${userId}`);
+
+export type MentorshipSessionStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED" | "MISSED";
+
+export type MentorshipSession = {
+  id: string;
+  sessionNumber: number;
+  title: string;
+  status: MentorshipSessionStatus;
+  scheduledDate: string;
+  mentorNote?: string;
+  pastorNote?: string;
+  appointmentId?: string;
+  mentorshipInsights?: unknown;
+};
+
+function normalizeSessionsPayload(responseData: unknown): any[] {
+  if (Array.isArray(responseData)) return responseData;
+  if (responseData && typeof responseData === "object") {
+    const wrap = responseData as { success?: boolean; data?: unknown; message?: string };
+    if (wrap.success === false && wrap.message) {
+      throw new Error(wrap.message);
+    }
+    if (Array.isArray(wrap.data)) return wrap.data;
+  }
+  return [];
+}
+
+export async function apiGetMentorshipSessionsNormalized(userId: string): Promise<MentorshipSession[]> {
+  if (!userId?.trim()) throw new Error("userId is required");
+  const res = await apiGetMentorshipSessions(userId);
+  const raw = normalizeSessionsPayload(res.data);
+  return raw.map((item: any, index: number) => {
+    const id = String(item?._id ?? item?.id ?? `session-${index + 1}`);
+    const numberValue = Number(item?.sessionNumber ?? item?.sessionNo ?? item?.session ?? item?.sequence ?? index + 1);
+    const sessionNumber = Number.isFinite(numberValue) && numberValue > 0 ? numberValue : index + 1;
+    const scheduledDate = String(item?.scheduledDate ?? item?.meetingDate ?? item?.date ?? item?.createdAt ?? "");
+    const statusRaw = String(item?.status ?? "SCHEDULED").toUpperCase();
+    const status: MentorshipSessionStatus =
+      statusRaw === "COMPLETED" ? "COMPLETED" : statusRaw === "CANCELLED" ? "CANCELLED" : statusRaw === "MISSED" ? "MISSED" : "SCHEDULED";
+    const title = String(item?.title ?? item?.mentorNote ?? `Session ${sessionNumber}`);
+    const appointmentId = item?.appointmentId
+      ? String(item.appointmentId)
+      : item?.appointment?._id
+        ? String(item.appointment._id)
+        : undefined;
+    return {
+      id,
+      sessionNumber,
+      title,
+      status,
+      scheduledDate,
+      mentorNote: item?.mentorNote ? String(item.mentorNote) : undefined,
+      pastorNote: item?.pastorNote ? String(item.pastorNote) : undefined,
+      appointmentId,
+      mentorshipInsights: item?.mentorshipInsights,
+    };
+  });
+}
+
+// POST /roadmaps/complete-session  body: { appointmentId }
+export async function apiCompleteMentorshipSession(
+  appointmentId: string,
+): Promise<{ success: boolean; message: string }> {
+  if (!appointmentId?.trim()) {
+    throw new Error("appointmentId is required to complete a session");
+  }
+  const response = await axiosInstance.post<{ success?: boolean; message?: string }>(
+    `/roadmaps/complete-session`,
+    { appointmentId },
+  );
+  if (response.status >= 200 && response.status < 300) {
+    if (response.data && typeof response.data === "object" && response.data.success === false) {
+      throw new Error(response.data.message || "Failed to complete session");
+    }
+    return {
+      success: true,
+      message:
+        (typeof response.data?.message === "string" && response.data.message.trim()
+          ? response.data.message.trim()
+          : "Session completed successfully."),
+    };
+  }
+  throw new Error("Failed to complete session");
+}
+
+// POST /roadmaps/redo-session  body: { appointmentId }
+export async function apiRedoMentorshipSession(
+  appointmentId: string,
+): Promise<{ success: boolean; message: string }> {
+  if (!appointmentId?.trim()) {
+    throw new Error("appointmentId is required to redo a session");
+  }
+  const response = await axiosInstance.post<{ success?: boolean; message?: string }>(
+    `/roadmaps/redo-session`,
+    { appointmentId },
+  );
+  if (response.status >= 200 && response.status < 300) {
+    if (response.data && typeof response.data === "object" && response.data.success === false) {
+      throw new Error(response.data.message || "Failed to redo session");
+    }
+    return {
+      success: true,
+      message:
+        (typeof response.data?.message === "string" && response.data.message.trim()
+          ? response.data.message.trim()
+          : "Session marked for redo."),
+    };
+  }
+  throw new Error("Failed to redo session");
+}
 // ─── Legacy aliases ───────────────────────────────────────────────────────────
 /** @deprecated use apiUpdateRoadmap */
 export const apiUpdateRoadmapData = apiUpdateRoadmap;
