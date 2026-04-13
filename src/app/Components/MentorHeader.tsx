@@ -392,7 +392,7 @@ export default function MentorHeader({ showFullHeader = false }) {
                             if (item.action === "logout") {
                               void apiLogout().catch(() => { });
                               clearAllCookies();
-                              router.push("/mentor/login");
+                              window.location.href = "/";
                               return;
                             }
 

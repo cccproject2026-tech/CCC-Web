@@ -464,7 +464,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
                             if (item.label === "Log out") {
                               void apiLogout().catch(() => { });
                               clearAllCookies();
-                              router.push("/pastor/login");
+                              window.location.href = "/";
                               return;
                             }
                             if (item.path) {
