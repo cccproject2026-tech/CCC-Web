@@ -1,21 +1,45 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useLayoutEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { getCookie } from "@/app/utils/cookies";
 import DirectorHero from "../DirectorHero";
-import { directorGlassCard, directorPageContainer, directorPageRoot } from "../directorUi";
+import {
+  directorBtnPrimary,
+  directorBtnSecondary,
+  directorGlassCard,
+  directorPageContainer,
+  directorPageRoot,
+  directorSpinner,
+} from "../directorUi";
 import { DirectorFilterSection } from "../ui";
-import SearchBar from "@/app/Components/SearchBar";
 import ProgressBg from "../../Assets/progress-bg.jpg";
 import DuoIcon from "../../Assets/duo.png";
 import MeetIcon from "../../Assets/meet.png";
 import UserProfile from "../../Assets/user-profile.png";
-import { apiGetAppointments } from "@/app/Services/appointments.service";
-import { appointmentEntityId, unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
+import {
+  apiCancelAppointment,
+  apiCreateAppointment,
+  apiCreateAvailability,
+  apiGetAppointments,
+  apiGetWeeklyAvailability,
+} from "@/app/Services/appointments.service";
+import {
+  appointmentEntityId,
+  extractApiErrorMessage,
+  parseSlotStartToIso,
+  slotToHHmm,
+  uiMeetingModeToPlatform,
+  unwrapAppointmentsAxiosData,
+} from "@/app/Services/appointment-utils";
+import { timeOptions } from "@/app/Services/utils/helpers";
+import { apiGetAllUsers } from "@/app/Services/api";
 import type { AppointmentResponse, PersonInfo } from "@/app/Services/types";
 import { isRemoteImageSrc } from "@/app/utils/image";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function labelPerson(p: string | PersonInfo | undefined, fallback: string): string {
   if (p == null) return fallback;
@@ -24,98 +48,445 @@ function labelPerson(p: string | PersonInfo | undefined, fallback: string): stri
   return n || p.email || fallback;
 }
 
-function isToday(iso: string) {
+function isTodayDate(iso: string) {
   const d = new Date(iso);
   const t = new Date();
   return (
-    d.getDate() === t.getDate() && d.getMonth() === t.getMonth() && d.getFullYear() === t.getFullYear()
+    d.getDate() === t.getDate() &&
+    d.getMonth() === t.getMonth() &&
+    d.getFullYear() === t.getFullYear()
   );
 }
 
-export default function DirectorSchedulePage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState<"all" | "today" | "upcoming">("all");
-  const [rows, setRows] = useState<AppointmentResponse[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 
+function tabFromParam(raw: string | null): "Appointments" | "Availability" | "Schedule" | null {
+  if (!raw) return null;
+  const t = raw.trim().toLowerCase();
+  if (t === "appointments") return "Appointments";
+  if (t === "availability") return "Availability";
+  if (t === "schedule") return "Schedule";
+  return null;
+}
+
+const period = (p: unknown, fallback: "AM" | "PM"): "AM" | "PM" => {
+  const s = String(p ?? "").trim().toUpperCase();
+  if (s === "PM" || s.startsWith("P")) return "PM";
+  if (s === "AM" || s.startsWith("A")) return "AM";
+  return fallback;
+};
+
+// ─── Check if a date is in the past ───────────────────────────────────────────
+function isPastDate(dateStr: string): boolean {
+  const date = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  date.setHours(0, 0, 0, 0);
+  return date < today;
+}
+
+// ─── Inner content (needs useSearchParams — wrapped in Suspense) ──────────────
+
+function DirectorScheduleContent() {
+  const searchParams = useSearchParams();
+  const [activeTab, setActiveTab] = useState<"Appointments" | "Availability" | "Schedule">(
+    () => tabFromParam(searchParams.get("tab")) ?? "Appointments",
+  );
+
+  // director identity
+  const [directorId, setDirectorId] = useState<string | null>(null);
+
+  // shared state
+  const [appointments, setAppointments] = useState<AppointmentResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [showMenu, setShowMenu] = useState<number | null>(null);
+
+  // calendar (Appointments tab)
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  // availability state
+  const [availability, setAvailability] = useState<any[]>([]);
+  const [weekStart, setWeekStart] = useState(new Date());
+  const [selectedAvailabilityDay, setSelectedAvailabilityDay] = useState<number | null>(null);
+  const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
+  const [isAddSlotModalOpen, setIsAddSlotModalOpen] = useState(false);
+  const [newSlot, setNewSlot] = useState<any>(null);
+
+  // schedule drawer state
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [drawerStep, setDrawerStep] = useState<1 | 2>(1);
+  const [scheduleRecipientType, setScheduleRecipientType] = useState<"pastor" | "mentor">("pastor");
+  const [pastors, setPastors] = useState<any[]>([]);
+  const [mentors, setMentors] = useState<any[]>([]);
+  const [selectedRecipient, setSelectedRecipient] = useState<any | null>(null);
+  const [recipientSearch, setRecipientSearch] = useState("");
+  const [meetingDate, setMeetingDate] = useState("");
+  const [selectedSlot, setSelectedSlot] = useState("");
+  const [selectedPlatform, setSelectedPlatform] = useState("zoom");
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [isScheduling, setIsScheduling] = useState(false);
+
+  // mentor today-availability preview (Schedule drawer)
+  const [mentorTodaySlots, setMentorTodaySlots] = useState<string[] | null>(null);
+  const [mentorTodayLoading, setMentorTodayLoading] = useState(false);
+
+  // ── Resolve director ID from cookie ──────────────────────────────────────────
+  useEffect(() => {
+    const uid = getCookie("userId") as string | undefined;
+    if (uid) setDirectorId(String(uid));
+  }, []);
+
+  // ── Sync tab from URL params ──────────────────────────────────────────────────
+  useLayoutEffect(() => {
+    const next = tabFromParam(searchParams.get("tab"));
+    if (next) setActiveTab(next);
+  }, [searchParams]);
+
+  // ── Fetch all appointments ────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setError(null);
-
     (async () => {
       try {
-        const uid =
-          typeof window !== "undefined" ? (getCookie("userId") as string | undefined) : undefined;
-        let list: unknown[] = [];
-        try {
-          const res = await apiGetAppointments({ futureOnly: true, status: "scheduled" });
-          list = unwrapAppointmentsAxiosData(res);
-        } catch {
-          if (!uid) throw new Error("No scope");
-          const res = await apiGetAppointments({
-            futureOnly: true,
-            status: "scheduled",
-            userId: String(uid),
-          });
-          list = unwrapAppointmentsAxiosData(res);
-        }
-        if ((!list || list.length === 0) && uid) {
-          const res = await apiGetAppointments({
-            futureOnly: true,
-            status: "scheduled",
-            userId: String(uid),
-          });
-          const alt = unwrapAppointmentsAxiosData(res);
-          if (Array.isArray(alt) && alt.length > 0) list = alt;
-        }
-        const normalized = (Array.isArray(list) ? list : []) as AppointmentResponse[];
-        const sorted = [...normalized].sort(
+        const res = await apiGetAppointments({ futureOnly: false, status: "scheduled" });
+        const list = unwrapAppointmentsAxiosData(res);
+        const sorted = [...list].sort(
           (a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
         );
-        if (!cancelled) setRows(sorted);
-      } catch (e) {
-        console.error(e);
-        if (!cancelled) {
-          setError("Could not load schedule.");
-          setRows([]);
-        }
+        if (!cancelled) setAppointments(sorted);
+      } catch {
+        if (!cancelled) setAppointments([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
-  const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return rows.filter((a) => {
-      const mentor = a.mentor ?? (typeof a.mentorId === "object" ? a.mentorId : undefined);
-      const user = a.user ?? (typeof a.userId === "object" ? a.userId : undefined);
-      const mentorName = labelPerson(mentor, "").toLowerCase();
-      const userName = labelPerson(user, "").toLowerCase();
-      const hay = `${mentorName} ${userName} ${String(a.platform)} ${a.meetingDate}`.toLowerCase();
-      const matchesSearch = !q || hay.includes(q);
+  // ── Fetch pastors ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    apiGetAllUsers({ role: "pastor", roleMatch: "mixed", limit: 9999 })
+      .then((res) => {
+        const list = Array.isArray(res.data?.data?.users) ? res.data.data.users : [];
+        setPastors(list);
+      })
+      .catch(() => setPastors([]));
+  }, []);
 
-      const today = isToday(a.meetingDate);
-      const matchesTab =
-        activeTab === "all" ||
-        (activeTab === "today" && today) ||
-        (activeTab === "upcoming" && !today);
+  // ── Fetch mentors ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    apiGetAllUsers({ role: "mentor", roleMatch: "mixed", limit: 9999 })
+      .then((res) => {
+        const list = Array.isArray(res.data?.data?.users) ? res.data.data.users : [];
+        setMentors(list);
+      })
+      .catch(() => setMentors([]));
+  }, []);
 
-      return matchesSearch && matchesTab;
+  // ── Fetch weekly availability ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!directorId) return;
+    const sunday = new Date(weekStart);
+    sunday.setDate(sunday.getDate() - sunday.getDay());
+    const date = sunday.toISOString().split("T")[0];
+    apiGetWeeklyAvailability(directorId, date)
+      .then((res) => {
+        const raw = res.data?.data ?? res.data;
+        const data = Array.isArray(raw) ? raw : [];
+        if (data.length === 0) {
+          setAvailability(
+            [0, 1, 2, 3, 4, 5, 6].map((day) => ({
+              date: "",
+              day,
+              enabled: false,
+              slots: [{ startTime: "09:00", startPeriod: "AM", endTime: "05:00", endPeriod: "PM" }],
+            })),
+          );
+        } else {
+          setAvailability(
+            data.map((d: any) => ({
+              date: d.date,
+              day: typeof d.day === "number" ? d.day : Number(d.day) || 0,
+              enabled: Array.isArray(d.slots) && d.slots.length > 0,
+              slots:
+                Array.isArray(d.slots) && d.slots.length > 0
+                  ? d.slots.map((s: any) => ({
+                      startTime: s.startTime || "09:00",
+                      startPeriod: s.startPeriod || "AM",
+                      endTime: s.endTime || "05:00",
+                      endPeriod: s.endPeriod || "PM",
+                    }))
+                  : [{ startTime: "09:00", startPeriod: "AM", endTime: "05:00", endPeriod: "PM" }],
+            })),
+          );
+        }
+      })
+      .catch(() => {});
+  }, [directorId, weekStart, availabilityRefreshKey]);
+
+  // ── Fetch available slots for schedule step 2 ─────────────────────────────────
+  useEffect(() => {
+    if (!meetingDate) return;
+
+    // Static time slots for pastors (9 AM to 5 PM, hourly)
+    const staticPastorSlots = Array.from({ length: 8 }, (_, i) => {
+      const hour = 9 + i;
+      const startTime = hour > 12 ? hour - 12 : hour === 12 ? 12 : hour;
+      const period = hour >= 12 ? "PM" : "AM";
+      const endHour = hour + 1;
+      const endTime = endHour > 12 ? endHour - 12 : endHour === 12 ? 12 : endHour;
+      const endPeriod = endHour >= 12 ? "PM" : "AM";
+      return `${String(startTime).padStart(2, "0")}:00 ${period} - ${String(endTime).padStart(2, "0")}:00 ${endPeriod}`;
     });
-  }, [rows, searchQuery, activeTab]);
 
+    if (scheduleRecipientType === "pastor") {
+      // For pastors, use static slots
+      setAvailableSlots(staticPastorSlots);
+    } else if (scheduleRecipientType === "mentor" && (selectedRecipient?._id || selectedRecipient?.id)) {
+      // For mentors, fetch their availability
+      const mentorId = selectedRecipient._id || selectedRecipient.id;
+
+      // Convert the meeting date to the Sunday of that week for API call
+      const meetingDateObj = new Date(`${meetingDate}T12:00:00`);
+      const dayOfWeek = meetingDateObj.getDay();
+      const sunday = new Date(meetingDateObj);
+      sunday.setDate(meetingDateObj.getDate() - dayOfWeek);
+      const apiDate = sunday.toISOString().split("T")[0];
+
+      apiGetWeeklyAvailability(mentorId, apiDate)
+        .then((res) => {
+          const raw = res.data?.data ?? res.data;
+          const data = Array.isArray(raw) ? raw : [];
+          const dayData = data.find((d: any) => {
+            // Match by specific date first, then fall back to day-of-week index
+            if (typeof d.date === "string" && d.date.length >= 10 && d.date.startsWith(meetingDate)) return true;
+            const dNum = typeof d.day === "number" ? d.day : Number(d.day);
+            return dNum === dayOfWeek;
+          });
+          if (!dayData?.slots?.length) {
+            setAvailableSlots([]);
+            return;
+          }
+          const normalize = (t: string) => t.replace(/\s+/g, "").toLowerCase();
+          const bookedSlots = appointments
+            .filter((a) => a.meetingDate.startsWith(meetingDate))
+            .map((a) => {
+              const d = new Date(a.meetingDate);
+              return normalize(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+            });
+          const formatted = dayData.slots
+            .map((s: any) => `${s.startTime ?? "00:00"} ${(s.startPeriod ?? "AM").toUpperCase()} - ${s.endTime ?? "00:00"} ${(s.endPeriod ?? "PM").toUpperCase()}`)
+            .filter((slot: string) => !bookedSlots.includes(normalize(slot.split(" - ")[0])));
+          setAvailableSlots(formatted);
+        })
+        .catch((err) => {
+          console.error("Failed to fetch mentor availability:", err);
+          setAvailableSlots([]);
+        });
+    } else {
+      setAvailableSlots([]);
+    }
+  }, [meetingDate, scheduleRecipientType, selectedRecipient, appointments]);
+
+  // ── Fetch selected mentor's availability for today ────────────────────────────
+  useEffect(() => {
+    if (scheduleRecipientType !== "mentor" || !selectedRecipient) {
+      setMentorTodaySlots(null);
+      return;
+    }
+    const mentorId = selectedRecipient._id || selectedRecipient.id;
+    const today = new Date();
+    const todayStr = today.toISOString().split("T")[0];
+    const sunday = new Date(today);
+    sunday.setDate(today.getDate() - today.getDay());
+    const sundayStr = sunday.toISOString().split("T")[0];
+
+    let cancelled = false;
+    setMentorTodayLoading(true);
+    setMentorTodaySlots(null);
+    apiGetWeeklyAvailability(mentorId, sundayStr)
+      .then((res) => {
+        if (cancelled) return;
+        const data = Array.isArray(res.data?.data) ? res.data.data : [];
+        const todayDayOfWeek = today.getDay();
+        const dayData = data.find((d: any) => {
+          // Match by specific date first, then fall back to day-of-week
+          if (typeof d.date === "string" && d.date.startsWith(todayStr)) return true;
+          const dNum = typeof d.day === "number" ? d.day : Number(d.day);
+          return dNum === todayDayOfWeek;
+        });
+        if (!dayData?.slots?.length) { setMentorTodaySlots([]); return; }
+        setMentorTodaySlots(
+          dayData.slots.map((s: any) => `${s.startTime} ${s.startPeriod} – ${s.endTime} ${s.endPeriod}`)
+        );
+      })
+      .catch(() => { if (!cancelled) setMentorTodaySlots([]); })
+      .finally(() => { if (!cancelled) setMentorTodayLoading(false); });
+    return () => { cancelled = true; };
+  }, [selectedRecipient, scheduleRecipientType]);
+
+  // ── Auto-select current date in availability tab ──────────────────────────────
+  useEffect(() => {
+    if (availability.length === 0) { setSelectedAvailabilityDay(null); return; }
+    setSelectedAvailabilityDay((prev) => {
+      if (prev !== null && availability.some((d) => d.day === prev)) return prev;
+      // Try to select today's day of the week first
+      const todayDayOfWeek = new Date().getDay();
+      if (availability.some((d) => d.day === todayDayOfWeek)) return todayDayOfWeek;
+      // Fall back to first enabled day
+      const first = availability.find((d) => d.enabled)?.day;
+      return typeof first === "number" ? first : availability[0]?.day ?? 0;
+    });
+  }, [availability]);
+
+  // ── Derived calendar values ───────────────────────────────────────────────────
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startDay = new Date(year, month, 1).getDay();
+  const calendarDays = [...Array(startDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  const appointmentDates = appointments.map((appt) => {
+    const d = new Date(appt.meetingDate);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const todayAppointments = appointments.filter((a) => isTodayDate(a.meetingDate));
+
+  // ── Availability helpers ───────────────────────────────────────────────────────
+  const resolveAvailabilityRowDate = (d: any): string => {
+    const raw = typeof d.date === "string" ? d.date.trim() : "";
+    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+    const anchor = new Date(weekStart);
+    anchor.setHours(12, 0, 0, 0);
+    const sunday = new Date(anchor);
+    sunday.setDate(anchor.getDate() - anchor.getDay());
+    const di = Number(d.day ?? 0) % 7;
+    const dt = new Date(sunday);
+    dt.setDate(sunday.getDate() + di);
+    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  };
+
+  const weekCalendarDates = Array.from({ length: 7 }, (_, dayIndex) => {
+    const dayData = availability.find((d) => d.day === dayIndex);
+    const dateKey = resolveAvailabilityRowDate(dayData ?? { day: dayIndex });
+    const date = new Date(`${dateKey}T12:00:00`);
+    return { dayIndex, date, hasSlots: Boolean(dayData?.enabled && dayData?.slots?.length > 0) };
+  });
+
+  const weekMonthYearLabel =
+    weekCalendarDates.length > 0
+      ? weekCalendarDates[0].date.toLocaleDateString("default", { month: "long", year: "numeric" })
+      : "—";
+
+  const selectedDayData =
+    selectedAvailabilityDay === null ? null : availability.find((d) => d.day === selectedAvailabilityDay) || null;
+
+  // ── Save availability ─────────────────────────────────────────────────────────
+  const handleSaveAvailability = async () => {
+    if (!directorId) return;
+    const enabled = availability.filter((d) => d.enabled && d.slots?.length > 0);
+    if (enabled.length === 0) {
+      showToast("Please add at least one availability slot");
+      return;
+    }
+    const dated = enabled.map((d) => ({ date: resolveAvailabilityRowDate(d), uiSlots: d.slots || [] }));
+    const body = {
+      mentorId: directorId,
+      meetingDuration: 60,
+      weeklySlots: dated.map(({ date, uiSlots }) => ({
+        date,
+        slots: uiSlots.map((s: any) => ({
+          startTime: String(s.startTime || "09:00").replace(/\s*(AM|PM)\s*/gi, "").trim(),
+          startPeriod: period(s.startPeriod, "AM"),
+          endTime: String(s.endTime || "05:00").replace(/\s*(AM|PM)\s*/gi, "").trim(),
+          endPeriod: period(s.endPeriod, "PM"),
+        })),
+      })),
+    };
+    try {
+      await apiCreateAvailability(body as any);
+      setAvailabilityRefreshKey((k) => k + 1);
+      showToast("Availability saved successfully");
+    } catch (e) {
+      showToast(extractApiErrorMessage(e) || "Failed to save availability");
+    }
+  };
+
+  // ── Create appointment (Schedule tab) ────────────────────────────────────────
+  const handleCreateAppointment = async () => {
+    if (!directorId) return;
+    if (!selectedRecipient?._id && !selectedRecipient?.id) {
+      showToast(`Please select a ${scheduleRecipientType}`);
+      return;
+    }
+    if (!meetingDate || !selectedSlot) { showToast("Please select date and time"); return; }
+    if (isScheduling) return;
+    setIsScheduling(true);
+    try {
+      await apiCreateAppointment({
+        userId: selectedRecipient._id || selectedRecipient.id,
+        mentorId: directorId,
+        meetingDate: parseSlotStartToIso(meetingDate, selectedSlot.replace(/\u2013/g, "-")),
+        platform: uiMeetingModeToPlatform(selectedPlatform),
+        notes: "Scheduled by director",
+      });
+      const refresh = await apiGetAppointments({ futureOnly: false, status: "scheduled" });
+      setAppointments(unwrapAppointmentsAxiosData(refresh).sort(
+        (a: any, b: any) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
+      ));
+      setIsDrawerOpen(false);
+      setDrawerStep(1);
+      setSelectedRecipient(null);
+      setMeetingDate("");
+      setSelectedSlot("");
+      setAvailabilityRefreshKey((k) => k + 1);
+      showToast("Meeting scheduled successfully");
+    } catch (e) {
+      showToast(extractApiErrorMessage(e) || "Failed to schedule meeting");
+    } finally {
+      setIsScheduling(false);
+    }
+  };
+
+  // ── Cancel appointment ────────────────────────────────────────────────────────
+  const handleCancelAppointment = async (appt: AppointmentResponse) => {
+    const id = appointmentEntityId(appt);
+    if (!id) return;
+    try {
+      await apiCancelAppointment(id);
+      setAppointments((prev) => prev.filter((a) => appointmentEntityId(a) !== id));
+      setShowMenu(null);
+      showToast("Appointment cancelled");
+    } catch (e) {
+      showToast(extractApiErrorMessage(e) || "Failed to cancel appointment");
+    }
+  };
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  // ── Filtered recipients for schedule drawer ───────────────────────────────────
+  const scheduleRecipients = (scheduleRecipientType === "pastor" ? pastors : mentors).filter((p: any) => {
+    if (!recipientSearch.trim()) return true;
+    const q = recipientSearch.toLowerCase();
+    return `${p.firstName ?? ""} ${p.lastName ?? ""} ${p.email ?? ""}`.toLowerCase().includes(q);
+  });
+
+  // ── Glass select style (director tokens) ─────────────────────────────────────
+  const directorSelectDark =
+    "w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white outline-none focus:border-[#8ec5eb]/50 focus:ring-1 focus:ring-[#8ec5eb]/30 [&>option]:bg-[#062946]";
+
+  const directorDateInput =
+    "w-full rounded-lg border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white outline-none focus:border-[#8ec5eb]/50 focus:ring-1 focus:ring-[#8ec5eb]/30 [color-scheme:dark]";
+
+  // ─────────────────────────────────────────────────────────────────────────────
   return (
     <div className={directorPageRoot}>
       <DirectorHero
         title="Schedule"
-        subtitle="Upcoming mentor–mentee sessions across your network."
+        subtitle="Manage your appointments, set availability, and schedule meetings."
         image={ProgressBg}
         breadcrumbItems={[
           { label: "Home", href: "/director/home" },
@@ -123,153 +494,729 @@ export default function DirectorSchedulePage() {
         ]}
       />
 
-      <section className="relative flex-1 px-4 pb-12 sm:px-6 md:px-12 lg:px-20">
+      <section className="relative flex-1 px-4 pb-20 pt-8 md:px-4 lg:px-5">
         <div className={directorPageContainer}>
+
+          {/* ── Tab bar ── */}
           <DirectorFilterSection className="!p-4 sm:!p-5">
-            <div className="relative w-full flex-1 md:max-w-md">
-              <SearchBar
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="Search by name, platform, or date"
-                variant="dark"
-                className="w-full"
-              />
-            </div>
-            <div className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-1">
-              {[
-                { id: "all" as const, label: "All" },
-                { id: "today" as const, label: "Today" },
-                { id: "upcoming" as const, label: "Upcoming" },
-              ].map((tab) => (
+            <div
+              className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-1"
+              role="tablist"
+            >
+              {(["Appointments", "Availability", "Schedule"] as const).map((tab) => (
                 <button
-                  key={tab.id}
+                  key={tab}
                   type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`relative h-8 rounded-md px-4 text-sm font-semibold capitalize transition-all ${
-                    activeTab === tab.id
+                  role="tab"
+                  aria-selected={activeTab === tab}
+                  onClick={() => {
+                    setActiveTab(tab);
+                    if (tab === "Schedule") { setIsDrawerOpen(true); setDrawerStep(1); }
+                    else setIsDrawerOpen(false);
+                  }}
+                  className={`relative h-8 rounded-md px-5 text-sm font-semibold transition-all ${
+                    activeTab === tab
                       ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/35"
                       : "bg-transparent text-white/70 hover:text-white"
                   }`}
                 >
-                  {tab.label}
+                  {tab}
                 </button>
               ))}
             </div>
           </DirectorFilterSection>
 
-          {loading ? (
-            <div className="flex flex-col items-center justify-center gap-4 py-20">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb]/30 border-t-[#8ec5eb]" />
-              <p className="text-sm text-white/60">Loading schedule…</p>
-            </div>
-          ) : error ? (
-            <p className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 text-center text-sm text-red-100">
-              {error}
-            </p>
-          ) : null}
-
-          {!loading && !error && (
-            <div className="space-y-4">
-              {filtered.map((appointment) => {
-                const id = appointmentEntityId(appointment);
-                const platformIcon =
-                  appointment.platform === "gmeet" || appointment.platform === "google-meet"
-                    ? MeetIcon
-                    : DuoIcon;
-                const mentor = appointment.mentor ?? (typeof appointment.mentorId === "object" ? appointment.mentorId : undefined);
-                const mentee =
-                  appointment.user ?? (typeof appointment.userId === "object" ? appointment.userId : undefined);
-                const mentorName = labelPerson(mentor, "Mentor");
-                const menteeName = labelPerson(mentee, "Mentee");
-                const meetingDate = new Date(appointment.meetingDate);
-                const meetingTime = meetingDate.toLocaleTimeString("en-US", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: true,
-                });
-                const dateLabel = meetingDate.toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                });
-                const menteeId =
-                  typeof appointment.userId === "string"
-                    ? appointment.userId
-                    : appointment.userId?._id ?? appointment.user?._id;
-
-                return (
-                  <div
-                    key={id}
-                    className={`flex flex-col gap-4 p-5 sm:flex-row sm:items-stretch ${directorGlassCard}`}
-                  >
-                    <div className="flex shrink-0 justify-center sm:justify-start">
-                      <div className="flex h-[100px] w-[100px] items-center justify-center rounded-2xl border border-white/15 bg-white/10 sm:h-[120px] sm:w-[120px]">
-                        <Image src={platformIcon} alt="" className="h-12 w-12 sm:h-14 sm:w-14" />
-                      </div>
-                    </div>
-                    <div className="min-w-0 flex-1 text-center sm:text-left">
-                      <div className="mb-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                        {mentor?.profilePicture ? (
-                          <Image
-                            src={mentor.profilePicture}
-                            alt=""
-                            width={40}
-                            height={40}
-                            unoptimized={isRemoteImageSrc(mentor.profilePicture)}
-                            className="rounded-full border border-white/30"
-                          />
-                        ) : (
-                          <Image
-                            src={UserProfile}
-                            alt=""
-                            width={40}
-                            height={40}
-                            className="rounded-full border border-white/30"
-                          />
-                        )}
-                        <div>
-                          <h4 className="font-semibold text-white">{mentorName}</h4>
-                          <p className="text-xs capitalize text-white/60">Mentor</p>
-                        </div>
-                      </div>
-                      <p className="text-sm text-white/85">
-                        <span className="text-white/55">With </span>
-                        {menteeName}
-                      </p>
-                      <p className="mt-2 text-sm text-[#8ec5eb]">
-                        {dateLabel} · {meetingTime}
-                      </p>
-                      <p className="mt-1 text-xs capitalize text-white/50">{appointment.platform}</p>
-                      {menteeId ? (
-                        <Link
-                          href={`/director/mentees/profile/${menteeId}`}
-                          className="mt-3 inline-block text-sm font-medium text-[#8ec5eb] hover:text-[#b8ddf5]"
-                        >
-                          View mentee profile
-                        </Link>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
+          {/* ── Loading spinner ── */}
+          {loading && (
+            <div className="flex flex-col items-center justify-center gap-4 py-16">
+              <div className={directorSpinner} />
+              <p className="text-sm text-white/60">Loading…</p>
             </div>
           )}
 
-          {!loading && !error && filtered.length === 0 ? (
-            <div className="py-14 text-center">
-              <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full border border-white/15 bg-white/5">
-                <i className="fa-regular fa-calendar-xmark text-4xl text-white/50" />
+          {/* ══════════════════════════════════════════════
+              APPOINTMENTS TAB
+          ══════════════════════════════════════════════ */}
+          {!loading && activeTab === "Appointments" && (
+            <div className="grid grid-cols-1 gap-10 lg:grid-cols-2 lg:gap-12">
+
+              {/* Left: Monthly calendar */}
+              <div className={`${directorGlassCard} p-5 sm:p-6`}>
+                <h3 className="mb-4 flex items-center gap-2 text-[15px] font-medium text-white">
+                  <i className="fa-regular fa-calendar text-[#8ec5eb]" />
+                  Monthly meeting calendar
+                </h3>
+                <div className="rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-5 text-center shadow-inner">
+                  <div className="mb-4 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentDate(new Date(year, month - 1, 1))}
+                      className="rounded-lg px-2 py-1 text-white/90 transition hover:bg-white/10"
+                      aria-label="Previous month"
+                    >◀</button>
+                    <p className="text-sm font-medium text-white/90">
+                      {currentDate.toLocaleString("default", { month: "long", year: "numeric" })}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentDate(new Date(year, month + 1, 1))}
+                      className="rounded-lg px-2 py-1 text-white/90 transition hover:bg-white/10"
+                      aria-label="Next month"
+                    >▶</button>
+                  </div>
+                  <div className="mb-2 grid grid-cols-7 gap-2 text-[13px]">
+                    {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+                      <div key={`${d}-${i}`} className="font-medium text-[#cde2f2]/80">{d}</div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-2 text-[13px]">
+                    {calendarDays.map((day, index) => {
+                      if (!day) return <div key={index} />;
+                      const d = new Date(year, month, day);
+                      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                      const hasAppointment = appointmentDates.includes(dateStr);
+                      const isT =
+                        day === new Date().getDate() &&
+                        month === new Date().getMonth() &&
+                        year === new Date().getFullYear();
+                      const isPast = isPastDate(dateStr);
+                      return (
+                        <div
+                          key={index}
+                          className={`rounded-md py-1 transition ${isPast ? "opacity-40 cursor-not-allowed pointer-events-none" : "cursor-pointer"} ${
+                            isT
+                              ? "bg-[#8ec5eb]/35 font-semibold text-white ring-1 ring-[#8ec5eb]/50"
+                              : "text-[#d9ebf8] hover:bg-white/10"
+                          } ${hasAppointment && !isPast ? "ring-1 ring-amber-300/60" : ""}`}
+                        >
+                          {day}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-              <p className="text-lg text-white/80">
-                {rows.length === 0
-                  ? "No upcoming appointments."
-                  : "No sessions match your search or filter."}
-              </p>
+
+              {/* Right: Today's appointments */}
+              <div>
+                <h3 className="mb-4 text-[15px] font-semibold text-white">
+                  Today — {todayAppointments.length} appointment{todayAppointments.length === 1 ? "" : "s"}
+                </h3>
+                <div className="flex flex-col gap-5">
+                  {todayAppointments.length === 0 && (
+                    <div className={`${directorGlassCard} flex items-center justify-center p-8`}>
+                      <p className="text-sm text-white/60">No meetings scheduled for today.</p>
+                    </div>
+                  )}
+                  {todayAppointments.map((appt, index) => {
+                    const md = new Date(appt.meetingDate);
+                    const apptKey = appointmentEntityId(appt) || String(index);
+                    const mentor = appt.mentor ?? (typeof appt.mentorId === "object" ? appt.mentorId : undefined);
+                    const mentee = appt.user ?? (typeof appt.userId === "object" ? appt.userId : undefined);
+                    const mentorName = labelPerson(mentor, "Mentor");
+                    const menteeName = labelPerson(mentee, "Mentee");
+                    const mentorId =
+                      typeof appt.mentorId === "string" ? appt.mentorId : appt.mentorId?._id ?? appt.mentor?._id;
+                    const menteeId =
+                      typeof appt.userId === "string" ? appt.userId : appt.userId?._id ?? appt.user?._id;
+                    return (
+                      <div
+                        key={apptKey}
+                        className={`${directorGlassCard} relative flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center`}
+                      >
+                        <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-6">
+                          <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
+                            <Image
+                              src={appt.platform === "gmeet" || appt.platform === "google-meet" ? MeetIcon : DuoIcon}
+                              alt={appt.platform}
+                              className="h-10 w-10"
+                            />
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1 px-4 pt-4 pb-4 sm:px-5 sm:pt-0 sm:pb-0">
+                          <div className="mb-2 flex items-center gap-3">
+                            <Image
+                              src={mentor?.profilePicture || UserProfile}
+                              alt={mentorName}
+                              width={36}
+                              height={36}
+                              unoptimized={mentor?.profilePicture ? isRemoteImageSrc(mentor.profilePicture) : false}
+                              className="rounded-full border border-white/20"
+                            />
+                            <div>
+                              <h4 className="text-sm font-semibold text-white">
+                                {mentorId ? (
+                                  <Link href={`/director/mentors/profile/${encodeURIComponent(mentorId)}`} className="hover:text-[#8ec5eb]">
+                                    {mentorName}
+                                  </Link>
+                                ) : mentorName}
+                              </h4>
+                              <p className="text-[12px] text-[#cde2f2]/90">Mentor</p>
+                            </div>
+                          </div>
+                          <p className="mb-2 text-[12px] text-[#cde2f2]">
+                            with{" "}
+                            <span className="font-medium text-white">
+                              {menteeId ? (
+                                <Link href={`/director/mentees/profile/${encodeURIComponent(menteeId)}`} className="hover:text-[#8ec5eb]">
+                                  {menteeName}
+                                </Link>
+                              ) : menteeName}
+                            </span>
+                          </p>
+                          <div className="mb-2 flex flex-wrap gap-2">
+                            <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
+                              <i className="fa-regular fa-clock text-[#8ec5eb]" />
+                              {md.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                            <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] capitalize text-[#d9ebf8]">
+                              {appt.platform}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-end">
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowMenu(showMenu === index ? null : index)}
+                                className="rounded-lg px-3 py-1 text-[#8ec5eb] transition hover:bg-white/10 hover:text-white"
+                                aria-label="Appointment actions"
+                              >
+                                <i className="fa-solid fa-ellipsis-vertical" />
+                              </button>
+                              {showMenu === index && (
+                                <div className="absolute right-0 top-9 z-10 w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                                  <button
+                                    type="button"
+                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                                    onClick={() => handleCancelAppointment(appt)}
+                                  >
+                                    <i className="fa-regular fa-circle-xmark mr-2 text-red-300" />
+                                    Cancel meeting
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          ) : null}
+          )}
+
+          {/* ══════════════════════════════════════════════
+              AVAILABILITY TAB
+          ══════════════════════════════════════════════ */}
+          {!loading && activeTab === "Availability" && (
+            <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
+
+              {/* Left: Weekly calendar + settings */}
+              <div className={`${directorGlassCard} p-5 text-white sm:p-6`}>
+                <h3 className="mb-5 text-[15px] font-medium">My weekly availability</h3>
+                <div className="mb-6 rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-5 text-center shadow-inner">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setWeekStart((prev) => { const n = new Date(prev); n.setDate(n.getDate() - 7); return n; })}
+                      className="rounded-lg px-2 py-1 text-white/90 transition hover:bg-white/10"
+                      aria-label="Previous week"
+                    >◀</button>
+                    <p className="text-sm font-medium text-[#d9ebf8]">{weekMonthYearLabel}</p>
+                    <button
+                      type="button"
+                      onClick={() => setWeekStart((prev) => { const n = new Date(prev); n.setDate(n.getDate() + 7); return n; })}
+                      className="rounded-lg px-2 py-1 text-white/90 transition hover:bg-white/10"
+                      aria-label="Next week"
+                    >▶</button>
+                  </div>
+                  <div className="grid grid-cols-7 gap-2 text-[13px]">
+                    {weekCalendarDates.map(({ dayIndex, date, hasSlots }) => {
+                      const day = date.toLocaleDateString("default", { weekday: "short" });
+                      const isSelected = selectedAvailabilityDay === dayIndex;
+                      const isPast = isPastDate(date.toISOString().split("T")[0]);
+                      return (
+                        <div
+                          key={date.toISOString()}
+                          onClick={() => !isPast && setSelectedAvailabilityDay(dayIndex)}
+                          className={`rounded-md py-2 text-center transition ${
+                            isPast
+                              ? "opacity-40 cursor-not-allowed pointer-events-none"
+                              : "cursor-pointer"
+                          } ${
+                            isSelected
+                              ? "bg-[#8ec5eb]/30 font-semibold text-white ring-1 ring-[#8ec5eb]/55"
+                              : "text-[#d9ebf8] hover:bg-white/10"
+                          } ${hasSlots && !isPast ? "ring-1 ring-amber-300/55" : ""}`}
+                        >
+                          <div>{day}</div>
+                          <div className="text-xs text-white/80">{date.getDate()}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1 block text-xs text-[#cde2f2]">Meeting Duration</label>
+                    <select className={directorSelectDark}><option>60 Minutes</option><option>30 Minutes</option></select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-[#cde2f2]">Max. Bookings/Day</label>
+                    <select className={directorSelectDark}><option>5</option><option>10</option></select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-[#cde2f2]">Min. Notice</label>
+                    <select className={directorSelectDark}><option>2 Days</option><option>1 Day</option></select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-[#cde2f2]">Preferred Mode</label>
+                    <select className={directorSelectDark}><option>Zoom</option><option>Google Meet</option></select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Slot editor */}
+              <div className="text-white">
+                <h3 className="mb-3 text-[15px] font-medium">Available hours</h3>
+                {!selectedDayData ? (
+                  <div className={`${directorGlassCard} flex items-center justify-center p-8`}>
+                    <p className="text-sm text-white/60">Select a date from the weekly calendar to edit that day.</p>
+                  </div>
+                ) : (
+                  <div className={`${directorGlassCard} p-4 sm:p-5`}>
+                    <div className="mb-4 flex flex-wrap items-center gap-3 border-b border-white/15 pb-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedDayData.enabled || false}
+                        onChange={() =>
+                          setAvailability((prev) =>
+                            prev.map((d) => d.day === selectedAvailabilityDay ? { ...d, enabled: !d.enabled } : d),
+                          )
+                        }
+                        className="accent-[#8ec5eb]"
+                      />
+                      <p className="text-sm font-medium text-[#d9ebf8]">
+                        {DAY_LABELS[selectedDayData.day as number]} —{" "}
+                        {new Date(`${resolveAvailabilityRowDate(selectedDayData)}T12:00:00`).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {(selectedDayData.slots || []).map((slot: any, i: number) => (
+                        <div key={i} className="rounded-lg border border-white/15 bg-white/[0.03] p-2">
+                          <div className="mb-1 text-[11px] text-[#cde2f2]">Slot {i + 1}</div>
+                          <div className="flex items-center gap-1.5">
+                            <select
+                              className="rounded border border-white/15 bg-white/10 px-1.5 py-1 text-[11px] text-white outline-none [&>option]:bg-[#062946]"
+                              value={`${slot.startTime}-${slot.startPeriod}`}
+                              onChange={(e) => {
+                                const [time, slotPeriod] = e.target.value.split("-");
+                                setAvailability((prev) =>
+                                  prev.map((d) =>
+                                    d.day === selectedAvailabilityDay
+                                      ? { ...d, slots: d.slots.map((s: any, idx: number) => idx === i ? { ...s, startTime: time, startPeriod: slotPeriod } : s) }
+                                      : d,
+                                  ),
+                                );
+                              }}
+                            >
+                              {timeOptions.map((t) => (
+                                <option key={t.label} value={`${t.time}-${t.period}`}>{t.label}</option>
+                              ))}
+                            </select>
+                            <span className="text-[11px] text-[#d9ebf8]">to</span>
+                            <select
+                              className="rounded border border-white/15 bg-white/10 px-1.5 py-1 text-[11px] text-white outline-none [&>option]:bg-[#062946]"
+                              value={`${slot.endTime}-${slot.endPeriod}`}
+                              onChange={(e) => {
+                                const [time, slotPeriod] = e.target.value.split("-");
+                                setAvailability((prev) =>
+                                  prev.map((d) =>
+                                    d.day === selectedAvailabilityDay
+                                      ? { ...d, slots: d.slots.map((s: any, idx: number) => idx === i ? { ...s, endTime: time, endPeriod: slotPeriod } : s) }
+                                      : d,
+                                  ),
+                                );
+                              }}
+                            >
+                              {timeOptions.map((t) => (
+                                <option key={t.label} value={`${t.time}-${t.period}`}>{t.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        className={`${directorBtnSecondary} px-3 py-1.5 text-xs`}
+                        onClick={() => {
+                          setNewSlot({ startTime: "09:00", startPeriod: "AM", endTime: "10:00", endPeriod: "AM" });
+                          setIsAddSlotModalOpen(true);
+                        }}
+                      >
+                        + Add slot
+                      </button>
+                    </div>
+                  </div>
+                )}
+                <div className="mt-6">
+                  <button type="button" onClick={handleSaveAvailability} className={directorBtnPrimary}>
+                    Save availability
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Add slot modal */}
+          {!loading && activeTab === "Availability" && isAddSlotModalOpen && newSlot && (
+            <>
+              <div
+                className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
+                onClick={() => { setIsAddSlotModalOpen(false); setNewSlot(null); }}
+                aria-hidden
+              />
+              <div className="fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/20 bg-[#041f35] p-5 text-white shadow-2xl">
+                <h3 className="mb-4 text-base font-semibold">Add new slot</h3>
+                <div className="mb-5 flex items-center gap-2">
+                  <select
+                    className={directorSelectDark}
+                    value={`${newSlot.startTime}-${newSlot.startPeriod}`}
+                    onChange={(e) => { const [time, slotPeriod] = e.target.value.split("-"); setNewSlot((p: any) => ({ ...p, startTime: time, startPeriod: slotPeriod })); }}
+                  >
+                    {timeOptions.map((t) => <option key={t.label} value={`${t.time}-${t.period}`}>{t.label}</option>)}
+                  </select>
+                  <span className="shrink-0 text-sm text-[#d9ebf8]">to</span>
+                  <select
+                    className={directorSelectDark}
+                    value={`${newSlot.endTime}-${newSlot.endPeriod}`}
+                    onChange={(e) => { const [time, slotPeriod] = e.target.value.split("-"); setNewSlot((p: any) => ({ ...p, endTime: time, endPeriod: slotPeriod })); }}
+                  >
+                    {timeOptions.map((t) => <option key={t.label} value={`${t.time}-${t.period}`}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button type="button" className={directorBtnSecondary} onClick={() => { setIsAddSlotModalOpen(false); setNewSlot(null); }}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={directorBtnPrimary}
+                    onClick={() => {
+                      setAvailability((prev) =>
+                        prev.map((d) =>
+                          d.day === selectedAvailabilityDay
+                            ? { ...d, enabled: true, slots: [...(d.slots || []), newSlot] }
+                            : d,
+                        ),
+                      );
+                      setIsAddSlotModalOpen(false);
+                      setNewSlot(null);
+                    }}
+                  >
+                    Save slot
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ══════════════════════════════════════════════
+              SCHEDULE TAB — empty state (drawer closed)
+          ══════════════════════════════════════════════ */}
+          {!loading && activeTab === "Schedule" && !isDrawerOpen && (
+            <div className={`${directorGlassCard} flex flex-col items-center justify-center gap-4 py-16`}>
+              <i className="fa-regular fa-calendar-plus text-4xl text-[#8ec5eb]" />
+              <p className="text-sm text-white/70">
+                Open the panel to pick a pastor or mentor and set a time.
+              </p>
+              <button
+                type="button"
+                className={directorBtnPrimary}
+                onClick={() => { setDrawerStep(1); setIsDrawerOpen(true); }}
+              >
+                New meeting
+              </button>
+            </div>
+          )}
+
         </div>
       </section>
+
+      {/* ══════════════════════════════════════════════
+          SCHEDULE DRAWER (slide-over)
+      ══════════════════════════════════════════════ */}
+      {activeTab === "Schedule" && isDrawerOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
+            onClick={() => setIsDrawerOpen(false)}
+            aria-hidden
+          />
+          <div className="fixed right-0 top-0 z-50 h-full w-full border-l border-white/15 bg-[#041f35] text-white shadow-2xl sm:w-[480px] sm:max-w-[480px]">
+
+            {/* Step 1: Pick recipient */}
+            {drawerStep === 1 && (
+              <div className="flex h-full flex-col p-6">
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">New meeting</h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsDrawerOpen(false)}
+                    className="rounded-lg p-2 text-[#cde2f2] transition hover:bg-white/10 hover:text-white"
+                    aria-label="Close"
+                  >
+                    <i className="fa-solid fa-xmark text-xl" />
+                  </button>
+                </div>
+
+                {/* Recipient type toggle */}
+                <div className="mb-4 flex gap-2">
+                  {(["pastor", "mentor"] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => { setScheduleRecipientType(type); setSelectedRecipient(null); }}
+                      className={`rounded-lg px-4 py-2 text-sm font-medium capitalize transition ${
+                        scheduleRecipientType === type
+                          ? "bg-white/15 text-white ring-1 ring-[#8ec5eb]/40"
+                          : "border border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
+                      }`}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Search by name…"
+                  value={recipientSearch}
+                  onChange={(e) => setRecipientSearch(e.target.value)}
+                  className="mb-4 w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30"
+                />
+
+                <div className="flex max-h-[min(380px,50vh)] flex-col gap-3 overflow-y-auto pr-1">
+                  {scheduleRecipients.length === 0 && (
+                    <p className="px-2 py-4 text-sm text-white/60">No {scheduleRecipientType}s found.</p>
+                  )}
+                  {scheduleRecipients.map((person: any) => {
+                    const personId = person._id || person.id;
+                    const isSelected = (selectedRecipient?._id || selectedRecipient?.id) === personId;
+                    return (
+                      <button
+                        type="button"
+                        key={personId}
+                        onClick={() => setSelectedRecipient(person)}
+                        className={`flex w-full items-center justify-between gap-4 rounded-xl border px-4 py-3 text-left transition ${
+                          isSelected
+                            ? "border-[#8ec5eb]/45 bg-[#8ec5eb]/15"
+                            : "border-white/15 bg-white/5 hover:border-white/25 hover:bg-white/10"
+                        }`}
+                      >
+                        <div className="flex min-w-0 items-center gap-3">
+                          <Image
+                            src={person.profilePicture || UserProfile}
+                            alt=""
+                            width={36}
+                            height={36}
+                            unoptimized={person.profilePicture ? isRemoteImageSrc(person.profilePicture) : false}
+                            className="shrink-0 rounded-full border border-white/20"
+                          />
+                          <span className="truncate text-sm font-medium text-white">
+                            {person.firstName} {person.lastName}
+                          </span>
+                        </div>
+                        <input type="radio" checked={isSelected} readOnly className="accent-[#8ec5eb]" aria-hidden />
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Today's availability preview for selected mentor */}
+                {scheduleRecipientType === "mentor" && selectedRecipient && (
+                  <div className="mt-4 shrink-0 rounded-xl border border-white/15 bg-white/[0.04] p-4">
+                    <p className="mb-2 text-xs font-semibold text-[#cde2f2]">
+                      Today&apos;s availability —{" "}
+                      {new Date().toLocaleDateString("default", { weekday: "long", month: "short", day: "numeric" })}
+                    </p>
+                    {mentorTodayLoading ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
+                        <span className="text-xs text-white/50">Fetching slots…</span>
+                      </div>
+                    ) : !mentorTodaySlots || mentorTodaySlots.length === 0 ? (
+                      <p className="text-xs text-white/50">No availability set for today.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {mentorTodaySlots.map((slot) => (
+                          <span
+                            key={slot}
+                            className="rounded-lg border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 px-2.5 py-1 text-xs text-[#d9ebf8]"
+                          >
+                            {slot}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-auto flex justify-end gap-3 border-t border-white/10 pt-6">
+                  <button type="button" onClick={() => setIsDrawerOpen(false)} className={directorBtnSecondary}>Cancel</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedRecipient) { showToast(`Please select a ${scheduleRecipientType} first`); return; }
+                      setDrawerStep(2);
+                    }}
+                    className={directorBtnPrimary}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Pick date / slot / platform */}
+            {drawerStep === 2 && (
+              <div className="flex h-full flex-col p-6">
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold">
+                    <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
+                    Schedule a meeting
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsDrawerOpen(false)}
+                    className="rounded-lg p-2 text-[#cde2f2] transition hover:bg-white/10 hover:text-white"
+                    aria-label="Close"
+                  >
+                    <i className="fa-solid fa-xmark text-xl" />
+                  </button>
+                </div>
+
+                {selectedRecipient && (
+                  <div className="mb-4 flex items-center gap-3 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => setDrawerStep(1)}
+                      className="text-[#8ec5eb] hover:text-white"
+                      aria-label="Back"
+                    >
+                      <i className="fa-solid fa-arrow-left" />
+                    </button>
+                    <Image
+                      src={selectedRecipient.profilePicture || UserProfile}
+                      alt=""
+                      width={32}
+                      height={32}
+                      className="rounded-full border border-white/20"
+                    />
+                    <span className="text-sm font-medium text-white">
+                      {selectedRecipient.firstName} {selectedRecipient.lastName}
+                    </span>
+                    <span className="ml-auto rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] capitalize text-[#cde2f2]">
+                      {scheduleRecipientType}
+                    </span>
+                  </div>
+                )}
+
+                <div className="mb-5 rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-4 text-center">
+                  <p className="mb-2 text-sm text-[#cde2f2]">Select date</p>
+                  <input
+                    type="date"
+                    value={meetingDate}
+                    min={new Date().toISOString().split("T")[0]}
+                    onChange={(e) => { setMeetingDate(e.target.value); setSelectedSlot(""); }}
+                    className={directorDateInput}
+                  />
+                </div>
+
+                {meetingDate && (
+                  <div className="mb-5">
+                    <p className="mb-2 text-sm text-[#cde2f2]">Available time slots</p>
+                    {availableSlots.length === 0 ? (
+                      <p className="text-sm text-white/50">No slots available for selected date.</p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2">
+                        {availableSlots.map((label) => (
+                          <button
+                            key={label}
+                            type="button"
+                            onClick={() => setSelectedSlot(label)}
+                            className={`rounded-lg border px-3 py-2 text-sm transition ${
+                              selectedSlot === label
+                                ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20 text-white"
+                                : "border-white/15 bg-white/5 text-[#d9ebf8] hover:bg-white/10"
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="mb-6">
+                  <p className="mb-2 text-sm text-[#cde2f2]">Meeting platform</p>
+                  <select
+                    value={selectedPlatform}
+                    onChange={(e) => setSelectedPlatform(e.target.value)}
+                    className={directorSelectDark}
+                  >
+                    <option value="zoom">Zoom</option>
+                    <option value="google meet">Google Meet</option>
+                    <option value="teams">Microsoft Teams</option>
+                    <option value="phone">Phone</option>
+                  </select>
+                </div>
+
+                <div className="mt-auto flex justify-end gap-3 border-t border-white/10 pt-6">
+                  <button type="button" onClick={() => setIsDrawerOpen(false)} className={directorBtnSecondary}>Cancel</button>
+                  <button
+                    type="button"
+                    disabled={isScheduling}
+                    onClick={handleCreateAppointment}
+                    className={`${directorBtnPrimary} ${isScheduling ? "cursor-not-allowed opacity-70" : ""}`}
+                  >
+                    {isScheduling ? "Scheduling…" : "Schedule"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Toast ── */}
+      {toastMessage && (
+        <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-xl border border-white/20 bg-[#062946]/90 px-5 py-3 text-sm text-white shadow-xl backdrop-blur-md">
+          {toastMessage}
+        </div>
+      )}
     </div>
+  );
+}
+
+// ─── Page export (wraps in Suspense for useSearchParams) ──────────────────────
+export default function DirectorSchedulePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className={directorPageRoot}>
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 py-20">
+            <div className={directorSpinner} />
+            <p className="text-sm text-white/60">Loading schedule…</p>
+          </div>
+        </div>
+      }
+    >
+      <DirectorScheduleContent />
+    </Suspense>
   );
 }
