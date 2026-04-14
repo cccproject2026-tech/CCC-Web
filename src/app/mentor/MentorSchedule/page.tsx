@@ -43,23 +43,34 @@ import {
 import { convertToMinutes, getMentorFromCookie, isOverlapping, timeOptions } from "@/app/Services/utils/helpers";
 import { apiGetAllUsers, apiGetAssignedUsers } from "@/app/Services/api";
 
-function tabFromQueryParam(raw: string | null): "Appointments" | "Availability" | "Schedule" | null {
+function tabFromQueryParam(raw: string | null): "Appointments" | "Availability" | "Schedule" | "Appointment History" | null {
   if (!raw) return null;
   const t = raw.trim().toLowerCase();
   if (t === "appointments") return "Appointments";
   if (t === "availability") return "Availability";
   if (t === "schedule") return "Schedule";
+  if (t === "appointment-history" || t === "appointmenthistory" || t === "history") return "Appointment History";
   return null;
+}
+
+function isPastDate(dateStr: string): boolean {
+  const date = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  date.setHours(0, 0, 0, 0);
+  return date < today;
 }
 
 function MentorScheduleContent() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<
-    "Appointments" | "Availability" | "Schedule"
+    "Appointments" | "Availability" | "Schedule" | "Appointment History"
   >(() => tabFromQueryParam(searchParams.get("tab")) ?? "Appointments");
+  const [selectedAppointmentDate, setSelectedAppointmentDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [historyPage, setHistoryPage] = useState(1);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerStep, setDrawerStep] = useState<1 | 2>(1);
-  const [showMenu, setShowMenu] = useState<number | null>(null);
+  const [showMenu, setShowMenu] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,6 +127,17 @@ function MentorScheduleContent() {
     const next = tabFromQueryParam(searchParams.get("tab"));
     if (next) setActiveTab(next);
   }, [searchParams]);
+
+  useEffect(() => {
+    const onDocClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target?.closest("[data-mentor-appointment-menu]")) {
+        setShowMenu(null);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
 
   useEffect(() => {
     if (!mentorId) {
@@ -244,14 +266,7 @@ function MentorScheduleContent() {
               date: "",
               day,
               enabled: false,
-              slots: [
-                {
-                  startTime: "09:00",
-                  startPeriod: "AM",
-                  endTime: "05:00",
-                  endPeriod: "PM",
-                },
-              ],
+              slots: [],
             })),
           );
         } else {
@@ -267,14 +282,7 @@ function MentorScheduleContent() {
                   endTime: s.endTime || s.end?.split(":")?.slice(0, 2).join(":") || "05:00",
                   endPeriod: s.endPeriod || "PM",
                 }))
-                : [
-                  {
-                    startTime: "09:00",
-                    startPeriod: "AM",
-                    endTime: "05:00",
-                    endPeriod: "PM",
-                  },
-                ],
+                : [],
           }));
 
           setAvailability(formatted);
@@ -289,15 +297,24 @@ function MentorScheduleContent() {
 
   const today = new Date();
 
-  const todayAppointments = appointments.filter((appt) => {
-    const meeting = new Date(appt.meetingDate);
+  const todayKey = new Date().toISOString().split("T")[0];
+  const selectedDayAppointments = appointments
+    .filter((a) => a.meetingDate.startsWith(selectedAppointmentDate))
+    .filter((a) => selectedAppointmentDate !== todayKey || new Date(a.meetingDate).getTime() >= Date.now())
+    .sort((a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime());
+  const appointmentHistory = appointments
+    .filter((a) => new Date(a.meetingDate).getTime() < Date.now())
+    .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
+  const historyPageSize = 10;
+  const totalHistoryPages = Math.max(1, Math.ceil(appointmentHistory.length / historyPageSize));
+  const pagedAppointmentHistory = appointmentHistory.slice(
+    (historyPage - 1) * historyPageSize,
+    historyPage * historyPageSize,
+  );
 
-    return (
-      meeting.getDate() === today.getDate() &&
-      meeting.getMonth() === today.getMonth() &&
-      meeting.getFullYear() === today.getFullYear()
-    );
-  });
+  useEffect(() => {
+    setHistoryPage((prev) => Math.min(prev, totalHistoryPages));
+  }, [totalHistoryPages]);
 
   const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
   const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
@@ -516,14 +533,7 @@ function MentorScheduleContent() {
                 endTime: s.endTime || "05:00",
                 endPeriod: s.endPeriod || "PM",
               }))
-              : [
-                {
-                  startTime: "09:00",
-                  startPeriod: "AM",
-                  endTime: "05:00",
-                  endPeriod: "PM",
-                },
-              ],
+              : [],
         }));
         setAvailability(formatted);
       }
@@ -629,10 +639,11 @@ function MentorScheduleContent() {
                 className={`w-full max-w-none rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30 lg:max-w-sm`}
               />
               <MentorFilterTabGroup
-                tabs={["Appointments", "Availability", "Schedule"] as const}
+                tabs={["Appointments", "Availability", "Schedule", "Appointment History"] as const}
                 active={activeTab}
                 onChange={(tab) => {
                   setActiveTab(tab);
+                  if (tab === "Appointment History") setHistoryPage(1);
                   if (tab === "Schedule") {
                     setIsDrawerOpen(true);
                     setDrawerStep(1);
@@ -713,6 +724,8 @@ function MentorScheduleContent() {
                       ).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
                       const hasAppointment = appointmentDates.includes(dateStr);
+                      const isPast = isPastDate(dateStr);
+                      const isSelected = selectedAppointmentDate === dateStr;
 
                       const isToday =
                         day === new Date().getDate() &&
@@ -722,10 +735,12 @@ function MentorScheduleContent() {
                       return (
                         <div
                           key={index}
-                          className={`cursor-pointer rounded-md py-1 transition ${isToday
+                          onClick={() => !isPast && setSelectedAppointmentDate(dateStr)}
+                          className={`rounded-md py-1 transition ${isPast ? "cursor-not-allowed pointer-events-none opacity-40" : "cursor-pointer"
+                            } ${isSelected || isToday
                             ? "bg-[#8ec5eb]/35 font-semibold text-white ring-1 ring-[#8ec5eb]/50"
                             : "text-[#d9ebf8] hover:bg-white/10"
-                            } ${hasAppointment ? "ring-1 ring-amber-300/60" : ""}`}
+                            } ${hasAppointment && !isPast ? "ring-1 ring-amber-300/60" : ""}`}
                         >
                           {day}
                         </div>
@@ -737,24 +752,26 @@ function MentorScheduleContent() {
 
               <div>
                 <h3 className="mb-4 text-[15px] font-semibold text-white">
-                  Today — {todayAppointments.length} appointment
-                  {todayAppointments.length === 1 ? "" : "s"}
+                  {selectedAppointmentDate === todayKey
+                    ? "Today"
+                    : new Date(`${selectedAppointmentDate}T12:00:00`).toLocaleDateString()} — {selectedDayAppointments.length} appointment
+                  {selectedDayAppointments.length === 1 ? "" : "s"}
                 </h3>
 
                 <div className="flex flex-col gap-5">
-                  {todayAppointments.length === 0 ? (
+                  {selectedDayAppointments.length === 0 ? (
                     <div className={mentorEmptyPanel}>
-                      <p className={mentorBodyText}>No meetings scheduled for today.</p>
+                      <p className={mentorBodyText}>No meetings scheduled for this day.</p>
                     </div>
                   ) : null}
-                  {todayAppointments.map((appt, index) => {
+                  {selectedDayAppointments.map((appt, index) => {
                     const meetingDate = new Date(appt.meetingDate);
                     const apptKey = appointmentEntityId(appt) || String(index);
 
                     return (
                       <div
                         key={apptKey}
-                        className={`${mentorGlassCardRoadmap} relative items-stretch gap-0 p-4 sm:items-center sm:p-5`}
+                        className={`${mentorGlassCardRoadmap} relative items-stretch gap-0 overflow-visible p-4 sm:items-center sm:p-5`}
                       >
                         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-0">
                           <div className="flex h-[100px] w-[100px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
@@ -812,11 +829,11 @@ function MentorScheduleContent() {
                               <i className="fa-brands fa-whatsapp cursor-pointer transition hover:text-white" />
                             </div>
 
-                            <div className="relative">
+                            <div className="relative" data-mentor-appointment-menu>
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setShowMenu(showMenu === index ? null : index)
+                                  setShowMenu(showMenu === apptKey ? null : apptKey)
                                 }
                                 className="rounded-lg px-3 py-1 text-[#8ec5eb] transition hover:bg-white/10 hover:text-white"
                                 aria-label="Appointment actions"
@@ -824,8 +841,8 @@ function MentorScheduleContent() {
                                 <i className="fa-solid fa-ellipsis-vertical" />
                               </button>
 
-                              {showMenu === index && (
-                                <div className="absolute right-0 top-9 z-10 w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                              {showMenu === apptKey && (
+                                <div className="absolute right-0 top-9 z-30 w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
                                   <button
                                     type="button"
                                     className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -877,6 +894,86 @@ function MentorScheduleContent() {
             </div>
           )}
 
+          {mentorId && !loading && activeTab === "Appointment History" && (
+            <div className="flex flex-col gap-5">
+              <h3 className="text-[15px] font-semibold text-white">
+                Appointment history — {appointmentHistory.length} meeting{appointmentHistory.length === 1 ? "" : "s"}
+              </h3>
+              {appointmentHistory.length === 0 ? (
+                <div className={mentorEmptyPanel}>
+                  <p className={mentorBodyText}>No past meetings yet.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                  {pagedAppointmentHistory.map((appt, index) => {
+                    const meetingDate = new Date(appt.meetingDate);
+                    const apptKey = appointmentEntityId(appt) || `history-${historyPage}-${index}`;
+                    return (
+                      <div key={apptKey} className={`${mentorGlassCardRoadmap} relative items-stretch gap-0 p-4 sm:items-center sm:p-5`}>
+                        <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-0">
+                          <div className="flex h-[100px] w-[100px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
+                            <Image
+                              src={appt.platform === "zoom" ? MeetIcon : DuoIcon}
+                              alt={appt.platform}
+                              className="h-[52px] w-[52px]"
+                            />
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1 px-0 pt-4 sm:px-5 sm:pt-0">
+                          <div className="mb-2 flex items-center gap-3">
+                            <Image
+                              src={appt.user?.profilePicture || UserProfile}
+                              alt="User"
+                              width={36}
+                              height={36}
+                              className="rounded-full border border-white/20"
+                            />
+                            <div>
+                              <h4 className="text-sm font-semibold text-white">{appt.user?.firstName} {appt.user?.lastName}</h4>
+                              <p className="text-[12px] text-[#cde2f2]/90">Pastor</p>
+                            </div>
+                          </div>
+                          <div className="mb-2 flex flex-wrap gap-2">
+                            <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-medium text-[#d9ebf8]">
+                              <i className="fa-regular fa-calendar text-[#8ec5eb]" />
+                              {meetingDate.toLocaleDateString()}
+                            </div>
+                            <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-medium text-[#d9ebf8]">
+                              <i className="fa-regular fa-clock text-[#8ec5eb]" />
+                              {meetingDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </div>
+                          </div>
+                          <p className="mb-2 text-[12px] text-[#cde2f2]">Mode: <span className="font-semibold text-[#8ec5eb]">{appt.platform}</span></p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {appointmentHistory.length > 0 && (
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    disabled={historyPage === 1}
+                    onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                    className={`${mentorSecondaryCta} px-3 py-1.5 text-xs ${historyPage === 1 ? "cursor-not-allowed opacity-60" : ""}`}
+                  >
+                    Previous
+                  </button>
+                  <p className="text-xs text-[#cde2f2]">Page {historyPage} of {totalHistoryPages}</p>
+                  <button
+                    type="button"
+                    disabled={historyPage >= totalHistoryPages}
+                    onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
+                    className={`${mentorSecondaryCta} px-3 py-1.5 text-xs ${historyPage >= totalHistoryPages ? "cursor-not-allowed opacity-60" : ""}`}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {mentorId && !loading && activeTab === "Availability" && (
             <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
               <div className={`${mentorGlassCardFrost} p-5 text-white sm:p-6`}>
@@ -919,15 +1016,17 @@ function MentorScheduleContent() {
                     {weekCalendarDates.map(({ dayIndex, date, hasSlots }) => {
                       const day = date.toLocaleDateString("default", { weekday: "short" });
                       const isSelected = selectedAvailabilityDay === dayIndex;
+                      const isPast = isPastDate(date.toISOString().split("T")[0]);
 
                       return (
                         <div
                           key={date.toISOString()}
-                          onClick={() => setSelectedAvailabilityDay(dayIndex)}
-                          className={`cursor-pointer rounded-md py-2 text-center transition ${isSelected
+                          onClick={() => !isPast && setSelectedAvailabilityDay(dayIndex)}
+                          className={`rounded-md py-2 text-center transition ${isPast ? "cursor-not-allowed pointer-events-none opacity-40" : "cursor-pointer"
+                            } ${isSelected
                             ? "bg-[#8ec5eb]/30 font-semibold text-white ring-1 ring-[#8ec5eb]/55"
                             : "text-[#d9ebf8] hover:bg-white/10"
-                            } ${hasSlots ? "ring-1 ring-amber-300/55" : ""}`}
+                            } ${hasSlots && !isPast ? "ring-1 ring-amber-300/55" : ""}`}
                         >
                           <div>{day}</div>
                           <div className="text-xs text-white/80">{date.getDate()}</div>

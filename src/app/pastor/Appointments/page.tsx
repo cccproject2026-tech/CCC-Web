@@ -81,6 +81,7 @@ export default function PastorAppointmentsPage() {
   const [isScheduling, setIsScheduling] = useState(false);
   const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [appointmentsTab, setAppointmentsTab] = useState<"next" | "history">("next");
 
 
 
@@ -162,28 +163,35 @@ export default function PastorAppointmentsPage() {
         apiGetUserSchedule(userId),
         apiGetAppointments({ userId, futureOnly: true }),
       ]);
-      const data = unwrapAppointmentsAxiosData(scheduleResult.value);
-      setAppointments(data);
+      const scheduleData =
+        scheduleResult.status === "fulfilled" ? unwrapAppointmentsAxiosData(scheduleResult.value) : [];
+      setAppointments(scheduleData);
+
       const todayYmd = new Date().toLocaleDateString("en-CA");
       setAppointmentsToday(
-        data.filter((a: any) => {
+        scheduleData.filter((a: any) => {
           if (!a?.meetingDate) return false;
           return meetingDateLocalYmd(String(a.meetingDate)) === todayYmd;
         }) as any,
       );
 
-      const nowMs = Date.now();
-      const upcomingSorted = data
-        .filter((a: any) => {
-          if (!a?.meetingDate) return false;
-          const t = new Date(a.meetingDate).getTime();
-          return !Number.isNaN(t) && t >= nowMs - 60_000;
-        })
-        .sort(
-          (a: any, b: any) =>
-            new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
-        );
-      setUpcomingAppointments((upcomingSorted.length ? upcomingSorted : data) as any);
+      if (upcomingResult.status === "fulfilled") {
+        const upcomingData = unwrapAppointmentsAxiosData(upcomingResult.value);
+        const nowMs = Date.now();
+        const upcomingSorted = upcomingData
+          .filter((a: any) => {
+            if (!a?.meetingDate) return false;
+            const t = new Date(a.meetingDate).getTime();
+            return !Number.isNaN(t) && t >= nowMs - 60_000;
+          })
+          .sort(
+            (a: any, b: any) =>
+              new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
+          );
+        setUpcomingAppointments((upcomingSorted.length ? upcomingSorted : upcomingData) as any);
+      } else {
+        setUpcomingAppointments([] as any);
+      }
     } catch (err) {
       console.error("Error fetching appointments:", err);
     }
@@ -409,6 +417,8 @@ export default function PastorAppointmentsPage() {
     } catch (error) {
       console.error("Error scheduling appointment:", error);
       setToastMessage("Failed to schedule appointment.");
+    } finally {
+      setIsScheduling(false);
     }
   };
   const handleReschedule = async () => {
@@ -564,6 +574,28 @@ export default function PastorAppointmentsPage() {
     });
   }, [upcomingAppointments, appointmentSearch]);
 
+  const filteredHistory = useMemo(() => {
+    const q = appointmentSearch.trim().toLowerCase();
+    const nowMs = Date.now();
+    return (appointments as Record<string, unknown>[])
+      .filter((a) => {
+        const raw = String(a.meetingDate ?? "");
+        if (!raw) return false;
+        const t = new Date(raw).getTime();
+        if (Number.isNaN(t) || t >= nowMs) return false;
+        if (!q) return true;
+        const mentor = a.mentor as { firstName?: string; lastName?: string } | undefined;
+        const name = `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.toLowerCase();
+        const plat = String(a.platform ?? "").toLowerCase();
+        return name.includes(q) || plat.includes(q);
+      })
+      .sort(
+        (a, b) =>
+          new Date(String(b.meetingDate ?? "")).getTime() -
+          new Date(String(a.meetingDate ?? "")).getTime(),
+      );
+  }, [appointments, appointmentSearch]);
+
   const handleCancelAppointment = async () => {
     if (!appointmentToCancel) return;
     const id = appointmentEntityId(appointmentToCancel);
@@ -678,15 +710,31 @@ export default function PastorAppointmentsPage() {
 
                   {Array.from({ length: getDaysInMonth(currentMonth, currentYear) }).map((_, i) => {
                     const day = i + 1;
+                    const dayDate = new Date(currentYear, currentMonth, day);
+                    dayDate.setHours(0, 0, 0, 0);
+                    const todayDate = new Date();
+                    todayDate.setHours(0, 0, 0, 0);
+                    const isPast = dayDate < todayDate;
+                    const dayYmd = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                    const hasAppointment = (appointments as any[]).some((a) => {
+                      if (!a?.meetingDate) return false;
+                      return meetingDateLocalYmd(String(a.meetingDate)) === dayYmd;
+                    });
                     const isSelected = day === selectedDate;
 
                     return (
                       <div
                         key={i}
-                        onClick={() => setSelectedDate(day)}
-                        className={`py-1 rounded-md cursor-pointer transition ${isSelected
-                          ? "bg-[#00B3FF] text-white font-bold"
-                          : "text-white/80 hover:bg-[#00B3FF]/40"
+                        onClick={() => {
+                          if (!isPast) setSelectedDate(day);
+                        }}
+                        className={`py-1 rounded-md transition ${isPast
+                          ? "opacity-40 cursor-not-allowed pointer-events-none"
+                          : "cursor-pointer"
+                          } ${isSelected
+                            ? "bg-[#00B3FF] text-white font-bold"
+                            : "text-white/80 hover:bg-[#00B3FF]/40"
+                          } ${hasAppointment && !isPast ? "ring-1 ring-amber-300/70" : ""
                           }`}
                       >
                         {day}
@@ -856,144 +904,231 @@ export default function PastorAppointmentsPage() {
           </div>
 
           <section className="mt-10 border-t border-white/10 pt-10 md:mt-14 md:pt-12">
-            <h2 className="mb-4 text-base font-semibold text-white md:mb-6 md:text-lg">
-              Next appointments
-            </h2>
+            <div className="mb-4 flex items-center gap-2 md:mb-6">
+              <button
+                type="button"
+                onClick={() => setAppointmentsTab("next")}
+                className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
+                  appointmentsTab === "next"
+                    ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
+                    : "border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
+                }`}
+              >
+                Next appointments
+              </button>
+              <button
+                type="button"
+                onClick={() => setAppointmentsTab("history")}
+                className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
+                  appointmentsTab === "history"
+                    ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
+                    : "border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
+                }`}
+              >
+                Appointment history
+              </button>
+            </div>
 
-            <div className="grid grid-cols-1 gap-6 md:gap-10 lg:grid-cols-2">
-              {filteredUpcoming.length === 0 && (
-                <p className="text-sm text-[#cde2f2]/90">
-                  {appointmentSearch.trim()
-                    ? "No upcoming appointments match your search."
-                    : "No upcoming appointments."}
-                </p>
-              )}
+            {appointmentsTab === "next" ? (
+              <div className="grid grid-cols-1 gap-6 md:gap-10 lg:grid-cols-2">
+                {filteredUpcoming.length === 0 && (
+                  <p className="text-sm text-[#cde2f2]/90">
+                    {appointmentSearch.trim()
+                      ? "No upcoming appointments match your search."
+                      : "No upcoming appointments."}
+                  </p>
+                )}
 
-              {filteredUpcoming.map((appt) => {
-                const mode = String(appt.platform ?? "Duo");
-                const icon = getModeIcon(mode);
-                const mentor = appt.mentor as { profilePicture?: string; firstName?: string; lastName?: string } | undefined;
+                {filteredUpcoming.map((appt) => {
+                  const mode = String(appt.platform ?? "Duo");
+                  const icon = getModeIcon(mode);
+                  const mentor = appt.mentor as { profilePicture?: string; firstName?: string; lastName?: string } | undefined;
 
-                return (
-                  <div
-                    key={appointmentEntityId(appt)}
-                    className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard}`}
-                  >
-                    <div className="absolute right-3 top-3 z-20">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setMenuOpenId(
-                            menuOpenId === appointmentEntityId(appt) ? null : appointmentEntityId(appt),
-                          )
-                        }
-                        className="text-[#d9ebf8] hover:text-white"
-                      >
-                        <i className="fa-solid fa-ellipsis-vertical text-lg" />
-                      </button>
+                  return (
+                    <div
+                      key={appointmentEntityId(appt)}
+                      className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard}`}
+                    >
+                      <div className="absolute right-3 top-3 z-20">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setMenuOpenId(
+                              menuOpenId === appointmentEntityId(appt) ? null : appointmentEntityId(appt),
+                            )
+                          }
+                          className="text-[#d9ebf8] hover:text-white"
+                        >
+                          <i className="fa-solid fa-ellipsis-vertical text-lg" />
+                        </button>
 
-                      {menuOpenId === appointmentEntityId(appt) && (
-                        <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg bg-white text-sm shadow-lg">
-                          <button
-                            type="button"
-                            className="flex w-full gap-2 px-4 py-2 hover:bg-gray-100"
-                            onClick={() => {
-                              setAppointmentToEdit(appt);
-                              setShowReschedule(true);
-                              setMenuOpenId(null);
-                            }}
-                          >
-                            <i className="fa-regular fa-calendar" /> Reschedule Meeting
-                          </button>
+                        {menuOpenId === appointmentEntityId(appt) && (
+                          <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg bg-white text-sm shadow-lg">
+                            <button
+                              type="button"
+                              className="flex w-full gap-2 px-4 py-2 hover:bg-gray-100"
+                              onClick={() => {
+                                setAppointmentToEdit(appt);
+                                setShowReschedule(true);
+                                setMenuOpenId(null);
+                              }}
+                            >
+                              <i className="fa-regular fa-calendar" /> Reschedule Meeting
+                            </button>
 
-                          <button
-                            type="button"
-                            className="flex w-full items-center gap-2 px-4 py-2 hover:bg-gray-100"
-                            onClick={() => {
-                              setAppointmentToCancel(appt);
-                              setShowCancelConfirm(true);
-                              setMenuOpenId(null);
-                            }}
-                          >
-                            <i className="fa-regular fa-calendar-xmark" />
-                            Cancel Meeting
-                          </button>
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-2 px-4 py-2 hover:bg-gray-100"
+                              onClick={() => {
+                                setAppointmentToCancel(appt);
+                                setShowCancelConfirm(true);
+                                setMenuOpenId(null);
+                              }}
+                            >
+                              <i className="fa-regular fa-calendar-xmark" />
+                              Cancel Meeting
+                            </button>
 
-                          <button
-                            type="button"
-                            className="flex w-full gap-2 px-4 py-2 hover:bg-gray-100"
-                            onClick={() => {
-                              setAppointmentToEdit(appt);
-                              setSelectedMode(appt.platform || "zoom");
-                              setShowChangeMode(true);
-                              setMenuOpenId(null);
-                            }}
-                          >
-                            <i className="fa-regular fa-pen-to-square" />
-                            Change Meeting Mode
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-white/95 md:h-[140px] md:w-[140px]">
-                      <Image src={icon} alt={String(mode)} className="h-[50px] w-[50px] md:h-[60px] md:w-[60px]" />
-                    </div>
-
-                    <div className="flex w-full flex-col text-white">
-                      <div className="mb-3 flex items-center gap-3">
-                        <Image
-                          src={mentor?.profilePicture || UserProfile}
-                          alt="Mentor"
-                          width={32}
-                          height={32}
-                          className="rounded-full border border-white/30 md:h-9 md:w-9"
-                        />
-                        <div>
-                          <h4 className="text-sm font-semibold">
-                            {mentor?.firstName} {mentor?.lastName}
-                          </h4>
-                          <p className="text-xs text-[#cde2f2]">Mentor</p>
-                        </div>
+                            <button
+                              type="button"
+                              className="flex w-full gap-2 px-4 py-2 hover:bg-gray-100"
+                              onClick={() => {
+                                setAppointmentToEdit(appt);
+                                setSelectedMode(appt.platform || "zoom");
+                                setShowChangeMode(true);
+                                setMenuOpenId(null);
+                              }}
+                            >
+                              <i className="fa-regular fa-pen-to-square" />
+                              Change Meeting Mode
+                            </button>
+                          </div>
+                        )}
                       </div>
 
-                      <div className="mb-3 flex flex-col flex-wrap gap-2 md:flex-row">
-                        <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-2 py-[3px] text-xs text-[#d9ebf8] md:px-3">
-                          <i className="fa-regular fa-calendar text-[#E3D247]" />
-                          <span>Date: {formatDate(String(appt.meetingDate ?? ""))}</span>
-                        </div>
-
-                        <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 py-[3px] text-xs text-[#d9ebf8]">
-                          <i className="fa-regular fa-clock text-[#24E0C2]" />
-                          <span>Time: {formatTime(String(appt.meetingDate ?? ""))}</span>
-                        </div>
+                      <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-white/95 md:h-[140px] md:w-[140px]">
+                        <Image src={icon} alt={String(mode)} className="h-[50px] w-[50px] md:h-[60px] md:w-[60px]" />
                       </div>
 
-                      <div className="flex items-end justify-between">
-                        <div>
-                          <p className="mb-2 text-xs text-[#d9ebf8]">
-                            Mode:{" "}
-                            <span className="font-medium text-[#8ec5eb] underline underline-offset-2">
-                              {mode}
-                            </span>
-                          </p>
-
-                          <div className="flex gap-4 text-sm text-[#cde2f2]">
-                            <i className="fa-solid fa-phone cursor-pointer opacity-80 hover:opacity-100" />
-                            <i className="fa-regular fa-comment cursor-pointer opacity-80 hover:opacity-100" />
-                            <i className="fa-brands fa-whatsapp cursor-pointer opacity-80 hover:opacity-100" />
+                      <div className="flex w-full flex-col text-white">
+                        <div className="mb-3 flex items-center gap-3">
+                          <Image
+                            src={mentor?.profilePicture || UserProfile}
+                            alt="Mentor"
+                            width={32}
+                            height={32}
+                            className="rounded-full border border-white/30 md:h-9 md:w-9"
+                          />
+                          <div>
+                            <h4 className="text-sm font-semibold">
+                              {mentor?.firstName} {mentor?.lastName}
+                            </h4>
+                            <p className="text-xs text-[#cde2f2]">Mentor</p>
                           </div>
                         </div>
 
-                        <button type="button" className={pastorPrimaryCta}>
-                          Details
-                        </button>
+                        <div className="mb-3 flex flex-col flex-wrap gap-2 md:flex-row">
+                          <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-2 py-[3px] text-xs text-[#d9ebf8] md:px-3">
+                            <i className="fa-regular fa-calendar text-[#E3D247]" />
+                            <span>Date: {formatDate(String(appt.meetingDate ?? ""))}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 py-[3px] text-xs text-[#d9ebf8]">
+                            <i className="fa-regular fa-clock text-[#24E0C2]" />
+                            <span>Time: {formatTime(String(appt.meetingDate ?? ""))}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-end justify-between">
+                          <div>
+                            <p className="mb-2 text-xs text-[#d9ebf8]">
+                              Mode:{" "}
+                              <span className="font-medium text-[#8ec5eb] underline underline-offset-2">
+                                {mode}
+                              </span>
+                            </p>
+
+                            <div className="flex gap-4 text-sm text-[#cde2f2]">
+                              <i className="fa-solid fa-phone cursor-pointer opacity-80 hover:opacity-100" />
+                              <i className="fa-regular fa-comment cursor-pointer opacity-80 hover:opacity-100" />
+                              <i className="fa-brands fa-whatsapp cursor-pointer opacity-80 hover:opacity-100" />
+                            </div>
+                          </div>
+
+                          <button type="button" className={pastorPrimaryCta}>
+                            Details
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-6 md:gap-10 lg:grid-cols-2">
+                {filteredHistory.length === 0 && (
+                  <p className="text-sm text-[#cde2f2]/90">
+                    {appointmentSearch.trim()
+                      ? "No appointment history matches your search."
+                      : "No appointment history yet."}
+                  </p>
+                )}
+
+                {filteredHistory.map((appt) => {
+                  const mode = String(appt.platform ?? "Duo");
+                  const icon = getModeIcon(mode);
+                  const mentor = appt.mentor as { profilePicture?: string; firstName?: string; lastName?: string } | undefined;
+
+                  return (
+                    <div
+                      key={`history-${appointmentEntityId(appt as any)}`}
+                      className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard}`}
+                    >
+                      <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-white/95 md:h-[140px] md:w-[140px]">
+                        <Image src={icon} alt={String(mode)} className="h-[50px] w-[50px] md:h-[60px] md:w-[60px]" />
+                      </div>
+
+                      <div className="flex w-full flex-col text-white">
+                        <div className="mb-3 flex items-center gap-3">
+                          <Image
+                            src={mentor?.profilePicture || UserProfile}
+                            alt="Mentor"
+                            width={32}
+                            height={32}
+                            className="rounded-full border border-white/30 md:h-9 md:w-9"
+                          />
+                          <div>
+                            <h4 className="text-sm font-semibold">
+                              {mentor?.firstName} {mentor?.lastName}
+                            </h4>
+                            <p className="text-xs text-[#cde2f2]">Mentor</p>
+                          </div>
+                        </div>
+
+                        <div className="mb-3 flex flex-col flex-wrap gap-2 md:flex-row">
+                          <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-2 py-[3px] text-xs text-[#d9ebf8] md:px-3">
+                            <i className="fa-regular fa-calendar text-[#E3D247]" />
+                            <span>Date: {formatDate(String(appt.meetingDate ?? ""))}</span>
+                          </div>
+
+                          <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-3 py-[3px] text-xs text-[#d9ebf8]">
+                            <i className="fa-regular fa-clock text-[#24E0C2]" />
+                            <span>Time: {formatTime(String(appt.meetingDate ?? ""))}</span>
+                          </div>
+                        </div>
+
+                        <p className="mb-2 text-xs text-[#d9ebf8]">
+                          Mode:{" "}
+                          <span className="font-medium text-[#8ec5eb] underline underline-offset-2">
+                            {mode}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </section>
         </div>
       </main>

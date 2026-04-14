@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import AppHeader from "@/app/Components/Header/AppHeader";import AppHero from "@/app/Components/Hero/AppHero";
+import AppHeader from "@/app/Components/Header/AppHeader";
+import AppHero from "@/app/Components/Hero/AppHero";
 import AssessmentBg from "../../../Assets/assessment-bg.png";
 import { apiCreateAssessment } from "@/app/Services/assessment.service";
 
@@ -382,7 +383,7 @@ export default function CreateAssessmentPage() {
                               e.target.value
                             )
                           }
-                          placeholder={`Choice ${itemIdx + 1}`}
+                          placeholder={`Plan ${itemIdx + 1}`}
                           className="w-full px-4 py-3 bg-white/20 border border-white/40 text-white placeholder-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-white font-medium mb-2"
                         />
                       ))}
@@ -445,6 +446,7 @@ export default function CreateAssessmentPage() {
             <span className="text-[#2E3B8E] font-semibold">{toast}</span>
           </div>
         </div>
-      )}    </div>
+      )}
+    </div>
   );
 }

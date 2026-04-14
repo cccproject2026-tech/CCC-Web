@@ -379,7 +379,7 @@ export default function CreateAssessmentPage() {
                               e.target.value
                             )
                           }
-                          placeholder={`Choice ${itemIdx + 1}`}
+                          placeholder={`Plan ${itemIdx + 1}`}
                           className="mb-2 w-full rounded-xl border border-white/20 bg-white/10 px-4 py-3 font-medium text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
                         />
                       ))}

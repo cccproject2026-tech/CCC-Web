@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useLayoutEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -24,6 +24,7 @@ import {
   apiCreateAppointment,
   apiCreateAvailability,
   apiGetAppointments,
+  apiRescheduleAppointment,
   apiGetWeeklyAvailability,
 } from "@/app/Services/appointments.service";
 import {
@@ -60,12 +61,13 @@ function isTodayDate(iso: string) {
 
 const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 
-function tabFromParam(raw: string | null): "Appointments" | "Availability" | "Schedule" | null {
+function tabFromParam(raw: string | null): "Appointments" | "Availability" | "Schedule" | "Appointment History" | null {
   if (!raw) return null;
   const t = raw.trim().toLowerCase();
   if (t === "appointments") return "Appointments";
   if (t === "availability") return "Availability";
   if (t === "schedule") return "Schedule";
+  if (t === "appointment-history" || t === "appointmenthistory" || t === "history") return "Appointment History";
   return null;
 }
 
@@ -85,13 +87,24 @@ function isPastDate(dateStr: string): boolean {
   return date < today;
 }
 
+function toLocalDateTimeInput(iso: string): string {
+  const d = new Date(iso);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
 // ─── Inner content (needs useSearchParams — wrapped in Suspense) ──────────────
 
 function DirectorScheduleContent() {
   const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<"Appointments" | "Availability" | "Schedule">(
+  const [activeTab, setActiveTab] = useState<"Appointments" | "Availability" | "Schedule" | "Appointment History">(
     () => tabFromParam(searchParams.get("tab")) ?? "Appointments",
   );
+  const [historyPage, setHistoryPage] = useState(1);
 
   // director identity
   const [directorId, setDirectorId] = useState<string | null>(null);
@@ -101,9 +114,15 @@ function DirectorScheduleContent() {
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState<number | null>(null);
+  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState<AppointmentResponse | null>(null);
+  const [rescheduleDateTime, setRescheduleDateTime] = useState("");
+  const [reschedulePlatform, setReschedulePlatform] = useState("zoom");
+  const [isRescheduling, setIsRescheduling] = useState(false);
 
   // calendar (Appointments tab)
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedAppointmentDate, setSelectedAppointmentDate] = useState(() => new Date().toISOString().split("T")[0]);
 
   // availability state
   const [availability, setAvailability] = useState<any[]>([]);
@@ -135,6 +154,19 @@ function DirectorScheduleContent() {
   useEffect(() => {
     const uid = getCookie("userId") as string | undefined;
     if (uid) setDirectorId(String(uid));
+  }, []);
+
+  // ── Close action menu on outside click ───────────────────────────────────────
+  useEffect(() => {
+    const onMouseDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (!target.closest('[data-appointment-menu-root="true"]')) {
+        setShowMenu(null);
+      }
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
   }, []);
 
   // ── Sync tab from URL params ──────────────────────────────────────────────────
@@ -184,46 +216,51 @@ function DirectorScheduleContent() {
       .catch(() => setMentors([]));
   }, []);
 
-  // ── Fetch weekly availability ─────────────────────────────────────────────────
-  useEffect(() => {
+  const fetchWeeklyAvailability = useCallback(async () => {
     if (!directorId) return;
     const sunday = new Date(weekStart);
     sunday.setDate(sunday.getDate() - sunday.getDay());
     const date = sunday.toISOString().split("T")[0];
-    apiGetWeeklyAvailability(directorId, date)
-      .then((res) => {
-        const raw = res.data?.data ?? res.data;
-        const data = Array.isArray(raw) ? raw : [];
-        if (data.length === 0) {
-          setAvailability(
-            [0, 1, 2, 3, 4, 5, 6].map((day) => ({
-              date: "",
-              day,
-              enabled: false,
-              slots: [{ startTime: "09:00", startPeriod: "AM", endTime: "05:00", endPeriod: "PM" }],
-            })),
-          );
-        } else {
-          setAvailability(
-            data.map((d: any) => ({
-              date: d.date,
-              day: typeof d.day === "number" ? d.day : Number(d.day) || 0,
-              enabled: Array.isArray(d.slots) && d.slots.length > 0,
-              slots:
-                Array.isArray(d.slots) && d.slots.length > 0
-                  ? d.slots.map((s: any) => ({
-                      startTime: s.startTime || "09:00",
-                      startPeriod: s.startPeriod || "AM",
-                      endTime: s.endTime || "05:00",
-                      endPeriod: s.endPeriod || "PM",
-                    }))
-                  : [{ startTime: "09:00", startPeriod: "AM", endTime: "05:00", endPeriod: "PM" }],
-            })),
-          );
-        }
-      })
-      .catch(() => {});
-  }, [directorId, weekStart, availabilityRefreshKey]);
+    try {
+      const res = await apiGetWeeklyAvailability(directorId, date);
+      const raw = res.data?.data ?? res.data;
+      const data = Array.isArray(raw) ? raw : [];
+      if (data.length === 0) {
+        setAvailability(
+          [0, 1, 2, 3, 4, 5, 6].map((day) => ({
+            date: "",
+            day,
+            enabled: false,
+            slots: [],
+          })),
+        );
+      } else {
+        setAvailability(
+          data.map((d: any) => ({
+            date: d.date,
+            day: typeof d.day === "number" ? d.day : Number(d.day) || 0,
+            enabled: Array.isArray(d.slots) && d.slots.length > 0,
+            slots:
+              Array.isArray(d.slots) && d.slots.length > 0
+                ? d.slots.map((s: any) => ({
+                    startTime: s.startTime || "09:00",
+                    startPeriod: s.startPeriod || "AM",
+                    endTime: s.endTime || "05:00",
+                    endPeriod: s.endPeriod || "PM",
+                  }))
+                : [],
+          })),
+        );
+      }
+    } catch {
+      // Keep existing availability when fetch fails.
+    }
+  }, [directorId, weekStart]);
+
+  // ── Fetch weekly availability ─────────────────────────────────────────────────
+  useEffect(() => {
+    void fetchWeeklyAvailability();
+  }, [fetchWeeklyAvailability, availabilityRefreshKey]);
 
   // ── Fetch available slots for schedule step 2 ─────────────────────────────────
   useEffect(() => {
@@ -350,7 +387,24 @@ function DirectorScheduleContent() {
     const d = new Date(appt.meetingDate);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
-  const todayAppointments = appointments.filter((a) => isTodayDate(a.meetingDate));
+  const todayKey = new Date().toISOString().split("T")[0];
+  const selectedDayAppointments = appointments
+    .filter((a) => a.meetingDate.startsWith(selectedAppointmentDate))
+    .filter((a) => selectedAppointmentDate !== todayKey || new Date(a.meetingDate).getTime() >= Date.now())
+    .sort((a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime());
+  const appointmentHistory = appointments
+    .filter((a) => new Date(a.meetingDate).getTime() < Date.now())
+    .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
+  const historyPageSize = 10;
+  const totalHistoryPages = Math.max(1, Math.ceil(appointmentHistory.length / historyPageSize));
+  const pagedAppointmentHistory = appointmentHistory.slice(
+    (historyPage - 1) * historyPageSize,
+    historyPage * historyPageSize,
+  );
+
+  useEffect(() => {
+    setHistoryPage((prev) => Math.min(prev, totalHistoryPages));
+  }, [totalHistoryPages]);
 
   // ── Availability helpers ───────────────────────────────────────────────────────
   const resolveAvailabilityRowDate = (d: any): string => {
@@ -406,6 +460,7 @@ function DirectorScheduleContent() {
     try {
       await apiCreateAvailability(body as any);
       setAvailabilityRefreshKey((k) => k + 1);
+      await fetchWeeklyAvailability();
       showToast("Availability saved successfully");
     } catch (e) {
       showToast(extractApiErrorMessage(e) || "Failed to save availability");
@@ -462,6 +517,43 @@ function DirectorScheduleContent() {
     }
   };
 
+  const openRescheduleModal = (appt: AppointmentResponse) => {
+    setRescheduleTarget(appt);
+    setRescheduleDateTime(toLocalDateTimeInput(appt.meetingDate));
+    setReschedulePlatform(String(appt.platform || "zoom").toLowerCase());
+    setShowMenu(null);
+    setIsRescheduleModalOpen(true);
+  };
+
+  const handleRescheduleAppointment = async () => {
+    const appt = rescheduleTarget;
+    const id = appt ? appointmentEntityId(appt) : "";
+    if (!id || !rescheduleDateTime) {
+      showToast("Please select date and time");
+      return;
+    }
+    if (isRescheduling) return;
+    setIsRescheduling(true);
+    try {
+      await apiRescheduleAppointment(id, {
+        meetingDate: new Date(rescheduleDateTime).toISOString(),
+        platform: reschedulePlatform as any,
+      });
+      const refresh = await apiGetAppointments({ futureOnly: false, status: "scheduled" });
+      const list = unwrapAppointmentsAxiosData(refresh).sort(
+        (a: any, b: any) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
+      );
+      setAppointments(list);
+      setIsRescheduleModalOpen(false);
+      setRescheduleTarget(null);
+      showToast("Appointment rescheduled successfully");
+    } catch (e) {
+      showToast(extractApiErrorMessage(e) || "Failed to reschedule appointment");
+    } finally {
+      setIsRescheduling(false);
+    }
+  };
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
@@ -503,7 +595,7 @@ function DirectorScheduleContent() {
               className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-1"
               role="tablist"
             >
-              {(["Appointments", "Availability", "Schedule"] as const).map((tab) => (
+              {(["Appointments", "Availability", "Schedule", "Appointment History"] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -511,6 +603,7 @@ function DirectorScheduleContent() {
                   aria-selected={activeTab === tab}
                   onClick={() => {
                     setActiveTab(tab);
+                    if (tab === "Appointment History") setHistoryPage(1);
                     if (tab === "Schedule") { setIsDrawerOpen(true); setDrawerStep(1); }
                     else setIsDrawerOpen(false);
                   }}
@@ -531,6 +624,120 @@ function DirectorScheduleContent() {
             <div className="flex flex-col items-center justify-center gap-4 py-16">
               <div className={directorSpinner} />
               <p className="text-sm text-white/60">Loading…</p>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════
+              APPOINTMENT HISTORY TAB
+          ══════════════════════════════════════════════ */}
+          {!loading && activeTab === "Appointment History" && (
+            <div className="flex flex-col gap-5">
+              <h3 className="text-[15px] font-semibold text-white">
+                Appointment history — {appointmentHistory.length} meeting{appointmentHistory.length === 1 ? "" : "s"}
+              </h3>
+              {appointmentHistory.length === 0 ? (
+                <div className={`${directorGlassCard} flex items-center justify-center p-8`}>
+                  <p className="text-sm text-white/60">No past meetings yet.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                  {pagedAppointmentHistory.map((appt, index) => {
+                    const md = new Date(appt.meetingDate);
+                    const apptKey = appointmentEntityId(appt) || `history-${historyPage}-${index}`;
+                    const mentor = appt.mentor ?? (typeof appt.mentorId === "object" ? appt.mentorId : undefined);
+                    const mentee = appt.user ?? (typeof appt.userId === "object" ? appt.userId : undefined);
+                    const mentorName = labelPerson(mentor, "Mentor");
+                    const menteeName = labelPerson(mentee, "Mentee");
+                    const mentorId =
+                      typeof appt.mentorId === "string" ? appt.mentorId : appt.mentorId?._id ?? appt.mentor?._id;
+                    const menteeId =
+                      typeof appt.userId === "string" ? appt.userId : appt.userId?._id ?? appt.user?._id;
+
+                    return (
+                      <div
+                        key={apptKey}
+                        className={`${directorGlassCard} relative flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center`}
+                      >
+                        <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-6">
+                          <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
+                            <Image
+                              src={appt.platform === "gmeet" || appt.platform === "google-meet" ? MeetIcon : DuoIcon}
+                              alt={appt.platform}
+                              className="h-10 w-10"
+                            />
+                          </div>
+                        </div>
+                        <div className="relative min-w-0 flex-1 px-4 py-4 sm:px-5">
+                          <div className="mb-2 flex items-center gap-3">
+                            <Image
+                              src={mentor?.profilePicture || UserProfile}
+                              alt={mentorName}
+                              width={36}
+                              height={36}
+                              unoptimized={mentor?.profilePicture ? isRemoteImageSrc(mentor.profilePicture) : false}
+                              className="rounded-full border border-white/20"
+                            />
+                            <div>
+                              <h4 className="text-sm font-semibold text-white">
+                                {mentorId ? (
+                                  <Link href={`/director/mentors/profile/${encodeURIComponent(mentorId)}`} className="hover:text-[#8ec5eb]">
+                                    {mentorName}
+                                  </Link>
+                                ) : mentorName}
+                              </h4>
+                              <p className="text-[12px] text-[#cde2f2]/90">Mentor</p>
+                            </div>
+                          </div>
+                          <p className="mb-2 text-[12px] text-[#cde2f2]">
+                            with{" "}
+                            <span className="font-medium text-white">
+                              {menteeId ? (
+                                <Link href={`/director/mentees/profile/${encodeURIComponent(menteeId)}`} className="hover:text-[#8ec5eb]">
+                                  {menteeName}
+                                </Link>
+                              ) : menteeName}
+                            </span>
+                          </p>
+                          <div className="mb-2 flex flex-wrap gap-2">
+                            <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
+                              <i className="fa-regular fa-calendar text-[#8ec5eb]" />
+                              {md.toLocaleDateString()}
+                            </span>
+                            <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
+                              <i className="fa-regular fa-clock text-[#8ec5eb]" />
+                              {md.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </span>
+                            <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] capitalize text-[#d9ebf8]">
+                              {appt.platform}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {appointmentHistory.length > 0 && (
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    disabled={historyPage === 1}
+                    onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                    className={`${directorBtnSecondary} px-3 py-1.5 text-xs ${historyPage === 1 ? "cursor-not-allowed opacity-60" : ""}`}
+                  >
+                    Previous
+                  </button>
+                  <p className="text-xs text-[#cde2f2]">Page {historyPage} of {totalHistoryPages}</p>
+                  <button
+                    type="button"
+                    disabled={historyPage >= totalHistoryPages}
+                    onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
+                    className={`${directorBtnSecondary} px-3 py-1.5 text-xs ${historyPage >= totalHistoryPages ? "cursor-not-allowed opacity-60" : ""}`}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -579,12 +786,14 @@ function DirectorScheduleContent() {
                         day === new Date().getDate() &&
                         month === new Date().getMonth() &&
                         year === new Date().getFullYear();
+                      const isSelected = selectedAppointmentDate === dateStr;
                       const isPast = isPastDate(dateStr);
                       return (
                         <div
                           key={index}
+                          onClick={() => !isPast && setSelectedAppointmentDate(dateStr)}
                           className={`rounded-md py-1 transition ${isPast ? "opacity-40 cursor-not-allowed pointer-events-none" : "cursor-pointer"} ${
-                            isT
+                            isSelected || isT
                               ? "bg-[#8ec5eb]/35 font-semibold text-white ring-1 ring-[#8ec5eb]/50"
                               : "text-[#d9ebf8] hover:bg-white/10"
                           } ${hasAppointment && !isPast ? "ring-1 ring-amber-300/60" : ""}`}
@@ -600,15 +809,15 @@ function DirectorScheduleContent() {
               {/* Right: Today's appointments */}
               <div>
                 <h3 className="mb-4 text-[15px] font-semibold text-white">
-                  Today — {todayAppointments.length} appointment{todayAppointments.length === 1 ? "" : "s"}
+                  {selectedAppointmentDate === todayKey ? "Today" : new Date(`${selectedAppointmentDate}T12:00:00`).toLocaleDateString()} — {selectedDayAppointments.length} appointment{selectedDayAppointments.length === 1 ? "" : "s"}
                 </h3>
                 <div className="flex flex-col gap-5">
-                  {todayAppointments.length === 0 && (
+                  {selectedDayAppointments.length === 0 && (
                     <div className={`${directorGlassCard} flex items-center justify-center p-8`}>
-                      <p className="text-sm text-white/60">No meetings scheduled for today.</p>
+                      <p className="text-sm text-white/60">No meetings scheduled for this day.</p>
                     </div>
                   )}
-                  {todayAppointments.map((appt, index) => {
+                  {selectedDayAppointments.map((appt, index) => {
                     const md = new Date(appt.meetingDate);
                     const apptKey = appointmentEntityId(appt) || String(index);
                     const mentor = appt.mentor ?? (typeof appt.mentorId === "object" ? appt.mentorId : undefined);
@@ -633,7 +842,39 @@ function DirectorScheduleContent() {
                             />
                           </div>
                         </div>
-                        <div className="min-w-0 flex-1 px-4 pt-4 pb-4 sm:px-5 sm:pt-0 sm:pb-0">
+                        <div className="relative min-w-0 flex-1 px-4 py-4 sm:px-5">
+                          <div className="absolute right-4 top-4 z-10 sm:right-5">
+                            <div className="relative" data-appointment-menu-root="true">
+                              <button
+                                type="button"
+                                onClick={() => setShowMenu(showMenu === index ? null : index)}
+                                className="rounded-lg px-3 py-1 text-[#8ec5eb] transition hover:bg-white/10 hover:text-white"
+                                aria-label="Appointment actions"
+                              >
+                                <i className="fa-solid fa-ellipsis-vertical" />
+                              </button>
+                              {showMenu === index && (
+                                <div className="absolute right-0 top-9 z-10 w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                                  <button
+                                    type="button"
+                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                                    onClick={() => openRescheduleModal(appt)}
+                                  >
+                                    <i className="fa-regular fa-calendar mr-2 text-[#8ec5eb]" />
+                                    Reschedule meeting
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                                    onClick={() => handleCancelAppointment(appt)}
+                                  >
+                                    <i className="fa-regular fa-circle-xmark mr-2 text-red-300" />
+                                    Cancel meeting
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                           <div className="mb-2 flex items-center gap-3">
                             <Image
                               src={mentor?.profilePicture || UserProfile}
@@ -644,7 +885,7 @@ function DirectorScheduleContent() {
                               className="rounded-full border border-white/20"
                             />
                             <div>
-                              <h4 className="text-sm font-semibold text-white">
+                              <h4 className="pr-10 text-sm font-semibold text-white">
                                 {mentorId ? (
                                   <Link href={`/director/mentors/profile/${encodeURIComponent(mentorId)}`} className="hover:text-[#8ec5eb]">
                                     {mentorName}
@@ -672,30 +913,6 @@ function DirectorScheduleContent() {
                             <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] capitalize text-[#d9ebf8]">
                               {appt.platform}
                             </span>
-                          </div>
-                          <div className="flex items-center justify-end">
-                            <div className="relative">
-                              <button
-                                type="button"
-                                onClick={() => setShowMenu(showMenu === index ? null : index)}
-                                className="rounded-lg px-3 py-1 text-[#8ec5eb] transition hover:bg-white/10 hover:text-white"
-                                aria-label="Appointment actions"
-                              >
-                                <i className="fa-solid fa-ellipsis-vertical" />
-                              </button>
-                              {showMenu === index && (
-                                <div className="absolute right-0 top-9 z-10 w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
-                                  <button
-                                    type="button"
-                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
-                                    onClick={() => handleCancelAppointment(appt)}
-                                  >
-                                    <i className="fa-regular fa-circle-xmark mr-2 text-red-300" />
-                                    Cancel meeting
-                                  </button>
-                                </div>
-                              )}
-                            </div>
                           </div>
                         </div>
                       </div>
@@ -1198,6 +1415,62 @@ function DirectorScheduleContent() {
         <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-xl border border-white/20 bg-[#062946]/90 px-5 py-3 text-sm text-white shadow-xl backdrop-blur-md">
           {toastMessage}
         </div>
+      )}
+
+      {/* ── Reschedule Modal ── */}
+      {isRescheduleModalOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-[70] bg-black/45 backdrop-blur-[2px]"
+            onClick={() => { if (!isRescheduling) setIsRescheduleModalOpen(false); }}
+            aria-hidden
+          />
+          <div className="fixed left-1/2 top-1/2 z-[71] w-[92vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/20 bg-[#041f35] p-5 text-white shadow-2xl">
+            <h3 className="mb-4 text-base font-semibold">Reschedule meeting</h3>
+            <div className="mb-4">
+              <label className="mb-1 block text-xs text-[#cde2f2]">Date and time</label>
+              <input
+                type="datetime-local"
+                value={rescheduleDateTime}
+                min={toLocalDateTimeInput(new Date().toISOString())}
+                onChange={(e) => setRescheduleDateTime(e.target.value)}
+                className={directorDateInput}
+              />
+            </div>
+            <div className="mb-6">
+              <label className="mb-1 block text-xs text-[#cde2f2]">Platform</label>
+              <select
+                value={reschedulePlatform}
+                onChange={(e) => setReschedulePlatform(e.target.value)}
+                className={directorSelectDark}
+              >
+                <option value="zoom">Zoom</option>
+                <option value="google-meet">Google Meet</option>
+                <option value="teams">Microsoft Teams</option>
+                <option value="phone">Phone</option>
+                <option value="in-person">In person</option>
+              </select>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className={directorBtnSecondary}
+                onClick={() => setIsRescheduleModalOpen(false)}
+                disabled={isRescheduling}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={`${directorBtnPrimary} ${isRescheduling ? "cursor-not-allowed opacity-70" : ""}`}
+                onClick={handleRescheduleAppointment}
+                disabled={isRescheduling}
+              >
+                {isRescheduling ? "Saving..." : "Save changes"}
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

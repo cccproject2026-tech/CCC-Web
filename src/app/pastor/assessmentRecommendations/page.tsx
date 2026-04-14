@@ -1,107 +1,246 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import HeroBg from "../../Assets/progress-bg.png";
+import PastorHeader from "@/app/Components/PastorHeader";
+import { getCookie } from "@/app/utils/cookies";
+import {
+  apiGetAssessmentById,
+  apiGetAssignedAssessments,
+  flattenAssignedAssessmentRow,
+  parseAssignedAssessmentsListBody,
+  parseAssessmentDetailPayload,
+} from "@/app/Services/assessment.service";
+import { getStoredRecommendationsForPastorAssessment } from "@/app/utils/assessment-recommendations";
 
-export default function PastorAssessmentRecommendationsPage() {
-    const [selected, setSelected] = useState<any>(null);
+type AssessmentRow = {
+  id: string;
+  name: string;
+};
 
-    // 🔴 Replace with API
-    const assessments = [
-        {
-            id: "1",
-            name: "Mental Health Check",
-            sections: [
-                {
-                    title: "Emotional Health",
-                    recommendations: ["Improve communication", "Attend counseling"],
-                },
-            ],
-        },
-    ];
+type SectionRecommendationRow = {
+  sectionId: string;
+  sectionTitle: string;
+  message: string;
+  sentAt?: string;
+};
 
-    return (
-        <div className="flex min-h-screen flex-col bg-[#062946] text-white">
-
-            {/* HERO */}
-            <section
-                className="relative bg-cover px-4 pb-10 pt-4 md:px-20"
-                style={{ backgroundImage: `url(${HeroBg.src})` }}
-            >
-                <div className="absolute inset-0 bg-black/60" />
-                <div className="relative z-10 max-w-6xl mx-auto">
-                    <h1 className="text-2xl font-semibold">My Recommendations</h1>
-                </div>
-            </section>
-
-            {/* MAIN */}
-            <main className="flex-1 px-4 md:px-20 py-10">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                    {/* LEFT */}
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
-                        <h2 className="text-[#8ec5eb] mb-4">Assessments</h2>
-
-                        {assessments.map((a) => (
-                            <button
-                                key={a.id}
-                                onClick={() => setSelected(a)}
-                                className="block w-full text-left px-4 py-3 rounded-lg hover:bg-white/10"
-                            >
-                                {a.name}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* RIGHT */}
-                    <div className="lg:col-span-2">
-                        {!selected ? (
-                            <Empty text="Select an assessment" />
-                        ) : (
-                            <div>
-                                <div className="flex justify-between mb-6">
-                                    <h2 className="text-xl font-semibold">{selected.name}</h2>
-
-                                    <button className="px-4 py-2 bg-[#8ec5eb]/25 rounded-lg text-sm">
-                                        Download
-                                    </button>
-                                </div>
-
-                                {selected.sections.map((s: any, i: number) => (
-                                    <div
-                                        key={i}
-                                        className="mb-4 p-5 rounded-2xl border border-white/10 bg-white/5"
-                                    >
-                                        <h3 className="text-[#8ec5eb] font-semibold mb-2">
-                                            {s.title}
-                                        </h3>
-
-                                        {s.recommendations?.length > 0 ? (
-                                            <ul className="list-disc list-inside text-sm text-white/70 space-y-1">
-                                                {s.recommendations.map((r: string, i: number) => (
-                                                    <li key={i}>{r}</li>
-                                                ))}
-                                            </ul>
-                                        ) : (
-                                            <p className="text-white/50 text-sm">
-                                                No recommendations yet
-                                            </p>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </main>
-        </div>
-    );
+function readCurrentPastorId(): string {
+  const raw = getCookie("user");
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw) as { id?: string; _id?: string };
+    return String(parsed.id || parsed._id || "").trim();
+  } catch {
+    return "";
+  }
 }
 
-function Empty({ text }: any) {
-    return (
-        <div className="p-10 text-center border border-white/10 bg-white/5 rounded-2xl">
-            <p className="text-white/50">{text}</p>
+export default function PastorAssessmentRecommendationsPage() {
+  const router = useRouter();
+  const [assessments, setAssessments] = useState<AssessmentRow[]>([]);
+  const [selectedAssessmentId, setSelectedAssessmentId] = useState("");
+  const [sectionRecommendations, setSectionRecommendations] = useState<SectionRecommendationRow[]>([]);
+  const [assessmentTitle, setAssessmentTitle] = useState("");
+  const [loadingAssessments, setLoadingAssessments] = useState(true);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+
+  const pastorId = useMemo(() => readCurrentPastorId(), []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadAssessments = async () => {
+      if (!pastorId) {
+        setLoadingAssessments(false);
+        return;
+      }
+      try {
+        setLoadingAssessments(true);
+        const res = await apiGetAssignedAssessments(pastorId);
+        const list = parseAssignedAssessmentsListBody(res.data)
+          .map(flattenAssignedAssessmentRow)
+          .filter((row): row is NonNullable<ReturnType<typeof flattenAssignedAssessmentRow>> => row !== null)
+          .map((row) => ({
+            id: row.assessmentId,
+            name: String(row.assessment.name ?? "Untitled Assessment"),
+          }));
+
+        const uniq = list.filter((item, idx) => list.findIndex((x) => x.id === item.id) === idx);
+
+        if (!active) return;
+        setAssessments(uniq);
+        setSelectedAssessmentId((current) => current || uniq[0]?.id || "");
+      } catch {
+        if (!active) return;
+        setAssessments([]);
+      } finally {
+        if (!active) return;
+        setLoadingAssessments(false);
+      }
+    };
+
+    void loadAssessments();
+    return () => {
+      active = false;
+    };
+  }, [pastorId]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadSelectedAssessmentDetails = async () => {
+      if (!pastorId || !selectedAssessmentId) {
+        setSectionRecommendations([]);
+        setAssessmentTitle("");
+        return;
+      }
+
+      try {
+        setLoadingDetails(true);
+        const detailRes = await apiGetAssessmentById(selectedAssessmentId);
+        const detail = parseAssessmentDetailPayload(detailRes.data);
+
+        const sectionTitleById = new Map<string, string>();
+        (Array.isArray(detail?.sections) ? detail.sections : []).forEach((section, idx) => {
+          sectionTitleById.set(String(section._id || `section_${idx}`), section.name || `Section ${idx + 1}`);
+        });
+
+        const stored = getStoredRecommendationsForPastorAssessment(pastorId, selectedAssessmentId).filter(
+          (entry) => entry.sent,
+        );
+
+        const mapped = stored.map((entry) => ({
+          sectionId: entry.sectionId,
+          sectionTitle: sectionTitleById.get(entry.sectionId) || entry.sectionTitle,
+          message: entry.message,
+          sentAt: entry.sentAt,
+        }));
+
+        if (!active) return;
+        setAssessmentTitle(String(detail?.name || "Assessment"));
+        setSectionRecommendations(mapped);
+      } catch {
+        if (!active) return;
+        setSectionRecommendations([]);
+        setAssessmentTitle("Assessment");
+      } finally {
+        if (!active) return;
+        setLoadingDetails(false);
+      }
+    };
+
+    void loadSelectedAssessmentDetails();
+    return () => {
+      active = false;
+    };
+  }, [pastorId, selectedAssessmentId]);
+
+  return (
+    <div className="flex min-h-screen flex-col bg-[#062946] text-white">
+      <PastorHeader showFullHeader={true} />
+
+      <section
+        className="relative bg-cover px-4 pb-10 pt-4 md:px-20"
+        style={{ backgroundImage: `url(${HeroBg.src})` }}
+      >
+        <div className="absolute inset-0 bg-black/60" />
+        <div className="relative z-10 mx-auto max-w-6xl">
+          <h1 className="text-2xl font-semibold">My Recommendations</h1>
+          <p className="mt-1 text-sm text-white/70">
+            View mentor recommendations and download your customized development plans.
+          </p>
         </div>
-    );
+      </section>
+
+      <main className="flex-1 px-4 py-10 md:px-20">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 lg:col-span-4">
+            <h2 className="mb-4 font-semibold text-[#8ec5eb]">Assessments</h2>
+
+            {loadingAssessments ? (
+              <p className="text-sm text-white/60">Loading assessments...</p>
+            ) : assessments.length === 0 ? (
+              <p className="text-sm text-white/60">No assessments found.</p>
+            ) : (
+              <div className="space-y-2">
+                {assessments.map((assessment) => (
+                  <button
+                    key={assessment.id}
+                    type="button"
+                    onClick={() => setSelectedAssessmentId(assessment.id)}
+                    className={`w-full rounded-lg px-4 py-3 text-left text-sm transition ${
+                      selectedAssessmentId === assessment.id
+                        ? "bg-[#8ec5eb]/25 text-white"
+                        : "bg-white/5 text-white/85 hover:bg-white/10"
+                    }`}
+                  >
+                    {assessment.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 lg:col-span-8">
+            {!selectedAssessmentId ? (
+              <Empty text="Select an assessment to view recommendations." />
+            ) : loadingDetails ? (
+              <Empty text="Loading recommendations..." />
+            ) : (
+              <div>
+                <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-xl font-semibold">{assessmentTitle}</h2>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      router.push(`/pastor/SurveyRecommendationDownload?assessmentId=${selectedAssessmentId}`)
+                    }
+                    className="rounded-lg bg-[#8ec5eb]/25 px-4 py-2 text-sm font-semibold hover:bg-[#8ec5eb]/35"
+                  >
+                    <i className="fa-solid fa-download mr-2" />
+                    Download Plans
+                  </button>
+                </div>
+
+                {sectionRecommendations.length === 0 ? (
+                  <Empty text="No recommendations have been sent for this assessment yet." />
+                ) : (
+                  <div className="space-y-4">
+                    {sectionRecommendations.map((section) => (
+                      <div
+                        key={section.sectionId}
+                        className="rounded-xl border border-white/15 bg-white/5 p-4"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h3 className="font-semibold text-[#8ec5eb]">{section.sectionTitle}</h3>
+                          <span className="text-xs text-white/60">
+                            {section.sentAt
+                              ? `Sent on ${new Date(section.sentAt).toLocaleString()}`
+                              : "Sent"}
+                          </span>
+                        </div>
+                        <p className="mt-3 whitespace-pre-wrap text-sm text-white/85">
+                          {section.message}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function Empty({ text }: { text: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-10 text-center">
+      <p className="text-sm text-white/55">{text}</p>
+    </div>
+  );
 }
