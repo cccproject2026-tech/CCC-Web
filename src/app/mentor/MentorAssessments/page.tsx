@@ -2,16 +2,23 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import HeroBg from "@/app/Assets/assignments-bg.png";
+import UserProfile from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { ApiAvatarPlaceholder, ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import {
+  apiGetAssessmentById,
+  apiGetAssessmentRecommendationRules,
   apiCreateAssessment,
   apiDeleteAssessments,
   apiGetAssessments,
+  apiGetSectionRecommendations,
+  apiGetUserAnswers,
+  parseAssessmentDetailPayload,
   parseAssessmentsListPayload,
+  apiSendSectionRecommendations,
 } from "@/app/Services/assessment.service";
-import { apiAssignAssessment } from "@/app/Services/progress.service";
+import { apiAssignAssessment, apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 import { useRouter } from "next/navigation";
@@ -28,6 +35,67 @@ import {
   mentorModalBtnSecondary,
   mentorPageRoot,
 } from "@/app/Components/mentor/mentor-theme";
+import FeaturedAvatars, { FeaturedAvatarItem } from "@/app/Components/FeaturedAvatars";
+import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
+import { getStoredRecommendationsForPastorAssessment, upsertStoredRecommendation } from "@/app/utils/assessment-recommendations";
+
+type MentorAssessmentStatus = "not_started" | "submitted" | "completed";
+
+type RecommendationRow = {
+  sectionId: string;
+  sectionTitle: string;
+  message: string;
+  score?: number;
+};
+
+type RecommendationRule = {
+  level?: number | string;
+  items?: string[];
+};
+
+type RuleLayer = {
+  _id?: string;
+  title?: string;
+  recommendations?: string[];
+};
+
+type RuleSection = {
+  _id?: string;
+  title?: string;
+  name?: string;
+  recommendations?: RecommendationRule[];
+  layers?: RuleLayer[];
+};
+
+function normalizeMentorAssessmentStatus(raw: unknown): MentorAssessmentStatus {
+  const s = String(raw || "").toLowerCase().replace(/\s+/g, "_");
+  if (s === "submitted") return "submitted";
+  if (s === "completed" || s === "reviewed") return "completed";
+  return "not_started";
+}
+
+function statusChipClass(status: MentorAssessmentStatus): string {
+  if (status === "completed") return "border-emerald-300/40 bg-emerald-400/20 text-emerald-100";
+  if (status === "submitted") return "border-amber-300/40 bg-amber-400/20 text-amber-100";
+  return "border-white/20 bg-white/10 text-[#cde2f2]";
+}
+
+function statusLabel(status: MentorAssessmentStatus): string {
+  if (status === "completed") return "Completed";
+  if (status === "submitted") return "Submitted";
+  return "Not Started";
+}
+
+function extractAssessmentIdFromProgressRow(row: any): string {
+  const direct = row?.assessmentId;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+  if (direct && typeof direct === "object") {
+    const nested = String((direct as { _id?: string; id?: string })._id ?? (direct as { _id?: string; id?: string }).id ?? "").trim();
+    if (nested) return nested;
+  }
+  const fallback = String(row?._id ?? row?.id ?? "").trim();
+  return fallback;
+}
 
 function isHttpUrl(u?: string): boolean {
   return !!u && (u.startsWith("http://") || u.startsWith("https://"));
@@ -36,6 +104,195 @@ function isHttpUrl(u?: string): boolean {
 function getAssessmentId(item: { _id?: string; id?: string }): string {
   const raw = item._id ?? item.id;
   return raw != null ? String(raw) : "";
+}
+
+function extractRulesPayload(body: unknown): RuleSection[] {
+  if (Array.isArray(body)) return body as RuleSection[];
+  if (!body || typeof body !== "object") return [];
+
+  const o = body as Record<string, unknown>;
+  if (Array.isArray(o.data)) return o.data as RuleSection[];
+
+  if (o.data && typeof o.data === "object") {
+    const d = o.data as Record<string, unknown>;
+    if (Array.isArray(d.data)) return d.data as RuleSection[];
+    if (Array.isArray(d.sections)) return d.sections as RuleSection[];
+    if (Array.isArray(d.items)) return d.items as RuleSection[];
+  }
+
+  if (Array.isArray(o.sections)) return o.sections as RuleSection[];
+  if (Array.isArray(o.items)) return o.items as RuleSection[];
+
+  return [];
+}
+
+function normalizeText(value: unknown): string {
+  return String(value || "").trim().toLowerCase();
+}
+
+function findRuleSection(
+  ruleSections: RuleSection[],
+  sectionId: string,
+  sectionTitle: string,
+  sectionIndex: number,
+): RuleSection | undefined {
+  const byId = ruleSections.find((rs) => String(rs?._id || "") === sectionId);
+  if (byId) return byId;
+
+  const normalizedTitle = normalizeText(sectionTitle);
+  if (normalizedTitle) {
+    const byTitle = ruleSections.find((rs) => {
+      const t = normalizeText(rs?.title || rs?.name);
+      return t !== "" && t === normalizedTitle;
+    });
+    if (byTitle) return byTitle;
+  }
+
+  return ruleSections[sectionIndex];
+}
+
+function buildSectionRuleText(section: RuleSection | undefined): string {
+  if (!section) return "";
+  const lines: string[] = [];
+
+  const sectionRules = Array.isArray(section.recommendations) ? section.recommendations : [];
+  sectionRules.forEach((rule, ruleIdx) => {
+    const levelLabel = `Level ${String(rule.level ?? ruleIdx + 1)}`;
+    const items = Array.isArray(rule.items) ? rule.items.filter((x) => String(x || "").trim() !== "") : [];
+    if (items.length > 0) {
+      lines.push(`${levelLabel}:`);
+      items.forEach((item) => lines.push(`- ${item}`));
+    }
+  });
+
+  const layers = Array.isArray(section.layers) ? section.layers : [];
+  layers.forEach((layer, layerIdx) => {
+    const layerTitle = layer.title || `Layer ${layerIdx + 1}`;
+    const items = Array.isArray(layer.recommendations)
+      ? layer.recommendations.filter((x) => String(x || "").trim() !== "")
+      : [];
+    if (items.length > 0) {
+      lines.push(`${layerTitle}:`);
+      items.forEach((item) => lines.push(`- ${item}`));
+    }
+  });
+
+  return lines.join("\n").trim();
+}
+
+function buildSectionExistingText(section: any): string {
+  if (!section || typeof section !== "object") return "";
+  const lines: string[] = [];
+
+  const sectionRules = Array.isArray(section.recommendations) ? section.recommendations : [];
+  sectionRules.forEach((rule: any, idx: number) => {
+    const levelLabel = `Level ${String(rule?.level ?? idx + 1)}`;
+    const items = Array.isArray(rule?.items)
+      ? rule.items.filter((x: unknown) => String(x || "").trim() !== "")
+      : [];
+    if (items.length > 0) {
+      lines.push(`${levelLabel}:`);
+      items.forEach((item: unknown) => lines.push(`- ${String(item)}`));
+    } else if (rule?.message && String(rule.message).trim()) {
+      lines.push(`${levelLabel}:`);
+      lines.push(`- ${String(rule.message).trim()}`);
+    }
+  });
+
+  const layers = Array.isArray(section.layers) ? section.layers : [];
+  layers.forEach((layer: any, idx: number) => {
+    const layerRecs = Array.isArray(layer?.recommendations)
+      ? layer.recommendations.filter((x: unknown) => String(x || "").trim() !== "")
+      : [];
+    if (layerRecs.length > 0) {
+      const layerTitle = String(layer?.title || `Layer ${idx + 1}`);
+      lines.push(`${layerTitle}:`);
+      layerRecs.forEach((item: unknown) => lines.push(`- ${String(item)}`));
+    }
+  });
+
+  return lines.join("\n").trim();
+}
+
+function buildLayerTextForScore(section: RuleSection | undefined, score: number | undefined): string {
+  if (!section || score === undefined || score === null) return "";
+
+  // Priority 1: level-based recommendations matching the score exactly
+  const sectionRules = Array.isArray(section.recommendations) ? section.recommendations : [];
+  const matchingRule = sectionRules.find((r) => {
+    const rLevel = typeof r.level === "number" ? r.level : Number(r.level);
+    return !isNaN(rLevel) && rLevel === score;
+  });
+  if (matchingRule) {
+    const items = Array.isArray(matchingRule.items)
+      ? matchingRule.items.filter((x) => String(x || "").trim() !== "")
+      : [];
+    if (items.length > 0) return items.map((item) => `- ${item}`).join("\n");
+  }
+
+  // Priority 2: layers array indexed by score (score is 1-based → index = score - 1)
+  const layers = Array.isArray(section.layers) ? section.layers : [];
+  const layerIndex = score - 1;
+  if (layerIndex >= 0 && layerIndex < layers.length) {
+    const layer = layers[layerIndex];
+    const items = Array.isArray(layer.recommendations)
+      ? layer.recommendations.filter((x) => String(x || "").trim() !== "")
+      : [];
+    if (items.length > 0) {
+      const lines: string[] = [];
+      if (layer.title) lines.push(`${layer.title}:`);
+      items.forEach((item) => lines.push(`- ${item}`));
+      return lines.join("\n");
+    }
+  }
+
+  // Fallback: if score-specific layer is empty, aggregate non-empty layer recommendations.
+  const aggregated: string[] = [];
+  layers.forEach((layer) => {
+    const items = Array.isArray(layer.recommendations)
+      ? layer.recommendations.filter((x) => String(x || "").trim() !== "")
+      : [];
+    if (items.length > 0) {
+      if (layer.title) aggregated.push(`${layer.title}:`);
+      items.forEach((item) => aggregated.push(`- ${item}`));
+    }
+  });
+  if (aggregated.length > 0) return aggregated.join("\n");
+
+  return "";
+}
+
+function parseRecommendationItemsFromText(message: string): string[] {
+  return message
+    .split("\n")
+    .map((line) => line.replace(/^\s*[-*]\s*/, "").trim())
+    .filter((line) => line !== "" && !/^level\s+\d+\s*:$/i.test(line) && !/^layer\s+\d+\s*:$/i.test(line));
+}
+
+function extractUserAnswerSections(body: unknown): Array<{ sectionId: string; sectionScore?: number; recommendations: string[] }> {
+  const root = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+  return sections.map((s: any) => ({
+    sectionId: String(s?.sectionId ?? ""),
+    sectionScore: typeof s?.sectionScore === "number" ? s.sectionScore : undefined,
+    recommendations: Array.isArray(s?.recommendations)
+      ? s.recommendations.filter((x: unknown) => String(x || "").trim() !== "").map((x: unknown) => String(x))
+      : [],
+  }));
+}
+
+function extractRecommendationPreview(body: unknown): Array<{ sectionId: string; score?: number; recommendations: string[] }> {
+  const root = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const data = root.data;
+  const list = Array.isArray(data) ? data : Array.isArray(root) ? (root as unknown[]) : [];
+  return list.map((row: any) => ({
+    sectionId: String(row?.sectionId ?? ""),
+    score: typeof row?.score === "number" ? row.score : undefined,
+    recommendations: Array.isArray(row?.recommendations)
+      ? row.recommendations.filter((x: unknown) => String(x || "").trim() !== "").map((x: unknown) => String(x))
+      : [],
+  }));
 }
 
 export default function MentorAssessments() {
@@ -56,6 +313,15 @@ export default function MentorAssessments() {
   const [showForm, setShowForm] = useState(false);
   const [assessments, setAssessments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [featuredItems, setFeaturedItems] = useState<FeaturedAvatarItem[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(false);
+  const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(null);
+  const [recommendationOpen, setRecommendationOpen] = useState(false);
+  const [recommendationLoading, setRecommendationLoading] = useState(false);
+  const [recommendationSubmitting, setRecommendationSubmitting] = useState(false);
+  const [recommendationRows, setRecommendationRows] = useState<RecommendationRow[]>([]);
+  const [recommendationAssessmentId, setRecommendationAssessmentId] = useState<string | null>(null);
+  const [recommendationAssessmentTitle, setRecommendationAssessmentTitle] = useState("Assessment");
 
   const [formTitle, setFormTitle] = useState("");
   const [formDesc, setFormDesc] = useState("");
@@ -67,20 +333,105 @@ export default function MentorAssessments() {
     const fetchAssessments = async () => {
       try {
         setLoading(true);
+        if (selectedMenteeId) {
+          const progressRes = await apiGetUserProgress(selectedMenteeId);
+          const progressData = unwrapProgressData(progressRes);
+          const assessmentProgress = Array.isArray(progressData?.assessments)
+            ? progressData.assessments
+            : [];
 
-        const res = await apiGetAssessments({
-          search: searchTerm || undefined,
-        });
-        setAssessments(parseAssessmentsListPayload(res.data));
+          const idStatusRows = assessmentProgress
+            .map((p: any) => ({
+              assessmentId: extractAssessmentIdFromProgressRow(p),
+              status: normalizeMentorAssessmentStatus(p?.status),
+              assignmentId: p?.assignmentId ? String(p.assignmentId) : undefined,
+            }))
+            .filter((p: { assessmentId: string }) => p.assessmentId !== "");
+
+          const uniqById = idStatusRows.filter(
+            (row: { assessmentId: string }, idx: number, arr: Array<{ assessmentId: string }>) =>
+              arr.findIndex((x) => x.assessmentId === row.assessmentId) === idx,
+          );
+
+          const details = await Promise.allSettled(
+            uniqById.map(async (row: { assessmentId: string; status: MentorAssessmentStatus; assignmentId?: string }) => {
+              const detailRes = await apiGetAssessmentById(row.assessmentId);
+              const detail = parseAssessmentDetailPayload(detailRes.data);
+              if (!detail) return null;
+              return {
+                ...(detail as any),
+                _id: String((detail as any)._id ?? row.assessmentId),
+                id: String((detail as any)._id ?? row.assessmentId),
+                _mentorAssignmentStatus: row.status,
+                _mentorAssignmentId: row.assignmentId,
+              };
+            }),
+          );
+
+          const assigned = details
+            .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+            .map((r) => r.value)
+            .filter((v) => v !== null);
+
+          const q = searchTerm.trim().toLowerCase();
+          const filteredAssigned = !q
+            ? assigned
+            : assigned.filter((a: any) => {
+              const name = String(a?.name || "").toLowerCase();
+              const desc = String(a?.description || "").toLowerCase();
+              return name.includes(q) || desc.includes(q);
+            });
+          setAssessments(filteredAssigned);
+        } else {
+          const res = await apiGetAssessments({
+            search: searchTerm || undefined,
+          });
+          setAssessments(parseAssessmentsListPayload(res.data));
+        }
       } catch (err) {
         console.error("Failed to load assessments", err);
+        setAssessments([]);
       } finally {
         setLoading(false);
       }
     };
 
     fetchAssessments();
-  }, [searchTerm]);
+  }, [searchTerm, selectedMenteeId]);
+
+  useEffect(() => {
+    const mentor = getMentorFromCookie();
+    const mentorId = mentor?.id ?? mentor?._id;
+    if (!mentorId) {
+      setFeaturedItems([]);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setFeaturedLoading(true);
+        const res = await apiGetAssignedUsers(mentorId);
+        const raw = res.data?.data;
+        const list = Array.isArray(raw) ? raw : [];
+        const mapped: FeaturedAvatarItem[] = list.map((u: any, idx: number) => ({
+          id: String(u._id ?? u.id ?? idx),
+          name: `${u.firstName || ""} ${u.lastName || ""}`.trim() || "Pastor",
+          img: isHttpUrl(u.profilePicture) ? u.profilePicture : UserProfile,
+        }));
+        if (!cancelled) setFeaturedItems(mapped);
+      } catch (err) {
+        console.error("Failed to load featured mentees", err);
+        if (!cancelled) setFeaturedItems([]);
+      } finally {
+        if (!cancelled) setFeaturedLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (!showAssignDrawer) {
@@ -156,6 +507,144 @@ export default function MentorAssessments() {
   };
 
   const filtered = assessments;
+
+  const selectedMenteeName = useMemo(() => {
+    const row = featuredItems.find((item) => String(item.id) === String(selectedMenteeId || ""));
+    return row?.name || "Mentee";
+  }, [featuredItems, selectedMenteeId]);
+
+  const openRecommendationEditor = async (assessment: any) => {
+    if (!selectedMenteeId) return;
+    const assessmentId = getAssessmentId(assessment);
+    if (!assessmentId) return;
+
+    try {
+      setRecommendationLoading(true);
+      const [detailRes, rulesRes, userAnswersRes, previewRes] = await Promise.allSettled([
+        apiGetAssessmentById(assessmentId),
+        apiGetAssessmentRecommendationRules(assessmentId),
+        apiGetUserAnswers(assessmentId, selectedMenteeId),
+        apiGetSectionRecommendations(assessmentId, selectedMenteeId),
+      ]);
+
+      const detail =
+        detailRes.status === "fulfilled" ? parseAssessmentDetailPayload(detailRes.value.data) : null;
+      const ruleSections =
+        rulesRes.status === "fulfilled" ? extractRulesPayload(rulesRes.value.data) : [];
+      const answerSections =
+        userAnswersRes.status === "fulfilled" ? extractUserAnswerSections(userAnswersRes.value.data) : [];
+      const previewSections =
+        previewRes.status === "fulfilled" ? extractRecommendationPreview(previewRes.value.data) : [];
+
+      const sections = Array.isArray(detail?.sections) ? detail.sections : [];
+      const stored = getStoredRecommendationsForPastorAssessment(selectedMenteeId, assessmentId);
+
+      const rows: RecommendationRow[] = sections.map((section: any, idx: number) => {
+        const sectionId = String(section?._id || `section_${idx}`);
+        const sectionTitle = String(section?.name || section?.title || `Section ${idx + 1}`);
+        const existing = stored.find((s) => s.sectionId === sectionId);
+        const matchedRulesSection = findRuleSection(ruleSections, sectionId, sectionTitle, idx);
+        const rulesText = buildSectionRuleText(matchedRulesSection);
+        const existingFromAssessment = buildSectionExistingText(section);
+
+        const answerSection = answerSections.find((s) => s.sectionId === sectionId);
+        const answerText = (answerSection?.recommendations || []).join("\n");
+        const previewSection = previewSections.find((s) => s.sectionId === sectionId);
+        const previewText = (previewSection?.recommendations || []).join("\n");
+        const currentScore = answerSection?.sectionScore ?? previewSection?.score;
+        const layerText = buildLayerTextForScore(matchedRulesSection, currentScore);
+
+        return {
+          sectionId,
+          sectionTitle,
+          score: currentScore,
+          message: existing?.message || answerText || previewText || layerText || existingFromAssessment || rulesText,
+        };
+      });
+
+      setRecommendationRows(rows);
+      setRecommendationAssessmentId(assessmentId);
+      setRecommendationAssessmentTitle(String(assessment?.name || "Assessment"));
+      setRecommendationOpen(true);
+    } catch (err) {
+      console.error("Failed to load recommendation editor", err);
+      setToastMsg("Unable to load recommendations editor");
+      setTimeout(() => setToastMsg(""), 3000);
+    } finally {
+      setRecommendationLoading(false);
+    }
+  };
+
+  const handleSendRecommendations = async () => {
+    if (!selectedMenteeId || !recommendationAssessmentId) return;
+    const mentor = getMentorFromCookie();
+    const mentorId = String(mentor?.id ?? mentor?._id ?? "");
+    const now = new Date().toISOString();
+    const payloadRows = recommendationRows
+      .map((row) => ({
+        ...row,
+        parsedItems: parseRecommendationItemsFromText(row.message),
+      }))
+      .filter((row) => row.parsedItems.length > 0);
+
+    if (payloadRows.length === 0) {
+      setToastMsg("Add at least one recommendation to send");
+      setTimeout(() => setToastMsg(""), 3000);
+      return;
+    }
+
+    try {
+      setRecommendationSubmitting(true);
+
+      // Persist mentor-written recommendation content for pastor recommendation pages.
+      payloadRows.forEach((row) => {
+        upsertStoredRecommendation({
+          mentorId: mentorId || undefined,
+          pastorId: selectedMenteeId,
+          assessmentId: recommendationAssessmentId,
+          sectionId: row.sectionId,
+          sectionTitle: row.sectionTitle,
+          message: row.message.trim(),
+          sent: true,
+          sentAt: now,
+          updatedAt: now,
+        });
+      });
+
+      // Send per-section recommendations using endpoint POST /assessment/:assessmentId/send-recommendation.
+      const sendResults = await Promise.allSettled(
+        payloadRows.map((row) =>
+          apiSendSectionRecommendations(recommendationAssessmentId, {
+            userId: selectedMenteeId,
+            sectionId: row.sectionId,
+            recommendations: row.parsedItems,
+          }),
+        ),
+      );
+
+      const failed = sendResults.filter((r) => r.status === "rejected").length;
+      const succeeded = sendResults.length - failed;
+
+      if (failed === sendResults.length) {
+        throw new Error("All recommendation requests failed");
+      }
+
+      if (failed > 0) {
+        setToastMsg(`Sent ${succeeded} recommendation section(s); ${failed} failed`);
+      } else {
+        setToastMsg("Recommendations sent successfully");
+      }
+
+      setRecommendationOpen(false);
+      setTimeout(() => setToastMsg(""), 3000);
+    } catch (err) {
+      console.error(err);
+      setToastMsg("Failed to send recommendations");
+      setTimeout(() => setToastMsg(""), 3000);
+    } finally {
+      setRecommendationSubmitting(false);
+    }
+  };
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -249,11 +738,10 @@ export default function MentorAssessments() {
                     <button
                       type="button"
                       onClick={() => setMode(mode === "select" ? "normal" : "select")}
-                      className={`rounded-xl border px-5 py-2.5 text-sm font-medium transition ${
-                        mode === "select"
-                          ? "border-[#8ec5eb] bg-[#8ec5eb]/20 text-white"
-                          : "border-white/20 bg-white/10 text-[#cde2f2] hover:bg-white/15"
-                      }`}
+                      className={`rounded-xl border px-5 py-2.5 text-sm font-medium transition ${mode === "select"
+                        ? "border-[#8ec5eb] bg-[#8ec5eb]/20 text-white"
+                        : "border-white/20 bg-white/10 text-[#cde2f2] hover:bg-white/15"
+                        }`}
                     >
                       <i className="fa-regular fa-pen-to-square mr-2" />
                       {mode === "select" ? "Cancel" : "Select"}
@@ -270,6 +758,33 @@ export default function MentorAssessments() {
                   </div>
                 </div>
               </div>
+
+              {!featuredLoading && featuredItems.length > 0 && (
+                <div className={mentorFilterPanel}>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm text-[#cde2f2]">
+                      {selectedMenteeId
+                        ? "Showing assigned assessments for selected mentee"
+                        : "Showing all assessments"}
+                    </p>
+                    {selectedMenteeId && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMenteeId(null)}
+                        className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/15"
+                      >
+                        Clear filter
+                      </button>
+                    )}
+                  </div>
+                  <FeaturedAvatars
+                    items={featuredItems}
+                    showDivider={false}
+                    className="mb-0"
+                    onItemClick={(item) => setSelectedMenteeId(String(item.id))}
+                  />
+                </div>
+              )}
 
               {mode === "select" && (
                 <div
@@ -311,9 +826,8 @@ export default function MentorAssessments() {
                   return (
                     <div
                       key={aid || `row-${index}`}
-                      className={`relative flex overflow-hidden ${mentorGlassCardRoadmap} ${
-                        selectedIds.includes(aid) ? "ring-2 ring-[#8ec5eb]/50" : ""
-                      }`}
+                      className={`relative flex overflow-hidden ${mentorGlassCardRoadmap} ${selectedIds.includes(aid) ? "ring-2 ring-[#8ec5eb]/50" : ""
+                        }`}
                     >
                       {mode === "select" && (
                         <div className="absolute right-3 top-3 z-20">
@@ -398,8 +912,53 @@ export default function MentorAssessments() {
                             </div>
                           </div>
                           <p className="mt-1 line-clamp-2 text-sm text-[#cde2f2]/90">{item.description}</p>
+
+                          {selectedMenteeId && (
+                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                              <span className="text-[#cde2f2]/80">Status</span>
+                              <span
+                                className={`rounded-md border px-2 py-1 font-medium ${statusChipClass(
+                                  (item._mentorAssignmentStatus as MentorAssessmentStatus) || "not_started",
+                                )}`}
+                              >
+                                {statusLabel(
+                                  (item._mentorAssignmentStatus as MentorAssessmentStatus) || "not_started",
+                                )}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                        <div className="relative z-10 mt-3 flex justify-end">
+                        <div className="relative z-10 mt-3 flex flex-wrap justify-end gap-2">
+                          {selectedMenteeId &&
+                            ((item._mentorAssignmentStatus as MentorAssessmentStatus) === "submitted" ||
+                              (item._mentorAssignmentStatus as MentorAssessmentStatus) === "completed") && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const aid = getAssessmentId(item);
+                                  if (!aid || !selectedMenteeId) return;
+                                  router.push(
+                                    `/mentor/MentorAssessments/result?assessmentId=${encodeURIComponent(aid)}&userId=${encodeURIComponent(selectedMenteeId)}`,
+                                  );
+                                }}
+                                className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/15"
+                              >
+                                View Result
+                              </button>
+                            )}
+
+                          {selectedMenteeId &&
+                            ((item._mentorAssignmentStatus as MentorAssessmentStatus) === "submitted" ||
+                              (item._mentorAssignmentStatus as MentorAssessmentStatus) === "completed") && (
+                              <button
+                                type="button"
+                                onClick={() => openRecommendationEditor(item)}
+                                className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                              >
+                                Edit Recommendation
+                              </button>
+                            )}
+
                           <button
                             type="button"
                             onClick={() => {
@@ -679,6 +1238,86 @@ export default function MentorAssessments() {
                 className="w-full rounded-xl bg-[#8ec5eb]/90 py-2.5 font-semibold text-[#062946] hover:bg-[#8ec5eb] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {assignSubmitting ? "Assigning…" : "Assign"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {recommendationOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <button
+            type="button"
+            aria-label="Close"
+            className="absolute inset-0 bg-transparent"
+            onClick={() => setRecommendationOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-3xl rounded-2xl border border-white/15 bg-[#062946] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Edit and send recommendations</h3>
+                <p className="mt-1 text-xs text-[#cde2f2]/80">
+                  {selectedMenteeName} • {recommendationAssessmentTitle}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRecommendationOpen(false)}
+                className="text-[#8ec5eb] hover:text-white"
+                aria-label="Close"
+              >
+                <i className="fa-solid fa-xmark text-xl" />
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] space-y-4 overflow-y-auto p-6">
+              {recommendationLoading ? (
+                <p className="text-sm text-[#cde2f2]">Loading recommendations editor…</p>
+              ) : recommendationRows.length === 0 ? (
+                <p className="text-sm text-[#cde2f2]">No sections found for this assessment.</p>
+              ) : (
+                recommendationRows.map((row, idx) => (
+                  <div key={row.sectionId || idx} className="rounded-xl border border-white/15 bg-white/5 p-4">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-[#8ec5eb]">{row.sectionTitle}</p>
+                      {typeof row.score === "number" && (
+                        <span className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-[11px] text-[#cde2f2]">
+                          Score: {row.score}
+                        </span>
+                      )}
+                    </div>
+                    <textarea
+                      rows={4}
+                      value={row.message}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setRecommendationRows((prev) =>
+                          prev.map((item, i) => (i === idx ? { ...item, message: value } : item)),
+                        );
+                      }}
+                      placeholder="Write recommendation for this section"
+                      className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-white/10 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setRecommendationOpen(false)}
+                className="rounded-lg border border-white/25 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={recommendationSubmitting || recommendationLoading}
+                onClick={handleSendRecommendations}
+                className="rounded-lg bg-[#8ec5eb]/90 px-5 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#8ec5eb] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {recommendationSubmitting ? "Sending..." : "Send to mentee"}
               </button>
             </div>
           </div>
