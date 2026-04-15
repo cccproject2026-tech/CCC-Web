@@ -61,8 +61,12 @@ export function getNotesSession(variant: NotesVariant): {
   }
 }
 
+// export function noteBody(note: Pick<Note, "text" | "content">): string {
+//   return (note.text ?? note.content ?? "").trim();
+// }
+
 export function noteBody(note: Pick<Note, "text" | "content">): string {
-  return (note.text ?? note.content ?? "").trim();
+  return (note.content ?? note.text ?? "").trim();
 }
 
 export function notePreviewTitle(note: Note): string {
