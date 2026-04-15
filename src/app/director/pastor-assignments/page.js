@@ -85,6 +85,7 @@ export default function PastorAssignmentsPage() {
         `Deleted ${idsToDelete.length} roadmap${idsToDelete.length > 1 ? "s" : ""} successfully`
       );
       setTimeout(() => setToast(null), 2000);
+      router.push("/director/pastor-assignments");
     } catch (err) {
       console.error("Error deleting roadmaps:", err);
     } finally {

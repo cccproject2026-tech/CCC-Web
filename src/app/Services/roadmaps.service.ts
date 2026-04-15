@@ -48,8 +48,11 @@ export type {
 // ─── Roadmap CRUD ─────────────────────────────────────────────────────────────
 
 // GET /roadmaps?status=all&search=
-export const apiGetRoadmaps = (status = 'all', search = '') =>
-  axiosInstance.get(`/roadmaps`, { params: { status, search } });
+export const apiGetRoadmaps = (status = "all", search = "") =>
+  axiosInstance.get(`/roadmaps`, {
+    params: { status, search, _cb: Date.now() },
+    headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+  });
 
 // GET /roadmaps/user/:userId
 export const apiGetRoadmapsByUser = (userId: string) =>

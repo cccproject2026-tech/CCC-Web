@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
@@ -9,18 +9,29 @@ import { directorGlassCard, directorInputClass, directorPageRoot } from "@/app/d
 import AssignRoadmapModal from "@/app/Components/AssignRoadmapModal";
 import MentorBg from "@/app/Assets/mentor-bg.png";
 import Card1 from "@/app/Assets/card1.png";
-import { apiGetRoadmapById, apiUpdateRoadmap } from "@/app/Services/api";
+import {
+  apiAddNestedRoadmapItem,
+  apiDeleteRoadmap,
+  apiGetRoadmapById,
+  apiGetRoadmaps,
+  apiUpdateRoadmap,
+} from "@/app/Services/api";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 
 type RoadmapDoc = {
   _id?: string;
+  id?: string;
   name?: string;
   description?: string;
   roadMapDetails?: string;
   duration?: string;
   type?: string;
   imageUrl?: string;
-  roadmaps?: { _id?: string; name?: string; description?: string }[];
+  phase?: string;
+  totalSteps?: number;
+  startDate?: string;
+  endDate?: string;
+  roadmaps?: { _id?: string; name?: string; description?: string; duration?: string }[];
 };
 
 function unwrapRoadmap(res: unknown): RoadmapDoc | null {
@@ -40,7 +51,7 @@ export default function DirectorRoadmapDetailPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const id = typeof params.id === "string" ? params.id : "";
+  const id = typeof params.id === "string" ? decodeURIComponent(params.id).trim() : "";
   const assignUserId = searchParams.get("assignUser");
   const editParam = searchParams.get("edit");
   const isEditMode = editParam === "1" || editParam === "true";
@@ -52,10 +63,26 @@ export default function DirectorRoadmapDetailPage() {
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editDuration, setEditDuration] = useState("");
+  const [editType, setEditType] = useState("");
+  const [editPhase, setEditPhase] = useState("");
+  const [editTotalSteps, setEditTotalSteps] = useState<string>("");
+  const [editStartDate, setEditStartDate] = useState("");
+  const [editEndDate, setEditEndDate] = useState("");
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [taskName, setTaskName] = useState("");
+  const [taskDuration, setTaskDuration] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [taskSaving, setTaskSaving] = useState(false);
+  const [taskError, setTaskError] = useState("");
+
+  const isPhaseRoadmap = useMemo(() => {
+    const t = String(roadmap?.type ?? "").toLowerCase();
+    return t === "phase" || t.includes("phase");
+  }, [roadmap?.type]);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -75,9 +102,45 @@ export default function DirectorRoadmapDetailPage() {
       }
       setRoadmap(doc);
     } catch (e) {
+      const err = e as {
+        response?: { status?: number; data?: { message?: string | string[] } };
+        message?: string;
+      };
+      const status = err?.response?.status;
+      const msg = err?.response?.data?.message;
+      const msgText = Array.isArray(msg) ? msg.join(", ") : msg;
+
+      // If this was linked with a non-_id field, attempt a quick lookup and retry.
+      if (status === 404) {
+        try {
+          const listRes = await apiGetRoadmaps("all", "");
+          const raw = (listRes as any)?.data?.data ?? (listRes as any)?.data ?? [];
+          const list: any[] = Array.isArray(raw) ? raw : [];
+          const hit = list.find((r) => String(r?._id ?? "").trim() === id || String(r?.id ?? "").trim() === id);
+          const nextId = hit?._id ? String(hit._id).trim() : "";
+          if (nextId && nextId !== id) {
+            const retry = await apiGetRoadmapById(nextId);
+            const doc2 = unwrapRoadmap(retry.data);
+            if (doc2) {
+              setRoadmap(doc2);
+              setError(null);
+              return;
+            }
+          }
+        } catch {
+          // ignore fallback failure; surface original error
+        }
+      }
+
       console.error(e);
       setRoadmap(null);
-      setError("Could not load this roadmap.");
+      setError(
+        msgText?.trim()
+          ? msgText.trim()
+          : status === 404
+            ? "Roadmap not found (or you may not have access)."
+            : err?.message || "Could not load this roadmap.",
+      );
     } finally {
       setLoading(false);
     }
@@ -94,6 +157,11 @@ export default function DirectorRoadmapDetailPage() {
       (roadmap.description ?? roadmap.roadMapDetails ?? "").trim()
     );
     setEditDuration(roadmap.duration?.trim() ?? "");
+    setEditType((roadmap.type ?? "").trim());
+    setEditPhase((roadmap.phase ?? "").trim());
+    setEditTotalSteps(roadmap.totalSteps != null ? String(roadmap.totalSteps) : "");
+    setEditStartDate(typeof roadmap.startDate === "string" ? roadmap.startDate.slice(0, 10) : "");
+    setEditEndDate(typeof roadmap.endDate === "string" ? roadmap.endDate.slice(0, 10) : "");
     setBannerFile(null);
     setBannerPreview(null);
     setSaveError("");
@@ -132,13 +200,18 @@ export default function DirectorRoadmapDetailPage() {
     }
     try {
       setSaving(true);
+      const stepsNum = Number(editTotalSteps);
       await apiUpdateRoadmap(
         id,
         {
           name: editName.trim(),
           description: editDescription.trim(),
           duration: editDuration.trim(),
-          ...(roadmap?.type ? { type: roadmap.type } : {}),
+          ...(editType.trim() ? { type: editType.trim() } : roadmap?.type ? { type: roadmap.type } : {}),
+          ...(editPhase.trim() ? { phase: editPhase.trim() } : {}),
+          ...(Number.isFinite(stepsNum) && stepsNum > 0 ? { totalSteps: stepsNum } : {}),
+          ...(editStartDate ? { startDate: editStartDate } : {}),
+          ...(editEndDate ? { endDate: editEndDate } : {}),
         },
         bannerFile ?? undefined
       );
@@ -152,6 +225,45 @@ export default function DirectorRoadmapDetailPage() {
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const closeAddTaskModal = () => {
+    setShowAddTaskModal(false);
+    setTaskError("");
+    setTaskName("");
+    setTaskDuration("");
+    setTaskDescription("");
+  };
+
+  const handleAddPhaseTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    setTaskError("");
+    if (!taskName.trim()) {
+      setTaskError("Task name is required.");
+      return;
+    }
+    if (!taskDuration.trim()) {
+      setTaskError("Task duration is required.");
+      return;
+    }
+    try {
+      setTaskSaving(true);
+      await apiAddNestedRoadmapItem(id, {
+        name: taskName.trim(),
+        duration: taskDuration.trim(),
+        description: taskDescription.trim() || undefined,
+        roadMapDetails: taskDescription.trim() || undefined,
+      });
+      closeAddTaskModal();
+      await load();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string | string[] } } };
+      const msg = e?.response?.data?.message;
+      setTaskError(Array.isArray(msg) ? msg.join(", ") : msg || "Could not add task.");
+    } finally {
+      setTaskSaving(false);
     }
   };
 
@@ -225,12 +337,41 @@ export default function DirectorRoadmapDetailPage() {
                 </button>
                 <button
                   type="button"
+                  onClick={async () => {
+                    if (!id) return;
+                    const ok = window.confirm("Delete this roadmap? This cannot be undone.");
+                    if (!ok) return;
+                    try {
+                      await apiDeleteRoadmap(id);
+                      router.push("/director/pastor-assignments");
+                    } catch (e) {
+                      console.error(e);
+                      setError("Could not delete this roadmap.");
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-red-400/40 bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-200 transition hover:bg-red-500/25"
+                >
+                  <i className="fa-solid fa-trash text-xs" />
+                  Delete
+                </button>
+                <button
+                  type="button"
                   onClick={() => setShowAssignModal(true)}
                   className="inline-flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
                 >
                   <i className="fa-solid fa-user-plus text-xs" />
                   Assign to pastors
                 </button>
+                {isPhaseRoadmap ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowAddTaskModal(true)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+                  >
+                    <i className="fa-solid fa-diagram-project text-xs" />
+                    Add phase task
+                  </button>
+                ) : null}
               </>
             ) : (
               <button
@@ -280,6 +421,18 @@ export default function DirectorRoadmapDetailPage() {
                 ) : null}
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-white/70">
+                    Type
+                  </label>
+                  <input
+                    type="text"
+                    value={editType}
+                    onChange={(e) => setEditType(e.target.value)}
+                    className={directorInputClass}
+                    placeholder="Phase / Single Roadmap"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-white/70">
                     Name
                   </label>
                   <input
@@ -313,6 +466,57 @@ export default function DirectorRoadmapDetailPage() {
                     rows={6}
                     className={`${directorInputClass} min-h-[120px] resize-y`}
                   />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-white/70">
+                    Phase label (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={editPhase}
+                    onChange={(e) => setEditPhase(e.target.value)}
+                    className={directorInputClass}
+                    placeholder="e.g. Jump Start"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-white/70">
+                    Total steps (optional)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={editTotalSteps}
+                    onChange={(e) => setEditTotalSteps(e.target.value)}
+                    className={directorInputClass}
+                    placeholder="e.g. 10"
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-white/70">
+                      Start date (optional)
+                    </label>
+                    <input
+                      type="date"
+                      value={editStartDate}
+                      onChange={(e) => setEditStartDate(e.target.value)}
+                      className={directorInputClass}
+                      style={{ colorScheme: "dark" }}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-white/70">
+                      End date (optional)
+                    </label>
+                    <input
+                      type="date"
+                      value={editEndDate}
+                      onChange={(e) => setEditEndDate(e.target.value)}
+                      className={directorInputClass}
+                      style={{ colorScheme: "dark" }}
+                    />
+                  </div>
                 </div>
                 {saveError ? (
                   <p className="text-sm text-red-300">{saveError}</p>
@@ -380,6 +584,9 @@ export default function DirectorRoadmapDetailPage() {
                     className="rounded-lg border border-white/10 bg-white/5 px-4 py-3"
                   >
                     <p className="font-medium text-white">{sub.name ?? "Untitled"}</p>
+                    {sub.duration ? (
+                      <p className="mt-0.5 text-xs text-white/55">Duration: {sub.duration}</p>
+                    ) : null}
                     {sub.description ? (
                       <p className="mt-1 text-sm text-white/65">{sub.description}</p>
                     ) : null}
@@ -390,6 +597,91 @@ export default function DirectorRoadmapDetailPage() {
           ) : null}
         </div>
       </section>
+
+      {showAddTaskModal ? (
+        <>
+          <div
+            className="fixed inset-0 z-[80] bg-black/50"
+            onClick={closeAddTaskModal}
+          />
+          <div className="fixed left-1/2 top-1/2 z-[81] w-[92vw] max-w-[560px] -translate-x-1/2 -translate-y-1/2">
+            <form onSubmit={handleAddPhaseTask} className={`${directorGlassCard} p-5 sm:p-6`}>
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Add phase task</h3>
+                  <p className="mt-1 text-xs text-white/60">
+                    Adds a nested task to this phase roadmap via the API.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeAddTaskModal}
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 hover:text-white"
+                  aria-label="Close"
+                >
+                  <i className="fa-solid fa-xmark text-sm" />
+                </button>
+              </div>
+
+              {taskError ? (
+                <p className="mb-4 rounded-lg border border-red-400/40 bg-red-500/15 px-3 py-2 text-sm text-red-200">
+                  {taskError}
+                </p>
+              ) : null}
+
+              <div className="space-y-4">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-white/70">Task name</label>
+                  <input
+                    value={taskName}
+                    onChange={(e) => setTaskName(e.target.value)}
+                    className={directorInputClass}
+                    placeholder="Enter task name"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-white/70">Duration</label>
+                  <input
+                    value={taskDuration}
+                    onChange={(e) => setTaskDuration(e.target.value)}
+                    className={directorInputClass}
+                    placeholder="e.g. 2 Weeks / 1 Month"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-white/70">Description (optional)</label>
+                  <textarea
+                    value={taskDescription}
+                    onChange={(e) => setTaskDescription(e.target.value)}
+                    rows={4}
+                    className={`${directorInputClass} min-h-[110px] resize-y`}
+                    placeholder="Brief task description"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeAddTaskModal}
+                  className="rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={taskSaving}
+                  className="rounded-xl border border-[#8ec5eb]/45 bg-[#8ec5eb]/20 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:opacity-60"
+                >
+                  {taskSaving ? "Adding…" : "Add task"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </>
+      ) : null}
 
       <AssignRoadmapModal
         isOpen={showAssignModal}

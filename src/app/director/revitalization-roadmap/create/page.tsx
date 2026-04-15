@@ -3,15 +3,14 @@
 import { useState, useCallback, useEffect, useRef, useId, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import axiosInstance from "@/app/Services/config/axios-instance";
-import { apiGetRoadmapById, apiUpdateRoadmap } from "@/app/Services/api";
+import { apiCreateRoadmap, apiGetRoadmapById, apiUpdateRoadmap } from "@/app/Services/api";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 import DirectorHero from "../../DirectorHero";
 import { directorGlassCard, directorInputClass, directorPageRoot, directorSpinner } from "../../directorUi";
 import HeroBg from "../../../Assets/roadmap-bg.png";
 
-/** Matches CreateRoadmapModal / backend expectations. */
-const ROADMAP_TYPES = ["Phase", "Single Roadmap"] as const;
+/** Mobile parity: CreateRoadmapSheet uses 'Phase' | 'Single'. */
+const ROADMAP_TYPES = ["Phase", "Single"] as const;
 
 type RoadmapDoc = {
   _id?: string;
@@ -21,6 +20,7 @@ type RoadmapDoc = {
   duration?: string;
   type?: string;
   imageUrl?: string;
+  divisions?: string[];
 };
 
 function unwrapRoadmap(res: unknown): RoadmapDoc | null {
@@ -39,7 +39,7 @@ function unwrapRoadmap(res: unknown): RoadmapDoc | null {
 function mapApiTypeToSelect(apiType: string | undefined): string {
   const t = String(apiType ?? "").toLowerCase();
   if (t === "phase" || t.includes("phase")) return "Phase";
-  return "Single Roadmap";
+  return "Single";
 }
 
 /** Axios response body: { data: roadmap } or { success, data } */
@@ -69,10 +69,13 @@ function CreateRoadmapStepOnePage() {
   const roadmapIdParam = searchParams.get("roadmapId") ?? searchParams.get("id");
   const isEditMode = Boolean(roadmapIdParam);
 
-  const [type, setType] = useState<string>("Single Roadmap");
+  const [type, setType] = useState<string>("Single");
   const [name, setName] = useState("");
   const [roadmapSubheading, setRoadmapSubheading] = useState("");
   const [duration, setDuration] = useState("");
+  // Mobile parity: divisions are only configured during create (phase type)
+  const [divisions, setDivisions] = useState<string[]>([]);
+  const [newDivision, setNewDivision] = useState("");
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [bannerDragOver, setBannerDragOver] = useState(false);
@@ -100,6 +103,7 @@ function CreateRoadmapStepOnePage() {
         setName(doc.name?.trim() ?? "");
         setRoadmapSubheading((doc.description ?? doc.roadMapDetails ?? "").trim());
         setDuration(doc.duration?.trim() ?? "");
+        setDivisions(Array.isArray(doc.divisions) && doc.divisions.length ? doc.divisions : []);
         const raw = doc.imageUrl;
         if (raw && typeof raw === "string") {
           const resolved = resolveApiMediaUrl(raw) || raw;
@@ -176,6 +180,10 @@ function CreateRoadmapStepOnePage() {
       setError("Completion time is required (e.g. 12 Months or 6).");
       return;
     }
+    if (!roadmapSubheading.trim()) {
+      setError("Roadmap subheading is required.");
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -191,31 +199,45 @@ function CreateRoadmapStepOnePage() {
           },
           bannerFile ?? undefined
         );
-        router.push(`/director/pastor-assignments/roadmap/${roadmapIdParam}`);
+        router.push("/director/revitalization-roadmap");
         return;
       }
 
-      const formData = new FormData();
-      formData.append("type", type);
-      formData.append("name", name.trim());
-      formData.append("duration", duration.trim());
-      if (roadmapSubheading.trim()) {
-        formData.append("description", roadmapSubheading.trim());
-      }
-      ["church", "pastor"].forEach((d, i) => formData.append(`divisions[${i}]`, d));
-      if (bannerFile) formData.append("image", bannerFile);
+      // Mobile parity: create parent roadmap first, then route into form flow.
+      const payload = {
+        type: type === "Phase" ? "phase" : "single",
+        name: name.trim(),
+        roadMapDetails: roadmapSubheading.trim(),
+        duration: duration.trim(),
+        divisions:
+          type === "Phase"
+            ? (divisions.length ? divisions : ["All"])
+            : (divisions.length ? divisions : ["All"]),
+        extras: [],
+        roadmaps: [],
+      };
 
-      const res = await axiosInstance.post("/roadmaps", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-
+      const res = await apiCreateRoadmap(payload as any, bannerFile ?? undefined);
       const id = extractCreatedRoadmapId(res.data);
       if (!id) {
         setError("Roadmap was created but no ID was returned. Open the roadmap library.");
         return;
       }
 
-      router.push(`/director/pastor-assignments/roadmap/${id}`);
+      if (type === "Phase") {
+        // Mobile parity: after creating a Phase roadmap, land on the phase list first.
+        router.push(`/director/revitalization-roadmap/phase-list?roadmapId=${encodeURIComponent(id)}`);
+      } else {
+        const qp = new URLSearchParams();
+        qp.set("roadmapId", id);
+        qp.set("type", "single");
+        qp.set("isEditMode", "false");
+        qp.set("name", name.trim());
+        qp.set("subheading", roadmapSubheading.trim());
+        qp.set("completionTime", duration.trim());
+        if (bannerPreview) qp.set("bannerImage", bannerPreview);
+        router.push(`/director/revitalization-roadmap/roadmap-form?${qp.toString()}`);
+      }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { message?: string | string[] } } };
       const msg = e?.response?.data?.message;
@@ -254,7 +276,7 @@ function CreateRoadmapStepOnePage() {
         subtitle={
           isEditMode
             ? "Update details from the server; save when done."
-            : "Step 1 — Roadmap details; then open the library or detail view."
+            : undefined
         }
         image={HeroBg}
         breadcrumbItems={[
@@ -282,7 +304,7 @@ function CreateRoadmapStepOnePage() {
             <p className="mt-1 text-xs text-[#8ec5eb]/80">
               {isEditMode
                 ? "Values below are loaded from the API. Change the banner by uploading a new image."
-                : "Creates the roadmap via POST /roadmaps; then you can manage it from the library."}
+                : ""}
             </p>
           </div>
 
@@ -307,6 +329,7 @@ function CreateRoadmapStepOnePage() {
                   onChange={(e) => setType(e.target.value)}
                   className={selectCls}
                   aria-label="Roadmap type"
+                  disabled={isEditMode}
                 >
                   {ROADMAP_TYPES.map((t) => (
                     <option key={t} value={t}>
@@ -332,12 +355,14 @@ function CreateRoadmapStepOnePage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-white/90">Roadmap subheading</label>
-              <p className="mb-2 text-xs text-white/50">Short task-style line shown with the roadmap (optional).</p>
+              <label className="mb-1 block text-sm font-medium text-white/90">
+                {type === "Phase" ? "Name of Subtitle for Phase" : "Roadmap Subheading"}{" "}
+                <span className="text-red-400">*</span>
+              </label>
               <textarea
                 value={roadmapSubheading}
                 onChange={(e) => setRoadmapSubheading(e.target.value)}
-                placeholder="Task description preview"
+                placeholder={type === "Phase" ? "Enter Subtitle" : "Enter Subheading"}
                 rows={3}
                 className={`${directorInputClass} resize-none`}
               />
@@ -345,16 +370,64 @@ function CreateRoadmapStepOnePage() {
 
             <div>
               <label className="mb-1 block text-sm font-medium text-white/90">
-                Completion time for the roadmap <span className="text-red-400">*</span>
+                {type === "Phase" ? "Completion Time for the Phase" : "Completion Time for the Roadmap"}{" "}
+                <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
                 value={duration}
                 onChange={(e) => setDuration(e.target.value)}
-                placeholder="e.g. 12 Months"
+                placeholder="1-2 Months"
                 className={directorInputClass}
               />
             </div>
+
+            {type === "Phase" && !isEditMode ? (
+              <div>
+                <label className="mb-2 block text-sm font-medium text-white/90">Division of Phase</label>
+                <div className="flex flex-wrap items-end gap-3">
+                  <input
+                    value={newDivision}
+                    onChange={(e) => setNewDivision(e.target.value)}
+                    placeholder="None"
+                    className={`${directorInputClass} flex-1 min-w-[220px]`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const d = newDivision.trim();
+                      if (!d) return;
+                      setDivisions((prev) => [...prev, d]);
+                      setNewDivision("");
+                    }}
+                    className="rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
+                  >
+                    <i className="fa-solid fa-plus text-xs" /> Add
+                  </button>
+                </div>
+
+                {divisions.length > 0 ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {divisions.map((d, idx) => (
+                      <span
+                        key={`${d}-${idx}`}
+                        className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white/90"
+                      >
+                        {d}
+                        <button
+                          type="button"
+                          onClick={() => setDivisions((prev) => prev.filter((_, i) => i !== idx))}
+                          className="text-white/70 hover:text-white"
+                          aria-label={`Remove ${d}`}
+                        >
+                          <i className="fa-solid fa-xmark text-xs" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             <div>
               <span className="mb-1 block text-sm font-medium text-white/90" id={`${bannerInputId}-label`}>
@@ -429,7 +502,7 @@ function CreateRoadmapStepOnePage() {
                   : "Creating…"
                 : isEditMode
                   ? "Save changes"
-                  : "Create & continue"}
+                  : "Create"}
             </button>
           </div>
         </div>

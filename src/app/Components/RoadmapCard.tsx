@@ -45,7 +45,8 @@ export default function RoadmapCard({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const handleDeleteClick = () => {
+  const handleDeleteClick = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setShowMenu(false);
     setShowDeleteConfirm(true);
   };
@@ -126,7 +127,8 @@ export default function RoadmapCard({
                 }`}
               >
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setShowMenu(false);
                     setShowAssignModal(true);
                   }}
@@ -140,7 +142,8 @@ export default function RoadmapCard({
                   Assign
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     setShowMenu(false);
                     onEdit?.();
                   }}

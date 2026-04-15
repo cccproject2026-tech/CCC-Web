@@ -34,8 +34,8 @@
 // export default axiosInstance;
 
 
-import axios, { AxiosHeaders } from "axios";
-import { getCookie, clearAllCookies } from "@/app/utils/cookies";
+import axios, { AxiosError, AxiosHeaders } from "axios";
+import { getCookie, setCookie, clearAllCookies } from "@/app/utils/cookies";
 import { isPastorPublicRoute } from "@/app/utils/pastor-auth";
 import { isMentorPublicRoute } from "@/app/utils/mentor-auth";
 import { isDirectorPublicRoute } from "@/app/utils/director-auth";
@@ -76,6 +76,28 @@ const axiosInstance = axios.create({
   },
 });
 
+// Mobile parity: queued refresh flow for concurrent 401s
+let isRefreshing = false;
+let refreshQueue: Array<{
+  resolve: (token: string) => void;
+  reject: (err: unknown) => void;
+}> = [];
+
+function processRefreshQueue(err: unknown, token: string | null) {
+  refreshQueue.forEach(({ resolve, reject }) => {
+    if (token) resolve(token);
+    else reject(err);
+  });
+  refreshQueue = [];
+}
+
+// Dedicated client for refresh call (avoid interceptor recursion)
+const refreshClient = axios.create({
+  baseURL: resolvedBaseURL,
+  timeout: 10000,
+  headers: { "Content-Type": "application/json" },
+});
+
 // --------------------------------------------------
 // REQUEST INTERCEPTOR (Attach Token)
 // --------------------------------------------------
@@ -94,6 +116,28 @@ axiosInstance.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Mobile parity: clean query params + prevent cached GETs
+    if (config.params && typeof config.params === "object") {
+      const cleaned: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(config.params as Record<string, unknown>)) {
+        if (v === undefined || v === null) continue;
+        const s = String(v).trim();
+        if (!s || s === "undefined" || s === "null") continue;
+        cleaned[k] = v;
+      }
+      config.params = Object.keys(cleaned).length ? cleaned : undefined;
+    }
+    if (typeof config.url === "string" && config.url.includes("undefined")) {
+      config.url = config.url.replace(/[?&][^=]*=undefined/g, "").replace(/[?&]$/, "");
+    }
+
+    // Encourage fresh reads where backend/proxies cache aggressively
+    if (config.method?.toLowerCase() === "get") {
+      (config.headers as any)["Cache-Control"] = "no-cache";
+      (config.headers as any)["Pragma"] = "no-cache";
+    }
+
     return config;
   },
   (error) => Promise.reject(error)
@@ -104,8 +148,69 @@ axiosInstance.interceptors.request.use(
 // --------------------------------------------------
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error: AxiosError) => {
     const status = error?.response?.status;
+    const originalRequest = error.config as (AxiosError["config"] & { _retry?: boolean; skipAuth?: boolean }) | undefined;
+
+    // Attempt refresh flow on 401 (except auth endpoints / public routes)
+    if (
+      status === 401 &&
+      typeof window !== "undefined" &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !originalRequest.skipAuth
+    ) {
+      const url = String(originalRequest.url ?? "");
+      const isAuthEndpoint = url.includes("/auth/login") || url.includes("/auth/refresh-token");
+      if (!isAuthEndpoint) {
+        const refreshToken = getCookie("refreshToken")?.trim();
+        if (refreshToken) {
+          originalRequest._retry = true;
+
+          if (isRefreshing) {
+            return new Promise((resolve, reject) => {
+              refreshQueue.push({
+                resolve: (token: string) => {
+                  if (originalRequest.headers) {
+                    (originalRequest.headers as any).Authorization = `Bearer ${token}`;
+                  }
+                  resolve(axiosInstance(originalRequest));
+                },
+                reject,
+              });
+            });
+          }
+
+          isRefreshing = true;
+          try {
+            const res = await refreshClient.post<{ success: boolean; data?: { accessToken: string; refreshToken: string } }>(
+              "/auth/refresh-token",
+              { refreshToken },
+            );
+            const nextAccess = res.data?.data?.accessToken;
+            const nextRefresh = res.data?.data?.refreshToken;
+            if (!nextAccess || !nextRefresh) {
+              throw new Error("Refresh token failed.");
+            }
+            setCookie("accessToken", nextAccess);
+            setCookie("refreshToken", nextRefresh);
+            processRefreshQueue(null, nextAccess);
+
+            if (originalRequest.headers) {
+              (originalRequest.headers as any).Authorization = `Bearer ${nextAccess}`;
+            }
+            return axiosInstance(originalRequest);
+          } catch (refreshErr) {
+            processRefreshQueue(refreshErr, null);
+            // fall through to role redirect below
+          } finally {
+            isRefreshing = false;
+          }
+        }
+      }
+    }
+
+    // Role redirect (kept) when not refreshable / refresh fails
     if (status === 401 && typeof window !== "undefined") {
       const path = window.location.pathname;
       const search = window.location.search || "";
@@ -121,6 +226,7 @@ axiosInstance.interceptors.response.use(
         window.location.assign(`/director/login?returnUrl=${encodeURIComponent(ret)}`);
       }
     }
+
     return Promise.reject(error);
   }
 );
