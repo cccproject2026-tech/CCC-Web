@@ -22,17 +22,18 @@ export function isPastorPublicRoute(pathname: string): boolean {
 /** Normalize user id from API (Mongo `id` / `_id`) or dedicated cookie. */
 export function getPastorUserId(): string | null {
   if (typeof document === "undefined") return null;
-  const direct = getCookie("userId")?.trim();
-  if (direct) return direct;
   const raw = getCookie("user");
-  if (!raw) return null;
-  try {
-    const u = JSON.parse(raw) as { id?: string; _id?: string };
-    const id = u.id ?? u._id;
-    return id != null && String(id).trim() !== "" ? String(id) : null;
-  } catch {
-    return null;
+  if (raw) {
+    try {
+      const u = JSON.parse(raw) as { id?: string; _id?: string };
+      const id = u.id ?? u._id;
+      if (id != null && String(id).trim() !== "") return String(id);
+    } catch {
+      // Fall back to legacy cookie below.
+    }
   }
+  const direct = getCookie("userId")?.trim();
+  return direct || null;
 }
 
 /** Session = bearer token + resolvable user id (API calls need both). */
