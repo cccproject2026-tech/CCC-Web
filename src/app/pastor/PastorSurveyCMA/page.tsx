@@ -313,6 +313,7 @@ function PastorSurveyCMAContent() {
   const [toast, setToast] = useState<string | null>(null);
   /** Mentor Customized Development Plan (CDP) text per layer — from answers doc + GET recommendations. */
   const [mentorLayerCdp, setMentorLayerCdp] = useState<Record<string, string>>({});
+  const hasSentRecommendations = Object.keys(mentorLayerCdp).length > 0;
 
   useEffect(() => {
     if (!assessmentId) {
@@ -1083,13 +1084,41 @@ function PastorSurveyCMAContent() {
 
                 {activeSection === sections.length - 1 ? (
                   uiReadOnly ? (
-                    <button
-                      type="button"
-                      onClick={() => router.back()}
-                      className="rounded-lg bg-white px-6 py-2.5 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa]"
-                    >
-                      Done
-                    </button>
+                    <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
+                      {selfReadOnlyMode && hasSentRecommendations ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              router.push(
+                                `/pastor/assessmentRecommendations?assessmentId=${encodeURIComponent(String(assessmentId || ""))}`,
+                              )
+                            }
+                            className="rounded-lg border border-white/25 bg-white/10 px-6 py-2.5 text-sm font-semibold text-[#cde2f2] transition hover:bg-white/15"
+                          >
+                            View Recommendation
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              router.push(
+                                `/pastor/SurveyRecommendationDownload?assessmentId=${encodeURIComponent(String(assessmentId || ""))}`,
+                              )
+                            }
+                            className="rounded-lg bg-white px-6 py-2.5 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa]"
+                          >
+                            Download Recommendation
+                          </button>
+                        </>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => router.back()}
+                        className="rounded-lg bg-white px-6 py-2.5 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa]"
+                      >
+                        Done
+                      </button>
+                    </div>
                   ) : (
                     <button
                       type="button"

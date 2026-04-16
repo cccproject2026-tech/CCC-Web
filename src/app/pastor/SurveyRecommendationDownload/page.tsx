@@ -7,8 +7,13 @@ import PastorHeader from "@/app/Components/PastorHeader";
 import Logo from "../../Assets/CCCLogo.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { getCookie } from "@/app/utils/cookies";
-import { apiGetAssessmentById, parseAssessmentDetailPayload } from "@/app/Services/assessment.service";
+import {
+  apiGetAssessmentById,
+  apiGetSectionRecommendations,
+  parseAssessmentDetailPayload,
+} from "@/app/Services/assessment.service";
 import { getStoredRecommendationsForPastorAssessment } from "@/app/utils/assessment-recommendations";
+import { parseRecommendationSectionsForPastorView } from "@/app/utils/assessment-recommendation-view";
 
 type DownloadSection = {
   sectionId: string;
@@ -66,19 +71,32 @@ export default function SurveyRecommendationDownload() {
         const detailRes = await apiGetAssessmentById(assessmentId);
         const detail = parseAssessmentDetailPayload(detailRes.data);
 
-        const sectionTitleById = new Map<string, string>();
-        (Array.isArray(detail?.sections) ? detail.sections : []).forEach((section, idx) => {
-          sectionTitleById.set(String(section._id || `section_${idx}`), section.name || `Section ${idx + 1}`);
-        });
+        let saved: DownloadSection[] = [];
+        try {
+          const recommendationsRes = await apiGetSectionRecommendations(assessmentId, pastor.id);
+          saved = parseRecommendationSectionsForPastorView(
+            recommendationsRes.data,
+            Array.isArray(detail?.sections) ? detail.sections : [],
+          );
+        } catch {
+          saved = [];
+        }
 
-        const saved = getStoredRecommendationsForPastorAssessment(pastor.id, assessmentId)
-          .filter((entry) => entry.sent)
-          .map((entry) => ({
-            sectionId: entry.sectionId,
-            sectionTitle: sectionTitleById.get(entry.sectionId) || entry.sectionTitle,
-            message: entry.message,
-            sentAt: entry.sentAt,
-          }));
+        if (saved.length === 0) {
+          const sectionTitleById = new Map<string, string>();
+          (Array.isArray(detail?.sections) ? detail.sections : []).forEach((section, idx) => {
+            sectionTitleById.set(String(section._id || `section_${idx}`), section.name || `Section ${idx + 1}`);
+          });
+
+          saved = getStoredRecommendationsForPastorAssessment(pastor.id, assessmentId)
+            .filter((entry) => entry.sent)
+            .map((entry) => ({
+              sectionId: entry.sectionId,
+              sectionTitle: sectionTitleById.get(entry.sectionId) || entry.sectionTitle,
+              message: entry.message,
+              sentAt: entry.sentAt,
+            }));
+        }
 
         if (!active) return;
         setAssessmentName(String(detail?.name || "Assessment"));

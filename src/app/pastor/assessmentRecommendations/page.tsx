@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import HeroBg from "../../Assets/progress-bg.png";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { getCookie } from "@/app/utils/cookies";
 import {
   apiGetAssessmentById,
   apiGetAssignedAssessments,
+  apiGetSectionRecommendations,
   flattenAssignedAssessmentRow,
   parseAssignedAssessmentsListBody,
   parseAssessmentDetailPayload,
 } from "@/app/Services/assessment.service";
 import { getStoredRecommendationsForPastorAssessment } from "@/app/utils/assessment-recommendations";
+import { parseRecommendationSectionsForPastorView } from "@/app/utils/assessment-recommendation-view";
 
 type AssessmentRow = {
   id: string;
@@ -39,6 +41,7 @@ function readCurrentPastorId(): string {
 
 export default function PastorAssessmentRecommendationsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [assessments, setAssessments] = useState<AssessmentRow[]>([]);
   const [selectedAssessmentId, setSelectedAssessmentId] = useState("");
   const [sectionRecommendations, setSectionRecommendations] = useState<SectionRecommendationRow[]>([]);
@@ -47,6 +50,7 @@ export default function PastorAssessmentRecommendationsPage() {
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   const pastorId = useMemo(() => readCurrentPastorId(), []);
+  const requestedAssessmentId = (searchParams.get("assessmentId") || "").trim();
 
   useEffect(() => {
     let active = true;
@@ -71,7 +75,13 @@ export default function PastorAssessmentRecommendationsPage() {
 
         if (!active) return;
         setAssessments(uniq);
-        setSelectedAssessmentId((current) => current || uniq[0]?.id || "");
+        setSelectedAssessmentId((current) => {
+          if (current) return current;
+          if (requestedAssessmentId && uniq.some((item) => item.id === requestedAssessmentId)) {
+            return requestedAssessmentId;
+          }
+          return uniq[0]?.id || "";
+        });
       } catch {
         if (!active) return;
         setAssessments([]);
@@ -85,7 +95,7 @@ export default function PastorAssessmentRecommendationsPage() {
     return () => {
       active = false;
     };
-  }, [pastorId]);
+  }, [pastorId, requestedAssessmentId]);
 
   useEffect(() => {
     let active = true;
@@ -102,21 +112,34 @@ export default function PastorAssessmentRecommendationsPage() {
         const detailRes = await apiGetAssessmentById(selectedAssessmentId);
         const detail = parseAssessmentDetailPayload(detailRes.data);
 
-        const sectionTitleById = new Map<string, string>();
-        (Array.isArray(detail?.sections) ? detail.sections : []).forEach((section, idx) => {
-          sectionTitleById.set(String(section._id || `section_${idx}`), section.name || `Section ${idx + 1}`);
-        });
+        let mapped: SectionRecommendationRow[] = [];
+        try {
+          const recommendationsRes = await apiGetSectionRecommendations(selectedAssessmentId, pastorId);
+          mapped = parseRecommendationSectionsForPastorView(
+            recommendationsRes.data,
+            Array.isArray(detail?.sections) ? detail.sections : [],
+          );
+        } catch {
+          mapped = [];
+        }
 
-        const stored = getStoredRecommendationsForPastorAssessment(pastorId, selectedAssessmentId).filter(
-          (entry) => entry.sent,
-        );
+        if (mapped.length === 0) {
+          const sectionTitleById = new Map<string, string>();
+          (Array.isArray(detail?.sections) ? detail.sections : []).forEach((section, idx) => {
+            sectionTitleById.set(String(section._id || `section_${idx}`), section.name || `Section ${idx + 1}`);
+          });
 
-        const mapped = stored.map((entry) => ({
-          sectionId: entry.sectionId,
-          sectionTitle: sectionTitleById.get(entry.sectionId) || entry.sectionTitle,
-          message: entry.message,
-          sentAt: entry.sentAt,
-        }));
+          const stored = getStoredRecommendationsForPastorAssessment(pastorId, selectedAssessmentId).filter(
+            (entry) => entry.sent,
+          );
+
+          mapped = stored.map((entry) => ({
+            sectionId: entry.sectionId,
+            sectionTitle: sectionTitleById.get(entry.sectionId) || entry.sectionTitle,
+            message: entry.message,
+            sentAt: entry.sentAt,
+          }));
+        }
 
         if (!active) return;
         setAssessmentTitle(String(detail?.name || "Assessment"));
@@ -192,16 +215,18 @@ export default function PastorAssessmentRecommendationsPage() {
               <div>
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                   <h2 className="text-xl font-semibold">{assessmentTitle}</h2>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      router.push(`/pastor/SurveyRecommendationDownload?assessmentId=${selectedAssessmentId}`)
-                    }
-                    className="rounded-lg bg-[#8ec5eb]/25 px-4 py-2 text-sm font-semibold hover:bg-[#8ec5eb]/35"
-                  >
-                    <i className="fa-solid fa-download mr-2" />
-                    Download Plans
-                  </button>
+                  {sectionRecommendations.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push(`/pastor/SurveyRecommendationDownload?assessmentId=${selectedAssessmentId}`)
+                      }
+                      className="rounded-lg bg-[#8ec5eb]/25 px-4 py-2 text-sm font-semibold hover:bg-[#8ec5eb]/35"
+                    >
+                      <i className="fa-solid fa-download mr-2" />
+                      Download Plans
+                    </button>
+                  ) : null}
                 </div>
 
                 {sectionRecommendations.length === 0 ? (
