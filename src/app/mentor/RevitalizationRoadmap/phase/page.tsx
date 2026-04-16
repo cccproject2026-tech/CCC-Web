@@ -20,6 +20,9 @@ import HeroBg from "@/app/Assets/roadmap-bg.png";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
 import { apiGetUserById } from "@/app/Services/users.service";
 import MentorHeader from "@/app/Components/MentorHeader";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
+import { mergeProgressOntoRoadmaps, unwrapProgressData } from "@/app/Services/roadmap-assignments";
+import { verifyMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
 
 function isHttpUrl(u?: string): boolean {
   return !!u && (u.startsWith("http://") || u.startsWith("https://"));
@@ -62,12 +65,20 @@ function PhasePageContent() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<{ firstName?: string; lastName?: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
 
     const load = async () => {
       try {
+        const access = await verifyMentorPastorAccess(userId);
+        if (!access.ok) {
+          setAccessError(access.reason);
+          setUser(null);
+          return;
+        }
+        setAccessError(null);
         const res = await apiGetUserById(userId);
         const body = res.data as { data?: unknown };
         setUser((body?.data ?? res.data) as { firstName?: string; lastName?: string });
@@ -90,13 +101,35 @@ function PhasePageContent() {
     const fetchRoadmap = async () => {
       try {
         setLoading(true);
-        const res = await apiGetRoadmapById(roadmapId);
-        const raw = res.data as { data?: unknown };
-        const roadmap = (raw?.data ?? res.data) as Record<string, unknown> | null;
+        const access = await verifyMentorPastorAccess(userId);
+        if (!access.ok) {
+          setAccessError(access.reason);
+          setPhase(null);
+          setTasks([]);
+          return;
+        }
+        setAccessError(null);
+        const [roadmapRes, progressRes] = await Promise.all([
+          apiGetRoadmapById(roadmapId),
+          userId ? apiGetUserProgress(userId).catch(() => null) : Promise.resolve(null),
+        ]);
 
-        setPhase(roadmap);
-        const nested = roadmap?.roadmaps;
+        const raw = roadmapRes.data as { data?: unknown };
+        const roadmap = (raw?.data ?? roadmapRes.data) as Record<string, unknown> | null;
+
+        const progress = progressRes ? unwrapProgressData(progressRes) : null;
+        const merged = roadmap ? mergeProgressOntoRoadmaps([roadmap as any], progress)[0] : null;
+
+        setPhase((merged ?? roadmap) as Record<string, unknown> | null);
+        const nested = (merged ?? roadmap)?.roadmaps;
         setTasks(Array.isArray(nested) ? (nested as Record<string, unknown>[]) : []);
+
+        console.debug("[mentor/phase] loaded phase", {
+          userId,
+          roadmapId,
+          tasks: Array.isArray(nested) ? (nested as unknown[]).length : 0,
+          progressMerged: Boolean(progress),
+        });
       } catch (err) {
         console.error("Failed to fetch roadmap:", err);
         setPhase(null);
@@ -107,12 +140,14 @@ function PhasePageContent() {
     };
 
     fetchRoadmap();
-  }, [roadmapId]);
+  }, [roadmapId, userId]);
 
   const openTask = (taskId: string) => {
     if (!userId || !roadmapId) return;
     router.push(
-      `/mentor/RevitalizationRoadmap/task?userId=${userId}&roadmapId=${roadmapId}&taskId=${taskId}`,
+      `/mentor/RevitalizationRoadmap/task?userId=${encodeURIComponent(userId)}&roadmapId=${encodeURIComponent(
+        roadmapId,
+      )}&taskId=${encodeURIComponent(taskId)}`,
     );
   };
 
@@ -190,6 +225,8 @@ function PhasePageContent() {
               Missing <code className="rounded bg-white/10 px-1">roadmapId</code> in the URL. Open a phase from the pastor&apos;s roadmap list.
             </p>
           )}
+
+          {accessError && <p className={`${mentorWarningPanel} mb-6`}>{accessError}</p>}
 
           {roadmapId && !userId && (
             <p className={`${mentorWarningPanel} mb-6`}>

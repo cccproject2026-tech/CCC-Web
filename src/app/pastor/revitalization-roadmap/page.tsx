@@ -25,6 +25,7 @@ import PhaseImg from "@/app/Assets/phase-img.png";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { getCookie } from "@/app/utils/cookies";
+import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 import {
   collapseRoadmapAssignmentsToParents,
   fetchRoadmapAssignmentsForUser,
@@ -134,7 +135,10 @@ export default function RevitalizationRoadmap() {
         months: item.months || "N/A",
         status: toUiStatus(item.status),
         sessionDate: item.meetings?.[0] || "",
-        imageUrl: isValidImageUrl(item.imageUrl) ? item.imageUrl : PhaseImg.src,
+        imageUrl: (() => {
+          const resolved = resolveApiMediaUrl(item.imageUrl) || "";
+          return isValidImageUrl(resolved) ? resolved : PhaseImg.src;
+        })(),
         hasNestedTasks: item.hasNestedTasks === true,
       }));
 
@@ -307,6 +311,7 @@ export default function RevitalizationRoadmap() {
                       width={200}
                       height={200}
                       className="w-full h-full object-cover rounded-lg"
+                      unoptimized={isRemoteImageSrc(phase.imageUrl) || String(phase.imageUrl).startsWith("blob:")}
                     />
                   </div>
 
@@ -371,8 +376,8 @@ export default function RevitalizationRoadmap() {
                             phase.parentRoadmapId.trim() !== "" &&
                             phase.parentRoadmapId !== phase.id;
                           const href = hasParent
-                            ? `/pastor/jumpstart?id=${phase.id}&parentId=${phase.parentRoadmapId}`
-                            : `/pastor/jumpstart?id=${phase.id}`;
+                            ? `/pastor/jumpstart?id=${encodeURIComponent(phase.id)}&parentId=${encodeURIComponent(phase.parentRoadmapId)}`
+                            : `/pastor/jumpstart?id=${encodeURIComponent(phase.id)}`;
                           router.push(href);
                         }}
                         className={pastorPrimaryCta}

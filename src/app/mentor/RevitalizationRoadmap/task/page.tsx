@@ -21,6 +21,7 @@ import {
 import { apiGetUserById } from "@/app/Services/users.service";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { getMentorUserId } from "@/app/utils/mentor-auth";
+import { verifyMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
 
 const glassPanel =
   "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.88)_0%,rgba(10,53,88,0.95)_100%)] shadow-md backdrop-blur-sm";
@@ -118,12 +119,20 @@ function TaskPageContent() {
   const [queryTab, setQueryTab] = useState<"Pending" | "Answered">("Pending");
 
   const [user, setUser] = useState<{ firstName?: string; lastName?: string } | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
 
     const loadUser = async () => {
       try {
+        const access = await verifyMentorPastorAccess(userId);
+        if (!access.ok) {
+          setAccessError(access.reason);
+          setUser(null);
+          return;
+        }
+        setAccessError(null);
         const res = await apiGetUserById(userId);
         const body = res.data as { data?: unknown };
         setUser((body?.data ?? res.data) as { firstName?: string; lastName?: string });
@@ -171,6 +180,14 @@ function TaskPageContent() {
       setLoading(true);
       setLoadError(null);
       try {
+        const access = await verifyMentorPastorAccess(userId);
+        if (!access.ok) {
+          setAccessError(access.reason);
+          setTask(null);
+          setPhaseName(null);
+          return;
+        }
+        setAccessError(null);
         let taskDoc: Record<string, unknown> | null = null;
         let phaseTitle: string | null = null;
 
@@ -375,6 +392,12 @@ function TaskPageContent() {
           {loadError && (
             <div className="mb-8 rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
               {loadError}
+            </div>
+          )}
+
+          {accessError && (
+            <div className="mb-8 rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
+              {accessError}
             </div>
           )}
 

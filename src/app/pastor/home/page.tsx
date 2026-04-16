@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { isAxiosError } from "axios";
 import { getCookie } from "@/app/utils/cookies";
 import {
   subscribePastorAssignmentsBroadcast,
@@ -29,6 +30,10 @@ import {
 } from "@/app/utils/dashboard-focus/pastor-focus";
 import type { DashboardFocusSection } from "@/app/utils/dashboard-focus/types";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 type Mentor = {
   id: string;
@@ -190,6 +195,7 @@ export default function PastorDashboard() {
   const [roadmaps, setRoadmaps] = useState<any[]>([]);
   const [roadmapsFull, setRoadmapsFull] = useState<any[]>([]);
   const [overallProgress, setOverallProgress] = useState<number | null>(null);
+  const [overallProgressWarning, setOverallProgressWarning] = useState<string | null>(null);
   const [pastorFocusSections, setPastorFocusSections] = useState<DashboardFocusSection[]>([]);
   const [pastorFocusLoading, setPastorFocusLoading] = useState(false);
   const [pastorAssessmentRows, setPastorAssessmentRows] = useState<PastorFocusInput["assessments"]>([]);
@@ -322,12 +328,43 @@ export default function PastorDashboard() {
       console.error("Error fetching roadmaps:", err);
     }
     try {
-      const res = await apiGetUserProgress(pastorUserId);
-      const progress = Number(res.data?.data?.overallProgress ?? 0);
-      setOverallProgress(Number.isFinite(progress) ? progress : 0);
+      setOverallProgressWarning(null);
+
+      let lastErr: unknown = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+          const res = await apiGetUserProgress(pastorUserId);
+          // Progress envelope shapes vary by deploy; use existing normalizer.
+          const detail = unwrapProgressData(res);
+          const progress = Number(detail?.overallProgress ?? 0);
+          setOverallProgress(Number.isFinite(progress) ? progress : 0);
+          lastErr = null;
+          break;
+        } catch (e) {
+          lastErr = e;
+          const status = isAxiosError(e) ? e.response?.status : undefined;
+          // 503 is usually transient; retry quickly with backoff.
+          if (status === 503 && attempt < 2) {
+            setOverallProgressWarning("Progress service is temporarily unavailable. Retrying…");
+            await sleep(600 * (attempt + 1));
+            continue;
+          }
+          throw e;
+        }
+      }
+      if (lastErr) {
+        // If all retries failed but didn't throw (shouldn't happen), surface warning.
+        setOverallProgressWarning("Could not refresh progress right now.");
+      }
     } catch (error) {
+      const status = isAxiosError(error) ? error.response?.status : undefined;
+      if (status === 503) {
+        setOverallProgressWarning("Progress service is temporarily unavailable.");
+        // Keep the previous progress value instead of resetting to null.
+        return;
+      }
       console.error("Error fetching overall progress:", error);
-      setOverallProgress(null);
+      setOverallProgressWarning("Could not refresh progress.");
     }
   }, [pastorUserId]);
 
@@ -491,6 +528,9 @@ export default function PastorDashboard() {
                   </div>
                   <span className="text-sm font-semibold">{progressPercent}%</span>
                 </div>
+                {overallProgressWarning ? (
+                  <p className="mt-2 text-xs text-amber-200/90">{overallProgressWarning}</p>
+                ) : null}
                 <button
                   type="button"
                   onClick={(e) => {
