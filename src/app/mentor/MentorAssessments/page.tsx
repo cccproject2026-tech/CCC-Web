@@ -269,13 +269,25 @@ function parseRecommendationItemsFromText(message: string): string[] {
     .filter((line) => line !== "" && !/^level\s+\d+\s*:$/i.test(line) && !/^layer\s+\d+\s*:$/i.test(line));
 }
 
+function toNumberOrUndefined(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const n = Number(value.trim());
+    if (Number.isFinite(n)) return n;
+  }
+  return undefined;
+}
+
 function extractUserAnswerSections(body: unknown): Array<{ sectionId: string; sectionScore?: number; recommendations: string[] }> {
   const root = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
   const sections = Array.isArray(data.sections) ? data.sections : [];
   return sections.map((s: any) => ({
-    sectionId: String(s?.sectionId ?? ""),
-    sectionScore: typeof s?.sectionScore === "number" ? s.sectionScore : undefined,
+    sectionId: String(s?.sectionId ?? s?._id ?? s?.id ?? ""),
+    sectionScore:
+      toNumberOrUndefined(s?.sectionScore) ??
+      toNumberOrUndefined(s?.score) ??
+      toNumberOrUndefined(s?.totalScore),
     recommendations: Array.isArray(s?.recommendations)
       ? s.recommendations.filter((x: unknown) => String(x || "").trim() !== "").map((x: unknown) => String(x))
       : [],
@@ -285,10 +297,19 @@ function extractUserAnswerSections(body: unknown): Array<{ sectionId: string; se
 function extractRecommendationPreview(body: unknown): Array<{ sectionId: string; score?: number; recommendations: string[] }> {
   const root = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   const data = root.data;
-  const list = Array.isArray(data) ? data : Array.isArray(root) ? (root as unknown[]) : [];
+  const list = Array.isArray(data)
+    ? data
+    : Array.isArray(root)
+      ? (root as unknown[])
+      : Array.isArray((data as Record<string, unknown> | undefined)?.sections)
+        ? (((data as Record<string, unknown>).sections as unknown[]))
+        : [];
   return list.map((row: any) => ({
-    sectionId: String(row?.sectionId ?? ""),
-    score: typeof row?.score === "number" ? row.score : undefined,
+    sectionId: String(row?.sectionId ?? row?._id ?? row?.id ?? ""),
+    score:
+      toNumberOrUndefined(row?.score) ??
+      toNumberOrUndefined(row?.sectionScore) ??
+      toNumberOrUndefined(row?.totalScore),
     recommendations: Array.isArray(row?.recommendations)
       ? row.recommendations.filter((x: unknown) => String(x || "").trim() !== "").map((x: unknown) => String(x))
       : [],

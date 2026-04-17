@@ -64,7 +64,7 @@ type Row = {
 
 function getAssessmentPrimaryHref(assessmentId: string, status: Row["status"]): string {
   if (status === "Completed" || status === "Submitted") {
-    return `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(assessmentId)}&readOnly=1`;
+    return `/pastor/AssessmentEvaluation?assessmentId=${encodeURIComponent(assessmentId)}`;
   }
   return `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(assessmentId)}`;
 }

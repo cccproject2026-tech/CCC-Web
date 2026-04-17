@@ -296,6 +296,22 @@ function getTimesForDate(dateStr: string, availability: any[]): string[] {
   return [];
 }
 
+/** Backend expects selectedChoice like "1", "2", ... based on option order. */
+function toSelectedChoiceNumber(layer: any, selectedValue: string): string {
+  const raw = String(selectedValue ?? "").trim();
+  if (/^\d+$/.test(raw)) return raw;
+
+  const choices = Array.isArray(layer?.choices) ? layer.choices : [];
+  const idx = choices.findIndex((choice: any) => {
+    const key = String(choice?._id ?? choice?.value ?? choice?.label ?? "").trim();
+    const value = String(choice?.value ?? "").trim();
+    const label = String(choice?.label ?? choice?.text ?? "").trim();
+    return raw === key || raw === value || raw === label;
+  });
+
+  return idx >= 0 ? String(idx + 1) : raw;
+}
+
 /** Parse a time range like `10:30 am – 11:30 am` and return start time in 24h. */
 function parseStartTimeFromRange(range: string): { hour24: number; minute: number } | null {
   const m = String(range).trim().match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])\b/);
@@ -620,7 +636,7 @@ function PastorSurveyCMAContent() {
           if (!selectedValue || String(selectedValue).trim() === "") return null;
           return {
             layerId,
-            selectedChoice: String(selectedValue),
+            selectedChoice: toSelectedChoiceNumber(layer, String(selectedValue)),
           };
         })
         .filter((layer: any): layer is { layerId: string; selectedChoice: string } => layer != null);
@@ -998,17 +1014,35 @@ function PastorSurveyCMAContent() {
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.92)_100%)]" />
 
-        <div className="relative z-10 max-w-4xl">
-          <h2 className="text-xl font-bold sm:text-2xl md:text-3xl">
-            {assessmentTitle || "Church Assessment Evaluation (CMA)"}
-          </h2>
-          <p className="mt-2 max-w-full text-sm text-[#d9ebf8] sm:max-w-2xl">
-            {mentorReviewMode
-              ? "Read-only review of this pastor’s saved responses."
-              : selfReadOnlyMode
-                ? "Read-only view of your saved responses."
-                : "Complete each section using the options that best reflect your church."}
-          </p>
+        <div className="relative z-10 flex w-full max-w-5xl items-start justify-between gap-4">
+          <div className="max-w-4xl">
+            <h2 className="text-xl font-bold sm:text-2xl md:text-3xl">
+              {assessmentTitle || "Church Assessment Evaluation (CMA)"}
+            </h2>
+            <p className="mt-2 max-w-full text-sm text-[#d9ebf8] sm:max-w-2xl">
+              {mentorReviewMode
+                ? "Read-only review of this pastor’s saved responses."
+                : selfReadOnlyMode
+                  ? "Read-only view of your saved responses."
+                  : "Complete each section using the options that best reflect your church."}
+            </p>
+          </div>
+
+          {selfReadOnlyMode && assessmentId ? (
+            <div className="shrink-0 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(
+                    `/pastor/assessmentRecommendations?assessmentId=${encodeURIComponent(String(assessmentId || ""))}`,
+                  )
+                }
+                className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30 sm:text-sm"
+              >
+                View Customized Development Plan
+              </button>
+            </div>
+          ) : null}
         </div>
       </header>
 
@@ -1086,14 +1120,20 @@ function PastorSurveyCMAContent() {
                       {layer.choices?.map((choice: any, ci: number) => {
                         const choiceKey = String(choice._id ?? choice.value ?? choice.label ?? `c_${ci}`);
                         const choiceLabel = choice.label ?? choice.text ?? String(choice.value ?? "");
+                        const ordinalValue = String(ci + 1);
                         const isChecked =
                           answers[layerId] === choiceKey ||
+                          answers[layerId] === ordinalValue ||
                           (choice.value != null && answers[layerId] === String(choice.value)) ||
                           (choice.label != null && answers[layerId] === String(choice.label));
                         return (
                           <label
                             key={`${layerId}-${choiceKey}-${ci}`}
-                            className={`flex items-start gap-3 rounded-lg border border-transparent px-1 py-0.5 transition hover:border-white/10 hover:bg-white/[0.04] ${uiReadOnly ? "cursor-default" : "cursor-pointer"}`}
+                            className={`flex items-start gap-3 rounded-lg border px-2 py-1 transition ${
+                              isChecked
+                                ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/15 shadow-[0_0_0_1px_rgba(142,197,235,0.2)]"
+                                : "border-transparent hover:border-white/10 hover:bg-white/[0.04]"
+                            } ${uiReadOnly ? "cursor-default" : "cursor-pointer"}`}
                           >
                             <input
                               type="radio"
@@ -1163,17 +1203,6 @@ function PastorSurveyCMAContent() {
                             className="rounded-lg border border-white/25 bg-white/10 px-6 py-2.5 text-sm font-semibold text-[#cde2f2] transition hover:bg-white/15"
                           >
                             View Recommendation
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() =>
-                              router.push(
-                                `/pastor/SurveyRecommendationDownload?assessmentId=${encodeURIComponent(String(assessmentId || ""))}`,
-                              )
-                            }
-                            className="rounded-lg bg-white px-6 py-2.5 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa]"
-                          >
-                            Download Recommendation
                           </button>
                         </>
                       ) : null}
