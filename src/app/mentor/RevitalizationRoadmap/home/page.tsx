@@ -2,7 +2,8 @@
 import { useState, useRef, useEffect, Suspense, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import "@fortawesome/fontawesome-free/css/all.min.css";import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
+import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
+import "@fortawesome/fontawesome-free/css/all.min.css";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import { useSearchParams } from "next/navigation";
 import { apiGetUserRoadmaps } from "@/app/Services/roadmaps.service";
@@ -10,6 +11,7 @@ import { apiGetUserById } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { unwrapProgressData, resolveMentorUserRoadmapsList } from "@/app/Services/roadmap-assignments";
 import MentorHeader from "@/app/Components/MentorHeader";
+import { verifyMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
 
 function RevitalizationRoadmapHomeContent() {
   const router = useRouter();
@@ -24,6 +26,7 @@ function RevitalizationRoadmapHomeContent() {
   const [roadmaps, setRoadmaps] = useState<any[]>([]);
   const [loadingRoadmaps, setLoadingRoadmaps] = useState(true);
   const [roadmapsError, setRoadmapsError] = useState<string | null>(null);
+  const [accessChecked, setAccessChecked] = useState(false);
 
   useEffect(() => {
     if (!userId) {
@@ -37,6 +40,14 @@ function RevitalizationRoadmapHomeContent() {
       try {
         setLoadingRoadmaps(true);
         setRoadmapsError(null);
+        setAccessChecked(false);
+
+        const access = await verifyMentorPastorAccess(userId);
+        if (!access.ok) {
+          setRoadmaps([]);
+          setRoadmapsError(access.reason);
+          return;
+        }
 
         const [res, progressRes] = await Promise.all([
           apiGetUserRoadmaps(userId),
@@ -66,6 +77,7 @@ function RevitalizationRoadmapHomeContent() {
         }
         setRoadmapsError(msg || "Could not load roadmaps for this user.");
       } finally {
+        setAccessChecked(true);
         setLoadingRoadmaps(false);
       }
     };
@@ -78,6 +90,11 @@ function RevitalizationRoadmapHomeContent() {
 
     const fetchUser = async () => {
       try {
+        const access = await verifyMentorPastorAccess(userId);
+        if (!access.ok) {
+          setUser(null);
+          return;
+        }
         const res = await apiGetUserById(userId);
         setUser(res.data?.data || res.data);
       } catch (err) {
@@ -301,6 +318,12 @@ function RevitalizationRoadmapHomeContent() {
               </p>
             )}
 
+            {!loadingRoadmaps && accessChecked && userId && !roadmapsError && !user && (
+              <p className="col-span-full text-center text-sm text-[#cde2f2]">
+                Pastor details could not be loaded for this mentor relationship.
+              </p>
+            )}
+
             {!loadingRoadmaps &&
               filteredRoadmaps.map((roadmap) => {
                 const rid = String(roadmap._id ?? roadmap.id ?? "");
@@ -332,7 +355,8 @@ function RevitalizationRoadmapHomeContent() {
             )}
           </div>
         </div>
-      </main>    </div>
+      </main>
+    </div>
   );
 }
 

@@ -273,13 +273,13 @@ export async function apiSubmitPreSurvey(
   throw lastError;
 }
 
-// POST /assessment/:id/recommendations/send
+// POST /assessment/:assessmentId/send-recommendation
 export const apiSendSectionRecommendations = (assessmentId: string, payload: SendSectionRecommendationsPayload) =>
-  axiosInstance.post(`/assessment/${assessmentId}/recommendations/send`, payload);
+  axiosInstance.post(`/assessment/${assessmentId}/send-recommendation`, payload);
 
-// GET /assessment/:id/recommendations
+// GET /assessment/:assessmentId/recommendations/:userId
 export const apiGetSectionRecommendations = (assessmentId: string, userId: string) =>
-  axiosInstance.get(`/assessment/${assessmentId}/recommendations`, { params: { userId } });
+  axiosInstance.get(`/assessment/${assessmentId}/recommendations/${userId}`);
 
 // GET /assessment/:id/recommendation-rules
 export const apiGetAssessmentRecommendationRules = (assessmentId: string) =>

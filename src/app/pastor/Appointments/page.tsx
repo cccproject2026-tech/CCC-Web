@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorSearchBar from "@/app/Components/pastor/PastorSearchBar";
+import AvailabilityCalendar from "@/app/Components/AvailabilityCalendar";
 import {
   pastorContainer,
   pastorControlsRow,
@@ -82,6 +83,7 @@ export default function PastorAppointmentsPage() {
   const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [appointmentsTab, setAppointmentsTab] = useState<"next" | "history">("next");
+  const [monthlyAvailabilitySlots, setMonthlyAvailabilitySlots] = useState<any[]>([]);
 
 
 
@@ -287,6 +289,7 @@ export default function PastorAppointmentsPage() {
   useEffect(() => {
     if (drawerStep !== "schedule" || !selectedMentor) {
       setAvailableTimesForBooking([]);
+      setMonthlyAvailabilitySlots([]);
       setAvailabilityLoading(false);
       return;
     }
@@ -297,25 +300,17 @@ export default function PastorAppointmentsPage() {
     (async () => {
       try {
         setAvailabilityLoading(true);
-        const monthStart = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
         const selectedYmdForWeek = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}`;
         const selectedYmd = new Date(currentYear, currentMonth, selectedDate).toLocaleDateString("en-CA");
         let slots: any[] = [];
         try {
-          const availRes = await apiGetMonthlyAvailability(String(mentorId), monthStart);
-          slots = unwrapMonthlyAvailabilityPayload(availRes);
+          // Use year/month parameters format
+          const availRes = await axiosInstance.get(`/appointments/availability/${mentorId}/month`, {
+            params: { year: currentYear, month: currentMonth + 1 },
+          });
+          const raw = availRes.data?.data ?? availRes.data;
+          slots = Array.isArray(raw) ? raw : [];
         } catch {
-          try {
-            const legacy = await axiosInstance.get(`/appointments/availability/${mentorId}/month`, {
-              params: { year: currentYear, month: currentMonth + 1 },
-            });
-            const raw = legacy.data?.data;
-            slots = Array.isArray(raw) ? raw : [];
-          } catch {
-            slots = [];
-          }
-        }
-        if (!slots.length) {
           try {
             const wk = await apiGetWeeklyAvailability(String(mentorId), selectedYmdForWeek);
             const wRaw = unwrapMonthlyAvailabilityPayload(wk);
@@ -325,8 +320,13 @@ export default function PastorAppointmentsPage() {
               if (Array.isArray(d)) slots = d;
             }
           } catch {
-            /* ignore */
+            slots = [];
           }
+        }
+
+        // Store the monthly slots for the calendar
+        if (!cancelled) {
+          setMonthlyAvailabilitySlots(slots);
         }
 
         const dateSlot = slots.find((slot: any) => {
@@ -364,6 +364,7 @@ export default function PastorAppointmentsPage() {
         console.error("Error fetching availability:", error);
         if (!cancelled) {
           setAvailableTimesForBooking([]);
+          setMonthlyAvailabilitySlots([]);
           setAvailabilityLoading(false);
         }
       }
@@ -465,53 +466,27 @@ export default function PastorAppointmentsPage() {
     let cancelled = false;
     (async () => {
       try {
-        const rescheduleDate_iso = new Date(
-          rescheduleYear,
-          rescheduleMonth,
-          rescheduleDay
-        ).toLocaleDateString("en-CA");
-        console.log("Reschedule date ISO:", rescheduleDate_iso);
-        console.log("Reschedule year/month/day:", rescheduleYear, rescheduleMonth, rescheduleDay);
-
-        const res = await apiGetWeeklyAvailability(mentorId, rescheduleDate_iso);
-        console.log("Reschedule full API response:", res);
-        console.log("Reschedule response data:", res.data);
-        let weekData = res.data?.data;
-
-        // Handle different response structures
-        if (!weekData && Array.isArray(res.data)) {
-          weekData = res.data;
-        }
-
-        console.log("Reschedule final weekData:", weekData);
+        // Fetch availability using new API format
+        const res = await axiosInstance.get(`/appointments/availability/${mentorId}/month`, {
+          params: { year: rescheduleYear, month: rescheduleMonth + 1 },
+        });
 
         if (!cancelled) {
-          if (weekData && Array.isArray(weekData)) {
-            const dayData = weekData.find((day: any) => day.date === rescheduleDate_iso);
-            console.log("Reschedule found dayData for selected date:", dayData);
-
-            if (dayData && Array.isArray(dayData.slots) && dayData.slots.length > 0) {
-              const times = dayData.slots.map((slot: any) => {
-                const start = `${slot.startTime} ${String(slot.startPeriod || "").toLowerCase()}`;
-                const end = `${slot.endTime} ${String(slot.endPeriod || "").toLowerCase()}`;
-                return `${start} – ${end}`;
-              });
-
-              const filteredTimes = filterSlotsAfter2Hours(times, rescheduleDate_iso);
-
-              setRescheduleAvailableTimes(filteredTimes);
-            } else {
-              console.log("Reschedule no slots found for selected date");
-              setRescheduleAvailableTimes([]);
-            }
+          const slots = res.data?.data || [];
+          
+          // Find slots for the selected date
+          const selectedDate = `${rescheduleYear}-${String(rescheduleMonth + 1).padStart(2, "0")}-${String(rescheduleDay).padStart(2, "0")}`;
+          const daySlots = slots.find((slot: any) => slot.date === selectedDate);
+          
+          if (daySlots && Array.isArray(daySlots.times)) {
+            setRescheduleAvailableTimes(daySlots.times);
           } else {
-            console.log("Reschedule no weekData or not an array");
             setRescheduleAvailableTimes([]);
           }
         }
-      } catch (error) {
-        console.error("Error fetching reschedule availability:", error);
+      } catch (err) {
         if (!cancelled) {
+          console.error("Failed to fetch reschedule availability:", err);
           setRescheduleAvailableTimes([]);
         }
       }
@@ -966,7 +941,7 @@ export default function PastorAppointmentsPage() {
                           <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg bg-white text-sm shadow-lg">
                             <button
                               type="button"
-                              className="flex w-full gap-2 px-4 py-2 hover:bg-gray-100"
+                              className="flex w-full gap-2 px-4 py-2 hover:bg-gray-100 text-black"
                               onClick={() => {
                                 setAppointmentToEdit(appt);
                                 setShowReschedule(true);
@@ -1394,30 +1369,26 @@ export default function PastorAppointmentsPage() {
               ) : (
                 <>
                   <label className={pastorFieldLabel} htmlFor="new-meeting-date">
-                    Meeting date
+                    Mentor Availability
                   </label>
-                  <input
-                    id="new-meeting-date"
-                    type="date"
-                    className="mb-4 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-white outline-none [color-scheme:dark] focus:border-[#8ec5eb]/60 focus:ring-2 focus:ring-[#8ec5eb]/30"
-                    value={`${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}`}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      if (!v) return;
-                      const [y, mo, d] = v.split("-").map((n) => parseInt(n, 10));
-                      if (!y || !mo || !d) return;
-                      setCurrentYear(y);
-                      setCurrentMonth(mo - 1);
-                      setSelectedDate(d);
-                      setSelectedTime("");
-                    }}
+                  <AvailabilityCalendar
+                    mentorId={String(selectedMentor?.id || selectedMentor?._id || "")}
+                    currentMonth={currentMonth}
+                    currentYear={currentYear}
+                    selectedDate={selectedDate}
+                    onDateSelect={setSelectedDate}
+                    onPrevMonth={handlePrevMonth}
+                    onNextMonth={handleNextMonth}
+                    availabilitySlots={monthlyAvailabilitySlots}
+                    isLoading={availabilityLoading}
                   />
-                  <p className="mb-2 text-sm font-medium text-white">
+                  
+                  <label className={pastorFieldLabel} htmlFor="time-slot" style={{ marginTop: "1.5rem" }}>
                     Select a time
                     <span className="ml-1 font-normal text-[#cde2f2]">
                       ({new Date(currentYear, currentMonth, selectedDate).toLocaleDateString()})
                     </span>
-                  </p>
+                  </label>
                   {availabilityLoading ? (
                     <div className="mb-4 flex items-center justify-center py-6">
                       <div className="flex items-center gap-2 text-xs text-[#cde2f2]">

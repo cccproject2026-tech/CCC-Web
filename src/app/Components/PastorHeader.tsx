@@ -40,6 +40,7 @@ import {
   apiLogout,
 } from "../Services/api";
 import { parseAssessmentsListPayload } from "../Services/assessment.service";
+import { resolveApiMediaUrl } from "@/app/utils/image";
 
 function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: boolean }) {
   const pathname = usePathname();
@@ -286,7 +287,17 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
                         {searchResults.roadmaps.slice(0, 4).map((item: any) => (
                           <Link
                             key={item._id || item.id}
-                            href={`/pastor/SelfRevitalizationPhasePage?id=${item._id || item.id}`}
+                            href={(() => {
+                              const id = String(item._id || item.id || "").trim();
+                              if (!id) return "/pastor/revitalization-roadmap";
+                              const hasNested =
+                                (Array.isArray(item.roadmaps) && item.roadmaps.length > 0) ||
+                                String(item.haveNextedRoadMaps || "").toLowerCase() === "true" ||
+                                item.haveNextedRoadMaps === true;
+                              return hasNested
+                                ? `/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(id)}`
+                                : `/pastor/jumpstart?id=${encodeURIComponent(id)}`;
+                            })()}
                             className="mb-1 block rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
                           >
                             {item.name || item.title || "Untitled roadmap"}

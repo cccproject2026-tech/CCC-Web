@@ -9,6 +9,7 @@ import UserProfile from "../../Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import MentorFilterTabGroup from "@/app/Components/mentor/MentorFilterTabGroup";
+import AvailabilityCalendar from "@/app/Components/AvailabilityCalendar";
 import {
   mentorBodyText,
   mentorDateInputDark,
@@ -31,7 +32,9 @@ import {
   apiCreateAvailability,
   apiGetMentorAppointments,
   apiGetWeeklyAvailability,
+  apiRescheduleAppointment,
 } from "@/app/Services/appointments.service";
+import axiosInstance from "@/app/Services/config/axios-instance";
 import {
   appointmentEntityId,
   extractApiErrorMessage,
@@ -59,6 +62,18 @@ function isPastDate(dateStr: string): boolean {
   today.setHours(0, 0, 0, 0);
   date.setHours(0, 0, 0, 0);
   return date < today;
+}
+
+function convertTo24Hour(time12: string, period: string): string {
+  let [hours, minutes] = time12.split(":").map(Number);
+  
+  if (period.toUpperCase() === "PM" && hours !== 12) {
+    hours += 12;
+  } else if (period.toUpperCase() === "AM" && hours === 12) {
+    hours = 0;
+  }
+  
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 function MentorScheduleContent() {
@@ -91,6 +106,33 @@ function MentorScheduleContent() {
   const [selectedAvailabilityDay, setSelectedAvailabilityDay] = useState<number | null>(null);
   const [isAddSlotModalOpen, setIsAddSlotModalOpen] = useState(false);
   const [newSlot, setNewSlot] = useState<any>(null);
+
+  // schedule drawer calendar state
+  const today = new Date();
+  const [scheduleMonth, setScheduleMonth] = useState(today.getMonth());
+  const [scheduleYear, setScheduleYear] = useState(today.getFullYear());
+  const [scheduleSelectedDate, setScheduleSelectedDate] = useState(today.getDate());
+  const [scheduleMonthlyAvailabilitySlots, setScheduleMonthlyAvailabilitySlots] = useState<any[]>([]);
+  const [scheduleAvailabilityLoading, setScheduleAvailabilityLoading] = useState(false);
+
+  // availability tab calendar state
+  const [availabilityTabMonth, setAvailabilityTabMonth] = useState(today.getMonth());
+  const [availabilityTabYear, setAvailabilityTabYear] = useState(today.getFullYear());
+  const [availabilityTabSelectedDate, setAvailabilityTabSelectedDate] = useState(today.getDate());
+
+  // reschedule state
+  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
+  const [rescheduleTarget, setRescheduleTarget] = useState<Appointment | null>(null);
+  const [rescheduleRecipientType, setRescheduleRecipientType] = useState<"director" | "pastor" | null>(null);
+  const [rescheduleMonth, setRescheduleMonth] = useState(today.getMonth());
+  const [rescheduleYear, setRescheduleYear] = useState(today.getFullYear());
+  const [rescheduleSelectedDate, setRescheduleSelectedDate] = useState(today.getDate());
+  const [rescheduleMonthlyAvailabilitySlots, setRescheduleMonthlyAvailabilitySlots] = useState<any[]>([]);
+  const [rescheduleAvailabilityLoading, setRescheduleAvailabilityLoading] = useState(false);
+  const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState("");
+  const [rescheduleDateTime, setRescheduleDateTime] = useState("");
+  const [reschedulePlatform, setReschedulePlatform] = useState("zoom");
+  const [isRescheduling, setIsRescheduling] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -245,6 +287,116 @@ function MentorScheduleContent() {
     fetchSlots();
   }, [mentorId, meetingDate, availabilityRefreshKey, appointments]);
 
+  // ── Schedule drawer calendar navigation handlers ──────────────────────────────
+  const handleSchedulePrevMonth = () => {
+    if (scheduleMonth === 0) {
+      setScheduleMonth(11);
+      setScheduleYear(scheduleYear - 1);
+    } else {
+      setScheduleMonth(scheduleMonth - 1);
+    }
+  };
+
+  const handleScheduleNextMonth = () => {
+    if (scheduleMonth === 11) {
+      setScheduleMonth(0);
+      setScheduleYear(scheduleYear + 1);
+    } else {
+      setScheduleMonth(scheduleMonth + 1);
+    }
+  };
+
+  // ── Availability tab calendar navigation handlers ────────────────────────────
+  const handleAvailabilityTabPrevMonth = () => {
+    if (availabilityTabMonth === 0) {
+      setAvailabilityTabMonth(11);
+      setAvailabilityTabYear(availabilityTabYear - 1);
+    } else {
+      setAvailabilityTabMonth(availabilityTabMonth - 1);
+    }
+  };
+
+  const handleAvailabilityTabNextMonth = () => {
+    if (availabilityTabMonth === 11) {
+      setAvailabilityTabMonth(0);
+      setAvailabilityTabYear(availabilityTabYear + 1);
+    } else {
+      setAvailabilityTabMonth(availabilityTabMonth + 1);
+    }
+  };
+
+  // ── Convert availability data to calendar format ───────────────────────────────
+  const getAvailabilityTabSlots = (): any[] => {
+    if (!availability || availability.length === 0) return [];
+
+    // Create array to hold slots organized by date for the current month
+    const slotsMap: Record<string, any> = {};
+
+    // For each day in the month, check if it has slots from availability data
+    const firstDay = new Date(availabilityTabYear, availabilityTabMonth, 1);
+    const lastDay = new Date(availabilityTabYear, availabilityTabMonth + 1, 0);
+
+    for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
+      const dayOfWeek = d.getDay(); // 0-6 (Sunday-Saturday)
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+      // Find availability data for this day of week
+      const dayAvailability = availability.find((a: any) => a.day === dayOfWeek);
+
+      if (dayAvailability && dayAvailability.enabled && dayAvailability.slots && dayAvailability.slots.length > 0) {
+        slotsMap[dateStr] = {
+          date: dateStr,
+          slots: dayAvailability.slots,
+        };
+      }
+    }
+
+    return Object.values(slotsMap);
+  };
+
+  // ── Fetch mentor availability for schedule calendar ──────────────────────────
+  useEffect(() => {
+    if (drawerStep !== 2 || !mentorId || !scheduleRecipientType) {
+      setScheduleMonthlyAvailabilitySlots([]);
+      setScheduleAvailabilityLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setScheduleAvailabilityLoading(true);
+        // Use year/month parameters format
+        const res = await axiosInstance.get(`/appointments/availability/${mentorId}/month`, {
+          params: {
+            year: scheduleYear,
+            month: scheduleMonth + 1,
+          },
+        });
+        const raw = res.data?.data ?? res.data;
+        const slots = Array.isArray(raw) ? raw : [];
+
+        if (!cancelled) {
+          setScheduleMonthlyAvailabilitySlots(slots);
+          // Convert schedule calendar date to YYYY-MM-DD format and update meetingDate
+          const selectedDateStr = `${scheduleYear}-${String(scheduleMonth + 1).padStart(2, "0")}-${String(scheduleSelectedDate).padStart(2, "0")}`;
+          setMeetingDate(selectedDateStr);
+        }
+        setScheduleAvailabilityLoading(false);
+      } catch (error) {
+        console.error("Error fetching schedule availability:", error);
+        if (!cancelled) {
+          setScheduleMonthlyAvailabilitySlots([]);
+          setScheduleAvailabilityLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [drawerStep, mentorId, scheduleYear, scheduleMonth, scheduleSelectedDate]);
+
   useEffect(() => {
     if (!mentorId) return;
 
@@ -294,8 +446,6 @@ function MentorScheduleContent() {
 
     fetchWeeklyAvailability();
   }, [mentorId, weekStart, availabilityRefreshKey]);
-
-  const today = new Date();
 
   const todayKey = new Date().toISOString().split("T")[0];
   const selectedDayAppointments = appointments
@@ -349,6 +499,78 @@ function MentorScheduleContent() {
     });
   }, [availability]);
 
+  // ── Fetch availability for reschedule calendar (director only) ──────────────────
+  useEffect(() => {
+    if (!isRescheduleModalOpen || !rescheduleTarget) return;
+
+    const fetchAvailability = async () => {
+      if (rescheduleRecipientType === "director") {
+        // Fetch director's availability
+        const directorId = (rescheduleTarget.user as any)?._id || (rescheduleTarget.user as any)?.id;
+        if (!directorId) {
+          console.warn("No director ID available for reschedule");
+          return;
+        }
+
+        setRescheduleAvailabilityLoading(true);
+        try {
+          const url = `/appointments/availability/${directorId}/month`;
+          const params = { year: rescheduleYear, month: rescheduleMonth + 1 };
+          console.log("Fetching director availability for reschedule:", { url, params, directorId });
+          
+          const response = await axiosInstance.get(url, { params });
+          console.log("Director availability response:", response.data);
+          
+          if (response.data?.data) {
+            console.log("Setting rescheduleMonthlyAvailabilitySlots with:", response.data.data);
+            setRescheduleMonthlyAvailabilitySlots(response.data.data);
+          } else {
+            console.warn("No data in director availability response:", response.data);
+            setRescheduleMonthlyAvailabilitySlots([]);
+          }
+        } catch (e) {
+          console.error("Failed to fetch director availability for reschedule:", e);
+          setRescheduleMonthlyAvailabilitySlots([]);
+        } finally {
+          setRescheduleAvailabilityLoading(false);
+        }
+      } else if (rescheduleRecipientType === "pastor") {
+        // Fetch mentor's own availability for pastor reschedule
+        if (!mentorId) {
+          console.warn("No mentorId available for reschedule");
+          return;
+        }
+
+        setScheduleAvailabilityLoading(true);
+        try {
+          const url = `/appointments/availability/${mentorId}/month`;
+          const params = { year: rescheduleYear, month: rescheduleMonth + 1 };
+          console.log("Fetching mentor availability for pastor reschedule:", { url, params, mentorId });
+          
+          const response = await axiosInstance.get(url, { params });
+          console.log("Mentor availability response:", response.data);
+          
+          if (response.data?.data) {
+            console.log("Setting scheduleMonthlyAvailabilitySlots with:", response.data.data);
+            setScheduleMonthlyAvailabilitySlots(response.data.data);
+          } else {
+            console.warn("No data in mentor availability response:", response.data);
+            setScheduleMonthlyAvailabilitySlots([]);
+          }
+        } catch (e) {
+          console.error("Failed to fetch mentor availability for pastor reschedule:", e);
+          setScheduleMonthlyAvailabilitySlots([]);
+        } finally {
+          setScheduleAvailabilityLoading(false);
+        }
+      } else {
+        console.warn("Unknown rescheduleRecipientType:", rescheduleRecipientType);
+      }
+    };
+
+    fetchAvailability();
+  }, [isRescheduleModalOpen, rescheduleTarget, rescheduleRecipientType, rescheduleYear, rescheduleMonth, mentorId]);
+
   const weekCalendarDates = Array.from({ length: 7 }, (_, dayIndex) => {
     const dayData = availability.find((d) => d.day === dayIndex);
     const dateKey = resolveAvailabilityRowDate(dayData ?? { day: dayIndex });
@@ -373,6 +595,12 @@ function MentorScheduleContent() {
     selectedAvailabilityDay === null
       ? null
       : availability.find((d) => d.day === selectedAvailabilityDay) || null;
+
+  // Get selected day data for availability tab calendar
+  const selectedDateObj = new Date(availabilityTabYear, availabilityTabMonth, availabilityTabSelectedDate);
+  const selectedDayOfWeek = selectedDateObj.getDay();
+  const selectedAvailabilityTabDayData =
+    availability.find((d) => d.day === selectedDayOfWeek) || null;
 
   const period = (p: unknown, fallback: "AM" | "PM"): "AM" | "PM" => {
     const s = String(p ?? "").trim().toUpperCase();
@@ -607,6 +835,95 @@ function MentorScheduleContent() {
     } catch (e) {
       console.error(e);
       setToastMessage("Failed to cancel appointment");
+    }
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // ── Open reschedule modal ──────────────────────────────────────────────────────
+  const openRescheduleModal = (appt: Appointment) => {
+    setRescheduleTarget(appt);
+    setReschedulePlatform(String(appt.platform || "zoom").toLowerCase());
+    setShowMenu(null);
+    
+    // Determine recipient type (director or pastor)
+    const recipientRole = (appt.user as any)?.role || "pastor";
+    const isDirector = recipientRole?.toLowerCase().includes("director");
+    setRescheduleRecipientType(isDirector ? "director" : "pastor");
+    
+    // Reset states
+    const today = new Date();
+    setRescheduleMonth(today.getMonth());
+    setRescheduleYear(today.getFullYear());
+    setRescheduleSelectedDate(today.getDate());
+    setRescheduleSelectedSlot("");
+    setRescheduleDateTime("");
+    setRescheduleMonthlyAvailabilitySlots([]);
+    setScheduleMonthlyAvailabilitySlots([]);
+    setIsRescheduleModalOpen(true);
+  };
+
+  // ── Reschedule calendar navigation ─────────────────────────────────────────────
+  const handleReschedulePrevMonth = () => {
+    if (rescheduleMonth === 0) {
+      setRescheduleMonth(11);
+      setRescheduleYear(rescheduleYear - 1);
+    } else {
+      setRescheduleMonth(rescheduleMonth - 1);
+    }
+  };
+
+  const handleRescheduleNextMonth = () => {
+    if (rescheduleMonth === 11) {
+      setRescheduleMonth(0);
+      setRescheduleYear(rescheduleYear + 1);
+    } else {
+      setRescheduleMonth(rescheduleMonth + 1);
+    }
+  };
+
+  // ── Handle reschedule appointment ──────────────────────────────────────────────
+  const handleRescheduleAppointment = async () => {
+    const appt = rescheduleTarget;
+    const id = appt ? appointmentEntityId(appt) : "";
+    if (!id || !mentorId) return;
+
+    // Validate based on recipient type
+    if (rescheduleRecipientType === "director") {
+      if (!rescheduleSelectedSlot) {
+        setToastMessage("Please select an available time slot");
+        setTimeout(() => setToastMessage(null), 3000);
+        return;
+      }
+    } else {
+      if (!rescheduleDateTime) {
+        setToastMessage("Please select date and time");
+        setTimeout(() => setToastMessage(null), 3000);
+        return;
+      }
+    }
+
+    if (isRescheduling) return;
+    setIsRescheduling(true);
+
+    try {
+      const meetingDate = rescheduleRecipientType === "director"
+        ? rescheduleSelectedSlot
+        : rescheduleDateTime;
+
+      await apiRescheduleAppointment(id, {
+        meetingDate,
+        platform: reschedulePlatform as any,
+      });
+      const refresh = await apiGetMentorAppointments(mentorId);
+      setAppointments(unwrapAppointmentsAxiosData(refresh));
+      setIsRescheduleModalOpen(false);
+      setRescheduleTarget(null);
+      setToastMessage("Appointment rescheduled successfully");
+    } catch (e) {
+      console.error(e);
+      setToastMessage(extractApiErrorMessage(e) || "Failed to reschedule appointment");
+    } finally {
+      setIsRescheduling(false);
     }
     setTimeout(() => setToastMessage(null), 3000);
   };
@@ -846,13 +1163,7 @@ function MentorScheduleContent() {
                                   <button
                                     type="button"
                                     className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
-                                    onClick={() => {
-                                      setShowMenu(null);
-                                      setToastMessage(
-                                        "Use pastor’s calendar or reschedule from their account when supported."
-                                      );
-                                      setTimeout(() => setToastMessage(null), 4000);
-                                    }}
+                                    onClick={() => openRescheduleModal(appt)}
                                   >
                                     <i className="fa-regular fa-calendar-check mr-2 text-[#8ec5eb]" />
                                     Reschedule meeting
@@ -976,57 +1287,44 @@ function MentorScheduleContent() {
 
           {mentorId && !loading && activeTab === "Availability" && (
             <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
+
+              {/* Left: Weekly calendar + settings */}
               <div className={`${mentorGlassCardFrost} p-5 text-white sm:p-6`}>
                 <h3 className="mb-5 text-[15px] font-medium">My weekly availability</h3>
                 <div className="mb-6 rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-5 text-center shadow-inner">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <button
                       type="button"
-                      onClick={() => {
-                        setWeekStart((prev) => {
-                          const next = new Date(prev);
-                          next.setDate(next.getDate() - 7);
-                          return next;
-                        });
-                      }}
+                      onClick={() => setWeekStart((prev) => { const n = new Date(prev); n.setDate(n.getDate() - 7); return n; })}
                       className="rounded-lg px-2 py-1 text-white/90 transition hover:bg-white/10"
                       aria-label="Previous week"
-                    >
-                      ◀
-                    </button>
-
+                    >◀</button>
                     <p className="text-sm font-medium text-[#d9ebf8]">{weekMonthYearLabel}</p>
-
                     <button
                       type="button"
-                      onClick={() => {
-                        setWeekStart((prev) => {
-                          const next = new Date(prev);
-                          next.setDate(next.getDate() + 7);
-                          return next;
-                        });
-                      }}
+                      onClick={() => setWeekStart((prev) => { const n = new Date(prev); n.setDate(n.getDate() + 7); return n; })}
                       className="rounded-lg px-2 py-1 text-white/90 transition hover:bg-white/10"
                       aria-label="Next week"
-                    >
-                      ▶
-                    </button>
+                    >▶</button>
                   </div>
                   <div className="grid grid-cols-7 gap-2 text-[13px]">
                     {weekCalendarDates.map(({ dayIndex, date, hasSlots }) => {
                       const day = date.toLocaleDateString("default", { weekday: "short" });
                       const isSelected = selectedAvailabilityDay === dayIndex;
                       const isPast = isPastDate(date.toISOString().split("T")[0]);
-
                       return (
                         <div
                           key={date.toISOString()}
                           onClick={() => !isPast && setSelectedAvailabilityDay(dayIndex)}
-                          className={`rounded-md py-2 text-center transition ${isPast ? "cursor-not-allowed pointer-events-none opacity-40" : "cursor-pointer"
-                            } ${isSelected
-                            ? "bg-[#8ec5eb]/30 font-semibold text-white ring-1 ring-[#8ec5eb]/55"
-                            : "text-[#d9ebf8] hover:bg-white/10"
-                            } ${hasSlots && !isPast ? "ring-1 ring-amber-300/55" : ""}`}
+                          className={`rounded-md py-2 text-center transition ${
+                            isPast
+                              ? "opacity-40 cursor-not-allowed pointer-events-none"
+                              : "cursor-pointer"
+                          } ${
+                            isSelected
+                              ? "bg-[#8ec5eb]/30 font-semibold text-white ring-1 ring-[#8ec5eb]/55"
+                              : "text-[#d9ebf8] hover:bg-white/10"
+                          } ${hasSlots && !isPast ? "ring-1 ring-amber-300/55" : ""}`}
                         >
                           <div>{day}</div>
                           <div className="text-xs text-white/80">{date.getDate()}</div>
@@ -1035,35 +1333,22 @@ function MentorScheduleContent() {
                     })}
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="mb-1 block text-xs text-[#cde2f2]">Meeting Duration</label>
-                    <select className={mentorSelectDark}>
-                      <option className="bg-[#062946]">60 Minutes</option>
-                      <option className="bg-[#062946]">30 Minutes</option>
-                    </select>
+                    <select className={mentorSelectDark}><option>60 Minutes</option><option>30 Minutes</option></select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-[#cde2f2]">Max. Booking per Day</label>
-                    <select className={mentorSelectDark}>
-                      <option className="bg-[#062946]">5</option>
-                      <option className="bg-[#062946]">10</option>
-                    </select>
+                    <label className="mb-1 block text-xs text-[#cde2f2]">Max. Bookings/Day</label>
+                    <select className={mentorSelectDark}><option>5</option><option>10</option></select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-[#cde2f2]">Min. Scheduling Notice</label>
-                    <select className={mentorSelectDark}>
-                      <option className="bg-[#062946]">2 Days</option>
-                      <option className="bg-[#062946]">1 Day</option>
-                    </select>
+                    <label className="mb-1 block text-xs text-[#cde2f2]">Min. Notice</label>
+                    <select className={mentorSelectDark}><option>2 Days</option><option>1 Day</option></select>
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-[#cde2f2]">Preferred Meeting Option</label>
-                    <select className={mentorSelectDark}>
-                      <option className="bg-[#062946]">Zoom</option>
-                      <option className="bg-[#062946]">Google Meet</option>
-                    </select>
+                    <label className="mb-1 block text-xs text-[#cde2f2]">Preferred Mode</label>
+                    <select className={mentorSelectDark}><option>Zoom</option><option>Google Meet</option></select>
                   </div>
                 </div>
               </div>
@@ -1072,10 +1357,10 @@ function MentorScheduleContent() {
                 <h3 className="mb-3 text-[15px] font-medium">Available hours</h3>
                 {!selectedDayData ? (
                   <div className={mentorEmptyPanel}>
-                    <p className={mentorBodyText}>Select a date from the weekly calendar to edit that day.</p>
+                    <p className={mentorBodyText}>Select a day from the weekly calendar to edit availability.</p>
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-white/15 bg-white/[0.04] p-4 sm:p-5">
+                  <div className="rounded-2xl border border-white/15 bg-white/[0.04] p-4 sm:p-5 flex flex-col max-h-[500px]">
                     <div className="mb-4 flex flex-wrap items-center gap-3 border-b border-white/15 pb-4">
                       <input
                         type="checkbox"
@@ -1092,11 +1377,12 @@ function MentorScheduleContent() {
                         className="accent-[#8ec5eb]"
                       />
                       <p className="text-sm font-medium text-[#d9ebf8]">
-                        {DAY_LABELS[selectedDayData.day as number]} - {new Date(`${resolveAvailabilityRowDate(selectedDayData)}T12:00:00`).toLocaleDateString()}
+                        {DAY_LABELS[selectedAvailabilityDay as number]} - {weekCalendarDates[selectedAvailabilityDay as number]?.date.toLocaleDateString()}
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-2">
+                    <div className="flex-1 overflow-y-auto pr-3 mb-4">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-2">
                       {(selectedDayData.slots || []).map((slot: any, i: number) => (
                         <div key={i} className="rounded-lg border border-white/15 bg-white/[0.03] p-2">
                           <div className="mb-1 text-[11px] text-[#cde2f2]">Slot {i + 1}</div>
@@ -1108,7 +1394,7 @@ function MentorScheduleContent() {
                               const [time, slotPeriod] = e.target.value.split("-");
                               setAvailability((prev) =>
                                 prev.map((d) =>
-                                  d.day === selectedAvailabilityDay
+                                  d.day === selectedDayOfWeek
                                     ? {
                                       ...d,
                                       slots: d.slots.map((s: any, idx: number) =>
@@ -1136,7 +1422,7 @@ function MentorScheduleContent() {
                               const [time, slotPeriod] = e.target.value.split("-");
                               setAvailability((prev) =>
                                 prev.map((d) =>
-                                  d.day === selectedAvailabilityDay
+                                  d.day === selectedDayOfWeek
                                     ? {
                                       ...d,
                                       slots: d.slots.map((s: any, idx: number) =>
@@ -1157,6 +1443,7 @@ function MentorScheduleContent() {
                           </div>
                         </div>
                       ))}
+                      </div>
                     </div>
 
                     <div className="mt-4">
@@ -1256,7 +1543,7 @@ function MentorScheduleContent() {
                     onClick={() => {
                       setAvailability((prev) =>
                         prev.map((d) =>
-                          d.day === selectedAvailabilityDay
+                          d.day === selectedDayOfWeek
                             ? { ...d, enabled: true, slots: [...(d.slots || []), newSlot] }
                             : d,
                         ),
@@ -1417,7 +1704,7 @@ function MentorScheduleContent() {
 
             {drawerStep === 2 && (
               <div className="flex h-full flex-col p-6">
-                <div className="mb-6 flex items-center justify-between">
+                <div className="mb-6 flex items-center justify-between shrink-0">
                   <h2 className="flex items-center gap-2 text-lg font-semibold">
                     <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
                     Schedule a meeting
@@ -1432,53 +1719,60 @@ function MentorScheduleContent() {
                   </button>
                 </div>
 
-                <div className="mb-6 rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-5 text-center">
-                  <p className="mb-2 text-sm text-[#cde2f2]">Select date</p>
-                  <input
-                    type="date"
-                    value={meetingDate}
-                    onChange={(e) => setMeetingDate(e.target.value)}
-                    className={mentorDateInputDark}
-                  />
+                <div className="flex-1 overflow-y-auto pr-3 mb-6">
+                  <div className="mb-6 rounded-xl border border-white/15 bg-white/5 p-4">
+                    <p className="mb-3 text-sm text-[#cde2f2]">Mentor Availability</p>
+                    <AvailabilityCalendar
+                      mentorId={mentorId || ""}
+                      currentMonth={scheduleMonth}
+                      currentYear={scheduleYear}
+                      selectedDate={scheduleSelectedDate}
+                      onDateSelect={setScheduleSelectedDate}
+                      onPrevMonth={handleSchedulePrevMonth}
+                      onNextMonth={handleScheduleNextMonth}
+                      availabilitySlots={scheduleMonthlyAvailabilitySlots}
+                      isLoading={scheduleAvailabilityLoading}
+                    />
+                  </div>
+
+                  <div className="mb-6 grid grid-cols-2 gap-3">
+                    {availableSlots.length === 0 ? (
+                      <p className="text-sm text-[#cde2f2]">No slots available</p>
+                    ) : (
+                      availableSlots.map((label) => (
+                        <button
+                          key={label}
+                          onClick={() => setSelectedSlot(label)}
+                          className={`rounded-lg border px-3 py-2.5 text-sm ${selectedSlot === label ? "bg-blue-500 text-white" : ""
+                            }`}
+                        >
+                          {label}
+                        </button>
+                      ))
+                    )}
+                  </div>
+
+                  <select
+                    value={selectedPlatform}
+                    onChange={(e) => setSelectedPlatform(e.target.value)}
+                    className={`${mentorSelectDark} w-full`}
+                  >
+                    <option className="bg-[#062946]" value="zoom">
+                      Zoom
+                    </option>
+                    <option className="bg-[#062946]" value="google meet">
+                      Google Meet
+                    </option>
+                    <option className="bg-[#062946]" value="teams">
+                      Microsoft Teams
+                    </option>
+                    <option className="bg-[#062946]" value="phone">
+                      Phone
+                    </option>
+                  </select>
                 </div>
 
-                <div className="mb-6 grid grid-cols-2 gap-3">
-                  {availableSlots.length === 0 ? (
-                    <p className="text-sm text-[#cde2f2]">No slots available</p>
-                  ) : (
-                    availableSlots.map((label) => (
-                      <button
-                        key={label}
-                        onClick={() => setSelectedSlot(label)}
-                        className={`rounded-lg border px-3 py-2.5 text-sm ${selectedSlot === label ? "bg-blue-500 text-white" : ""
-                          }`}
-                      >
-                        {label}
-                      </button>
-                    ))
-                  )}
-                </div>
-
-                <select
-                  value={selectedPlatform}
-                  onChange={(e) => setSelectedPlatform(e.target.value)}
-                  className={`${mentorSelectDark} mb-8`}
-                >
-                  <option className="bg-[#062946]" value="zoom">
-                    Zoom
-                  </option>
-                  <option className="bg-[#062946]" value="google meet">
-                    Google Meet
-                  </option>
-                  <option className="bg-[#062946]" value="teams">
-                    Microsoft Teams
-                  </option>
-                  <option className="bg-[#062946]" value="phone">
-                    Phone
-                  </option>
-                </select>
-
-                <div className="mt-auto flex justify-end gap-3 border-t border-white/10 pt-6">
+                <div className="flex justify-end gap-3 border-t border-white/10 pt-6 shrink-0">
                   <button type="button" onClick={() => setIsDrawerOpen(false)} className={mentorSecondaryCta}>
                     Cancel
                   </button>
@@ -1488,6 +1782,262 @@ function MentorScheduleContent() {
                     className={`${mentorPrimaryCta} ${isScheduling ? "opacity-70 cursor-not-allowed" : ""}`}
                   >
                     {isScheduling ? "Scheduling..." : "Schedule"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Reschedule Drawer (Right Side) ── */}
+      {isRescheduleModalOpen && rescheduleTarget && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
+            onClick={() => { if (!isRescheduling) setIsRescheduleModalOpen(false); }}
+            aria-hidden
+          />
+          <div className="fixed right-0 top-0 z-50 h-full w-full border-l border-white/15 bg-[#041f35] text-white shadow-2xl sm:max-w-[480px] sm:w-[480px]">
+            {/* ── Director: Show availability calendar ── */}
+            {rescheduleRecipientType === "director" ? (
+              <div className="flex h-full flex-col p-6">
+                <div className="mb-6 flex items-center justify-between shrink-0">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold">
+                    <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
+                    Reschedule meeting
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsRescheduleModalOpen(false)}
+                    className="rounded-lg p-2 text-[#cde2f2] transition hover:bg-white/10 hover:text-white"
+                    aria-label="Close"
+                  >
+                    <i className="fa-solid fa-xmark text-xl" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto pr-3 mb-6">
+                  {/* Next Availability Info */}
+                  {rescheduleMonthlyAvailabilitySlots.length > 0 && (
+                    <div className="mb-6 rounded-xl border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 p-4">
+                      <p className="text-xs text-[#cde2f2] font-semibold mb-2">Next Available</p>
+                      <p className="text-sm font-medium text-[#8ec5eb]">
+                        {rescheduleMonthlyAvailabilitySlots[0]?.date && rescheduleMonthlyAvailabilitySlots[0]?.times?.[0]
+                          ? `${new Date(rescheduleMonthlyAvailabilitySlots[0].date).toLocaleDateString()} at ${rescheduleMonthlyAvailabilitySlots[0].times[0]}`
+                          : "No availability found"}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="mb-6 rounded-xl border border-white/15 bg-white/5 p-4">
+                    <p className="mb-3 text-sm text-[#cde2f2]">Director Availability</p>
+                    {rescheduleAvailabilityLoading ? (
+                      <div className="flex justify-center py-8">
+                        <div className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-r-white" />
+                      </div>
+                    ) : (
+                      <AvailabilityCalendar
+                        mentorId={(rescheduleTarget.user as any)?._id || (rescheduleTarget.user as any)?.id || ""}
+                        currentMonth={rescheduleMonth}
+                        currentYear={rescheduleYear}
+                        selectedDate={rescheduleSelectedDate}
+                        onDateSelect={setRescheduleSelectedDate}
+                        onPrevMonth={handleReschedulePrevMonth}
+                        onNextMonth={handleRescheduleNextMonth}
+                        availabilitySlots={rescheduleMonthlyAvailabilitySlots}
+                        isLoading={rescheduleAvailabilityLoading}
+                      />
+                    )}
+                  </div>
+
+                  {/* Time slots for selected date */}
+                  <div className="mb-6">
+                    <label className="block text-sm text-[#cde2f2] font-semibold mb-3">
+                      Available times on {new Date(rescheduleYear, rescheduleMonth, rescheduleSelectedDate).toLocaleDateString()}
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {(() => {
+                        const selectedDateSlots = rescheduleMonthlyAvailabilitySlots.find(
+                          (slot) => new Date(slot.date).getDate() === rescheduleSelectedDate
+                        );
+
+                        // Filter to only hourly slots (ending with :00)
+                        const timeSlots = (selectedDateSlots?.slots || []).filter(
+                          (slot) => slot.startTime.endsWith(":00")
+                        );
+                        
+                        if (timeSlots.length === 0) {
+                          return <p className="text-sm text-[#cde2f2]">No slots available on this date</p>;
+                        }
+                        
+                        return timeSlots.map((slot, idx) => {
+                          const timeLabel = `${slot.startTime} ${slot.startPeriod}`;
+                          const isoString = new Date(`${selectedDateSlots.date}T${convertTo24Hour(slot.startTime, slot.startPeriod)}`).toISOString();
+                          
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => setRescheduleSelectedSlot(isoString)}
+                              className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition ${
+                                rescheduleSelectedSlot === isoString
+                                  ? "bg-blue-600 text-white border-blue-500"
+                                  : "border-white/20 text-white hover:bg-white/10"
+                              }`}
+                            >
+                              {timeLabel}
+                            </button>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Platform selector */}
+                  <select
+                    value={reschedulePlatform}
+                    onChange={(e) => setReschedulePlatform(e.target.value)}
+                    className={`${mentorSelectDark} w-full`}
+                  >
+                    <option className="bg-[#062946]" value="zoom">Zoom</option>
+                    <option className="bg-[#062946]" value="google-meet">Google Meet</option>
+                    <option className="bg-[#062946]" value="teams">Microsoft Teams</option>
+                    <option className="bg-[#062946]" value="phone">Phone</option>
+                    <option className="bg-[#062946]" value="in-person">In person</option>
+                  </select>
+                </div>
+
+                <div className="flex justify-end gap-3 shrink-0 border-t border-white/10 pt-6">
+                  <button
+                    type="button"
+                    className="px-4 py-2 rounded-lg border border-white/20 text-xs text-white transition hover:bg-white/10"
+                    onClick={() => setIsRescheduleModalOpen(false)}
+                    disabled={isRescheduling}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-6 py-2 rounded-lg bg-blue-600 text-xs font-medium text-white transition ${isRescheduling ? "cursor-not-allowed opacity-70" : "hover:bg-blue-700"}`}
+                    onClick={handleRescheduleAppointment}
+                    disabled={isRescheduling}
+                  >
+                    {isRescheduling ? "Saving..." : "Save changes"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* ── Pastor: Show simple datetime input ── */
+              <div className="flex h-full flex-col p-6">
+                <div className="mb-6 flex items-center justify-between shrink-0">
+                  <h2 className="flex items-center gap-2 text-lg font-semibold">
+                    <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
+                    Reschedule meeting
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsRescheduleModalOpen(false)}
+                    className="rounded-lg p-2 text-[#cde2f2] transition hover:bg-white/10 hover:text-white"
+                    aria-label="Close"
+                  >
+                    <i className="fa-solid fa-xmark text-xl" />
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto pr-3 mb-6">
+                  <div className="mb-6 rounded-xl border border-white/15 bg-white/5 p-4">
+                    <p className="mb-3 text-sm text-[#cde2f2]">Mentor Availability</p>
+                    {scheduleAvailabilityLoading ? (
+                      <div className="flex justify-center py-8">
+                        <div className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-r-white" />
+                      </div>
+                    ) : (
+                      <AvailabilityCalendar
+                        mentorId={mentorId || ""}
+                        currentMonth={rescheduleMonth}
+                        currentYear={rescheduleYear}
+                        selectedDate={rescheduleSelectedDate}
+                        onDateSelect={setRescheduleSelectedDate}
+                        onPrevMonth={handleReschedulePrevMonth}
+                        onNextMonth={handleRescheduleNextMonth}
+                        availabilitySlots={scheduleMonthlyAvailabilitySlots}
+                        isLoading={scheduleAvailabilityLoading}
+                      />
+                    )}
+                  </div>
+
+                  {/* Time slots for selected date */}
+                  <div className="mb-6">
+                    <label className="block text-sm text-[#cde2f2] font-semibold mb-3">
+                      Available times on {new Date(rescheduleYear, rescheduleMonth, rescheduleSelectedDate).toLocaleDateString()}
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {(() => {
+                        const selectedDateSlots = scheduleMonthlyAvailabilitySlots.find(
+                          (slot) => new Date(slot.date).getDate() === rescheduleSelectedDate
+                        );
+
+                        // Filter to only hourly slots (ending with :00)
+                        const timeSlots = (selectedDateSlots?.slots || []).filter(
+                          (slot) => slot.startTime.endsWith(":00")
+                        );
+                        
+                        if (timeSlots.length === 0) {
+                          return <p className="text-sm text-[#cde2f2]">No slots available on this date</p>;
+                        }
+                        
+                        return timeSlots.map((slot, idx) => {
+                          const timeLabel = `${slot.startTime} ${slot.startPeriod}`;
+                          const isoString = new Date(`${selectedDateSlots.date}T${convertTo24Hour(slot.startTime, slot.startPeriod)}`).toISOString();
+                          
+                          return (
+                            <button
+                              key={idx}
+                              onClick={() => setRescheduleDateTime(isoString)}
+                              className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition ${
+                                rescheduleDateTime === isoString
+                                  ? "bg-blue-600 text-white border-blue-500"
+                                  : "border-white/20 text-white hover:bg-white/10"
+                              }`}
+                            >
+                              {timeLabel}
+                            </button>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Platform selector */}
+                  <select
+                    value={reschedulePlatform}
+                    onChange={(e) => setReschedulePlatform(e.target.value)}
+                    className={`${mentorSelectDark} w-full`}
+                  >
+                    <option className="bg-[#062946]" value="zoom">Zoom</option>
+                    <option className="bg-[#062946]" value="google-meet">Google Meet</option>
+                    <option className="bg-[#062946]" value="teams">Microsoft Teams</option>
+                    <option className="bg-[#062946]" value="phone">Phone</option>
+                    <option className="bg-[#062946]" value="in-person">In person</option>
+                  </select>
+                </div>
+
+                <div className="flex justify-end gap-3 shrink-0 border-t border-white/10 pt-6">
+                  <button
+                    type="button"
+                    className="px-4 py-2 rounded-lg border border-white/20 text-xs text-white transition hover:bg-white/10"
+                    onClick={() => setIsRescheduleModalOpen(false)}
+                    disabled={isRescheduling}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={`px-6 py-2 rounded-lg bg-blue-600 text-xs font-medium text-white transition ${isRescheduling ? "cursor-not-allowed opacity-70" : "hover:bg-blue-700"}`}
+                    onClick={handleRescheduleAppointment}
+                    disabled={isRescheduling}
+                  >
+                    {isRescheduling ? "Saving..." : "Save changes"}
                   </button>
                 </div>
               </div>

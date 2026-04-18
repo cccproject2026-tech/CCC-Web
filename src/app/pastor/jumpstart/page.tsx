@@ -83,6 +83,10 @@ function listStatusBadgeClass(s: RoadmapAssignmentUi["status"]): string {
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 interface ExtraComponent {
   type:
     | "TEXT_DISPLAY"
@@ -207,16 +211,19 @@ function JumpStartContent() {
   const [extrasExist, setExtrasExist] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [completeLoading, setCompleteLoading] = useState(false);
   const [completeFeedback, setCompleteFeedback] = useState<string | null>(null);
 
   // Comments
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsCount, setCommentsCount] = useState(0);
 
   // Queries
   const [queries, setQueries] = useState<QueryItem[]>([]);
   const [queriesLoading, setQueriesLoading] = useState(false);
+  const [queriesCount, setQueriesCount] = useState(0);
   const [newQueryText, setNewQueryText] = useState("");
   const [querySubmitting, setQuerySubmitting] = useState(false);
   const [querySuccess, setQuerySuccess] = useState(false);
@@ -424,23 +431,54 @@ function JumpStartContent() {
     loadExtras();
   }, [roadmapId, userId, nestedItemId, parentRoadmapId, roadmap, extraFieldMeta]);
 
+  const fetchComments = useCallback(async (showLoader = false) => {
+    if (!roadmapId || !userId) return;
+    if (showLoader) setCommentsLoading(true);
+    try {
+      const res = await apiGetComments(roadmapId, userId);
+      const thread = res.data?.data || res.data;
+      const list = Array.isArray(thread?.comments) ? thread.comments : [];
+      setComments(list);
+      setCommentsCount(list.length);
+    } catch {
+      setComments([]);
+      setCommentsCount(0);
+    } finally {
+      if (showLoader) setCommentsLoading(false);
+    }
+  }, [roadmapId, userId]);
+
+  const fetchQueries = useCallback(async (status?: string, showLoader = false) => {
+    if (!roadmapId || !userId) return;
+    if (showLoader) setQueriesLoading(true);
+    try {
+      const res = await apiGetQueries(roadmapId, userId, status);
+      const threads: any[] = res.data?.data || res.data || [];
+      const allQueries = Array.isArray(threads)
+        ? threads.flatMap((t: any) => t?.queries || [])
+        : (threads as any)?.queries || [];
+      setQueries(allQueries);
+      if (!status) setQueriesCount(allQueries.length);
+    } catch {
+      setQueries([]);
+      if (!status) setQueriesCount(0);
+    } finally {
+      if (showLoader) setQueriesLoading(false);
+    }
+  }, [roadmapId, userId]);
+
+  // Prefetch counts so the left rail matches mobile badges.
+  useEffect(() => {
+    if (!roadmapId || !userId) return;
+    void fetchComments(false);
+    void fetchQueries(undefined, false);
+  }, [roadmapId, userId, fetchComments, fetchQueries]);
+
   // Load comments when Comments tab is opened
   useEffect(() => {
-    if (activeTab !== "comments" || !roadmapId || !userId) return;
-    const fetchComments = async () => {
-      setCommentsLoading(true);
-      try {
-        const res = await apiGetComments(roadmapId, userId);
-        const thread = res.data?.data || res.data;
-        setComments(thread?.comments || []);
-      } catch {
-        setComments([]);
-      } finally {
-        setCommentsLoading(false);
-      }
-    };
-    fetchComments();
-  }, [activeTab, roadmapId, userId]);
+    if (activeTab !== "comments") return;
+    void fetchComments(true);
+  }, [activeTab, fetchComments]);
 
   // Load queries when Queries tab is opened or subtab changes
   // apiGetQueries returns an array of QueriesThread — flatten all queries from all threads
@@ -451,23 +489,8 @@ function JumpStartContent() {
       Answered: "answered",
       Pending: "pending",
     };
-    const fetchQueries = async () => {
-      setQueriesLoading(true);
-      try {
-        const res = await apiGetQueries(roadmapId, userId, statusMap[queryTab]);
-        const threads: any[] = res.data?.data || res.data || [];
-        const allQueries = Array.isArray(threads)
-          ? threads.flatMap((t: any) => t?.queries || [])
-          : (threads as any)?.queries || [];
-        setQueries(allQueries);
-      } catch {
-        setQueries([]);
-      } finally {
-        setQueriesLoading(false);
-      }
-    };
-    fetchQueries();
-  }, [activeTab, queryTab, roadmapId, userId]);
+    void fetchQueries(statusMap[queryTab], true);
+  }, [activeTab, queryTab, roadmapId, userId, fetchQueries]);
 
   const handleInputChange = (key: string, value: any) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -501,13 +524,7 @@ function JumpStartContent() {
   };
 
   const handleFileUpload = async (key: string, file: File) => {
-    if (!roadmapId || !userId) return;
-    try {
-      setUploadedFiles((prev) => ({ ...prev, [key]: file }));
-      await apiUploadExtrasDocuments(roadmapId, userId, [file], scopedNestedId, key);
-    } catch (err) {
-      console.error("Upload error:", err);
-    }
+    setUploadedFiles((prev) => ({ ...prev, [key]: file }));
   };
 
   const getAssessmentIdFromExtra = (extra: ExtraComponent): string | null => {
@@ -534,8 +551,13 @@ function JumpStartContent() {
   };
 
   const handleSave = async () => {
-    if (!roadmapId || !userId || !roadmap) return;
+    if (!roadmapId || !userId || !roadmap) {
+      setSaveFeedback("Sign in again or open this task from your roadmap.");
+      setTimeout(() => setSaveFeedback(null), 4000);
+      return;
+    }
     setSaving(true);
+    setSaveFeedback(null);
     try {
       await ensureJumpstartTriggered();
       const mergedForm: Record<string, any> = { ...formData };
@@ -568,11 +590,32 @@ function JumpStartContent() {
           setExtrasExist(true);
         }
       }
+      for (const [key, file] of Object.entries(uploadedFiles)) {
+        await apiUploadExtrasDocuments(roadmapId, userId, [file], scopedNestedId, key);
+      }
       await refetchRoadmap();
+      await refetchProgressData();
+      emitProgressUpdated(userId);
+      await fetchComments(false);
+      await fetchQueries(undefined, false);
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+      setSaveFeedback("Progress saved.");
+      setTimeout(() => {
+        setSaveSuccess(false);
+        setSaveFeedback(null);
+        if (parentRoadmapId) {
+          router.push(
+            `/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(parentRoadmapId)}`,
+          );
+        } else {
+          router.push("/pastor/revitalization-roadmap");
+        }
+      }, 1200);
     } catch (err) {
       console.error("Save error:", err);
+      setSaveSuccess(false);
+      setSaveFeedback(axiosMessage(err) || "Could not save progress. Try again.");
+      setTimeout(() => setSaveFeedback(null), 7000);
     } finally {
       setSaving(false);
     }
@@ -593,6 +636,12 @@ function JumpStartContent() {
     const progressErrors: string[] = [];
 
     try {
+      console.log("[Pastor Jumpstart] Mark complete clicked", {
+        userId,
+        roadMapId,
+        nestedRoadmapId,
+        nestedItemId,
+      });
       await ensureJumpstartTriggered();
       // Use progress API as source of completion; nested roadmap PATCH is flaky (400 in prod).
       let progressOk = false;
@@ -605,6 +654,10 @@ function JumpStartContent() {
           completedSteps: totalSteps,
           status: "completed",
         });
+        console.log("[Pastor Jumpstart] progress update response", progressUpdateAxios?.data);
+        if ((progressUpdateAxios as any)?.data?.success === false) {
+          throw new Error(String((progressUpdateAxios as any)?.data?.message || "Progress update failed"));
+        }
         progressOk = true;
       } catch (e1) {
         try {
@@ -614,6 +667,10 @@ function JumpStartContent() {
             nestedRoadmapId,
             completedSteps: totalSteps,
           });
+          console.log("[Pastor Jumpstart] progress update fallback response", progressUpdateAxios?.data);
+          if ((progressUpdateAxios as any)?.data?.success === false) {
+            throw new Error(String((progressUpdateAxios as any)?.data?.message || "Progress update failed"));
+          }
           progressOk = true;
         } catch (e2) {
           console.error("Mark complete — progress:", e1, e2);
@@ -630,9 +687,41 @@ function JumpStartContent() {
         setRoadmap((prev: any) => (prev ? { ...prev, status: "completed" } : prev));
         // Fresh GET /progress (cache-busted) so Revitalization Roadmap + phase lists match mobile.
         await refetchProgressData();
+
+        // Ensure the backend progress read reflects the completion before navigating away.
+        // This avoids "looks completed then reverts" when GET /progress lags behind PATCH.
+        for (let attempt = 0; attempt < 5; attempt++) {
+          try {
+            const res = await apiGetUserProgress(userId);
+            const prog = unwrapProgressData(res);
+            const derived = deriveTaskStatusForList(prog, {
+              parentRoadmapId: roadMapId,
+              taskId: nestedItemId,
+              itemStatus: "completed",
+              endDate: typeof roadmap?.endDate === "string" ? roadmap.endDate : undefined,
+            });
+            if (derived === "Completed") {
+              setProgressData(prog);
+              break;
+            }
+          } catch {
+            // ignore; we'll retry
+          }
+          await sleep(650);
+        }
+
         emitProgressUpdated(userId);
         setCompleteFeedback("Marked as completed.");
-        setTimeout(() => setCompleteFeedback(null), 4000);
+        setTimeout(() => {
+          setCompleteFeedback(null);
+          if (parentRoadmapId) {
+            router.push(
+              `/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(parentRoadmapId)}&completedTaskId=${encodeURIComponent(nestedItemId)}`,
+            );
+          } else {
+            router.push("/pastor/revitalization-roadmap");
+          }
+        }, 900);
       } else if (progressErrors.length > 0) {
         setCompleteFeedback(progressErrors.filter((s, i, a) => s && a.indexOf(s) === i).join(" — "));
         setTimeout(() => setCompleteFeedback(null), 9000);
@@ -651,16 +740,15 @@ function JumpStartContent() {
     try {
       await apiAddQuery(roadmapId, { actualQueryText: newQueryText.trim(), userId });
       setNewQueryText("");
+      setQueryTab("Pending");
       setQuerySuccess(true);
       setTimeout(() => setQuerySuccess(false), 3000);
-      // Refresh pending queries list
-      if (queryTab === "Pending") {
-        const res = await apiGetQueries(roadmapId, userId, "pending");
-        const threads: any[] = res.data?.data || res.data || [];
-        setQueries(Array.isArray(threads) ? threads.flatMap((t: any) => t?.queries || []) : []);
-      }
+      await fetchQueries(undefined, false);
+      await fetchQueries("pending", false);
     } catch (err) {
       console.error("Submit query error:", err);
+      setCompleteFeedback(axiosMessage(err) || "Could not submit query. Try again.");
+      setTimeout(() => setCompleteFeedback(null), 5000);
     } finally {
       setQuerySubmitting(false);
     }
@@ -977,9 +1065,9 @@ function JumpStartContent() {
           {/* LEFT PANEL */}
           <div className="h-fit w-full rounded-xl border border-white/20 bg-white/10 p-4 shadow-md backdrop-blur flex flex-col gap-2">
             {[
-              { key: "overview", label: "Over View" },
-              { key: "comments", label: "Comments" },
-              { key: "queries", label: "Queries" },
+              { key: "overview", label: "Over View", count: 0 },
+              { key: "comments", label: "Comments", count: commentsCount },
+              { key: "queries", label: "Queries", count: queriesCount },
             ].map((item) => (
               <button
                 key={item.key}
@@ -990,7 +1078,18 @@ function JumpStartContent() {
                     : "bg-transparent text-[#d9ebf8] hover:bg-white/15"
                 }`}
               >
-                {item.label}
+                <span>{item.label}</span>
+                {item.count > 0 ? (
+                  <span
+                    className={`rounded-full px-2 py-[1px] text-xs font-semibold ${
+                      activeTab === item.key
+                        ? "bg-[#0f4a76]/15 text-[#0f4a76]"
+                        : "bg-white/15 text-white"
+                    }`}
+                  >
+                    {item.count}
+                  </span>
+                ) : null}
               </button>
             ))}
           </div>
@@ -1039,6 +1138,11 @@ function JumpStartContent() {
                     {saveSuccess && (
                       <span className="inline-flex items-center gap-1 text-emerald-300">
                         <i className="fa-solid fa-circle-check" /> Saved
+                      </span>
+                    )}
+                    {!saveSuccess && saveFeedback && (
+                      <span className="inline-flex items-center gap-1 text-amber-200">
+                        {saveFeedback}
                       </span>
                     )}
                     {completeFeedback && (
@@ -1184,11 +1288,11 @@ function JumpStartContent() {
                         placeholder="Write Your Questions..."
                         value={newQueryText}
                         onChange={(e) => setNewQueryText(e.target.value)}
-                        maxLength={1500}
+                        maxLength={250}
                         className="w-full rounded-md bg-transparent border border-[#7FB6EA] text-white text-sm p-3 focus:outline-none focus:ring-1 focus:ring-[#00B3FF] resize-none h-28 mb-2"
                       />
                       <span className="text-xs text-white/60 absolute bottom-4 right-4">
-                        {newQueryText.length}/1500
+                        ({newQueryText.length} Words)
                       </span>
                     </div>
                     {querySuccess && (

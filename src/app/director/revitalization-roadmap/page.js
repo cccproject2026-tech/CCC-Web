@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import RoadmapCard from "@/app/Components/RoadmapCard";
 import FeaturedAvatars from "@/app/Components/FeaturedAvatars";
@@ -97,28 +97,44 @@ export default function RevitalizationRoadmapPage() {
   const sortPopupRef = useRef(null);
   const filterPopupRef = useRef(null);
 
-  useEffect(() => {
-    const fetchRoadmaps = async () => {
-      try {
-        setLoadingRoadmaps(true);
-        const res = await apiGetRoadmaps();
-        const list = unwrapRoadmapsList(res);
-        const mapped = list.map((item) => ({
-          id: item._id,
-          title: item.name || "Untitled roadmap",
-          description: item.description || item.roadMapDetails || "No description",
-          completionTime: item.duration || "N/A",
-          img: item.imageUrl || Card1,
-        }));
-        setRoadmapLibrary(mapped);
-      } catch (err) {
-        console.error("Error fetching roadmaps:", err);
-      } finally {
-        setLoadingRoadmaps(false);
-      }
-    };
-    fetchRoadmaps();
+  const fetchRoadmaps = useCallback(async () => {
+    try {
+      setLoadingRoadmaps(true);
+      const res = await apiGetRoadmaps();
+      const list = unwrapRoadmapsList(res);
+      const mapped = list.map((item) => ({
+        id: item._id,
+        title: item.name || "Untitled roadmap",
+        description: item.description || item.roadMapDetails || "No description",
+        completionTime: item.duration || "N/A",
+        img: item.imageUrl || Card1,
+        raw: item,
+      }));
+      setRoadmapLibrary(mapped);
+    } catch (err) {
+      console.error("Error fetching roadmaps:", err);
+    } finally {
+      setLoadingRoadmaps(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchRoadmaps();
+  }, [fetchRoadmaps]);
+
+  // When returning to this tab (back navigation / restored state), refetch so newly created roadmaps appear.
+  useEffect(() => {
+    const onFocus = () => fetchRoadmaps();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") fetchRoadmaps();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [fetchRoadmaps]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -157,9 +173,35 @@ export default function RevitalizationRoadmapPage() {
     try {
       await apiDeleteRoadmap(id);
       setRoadmapLibrary((prev) => prev.filter((r) => r.id !== id));
+      router.push("/director/revitalization-roadmap");
     } catch (err) {
       console.error("Error deleting roadmap:", err);
     }
+  };
+
+  const openRoadmapFlow = (row, opts) => {
+    const rm = row?.raw || {};
+    const t = String(rm.type || "").toLowerCase();
+    const isPhase = t === "phase" || t.includes("phase") || Boolean(rm.haveNextedRoadMaps);
+    const roadmapId = row?.id;
+    if (!roadmapId) return;
+
+    if (isPhase) {
+      router.push(`/director/revitalization-roadmap/phase-list?roadmapId=${encodeURIComponent(roadmapId)}`);
+      return;
+    }
+
+    // Mobile parity: edit "single" opens the roadmap-form for the parent roadmap,
+    // which edits/creates the first nested roadmap template.
+    const qp = new URLSearchParams();
+    qp.set("roadmapId", roadmapId);
+    qp.set("type", "single");
+    qp.set("isEditMode", opts?.edit ? "true" : "true");
+    qp.set("name", String(rm.name || row?.title || ""));
+    qp.set("subheading", String(rm.roadMapDetails || rm.description || row?.description || ""));
+    qp.set("completionTime", String(rm.duration || row?.completionTime || ""));
+    qp.set("bannerImage", String(rm.imageUrl || ""));
+    router.push(`/director/revitalization-roadmap/roadmap-form?${qp.toString()}`);
   };
 
   const handleClearFilter = () => {
@@ -266,14 +308,8 @@ export default function RevitalizationRoadmapPage() {
                         title={roadmap.title}
                         description={roadmap.description}
                         completionTime={roadmap.completionTime}
-                        onView={() =>
-                          router.push(`/director/pastor-assignments/roadmap/${roadmap.id}`)
-                        }
-                        onEdit={() =>
-                          router.push(
-                            `/director/pastor-assignments/roadmap/${roadmap.id}?edit=1`
-                          )
-                        }
+                        onView={() => openRoadmapFlow(roadmap, { edit: false })}
+                        onEdit={() => openRoadmapFlow(roadmap, { edit: true })}
                         onDelete={() => handleDeleteRoadmap(roadmap.id)}
                       />
                     ))}

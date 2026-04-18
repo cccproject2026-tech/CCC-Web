@@ -62,6 +62,13 @@ type Row = {
   meeting?: string;
 };
 
+function getAssessmentPrimaryHref(assessmentId: string, status: Row["status"]): string {
+  if (status === "Completed" || status === "Submitted") {
+    return `/pastor/AssessmentEvaluation?assessmentId=${encodeURIComponent(assessmentId)}`;
+  }
+  return `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(assessmentId)}`;
+}
+
 function readSessionUserId(): string | null {
   try {
     const userCookie = getCookie("user");
@@ -106,7 +113,7 @@ export default function PastorAssessments() {
         const progressData = unwrapProgressData(progressRes);
         const assessmentProgress = progressData?.assessments || [];
 
-        const mapped: Row[] = list
+        const mapped = list
           .map((item) => {
             const flat = flattenAssignedAssessmentRow(item);
             if (!flat) return null;
@@ -153,9 +160,9 @@ export default function PastorAssessments() {
               meeting: meetingDate ? new Date(meetingDate).toLocaleDateString() : undefined,
             };
           })
-          .filter((r): r is Row => r != null);
+          .filter((r): r is NonNullable<typeof r> => r != null);
 
-        setAssessments(mapped);
+        setAssessments(mapped as Row[]);
       } catch (error) {
         console.error("Failed to fetch assessments", error);
       } finally {
@@ -332,11 +339,7 @@ export default function PastorAssessments() {
                     <div className="mt-3 flex justify-end">
                       <button
                         type="button"
-                        onClick={() =>
-                          router.push(
-                            `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(item.id)}`,
-                          )
-                        }
+                        onClick={() => router.push(getAssessmentPrimaryHref(item.id, item.status))}
                         className={`${pastorPrimaryCta} px-4 text-xs md:px-5 md:text-sm`}
                       >
                         {item.button}

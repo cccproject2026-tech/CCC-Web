@@ -128,6 +128,6 @@ export interface SectionRecommendationRule {
 
 export interface SendSectionRecommendationsPayload {
   userId: string;
-  assessmentId: string;
   sectionId: string;
+  recommendations: string[];
 }

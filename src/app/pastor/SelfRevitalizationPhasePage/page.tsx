@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { useState, useEffect, Suspense, useCallback } from "react";
+import { useState, useEffect, Suspense, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "@/app/Assets/self-revitalization-hero.png";
@@ -13,19 +13,13 @@ import {
   type RoadmapAssignmentUi,
 } from "@/app/Services/roadmap-assignments";
 import type { ProgressResponse } from "@/app/Services/types/progress.types";
-import { getCookie } from "@/app/utils/cookies";
+import { getPastorUserId } from "@/app/utils/pastor-auth";
 import { subscribeProgressUpdated } from "@/app/utils/progress-sync";
 import { pastorRoadmapDescription } from "@/app/Components/pastor/pastor-theme";
+import { resolveApiMediaUrl, isRemoteImageSrc } from "@/app/utils/image";
 
 function getSessionUserId(): string {
-  const direct = getCookie("userId")?.trim();
-  if (direct) return direct;
-  try {
-    const user = JSON.parse(getCookie("user") || "{}") as { id?: string; _id?: string };
-    return String(user?.id || user?._id || "");
-  } catch {
-    return "";
-  }
+  return getPastorUserId() || "";
 }
 
 function SelfRevitalizationContent() {
@@ -33,12 +27,55 @@ function SelfRevitalizationContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const roadmapId = searchParams.get("id")?.trim() || null;
+  const completedTaskIdParam = searchParams.get("completedTaskId")?.trim() || "";
+  const sessionUserId = getSessionUserId();
 
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [roadmap, setRoadmap] = useState<any>(null);
   const [progressData, setProgressData] = useState<ProgressResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
+
+  const overridesStorageKey = useMemo(() => {
+    const uid = String(sessionUserId || "").trim();
+    const pid = String(roadmapId || "").trim();
+    return uid && pid ? `ccc:phase-completed:${uid}:${pid}` : "";
+  }, [sessionUserId, roadmapId]);
+
+  const readPersistedOverrides = useCallback((): Record<string, string> => {
+    if (typeof window === "undefined") return {};
+    if (!overridesStorageKey) return {};
+    try {
+      const raw = window.localStorage.getItem(overridesStorageKey);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as string[] | Record<string, unknown>;
+      const ids = Array.isArray(parsed)
+        ? parsed
+        : Object.keys(parsed || {});
+      const out: Record<string, string> = {};
+      ids.map(String).map((s) => s.trim()).filter(Boolean).forEach((id) => {
+        out[id] = "Completed";
+      });
+      return out;
+    } catch {
+      return {};
+    }
+  }, [overridesStorageKey]);
+
+  const persistOverrides = useCallback((next: Record<string, string>) => {
+    if (typeof window === "undefined") return;
+    if (!overridesStorageKey) return;
+    try {
+      const ids = Object.entries(next)
+        .filter(([, v]) => v === "Completed")
+        .map(([k]) => k);
+      window.localStorage.setItem(overridesStorageKey, JSON.stringify(ids));
+    } catch {
+      // ignore
+    }
+  }, [overridesStorageKey]);
 
   const normalizeStatus = (status: unknown) =>
     String(status ?? "").trim().toLowerCase().replace(/[_\s]+/g, " ");
@@ -62,6 +99,8 @@ function SelfRevitalizationContent() {
     item: { _id?: string; id?: string; status?: unknown; endDate?: string },
   ): string => {
     const tid = String(item._id ?? item.id ?? "").trim();
+    const ov = tid ? statusOverrides[tid] : undefined;
+    if (ov) return ov;
     if (!roadmapId || !tid) return statusLabel(item.status);
     const derived: RoadmapAssignmentUi["status"] = deriveTaskStatusForList(progressData, {
       parentRoadmapId: roadmapId,
@@ -74,13 +113,19 @@ function SelfRevitalizationContent() {
   };
 
   const loadRoadmapAndProgress = useCallback(async () => {
-    if (!roadmapId) return;
+    if (!roadmapId) {
+      setError("Missing roadmap link. Open this phase from Revitalization Roadmap.");
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
+      setError("");
       const userId = getSessionUserId();
       const rmRes = await apiGetRoadmapById(roadmapId);
       const body = rmRes.data as { data?: unknown };
-      setRoadmap(body?.data ?? rmRes.data);
+      const doc = body?.data ?? rmRes.data;
+      setRoadmap(doc);
       if (userId) {
         try {
           const progRes = await apiGetUserProgress(userId);
@@ -90,9 +135,13 @@ function SelfRevitalizationContent() {
         }
       } else {
         setProgressData(null);
+        setError("User session not found. Please sign in again.");
       }
     } catch (err) {
       console.error("Failed to fetch roadmap", err);
+      setRoadmap(null);
+      setProgressData(null);
+      setError("Could not load this roadmap. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -101,6 +150,12 @@ function SelfRevitalizationContent() {
   useEffect(() => {
     void loadRoadmapAndProgress();
   }, [loadRoadmapAndProgress, pathname]);
+
+  // Hydrate persisted "Completed" overrides for this phase (prevents flip-flopping between tasks).
+  useEffect(() => {
+    if (!overridesStorageKey) return;
+    setStatusOverrides((prev) => ({ ...readPersistedOverrides(), ...prev }));
+  }, [overridesStorageKey, readPersistedOverrides]);
 
   useEffect(() => {
     const onVis = () => {
@@ -116,12 +171,53 @@ function SelfRevitalizationContent() {
     };
   }, [roadmapId, loadRoadmapAndProgress]);
 
+  useEffect(() => {
+    if (!completedTaskIdParam) return;
+    setStatusOverrides((prev) => {
+      const next = { ...prev, [completedTaskIdParam]: "Completed" };
+      persistOverrides(next);
+      return next;
+    });
+  }, [completedTaskIdParam, persistOverrides]);
+
+  // When progress API confirms completion, keep overrides persisted (optional),
+  // but also ensures we re-persist after a refetch.
+  useEffect(() => {
+    if (!overridesStorageKey) return;
+    if (!progressData) return;
+    if (!roadmapId) return;
+    const current = readPersistedOverrides();
+    if (!Object.keys(current).length) return;
+    // If API already confirms completed, leave as-is; we just re-persist to be safe.
+    persistOverrides({ ...current });
+  }, [progressData, overridesStorageKey, roadmapId, readPersistedOverrides, persistOverrides]);
+
   const title = roadmap?.name || "Self Revitalization Phase";
   const phase = roadmap?.phase || "";
+  const subtitle = String(roadmap?.roadMapDetails || roadmap?.description || "").trim();
   const nestedRoadmaps: any[] = roadmap?.roadmaps || [];
+  const divisions = useMemo(() => {
+    const raw = Array.isArray(roadmap?.divisions) ? roadmap.divisions : [];
+    const cleaned = raw.map((d: unknown) => String(d ?? "").trim()).filter(Boolean);
+    return cleaned
+      .filter((d: string, idx: number) => cleaned.findIndex((x: string) => x.toLowerCase() === d.toLowerCase()) === idx)
+      .filter((d: string) => d.toLowerCase() !== "all");
+  }, [roadmap?.divisions]);
+  const filterTabs = useMemo(() => {
+    if (divisions.length > 0) {
+      return ["All", ...divisions, "Due", "Not Started", "Completed"];
+    }
+    return ["All", "Due", "Not Started", "Completed"];
+  }, [divisions]);
 
   const isValidImageUrl = (url: string) =>
     url && (url.startsWith("http://") || url.startsWith("https://"));
+  const phaseBadgeText = useMemo(() => {
+    const raw = String(phase || "").trim();
+    if (!raw) return "";
+    const num = raw.match(/\d+/)?.[0];
+    return num ? `Phase ${num}` : raw;
+  }, [phase]);
 
   const filteredCards = nestedRoadmaps.filter((item) => {
     const q = search.trim().toLowerCase();
@@ -130,10 +226,13 @@ function SelfRevitalizationContent() {
       item.name?.toLowerCase().includes(q) ||
       item.description?.toLowerCase().includes(q) ||
       item.roadMapDetails?.toLowerCase().includes(q);
-    const status = statusLabel(item.status);
+    const mergedStatus = taskStatusFromProgress(item);
+    const itemDivision = String(item.phase || "").trim();
+    const hasDivisionTabs = divisions.length > 0;
     const matchesFilter =
       filter === "All" ||
-      normalizeStatus(status) === normalizeStatus(filter);
+      normalizeStatus(mergedStatus) === normalizeStatus(filter) ||
+      (hasDivisionTabs && normalizeStatus(itemDivision) === normalizeStatus(filter));
     return matchesSearch && matchesFilter;
   });
 
@@ -141,6 +240,33 @@ function SelfRevitalizationContent() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#062946]">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">
+        <PastorHeader showFullHeader={true} />
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+          <p className="max-w-md text-white/80">{error}</p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => void loadRoadmapAndProgress()}
+              className="rounded-md bg-white px-5 py-2 text-sm font-semibold text-[#0f4a76] shadow-sm transition hover:bg-[#e7f1fa]"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/pastor/revitalization-roadmap")}
+              className="rounded-md border border-white/30 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+            >
+              Back
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -161,13 +287,16 @@ function SelfRevitalizationContent() {
             <span className="text-white font-medium">{title}</span>
           </p>
           <div className="flex items-center gap-2">
-            {phase && (
+            {phaseBadgeText && (
               <span className="bg-[#FFD84E] text-[#0B1C58] text-xs font-semibold px-3 py-[3px] rounded-md">
-                {phase}
+                {phaseBadgeText}
               </span>
             )}
             <h1 className="text-3xl font-semibold">{title}</h1>
           </div>
+          {subtitle && (
+            <p className="text-white/80 text-sm mt-1">{subtitle}</p>
+          )}
           {roadmap?.duration && (
             <p className="text-white/70 text-sm mt-1">Completion Time {roadmap.duration}</p>
           )}
@@ -193,7 +322,7 @@ function SelfRevitalizationContent() {
 
             <div className="flex items-center gap-3">
               <div className="flex rounded-xl border border-white/20 bg-white/10 shadow-sm overflow-hidden p-1 backdrop-blur">
-                {["All", "Due", "In-progress", "Not Started", "Completed"].map((tab) => (
+                {filterTabs.map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setFilter(tab)}
@@ -219,7 +348,8 @@ function SelfRevitalizationContent() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {filteredCards.map((item, index) => {
-                const imgSrc = isValidImageUrl(item.imageUrl) ? item.imageUrl : PhaseImg;
+                const resolvedImage = resolveApiMediaUrl(item.imageUrl) || "";
+                const imgSrc = isValidImageUrl(resolvedImage) ? resolvedImage : PhaseImg;
                 const status = taskStatusFromProgress(item);
 
                 return (
@@ -234,6 +364,7 @@ function SelfRevitalizationContent() {
                         alt={item.name}
                         fill
                         className="object-cover rounded-l-2xl"
+                        unoptimized={typeof imgSrc === "string" && (imgSrc.startsWith("blob:") || isRemoteImageSrc(imgSrc))}
                       />
                     </div>
 
@@ -261,6 +392,12 @@ function SelfRevitalizationContent() {
                             {status}
                           </span>
                         </div>
+
+                        {item.phase ? (
+                          <p className="text-[12px] text-[#d9ebf8]">
+                            Division <span className="font-semibold text-white">{item.phase}</span>
+                          </p>
+                        ) : null}
 
                         {item.duration && (
                           <p className="mt-2 text-[12px] text-[#d9ebf8]">

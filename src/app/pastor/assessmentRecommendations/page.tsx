@@ -1,23 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import HeroBg from "../../Assets/progress-bg.png";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { getCookie } from "@/app/utils/cookies";
 import {
   apiGetAssessmentById,
-  apiGetAssignedAssessments,
-  flattenAssignedAssessmentRow,
-  parseAssignedAssessmentsListBody,
   parseAssessmentDetailPayload,
 } from "@/app/Services/assessment.service";
-import { getStoredRecommendationsForPastorAssessment } from "@/app/utils/assessment-recommendations";
-
-type AssessmentRow = {
-  id: string;
-  name: string;
-};
+import { parseRecommendationSectionsForPastorView } from "@/app/utils/assessment-recommendation-view";
+import axiosInstance from "@/app/Services/config/axios-instance";
 
 type SectionRecommendationRow = {
   sectionId: string;
@@ -25,6 +18,40 @@ type SectionRecommendationRow = {
   message: string;
   sentAt?: string;
 };
+
+function collectSentSectionIds(payload: unknown): Set<string> {
+  const sentIds = new Set<string>();
+
+  const walk = (node: unknown) => {
+    if (!node) return;
+    if (Array.isArray(node)) {
+      node.forEach(walk);
+      return;
+    }
+    if (typeof node !== "object") return;
+
+    const row = node as Record<string, unknown>;
+    const id = row.sectionId ?? row._id ?? row.id;
+    const sentRaw = row.sent ?? row.isSent ?? row.status;
+    const isSent =
+      sentRaw === true ||
+      String(sentRaw ?? "")
+        .trim()
+        .toLowerCase() === "sent";
+
+    if (isSent && id != null) {
+      sentIds.add(String(id));
+    }
+
+    if (row.data != null) walk(row.data);
+    if (row.sections != null) walk(row.sections);
+    if (row.recommendations != null) walk(row.recommendations);
+    if (row.layers != null) walk(row.layers);
+  };
+
+  walk(payload);
+  return sentIds;
+}
 
 function readCurrentPastorId(): string {
   const raw = getCookie("user");
@@ -39,59 +66,19 @@ function readCurrentPastorId(): string {
 
 export default function PastorAssessmentRecommendationsPage() {
   const router = useRouter();
-  const [assessments, setAssessments] = useState<AssessmentRow[]>([]);
-  const [selectedAssessmentId, setSelectedAssessmentId] = useState("");
+  const searchParams = useSearchParams();
   const [sectionRecommendations, setSectionRecommendations] = useState<SectionRecommendationRow[]>([]);
   const [assessmentTitle, setAssessmentTitle] = useState("");
-  const [loadingAssessments, setLoadingAssessments] = useState(true);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   const pastorId = useMemo(() => readCurrentPastorId(), []);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadAssessments = async () => {
-      if (!pastorId) {
-        setLoadingAssessments(false);
-        return;
-      }
-      try {
-        setLoadingAssessments(true);
-        const res = await apiGetAssignedAssessments(pastorId);
-        const list = parseAssignedAssessmentsListBody(res.data)
-          .map(flattenAssignedAssessmentRow)
-          .filter((row): row is NonNullable<ReturnType<typeof flattenAssignedAssessmentRow>> => row !== null)
-          .map((row) => ({
-            id: row.assessmentId,
-            name: String(row.assessment.name ?? "Untitled Assessment"),
-          }));
-
-        const uniq = list.filter((item, idx) => list.findIndex((x) => x.id === item.id) === idx);
-
-        if (!active) return;
-        setAssessments(uniq);
-        setSelectedAssessmentId((current) => current || uniq[0]?.id || "");
-      } catch {
-        if (!active) return;
-        setAssessments([]);
-      } finally {
-        if (!active) return;
-        setLoadingAssessments(false);
-      }
-    };
-
-    void loadAssessments();
-    return () => {
-      active = false;
-    };
-  }, [pastorId]);
+  const requestedAssessmentId = (searchParams.get("assessmentId") || "").trim();
 
   useEffect(() => {
     let active = true;
 
     const loadSelectedAssessmentDetails = async () => {
-      if (!pastorId || !selectedAssessmentId) {
+      if (!pastorId || !requestedAssessmentId) {
         setSectionRecommendations([]);
         setAssessmentTitle("");
         return;
@@ -99,24 +86,26 @@ export default function PastorAssessmentRecommendationsPage() {
 
       try {
         setLoadingDetails(true);
-        const detailRes = await apiGetAssessmentById(selectedAssessmentId);
+        const detailRes = await apiGetAssessmentById(requestedAssessmentId);
         const detail = parseAssessmentDetailPayload(detailRes.data);
 
-        const sectionTitleById = new Map<string, string>();
-        (Array.isArray(detail?.sections) ? detail.sections : []).forEach((section, idx) => {
-          sectionTitleById.set(String(section._id || `section_${idx}`), section.name || `Section ${idx + 1}`);
-        });
-
-        const stored = getStoredRecommendationsForPastorAssessment(pastorId, selectedAssessmentId).filter(
-          (entry) => entry.sent,
-        );
-
-        const mapped = stored.map((entry) => ({
-          sectionId: entry.sectionId,
-          sectionTitle: sectionTitleById.get(entry.sectionId) || entry.sectionTitle,
-          message: entry.message,
-          sentAt: entry.sentAt,
-        }));
+        let mapped: SectionRecommendationRow[] = [];
+        try {
+          const recommendationsRes = await axiosInstance.get(
+            `/assessment/${requestedAssessmentId}/recommendations/${pastorId}`,
+          );
+          const sentIds = collectSentSectionIds(recommendationsRes.data);
+          mapped = parseRecommendationSectionsForPastorView(
+            recommendationsRes.data,
+            Array.isArray(detail?.sections) ? detail.sections : [],
+          );
+          mapped = mapped.filter((row) => row.message.trim() !== "");
+          if (sentIds.size > 0) {
+            mapped = mapped.filter((row) => sentIds.has(row.sectionId));
+          }
+        } catch {
+          mapped = [];
+        }
 
         if (!active) return;
         setAssessmentTitle(String(detail?.name || "Assessment"));
@@ -135,7 +124,7 @@ export default function PastorAssessmentRecommendationsPage() {
     return () => {
       active = false;
     };
-  }, [pastorId, selectedAssessmentId]);
+  }, [pastorId, requestedAssessmentId]);
 
   return (
     <div className="flex min-h-screen flex-col bg-[#062946] text-white">
@@ -155,53 +144,27 @@ export default function PastorAssessmentRecommendationsPage() {
       </section>
 
       <main className="flex-1 px-4 py-10 md:px-20">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 lg:col-span-4">
-            <h2 className="mb-4 font-semibold text-[#8ec5eb]">Assessments</h2>
-
-            {loadingAssessments ? (
-              <p className="text-sm text-white/60">Loading assessments...</p>
-            ) : assessments.length === 0 ? (
-              <p className="text-sm text-white/60">No assessments found.</p>
-            ) : (
-              <div className="space-y-2">
-                {assessments.map((assessment) => (
-                  <button
-                    key={assessment.id}
-                    type="button"
-                    onClick={() => setSelectedAssessmentId(assessment.id)}
-                    className={`w-full rounded-lg px-4 py-3 text-left text-sm transition ${
-                      selectedAssessmentId === assessment.id
-                        ? "bg-[#8ec5eb]/25 text-white"
-                        : "bg-white/5 text-white/85 hover:bg-white/10"
-                    }`}
-                  >
-                    {assessment.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 lg:col-span-8">
-            {!selectedAssessmentId ? (
-              <Empty text="Select an assessment to view recommendations." />
-            ) : loadingDetails ? (
+        <div className="mx-auto max-w-6xl rounded-2xl border border-white/10 bg-white/5 p-5">
+          {!requestedAssessmentId ? (
+            <Empty text="Missing assessment id. Please open recommendations from a specific assessment result." />
+          ) : loadingDetails ? (
               <Empty text="Loading recommendations..." />
             ) : (
               <div>
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                   <h2 className="text-xl font-semibold">{assessmentTitle}</h2>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      router.push(`/pastor/SurveyRecommendationDownload?assessmentId=${selectedAssessmentId}`)
-                    }
-                    className="rounded-lg bg-[#8ec5eb]/25 px-4 py-2 text-sm font-semibold hover:bg-[#8ec5eb]/35"
-                  >
-                    <i className="fa-solid fa-download mr-2" />
-                    Download Plans
-                  </button>
+                  {sectionRecommendations.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push(`/pastor/SurveyRecommendationDownload?assessmentId=${requestedAssessmentId}`)
+                      }
+                      className="rounded-lg bg-[#8ec5eb]/25 px-4 py-2 text-sm font-semibold hover:bg-[#8ec5eb]/35"
+                    >
+                      <i className="fa-solid fa-download mr-2" />
+                      Download Plans
+                    </button>
+                  ) : null}
                 </div>
 
                 {sectionRecommendations.length === 0 ? (
@@ -230,7 +193,6 @@ export default function PastorAssessmentRecommendationsPage() {
                 )}
               </div>
             )}
-          </div>
         </div>
       </main>
     </div>

@@ -48,8 +48,11 @@ export type {
 // ─── Roadmap CRUD ─────────────────────────────────────────────────────────────
 
 // GET /roadmaps?status=all&search=
-export const apiGetRoadmaps = (status = 'all', search = '') =>
-  axiosInstance.get(`/roadmaps`, { params: { status, search } });
+export const apiGetRoadmaps = (status = "all", search = "") =>
+  axiosInstance.get(`/roadmaps`, {
+    params: { status, search, _cb: Date.now() },
+    headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+  });
 
 // GET /roadmaps/user/:userId
 export const apiGetRoadmapsByUser = (userId: string) =>
@@ -293,7 +296,7 @@ export const apiUploadExtrasDocuments = (
     headers: { 'Content-Type': 'multipart/form-data' },
     params: {
       userId,
-      ...(nestedRoadMapItemId && { nestedRoadMapItemId }),
+      ...cleanQueryIds(userId, nestedRoadMapItemId),
       ...(name && { name }),
     },
   });
@@ -302,7 +305,7 @@ export const apiUploadExtrasDocuments = (
 // GET /roadmaps/:roadMapId/extras/documents?userId=&nestedRoadMapItemId=
 export const apiGetExtrasDocuments = (roadMapId: string, userId: string, nestedRoadMapItemId?: string) =>
   axiosInstance.get(`/roadmaps/${roadMapId}/extras/documents`, {
-    params: { userId, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
+    params: cleanQueryIds(userId, nestedRoadMapItemId),
   });
 
 // DELETE /roadmaps/:roadMapId/extras/documents?userId=&uploadBatchId=&nestedRoadMapItemId=
@@ -313,7 +316,7 @@ export const apiDeleteExtrasDocumentBatch = (
   nestedRoadMapItemId?: string,
 ) =>
   axiosInstance.delete(`/roadmaps/${roadMapId}/extras/documents`, {
-    params: { userId, uploadBatchId, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
+    params: { ...cleanQueryIds(userId, nestedRoadMapItemId), uploadBatchId },
   });
 
 // DELETE /roadmaps/:roadMapId/extras/documents/file?userId=&uploadBatchId=&fileUrl=&nestedRoadMapItemId=
@@ -325,7 +328,7 @@ export const apiDeleteExtrasDocumentFile = (
   nestedRoadMapItemId?: string,
 ) =>
   axiosInstance.delete(`/roadmaps/${roadMapId}/extras/documents/file`, {
-    params: { userId, uploadBatchId, fileUrl, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
+    params: { ...cleanQueryIds(userId, nestedRoadMapItemId), uploadBatchId, fileUrl },
   });
 
 // ─── Mentoring Sessions ────────────────────────────────────────────────────────

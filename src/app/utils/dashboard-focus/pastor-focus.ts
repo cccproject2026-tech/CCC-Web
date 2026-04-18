@@ -217,6 +217,16 @@ function unwrapQueriesFromThreads(res: { data?: unknown }): RoadmapQuery[] {
   });
 }
 
+function roadmapDetailHref(roadmap: RoadmapDoc | undefined): string {
+  const roadmapId = String(roadmap?._id ?? roadmap?.id ?? "").trim();
+  if (!roadmapId) return "/pastor/revitalization-roadmap";
+  const hasNested = Array.isArray(roadmap?.roadmaps) && roadmap.roadmaps.length > 0;
+  if (hasNested) {
+    return `/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(roadmapId)}`;
+  }
+  return `/pastor/jumpstart?id=${encodeURIComponent(roadmapId)}`;
+}
+
 export type PastorFocusInput = {
   pastorUserId: string;
   appointments: unknown[];
@@ -355,6 +365,8 @@ export async function loadPastorFocusSections(input: PastorFocusInput): Promise<
 
   type FeedbackRow = DashboardFocusItem & { sortKey?: string };
   const mentorFeedbackRows: FeedbackRow[] = feedbackEntries.flatMap((entry) => {
+    const sourceRoadmap = roadmaps.find((r) => String(r._id ?? r.id ?? "") === entry.roadmapId);
+    const feedbackHref = roadmapDetailHref(sourceRoadmap);
     const commentItems: FeedbackRow[] = (entry.comments || [])
       .filter((comment) => isCommentMentorFeedbackForPastor(comment, pastorUserId))
       .map((comment) => {
@@ -370,7 +382,7 @@ export async function loadPastorFocusSections(input: PastorFocusInput): Promise<
           description: String(comment.text ?? ""),
           meta: `${entry.roadmapName} • ${formatDateTime(comment.addedDate)}`,
           sortKey: comment.addedDate,
-          href: `/pastor/roadmap-detail/${encodeURIComponent(entry.roadmapId)}`,
+          href: feedbackHref,
         };
       });
 
@@ -384,7 +396,7 @@ export async function loadPastorFocusSections(input: PastorFocusInput): Promise<
           description: String(query.repliedAnswer || query.actualQueryText || ""),
           meta: `${entry.roadmapName} • ${formatDateTime(query.repliedDate || query.createdDate || query.created_at)}`,
           sortKey: query.repliedDate || query.createdDate || query.created_at,
-          href: `/pastor/roadmap-detail/${encodeURIComponent(entry.roadmapId)}`,
+          href: feedbackHref,
         };
       });
 

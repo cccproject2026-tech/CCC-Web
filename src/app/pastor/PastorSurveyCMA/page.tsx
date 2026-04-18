@@ -15,10 +15,7 @@ import {
 import { apiGetRoadmapsByUser, apiTriggerJumpstartComplete } from "@/app/Services/api";
 import { getCookie } from "@/app/utils/cookies";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
-import {
-  apiCreateAppointment,
-  apiGetMonthlyAvailability,
-} from "@/app/Services/appointments.service";
+import { apiCreateAppointment } from "@/app/Services/appointments.service";
 import axiosInstance from "@/app/Services/config/axios-instance";
 import { isAxiosError } from "axios";
 
@@ -255,6 +252,99 @@ async function fetchMentorRecommendationsPayload(
   return null;
 }
 
+/** Get total days in a month */
+function getDaysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+/** Get first day of month (0 = Sunday, 6 = Saturday) */
+function getFirstDayOfMonth(year: number, month: number): number {
+  return new Date(year, month - 1, 1).getDay();
+}
+
+/** Check if date is in the past */
+function isPastDate(dateStr: string): boolean {
+  const selected = new Date(dateStr);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return selected < today;
+}
+
+/** Check if date has available slots */
+function hasAvailability(dateStr: string, availability: any[]): boolean {
+  return availability.some((slot: any) => {
+    const ymd = slotDateToYmd(slot?.date);
+    if (ymd !== dateStr) return false;
+    return Array.isArray(slot?.slots) && slot.slots.length > 0;
+  });
+}
+
+/** Get available times for a specific date */
+function getTimesForDate(dateStr: string, availability: any[]): string[] {
+  const dateSlot = availability.find((slot: any) => {
+    const ymd = slotDateToYmd(slot?.date);
+    return ymd === dateStr;
+  });
+  
+  if (dateSlot && dateSlot.slots && Array.isArray(dateSlot.slots)) {
+    return dateSlot.slots.map((raw: any) => {
+      const start = `${raw.startTime} ${String(raw.startPeriod ?? "").toLowerCase()}`;
+      const end = `${raw.endTime} ${String(raw.endPeriod ?? "").toLowerCase()}`;
+      return `${start} – ${end}`;
+    });
+  }
+  return [];
+}
+
+/** Backend expects selectedChoice like "1", "2", ... based on option order. */
+function toSelectedChoiceNumber(layer: any, selectedValue: string): string {
+  const raw = String(selectedValue ?? "").trim();
+  if (/^\d+$/.test(raw)) return raw;
+
+  const choices = Array.isArray(layer?.choices) ? layer.choices : [];
+  const idx = choices.findIndex((choice: any) => {
+    const key = String(choice?._id ?? choice?.value ?? choice?.label ?? "").trim();
+    const value = String(choice?.value ?? "").trim();
+    const label = String(choice?.label ?? choice?.text ?? "").trim();
+    return raw === key || raw === value || raw === label;
+  });
+
+  return idx >= 0 ? String(idx + 1) : raw;
+}
+
+/** Parse a time range like `10:30 am – 11:30 am` and return start time in 24h. */
+function parseStartTimeFromRange(range: string): { hour24: number; minute: number } | null {
+  const m = String(range).trim().match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])\b/);
+  if (!m) return null;
+
+  const hour12 = Number(m[1]);
+  const minute = Number(m[2]);
+  const period = m[3].toLowerCase();
+
+  if (!Number.isFinite(hour12) || hour12 < 1 || hour12 > 12) return null;
+  if (!Number.isFinite(minute) || minute < 0 || minute > 59) return null;
+
+  let hour24 = hour12 % 12;
+  if (period === "pm") hour24 += 12;
+  return { hour24, minute };
+}
+
+/** Build ISO timestamp expected by appointments API (UTC string). */
+function buildMeetingDateIso(dateYmd: string, timeRange: string): string | null {
+  const dateMatch = String(dateYmd).trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!dateMatch) return null;
+
+  const parsed = parseStartTimeFromRange(timeRange);
+  if (!parsed) return null;
+
+  const year = Number(dateMatch[1]);
+  const month = Number(dateMatch[2]);
+  const day = Number(dateMatch[3]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+
+  return new Date(Date.UTC(year, month - 1, day, parsed.hour24, parsed.minute, 0, 0)).toISOString();
+}
+
 /** CCC-Mobile: trigger jumpstart POST before assessment submit (non-blocking). */
 async function ensureJumpstartTriggeredForAssessment(userId: string): Promise<void> {
   try {
@@ -313,6 +403,7 @@ function PastorSurveyCMAContent() {
   const [toast, setToast] = useState<string | null>(null);
   /** Mentor Customized Development Plan (CDP) text per layer — from answers doc + GET recommendations. */
   const [mentorLayerCdp, setMentorLayerCdp] = useState<Record<string, string>>({});
+  const hasSentRecommendations = Object.keys(mentorLayerCdp).length > 0;
 
   useEffect(() => {
     if (!assessmentId) {
@@ -426,18 +517,12 @@ function PastorSurveyCMAContent() {
     }
     const fetchAvailability = async () => {
       try {
-        const monthStart = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
         let slots: any[] = [];
-        try {
-          const availRes = await apiGetMonthlyAvailability(selectedMentor, monthStart);
-          slots = unwrapMonthlyAvailabilityPayload(availRes);
-        } catch {
-          const legacy = await axiosInstance.get(`/appointments/availability/${selectedMentor}/month`, {
-            params: { year: currentYear, month: currentMonth },
-          });
-          const raw = legacy.data?.data;
-          slots = Array.isArray(raw) ? raw : [];
-        }
+        const availRes = await axiosInstance.get(`/appointments/availability/${selectedMentor}/month`, {
+          params: { year: currentYear, month: currentMonth },
+        });
+        const raw = availRes.data?.data;
+        slots = Array.isArray(raw) ? raw : [];
         setAvailability(slots);
       } catch (err) {
         console.error("Failed to fetch availability", err);
@@ -551,10 +636,10 @@ function PastorSurveyCMAContent() {
           if (!selectedValue || String(selectedValue).trim() === "") return null;
           return {
             layerId,
-            selectedChoice: String(selectedValue),
+            selectedChoice: toSelectedChoiceNumber(layer, String(selectedValue)),
           };
         })
-        .filter((layer): layer is { layerId: string; selectedChoice: string } => layer != null);
+        .filter((layer: any): layer is { layerId: string; selectedChoice: string } => layer != null);
 
       return { sectionId, layers };
     }).filter((sectionAnswer) => sectionAnswer.sectionId && sectionAnswer.layers.length > 0);
@@ -588,24 +673,15 @@ function PastorSurveyCMAContent() {
     const userCookie = getCookie("user");
     if (!userCookie) return;
 
-    const user = JSON.parse(userCookie);
+    const user = JSON.parse(userCookie) as { id?: string; _id?: string };
 
     try {
-      // Parse the selected time (format: "10:00 AM – 11:00 AM")
-      const timeMatch = selectedTime.match(/^(\d{1,2}):(\d{2})\s+(AM|PM)/);
-      if (!timeMatch) {
+      const meetingDateIso = buildMeetingDateIso(selectedDate, selectedTime);
+      if (!meetingDateIso) {
         setToast("Invalid time format");
         setTimeout(() => setToast(null), 3000);
         return;
       }
-
-      const [, hours, minutes, period] = timeMatch;
-      let hour24 = parseInt(hours);
-      if (period === 'PM' && hour24 !== 12) hour24 += 12;
-      if (period === 'AM' && hour24 === 12) hour24 = 0;
-
-      // Create ISO date string
-      const meetingDate = new Date(`${selectedDate}T${hour24.toString().padStart(2, '0')}:${minutes}:00.000Z`);
 
       const uid = String(user.id || user._id || "");
       if (!uid) return;
@@ -613,16 +689,23 @@ function PastorSurveyCMAContent() {
       const payload = {
         userId: uid,
         mentorId: selectedMentor,
-        meetingDate: meetingDate.toISOString(),
+        meetingDate: meetingDateIso,
         platform: "zoom",
-        notes: "Assessment follow-up meeting",
+        notes: "Initial mentorship session to review progress.",
       };
 
-      await apiCreateAppointment(payload);
+      const createRes = await apiCreateAppointment(payload);
+      const success = (createRes.data as { success?: boolean } | undefined)?.success;
+      if (success === false) {
+        throw new Error("Appointment API returned unsuccessful response");
+      }
+
       setShowFinalPopup(true);
       setTimeout(() => {
         setShowFinalPopup(false);
-        // router.push("/pastor/AssessmentEvaluation");
+        setShowMentorSidebar(false);
+        setShowSchedulePrompt(false);
+        router.push("/pastor/Assessments");
       }, 2500);
     } catch (err) {
       console.error("Failed to schedule appointment", err);
@@ -931,17 +1014,35 @@ function PastorSurveyCMAContent() {
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.92)_100%)]" />
 
-        <div className="relative z-10 max-w-4xl">
-          <h2 className="text-xl font-bold sm:text-2xl md:text-3xl">
-            {assessmentTitle || "Church Assessment Evaluation (CMA)"}
-          </h2>
-          <p className="mt-2 max-w-full text-sm text-[#d9ebf8] sm:max-w-2xl">
-            {mentorReviewMode
-              ? "Read-only review of this pastor’s saved responses."
-              : selfReadOnlyMode
-                ? "Read-only view of your saved responses."
-                : "Complete each section using the options that best reflect your church."}
-          </p>
+        <div className="relative z-10 flex w-full max-w-5xl items-start justify-between gap-4">
+          <div className="max-w-4xl">
+            <h2 className="text-xl font-bold sm:text-2xl md:text-3xl">
+              {assessmentTitle || "Church Assessment Evaluation (CMA)"}
+            </h2>
+            <p className="mt-2 max-w-full text-sm text-[#d9ebf8] sm:max-w-2xl">
+              {mentorReviewMode
+                ? "Read-only review of this pastor’s saved responses."
+                : selfReadOnlyMode
+                  ? "Read-only view of your saved responses."
+                  : "Complete each section using the options that best reflect your church."}
+            </p>
+          </div>
+
+          {selfReadOnlyMode && assessmentId ? (
+            <div className="shrink-0 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(
+                    `/pastor/assessmentRecommendations?assessmentId=${encodeURIComponent(String(assessmentId || ""))}`,
+                  )
+                }
+                className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30 sm:text-sm"
+              >
+                View Customized Development Plan
+              </button>
+            </div>
+          ) : null}
         </div>
       </header>
 
@@ -1019,14 +1120,20 @@ function PastorSurveyCMAContent() {
                       {layer.choices?.map((choice: any, ci: number) => {
                         const choiceKey = String(choice._id ?? choice.value ?? choice.label ?? `c_${ci}`);
                         const choiceLabel = choice.label ?? choice.text ?? String(choice.value ?? "");
+                        const ordinalValue = String(ci + 1);
                         const isChecked =
                           answers[layerId] === choiceKey ||
+                          answers[layerId] === ordinalValue ||
                           (choice.value != null && answers[layerId] === String(choice.value)) ||
                           (choice.label != null && answers[layerId] === String(choice.label));
                         return (
                           <label
                             key={`${layerId}-${choiceKey}-${ci}`}
-                            className={`flex items-start gap-3 rounded-lg border border-transparent px-1 py-0.5 transition hover:border-white/10 hover:bg-white/[0.04] ${uiReadOnly ? "cursor-default" : "cursor-pointer"}`}
+                            className={`flex items-start gap-3 rounded-lg border px-2 py-1 transition ${
+                              isChecked
+                                ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/15 shadow-[0_0_0_1px_rgba(142,197,235,0.2)]"
+                                : "border-transparent hover:border-white/10 hover:bg-white/[0.04]"
+                            } ${uiReadOnly ? "cursor-default" : "cursor-pointer"}`}
                           >
                             <input
                               type="radio"
@@ -1083,13 +1190,30 @@ function PastorSurveyCMAContent() {
 
                 {activeSection === sections.length - 1 ? (
                   uiReadOnly ? (
-                    <button
-                      type="button"
-                      onClick={() => router.back()}
-                      className="rounded-lg bg-white px-6 py-2.5 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa]"
-                    >
-                      Done
-                    </button>
+                    <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-end">
+                      {selfReadOnlyMode && hasSentRecommendations ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              router.push(
+                                `/pastor/assessmentRecommendations?assessmentId=${encodeURIComponent(String(assessmentId || ""))}`,
+                              )
+                            }
+                            className="rounded-lg border border-white/25 bg-white/10 px-6 py-2.5 text-sm font-semibold text-[#cde2f2] transition hover:bg-white/15"
+                          >
+                            View Recommendation
+                          </button>
+                        </>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => router.back()}
+                        className="rounded-lg bg-white px-6 py-2.5 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa]"
+                      >
+                        Done
+                      </button>
+                    </div>
                   ) : (
                     <button
                       type="button"
@@ -1193,48 +1317,138 @@ function PastorSurveyCMAContent() {
                   Schedule a Meeting
                 </h2>
                 {selectedMentor && (
-                  <p className="mb-4 text-sm text-[#cbe6f9]">
+                  <p className="mb-6 text-sm text-[#cbe6f9]">
                     Scheduling meeting with {mentors.find(m => (m._id || m.id) === selectedMentor)?.name || mentors.find(m => (m._id || m.id) === selectedMentor)?.firstName + " " + mentors.find(m => (m._id || m.id) === selectedMentor)?.lastName || "Selected Mentor"}
                   </p>
                 )}
+                
+                {/* Calendar Section */}
                 <div className="mb-6">
-                  <label className="block text-sm mb-2">
-                    Select Available Date
-                  </label>
-                  <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => {
-                      const newDate = e.target.value;
-                      setSelectedDate(newDate);
-                      setSelectedTime("");
-                      const parts = parseYmdParts(newDate);
-                      if (parts && (parts.y !== currentYear || parts.m !== currentMonth)) {
-                        setCurrentYear(parts.y);
-                        setCurrentMonth(parts.m);
-                      }
-                    }}
-                    className="w-full rounded-xl border border-white/20 bg-white/5 p-2 text-white outline-none focus:border-[#8ec5eb]"
-                  />
-                </div>
-                <div className="mb-6">
-                  <label className="block text-sm mb-2">Select Time</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {availableTimes.map((t, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setSelectedTime(t)}
-                        className={`rounded-xl border py-2 text-sm transition ${selectedTime === t ? "border-[#8ec5eb] bg-[#8ec5eb]/20 text-white" : "border-white/20 bg-white/5 text-[#d8ecfa] hover:bg-white/10"}`}
-                      >
-                        {t}
-                      </button>
+                  <label className="block text-sm font-medium mb-3 text-white">Select Date</label>
+                  
+                  {/* Month/Year Navigation */}
+                  <div className="flex items-center justify-between mb-4">
+                    <button
+                      onClick={() => {
+                        if (currentMonth === 1) {
+                          setCurrentMonth(12);
+                          setCurrentYear(currentYear - 1);
+                        } else {
+                          setCurrentMonth(currentMonth - 1);
+                        }
+                      }}
+                      className="p-2 hover:bg-white/10 rounded-lg transition"
+                    >
+                      <i className="fa-solid fa-chevron-left text-[#8ec5eb]"></i>
+                    </button>
+                    <p className="text-sm font-semibold text-white">
+                      {new Date(currentYear, currentMonth - 1).toLocaleDateString('en-US', { month: 'long' })}
+                    </p>
+                    <button
+                      onClick={() => {
+                        if (currentMonth === 12) {
+                          setCurrentMonth(1);
+                          setCurrentYear(currentYear + 1);
+                        } else {
+                          setCurrentMonth(currentMonth + 1);
+                        }
+                      }}
+                      className="p-2 hover:bg-white/10 rounded-lg transition"
+                    >
+                      <i className="fa-solid fa-chevron-right text-[#8ec5eb]"></i>
+                    </button>
+                  </div>
+                  
+                  {/* Day Headers */}
+                  <div className="grid grid-cols-7 gap-1 mb-2">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                      <div key={day} className="text-center text-xs font-semibold text-[#8ec5eb] py-1">
+                        {day}
+                      </div>
                     ))}
                   </div>
-                  {selectedDate && availableTimes.length === 0 && (
-                    <p className="mt-2 text-sm text-[#cbe6f9]">No available times for this date.</p>
+                  
+                  {/* Calendar Grid */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {(() => {
+                      const daysInMonth = getDaysInMonth(currentYear, currentMonth);
+                      const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
+                      const days = [];
+                      
+                      // Empty cells for days before month starts
+                      for (let i = 0; i < firstDay; i++) {
+                        days.push(<div key={`empty-${i}`} className="p-2"></div>);
+                      }
+                      
+                      // Calendar days
+                      for (let day = 1; day <= daysInMonth; day++) {
+                        const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                        const isPast = isPastDate(dateStr);
+                        const isSelected = selectedDate === dateStr;
+                        const hasSlots = hasAvailability(dateStr, availability);
+                        
+                        days.push(
+                          <button
+                            key={day}
+                            onClick={() => {
+                              if (!isPast) {
+                                setSelectedDate(dateStr);
+                                setSelectedTime("");
+                                const times = getTimesForDate(dateStr, availability);
+                                setAvailableTimes(times);
+                              }
+                            }}
+                            disabled={isPast}
+                            className={`relative p-2 rounded-lg text-sm font-medium transition ${
+                              isPast
+                                ? 'cursor-not-allowed text-white/30 bg-white/5'
+                                : isSelected
+                                ? 'bg-[#8ec5eb] text-[#062946] font-semibold shadow-lg shadow-[#8ec5eb]/40'
+                                : hasSlots
+                                ? 'border-2 border-[#8ec5eb] text-white bg-[#8ec5eb]/15 hover:bg-[#8ec5eb]/25 shadow-md shadow-[#8ec5eb]/20 font-semibold'
+                                : 'text-[#cbe6f9] hover:bg-white/10 bg-white/5'
+                            }`}
+                          >
+                            {day}
+                            {hasSlots && !isSelected && (
+                              <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-[#7be495] rounded-full"></div>
+                            )}
+                          </button>
+                        );
+                      }
+                      
+                      return days;
+                    })()}
+                  </div>
+                  
+                  {availability.length === 0 && (
+                    <p className="mt-4 text-xs text-[#cbe6f9] text-center">No availability data for this mentor.</p>
                   )}
                 </div>
-                <div className="flex justify-between">
+                
+                {/* Time Selection */}
+                {selectedDate && (
+                  <div className="mb-6 p-3 rounded-xl border border-white/15 bg-white/5">
+                    <label className="block text-sm font-medium mb-3 text-white">Select Time</label>
+                    {availableTimes.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        {availableTimes.map((t, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setSelectedTime(t)}
+                            className={`rounded-lg border py-2 px-2 text-xs transition ${selectedTime === t ? "border-[#8ec5eb] bg-[#8ec5eb]/20 text-white font-medium" : "border-white/20 bg-white/5 text-[#d8ecfa] hover:bg-white/10"}`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-[#cbe6f9]">No available times for this date. Please select another date.</p>
+                    )}
+                  </div>
+                )}
+                
+                <div className="flex justify-between gap-3">
                   <button
                     onClick={() => {
                       setMentorStep(1);
@@ -1242,16 +1456,16 @@ function PastorSurveyCMAContent() {
                       setSelectedTime("");
                       setAvailableTimes([]);
                     }}
-                    className="rounded-xl border border-white/30 px-5 py-2 text-[#d8ecfa] transition hover:bg-white/10"
+                    className="flex-1 rounded-xl border border-white/30 px-5 py-2 text-[#d8ecfa] transition hover:bg-white/10"
                   >
                     Back
                   </button>
                   <button
                     onClick={handleFinalSchedule}
                     disabled={!selectedDate || !selectedTime}
-                    className={`rounded-xl px-6 py-2 text-sm font-semibold ${selectedDate && selectedTime ? "bg-[#8ec5eb] text-[#062946] hover:bg-[#a9d5f2]" : "cursor-not-allowed bg-white/20 text-white/60"}`}
+                    className={`flex-1 rounded-xl px-6 py-2 text-sm font-semibold transition ${selectedDate && selectedTime ? "bg-[#8ec5eb] text-[#062946] hover:bg-[#a9d5f2]" : "cursor-not-allowed bg-white/20 text-white/60"}`}
                   >
-                    Schedule
+                    Schedule Meeting
                   </button>
                 </div>
               </>
