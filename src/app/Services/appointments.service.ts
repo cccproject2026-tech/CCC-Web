@@ -7,6 +7,7 @@ import type {
   RescheduleAppointmentPayload,
   AvailabilityPayload,
   GetAppointmentsParams,
+  TranscriptSummaryResponseDto,
 } from "./types/appointments.types";
 
 // GET /appointments/upcoming?userId=&mentorId=&status=&futureOnly=
@@ -88,12 +89,16 @@ export const apiGetMonthlyAvailability = (mentorId: string, date: string) =>
 
 // ─── Transcript Summary ─────────────────────────────────────────────────────────
 
-// GET /appointments/:appointmentId/transcript-summary
+// GET /appointments/pastor/:appointmentId/transcript-summary
 export const apiGetTranscriptSummary = (appointmentId: string) =>
-  axiosInstance.get(`/appointments/${appointmentId}/transcript-summary`);
+  axiosInstance.get<{ success: boolean; message: string; data: TranscriptSummaryResponseDto }>(
+    `/appointments/pastor/${appointmentId}/transcript-summary`
+  );
 
-// POST /appointments/:appointmentId/transcript-summary (generate/refresh)
+// POST /appointments/pastor/:appointmentId/transcript-summary (generate/refresh)
 export const apiGenerateTranscriptSummary = (appointmentId: string, refresh: boolean = false) =>
-  axiosInstance.post(`/appointments/${appointmentId}/transcript-summary`, null, {
-    params: { refresh: refresh ? 'true' : 'false' }
-  });
+  axiosInstance.post<{ success: boolean; message: string; data: TranscriptSummaryResponseDto }>(
+    `/appointments/pastor/${appointmentId}/transcript-summary`,
+    null,
+    { params: { refresh: refresh ? 'true' : 'false' } }
+  );

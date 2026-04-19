@@ -94,6 +94,26 @@ export interface GetAppointmentsParams {
   futureOnly?: boolean;
 }
 
+// ─── Transcript Summary ─────────────────────────────────────────────────────────
+
+export interface TranscriptSummaryDto {
+  sessionOverview: string;
+  keyDiscussionPoints: string[];
+  mentorGuidance: string[];
+  actionItems: string[];
+  followUp: string;
+}
+
+export interface TranscriptSummaryResponseDto {
+  appointmentId: string;
+  transcript?: string;
+  transcriptSavedAt?: Date;
+  summary: TranscriptSummaryDto;
+  generatedAt: Date;
+  model: string;
+  cached: boolean;
+}
+
 // ─── Legacy alias ─────────────────────────────────────────────────────────────
 /** @deprecated use AppointmentResponse */
 export type Appointment = AppointmentResponse;
