@@ -5,7 +5,9 @@ import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { getCookie } from "@/app/utils/cookies";
+import axiosInstance from "@/app/Services/config/axios-instance";
 import DirectorHero from "../DirectorHero";
+import AvailabilityCalendar from "@/app/Components/AvailabilityCalendar";
 import {
   directorBtnPrimary,
   directorBtnSecondary,
@@ -120,6 +122,14 @@ function DirectorScheduleContent() {
   const [reschedulePlatform, setReschedulePlatform] = useState("zoom");
   const [isRescheduling, setIsRescheduling] = useState(false);
 
+  // reschedule calendar state (for mentor availability)
+  const [rescheduleMonth, setRescheduleMonth] = useState(new Date().getMonth());
+  const [rescheduleYear, setRescheduleYear] = useState(new Date().getFullYear());
+  const [rescheduleSelectedDate, setRescheduleSelectedDate] = useState(new Date().getDate());
+  const [rescheduleMonthlyAvailabilitySlots, setRescheduleMonthlyAvailabilitySlots] = useState<any[]>([]);
+  const [rescheduleAvailabilityLoading, setRescheduleAvailabilityLoading] = useState(false);
+  const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState("");
+
   // calendar (Appointments tab)
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedAppointmentDate, setSelectedAppointmentDate] = useState(() => new Date().toISOString().split("T")[0]);
@@ -145,6 +155,13 @@ function DirectorScheduleContent() {
   const [selectedPlatform, setSelectedPlatform] = useState("zoom");
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [isScheduling, setIsScheduling] = useState(false);
+
+  // schedule drawer calendar state
+  const [scheduleMonth, setScheduleMonth] = useState(new Date().getMonth());
+  const [scheduleYear, setScheduleYear] = useState(new Date().getFullYear());
+  const [scheduleSelectedDate, setScheduleSelectedDate] = useState(new Date().getDate());
+  const [scheduleMonthlyAvailabilitySlots, setScheduleMonthlyAvailabilitySlots] = useState<any[]>([]);
+  const [scheduleAvailabilityLoading, setScheduleAvailabilityLoading] = useState(false);
 
   // mentor today-availability preview (Schedule drawer)
   const [mentorTodaySlots, setMentorTodaySlots] = useState<string[] | null>(null);
@@ -326,6 +343,71 @@ function DirectorScheduleContent() {
     }
   }, [meetingDate, scheduleRecipientType, selectedRecipient, appointments]);
 
+  // ── Schedule drawer calendar navigation handlers ──────────────────────────────
+  const handleSchedulePrevMonth = () => {
+    if (scheduleMonth === 0) {
+      setScheduleMonth(11);
+      setScheduleYear(scheduleYear - 1);
+    } else {
+      setScheduleMonth(scheduleMonth - 1);
+    }
+  };
+
+  const handleScheduleNextMonth = () => {
+    if (scheduleMonth === 11) {
+      setScheduleMonth(0);
+      setScheduleYear(scheduleYear + 1);
+    } else {
+      setScheduleMonth(scheduleMonth + 1);
+    }
+  };
+
+  // ── Fetch mentor availability for schedule calendar ──────────────────────────
+  useEffect(() => {
+    if (drawerStep !== 2 || scheduleRecipientType !== "mentor" || !selectedRecipient) {
+      setScheduleMonthlyAvailabilitySlots([]);
+      setScheduleAvailabilityLoading(false);
+      return;
+    }
+
+    const mentorId = String(selectedRecipient._id || selectedRecipient.id || "").trim();
+    if (!mentorId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setScheduleAvailabilityLoading(true);
+        // Use year/month parameters format
+        const res = await axiosInstance.get(`/appointments/availability/${mentorId}/month`, {
+          params: {
+            year: scheduleYear,
+            month: scheduleMonth + 1,
+          },
+        });
+        const raw = res.data?.data ?? res.data;
+        const slots = Array.isArray(raw) ? raw : [];
+
+        if (!cancelled) {
+          setScheduleMonthlyAvailabilitySlots(slots);
+          // Convert schedule calendar date to YYYY-MM-DD format and update meetingDate
+          const selectedDateStr = `${scheduleYear}-${String(scheduleMonth + 1).padStart(2, "0")}-${String(scheduleSelectedDate).padStart(2, "0")}`;
+          setMeetingDate(selectedDateStr);
+        }
+        setScheduleAvailabilityLoading(false);
+      } catch (error) {
+        console.error("Error fetching schedule availability:", error);
+        if (!cancelled) {
+          setScheduleMonthlyAvailabilitySlots([]);
+          setScheduleAvailabilityLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [drawerStep, scheduleRecipientType, selectedRecipient, scheduleYear, scheduleMonth, scheduleSelectedDate]);
+
   // ── Fetch selected mentor's availability for today ────────────────────────────
   useEffect(() => {
     if (scheduleRecipientType !== "mentor" || !selectedRecipient) {
@@ -405,6 +487,39 @@ function DirectorScheduleContent() {
   useEffect(() => {
     setHistoryPage((prev) => Math.min(prev, totalHistoryPages));
   }, [totalHistoryPages]);
+
+  // ── Fetch availability for reschedule calendar (mentor only) ───────────────────
+  useEffect(() => {
+    if (!isRescheduleModalOpen || !rescheduleTarget) return;
+
+    // Only fetch for mentors, not for pastors
+    const isMentorRecipient = rescheduleTarget.user?.id && rescheduleTarget.user.id !== directorId;
+    if (!isMentorRecipient) return;
+
+    const mentorId = rescheduleTarget.mentor?.id;
+    if (!mentorId) return;
+
+    const fetchAvailability = async () => {
+      setRescheduleAvailabilityLoading(true);
+      try {
+        const response = await axiosInstance.get(
+          `/appointments/availability/${mentorId}/month`,
+          { params: { year: rescheduleYear, month: rescheduleMonth + 1 } }
+        );
+        if (response.data?.data) {
+          const slots = response.data.data;
+          setRescheduleMonthlyAvailabilitySlots(slots);
+        }
+      } catch (e) {
+        console.error("Failed to fetch reschedule availability:", e);
+        setRescheduleMonthlyAvailabilitySlots([]);
+      } finally {
+        setRescheduleAvailabilityLoading(false);
+      }
+    };
+
+    fetchAvailability();
+  }, [isRescheduleModalOpen, rescheduleTarget, rescheduleYear, rescheduleMonth, directorId]);
 
   // ── Availability helpers ───────────────────────────────────────────────────────
   const resolveAvailabilityRowDate = (d: any): string => {
@@ -522,21 +637,66 @@ function DirectorScheduleContent() {
     setRescheduleDateTime(toLocalDateTimeInput(appt.meetingDate));
     setReschedulePlatform(String(appt.platform || "zoom").toLowerCase());
     setShowMenu(null);
+    // Reset reschedule calendar states
+    const today = new Date();
+    setRescheduleMonth(today.getMonth());
+    setRescheduleYear(today.getFullYear());
+    setRescheduleSelectedDate(today.getDate());
+    setRescheduleSelectedSlot("");
+    setRescheduleMonthlyAvailabilitySlots([]);
     setIsRescheduleModalOpen(true);
+  };
+
+  // ── Reschedule calendar navigation ───────────────────────────────────────────
+  const handleReschedulePrevMonth = () => {
+    if (rescheduleMonth === 0) {
+      setRescheduleMonth(11);
+      setRescheduleYear(rescheduleYear - 1);
+    } else {
+      setRescheduleMonth(rescheduleMonth - 1);
+    }
+  };
+
+  const handleRescheduleNextMonth = () => {
+    if (rescheduleMonth === 11) {
+      setRescheduleMonth(0);
+      setRescheduleYear(rescheduleYear + 1);
+    } else {
+      setRescheduleMonth(rescheduleMonth + 1);
+    }
   };
 
   const handleRescheduleAppointment = async () => {
     const appt = rescheduleTarget;
     const id = appt ? appointmentEntityId(appt) : "";
-    if (!id || !rescheduleDateTime) {
-      showToast("Please select date and time");
-      return;
+    if (!id) return;
+
+    // Determine if recipient is a mentor
+    const isMentorRecipient = appt?.user?.id && appt.user.id !== directorId;
+
+    // Validate based on recipient type
+    if (isMentorRecipient) {
+      if (!rescheduleSelectedSlot) {
+        showToast("Please select an available time slot");
+        return;
+      }
+    } else {
+      if (!rescheduleDateTime) {
+        showToast("Please select date and time");
+        return;
+      }
     }
+
     if (isRescheduling) return;
     setIsRescheduling(true);
+
     try {
+      const meetingDate = isMentorRecipient
+        ? rescheduleSelectedSlot
+        : new Date(rescheduleDateTime).toISOString();
+
       await apiRescheduleAppointment(id, {
-        meetingDate: new Date(rescheduleDateTime).toISOString(),
+        meetingDate,
         platform: reschedulePlatform as any,
       });
       const refresh = await apiGetAppointments({ futureOnly: false, status: "scheduled" });
@@ -1301,7 +1461,7 @@ function DirectorScheduleContent() {
             {/* Step 2: Pick date / slot / platform */}
             {drawerStep === 2 && (
               <div className="flex h-full flex-col p-6">
-                <div className="mb-6 flex items-center justify-between">
+                <div className="mb-6 flex items-center justify-between shrink-0">
                   <h2 className="flex items-center gap-2 text-lg font-semibold">
                     <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
                     Schedule a meeting
@@ -1316,74 +1476,94 @@ function DirectorScheduleContent() {
                   </button>
                 </div>
 
-                {selectedRecipient && (
-                  <div className="mb-4 flex items-center gap-3 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => setDrawerStep(1)}
-                      className="text-[#8ec5eb] hover:text-white"
-                      aria-label="Back"
-                    >
-                      <i className="fa-solid fa-arrow-left" />
-                    </button>
-                    <Image
-                      src={selectedRecipient.profilePicture || UserProfile}
-                      alt=""
-                      width={32}
-                      height={32}
-                      className="rounded-full border border-white/20"
-                    />
-                    <span className="text-sm font-medium text-white">
-                      {selectedRecipient.firstName} {selectedRecipient.lastName}
-                    </span>
-                    <span className="ml-auto rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] capitalize text-[#cde2f2]">
-                      {scheduleRecipientType}
-                    </span>
-                  </div>
-                )}
+                <div className="flex-1 overflow-y-auto pr-3 mb-6">
+                  {selectedRecipient && (
+                    <div className="mb-4 flex items-center gap-3 rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3">
+                      <button
+                        type="button"
+                        onClick={() => setDrawerStep(1)}
+                        className="text-[#8ec5eb] hover:text-white"
+                        aria-label="Back"
+                      >
+                        <i className="fa-solid fa-arrow-left" />
+                      </button>
+                      <Image
+                        src={selectedRecipient.profilePicture || UserProfile}
+                        alt=""
+                        width={32}
+                        height={32}
+                        className="rounded-full border border-white/20"
+                      />
+                      <span className="text-sm font-medium text-white">
+                        {selectedRecipient.firstName} {selectedRecipient.lastName}
+                      </span>
+                      <span className="ml-auto rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] capitalize text-[#cde2f2]">
+                        {scheduleRecipientType}
+                      </span>
+                    </div>
+                  )}
 
-                <div className="mb-5 rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-4 text-center">
-                  <p className="mb-2 text-sm text-[#cde2f2]">Select date</p>
-                  <input
-                    type="date"
-                    value={meetingDate}
-                    min={new Date().toISOString().split("T")[0]}
-                    onChange={(e) => { setMeetingDate(e.target.value); setSelectedSlot(""); }}
-                    className={directorDateInput}
-                  />
-                </div>
-
-                {meetingDate && (
-                  <div className="mb-5">
-                    <p className="mb-2 text-sm text-[#cde2f2]">Available time slots</p>
-                    {availableSlots.length === 0 ? (
-                      <p className="text-sm text-white/50">No slots available for selected date.</p>
+                  <div className="mb-5 rounded-xl border border-white/15 bg-white/5 p-4">
+                    {scheduleRecipientType === "mentor" ? (
+                      <>
+                        <p className="mb-3 text-sm text-[#cde2f2]">Mentor Availability</p>
+                        <AvailabilityCalendar
+                          mentorId={String(selectedRecipient?._id || selectedRecipient?.id || "")}
+                          currentMonth={scheduleMonth}
+                          currentYear={scheduleYear}
+                          selectedDate={scheduleSelectedDate}
+                          onDateSelect={setScheduleSelectedDate}
+                          onPrevMonth={handleSchedulePrevMonth}
+                          onNextMonth={handleScheduleNextMonth}
+                          availabilitySlots={scheduleMonthlyAvailabilitySlots}
+                          isLoading={scheduleAvailabilityLoading}
+                        />
+                      </>
                     ) : (
-                      <div className="grid grid-cols-2 gap-2">
-                        {availableSlots.map((label) => (
-                          <button
-                            key={label}
-                            type="button"
-                            onClick={() => setSelectedSlot(label)}
-                            className={`rounded-lg border px-3 py-2 text-sm transition ${
-                              selectedSlot === label
-                                ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20 text-white"
-                                : "border-white/15 bg-white/5 text-[#d9ebf8] hover:bg-white/10"
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
+                      <>
+                        <p className="mb-2 text-sm text-[#cde2f2]">Select date</p>
+                        <input
+                          type="date"
+                          value={meetingDate}
+                          min={new Date().toISOString().split("T")[0]}
+                          onChange={(e) => { setMeetingDate(e.target.value); setSelectedSlot(""); }}
+                          className={directorDateInput}
+                        />
+                      </>
                     )}
                   </div>
-                )}
 
-                <div className="mb-6">
-                  <p className="mb-2 text-sm text-[#cde2f2]">Meeting platform</p>
-                  <select
-                    value={selectedPlatform}
-                    onChange={(e) => setSelectedPlatform(e.target.value)}
+                  {meetingDate && (
+                    <div className="mb-5">
+                      <p className="mb-2 text-sm text-[#cde2f2]">Available time slots</p>
+                      {availableSlots.length === 0 ? (
+                        <p className="text-sm text-white/50">No slots available for selected date.</p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          {availableSlots.map((label) => (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={() => setSelectedSlot(label)}
+                              className={`rounded-lg border px-3 py-2 text-sm transition ${
+                                selectedSlot === label
+                                  ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20 text-white"
+                                  : "border-white/15 bg-white/5 text-[#d9ebf8] hover:bg-white/10"
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="mb-6">
+                    <p className="mb-2 text-sm text-[#cde2f2]">Meeting platform</p>
+                    <select
+                      value={selectedPlatform}
+                      onChange={(e) => setSelectedPlatform(e.target.value)}
                     className={directorSelectDark}
                   >
                     <option value="zoom">Zoom</option>
@@ -1392,8 +1572,9 @@ function DirectorScheduleContent() {
                     <option value="phone">Phone</option>
                   </select>
                 </div>
+                </div>
 
-                <div className="mt-auto flex justify-end gap-3 border-t border-white/10 pt-6">
+                <div className="flex justify-end gap-3 border-t border-white/10 pt-6 shrink-0">
                   <button type="button" onClick={() => setIsDrawerOpen(false)} className={directorBtnSecondary}>Cancel</button>
                   <button
                     type="button"
@@ -1418,40 +1599,138 @@ function DirectorScheduleContent() {
       )}
 
       {/* ── Reschedule Modal ── */}
-      {isRescheduleModalOpen && (
+      {isRescheduleModalOpen && rescheduleTarget && (
         <>
           <div
             className="fixed inset-0 z-[70] bg-black/45 backdrop-blur-[2px]"
             onClick={() => { if (!isRescheduling) setIsRescheduleModalOpen(false); }}
             aria-hidden
           />
-          <div className="fixed left-1/2 top-1/2 z-[71] w-[92vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/20 bg-[#041f35] p-5 text-white shadow-2xl">
-            <h3 className="mb-4 text-base font-semibold">Reschedule meeting</h3>
-            <div className="mb-4">
-              <label className="mb-1 block text-xs text-[#cde2f2]">Date and time</label>
-              <input
-                type="datetime-local"
-                value={rescheduleDateTime}
-                min={toLocalDateTimeInput(new Date().toISOString())}
-                onChange={(e) => setRescheduleDateTime(e.target.value)}
-                className={directorDateInput}
-              />
+          <div className="fixed left-1/2 top-1/2 z-[71] w-[92vw] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/20 bg-[#041f35] p-5 text-white shadow-2xl max-h-[85vh] flex flex-col">
+            <h3 className="mb-4 text-base font-semibold shrink-0">Reschedule meeting</h3>
+            <div className="flex-1 overflow-y-auto pr-3 mb-4">
+              {/* Check if recipient is a mentor */}
+              {rescheduleTarget.user?.id && rescheduleTarget.user.id !== directorId ? (
+                // ── Mentor: Show availability calendar ──
+                <>
+                  <div className="mb-4">
+                    <label className="block text-xs text-[#cde2f2] font-semibold mb-3">
+                      Select available time
+                    </label>
+                    
+                    {/* Month navigation */}
+                    <div className="flex items-center justify-between mb-4">
+                      <button
+                        onClick={handleReschedulePrevMonth}
+                        className="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 transition"
+                      >
+                        ← Prev
+                      </button>
+                      <span className="text-sm font-semibold">
+                        {new Date(rescheduleYear, rescheduleMonth).toLocaleDateString("en", {
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <button
+                        onClick={handleRescheduleNextMonth}
+                        className="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 transition"
+                      >
+                        Next →
+                      </button>
+                    </div>
+
+                    {/* Calendar */}
+                    {rescheduleAvailabilityLoading ? (
+                      <div className="flex justify-center py-8">
+                        <div className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-r-white" />
+                      </div>
+                    ) : (
+                      <AvailabilityCalendar
+                        mentorId={rescheduleTarget.mentor?.id || ""}
+                        currentMonth={rescheduleMonth}
+                        currentYear={rescheduleYear}
+                        selectedDate={rescheduleSelectedDate}
+                        onDateSelect={setRescheduleSelectedDate}
+                        onPrevMonth={handleReschedulePrevMonth}
+                        onNextMonth={handleRescheduleNextMonth}
+                        availabilitySlots={rescheduleMonthlyAvailabilitySlots}
+                        isLoading={rescheduleAvailabilityLoading}
+                      />
+                    )}
+
+                    {/* Time slots for selected date */}
+                    {rescheduleMonthlyAvailabilitySlots.length > 0 && (
+                      <div className="mt-4">
+                        <label className="block text-xs text-[#cde2f2] font-semibold mb-2">
+                          Available times
+                        </label>
+                        <div className="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto">
+                          {rescheduleMonthlyAvailabilitySlots
+                            .filter((slot) => {
+                              const slotDate = new Date(slot.date).getDate();
+                              return slotDate === rescheduleSelectedDate;
+                            })
+                            .flatMap((slot) =>
+                              (slot.times || []).map((time) => ({
+                                date: slot.date,
+                                time,
+                                iso: new Date(`${slot.date}T${time}`).toISOString(),
+                              }))
+                            )
+                            .map((item, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => setRescheduleSelectedSlot(item.iso)}
+                                className={`px-3 py-2 rounded text-xs font-medium transition ${
+                                  rescheduleSelectedSlot === item.iso
+                                    ? "bg-blue-600 text-white"
+                                    : "bg-white/10 hover:bg-white/20 text-white"
+                                }`}
+                              >
+                                {item.time}
+                              </button>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                // ── Pastor/Default: Show simple datetime input ──
+                <>
+                  <div className="mb-4">
+                    <label className="mb-1 block text-xs text-[#cde2f2]">Date and time</label>
+                    <input
+                      type="datetime-local"
+                      value={rescheduleDateTime}
+                      min={toLocalDateTimeInput(new Date().toISOString())}
+                      onChange={(e) => setRescheduleDateTime(e.target.value)}
+                      className={directorDateInput}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Platform selector (always visible) */}
+              <div className="mb-6">
+                <label className="mb-1 block text-xs text-[#cde2f2]">Platform</label>
+                <select
+                  value={reschedulePlatform}
+                  onChange={(e) => setReschedulePlatform(e.target.value)}
+                  className={directorSelectDark}
+                >
+                  <option value="zoom">Zoom</option>
+                  <option value="google-meet">Google Meet</option>
+                  <option value="teams">Microsoft Teams</option>
+                  <option value="phone">Phone</option>
+                  <option value="in-person">In person</option>
+                </select>
+              </div>
             </div>
-            <div className="mb-6">
-              <label className="mb-1 block text-xs text-[#cde2f2]">Platform</label>
-              <select
-                value={reschedulePlatform}
-                onChange={(e) => setReschedulePlatform(e.target.value)}
-                className={directorSelectDark}
-              >
-                <option value="zoom">Zoom</option>
-                <option value="google-meet">Google Meet</option>
-                <option value="teams">Microsoft Teams</option>
-                <option value="phone">Phone</option>
-                <option value="in-person">In person</option>
-              </select>
-            </div>
-            <div className="flex justify-end gap-3">
+
+            {/* Action buttons (fixed at bottom) */}
+            <div className="flex justify-end gap-3 shrink-0 border-t border-white/10 pt-4">
               <button
                 type="button"
                 className={directorBtnSecondary}
