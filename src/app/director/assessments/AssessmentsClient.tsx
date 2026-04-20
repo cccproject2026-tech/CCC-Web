@@ -406,29 +406,44 @@ function AssessmentsPageContent() {
             search: searchQuery || undefined,
           });
 
-        if (assignUserFromQuery) {
-          try {
-            const progRes = await apiGetUserProgress(assignUserFromQuery);
-            const pr = unwrapProgressData(progRes);
-            const rows = pr?.assessments ?? [];
-            const allowed = new Set<string>();
-            for (const row of rows) {
-              const aid = (row as { assessmentId?: string }).assessmentId;
-              if (aid != null && String(aid).trim() !== "") {
-                allowed.add(String(aid).trim());
+          const parsed = parseAssessmentsListPayload(res.data);
+          const mapped = Array.isArray(parsed)
+            ? parsed.map((a: any) => {
+              const raw = (a as any)?.bannerImage;
+              const resolved = (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
+              return {
+                ...(a as any),
+                id: String((a as any)._id ?? (a as any).id),
+                image: resolved,
+                title: String((a as any).name ?? (a as any).title ?? "Untitled"),
+              };
+            })
+            : [];
+
+          if (assignUserFromQuery) {
+            try {
+              const progRes = await apiGetUserProgress(assignUserFromQuery);
+              const pr = unwrapProgressData(progRes);
+              const rows = pr?.assessments ?? [];
+              const allowed = new Set<string>();
+              for (const row of rows) {
+                const aid = (row as { assessmentId?: string }).assessmentId;
+                if (aid != null && String(aid).trim() !== "") {
+                  allowed.add(String(aid).trim());
+                }
               }
-            }
-            if (allowed.size === 0) {
+              if (allowed.size === 0) {
+                setAssessments([]);
+              } else {
+                setAssessments(mapped.filter((a) => allowed.has(String(a.id))));
+              }
+            } catch (e) {
+              console.error("Failed to load pastor assessment assignments", e);
               setAssessments([]);
-            } else {
-              setAssessments(mapped.filter((a) => allowed.has(String(a.id))));
             }
-          } catch (e) {
-            console.error("Failed to load pastor assessment assignments", e);
-            setAssessments([]);
+          } else {
+            setAssessments(mapped);
           }
-        } else {
-          setAssessments(mapped);
         }
       } catch (error) {
         console.error("Failed to fetch assessments", error);
