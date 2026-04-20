@@ -406,32 +406,6 @@ function AssessmentsPageContent() {
             search: searchQuery || undefined,
           });
 
-<<<<<<< HEAD
-          const body = res?.data;
-          const list = parseAssessmentsListPayload(body);
-          const mapped: any[] = [];
-          for (const item of list) {
-            const rawItem = item as unknown as Record<string, unknown>;
-            const rawId = rawItem._id ?? rawItem.id;
-            const id = rawId != null && String(rawId).trim() !== "" ? String(rawId) : "";
-            if (!id) continue;
-
-            const raw = rawItem.bannerImage;
-            const resolved =
-              (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
-            const titleRaw =
-              (typeof rawItem.name === "string" && rawItem.name.trim() ? rawItem.name : null) ??
-              (typeof rawItem.title === "string" && rawItem.title.trim() ? rawItem.title : null);
-            mapped.push({
-              id,
-              title: titleRaw ?? "Untitled",
-              description: typeof rawItem.description === "string" ? rawItem.description : "",
-              image: resolved,
-              type: rawItem.type,
-            });
-          }
-
-=======
         if (assignUserFromQuery) {
           try {
             const progRes = await apiGetUserProgress(assignUserFromQuery);
@@ -454,7 +428,6 @@ function AssessmentsPageContent() {
             setAssessments([]);
           }
         } else {
->>>>>>> cc779df53bcb54d69adc88025b99826ea6e5d5a6
           setAssessments(mapped);
         }
       } catch (error) {
@@ -467,71 +440,7 @@ function AssessmentsPageContent() {
     };
 
     fetchAssessments();
-<<<<<<< HEAD
-  }, [searchQuery, selectedMenteeId]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchFeaturedPastors = async () => {
-      try {
-        setFeaturedLoading(true);
-        const res = await apiGetAllUsers({
-          role: "pastor",
-          roleMatch: "mixed",
-          page: avatarPage,
-          limit: AVATAR_PAGE_SIZE,
-        });
-
-        const inner = res?.data?.data as unknown;
-        let listUsers: unknown[] = [];
-        let totalPages = 1;
-        if (inner && typeof inner === "object") {
-          const o = inner as unknown as Record<string, unknown>;
-          if (Array.isArray(o.users)) listUsers = o.users;
-          else if (Array.isArray(o.rows)) listUsers = o.rows;
-
-          const tp = Number(o.totalPages);
-          const total = Number(o.total);
-          if (Number.isFinite(tp) && tp > 0) {
-            totalPages = Math.max(1, Math.floor(tp));
-          } else if (Number.isFinite(total) && total > 0) {
-            totalPages = Math.max(1, Math.ceil(total / AVATAR_PAGE_SIZE));
-          }
-        }
-
-        const mapped: FeaturedAvatarItem[] = (listUsers as any[])
-          .map((u: any, idx: number) => ({
-            id: String(u?._id ?? u?.id ?? idx),
-            name: `${u?.firstName || ""} ${u?.lastName || ""}`.trim() || "Pastor",
-            img: u?.profilePicture || Mentor1,
-          }))
-          .filter((x) => String(x.id).trim() !== "");
-
-        if (!cancelled) {
-          setFeaturedItems(mapped);
-          setAvatarTotalPages(totalPages);
-        }
-      } catch (err) {
-        console.error("Failed to fetch featured pastors", err);
-        if (!cancelled) {
-          setFeaturedItems([]);
-          setAvatarTotalPages(1);
-        }
-      } finally {
-        if (!cancelled) setFeaturedLoading(false);
-      }
-    };
-
-    fetchFeaturedPastors();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [avatarPage]);
-=======
   }, [searchQuery, assignUserFromQuery]);
->>>>>>> cc779df53bcb54d69adc88025b99826ea6e5d5a6
 
   useEffect(() => {
     if (!assignUserFromQuery) return;
