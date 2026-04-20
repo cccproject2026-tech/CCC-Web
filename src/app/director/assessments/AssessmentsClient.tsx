@@ -32,10 +32,10 @@ import {
 } from "@/app/Services/assessment.service";
 import { apiGetAllUsers } from "@/app/Services/users.service";
 import { apiAssignAssessment, apiGetUserProgress } from "@/app/Services/progress.service";
+import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { emitPastorAssignmentsChanged } from "@/app/utils/progress-sync";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 import FeaturedAvatars, { FeaturedAvatarItem } from "@/app/Components/FeaturedAvatars";
-import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { getStoredRecommendationsForPastorAssessment, upsertStoredRecommendation } from "@/app/utils/assessment-recommendations";
 
 function getApiErrorMessage(err: unknown, fallback: string): string {
@@ -396,16 +396,17 @@ function AssessmentsPageContent() {
           const filteredAssigned = !q
             ? assigned
             : assigned.filter((a: any) => {
-                const title = String(a?.title || "").toLowerCase();
-                const desc = String(a?.description || "").toLowerCase();
-                return title.includes(q) || desc.includes(q);
-              });
+              const title = String(a?.title || "").toLowerCase();
+              const desc = String(a?.description || "").toLowerCase();
+              return title.includes(q) || desc.includes(q);
+            });
           setAssessments(filteredAssigned);
         } else {
           const res = await apiGetAssessments({
             search: searchQuery || undefined,
           });
 
+<<<<<<< HEAD
           const body = res?.data;
           const list = parseAssessmentsListPayload(body);
           const mapped: any[] = [];
@@ -430,6 +431,30 @@ function AssessmentsPageContent() {
             });
           }
 
+=======
+        if (assignUserFromQuery) {
+          try {
+            const progRes = await apiGetUserProgress(assignUserFromQuery);
+            const pr = unwrapProgressData(progRes);
+            const rows = pr?.assessments ?? [];
+            const allowed = new Set<string>();
+            for (const row of rows) {
+              const aid = (row as { assessmentId?: string }).assessmentId;
+              if (aid != null && String(aid).trim() !== "") {
+                allowed.add(String(aid).trim());
+              }
+            }
+            if (allowed.size === 0) {
+              setAssessments([]);
+            } else {
+              setAssessments(mapped.filter((a) => allowed.has(String(a.id))));
+            }
+          } catch (e) {
+            console.error("Failed to load pastor assessment assignments", e);
+            setAssessments([]);
+          }
+        } else {
+>>>>>>> cc779df53bcb54d69adc88025b99826ea6e5d5a6
           setAssessments(mapped);
         }
       } catch (error) {
@@ -442,6 +467,7 @@ function AssessmentsPageContent() {
     };
 
     fetchAssessments();
+<<<<<<< HEAD
   }, [searchQuery, selectedMenteeId]);
 
   useEffect(() => {
@@ -503,6 +529,9 @@ function AssessmentsPageContent() {
       cancelled = true;
     };
   }, [avatarPage]);
+=======
+  }, [searchQuery, assignUserFromQuery]);
+>>>>>>> cc779df53bcb54d69adc88025b99826ea6e5d5a6
 
   useEffect(() => {
     if (!assignUserFromQuery) return;
@@ -790,7 +819,11 @@ function AssessmentsPageContent() {
     <div className={directorPageRoot}>
       <DirectorHero
         title="Assessments"
-        subtitle="Create, edit, and assign assessments to pastors."
+        subtitle={
+          assignUserFromQuery
+            ? "Assessments assigned to this pastor."
+            : "Create, edit, and assign assessments to pastors."
+        }
         image={AssessmentBg}
         breadcrumbItems={[
           { label: "Home", href: "/director/home" },
@@ -948,9 +981,8 @@ function AssessmentsPageContent() {
               {filteredAssessments.map((assessment) => (
                 <div
                   key={assessment.id}
-                  className={`relative ${directorListCardRadius} border border-white/10 transition-all ${directorGlassCard} ${
-                    selectedAssessments.includes(assessment.id) ? "ring-2 ring-[#8ec5eb]/60" : ""
-                  }`}
+                  className={`relative ${directorListCardRadius} border border-white/10 transition-all ${directorGlassCard} ${selectedAssessments.includes(assessment.id) ? "ring-2 ring-[#8ec5eb]/60" : ""
+                    }`}
                 >
                   {isSelectionMode && (
                     <div className="absolute left-4 top-4 z-10">
@@ -1099,9 +1131,15 @@ function AssessmentsPageContent() {
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/10">
                 <i className="fa-regular fa-folder-open text-2xl text-[#8ec5eb]" />
               </div>
-              <p className="text-lg font-semibold text-white">No assessments found</p>
+              <p className="text-lg font-semibold text-white">
+                {assignUserFromQuery
+                  ? "No assessments assigned to this pastor."
+                  : "No assessments found"}
+              </p>
               <p className="mt-2 text-sm text-white/60">
-                Try another search or create an assessment with Add.
+                {assignUserFromQuery
+                  ? "Assign assessments from the full list when needed."
+                  : "Try another search or create an assessment with Add."}
               </p>
             </div>
           )}

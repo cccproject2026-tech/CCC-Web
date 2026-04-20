@@ -1,11 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import DirectorHero from "../../DirectorHero";
 import {
+  directorBtnPrimary,
+  directorBtnSecondary,
   directorGlassCard,
   directorInputClass,
+  directorLabelClass,
   directorPageContainer,
   directorPageRoot,
   directorSpinner,
@@ -40,6 +43,173 @@ function safeString(v: unknown): string {
   return typeof v === "string" ? v : v == null ? "" : String(v);
 }
 
+function safeDecodeURIComponent(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
+function formatRoadmapPreviewDate(iso?: string): string {
+  if (!iso?.trim()) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function fieldBlockTitle(f: any): string {
+  switch (f.type) {
+    case "upload":
+      return f.buttonLabel?.trim() ? String(f.buttonLabel) : "Upload Strategy";
+    case "datepicker":
+      return f.label?.trim() ? String(f.label) : "Follow up Event Date";
+    case "text":
+      return f.label?.trim() ? String(f.label) : "Text Field";
+    case "textarea":
+      return f.label?.trim() ? String(f.label) : "Description";
+    case "assessment":
+      return typeof f.selectedAssessment === "object"
+        ? f.selectedAssessment?.name || "Assessment"
+        : f.selectedAssessment || "Assessment";
+    case "checkbox_item":
+      return f.name?.trim() ? String(f.name) : "Check Box";
+    case "text_display":
+      return "Text Display";
+    case "digital_signature":
+      return f.fieldName?.trim() ? String(f.fieldName) : "Digital Signature";
+    case "section":
+      return f.name?.trim() ? String(f.name) : "Section";
+    default:
+      return "Field";
+  }
+}
+
+function fieldBlockIcon(type: string): string {
+  switch (type) {
+    case "upload":
+      return "fa-solid fa-cloud-arrow-up";
+    case "datepicker":
+      return "fa-regular fa-calendar";
+    case "assessment":
+      return "fa-solid fa-clipboard-check";
+    case "section":
+      return "fa-solid fa-layer-group";
+    default:
+      return "fa-solid fa-pen-to-square";
+  }
+}
+
+const fieldSectionEditBtn =
+  "inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-[12px] font-semibold text-[#1F2A6E] shadow-sm transition hover:bg-white/90";
+const fieldSectionRemoveBtn =
+  "inline-flex items-center gap-1.5 rounded-lg border border-white/40 bg-transparent px-3 py-2 text-[12px] font-semibold text-white transition hover:bg-white/10";
+
+function RoadmapFieldPreview({ f }: { f: Record<string, any> }) {
+  switch (f.type) {
+    case "upload":
+      return (
+        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-white/35 bg-white/[0.04] px-6 py-12 text-center">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-white/25 bg-white/10">
+            <span className="text-2xl font-light leading-none text-[#8ec5eb]">+</span>
+          </div>
+          <p className="text-sm font-medium text-white/90">
+            Drag & Drop or Click here to choose file
+          </p>
+          <p className="mt-1 text-xs text-white/50">Max file size : 10 MB</p>
+        </div>
+      );
+    case "datepicker":
+      return (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3 rounded-lg border border-white/20 bg-white/10 px-4 py-3">
+            <i className="fa-regular fa-calendar text-lg text-[#8ec5eb]" />
+            <span className="text-[15px] text-white">
+              {formatRoadmapPreviewDate(f.date)}
+            </span>
+          </div>
+          <div className="space-y-2 pl-0.5">
+            <label className="flex cursor-default items-center gap-2.5 text-sm text-white/90">
+              <input
+                type="checkbox"
+                checked={!!f.allowPastorSelect}
+                readOnly
+                tabIndex={-1}
+                className="h-4 w-4 accent-[#8ec5eb]"
+              />
+              Allow Pastor to Select Date
+            </label>
+            <label className="flex cursor-default items-center gap-2.5 text-sm text-white/90">
+              <input
+                type="checkbox"
+                checked={!!f.showOnCard}
+                readOnly
+                tabIndex={-1}
+                className="h-4 w-4 accent-[#8ec5eb]"
+              />
+              Show on Card
+            </label>
+          </div>
+        </div>
+      );
+    case "text":
+      return (
+        <div className="rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-[15px] text-white/90">
+          {f.label || "—"}
+        </div>
+      );
+    case "textarea":
+      return (
+        <div className="min-h-[100px] whitespace-pre-wrap rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-[14px] leading-relaxed text-white/85">
+          {f.placeholder || f.label || "—"}
+        </div>
+      );
+    case "assessment": {
+      const nm =
+        typeof f.selectedAssessment === "object"
+          ? f.selectedAssessment?.name
+          : f.selectedAssessment;
+      return (
+        <div className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-[15px] text-white/90">
+          <i className="fa-solid fa-clipboard-check text-[#8ec5eb]" />
+          <span>{nm || "—"}</span>
+        </div>
+      );
+    }
+    case "checkbox_item":
+      return (
+        <label className="flex cursor-default items-center gap-2.5 text-sm text-white/90">
+          <input type="checkbox" readOnly className="h-4 w-4 accent-[#8ec5eb]" />
+          {f.name || "—"}
+        </label>
+      );
+    case "text_display":
+      return (
+        <div className="whitespace-pre-wrap rounded-lg border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/80">
+          {f.name || "—"}
+        </div>
+      );
+    case "digital_signature":
+      return (
+        <div className="rounded-lg border border-dashed border-white/30 bg-white/[0.04] px-4 py-8 text-center text-sm text-white/55">
+          {f.fieldName || "Signature"} — {f.placeholderText || "Sign here"}
+        </div>
+      );
+    case "section":
+      return (
+        <p className="text-sm text-white/55">
+          Section container — add nested fields with &quot;+ Nested field&quot;.
+        </p>
+      );
+    default:
+      return null;
+  }
+}
+
 export default function DirectorRoadmapFormPage() {
   const router = useRouter();
   const sp = useSearchParams();
@@ -48,6 +218,8 @@ export default function DirectorRoadmapFormPage() {
   const nestedRoadmapId = sp.get("nestedRoadmapId")?.trim() || "";
   const roadmapType = (sp.get("type") as "single" | "phase" | null) || "single";
   const isEditMode = sp.get("isEditMode") === "true";
+  /** Phase list “View” — read-only task template; requires isEditMode so nested data loads from API. */
+  const viewOnly = isEditMode && sp.get("viewOnly") === "true";
 
   const roadmapData = useMemo(
     () => ({
@@ -73,7 +245,22 @@ export default function DirectorRoadmapFormPage() {
   const [assessments, setAssessments] = useState<Array<{ id: string; name: string }>>([]);
 
   const [submitting, setSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState<string | null>(null);
+  /** Shown as fixed bottom toast; then navigate to library (replacing immediate `router.push` which hid the message). */
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+  const saveNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const goToRoadmapLibrary = useCallback(() => {
+    router.push("/director/revitalization-roadmap");
+  }, [router]);
+
+  const dismissSaveToast = useCallback(() => {
+    if (saveNavTimerRef.current) {
+      clearTimeout(saveNavTimerRef.current);
+      saveNavTimerRef.current = null;
+    }
+    setSaveToast(null);
+    goToRoadmapLibrary();
+  }, [goToRoadmapLibrary]);
 
   const [fieldModalOpen, setFieldModalOpen] = useState(false);
   const [fieldParentSectionId, setFieldParentSectionId] = useState<string | null>(null);
@@ -90,6 +277,15 @@ export default function DirectorRoadmapFormPage() {
     | "digital_signature"
   >("text");
   const [fieldDraft, setFieldDraft] = useState<Record<string, any>>({});
+
+  const heroTitle = useMemo(() => {
+    if (!isEditMode) return "Roadmap";
+    return safeDecodeURIComponent(roadmapData.name.trim()) || "Roadmap";
+  }, [isEditMode, roadmapData.name]);
+
+  const heroImageSrc = !isEditMode
+    ? bannerPreview || null
+    : bannerPreview || (roadmapData.bannerImage?.trim() ? roadmapData.bannerImage : null);
 
   // Mobile parity: transform extras <-> fields (subset of mobile renderers)
   const transformExtrasToFields = (extras: any[]): any[] => {
@@ -363,6 +559,16 @@ export default function DirectorRoadmapFormPage() {
         if (cancelled) return;
         setParent(doc);
 
+        /** New task / template: start with empty fields; ignore URL and nested row copy. */
+        if (!isEditMode) {
+          setChurchVerbiage("");
+          setDescriptionVerbiage("");
+          setCustomFields([]);
+          setBannerPreview(null);
+          setBannerFile(null);
+          return;
+        }
+
         // Mobile parity: editing uses extras from selected nested roadmap (phase uses nestedRoadmapId, single uses [0])
         const selectedNested =
           roadmapType === "phase" && nestedRoadmapId
@@ -374,8 +580,7 @@ export default function DirectorRoadmapFormPage() {
         setDescriptionVerbiage(safeString((nested as any)?.description || ""));
         setCustomFields(transformExtrasToFields(((nested as any)?.extras || []) as any[]));
 
-        // Mobile parity for banner: mobile passes local uri; web can pass blob: URL.
-        // Prefer param bannerImage; fall back to nested.imageUrl.
+        // Mobile parity for banner: prefer param bannerImage; fall back to nested.imageUrl.
         const img = roadmapData.bannerImage || safeString((nested as any)?.imageUrl || "");
         if (img) {
           setBannerPreview(img);
@@ -406,14 +611,30 @@ export default function DirectorRoadmapFormPage() {
     return () => {
       cancelled = true;
     };
-  }, [roadmapId, roadmapType, nestedRoadmapId, roadmapData.bannerImage]);
+  }, [roadmapId, roadmapType, nestedRoadmapId, roadmapData.bannerImage, isEditMode]);
+
+  useEffect(() => {
+    if (!saveToast) return;
+    saveNavTimerRef.current = window.setTimeout(() => {
+      saveNavTimerRef.current = null;
+      setSaveToast(null);
+      goToRoadmapLibrary();
+    }, 5000);
+    return () => {
+      if (saveNavTimerRef.current) {
+        clearTimeout(saveNavTimerRef.current);
+        saveNavTimerRef.current = null;
+      }
+    };
+  }, [saveToast, goToRoadmapLibrary]);
 
   const handleSubmit = async () => {
-    setFeedback(null);
+    if (viewOnly) return;
+    setSaveToast(null);
     setError(null);
 
     if (!churchVerbiage.trim() || !descriptionVerbiage.trim()) {
-      setError("Please fill in Church Roadmap Verbiage and Description Verbiage.");
+      setError("Please fill in Roadmap Verbiage and Description.");
       return;
     }
 
@@ -437,8 +658,12 @@ export default function DirectorRoadmapFormPage() {
 
       // Payload common to nested template item
       const nestedPayloadBase: Partial<NestedRoadMapItem> & { description?: string } = {
-        name: roadmapData.name || safeString(parent.name) || "Roadmap",
-        roadMapDetails: roadmapData.subheading || "",
+        name:
+          (roadmapData.name || "").trim() ||
+          churchVerbiage.trim() ||
+          safeString(parent.name) ||
+          "Roadmap",
+        roadMapDetails: churchVerbiage.trim() || roadmapData.subheading || "",
         description: descriptionVerbiage,
         duration: safeDuration,
         ...(bannerPreview && !bannerFile && bannerPreview.startsWith("http") ? { imageUrl: bannerPreview } : {}),
@@ -451,8 +676,7 @@ export default function DirectorRoadmapFormPage() {
       if (roadmapType === "single") {
         if (!hasNested && !isEditMode) {
           await apiAddNestedRoadmapItem(roadmapId, nestedPayloadBase as any, bannerFile ?? undefined);
-          setFeedback("Roadmap created successfully.");
-          router.push("/director/revitalization-roadmap");
+          setSaveToast("Roadmap created successfully.");
           return;
         }
         const existing = parent.roadmaps?.[0];
@@ -471,8 +695,7 @@ export default function DirectorRoadmapFormPage() {
             ...(Array.isArray(parent.divisions) ? { divisions: parent.divisions } : {}),
           } as any);
         }
-        setFeedback("Roadmap updated successfully.");
-        router.push("/director/revitalization-roadmap");
+        setSaveToast("Roadmap updated successfully.");
         return;
       }
 
@@ -480,8 +703,7 @@ export default function DirectorRoadmapFormPage() {
       if (roadmapType === "phase") {
         if (!isEditMode) {
           await apiAddNestedRoadmapItem(roadmapId, nestedPayloadBase as any, bannerFile ?? undefined);
-          setFeedback("Phase created successfully.");
-          router.push("/director/revitalization-roadmap");
+          setSaveToast("Phase created successfully.");
           return;
         }
         const updatedRoadmaps =
@@ -504,8 +726,7 @@ export default function DirectorRoadmapFormPage() {
             ...(Array.isArray(parent.divisions) ? { divisions: parent.divisions } : {}),
           } as any);
         }
-        setFeedback("Phase updated successfully.");
-        router.push("/director/revitalization-roadmap");
+        setSaveToast("Phase updated successfully.");
         return;
       }
     } catch (e: any) {
@@ -516,18 +737,20 @@ export default function DirectorRoadmapFormPage() {
     }
   };
 
+  const breadcrumbItems = [
+    { label: "Home", href: "/director/home" },
+    { label: "Revitalization Roadmap", href: "/director/revitalization-roadmap" },
+    { label: viewOnly ? "View tasks" : isEditMode ? "Edit roadmap" : "Roadmap form" },
+  ];
+
   if (loading) {
     return (
       <div className={directorPageRoot}>
         <DirectorHero
-          title={isEditMode ? "Edit roadmap" : "Create roadmap"}
+          title={heroTitle}
           subtitle="Loading…"
-          image={null as any}
-          breadcrumbItems={[
-            { label: "Home", href: "/director/home" },
-            { label: "Revitalization Roadmap", href: "/director/revitalization-roadmap" },
-            { label: "Roadmap form" },
-          ]}
+          image={heroImageSrc || null}
+          breadcrumbItems={breadcrumbItems}
         />
         <main className="flex flex-1 items-center justify-center px-4 pb-24">
           <div className={directorSpinner} />
@@ -539,248 +762,206 @@ export default function DirectorRoadmapFormPage() {
   return (
     <div className={directorPageRoot}>
       <DirectorHero
-        title={isEditMode ? "Edit roadmap" : "Create roadmap"}
-        subtitle="Mobile parity: verbiage + extras saved onto nested roadmap templates"
-        image={null as any}
-        breadcrumbItems={[
-          { label: "Home", href: "/director/home" },
-          { label: "Revitalization Roadmap", href: "/director/revitalization-roadmap" },
-          { label: "Roadmap form" },
-        ]}
+        title={heroTitle}
+        subtitle={
+          isEditMode && roadmapData.completionTime
+            ? `${roadmapData.completionTime} · ${roadmapType === "phase" ? "Phase" : "Single roadmap"}${viewOnly ? " · View only" : ""}`
+            : viewOnly
+              ? "View only"
+              : undefined
+        }
+        image={heroImageSrc || null}
+        breadcrumbItems={breadcrumbItems}
       />
 
-      <main className="flex-1 pb-12">
-        <div className={`${directorPageContainer} max-w-4xl`}>
-          {error ? (
-            <div className={`${directorGlassCard} mb-6 p-4 text-sm text-red-200`}>{error}</div>
-          ) : null}
-          {feedback ? (
-            <div className={`${directorGlassCard} mb-6 p-4 text-sm text-emerald-200`}>{feedback}</div>
-          ) : null}
-
-          <div className={`${directorGlassCard} p-6`}>
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => router.back()}
-                className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
-              >
-                <i className="fa-solid fa-arrow-left text-xs" /> Back
-              </button>
-              <div className="text-xs text-white/60">
-                {roadmapType === "phase" ? "Phase task template" : "Single roadmap template"}
-              </div>
-            </div>
-
-            <div className="space-y-5">
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-white/70">
-                  Banner image (optional)
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] || null;
-                    if (!f) return;
-                    setBannerFile(f);
-                    setBannerPreview(URL.createObjectURL(f));
-                  }}
-                  className="text-sm text-white/80 file:mr-3 file:rounded-lg file:border-0 file:bg-[#8ec5eb]/20 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white hover:file:bg-[#8ec5eb]/30"
-                />
-                {bannerPreview ? (
-                  <p className="mt-2 text-xs text-white/60">Selected: {bannerFile?.name || "image"}</p>
-                ) : null}
+      <main className="flex-1 pb-12 pt-2">
+        <div className={`${directorPageContainer} px-4`}>
+          <div className="mx-auto max-w-3xl">
+            {error ? (
+              <div className={`${directorGlassCard} mb-6 p-4 text-sm text-red-200`}>{error}</div>
+            ) : null}
+            <div className={`${directorGlassCard} p-6 sm:p-8`}>
+              <div className="mb-8 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => router.back()}
+                  className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+                >
+                  <i className="fa-solid fa-arrow-left mr-2 text-xs" /> Back
+                </button>
               </div>
 
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-white/70">
-                  Church Roadmap Verbiage <span className="text-red-300">*</span>
-                </label>
-                <textarea
-                  value={churchVerbiage}
-                  onChange={(e) => setChurchVerbiage(e.target.value)}
-                  rows={4}
-                  className={`${directorInputClass} min-h-[120px] resize-y`}
-                  placeholder="Enter verbiage"
-                />
-              </div>
+              <div className="space-y-8">
+                <div>
+                  <label className={directorLabelClass}>
+                    Roadmap Verbiage {!viewOnly ? <span className="text-red-300">*</span> : null}
+                  </label>
+                  <input
+                    type="text"
+                    value={churchVerbiage}
+                    readOnly={viewOnly}
+                    onChange={(e) => setChurchVerbiage(e.target.value)}
+                    className={`${directorInputClass} ${viewOnly ? "cursor-default opacity-95" : ""}`}
+                    placeholder="e.g. Attend a Jump-start Session in your area"
+                  />
+                </div>
 
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-white/70">
-                  Description Verbiage <span className="text-red-300">*</span>
-                </label>
-                <textarea
-                  value={descriptionVerbiage}
-                  onChange={(e) => setDescriptionVerbiage(e.target.value)}
-                  rows={4}
-                  className={`${directorInputClass} min-h-[120px] resize-y`}
-                  placeholder="Enter description verbiage"
-                />
-              </div>
+                <div>
+                  <label className={directorLabelClass}>
+                    Description {!viewOnly ? <span className="text-red-300">*</span> : null}
+                  </label>
+                  <textarea
+                    value={descriptionVerbiage}
+                    readOnly={viewOnly}
+                    onChange={(e) => setDescriptionVerbiage(e.target.value)}
+                    rows={8}
+                    className={`${directorInputClass} min-h-[180px] resize-y ${viewOnly ? "cursor-default opacity-95" : ""}`}
+                    placeholder="Numbered or free-form description for this step…"
+                  />
+                </div>
 
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-white/70">
-                  Tasks & Custom Fields
-                </label>
-                <p className="mb-2 text-xs text-white/50">
-                  This saves to the roadmap template’s <span className="text-white/80 font-semibold">extras</span>{" "}
-                  array (same API field as mobile).
-                </p>
-                <div className="rounded-xl border border-white/15 bg-white/5 p-4">
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      ["text", "Text Field"],
-                      ["textarea", "Text Area"],
-                      ["upload", "Upload"],
-                      ["datepicker", "Date Picker"],
-                      ["assessment", "Assessment"],
-                      ["checkbox_item", "Check Box"],
-                      ["text_display", "Text Display"],
-                      ["digital_signature", "Digital Signature"],
-                      ["section", "Section"],
-                    ].map(([k, label]) => (
-                      <button
-                        key={k}
-                        type="button"
-                        onClick={() => openFieldModal(k)}
-                        className="rounded-full border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/15"
-                      >
-                        + {label}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="mt-4 space-y-3">
-                    {customFields.filter((f) => !f.parentSectionId).length === 0 ? (
-                      <p className="text-sm text-white/60">No fields yet. Add one above.</p>
-                    ) : (
-                      customFields
-                        .filter((f) => !f.parentSectionId)
-                        .map((f) => {
-                          const nested = customFields.filter((nf) => nf.parentSectionId === f.id);
-                          return (
-                            <div key={f.id} className="rounded-lg border border-white/15 bg-white/5 p-4">
-                              <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="text-sm font-semibold text-white">
-                                    {f.type === "text" ? "Text Field" :
-                                     f.type === "textarea" ? "Text Area" :
-                                     f.type === "upload" ? "Upload" :
-                                     f.type === "datepicker" ? "Date Picker" :
-                                     f.type === "assessment" ? "Assessment" :
-                                     f.type === "checkbox_item" ? "Check Box" :
-                                     f.type === "text_display" ? "Text Display" :
-                                     f.type === "digital_signature" ? "Digital Signature" :
-                                     f.type === "section" ? "Section" : f.type}
-                                  </p>
-                                  <p className="mt-1 text-xs text-white/65 break-words">
-                                    {f.type === "text" || f.type === "textarea"
-                                      ? (f.label || "—")
-                                      : f.type === "upload"
-                                        ? (f.buttonLabel || "—")
-                                        : f.type === "datepicker"
-                                          ? (f.label || "—")
-                                          : f.type === "assessment"
-                                            ? (f.selectedAssessment || "—")
-                                            : f.type === "checkbox_item"
-                                              ? (f.name || "—")
-                                              : f.type === "text_display"
-                                                ? (f.name || "—")
-                                                : f.type === "digital_signature"
-                                                  ? (f.fieldName || "—")
-                                                  : f.type === "section"
-                                                    ? (f.name || "—")
-                                                    : "—"}
-                                  </p>
-                                  {f.type === "section" ? (
-                                    <p className="mt-2 text-xs text-white/55">
-                                      Nested fields: {nested.length}
-                                    </p>
-                                  ) : null}
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                  {f.type === "section" ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => openFieldModal("text", { parentSectionId: f.id })}
-                                      className="rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15"
-                                    >
-                                      + Nested
-                                    </button>
-                                  ) : null}
+                <div className="space-y-4">
+                  {customFields
+                    .filter((f) => !f.parentSectionId)
+                    .map((f) => {
+                      const nested = customFields.filter((nf) => nf.parentSectionId === f.id);
+                      return (
+                        <div key={f.id} className={`${directorGlassCard} p-5 sm:p-6`}>
+                          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <i
+                                className={`${fieldBlockIcon(f.type)} shrink-0 text-lg text-[#8ec5eb]`}
+                                aria-hidden
+                              />
+                              <h3 className="truncate text-[15px] font-semibold text-white">
+                                {fieldBlockTitle(f)}
+                              </h3>
+                            </div>
+                            {!viewOnly ? (
+                              <div className="flex flex-wrap gap-2">
+                                {f.type === "section" ? (
                                   <button
                                     type="button"
-                                    onClick={() => openFieldModal(f.type, { fieldId: f.id })}
-                                    className="rounded-md border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/15"
+                                    onClick={() => openFieldModal("text", { parentSectionId: f.id })}
+                                    className={`${fieldSectionEditBtn} border border-[#8ec5eb]/30 bg-[#8ec5eb]/15 text-white hover:bg-[#8ec5eb]/25`}
                                   >
-                                    Edit
+                                    <i className="fa-solid fa-plus text-[11px]" /> Nested field
                                   </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => deleteField(f.id)}
-                                    className="rounded-md border border-red-400/40 bg-red-500/15 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/25"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
+                                ) : null}
+                                <button
+                                  type="button"
+                                  onClick={() => openFieldModal(f.type, { fieldId: f.id })}
+                                  className={fieldSectionEditBtn}
+                                >
+                                  <i className="fa-regular fa-pen-to-square text-[11px]" /> Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteField(f.id)}
+                                  className={fieldSectionRemoveBtn}
+                                >
+                                  Remove Field
+                                </button>
                               </div>
+                            ) : null}
+                          </div>
 
-                              {f.type === "section" && nested.length > 0 ? (
-                                <div className="mt-3 space-y-2 border-t border-white/10 pt-3">
-                                  {nested.map((nf) => (
-                                    <div key={nf.id} className="flex items-center justify-between gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2">
-                                      <div className="min-w-0">
-                                        <p className="text-xs font-semibold text-white/90">{nf.type}</p>
-                                        <p className="text-xs text-white/60 truncate">
-                                          {nf.label || nf.name || nf.buttonLabel || "—"}
-                                        </p>
-                                      </div>
+                          <RoadmapFieldPreview f={f} />
+
+                          {f.type === "section" && nested.length > 0 ? (
+                            <div className="mt-5 space-y-3 border-t border-white/10 pt-4">
+                              {nested.map((nf) => (
+                                <div
+                                  key={nf.id}
+                                  className="rounded-xl border border-white/10 bg-white/[0.06] p-4"
+                                >
+                                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                    <span className="text-[13px] font-semibold text-white/90">
+                                      {fieldBlockTitle(nf)}
+                                    </span>
+                                    {!viewOnly ? (
                                       <div className="flex gap-2">
                                         <button
                                           type="button"
-                                          onClick={() => openFieldModal(nf.type, { fieldId: nf.id, parentSectionId: f.id })}
-                                          className="rounded-md border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-white/15"
+                                          onClick={() =>
+                                            openFieldModal(nf.type, {
+                                              fieldId: nf.id,
+                                              parentSectionId: f.id,
+                                            })
+                                          }
+                                          className={fieldSectionEditBtn}
                                         >
-                                          Edit
+                                          <i className="fa-regular fa-pen-to-square text-[11px]" /> Edit
                                         </button>
                                         <button
                                           type="button"
                                           onClick={() => deleteField(nf.id)}
-                                          className="rounded-md border border-red-400/40 bg-red-500/15 px-2.5 py-1 text-[11px] font-semibold text-red-200 hover:bg-red-500/25"
+                                          className={fieldSectionRemoveBtn}
                                         >
-                                          Delete
+                                          Remove Field
                                         </button>
                                       </div>
-                                    </div>
-                                  ))}
+                                    ) : null}
+                                  </div>
+                                  <RoadmapFieldPreview f={nf} />
                                 </div>
-                              ) : null}
+                              ))}
                             </div>
-                          );
-                        })
-                    )}
-                  </div>
-                </div>
-              </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
 
-              <div className="flex flex-wrap justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => router.back()}
-                  disabled={submitting}
-                  className="rounded-xl border border-white/20 bg-white/10 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/15 disabled:opacity-60"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:opacity-60"
-                >
-                  {submitting ? "Saving…" : isEditMode ? "Update roadmap" : "Create roadmap"}
-                </button>
+                  {!viewOnly ? (
+                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 px-4 py-3.5 sm:px-5">
+                      <span className="text-[14px] font-semibold text-white/90">Insert Field</span>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {[
+                          ["text", "Text Field"],
+                          ["textarea", "Text Area"],
+                          ["upload", "Upload"],
+                          ["datepicker", "Date Picker"],
+                          ["assessment", "Assessment"],
+                          ["checkbox_item", "Check Box"],
+                          ["text_display", "Text Display"],
+                          ["digital_signature", "Signature"],
+                          ["section", "Section"],
+                        ].map(([k, label]) => (
+                          <button
+                            key={k}
+                            type="button"
+                            onClick={() => openFieldModal(k)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white px-3 py-2 text-[11px] font-semibold text-[#1F2A6E] shadow-sm transition hover:bg-white/90 sm:text-[12px]"
+                          >
+                            <i className="fa-solid fa-plus text-[10px]" />
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                {!viewOnly ? (
+                  <div className="flex flex-wrap justify-end gap-3 border-t border-white/10 pt-6">
+                    <button
+                      type="button"
+                      onClick={() => router.back()}
+                      disabled={submitting}
+                      className={`${directorBtnSecondary} px-8 disabled:opacity-60`}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSubmit}
+                      disabled={submitting}
+                      className={`${directorBtnPrimary} border border-white/25 px-8 disabled:opacity-60`}
+                    >
+                      {submitting ? "Saving…" : "Save Changes"}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
@@ -879,7 +1060,7 @@ export default function DirectorRoadmapFormPage() {
                           onChange={(e) => setFieldDraft((p) => ({ ...p, allowPastorSelect: e.target.checked }))}
                           className="h-4 w-4 accent-[#8ec5eb]"
                         />
-                        Allow pastor to select Date
+                        Allow Pastor to Select Date
                       </label>
                       <label className="inline-flex items-center gap-2 text-sm text-white/80">
                         <input
@@ -888,7 +1069,7 @@ export default function DirectorRoadmapFormPage() {
                           onChange={(e) => setFieldDraft((p) => ({ ...p, showOnCard: e.target.checked }))}
                           className="h-4 w-4 accent-[#8ec5eb]"
                         />
-                        Show date on info card
+                        Show on Card
                       </label>
                     </div>
                   </>
@@ -1087,6 +1268,34 @@ export default function DirectorRoadmapFormPage() {
             </div>
           </div>
         </>
+      ) : null}
+
+      {saveToast ? (
+        <div
+          className="pointer-events-none fixed inset-x-0 bottom-0 z-[90] flex justify-center px-4 pb-6 pt-10 sm:pb-8"
+          aria-live="polite"
+        >
+          <div
+            role="status"
+            className="pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-2xl border border-emerald-400/35 bg-[#041f35]/98 px-4 py-4 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:items-center sm:gap-4 sm:px-5"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-300">
+              <i className="fa-solid fa-check text-base" aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1 pt-0.5">
+              <p className="text-[15px] font-semibold text-white">Saved</p>
+              <p className="mt-1 text-sm leading-snug text-white/75">{saveToast}</p>
+            </div>
+            <button
+              type="button"
+              onClick={dismissSaveToast}
+              className="shrink-0 rounded-lg p-2 text-white/50 transition hover:bg-white/10 hover:text-white"
+              aria-label="Dismiss"
+            >
+              <i className="fa-solid fa-xmark text-lg" />
+            </button>
+          </div>
+        </div>
       ) : null}
     </div>
   );

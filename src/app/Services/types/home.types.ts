@@ -27,6 +27,8 @@ export interface GetMentorsParams {
   country?: string;
   state?: string;
   conference?: string;
+  /** When supported by GET /users, limits results to active accounts. */
+  status?: string;
 }
 
 export interface GetMenteesParams {

@@ -9,23 +9,33 @@ export function isMentorPublicRoute(pathname: string): boolean {
   return PUBLIC_PATH_PREFIXES.some((prefix) => p === prefix || p.startsWith(`${prefix}/`));
 }
 
-/** Mentor area stores the profile JSON in the `mentor` cookie; `userId` may also be set at login. */
+/** Mentor area stores the profile JSON in the `mentor` cookie. */
 export function getMentorUserId(): string | null {
   if (typeof document === "undefined") return null;
   const raw = getCookie("mentor");
-  if (raw) {
-    try {
-      const u = JSON.parse(raw) as { id?: string; _id?: string };
-      const id = u.id ?? u._id;
-      if (id != null && String(id).trim() !== "") return String(id);
-    } catch {
-      // Fall back to legacy cookie below.
-    }
+  if (!raw) return null;
+  try {
+    const u = JSON.parse(raw) as { id?: string; _id?: string };
+    const id = u.id ?? u._id;
+    if (id != null && String(id).trim() !== "") return String(id);
+  } catch {
+    return null;
   }
-  const direct = getCookie("userId")?.trim();
-  return direct || null;
+  return null;
 }
 
+/** Session = token + `mentor` cookie with role `mentor` (do not use shared `userId` alone). */
 export function hasMentorSession(): boolean {
-  return !!getAccessToken() && !!getMentorUserId();
+  if (!getAccessToken()) return false;
+  const raw = getCookie("mentor");
+  if (!raw) return false;
+  try {
+    const u = JSON.parse(raw) as { role?: unknown; id?: string; _id?: string };
+    const id = u.id ?? u._id;
+    if (id == null || String(id).trim() === "") return false;
+    const r = u.role != null ? String(u.role).toLowerCase().trim() : "";
+    return r === "mentor";
+  } catch {
+    return false;
+  }
 }

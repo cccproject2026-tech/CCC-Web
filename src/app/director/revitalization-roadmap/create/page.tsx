@@ -12,6 +12,15 @@ import HeroBg from "../../../Assets/roadmap-bg.png";
 /** Mobile parity: CreateRoadmapSheet uses 'Phase' | 'Single'. */
 const ROADMAP_TYPES = ["Phase", "Single"] as const;
 
+type NestedRoadmapStub = {
+  _id?: string;
+  name?: string;
+  description?: string;
+  roadMapDetails?: string;
+  duration?: string;
+  imageUrl?: string;
+};
+
 type RoadmapDoc = {
   _id?: string;
   name?: string;
@@ -21,6 +30,7 @@ type RoadmapDoc = {
   type?: string;
   imageUrl?: string;
   divisions?: string[];
+  roadmaps?: NestedRoadmapStub[];
 };
 
 function unwrapRoadmap(res: unknown): RoadmapDoc | null {
@@ -40,6 +50,88 @@ function mapApiTypeToSelect(apiType: string | undefined): string {
   const t = String(apiType ?? "").toLowerCase();
   if (t === "phase" || t.includes("phase")) return "Phase";
   return "Single";
+}
+
+function safeDecodeURIComponent(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
+/**
+ * Parent document may store marketing copy on the first nested template (single / phase).
+ */
+function deriveEditFormValues(
+  doc: RoadmapDoc,
+  url: {
+    name?: string | null;
+    subheading?: string | null;
+    completionTime?: string | null;
+    bannerImage?: string | null;
+    type?: string | null;
+  },
+): {
+  type: string;
+  name: string;
+  subheading: string;
+  duration: string;
+  divisions: string[];
+  bannerUrl: string | null;
+} {
+  const nested0 = Array.isArray(doc.roadmaps) && doc.roadmaps.length > 0 ? doc.roadmaps[0] : null;
+
+  const apiType = mapApiTypeToSelect(doc.type);
+  const typeFromUrl = url.type?.trim().toLowerCase();
+  const type =
+    typeFromUrl === "phase"
+      ? "Phase"
+      : typeFromUrl === "single"
+        ? "Single"
+        : apiType;
+
+  const name =
+    (doc.name ?? "").trim() ||
+    (nested0?.name && String(nested0.name).trim()) ||
+    (url.name ? safeDecodeURIComponent(url.name) : "").trim();
+
+  const subheading =
+    [
+      doc.description,
+      doc.roadMapDetails,
+      nested0?.roadMapDetails,
+      nested0?.description,
+    ]
+      .map((x) => (typeof x === "string" ? x.trim() : ""))
+      .find(Boolean) ||
+    (url.subheading ? safeDecodeURIComponent(url.subheading) : "").trim();
+
+  const duration =
+    (doc.duration && String(doc.duration).trim()) ||
+    (nested0?.duration && String(nested0.duration).trim()) ||
+    (url.completionTime ? safeDecodeURIComponent(url.completionTime) : "").trim();
+
+  const divisions =
+    Array.isArray(doc.divisions) && doc.divisions.length ? [...doc.divisions] : [];
+
+  const rawBanner =
+    (typeof doc.imageUrl === "string" && doc.imageUrl.trim()) ||
+    (typeof nested0?.imageUrl === "string" && nested0.imageUrl.trim()) ||
+    (url.bannerImage ? safeDecodeURIComponent(url.bannerImage) : "").trim();
+
+  const bannerUrl = rawBanner
+    ? resolveApiMediaUrl(rawBanner) || rawBanner
+    : null;
+
+  return {
+    type,
+    name,
+    subheading,
+    duration,
+    divisions,
+    bannerUrl,
+  };
 }
 
 /** Axios response body: { data: roadmap } or { success, data } */
@@ -99,15 +191,23 @@ function CreateRoadmapStepOnePage() {
           if (!cancelled && !doc) setFetchError("Roadmap not found.");
           return;
         }
-        setType(mapApiTypeToSelect(doc.type));
-        setName(doc.name?.trim() ?? "");
-        setRoadmapSubheading((doc.description ?? doc.roadMapDetails ?? "").trim());
-        setDuration(doc.duration?.trim() ?? "");
-        setDivisions(Array.isArray(doc.divisions) && doc.divisions.length ? doc.divisions : []);
-        const raw = doc.imageUrl;
-        if (raw && typeof raw === "string") {
-          const resolved = resolveApiMediaUrl(raw) || raw;
-          setBannerPreview(resolved);
+
+        const urlSeed = {
+          name: searchParams.get("name"),
+          subheading: searchParams.get("subheading"),
+          completionTime: searchParams.get("completionTime"),
+          bannerImage: searchParams.get("bannerImage"),
+          type: searchParams.get("type"),
+        };
+
+        const v = deriveEditFormValues(doc as RoadmapDoc, urlSeed);
+        setType(v.type);
+        setName(v.name);
+        setRoadmapSubheading(v.subheading);
+        setDuration(v.duration);
+        setDivisions(v.divisions.length ? v.divisions : []);
+        if (v.bannerUrl) {
+          setBannerPreview(v.bannerUrl);
           setBannerFile(null);
         } else {
           setBannerPreview(null);
@@ -286,8 +386,8 @@ function CreateRoadmapStepOnePage() {
         ]}
       />
 
-      <main className="mx-auto flex-1 px-4 pb-12">
-        <div className={`mx-auto max-w-xl ${directorGlassCard} relative overflow-hidden p-6 sm:p-8`}>
+      <main className="mx-auto w-full max-w-[1600px] flex-1 px-4 pb-12 sm:px-6 lg:px-10">
+        <div className={`mx-auto w-full max-w-5xl ${directorGlassCard} relative overflow-hidden p-6 sm:p-8 lg:p-10`}>
           <button
             type="button"
             onClick={() => router.push("/director/revitalization-roadmap")}

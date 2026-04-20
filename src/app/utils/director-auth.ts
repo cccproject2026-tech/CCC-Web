@@ -26,5 +26,14 @@ export function getDirectorUserId(): string | null {
 }
 
 export function hasDirectorSession(): boolean {
-  return !!getAccessToken() && !!getDirectorUserId();
+  if (!getAccessToken() || !getDirectorUserId()) return false;
+  const raw = getCookie("user");
+  if (!raw) return false;
+  try {
+    const u = JSON.parse(raw) as { role?: unknown };
+    const r = u.role != null ? String(u.role).toLowerCase().trim() : "";
+    return r === "director";
+  } catch {
+    return false;
+  }
 }

@@ -41,6 +41,15 @@ interface PersonListCardProps {
   }[];
   /** Dark glass shell for director routes (RoleShell). */
   variant?: "light" | "glass";
+  /** Compact horizontal row (mentees list view). */
+  listLayout?: boolean;
+}
+
+function formatProgressPercent(value: number): string {
+  const v = Math.min(100, Math.max(0, Number(value) || 0));
+  const rounded = Math.round(v * 100) / 100;
+  if (Number.isInteger(rounded)) return `${rounded}%`;
+  return `${rounded.toFixed(1)}%`;
 }
 
 export default function PersonListCard({
@@ -58,17 +67,26 @@ export default function PersonListCard({
   progress,
   optionsMenu,
   variant = "light",
+  listLayout = false,
 }: PersonListCardProps) {
   const [showOptions, setShowOptions] = useState(false);
   const isGlass = variant === "glass";
 
   const shellClass = isGlass
-    ? `rounded-xl p-4 sm:p-5 flex flex-col gap-4 sm:flex-row sm:items-start relative border border-white/15 ${directorGlassCard} ${directorGlassCardHover} sm:gap-5`
-    : "bg-white rounded-xl p-5 flex gap-5 items-start shadow-lg hover:shadow-xl transition-all relative";
+    ? listLayout
+      ? `rounded-xl p-4 flex flex-row items-stretch gap-4 relative border border-white/15 ${directorGlassCard} ${directorGlassCardHover}`
+      : `rounded-xl p-4 sm:p-5 flex flex-col gap-4 sm:flex-row sm:items-start relative border border-white/15 ${directorGlassCard} ${directorGlassCardHover} sm:gap-5`
+    : listLayout
+      ? "bg-white rounded-xl p-4 flex flex-row items-stretch gap-4 shadow-lg hover:shadow-xl transition-all relative"
+      : "bg-white rounded-xl p-5 flex gap-5 items-start shadow-lg hover:shadow-xl transition-all relative";
 
   const imgWrapClass = isGlass
-    ? "relative w-full max-w-[120px] h-[120px] mx-auto sm:mx-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 flex-shrink-0 cursor-pointer"
-    : "relative w-[120px] h-[120px] overflow-hidden rounded-xl bg-gray-100 flex-shrink-0 cursor-pointer";
+    ? listLayout
+      ? "relative w-[88px] h-[88px] shrink-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 cursor-pointer"
+      : "relative w-full max-w-[120px] h-[120px] mx-auto sm:mx-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 flex-shrink-0 cursor-pointer"
+    : listLayout
+      ? "relative w-[88px] h-[88px] shrink-0 overflow-hidden rounded-xl bg-gray-100 cursor-pointer"
+      : "relative w-[120px] h-[120px] overflow-hidden rounded-xl bg-gray-100 flex-shrink-0 cursor-pointer";
 
   const titleClass = isGlass
     ? "font-semibold text-white text-[16px]"
@@ -83,7 +101,11 @@ export default function PersonListCard({
     : "flex items-center gap-4 text-[#2E3B8E] text-[17px]";
 
   return (
-    <div className={shellClass}>
+    <div
+      className={`${shellClass}${
+        showOptions ? " z-[60] overflow-visible" : ""
+      }`}
+    >
       <Link href={profileLink} className={imgWrapClass}>
         <Image
           src={image}
@@ -161,7 +183,11 @@ export default function PersonListCard({
         </div>
       )}
 
-      <div className="flex min-h-[120px] min-w-0 flex-1 flex-col justify-between">
+      <div
+        className={`flex min-w-0 flex-1 flex-col justify-between ${
+          listLayout ? "min-h-0" : "min-h-[120px]"
+        }`}
+      >
         <div>
           <Link
             href={profileLink}
@@ -179,7 +205,7 @@ export default function PersonListCard({
               {role}
             </p>
           ) : null}
-          <p className={descClass}>{description}</p>
+          {!listLayout ? <p className={descClass}>{description}</p> : null}
 
           {badge && (
             <span
@@ -204,11 +230,11 @@ export default function PersonListCard({
           {progress && (
             <div className="mb-3 mt-1">
               <p
-                className={`mb-2 text-[12px] font-semibold ${
+                className={`mb-2 text-[12px] font-semibold leading-snug ${
                   isGlass ? "text-[#8ec5eb]" : "text-[#2E3B8E]"
                 }`}
               >
-                Phase: {progress.phase ?? "—"}
+                Phase: {progress.phase?.trim() ? progress.phase : "—"}
               </p>
               <div className="flex items-center gap-3">
                 <div className="flex-1">
@@ -226,16 +252,18 @@ export default function PersonListCard({
                       className={`h-full transition-all ${
                         isGlass ? "bg-[#8ec5eb]" : "bg-green-500"
                       }`}
-                      style={{ width: `${Math.min(100, Math.max(0, progress.value))}%` }}
+                      style={{
+                        width: `${Math.min(100, Math.max(0, Number(progress.value) || 0))}%`,
+                      }}
                     />
                   </div>
                 </div>
                 <span
-                  className={`text-[14px] font-bold ${
+                  className={`min-w-[3.25rem] text-right text-[14px] font-bold tabular-nums ${
                     isGlass ? "text-white" : "text-gray-700"
                   }`}
                 >
-                  {Math.round(progress.value)}%
+                  {formatProgressPercent(progress.value)}
                 </span>
               </div>
             </div>
