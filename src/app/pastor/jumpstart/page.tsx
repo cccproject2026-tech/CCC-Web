@@ -228,6 +228,13 @@ function JumpStartContent() {
   const [querySubmitting, setQuerySubmitting] = useState(false);
   const [querySuccess, setQuerySuccess] = useState(false);
 
+  // Signature drawing state
+  const [signatureModalOpen, setSignatureModalOpen] = useState(false);
+  const [activeSignatureField, setActiveSignatureField] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
+
   const [userId, setUserId] = useState("");
   const [sessionDisplayName, setSessionDisplayName] = useState<string | null>(null);
   const [parentPhaseLabel, setParentPhaseLabel] = useState<string | null>(null);
@@ -754,6 +761,113 @@ function JumpStartContent() {
     }
   };
 
+  // Signature drawing functions
+  const openSignatureModal = (fieldKey: string) => {
+    setActiveSignatureField(fieldKey);
+    setSignatureModalOpen(true);
+    setSignaturePreview(null);
+    setTimeout(() => {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+      }
+    }, 100);
+  };
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    let x, y;
+
+    if ("touches" in e) {
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setIsDrawing(true);
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    let x, y;
+
+    if ("touches" in e) {
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
+
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.strokeStyle = "#000000";
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+  };
+
+  const saveSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !activeSignatureField) return;
+    
+    const dataUrl = canvas.toDataURL("image/png");
+    setSignaturePreview(dataUrl);
+    setFormData((prev) => ({
+      ...prev,
+      [activeSignatureField]: dataUrl,
+    }));
+  };
+
+  const confirmSignature = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !activeSignatureField) return;
+
+    // Convert canvas to blob and upload
+    canvas.toBlob(async (blob) => {
+      if (!blob) return;
+      const file = new File([blob], `signature_${Date.now()}.png`, { type: "image/png" });
+      await handleFileUpload(activeSignatureField, file);
+      setSignatureModalOpen(false);
+      setActiveSignatureField(null);
+      setSignaturePreview(null);
+    }, "image/png");
+  };
+
   const renderExtraComponent = (
     extra: ExtraComponent,
     index: number,
@@ -885,23 +999,26 @@ function JumpStartContent() {
           <div key={`${fieldKey}_${index}`} className="mb-5">
             <h4 className="text-sm font-semibold text-white mb-2">{extra.name}</h4>
             <div className="border border-[#5A8DCB] rounded-lg bg-white/5 p-4">
-              <input
-                type="text"
-                placeholder={extra.placeHolder || "Sign here (your name)"}
-                value={formData[fieldKey] ?? ""}
-                onChange={(e) => handleInputChange(fieldKey, e.target.value)}
-                className="w-full bg-transparent border-b border-[#5A8DCB] text-white text-sm pb-2 focus:outline-none italic"
-              />
-              <p className="text-white/40 text-xs mt-2">Digital signature</p>
-            </div>
-            {extra.buttonName && (
+              {formData[fieldKey] ? (
+                <div className="space-y-3">
+                  <img
+                    src={typeof formData[fieldKey] === "string" ? formData[fieldKey] : ""}
+                    alt="Signature"
+                    className="max-h-24 bg-white rounded"
+                  />
+                  <p className="text-white/60 text-xs">Signature captured</p>
+                </div>
+              ) : (
+                <p className="text-white/40 text-xs italic mb-3">No signature yet</p>
+              )}
               <button
                 type="button"
-                className="mt-2 bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-5 py-2 rounded-md shadow"
+                onClick={() => openSignatureModal(fieldKey)}
+                className="w-full bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-5 py-2 rounded-md shadow mt-3"
               >
-                {extra.buttonName}
+                {formData[fieldKey] ? "Redraw Signature" : "Draw Signature"}
               </button>
-            )}
+            </div>
           </div>
         );
 
@@ -1400,6 +1517,78 @@ function JumpStartContent() {
             )}
           </div>
         </div>
+
+        {/* Signature Drawing Modal */}
+        {signatureModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-[#0F3A62] border border-[#5A8DCB] rounded-lg p-6 w-full max-w-2xl mx-4 shadow-xl">
+              <h3 className="text-lg font-semibold text-white mb-4">Draw Your Signature</h3>
+              
+              <div className="mb-4">
+                <p className="text-sm text-white/70 mb-3">Use your mouse or touch to sign in the box below:</p>
+                <canvas
+                  ref={canvasRef}
+                  width={500}
+                  height={200}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                  className="w-full border-2 border-[#5A8DCB] rounded-md bg-white cursor-crosshair"
+                />
+              </div>
+
+              <div className="flex gap-3 mb-4">
+                <button
+                  type="button"
+                  onClick={clearSignature}
+                  className="flex-1 bg-[#4A5F7F] hover:bg-[#3A4F6F] transition text-white text-sm font-medium px-4 py-2 rounded-md"
+                >
+                  <i className="fa-solid fa-rotate-left mr-2"></i>Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={saveSignature}
+                  className="flex-1 bg-[#1E5A96] hover:bg-[#154B7F] transition text-white text-sm font-medium px-4 py-2 rounded-md"
+                >
+                  <i className="fa-solid fa-image mr-2"></i>Preview
+                </button>
+              </div>
+
+              {signaturePreview && (
+                <div className="mb-4 p-3 bg-white/10 rounded-md">
+                  <p className="text-xs text-white/60 mb-2">Signature Preview:</p>
+                  <img src={signaturePreview} alt="Signature Preview" className="max-h-24 bg-white rounded" />
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSignatureModalOpen(false);
+                    setActiveSignatureField(null);
+                    setSignaturePreview(null);
+                  }}
+                  className="flex-1 border border-white/25 hover:bg-white/10 transition text-white text-sm font-medium px-4 py-2 rounded-md"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmSignature}
+                  disabled={!signaturePreview}
+                  className="flex-1 bg-[#103C8C] hover:bg-[#0B2E72] disabled:opacity-50 transition text-white text-sm font-medium px-4 py-2 rounded-md"
+                >
+                  <i className="fa-solid fa-check mr-2"></i>Confirm & Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

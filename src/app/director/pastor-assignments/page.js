@@ -17,7 +17,7 @@ import AssignRoadmapModal from "@/app/Components/AssignRoadmapModal";
 import ConfirmModal from "@/app/Components/ConfirmModal";
 import MentorBg from "../../Assets/mentor-bg.png";
 import Card1 from "../../Assets/card1.png";
-import { apiGetRoadmaps, apiDeleteRoadmap } from "@/app/Services/api";
+import { apiGetRoadmaps, apiGetRoadmapsByUser, apiDeleteRoadmap } from "@/app/Services/api";
 
 export default function PastorAssignmentsPage() {
   const router = useRouter();
@@ -37,16 +37,25 @@ export default function PastorAssignmentsPage() {
 
   useEffect(() => {
     fetchRoadmaps();
-  }, []);
+  }, [assignUserId]);
 
   const fetchRoadmaps = async () => {
     try {
       setLoading(true);
-      const res = await apiGetRoadmaps();
-      const data = res.data?.data || [];
+      const res = assignUserId
+        ? await apiGetRoadmapsByUser(assignUserId)
+        : await apiGetRoadmaps();
+      const envelope = res.data?.data !== undefined ? res.data.data : res.data;
+      const data = Array.isArray(envelope)
+        ? envelope
+        : Array.isArray(envelope?.roadmaps)
+          ? envelope.roadmaps
+          : Array.isArray(envelope?.data)
+            ? envelope.data
+            : [];
       setRoadmaps(
         data.map((item) => ({
-          id: item._id,
+          id: item._id ?? item.id,
           title: item.name,
           description: item.description || item.roadMapDetails || "No description",
           image: item.imageUrl || Card1,
@@ -139,7 +148,11 @@ export default function PastorAssignmentsPage() {
     <div className={directorPageRoot}>
       <DirectorHero
         title="Roadmap"
-        subtitle="Create, assign, and manage revitalization roadmaps for pastors."
+        subtitle={
+          assignUserId
+            ? "Roadmaps assigned to this pastor. Assign or manage revitalization roadmaps."
+            : "Create, assign, and manage revitalization roadmaps for pastors."
+        }
         image={MentorBg}
         breadcrumbItems={[
           { label: "Home", href: "/director/home" },
@@ -227,7 +240,11 @@ export default function PastorAssignmentsPage() {
               <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/20 border-t-[#8ec5eb]" />
             </div>
           ) : filtered.length === 0 ? (
-            <p className="py-16 text-center text-white/70">No roadmaps found.</p>
+            <p className="py-16 text-center text-white/70">
+              {assignUserId
+                ? "No roadmaps assigned to this pastor yet."
+                : "No roadmaps found."}
+            </p>
           ) : (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {filtered.map((roadmap) => (
@@ -240,11 +257,21 @@ export default function PastorAssignmentsPage() {
                   variant="glass"
                   onView={() =>
                     router.push(
-                      `/director/pastor-assignments/roadmap/${roadmap.id}`
+                      `/director/pastor-assignments/roadmap/${roadmap.id}${
+                        assignUserId
+                          ? `?assignUser=${encodeURIComponent(assignUserId)}`
+                          : ""
+                      }`
                     )
                   }
                   onEdit={(id) =>
-                    router.push(`/director/pastor-assignments/roadmap/${id}?edit=1`)
+                    router.push(
+                      `/director/pastor-assignments/roadmap/${id}?edit=1${
+                        assignUserId
+                          ? `&assignUser=${encodeURIComponent(assignUserId)}`
+                          : ""
+                      }`
+                    )
                   }
                   onDelete={handleCardDelete}
                   onOptionsClick={handleOptionsClick}

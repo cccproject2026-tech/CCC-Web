@@ -9,7 +9,7 @@ import { useToast } from "@/app/Components/ui/Toast";
 import { extractApiErrorMessage, appointmentEntityId, unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
 import { apiGetMentorshipSessionsNormalized, type MentorshipSession } from "@/app/Services/roadmaps.service";
 import { apiGetUserSchedule, apiGenerateTranscriptSummary } from "@/app/Services/appointments.service";
-import type { AppointmentResponse } from "@/app/Services/types/appointments.types";
+import type { AppointmentResponse, TranscriptSummaryResponseDto } from "@/app/Services/types/appointments.types";
 import {
   appointmentPlatformLabel,
   formatMeetingIdForDisplay,
@@ -22,14 +22,19 @@ import {
 import { formatSessionTime, getNextSessionId } from "../utils/sessionFlow";
 
 type TranscriptSummary = {
+  appointmentId: string;
   transcript?: string;
+  transcriptSavedAt?: Date;
   summary?: {
-    overview?: string;
-    keyPoints?: string[];
-    advice?: string[];
-    actionItems?: string[];
-    nextFocus?: string[];
+    sessionOverview: string;
+    keyDiscussionPoints: string[];
+    mentorGuidance: string[];
+    actionItems: string[];
+    followUp: string;
   };
+  generatedAt?: Date;
+  model?: string;
+  cached?: boolean;
 };
 
 export default function PastorMentoringSessionDetailPage() {
@@ -100,10 +105,20 @@ export default function PastorMentoringSessionDetailPage() {
     setTsLoading(true);
     try {
       const res = await apiGenerateTranscriptSummary(String(session.appointmentId), refresh);
-      const data = res.data?.data ?? res.data;
+      const data = (res.data?.data ?? res.data) as TranscriptSummaryResponseDto;
       setTsData({
-        transcript: data?.transcript,
-        summary: data?.summary,
+        appointmentId: data.appointmentId,
+        transcript: data.transcript,
+        transcriptSavedAt: data.transcriptSavedAt,
+        summary: data.summary,
+        generatedAt: data.generatedAt,
+        model: data.model,
+        cached: data.cached,
+      });
+      toast.show({
+        kind: "success",
+        title: data.cached ? "Summary loaded from cache" : "Summary generated successfully",
+        subtitle: `Model: ${data.model}`,
       });
     } catch (e) {
       toast.show({ kind: "error", title: "Failed to generate summary", subtitle: extractApiErrorMessage(e) });
@@ -247,27 +262,27 @@ export default function PastorMentoringSessionDetailPage() {
               <div className="text-sm font-semibold mb-2">AI Summary</div>
               {tsData?.summary ? (
                 <div className="space-y-4 text-sm text-white/70">
-                  {tsData.summary.overview ? (
+                  {tsData.summary.sessionOverview ? (
                     <div>
-                      <div className="font-semibold text-white/80">Overview</div>
-                      <div>{tsData.summary.overview}</div>
+                      <div className="font-semibold text-white/80">Session Overview</div>
+                      <div>{tsData.summary.sessionOverview}</div>
                     </div>
                   ) : null}
-                  {tsData.summary.keyPoints?.length ? (
+                  {tsData.summary.keyDiscussionPoints?.length ? (
                     <div>
-                      <div className="font-semibold text-white/80">Key points</div>
+                      <div className="font-semibold text-white/80">Key Discussion Points</div>
                       <ul className="list-disc list-inside">
-                        {tsData.summary.keyPoints.map((x) => (
+                        {tsData.summary.keyDiscussionPoints.map((x) => (
                           <li key={x}>{x}</li>
                         ))}
                       </ul>
                     </div>
                   ) : null}
-                  {tsData.summary.advice?.length ? (
+                  {tsData.summary.mentorGuidance?.length ? (
                     <div>
-                      <div className="font-semibold text-white/80">Advice</div>
+                      <div className="font-semibold text-white/80">Mentor Guidance</div>
                       <ul className="list-disc list-inside">
-                        {tsData.summary.advice.map((x) => (
+                        {tsData.summary.mentorGuidance.map((x) => (
                           <li key={x}>{x}</li>
                         ))}
                       </ul>
@@ -275,7 +290,7 @@ export default function PastorMentoringSessionDetailPage() {
                   ) : null}
                   {tsData.summary.actionItems?.length ? (
                     <div>
-                      <div className="font-semibold text-white/80">Action items</div>
+                      <div className="font-semibold text-white/80">Action Items</div>
                       <ul className="list-disc list-inside">
                         {tsData.summary.actionItems.map((x) => (
                           <li key={x}>{x}</li>
@@ -283,21 +298,17 @@ export default function PastorMentoringSessionDetailPage() {
                       </ul>
                     </div>
                   ) : null}
-                  {tsData.summary.nextFocus?.length ? (
+                  {tsData.summary.followUp ? (
                     <div>
-                      <div className="font-semibold text-white/80">Next focus</div>
-                      <ul className="list-disc list-inside">
-                        {tsData.summary.nextFocus.map((x) => (
-                          <li key={x}>{x}</li>
-                        ))}
-                      </ul>
+                      <div className="font-semibold text-white/80">Follow-up</div>
+                      <div>{tsData.summary.followUp}</div>
                     </div>
                   ) : null}
-                  {!tsData.summary.overview &&
-                  !tsData.summary.keyPoints?.length &&
-                  !tsData.summary.advice?.length &&
+                  {!tsData.summary.sessionOverview &&
+                  !tsData.summary.keyDiscussionPoints?.length &&
+                  !tsData.summary.mentorGuidance?.length &&
                   !tsData.summary.actionItems?.length &&
-                  !tsData.summary.nextFocus?.length ? (
+                  !tsData.summary.followUp ? (
                     <div>Summary is being generated or temporarily unavailable.</div>
                   ) : null}
                 </div>

@@ -12,6 +12,7 @@ import {
 } from "@/app/utils/director-auth";
 
 import Framelogo1 from "@/app/Assets/Frame-logo-1.png";
+import LoginPasswordField from "@/app/Components/LoginPasswordField";
 import AndrewsLogo from "../../Assets/andrews-logo.png";
 
 const ENABLE_TEMP_LOGIN_BYPASS = false;
@@ -192,13 +193,10 @@ function DirectorLoginInner() {
               />
 
               <div className="flex flex-col gap-2">
-                <input
-                  type="password"
-                  placeholder="Password"
-                  autoComplete="current-password"
-                  className="w-full rounded-lg px-4 py-3 text-sm sm:text-base bg-white/10 border border-white/35 text-white placeholder:text-white/65 focus:outline-none focus:border-[#8ec5eb] focus:ring-1 focus:ring-[#8ec5eb]/40"
+                <LoginPasswordField
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={setPassword}
+                  disabled={isLoading}
                 />
                 <div className="flex justify-end">
                   <a

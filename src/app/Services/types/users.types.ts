@@ -31,6 +31,8 @@ export interface UserResponse {
   email: string;
   role: UserRole;
   status: UserStatus;
+  /** Set when the pastor is marked complete (mentor/director) or program completed. */
+  hasCompleted?: boolean;
   profilePicture?: string;
   assignedId?: string[];
   phoneNumber?: string;

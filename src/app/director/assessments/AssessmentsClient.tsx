@@ -32,10 +32,10 @@ import {
 } from "@/app/Services/assessment.service";
 import { apiGetAllUsers } from "@/app/Services/users.service";
 import { apiAssignAssessment, apiGetUserProgress } from "@/app/Services/progress.service";
+import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { emitPastorAssignmentsChanged } from "@/app/utils/progress-sync";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 import FeaturedAvatars, { FeaturedAvatarItem } from "@/app/Components/FeaturedAvatars";
-import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { getStoredRecommendationsForPastorAssessment, upsertStoredRecommendation } from "@/app/utils/assessment-recommendations";
 
 function getApiErrorMessage(err: unknown, fallback: string): string {
@@ -396,41 +396,54 @@ function AssessmentsPageContent() {
           const filteredAssigned = !q
             ? assigned
             : assigned.filter((a: any) => {
-                const title = String(a?.title || "").toLowerCase();
-                const desc = String(a?.description || "").toLowerCase();
-                return title.includes(q) || desc.includes(q);
-              });
+              const title = String(a?.title || "").toLowerCase();
+              const desc = String(a?.description || "").toLowerCase();
+              return title.includes(q) || desc.includes(q);
+            });
           setAssessments(filteredAssigned);
         } else {
           const res = await apiGetAssessments({
             search: searchQuery || undefined,
           });
 
-          const body = res?.data;
-          const list = parseAssessmentsListPayload(body);
-          const mapped: any[] = [];
-          for (const item of list) {
-            const rawItem = item as unknown as Record<string, unknown>;
-            const rawId = rawItem._id ?? rawItem.id;
-            const id = rawId != null && String(rawId).trim() !== "" ? String(rawId) : "";
-            if (!id) continue;
+          const parsed = parseAssessmentsListPayload(res.data);
+          const mapped = Array.isArray(parsed)
+            ? parsed.map((a: any) => {
+              const raw = (a as any)?.bannerImage;
+              const resolved = (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
+              return {
+                ...(a as any),
+                id: String((a as any)._id ?? (a as any).id),
+                image: resolved,
+                title: String((a as any).name ?? (a as any).title ?? "Untitled"),
+              };
+            })
+            : [];
 
-            const raw = rawItem.bannerImage;
-            const resolved =
-              (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
-            const titleRaw =
-              (typeof rawItem.name === "string" && rawItem.name.trim() ? rawItem.name : null) ??
-              (typeof rawItem.title === "string" && rawItem.title.trim() ? rawItem.title : null);
-            mapped.push({
-              id,
-              title: titleRaw ?? "Untitled",
-              description: typeof rawItem.description === "string" ? rawItem.description : "",
-              image: resolved,
-              type: rawItem.type,
-            });
+          if (assignUserFromQuery) {
+            try {
+              const progRes = await apiGetUserProgress(assignUserFromQuery);
+              const pr = unwrapProgressData(progRes);
+              const rows = pr?.assessments ?? [];
+              const allowed = new Set<string>();
+              for (const row of rows) {
+                const aid = (row as { assessmentId?: string }).assessmentId;
+                if (aid != null && String(aid).trim() !== "") {
+                  allowed.add(String(aid).trim());
+                }
+              }
+              if (allowed.size === 0) {
+                setAssessments([]);
+              } else {
+                setAssessments(mapped.filter((a) => allowed.has(String(a.id))));
+              }
+            } catch (e) {
+              console.error("Failed to load pastor assessment assignments", e);
+              setAssessments([]);
+            }
+          } else {
+            setAssessments(mapped);
           }
-
-          setAssessments(mapped);
         }
       } catch (error) {
         console.error("Failed to fetch assessments", error);
@@ -442,67 +455,7 @@ function AssessmentsPageContent() {
     };
 
     fetchAssessments();
-  }, [searchQuery, selectedMenteeId]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchFeaturedPastors = async () => {
-      try {
-        setFeaturedLoading(true);
-        const res = await apiGetAllUsers({
-          role: "pastor",
-          roleMatch: "mixed",
-          page: avatarPage,
-          limit: AVATAR_PAGE_SIZE,
-        });
-
-        const inner = res?.data?.data as unknown;
-        let listUsers: unknown[] = [];
-        let totalPages = 1;
-        if (inner && typeof inner === "object") {
-          const o = inner as unknown as Record<string, unknown>;
-          if (Array.isArray(o.users)) listUsers = o.users;
-          else if (Array.isArray(o.rows)) listUsers = o.rows;
-
-          const tp = Number(o.totalPages);
-          const total = Number(o.total);
-          if (Number.isFinite(tp) && tp > 0) {
-            totalPages = Math.max(1, Math.floor(tp));
-          } else if (Number.isFinite(total) && total > 0) {
-            totalPages = Math.max(1, Math.ceil(total / AVATAR_PAGE_SIZE));
-          }
-        }
-
-        const mapped: FeaturedAvatarItem[] = (listUsers as any[])
-          .map((u: any, idx: number) => ({
-            id: String(u?._id ?? u?.id ?? idx),
-            name: `${u?.firstName || ""} ${u?.lastName || ""}`.trim() || "Pastor",
-            img: u?.profilePicture || Mentor1,
-          }))
-          .filter((x) => String(x.id).trim() !== "");
-
-        if (!cancelled) {
-          setFeaturedItems(mapped);
-          setAvatarTotalPages(totalPages);
-        }
-      } catch (err) {
-        console.error("Failed to fetch featured pastors", err);
-        if (!cancelled) {
-          setFeaturedItems([]);
-          setAvatarTotalPages(1);
-        }
-      } finally {
-        if (!cancelled) setFeaturedLoading(false);
-      }
-    };
-
-    fetchFeaturedPastors();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [avatarPage]);
+  }, [searchQuery, assignUserFromQuery]);
 
   useEffect(() => {
     if (!assignUserFromQuery) return;
@@ -790,7 +743,11 @@ function AssessmentsPageContent() {
     <div className={directorPageRoot}>
       <DirectorHero
         title="Assessments"
-        subtitle="Create, edit, and assign assessments to pastors."
+        subtitle={
+          assignUserFromQuery
+            ? "Assessments assigned to this pastor."
+            : "Create, edit, and assign assessments to pastors."
+        }
         image={AssessmentBg}
         breadcrumbItems={[
           { label: "Home", href: "/director/home" },
@@ -948,9 +905,8 @@ function AssessmentsPageContent() {
               {filteredAssessments.map((assessment) => (
                 <div
                   key={assessment.id}
-                  className={`relative ${directorListCardRadius} border border-white/10 transition-all ${directorGlassCard} ${
-                    selectedAssessments.includes(assessment.id) ? "ring-2 ring-[#8ec5eb]/60" : ""
-                  }`}
+                  className={`relative ${directorListCardRadius} border border-white/10 transition-all ${directorGlassCard} ${selectedAssessments.includes(assessment.id) ? "ring-2 ring-[#8ec5eb]/60" : ""
+                    }`}
                 >
                   {isSelectionMode && (
                     <div className="absolute left-4 top-4 z-10">
@@ -1099,9 +1055,15 @@ function AssessmentsPageContent() {
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/10">
                 <i className="fa-regular fa-folder-open text-2xl text-[#8ec5eb]" />
               </div>
-              <p className="text-lg font-semibold text-white">No assessments found</p>
+              <p className="text-lg font-semibold text-white">
+                {assignUserFromQuery
+                  ? "No assessments assigned to this pastor."
+                  : "No assessments found"}
+              </p>
               <p className="mt-2 text-sm text-white/60">
-                Try another search or create an assessment with Add.
+                {assignUserFromQuery
+                  ? "Assign assessments from the full list when needed."
+                  : "Try another search or create an assessment with Add."}
               </p>
             </div>
           )}

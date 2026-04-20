@@ -50,6 +50,28 @@ interface PhaseCard {
   hasNestedTasks?: boolean;
 }
 
+/** Canonical order matches director roadmap home: Jump-start → Self → Church → Community. */
+function phaseSequenceIndex(phase: PhaseCard): number {
+  const text = `${phase.title} ${phase.parentRoadmapName}`.toLowerCase();
+  if (text.includes("jump") && text.includes("start")) return 0;
+  if (text.includes("self") && text.includes("revitalization")) return 1;
+  if (text.includes("church") && text.includes("empowerment")) return 2;
+  if (
+    text.includes("community") &&
+    text.includes("revitalization") &&
+    text.includes("multiplication")
+  ) {
+    return 3;
+  }
+  return -1;
+}
+
+function roadmapDisplayName(phase: PhaseCard): string {
+  const t = phase.title?.trim();
+  if (t) return t;
+  return phase.parentRoadmapName?.trim() || "this roadmap";
+}
+
 const TABS: TabKey[] = ["All", "Due", "In Progress", "Not Started", "Completed"];
 
 function tabKeyFromSearchParam(raw: string | null): TabKey | null {
@@ -83,6 +105,10 @@ export default function RevitalizationRoadmap() {
   const [phases, setPhases] = useState<PhaseCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sequenceGate, setSequenceGate] = useState<{
+    previousName: string;
+    currentName: string;
+  } | null>(null);
 
   const toUiStatus = (rawStatus: unknown): UiStatus => {
     const t = String(rawStatus ?? "").trim();
@@ -177,6 +203,51 @@ export default function RevitalizationRoadmap() {
       unsubProgress();
     };
   }, [fetchRoadmaps, pathname]);
+
+  const phasesSortedForSequence = useMemo(() => {
+    const known = phases.filter((p) => phaseSequenceIndex(p) >= 0);
+    return [...known].sort((a, b) => phaseSequenceIndex(a) - phaseSequenceIndex(b));
+  }, [phases]);
+
+  const openPhaseRoute = useCallback(
+    (phase: PhaseCard) => {
+      if (phase.hasNestedTasks) {
+        router.push(`/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(phase.id)}`);
+        return;
+      }
+      const hasParent =
+        phase.parentRoadmapId &&
+        phase.parentRoadmapId.trim() !== "" &&
+        phase.parentRoadmapId !== phase.id;
+      const href = hasParent
+        ? `/pastor/jumpstart?id=${encodeURIComponent(phase.id)}&parentId=${encodeURIComponent(phase.parentRoadmapId!)}`
+        : `/pastor/jumpstart?id=${encodeURIComponent(phase.id)}`;
+      router.push(href);
+    },
+    [router],
+  );
+
+  const handleViewPhase = useCallback(
+    (phase: PhaseCard) => {
+      const idx = phaseSequenceIndex(phase);
+      if (idx <= 0) {
+        openPhaseRoute(phase);
+        return;
+      }
+      const prevPhase = phasesSortedForSequence.find(
+        (p) => phaseSequenceIndex(p) === idx - 1,
+      );
+      if (prevPhase && prevPhase.status !== "Completed") {
+        setSequenceGate({
+          previousName: roadmapDisplayName(prevPhase),
+          currentName: roadmapDisplayName(phase),
+        });
+        return;
+      }
+      openPhaseRoute(phase);
+    },
+    [openPhaseRoute, phasesSortedForSequence],
+  );
 
   const filteredPhases = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -364,22 +435,8 @@ export default function RevitalizationRoadmap() {
 
                     <div className="flex justify-end mt-3 sm:mt-0">
                       <button
-                        onClick={() => {
-                          if (phase.hasNestedTasks) {
-                            router.push(
-                              `/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(phase.id)}`,
-                            );
-                            return;
-                          }
-                          const hasParent =
-                            phase.parentRoadmapId &&
-                            phase.parentRoadmapId.trim() !== "" &&
-                            phase.parentRoadmapId !== phase.id;
-                          const href = hasParent
-                            ? `/pastor/jumpstart?id=${encodeURIComponent(phase.id)}&parentId=${encodeURIComponent(phase.parentRoadmapId)}`
-                            : `/pastor/jumpstart?id=${encodeURIComponent(phase.id)}`;
-                          router.push(href);
-                        }}
+                        type="button"
+                        onClick={() => handleViewPhase(phase)}
                         className={pastorPrimaryCta}
                       >
                         View
@@ -392,6 +449,37 @@ export default function RevitalizationRoadmap() {
           )}
         </div>
       </main>
+
+      {sequenceGate && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="roadmap-sequence-title"
+          onClick={() => setSequenceGate(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-white/15 bg-[linear-gradient(180deg,#0c3f66_0%,#082a47_100%)] p-6 text-center shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="roadmap-sequence-title" className="text-lg font-semibold text-white">
+              Complete the previous roadmap first
+            </h2>
+            <p className="mt-4 text-sm leading-relaxed text-[#d9ebf8]">
+              Complete{" "}
+              <span className="font-semibold text-white">{sequenceGate.previousName}</span> to begin{" "}
+              <span className="font-semibold text-white">{sequenceGate.currentName}</span>.
+            </p>
+            <button
+              type="button"
+              onClick={() => setSequenceGate(null)}
+              className="mt-6 inline-flex min-w-[120px] items-center justify-center rounded-xl bg-[#8ec5eb] px-5 py-2.5 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#b8daf3]"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

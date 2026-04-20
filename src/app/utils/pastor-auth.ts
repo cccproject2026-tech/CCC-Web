@@ -1,6 +1,6 @@
 import { getCookie } from "@/app/utils/cookies";
 import { getAccessToken } from "@/app/utils/auth-tokens";
-export { normalizeUserCookieForClient } from "@/app/utils/user-cookie";
+export { normalizeUserCookieForClient, getRoleFromUserCookie } from "@/app/utils/user-cookie";
 
 /** Routes under /pastor that do not require a session (onboarding / auth). */
 const PUBLIC_PATH_PREFIXES = [
@@ -36,8 +36,20 @@ export function getPastorUserId(): string | null {
   return direct || null;
 }
 
-/** Session = bearer token + resolvable user id (API calls need both). */
+/**
+ * Session = bearer token + resolvable user id + `user` cookie role is `pastor`.
+ * (Same cookies were previously shared across portals, which caused wrong auto-redirects.)
+ */
 export function hasPastorSession(): boolean {
-  return !!getAccessToken() && !!getPastorUserId();
+  if (!getAccessToken() || !getPastorUserId()) return false;
+  const raw = getCookie("user");
+  if (!raw) return false;
+  try {
+    const u = JSON.parse(raw) as { role?: unknown };
+    const r = u.role != null ? String(u.role).toLowerCase().trim() : "";
+    return r === "pastor";
+  } catch {
+    return false;
+  }
 }
 
