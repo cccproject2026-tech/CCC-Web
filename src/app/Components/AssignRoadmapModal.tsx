@@ -8,6 +8,29 @@ import { apiGetAllUsers } from "@/app/Services/users.service";
 import { apiAssignRoadmap } from "@/app/Services/api";
 import { emitPastorAssignmentsChanged } from "@/app/utils/progress-sync";
 
+function formatAssignRoadmapError(err: unknown): string {
+  const e = err as {
+    response?: { status?: number; data?: { message?: unknown } };
+    message?: string;
+  };
+  const status = e?.response?.status;
+  const raw = e?.response?.data?.message;
+  const msg =
+    raw == null
+      ? ""
+      : Array.isArray(raw)
+        ? raw.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" ")
+        : String(raw);
+  const text = msg.trim() || e?.message || "Failed to assign roadmap.";
+  if (
+    status === 409 ||
+    /\balready\b|duplicate|assigned already|has already been assigned|already assigned/i.test(text)
+  ) {
+    return "This roadmap is already assigned to the selected user(s).";
+  }
+  return text;
+}
+
 const ROLE_FILTERS = [
   { label: "All", value: "all" },
   { label: "Pastors", value: "pastor" },
@@ -50,22 +73,44 @@ export default function AssignRoadmapModal({
   const [loading, setLoading] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
     setSelected(initialUserId ? [initialUserId] : []);
     setQuery("");
     setRoleFilter("all");
+    setAssignSuccess(null);
     fetchUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialUserId]);
+
+  useEffect(() => {
+    if (!assignSuccess) return;
+    const t = window.setTimeout(() => {
+      setAssignSuccess(null);
+      onClose();
+    }, 2800);
+    return () => window.clearTimeout(t);
+  }, [assignSuccess, onClose]);
 
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiGetAllUsers({ role: "pastor", roleMatch: "mixed", limit: 9999 });
-      const allUsers = res.data?.data?.users || [];
+      const res = await apiGetAllUsers({
+        role: "pastor",
+        roleMatch: "mixed",
+        limit: 9999,
+        status: "active",
+      });
+      const raw = res.data?.data?.users || [];
+      const allUsers = raw.filter((u: any) => {
+        if (u?.isDeleted === true || u?.deletedAt) return false;
+        const s = String(u?.status || "").toLowerCase();
+        if (s === "inactive" || s === "deleted") return false;
+        return true;
+      });
 
       setPeople(
         allUsers.map((u: any, i: number) => ({
@@ -100,13 +145,14 @@ export default function AssignRoadmapModal({
   const handleAssign = async () => {
     if (!roadmapIds.length || selected.length === 0) return;
     setAssigning(true);
+    setError(null);
     try {
       await apiAssignRoadmap({ userIds: selected, roadMapIds: roadmapIds });
       emitPastorAssignmentsChanged(selected);
       onSuccess?.();
-      onClose();
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to assign roadmap.");
+      setAssignSuccess("Roadmap assigned successfully.");
+    } catch (err: unknown) {
+      setError(formatAssignRoadmapError(err));
     } finally {
       setAssigning(false);
     }
@@ -116,6 +162,15 @@ export default function AssignRoadmapModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
+      {assignSuccess ? (
+        <div
+          className="pointer-events-none fixed bottom-6 left-1/2 z-[110] max-w-[min(100%,24rem)] -translate-x-1/2 rounded-xl border border-emerald-200/90 bg-emerald-50 px-5 py-3.5 text-center text-sm font-semibold text-emerald-950 shadow-xl"
+          role="status"
+        >
+          <i className="fa-solid fa-circle-check mr-2 text-emerald-600" aria-hidden />
+          {assignSuccess}
+        </div>
+      ) : null}
       <div className="bg-white rounded-xl max-w-md w-full shadow-2xl max-h-[90vh] flex flex-col">
 
         {/* Header */}
@@ -236,7 +291,7 @@ export default function AssignRoadmapModal({
           </p>
           <button
             onClick={handleAssign}
-            disabled={selected.length === 0 || assigning}
+            disabled={selected.length === 0 || assigning || Boolean(assignSuccess)}
             className="px-6 py-2.5 bg-[#2E3B8E] text-white rounded-lg text-sm font-semibold hover:bg-[#1F2A6E] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {assigning && <i className="fa-solid fa-spinner animate-spin text-xs"></i>}

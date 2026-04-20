@@ -47,6 +47,12 @@ interface ProfileFormProps {
   onCommentsChange?: (value: string) => void;
 }
 
+function digitsOnly(value: string, maxLen?: number) {
+  const d = value.replace(/\D/g, "");
+  if (maxLen != null) return d.slice(0, maxLen);
+  return d;
+}
+
 export default function ProfileForm({
   title,
   headerActions,
@@ -200,12 +206,13 @@ export default function ProfileForm({
               </label>
               <input
                 type="text"
+                inputMode="numeric"
                 value={other.yearsInMinistry || ""}
                 readOnly={!editable}
                 onChange={(e) =>
                   onOtherChange?.({
                     ...other,
-                    yearsInMinistry: e.target.value,
+                    yearsInMinistry: digitsOnly(e.target.value),
                   })
                 }
                 className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
@@ -297,7 +304,7 @@ function renderChurchGrid(
           type="text"
           value={church.churchName || ""}
           readOnly={!editable}
-          onChange={(e) => onChange?.({ ...church, name: e.target.value })}
+          onChange={(e) => onChange?.({ ...church, churchName: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
         />
       </div>
@@ -309,7 +316,7 @@ function renderChurchGrid(
           type="text"
           value={church.churchPhone || ""}
           readOnly={!editable}
-          onChange={(e) => onChange?.({ ...church, phone: e.target.value })}
+          onChange={(e) => onChange?.({ ...church, churchPhone: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
         />
       </div>
@@ -321,7 +328,7 @@ function renderChurchGrid(
           type="text"
           value={church.churchWebsite || ""}
           readOnly={!editable}
-          onChange={(e) => onChange?.({ ...church, website: e.target.value })}
+          onChange={(e) => onChange?.({ ...church, churchWebsite: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
         />
       </div>
@@ -333,7 +340,7 @@ function renderChurchGrid(
           type="text"
           value={church.churchAddress || ""}
           readOnly={!editable}
-          onChange={(e) => onChange?.({ ...church, address: e.target.value })}
+          onChange={(e) => onChange?.({ ...church, churchAddress: e.target.value })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
         />
       </div>
@@ -361,9 +368,10 @@ function renderChurchGrid(
         <label className="block text-[13px] text-white/80 mb-2">Zip Code</label>
         <input
           type="text"
+          inputMode="numeric"
           value={church.zipCode || ""}
           readOnly={!editable}
-          onChange={(e) => onChange?.({ ...church, zipCode: e.target.value })}
+          onChange={(e) => onChange?.({ ...church, zipCode: digitsOnly(e.target.value) })}
           className="w-full px-4 py-3 bg-[#4A7BA8]/30 text-white border border-white/20 rounded-lg text-[14px] outline-none"
         />
       </div>

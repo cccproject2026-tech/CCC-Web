@@ -28,9 +28,12 @@ import {
   apiUpdateUserById,
 } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
+import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
+import { updateInterestByEmail } from "@/app/Services/pastor.service";
 import { getCookie } from "@/app/utils/cookies";
-import { isRemoteImageSrc } from "@/app/utils/image";
+import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 import type { ChurchDetails } from "@/app/Services/types/interests.types";
+import type { ProgressResponse } from "@/app/Services/types/progress.types";
 
 type InviteState = "none" | "invited" | "accepted" | "cert_issued";
 
@@ -82,6 +85,8 @@ export default function MenteeProfileClient({ menteeId }: Props) {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [inviteState, setInviteState] = useState<InviteState>("none");
+  const [progressOverallDone, setProgressOverallDone] = useState(false);
+  const [userMarkedComplete, setUserMarkedComplete] = useState(false);
 
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("");
@@ -118,13 +123,25 @@ export default function MenteeProfileClient({ menteeId }: Props) {
       ]);
 
       const user = userRes.data.data;
-      const progress = progressRes.data.data;
+      const progress = unwrapProgressData(progressRes as { data: unknown }) as ProgressResponse | null;
       const interest = user?.interest;
+
+      const marked =
+        user.hasCompleted === true ||
+        String(user.status ?? "").toLowerCase() === "completed";
+      setProgressOverallDone(Boolean(progress?.overallCompleted));
+      setUserMarkedComplete(marked);
 
       setFullName(`${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Mentee");
       setRole(user.role ?? "Pastor");
       setProfileProgress(Math.round(progress?.overallProgress ?? 0));
-      setProfileImage(user.profilePicture || Mentor1);
+
+      const rawPic = user.profilePicture;
+      const resolved =
+        typeof rawPic === "string" && rawPic.trim()
+          ? resolveApiMediaUrl(rawPic) ?? rawPic
+          : null;
+      setProfileImage(resolved || Mentor1);
       setInviteState(deriveInviteState(user));
 
       setPersonal({
@@ -176,9 +193,10 @@ export default function MenteeProfileClient({ menteeId }: Props) {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const phoneDigits = personal.phoneNumber.replace(/\D/g, "");
-  const mailtoHref = personal.email.trim()
-    ? `mailto:${encodeURIComponent(personal.email.trim())}`
+  const phoneDigits = (personal.phoneNumber ?? "").replace(/\D/g, "");
+  const emailTrim = (personal.email ?? "").trim();
+  const mailtoHref = emailTrim
+    ? `mailto:${encodeURIComponent(emailTrim)}`
     : undefined;
   const telHref = phoneDigits ? `tel:${phoneDigits}` : undefined;
   const whatsappHref =
@@ -187,13 +205,16 @@ export default function MenteeProfileClient({ menteeId }: Props) {
       : undefined;
   const smsHref = phoneDigits ? `sms:${phoneDigits}` : undefined;
 
+  const canInviteFieldMentor =
+    progressOverallDone && userMarkedComplete;
+
   const inviteButton = useMemo(() => {
     switch (inviteState) {
       case "none":
         return {
           icon: "fa-solid fa-user-plus",
           label: "Invite to be a Field Mentor",
-          disabled: false,
+          disabled: !canInviteFieldMentor,
           onClick: async () => {
             try {
               const invitedBy = getCookie("userId");
@@ -237,12 +258,17 @@ export default function MenteeProfileClient({ menteeId }: Props) {
           disabled: true,
         };
     }
-  }, [inviteState, personal.email]);
+  }, [inviteState, personal.email, canInviteFieldMentor]);
 
   const persistProfile = async () => {
     const churches: ChurchDetails[] = [];
     if (hasChurchData(church1)) churches.push(churchInfoToDetails(church1));
     if (hasChurchData(church2)) churches.push(churchInfoToDetails(church2));
+
+    const interestLines = interests
+      .split(/[\n,]+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
 
     await apiUpdateUserById(menteeId, {
       firstName: personal.firstName,
@@ -251,13 +277,24 @@ export default function MenteeProfileClient({ menteeId }: Props) {
       title: other.title,
       yearsInMinistry: other.yearsInMinistry,
       conference: other.conference,
-      bio: comments,
       churchDetails: churches.length ? churches : undefined,
     });
+
+    const email = personal.email?.trim();
+    if (email) {
+      await updateInterestByEmail(email, {
+        title: other.title,
+        yearsInMinistry: other.yearsInMinistry,
+        conference: other.conference,
+        currentCommunityProjects: other.communityServiceProjects,
+        interests: interestLines,
+        comments,
+        ...(churches.length ? { churchDetails: churches } : {}),
+      });
+    }
   };
 
   const handleSave = async () => {
-    setConfirmSave(false);
     try {
       setSaving(true);
       await persistProfile();
@@ -272,6 +309,7 @@ export default function MenteeProfileClient({ menteeId }: Props) {
         if (d?.message) msg = d.message;
       }
       setToast({ message: msg, variant: "error" });
+      throw e;
     } finally {
       setSaving(false);
     }
@@ -451,6 +489,11 @@ export default function MenteeProfileClient({ menteeId }: Props) {
                   type="button"
                   onClick={inviteButton.onClick}
                   disabled={inviteButton.disabled}
+                  title={
+                    inviteState === "none" && !canInviteFieldMentor
+                      ? "Available when the program is complete and the mentee is marked complete (mentor or director)."
+                      : undefined
+                  }
                   className={`${directorBtnPrimary} w-full justify-center disabled:cursor-not-allowed disabled:opacity-50`}
                 >
                   <i className={inviteButton.icon} />

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import SearchBar from "@/app/Components/SearchBar";
@@ -21,8 +21,19 @@ import {
   apiAssignUsers,
   apiGetAllUsers,
   apiGetAssignedUsers,
+  apiGetUserById,
+  unwrapUserResponse,
 } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
+import type { ProgressResponse } from "@/app/Services/types/progress.types";
+import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
+import {
+  deriveCurrentRoadmapPhaseLabel,
+  fetchRoadmapTitlesForIds,
+} from "@/app/utils/roadmap-phase-from-progress";
+import { deriveOverallProgressPercent } from "@/app/utils/user-progress-display";
+import { resolveApiMediaUrl } from "@/app/utils/image";
+import { formatUserLastLoginDisplay } from "@/app/utils/last-login-display";
 
 export interface Mentee {
   id: string;
@@ -35,16 +46,81 @@ export interface Mentee {
   phase?: string;
   assignedId: string[];
   assignedLoaded: boolean;
+  createdAt?: string;
+  country?: string;
+}
+
+type MenteeSortKey =
+  | { kind: "latest" }
+  | { kind: "phase_self" | "phase_church" | "phase_community" }
+  | { kind: "country"; country: string }
+  | { kind: "name_az" | "name_za" | "progress" };
+
+function phaseFilterMatches(
+  phase: string | undefined,
+  sub: "self" | "church" | "community",
+): boolean {
+  const p = (phase || "").toLowerCase();
+  if (sub === "self")
+    return p.includes("self") && p.includes("revitalization");
+  if (sub === "church")
+    return p.includes("church") && p.includes("empowerment");
+  return p.includes("community") || p.includes("multiplication");
+}
+
+function sortByCreatedDesc(a?: string, b?: string) {
+  const ta = a ? new Date(a).getTime() : 0;
+  const tb = b ? new Date(b).getTime() : 0;
+  return tb - ta;
+}
+
+function isPhaseSortKey(k: MenteeSortKey): boolean {
+  return (
+    k.kind === "phase_self" ||
+    k.kind === "phase_church" ||
+    k.kind === "phase_community"
+  );
+}
+
+function labelForSortKey(k: MenteeSortKey): string {
+  switch (k.kind) {
+    case "latest":
+      return "Latest Join";
+    case "phase_self":
+      return "Self Revitalization";
+    case "phase_church":
+      return "Church Empowerment";
+    case "phase_community":
+      return "Community Revitalization and Multiplication";
+    case "country":
+      return `Country · ${k.country}`;
+    case "name_az":
+      return "Name A–Z";
+    case "name_za":
+      return "Name Z–A";
+    case "progress":
+      return "Progress";
+    default:
+      return "Latest Join";
+  }
 }
 
 const IMAGE_POOL = [Mentor1, Mentor2, Mentor3];
+
+function profileImageForUser(user: any, index: number) {
+  const raw = user.profilePicture;
+  if (typeof raw === "string" && raw.trim()) {
+    return resolveApiMediaUrl(raw) ?? raw;
+  }
+  return IMAGE_POOL[index % IMAGE_POOL.length];
+}
 
 const mapUserToMentee = (user: any, index: number): Mentee => ({
   id: user.id ?? user._id,
   name: `${user.firstName} ${user.lastName}`,
   role: user.role,
   description: `${user.role} enrolled in mentoring program`,
-  img: user.profilePicture || IMAGE_POOL[index % IMAGE_POOL.length],
+  img: profileImageForUser(user, index),
   status: user.hasCompleted
     ? "completed"
     : user.status === "pending"
@@ -54,6 +130,11 @@ const mapUserToMentee = (user: any, index: number): Mentee => ({
   phase: user.currentPhase ?? undefined,
   assignedId: [],
   assignedLoaded: false,
+  createdAt: typeof user.createdAt === "string" ? user.createdAt : undefined,
+  country:
+    user.interest?.churchDetails?.[0]?.country?.trim() ||
+    user.interest?.country?.trim() ||
+    "",
 });
 
 export default function MenteesPage() {
@@ -67,8 +148,11 @@ export default function MenteesPage() {
   const [activeTab, setActiveTab] = useState<"all" | "active" | "completed">(
     "active"
   );
-  const [sortBy, setSortBy] = useState("Phase");
+  const [sortKey, setSortKey] = useState<MenteeSortKey>({ kind: "latest" });
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [phaseSectionOpen, setPhaseSectionOpen] = useState(true);
+  const [countrySectionOpen, setCountrySectionOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -77,6 +161,7 @@ export default function MenteesPage() {
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [selectedMentee, setSelectedMentee] = useState<string | null>(null);
   const [mentors, setMentors] = useState<Mentor[]>([]);
+  const [mentorsLoading, setMentorsLoading] = useState(false);
 
   /* ---------------- LOAD ASSIGNED USERS ---------------- */
 
@@ -157,58 +242,140 @@ export default function MenteesPage() {
     let cancelled = false;
 
     const hydrateProgress = async () => {
-      // snapshot the current page's users so page changes mid-fetch stop cleanly
       const currentMentees = mentees.slice();
-      for (const m of currentMentees) {
-        if (cancelled) break;
-        try {
-          const res = await apiGetUserProgress(m.id);
-          const progress = res.data.data?.overallProgress ?? 0;
-          const completed = res.data.data?.overallCompleted ?? false;
-          setMentees((prev) =>
-            prev.map((item) =>
-              item.id === m.id
-                ? { ...item, progress, status: completed ? "completed" : item.status }
-                : item
-            )
-          );
-        } catch {
-          // skip failed individual progress fetch
+      try {
+        const results = await Promise.all(
+          currentMentees.map(async (m) => {
+            try {
+              const res = await apiGetUserProgress(m.id);
+              const pr = unwrapProgressData(res) as ProgressResponse | null | undefined;
+              return { id: m.id, pr };
+            } catch {
+              return { id: m.id, pr: null as ProgressResponse | null };
+            }
+          }),
+        );
+        if (cancelled) return;
+
+        const roadMapIds: string[] = [];
+        for (const r of results) {
+          const list = r.pr?.roadmaps;
+          if (!list?.length) continue;
+          for (const row of list) {
+            if (row.roadMapId) roadMapIds.push(String(row.roadMapId));
+          }
         }
-        await new Promise((r) => setTimeout(r, 150));
+        const nameById = await fetchRoadmapTitlesForIds(roadMapIds);
+        if (cancelled) return;
+
+        const patch = new Map<
+          string,
+          { progress: number; phase?: string; markCompleted?: boolean }
+        >();
+        for (const { id, pr } of results) {
+          if (!pr) continue;
+          const safeProgress = deriveOverallProgressPercent(pr);
+          const completed = Boolean(pr.overallCompleted);
+          const hasRoadmaps = Array.isArray(pr.roadmaps) && pr.roadmaps.length > 0;
+          const phase = hasRoadmaps
+            ? deriveCurrentRoadmapPhaseLabel(pr, nameById)
+            : "Phase not assigned";
+          patch.set(id, {
+            progress: safeProgress,
+            phase: phase ?? "Phase not assigned",
+            ...(completed ? { markCompleted: true as const } : {}),
+          });
+        }
+
+        setMentees((prev) =>
+          prev.map((item) => {
+            const u = patch.get(item.id);
+            if (!u) return item;
+            return {
+              ...item,
+              progress: u.progress,
+              phase: u.phase ?? item.phase,
+              ...(u.markCompleted ? { status: "completed" as const } : {}),
+            };
+          }),
+        );
+      } catch {
+        // keep list without progress
       }
     };
 
-    hydrateProgress();
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    void hydrateProgress();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [menteeIdsKey]);
 
-  /* ---------------- FETCH MENTORS ---------------- */
+  /* ---------------- FETCH MENTORS (assign / remove modals) ---------------- */
 
-  useEffect(() => {
-    const fetchMentors = async () => {
+  const loadMentorsForAssignModal = useCallback(async () => {
+    setMentorsLoading(true);
+    try {
       const res = await apiGetAllUsers({
         role: "mentor",
         roleMatch: "exact",
+        page: 1,
+        limit: 500,
       });
+      const rows = res.data.data.users ?? [];
+
+      /** GET /users list often omits `lastLogin`; merge GET /users/:id for each mentor. */
+      const CHUNK = 20;
+      const enriched: any[] = [];
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const part = rows.slice(i, i + CHUNK);
+        const batch = await Promise.all(
+          part.map(async (u: any) => {
+            const id = u.id ?? u._id;
+            if (!id) return u;
+            try {
+              const detailRes = await apiGetUserById(id);
+              const full = unwrapUserResponse(detailRes as { data?: unknown });
+              if (full && typeof full === "object") {
+                const merged = { ...u, ...full } as Record<string, unknown>;
+                if (Array.isArray((u as { assignedId?: string[] }).assignedId)) {
+                  merged.assignedId =
+                    (full as { assignedId?: string[] }).assignedId ??
+                    (u as { assignedId?: string[] }).assignedId;
+                }
+                return merged;
+              }
+              return u;
+            } catch {
+              return u;
+            }
+          }),
+        );
+        enriched.push(...batch);
+      }
 
       setMentors(
-        res.data.data.users.map((u: any, i: number): Mentor => ({
+        enriched.map((u: any, i: number): Mentor => ({
           id: u.id ?? u._id,
           name: `${u.firstName} ${u.lastName}`,
           role: u.role,
           menteeCount: u.assignedId?.length ?? 0,
-          img: u.profilePicture || IMAGE_POOL[i % IMAGE_POOL.length],
-          loginDate: u.lastLogin
-            ? new Date(u.lastLogin).toLocaleDateString()
-            : "Not Started yet",
-        }))
+          img: profileImageForUser(u, i),
+          loginDate: formatUserLastLoginDisplay(u),
+        })),
       );
-    };
-
-    fetchMentors();
+    } catch (e) {
+      console.error("Failed to load mentors", e);
+      setMentors([]);
+    } finally {
+      setMentorsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    if (!showAssignModal && !showRemoveModal) return;
+    void loadMentorsForAssignModal();
+  }, [showAssignModal, showRemoveModal, loadMentorsForAssignModal]);
 
   /* ---------------- ASSIGN ---------------- */
 
@@ -277,24 +444,43 @@ export default function MenteesPage() {
     );
   }, [selectedMentee, mentees, mentors]);
 
-  const sortedMentees = useMemo(() => {
-    const arr = [...mentees];
-    switch (sortBy) {
-      case "Name A-Z":
-        return arr.sort((a, b) => a.name.localeCompare(b.name));
-      case "Name Z-A":
-        return arr.sort((a, b) => b.name.localeCompare(a.name));
-      case "Progress":
-        return arr.sort(
-          (a, b) => (a.progress ?? 0) - (b.progress ?? 0)
-        );
-      case "Phase":
-      default:
-        return arr.sort((a, b) =>
-          (a.phase ?? "\uFFFF").localeCompare(b.phase ?? "\uFFFF")
-        );
+  const uniqueCountries = useMemo(() => {
+    const s = new Set<string>();
+    for (const m of mentees) {
+      const c = m.country?.trim();
+      if (c) s.add(c);
     }
-  }, [mentees, sortBy]);
+    return [...s].sort((a, b) => a.localeCompare(b));
+  }, [mentees]);
+
+  const sortedMentees = useMemo(() => {
+    let list = [...mentees];
+
+    if (sortKey.kind === "phase_self") {
+      list = list.filter((m) => phaseFilterMatches(m.phase, "self"));
+    } else if (sortKey.kind === "phase_church") {
+      list = list.filter((m) => phaseFilterMatches(m.phase, "church"));
+    } else if (sortKey.kind === "phase_community") {
+      list = list.filter((m) => phaseFilterMatches(m.phase, "community"));
+    } else if (sortKey.kind === "country") {
+      const want = sortKey.country.trim().toLowerCase();
+      list = list.filter(
+        (m) => (m.country || "").trim().toLowerCase() === want,
+      );
+    }
+
+    const arr = [...list];
+    if (sortKey.kind === "name_az") {
+      arr.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortKey.kind === "name_za") {
+      arr.sort((a, b) => b.name.localeCompare(a.name));
+    } else if (sortKey.kind === "progress") {
+      arr.sort((a, b) => (a.progress ?? 0) - (b.progress ?? 0));
+    } else {
+      arr.sort((a, b) => sortByCreatedDesc(a.createdAt, b.createdAt));
+    }
+    return arr;
+  }, [mentees, sortKey]);
 
   const featuredItems: FeaturedAvatarItem[] = useMemo(
     () =>
@@ -359,7 +545,12 @@ export default function MenteesPage() {
   ];
 
   const activeCount = mentees.filter((m) => m.status === "active").length;
-  const sortOptions = ["Phase", "Name A-Z", "Name Z-A", "Progress"];
+  const sortControlClass = (active: boolean) =>
+    `flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] transition sm:text-[14px] ${
+      active
+        ? "bg-[#e8f1f8] font-semibold text-[#0f4a76]"
+        : "text-gray-700 hover:bg-gray-50"
+    }`;
 
   return (
     <div className={directorPageRoot}>
@@ -397,7 +588,26 @@ export default function MenteesPage() {
               </button>
               <button
                 type="button"
-                className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-[#8ec5eb] transition hover:bg-white/15"
+                onClick={() => setViewMode("grid")}
+                aria-pressed={viewMode === "grid"}
+                className={`flex h-11 w-11 items-center justify-center rounded-lg border text-[#8ec5eb] transition hover:bg-white/15 ${
+                  viewMode === "grid"
+                    ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20"
+                    : "border-white/15 bg-white/10"
+                }`}
+                aria-label="Grid view"
+              >
+                <i className="fa-solid fa-table-cells" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("list")}
+                aria-pressed={viewMode === "list"}
+                className={`flex h-11 w-11 items-center justify-center rounded-lg border text-[#8ec5eb] transition hover:bg-white/15 ${
+                  viewMode === "list"
+                    ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20"
+                    : "border-white/15 bg-white/10"
+                }`}
                 aria-label="List view"
               >
                 <i className="fa-solid fa-list" />
@@ -406,7 +616,16 @@ export default function MenteesPage() {
           </div>
 
           {!loading && featuredItems.length > 0 && (
-            <FeaturedAvatars items={featuredItems} showDivider className="mb-2" />
+            <FeaturedAvatars
+              items={featuredItems}
+              showDivider
+              className="mb-2"
+              onItemClick={(item) =>
+                router.push(
+                  `/director/mentees/profile/${encodeURIComponent(String(item.id))}`
+                )
+              }
+            />
           )}
         </div>
       </section>
@@ -455,44 +674,245 @@ export default function MenteesPage() {
             <span className="text-[14px] font-semibold whitespace-nowrap text-white sm:text-[15px]">
               Sort By
             </span>
-            <div className="relative w-full sm:w-auto sm:min-w-[200px]">
+            <div className="relative w-full sm:w-auto sm:min-w-[240px]">
               <button
                 type="button"
                 onClick={() => setShowSortMenu(!showSortMenu)}
-                className="flex w-full min-w-[160px] items-center justify-between gap-3 rounded-lg border border-white/15 bg-white/10 px-4 py-2.5 text-[13px] font-medium text-white shadow-sm transition-all hover:bg-white/15 sm:min-w-[180px] sm:text-[14px]"
+                className="flex w-full min-w-[160px] items-center justify-between gap-3 rounded-lg border border-white/15 bg-white/10 px-4 py-2.5 text-[13px] font-medium text-white shadow-sm transition-all hover:bg-white/15 sm:min-w-[220px] sm:text-[14px]"
               >
-                <span className="truncate">{sortBy}</span>
+                <span className="truncate">{labelForSortKey(sortKey)}</span>
                 <i className="fa-solid fa-chevron-down text-[10px]" />
               </button>
 
               {showSortMenu && (
-                <div className="absolute right-0 top-full z-50 mt-2 min-w-[200px] rounded-xl border border-white/15 bg-[#041f35]/98 py-2 px-1 shadow-2xl backdrop-blur-md">
-                  {sortOptions.map((option) => (
+                <div className="absolute right-0 top-full z-50 mt-2 w-[min(100vw-2rem,320px)] rounded-xl border border-gray-200 bg-white py-2 shadow-xl">
+                  {/* Phase */}
+                  <div
+                    className={`mx-2 rounded-lg ${
+                      isPhaseSortKey(sortKey)
+                        ? "bg-[#e8f0f8]"
+                        : "bg-transparent"
+                    }`}
+                  >
                     <button
-                      key={option}
+                      type="button"
+                      onClick={() => setPhaseSectionOpen(!phaseSectionOpen)}
+                      className="flex w-full items-center justify-between gap-2 px-2 py-2 text-left"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
+                            isPhaseSortKey(sortKey)
+                              ? "border-emerald-500 bg-emerald-500"
+                              : "border-gray-300"
+                          }`}
+                        >
+                          {isPhaseSortKey(sortKey) ? (
+                            <i className="fa-solid fa-check text-[9px] text-white" />
+                          ) : null}
+                        </span>
+                        <span className="text-[14px] font-semibold text-gray-900">
+                          Phase
+                        </span>
+                      </span>
+                      <span
+                        className={`flex h-8 w-8 items-center justify-center rounded border ${
+                          isPhaseSortKey(sortKey)
+                            ? "border-[#2E3B8E] bg-[#2E3B8E] text-white"
+                            : "border-[#2E3B8E] bg-white text-[#2E3B8E]"
+                        }`}
+                      >
+                        <i
+                          className={`fa-solid ${
+                            phaseSectionOpen ? "fa-chevron-up" : "fa-chevron-down"
+                          } text-xs`}
+                        />
+                      </span>
+                    </button>
+                    {phaseSectionOpen ? (
+                      <div className="border-t border-gray-200/80 pb-2 pl-4 pr-2 pt-1">
+                        {(
+                          [
+                            {
+                              key: "phase_self" as const,
+                              label: "Self Revitalization",
+                            },
+                            {
+                              key: "phase_church" as const,
+                              label: "Church Empowerment",
+                            },
+                            {
+                              key: "phase_community" as const,
+                              label:
+                                "Community Revitalization and Multiplication",
+                            },
+                          ] as const
+                        ).map(({ key, label }) => {
+                          const active = sortKey.kind === key;
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => {
+                                setSortKey({ kind: key });
+                                setShowSortMenu(false);
+                              }}
+                              className={sortControlClass(active)}
+                            >
+                              <span
+                                className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
+                                  active
+                                    ? "border-emerald-500 bg-emerald-500"
+                                    : "border-gray-300"
+                                }`}
+                              >
+                                {active ? (
+                                  <i className="fa-solid fa-check text-[9px] text-white" />
+                                ) : null}
+                              </span>
+                              <span>{label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {/* Country */}
+                  <div className="mx-2 mt-1 rounded-lg border-t border-gray-100 pt-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCountrySectionOpen(!countrySectionOpen)
+                      }
+                      className="flex w-full items-center justify-between gap-2 px-2 py-2 text-left"
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
+                            sortKey.kind === "country"
+                              ? "border-emerald-500 bg-emerald-500"
+                              : "border-gray-300"
+                          }`}
+                        >
+                          {sortKey.kind === "country" ? (
+                            <i className="fa-solid fa-check text-[9px] text-white" />
+                          ) : null}
+                        </span>
+                        <span className="text-[14px] font-semibold text-gray-900">
+                          Country
+                        </span>
+                      </span>
+                      <span className="flex h-8 w-8 items-center justify-center rounded border border-[#2E3B8E] bg-white text-[#2E3B8E]">
+                        <i
+                          className={`fa-solid ${
+                            countrySectionOpen
+                              ? "fa-chevron-up"
+                              : "fa-chevron-down"
+                          } text-xs`}
+                        />
+                      </span>
+                    </button>
+                    {countrySectionOpen ? (
+                      <div className="max-h-48 overflow-y-auto border-t border-gray-200/80 py-1 pl-4 pr-2">
+                        {uniqueCountries.length === 0 ? (
+                          <p className="px-2 py-2 text-[13px] text-gray-500">
+                            No countries on this page.
+                          </p>
+                        ) : (
+                          uniqueCountries.map((c) => {
+                            const active =
+                              sortKey.kind === "country" &&
+                              sortKey.country === c;
+                            return (
+                              <button
+                                key={c}
+                                type="button"
+                                onClick={() => {
+                                  setSortKey({ kind: "country", country: c });
+                                  setShowSortMenu(false);
+                                }}
+                                className={sortControlClass(active)}
+                              >
+                                <span
+                                  className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
+                                    active
+                                      ? "border-emerald-500 bg-emerald-500"
+                                      : "border-gray-300"
+                                  }`}
+                                >
+                                  {active ? (
+                                    <i className="fa-solid fa-check text-[9px] text-white" />
+                                  ) : null}
+                                </span>
+                                <span>{c}</span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="mx-2 mt-1 border-t border-gray-100 pt-2">
+                    {(
+                      [
+                        { kind: "name_az" as const, label: "Name A–Z" },
+                        { kind: "name_za" as const, label: "Name Z–A" },
+                        { kind: "progress" as const, label: "Progress" },
+                      ] as const
+                    ).map(({ kind, label }) => {
+                      const active = sortKey.kind === kind;
+                      return (
+                        <button
+                          key={kind}
+                          type="button"
+                          onClick={() => {
+                            setSortKey({ kind });
+                            setShowSortMenu(false);
+                          }}
+                          className={sortControlClass(active)}
+                        >
+                          <span
+                            className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
+                              active
+                                ? "border-emerald-500 bg-emerald-500"
+                                : "border-gray-300"
+                            }`}
+                          >
+                            {active ? (
+                              <i className="fa-solid fa-check text-[9px] text-white" />
+                            ) : null}
+                          </span>
+                          <span>{label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mx-2 mt-1 border-t border-gray-100 pt-2">
+                    <button
                       type="button"
                       onClick={() => {
-                        setSortBy(option);
+                        setSortKey({ kind: "latest" });
                         setShowSortMenu(false);
                       }}
-                      className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-left text-[13px] transition-all sm:text-[14px] ${sortBy === option
-                        ? "bg-[#8ec5eb]/20 font-semibold text-white"
-                        : "text-white/80 hover:bg-white/10"
-                        }`}
+                      className={sortControlClass(sortKey.kind === "latest")}
                     >
                       <span
-                        className={`flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-full border-2 ${sortBy === option
-                          ? "border-[#8ec5eb] bg-[#8ec5eb]/40"
-                          : "border-white/30"
-                          }`}
+                        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
+                          sortKey.kind === "latest"
+                            ? "border-emerald-500 bg-emerald-500"
+                            : "border-gray-300"
+                        }`}
                       >
-                        {sortBy === option && (
-                          <i className="fa-solid fa-check text-[9px] text-white"></i>
-                        )}
+                        {sortKey.kind === "latest" ? (
+                          <i className="fa-solid fa-check text-[9px] text-white" />
+                        ) : null}
                       </span>
-                      {option}
+                      <span>Clear Slot</span>
                     </button>
-                  ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -517,7 +937,13 @@ export default function MenteesPage() {
             </p>
           </div>
         ) : (
-        <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 md:gap-5">
+        <div
+          className={
+            viewMode === "list"
+              ? "flex flex-col gap-3"
+              : "grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 md:gap-5"
+          }
+        >
           {sortedMentees.map((m) => (
             <PersonListCard
               key={m.id}
@@ -527,6 +953,7 @@ export default function MenteesPage() {
               description={m.description}
               image={m.img}
               variant="glass"
+              listLayout={viewMode === "list"}
               profileLink={`/director/mentees/profile/${m.id}`}
               progress={
                 m.progress !== undefined
@@ -605,6 +1032,7 @@ export default function MenteesPage() {
         onClose={() => setShowAssignModal(false)}
         onConfirm={handleAssignMentors}
         mentors={mentors}
+        loading={mentorsLoading}
       />
 
       <RemoveMentorModal
@@ -612,6 +1040,7 @@ export default function MenteesPage() {
         onClose={() => setShowRemoveModal(false)}
         onConfirm={handleRemoveMentors}
         mentors={assignedMentors}
+        loading={mentorsLoading}
       />
 
       {(showSortMenu) && (

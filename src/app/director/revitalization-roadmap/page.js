@@ -65,8 +65,14 @@ export default function RevitalizationRoadmapPage() {
     const fetchMentors = async () => {
       try {
         setLoadingMentors(true);
-        const res = await apiGetMentorList();
-        const data = res.data?.data?.users || res.data?.data?.mentors || [];
+        const res = await apiGetMentorList({ status: "active", limit: 9999 });
+        const raw = res.data?.data?.users || res.data?.data?.mentors || [];
+        const data = raw.filter((m) => {
+          if (m?.isDeleted === true || m?.deletedAt) return false;
+          const s = String(m?.status || "").toLowerCase();
+          if (s === "inactive" || s === "deleted") return false;
+          return true;
+        });
         setMentorsList(data);
       } catch (err) {
         console.error("Error fetching mentors:", err);
@@ -102,14 +108,30 @@ export default function RevitalizationRoadmapPage() {
       setLoadingRoadmaps(true);
       const res = await apiGetRoadmaps();
       const list = unwrapRoadmapsList(res);
-      const mapped = list.map((item) => ({
-        id: item._id,
-        title: item.name || "Untitled roadmap",
-        description: item.description || item.roadMapDetails || "No description",
-        completionTime: item.duration || "N/A",
-        img: item.imageUrl || Card1,
-        raw: item,
-      }));
+      const mapped = list.map((item) => {
+        /** Card copy: prefer first nested row when present (single + phase). Routing uses `type` only — see openRoadmapView / openRoadmapEdit. */
+        const nested0 =
+          Array.isArray(item.roadmaps) && item.roadmaps.length > 0 ? item.roadmaps[0] : null;
+
+        const title = item.name || "Untitled roadmap";
+        const description =
+          (nested0 && String(nested0.roadMapDetails || nested0.description || "").trim()) ||
+          item.description ||
+          item.roadMapDetails ||
+          "No description";
+        const completionTime =
+          (nested0 && String(nested0.duration || "").trim()) || item.duration || "N/A";
+        const img = (nested0 && nested0.imageUrl) || item.imageUrl || Card1;
+
+        return {
+          id: item._id,
+          title,
+          description,
+          completionTime,
+          img,
+          raw: item,
+        };
+      });
       setRoadmapLibrary(mapped);
     } catch (err) {
       console.error("Error fetching roadmaps:", err);
@@ -179,29 +201,95 @@ export default function RevitalizationRoadmapPage() {
     }
   };
 
-  const openRoadmapFlow = (row, opts) => {
+  /** Browse phases (phase roadmap library card). */
+  const openRoadmapView = (row) => {
     const rm = row?.raw || {};
     const t = String(rm.type || "").toLowerCase();
-    const isPhase = t === "phase" || t.includes("phase") || Boolean(rm.haveNextedRoadMaps);
+    const isPhaseLibrary = t === "phase" || t.includes("phase");
     const roadmapId = row?.id;
     if (!roadmapId) return;
 
-    if (isPhase) {
+    if (isPhaseLibrary) {
       router.push(`/director/revitalization-roadmap/phase-list?roadmapId=${encodeURIComponent(roadmapId)}`);
       return;
     }
 
-    // Mobile parity: edit "single" opens the roadmap-form for the parent roadmap,
-    // which edits/creates the first nested roadmap template.
+    const firstNested =
+      Array.isArray(rm.roadmaps) && rm.roadmaps.length > 0 ? rm.roadmaps[0] : null;
+    const nestedId = firstNested?._id != null ? String(firstNested._id) : "";
+
     const qp = new URLSearchParams();
     qp.set("roadmapId", roadmapId);
     qp.set("type", "single");
-    qp.set("isEditMode", opts?.edit ? "true" : "true");
+    qp.set("isEditMode", "true");
+    qp.set("viewOnly", "true");
+    if (nestedId) qp.set("nestedRoadmapId", nestedId);
     qp.set("name", String(rm.name || row?.title || ""));
-    qp.set("subheading", String(rm.roadMapDetails || rm.description || row?.description || ""));
-    qp.set("completionTime", String(rm.duration || row?.completionTime || ""));
-    qp.set("bannerImage", String(rm.imageUrl || ""));
+    const subView = firstNested
+      ? String(firstNested.roadMapDetails || firstNested.description || "").trim()
+      : String(rm.roadMapDetails || rm.description || row?.description || "");
+    if (subView) qp.set("subheading", subView);
+    qp.set(
+      "completionTime",
+      String((firstNested && firstNested.duration) || rm.duration || row?.completionTime || ""),
+    );
+    const banner =
+      (firstNested && firstNested.imageUrl) || rm.imageUrl || row?.img || "";
+    if (banner) qp.set("bannerImage", String(banner));
     router.push(`/director/revitalization-roadmap/roadmap-form?${qp.toString()}`);
+  };
+
+  /**
+   * Edit: phase → roadmap-creation (card) then tasks on roadmap-form; single (e.g. Jump-Start) → same.
+   */
+  const openRoadmapEdit = (row) => {
+    const rm = row?.raw || {};
+    const t = String(rm.type || "").toLowerCase();
+    const isPhaseLibrary = t === "phase" || t.includes("phase");
+    const roadmapId = row?.id;
+    if (!roadmapId) return;
+
+    if (isPhaseLibrary) {
+      const first = Array.isArray(rm.roadmaps) && rm.roadmaps.length > 0 ? rm.roadmaps[0] : null;
+      const nestedId = first?._id != null ? String(first._id) : "";
+      const qp = new URLSearchParams();
+      qp.set("roadmapId", roadmapId);
+      qp.set("type", "phase");
+      qp.set("isEditMode", "true");
+      if (nestedId) qp.set("nestedRoadmapId", nestedId);
+      if (first) {
+        if (first.name) qp.set("name", String(first.name));
+        const sub = first.roadMapDetails || first.description || "";
+        if (sub) qp.set("subheading", String(sub));
+        if (first.duration) qp.set("completionTime", String(first.duration));
+        qp.set("selectedDivision", String(first.phase || "All"));
+        if (first.imageUrl) qp.set("bannerImage", String(first.imageUrl));
+      }
+      router.push(`/director/revitalization-roadmap/roadmap-creation?${qp.toString()}`);
+      return;
+    }
+
+    /** Single (e.g. Jump-Start): same as phase — edit library card on roadmap-creation, then tasks on roadmap-form. */
+    const firstSingle = Array.isArray(rm.roadmaps) && rm.roadmaps.length > 0 ? rm.roadmaps[0] : null;
+    const nestedIdSingle = firstSingle?._id != null ? String(firstSingle._id) : "";
+    const qpSingle = new URLSearchParams();
+    qpSingle.set("roadmapId", roadmapId);
+    qpSingle.set("type", "single");
+    qpSingle.set("isEditMode", "true");
+    if (nestedIdSingle) qpSingle.set("nestedRoadmapId", nestedIdSingle);
+    qpSingle.set("name", String(rm.name || row?.title || ""));
+    const subSingle = firstSingle
+      ? String(firstSingle.roadMapDetails || firstSingle.description || "").trim()
+      : String(rm.roadMapDetails || rm.description || row?.description || "");
+    if (subSingle) qpSingle.set("subheading", subSingle);
+    qpSingle.set(
+      "completionTime",
+      String((firstSingle && firstSingle.duration) || rm.duration || row?.completionTime || ""),
+    );
+    qpSingle.set("selectedDivision", String((firstSingle && firstSingle.phase) || "All"));
+    const bannerSingle = (firstSingle && firstSingle.imageUrl) || rm.imageUrl || "";
+    if (bannerSingle) qpSingle.set("bannerImage", String(bannerSingle));
+    router.push(`/director/revitalization-roadmap/roadmap-creation?${qpSingle.toString()}`);
   };
 
   const handleClearFilter = () => {
@@ -234,8 +322,8 @@ export default function RevitalizationRoadmapPage() {
       <main className="flex-1 pb-12">
         <div className={`${directorPageContainer} max-w-7xl`}>
           <DirectorFilterSection className="!p-5 sm:!p-6">
-            <div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0 w-full lg:max-w-md">
+            <div className="flex min-w-0 flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-6">
+              <div className="min-w-0 w-full md:max-w-[min(100%,24rem)] md:flex-1">
                 <SearchBar
                   value={searchQuery}
                   onChange={setSearchQuery}
@@ -245,32 +333,32 @@ export default function RevitalizationRoadmapPage() {
                 />
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex min-w-0 w-full flex-nowrap items-center justify-end gap-2 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] md:ml-auto md:w-auto [&::-webkit-scrollbar]:hidden">
                 <button
                   type="button"
                   onClick={() => setActiveTab("roadmap-library")}
-                  className={`rounded-lg border px-4 py-2.5 text-[13px] font-semibold transition-all sm:px-5 sm:text-[14px] ${tabBtn(activeTab === "roadmap-library")}`}
+                  className={`shrink-0 rounded-lg border px-3 py-2.5 text-[13px] font-semibold transition-all sm:px-4 sm:text-[14px] ${tabBtn(activeTab === "roadmap-library")}`}
                 >
                   Roadmap library
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab("mentors")}
-                  className={`rounded-lg border px-4 py-2.5 text-[13px] font-semibold transition-all sm:px-5 sm:text-[14px] ${tabBtn(activeTab === "mentors")}`}
+                  className={`shrink-0 rounded-lg border px-3 py-2.5 text-[13px] font-semibold transition-all sm:px-4 sm:text-[14px] ${tabBtn(activeTab === "mentors")}`}
                 >
                   Mentors
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab("pastor-roadmaps")}
-                  className={`rounded-lg border px-4 py-2.5 text-[13px] font-semibold transition-all sm:px-5 sm:text-[14px] ${tabBtn(activeTab === "pastor-roadmaps")}`}
+                  className={`shrink-0 rounded-lg border px-3 py-2.5 text-[13px] font-semibold transition-all sm:px-4 sm:text-[14px] ${tabBtn(activeTab === "pastor-roadmaps")}`}
                 >
                   Pastor roadmaps
                 </button>
                 <button
                   type="button"
                   onClick={() => router.push("/director/pastor-assignments")}
-                  className={directorBtnSecondary}
+                  className={`${directorBtnSecondary} shrink-0 !px-4 !py-2.5 !text-[13px] sm:!px-5 sm:!text-[14px]`}
                 >
                   <i className="fa-solid fa-share-nodes text-sm" />
                   <span>Assign</span>
@@ -278,7 +366,7 @@ export default function RevitalizationRoadmapPage() {
                 <button
                   type="button"
                   onClick={() => router.push("/director/revitalization-roadmap/create")}
-                  className={directorBtnPrimary}
+                  className={`${directorBtnPrimary} shrink-0 !px-4 !py-2.5 !text-[13px] sm:!px-5 sm:!text-[14px]`}
                 >
                   <i className="fa-solid fa-plus text-sm" />
                   <span>New roadmap</span>
@@ -308,8 +396,8 @@ export default function RevitalizationRoadmapPage() {
                         title={roadmap.title}
                         description={roadmap.description}
                         completionTime={roadmap.completionTime}
-                        onView={() => openRoadmapFlow(roadmap, { edit: false })}
-                        onEdit={() => openRoadmapFlow(roadmap, { edit: true })}
+                        onView={() => openRoadmapView(roadmap)}
+                        onEdit={() => openRoadmapEdit(roadmap)}
                         onDelete={() => handleDeleteRoadmap(roadmap.id)}
                       />
                     ))}

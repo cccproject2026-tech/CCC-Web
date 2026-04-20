@@ -78,9 +78,8 @@ export const apiCreateRoadmap = (payload: CreateRoadMapPayload, image?: File) =>
         formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
       }
     });
-    return axiosInstance.post('/roadmaps', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    // Let axios set Content-Type with boundary; a bare multipart/form-data breaks parsing on the server.
+    return axiosInstance.post('/roadmaps', formData);
   }
   return axiosInstance.post('/roadmaps', payload);
 };
@@ -95,9 +94,7 @@ export const apiUpdateRoadmap = (id: string, payload: UpdateRoadMapPayload, imag
         formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
       }
     });
-    return axiosInstance.patch(`/roadmaps/${id}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return axiosInstance.patch(`/roadmaps/${id}`, formData);
   }
   return axiosInstance.patch(`/roadmaps/${id}`, payload);
 };
@@ -122,9 +119,7 @@ export const apiAddNestedRoadmapItem = (roadMapId: string, payload: NestedRoadMa
         formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
       }
     });
-    return axiosInstance.post(`/roadmaps/${roadMapId}/nested`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return axiosInstance.post(`/roadmaps/${roadMapId}/nested`, formData);
   }
   return axiosInstance.post(`/roadmaps/${roadMapId}/nested`, payload);
 };
@@ -144,9 +139,7 @@ export const apiUpdateNestedRoadmapItem = (
         formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
       }
     });
-    return axiosInstance.patch(`/roadmaps/${roadMapId}/nested/${nestedItemId}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+    return axiosInstance.patch(`/roadmaps/${roadMapId}/nested/${nestedItemId}`, formData);
   }
   return axiosInstance.patch(`/roadmaps/${roadMapId}/nested/${nestedItemId}`, payload);
 };
@@ -293,9 +286,7 @@ export const apiUploadExtrasDocuments = (
   const formData = new FormData();
   files.forEach((file) => formData.append('files', file));
   return axiosInstance.post(`/roadmaps/${roadMapId}/extras/documents`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
     params: {
-      userId,
       ...cleanQueryIds(userId, nestedRoadMapItemId),
       ...(name && { name }),
     },

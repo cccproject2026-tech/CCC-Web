@@ -25,7 +25,8 @@ import {
   parseAssessmentsListPayload,
 } from "@/app/Services/assessment.service";
 import { apiGetAllUsers } from "@/app/Services/users.service";
-import { apiAssignAssessment } from "@/app/Services/progress.service";
+import { apiAssignAssessment, apiGetUserProgress } from "@/app/Services/progress.service";
+import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { emitPastorAssignmentsChanged } from "@/app/utils/progress-sync";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 
@@ -108,7 +109,30 @@ function AssessmentsPageContent() {
           });
         }
 
-        setAssessments(mapped);
+        if (assignUserFromQuery) {
+          try {
+            const progRes = await apiGetUserProgress(assignUserFromQuery);
+            const pr = unwrapProgressData(progRes);
+            const rows = pr?.assessments ?? [];
+            const allowed = new Set<string>();
+            for (const row of rows) {
+              const aid = (row as { assessmentId?: string }).assessmentId;
+              if (aid != null && String(aid).trim() !== "") {
+                allowed.add(String(aid).trim());
+              }
+            }
+            if (allowed.size === 0) {
+              setAssessments([]);
+            } else {
+              setAssessments(mapped.filter((a) => allowed.has(String(a.id))));
+            }
+          } catch (e) {
+            console.error("Failed to load pastor assessment assignments", e);
+            setAssessments([]);
+          }
+        } else {
+          setAssessments(mapped);
+        }
       } catch (error) {
         console.error("Failed to fetch assessments", error);
         setAssessments([]);
@@ -119,7 +143,7 @@ function AssessmentsPageContent() {
     };
 
     fetchAssessments();
-  }, [searchQuery]);
+  }, [searchQuery, assignUserFromQuery]);
 
   useEffect(() => {
     if (!assignUserFromQuery) return;
@@ -279,7 +303,11 @@ function AssessmentsPageContent() {
     <div className={directorPageRoot}>
       <DirectorHero
         title="Assessments"
-        subtitle="Create, edit, and assign assessments to pastors."
+        subtitle={
+          assignUserFromQuery
+            ? "Assessments assigned to this pastor."
+            : "Create, edit, and assign assessments to pastors."
+        }
         image={AssessmentBg}
         breadcrumbItems={[
           { label: "Home", href: "/director/home" },
@@ -494,9 +522,15 @@ function AssessmentsPageContent() {
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/10">
                 <i className="fa-regular fa-folder-open text-2xl text-[#8ec5eb]" />
               </div>
-              <p className="text-lg font-semibold text-white">No assessments found</p>
+              <p className="text-lg font-semibold text-white">
+                {assignUserFromQuery
+                  ? "No assessments assigned to this pastor."
+                  : "No assessments found"}
+              </p>
               <p className="mt-2 text-sm text-white/60">
-                Try another search or create an assessment with Add.
+                {assignUserFromQuery
+                  ? "Assign assessments from the full list when needed."
+                  : "Try another search or create an assessment with Add."}
               </p>
             </div>
           )}

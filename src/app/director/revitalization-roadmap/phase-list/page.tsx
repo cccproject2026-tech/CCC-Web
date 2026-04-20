@@ -1,10 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import DirectorHero from "../../DirectorHero";
-import { directorGlassCard, directorInputClass, directorPageContainer, directorPageRoot, directorSpinner } from "../../directorUi";
-import { apiGetRoadmapById } from "@/app/Services/api";
+import {
+  directorBtnPrimary,
+  directorBtnSecondary,
+  directorFilterSectionClass,
+  directorFilterSectionRow,
+  directorGlassCard,
+  directorGlassCardHover,
+  directorPageContainer,
+  directorPageRoot,
+  directorSearchBarWidth,
+  directorSearchIconClass,
+  directorSearchInputClass,
+  directorSpinner,
+} from "../../directorUi";
+import JumpStartBg from "@/app/Assets/roadmap-jump-start-bg.jpg";
+import { apiGetRoadmapById, apiUpdateRoadmap } from "@/app/Services/api";
+import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 
 type NestedItem = {
   _id?: string;
@@ -22,6 +38,9 @@ type RoadmapDoc = {
   imageUrl?: string;
   divisions?: string[];
   roadmaps?: NestedItem[];
+  /** Library card metadata (hero subtitle). */
+  type?: string;
+  duration?: string;
 };
 
 function unwrapRoadmap(res: unknown): RoadmapDoc | null {
@@ -36,6 +55,24 @@ function unwrapRoadmap(res: unknown): RoadmapDoc | null {
   return r as RoadmapDoc;
 }
 
+function formatAxiosError(e: unknown): string {
+  const err = e as { response?: { data?: unknown }; message?: string };
+  const data = err?.response?.data;
+  if (data && typeof data === "object" && data !== null) {
+    const m = (data as Record<string, unknown>).message;
+    if (typeof m === "string") return m;
+    if (Array.isArray(m)) return m.map(String).join(" ");
+    if (typeof (data as Record<string, unknown>).error === "string")
+      return String((data as Record<string, unknown>).error);
+  }
+  if (typeof data === "string") return data;
+  return err?.message || "Request failed.";
+}
+
+const cardActionPrimary = `${directorBtnPrimary} !px-4 !py-2.5 !text-sm`;
+const cardActionSecondary = `${directorBtnSecondary} !px-4 !py-2.5 !text-sm`;
+const cardActionDanger = `${directorBtnSecondary} !border-red-400/35 !px-4 !py-2.5 !text-sm !text-red-100 hover:!bg-red-500/15`;
+
 export default function DirectorPhaseListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -45,6 +82,9 @@ export default function DirectorPhaseListPage() {
   const [error, setError] = useState<string | null>(null);
   const [roadmap, setRoadmap] = useState<RoadmapDoc | null>(null);
   const [q, setQ] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!roadmapId) {
@@ -94,7 +134,36 @@ export default function DirectorPhaseListPage() {
     router.push(`/director/revitalization-roadmap/roadmap-creation?${qp.toString()}`);
   };
 
-  const openPhaseTaskEdit = (nestedRoadmapId: string) => {
+  const handleConfirmDeleteTask = async () => {
+    if (!confirmDelete?.id || !roadmapId || !roadmap) return;
+    setDeleteError(null);
+    setDeleting(true);
+    try {
+      /** Backend aligns with roadmap-form: nested phases are removed by PATCH parent `roadmaps` (no DELETE /nested). */
+      const before = roadmap.roadmaps || [];
+      const remaining = before.filter((r) => String(r?._id ?? "") !== String(confirmDelete.id));
+      if (remaining.length === before.length) {
+        setDeleteError("Could not find this task. Try refreshing the page.");
+        return;
+      }
+      await apiUpdateRoadmap(roadmapId, {
+        name: String(roadmap.name || "").trim() || "Roadmap",
+        roadmaps: remaining,
+        ...(Array.isArray(roadmap.divisions) ? { divisions: roadmap.divisions } : {}),
+      } as any);
+      setConfirmDelete(null);
+      const res = await apiGetRoadmapById(roadmapId);
+      const doc = unwrapRoadmap(res.data);
+      setRoadmap(doc);
+    } catch (e) {
+      console.error(e);
+      setDeleteError(formatAxiosError(e) || "Could not delete this task.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const openPhaseTaskPage = (nestedRoadmapId: string, opts?: { viewOnly?: boolean }) => {
     const phase = roadmap?.roadmaps?.find((r) => String(r._id) === nestedRoadmapId);
     if (!phase) return;
     const qp = new URLSearchParams();
@@ -102,6 +171,7 @@ export default function DirectorPhaseListPage() {
     qp.set("nestedRoadmapId", nestedRoadmapId);
     qp.set("type", "phase");
     qp.set("isEditMode", "true");
+    if (opts?.viewOnly) qp.set("viewOnly", "true");
     qp.set("name", String(phase.name || ""));
     qp.set("subheading", String(phase.roadMapDetails || phase.description || ""));
     qp.set("completionTime", String(phase.duration || ""));
@@ -110,22 +180,43 @@ export default function DirectorPhaseListPage() {
     router.push(`/director/revitalization-roadmap/roadmap-form?${qp.toString()}`);
   };
 
+  const heroTitle = roadmap?.name || "Phase roadmap";
+
+  const heroSubtitle = useMemo(() => {
+    if (!roadmap) return undefined;
+    const t = String(roadmap.type ?? "").toLowerCase();
+    const isPhase = t === "phase" || t.includes("phase");
+    const kind = isPhase ? "Phase roadmap" : "Single roadmap";
+    const n = roadmap.roadmaps?.length ?? 0;
+    const duration =
+      (typeof roadmap.duration === "string" && roadmap.duration.trim()) ||
+      (n > 0 ? items[0]?.duration?.trim() : "") ||
+      "";
+    if (isPhase && n > 0) {
+      return `${n} phase${n === 1 ? "" : "es"} · ${kind}`;
+    }
+    if (duration) return `${duration} · ${kind}`;
+    return kind;
+  }, [roadmap, items]);
+
+  const breadcrumbItems = [
+    { label: "Home", href: "/director/home" },
+    { label: "Revitalization Roadmap", href: "/director/revitalization-roadmap" },
+    { label: "Phase list" },
+  ];
+
   if (loading) {
     return (
       <div className={directorPageRoot}>
         <DirectorHero
           title="Phase list"
           subtitle="Loading…"
-          image={null as any}
-          breadcrumbItems={[
-            { label: "Home", href: "/director/home" },
-            { label: "Revitalization Roadmap", href: "/director/revitalization-roadmap" },
-            { label: "Phase list" },
-          ]}
+          image={JumpStartBg}
+          breadcrumbItems={breadcrumbItems}
         />
-        <main className="flex flex-1 items-center justify-center px-4 pb-24">
+        <div className="flex flex-1 items-center justify-center px-4 pb-16">
           <div className={directorSpinner} />
-        </main>
+        </div>
       </div>
     );
   }
@@ -133,75 +224,169 @@ export default function DirectorPhaseListPage() {
   return (
     <div className={directorPageRoot}>
       <DirectorHero
-        title={roadmap?.name || "Phase roadmap"}
-        subtitle="Revitalization Roadmap • Phase tasks"
-        image={null as any}
-        breadcrumbItems={[
-          { label: "Home", href: "/director/home" },
-          { label: "Revitalization Roadmap", href: "/director/revitalization-roadmap" },
-          { label: "Phase list" },
-        ]}
+        title={heroTitle}
+        subtitle="Revitalization Roadmap — phases and tasks"
+        image={JumpStartBg}
+        breadcrumbItems={breadcrumbItems}
       />
 
-      <main className="flex-1 pb-12">
-        <div className={`${directorPageContainer} max-w-4xl`}>
-          <div className={`${directorGlassCard} mb-6 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between`}>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => router.back()}
-                className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
-              >
+      <div className={`${directorPageContainer} max-w-4xl pb-10`}>
+        {/* Toolbar: same glass + button language as roadmap-creation / mentees */}
+        <div className={directorFilterSectionClass}>
+          <div className={directorFilterSectionRow}>
+            <div className="flex flex-wrap items-center gap-3">
+              <button type="button" onClick={() => router.back()} className={`${directorBtnSecondary} !px-4 !py-2.5 !text-sm`}>
                 <i className="fa-solid fa-arrow-left text-xs" /> Back
               </button>
-              <button
-                type="button"
-                onClick={goToCreatePhaseTask}
-                className="rounded-xl border border-[#8ec5eb]/45 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
-              >
+              <button type="button" onClick={goToCreatePhaseTask} className={`${directorBtnPrimary} !px-4 !py-2.5 !text-sm`}>
                 <i className="fa-solid fa-plus text-xs" /> Task
               </button>
             </div>
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search phases…"
-              className={`${directorInputClass} sm:max-w-[360px]`}
-            />
-          </div>
-
-          {error ? (
-            <div className={`${directorGlassCard} p-6 text-center text-white/80`}>{error}</div>
-          ) : items.length === 0 ? (
-            <div className={`${directorGlassCard} p-10 text-center text-white/70`}>
-              No phases yet. Click <span className="text-white font-semibold">Task</span> to add one.
+            <div className={`relative ${directorSearchBarWidth}`}>
+              <i className={directorSearchIconClass} />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder="Search phases…"
+                className={directorSearchInputClass}
+                aria-label="Search phases"
+              />
             </div>
-          ) : (
-            <div className="space-y-4">
-              {items.map((it) => (
-                <button
+          </div>
+        </div>
+
+        {error ? (
+          <div className={`${directorGlassCard} p-6 text-center text-white/85`}>{error}</div>
+        ) : items.length === 0 ? (
+          <div className={`${directorGlassCard} p-10 text-center text-white/75`}>
+            No phases yet. Click <span className="font-semibold text-white">Task</span> to add one.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {items.map((it) => {
+                const imgSrc = resolveApiMediaUrl(it.imageUrl) || JumpStartBg.src;
+              const imgUnopt = isRemoteImageSrc(imgSrc) || imgSrc.startsWith("blob:");
+              return (
+                <div
                   key={it.id}
-                  type="button"
-                  onClick={() => openPhaseTaskEdit(it.id)}
-                  className={`w-full text-left ${directorGlassCard} p-5 transition hover:bg-white/10`}
+                  className={`flex overflow-hidden rounded-2xl ${directorGlassCard} ${directorGlassCardHover} p-0`}
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-white font-semibold">{it.title}</p>
-                      {it.desc ? <p className="mt-1 text-sm text-white/70">{it.desc}</p> : null}
-                    </div>
-                    <div className="text-right text-xs text-white/60">
-                      {it.duration ? <div>Duration: {it.duration}</div> : null}
-                      {it.phase ? <div>Division: {it.phase}</div> : null}
+                  <div className="relative w-[38%] min-w-[140px] shrink-0 sm:w-[42%]">
+                    <div className="relative min-h-[200px] h-full sm:min-h-[220px]">
+                      <Image
+                        src={imgSrc}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        unoptimized={imgUnopt}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-r from-black/25 to-transparent sm:from-black/20" />
                     </div>
                   </div>
-                </button>
-              ))}
+                  <div className="flex min-w-0 flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5">
+                    <h3 className="text-[17px] font-semibold leading-tight text-white sm:text-[18px]">{it.title}</h3>
+                    {it.desc ? (
+                      <p className="mt-2 line-clamp-3 text-[13px] leading-relaxed text-white/70 sm:text-[14px]">{it.desc}</p>
+                    ) : null}
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <span className="text-[13px] font-semibold text-white/80">Status</span>
+                      <div className="h-3.5 w-px bg-white/25" />
+                      <span className="inline-block rounded-lg border border-[#8ec5eb]/35 bg-[#8ec5eb]/15 px-3 py-1 text-[12px] font-semibold text-[#8ec5eb]">
+                        Not Started
+                      </span>
+                    </div>
+                    <div className="mt-3 text-[13px] text-white/85 sm:text-[14px]">
+                      <p>
+                        <span className="font-semibold text-white/90">Completion time</span>{" "}
+                        <span className="text-white/80">{it.duration || "—"}</span>
+                      </p>
+                      {it.phase ? (
+                        <p className="mt-1.5 text-white/65">
+                          <span className="font-semibold text-white/80">Division:</span> {it.phase}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="mt-auto flex flex-wrap gap-3 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => openPhaseTaskPage(it.id, { viewOnly: true })}
+                        className={cardActionSecondary}
+                      >
+                        <i className="fa-regular fa-eye text-sm" aria-hidden />
+                        View
+                      </button>
+                      <button type="button" onClick={() => openPhaseTaskPage(it.id)} className={cardActionPrimary}>
+                        <i className="fa-solid fa-list-check text-sm" />
+                        Edit tasks
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!it.id}
+                        onClick={() => {
+                          setDeleteError(null);
+                          setConfirmDelete({ id: it.id, title: it.title });
+                        }}
+                        className={cardActionDanger}
+                      >
+                        <i className="fa-solid fa-trash text-sm" aria-hidden />
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {confirmDelete ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+          role="presentation"
+          onClick={() => !deleting && setConfirmDelete(null)}
+        >
+          <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" aria-hidden />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-phase-task-title"
+            className="relative z-[1] w-full max-w-md rounded-2xl border border-white/15 bg-[#041f35]/98 px-6 py-6 shadow-[0_20px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="delete-phase-task-title" className="text-lg font-semibold text-white">
+              Delete this task?
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-white/80">
+              <span className="font-semibold text-white/95">{confirmDelete.title}</span> will be removed from this phase
+              roadmap. This cannot be undone.
+            </p>
+            {deleteError ? (
+              <p className="mt-4 rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+                {deleteError}
+              </p>
+            ) : null}
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => setConfirmDelete(null)}
+                className={`${directorBtnSecondary} !px-5 !py-2.5 !text-sm`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={() => void handleConfirmDeleteTask()}
+                className={`${directorBtnSecondary} !border-red-400/40 !px-5 !py-2.5 !text-sm !text-red-100 hover:!bg-red-500/20 disabled:opacity-60`}
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
             </div>
-          )}
+          </div>
         </div>
-      </main>
+      ) : null}
     </div>
   );
 }
-
