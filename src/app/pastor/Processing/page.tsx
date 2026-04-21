@@ -50,9 +50,16 @@ export default function ProcessingPage() {
     (async () => {
       try {
         setStatusLoading(true);
-        await fetchStatus();
+        const data = await fetchStatus();
+        if (!cancelled) {
+          const statusNorm = normStatus(data?.status);
+          // Check if already accepted on load
+          if (statusNorm === "accepted" && !navigatedRef.current) {
+            navigatedRef.current = true;
+            setTimeout(() => router.push("/pastor/setpassword"), 1500);
+          }
+        }
       } catch (err) {
-        console.error("Failed to fetch interest status:", err);
         if (!cancelled) {
           setStatusError("Unable to load your status. Please try again later.");
         }
@@ -63,7 +70,7 @@ export default function ProcessingPage() {
     return () => {
       cancelled = true;
     };
-  }, [fetchStatus]);
+  }, [fetchStatus, router]);
 
   useEffect(() => {
     const email = getCookie("interestEmail");
@@ -84,11 +91,13 @@ export default function ProcessingPage() {
         if (next === "rejected" && intervalId != null) {
           window.clearInterval(intervalId);
         }
-      } catch {
-        /* keep last good state */
+      } catch (err) {
+        // Polling failed, will retry next interval
       }
     };
 
+    // Start polling immediately, then every 20 seconds
+    tick();
     intervalId = window.setInterval(tick, 20000);
     return () => {
       if (intervalId != null) window.clearInterval(intervalId);
@@ -113,7 +122,6 @@ export default function ProcessingPage() {
         setTimeout(() => router.push("/pastor/setpassword"), 1500);
       }
     } catch (err) {
-      console.error("Failed to fetch interest status:", err);
       setStatusError("Unable to load your status. Please try again later.");
     } finally {
       setStatusLoading(false);
@@ -258,12 +266,6 @@ export default function ProcessingPage() {
                       Go to Set Password
                     </button>
                   )}
-                  <Link
-                    href="/"
-                    className="rounded-xl border border-white/30 bg-white/10 px-8 py-3 text-center text-sm font-semibold text-white transition hover:bg-white/15 md:text-base"
-                  >
-                    Back to home
-                  </Link>
                   <Link
                     href="/pastor/Thankyou"
                     className="text-center text-sm font-medium text-[#8ec5eb] underline-offset-4 hover:underline sm:text-left"

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { isAxiosError } from "axios";
 import PastorHeader from "@/app/Components/PastorHeader";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { apiCreateInterest } from "@/app/Services/api";
 import type {
   ChurchDetails,
@@ -67,6 +67,9 @@ function axiosErrorMessage(err: unknown): string {
 
 export default function InterestForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const role = searchParams.get("role") || "pastor";
+  
   const [showInterests, setShowInterests] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -303,7 +306,7 @@ export default function InterestForm() {
                 />
                 <select
                   name="state"
-                  className="form-input text-gray-500"
+                  className="form-input"
                   defaultValue=""
                 >
                   <option value="" disabled>
@@ -324,7 +327,7 @@ export default function InterestForm() {
                 />
                 <select
                   name="country"
-                  className="form-input text-gray-500"
+                  className="form-input"
                   defaultValue=""
                 >
                   <option value="" disabled>
@@ -351,17 +354,23 @@ export default function InterestForm() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <select
                   name="title"
-                  className="form-input text-gray-500"
-                  defaultValue="Pastor"
+                  className="form-input"
+                  defaultValue={role === "mentor" ? "Mentor" : "Pastor"}
                   required
                   aria-label="Your role or title"
                 >
-                  <option value="Pastor">Pastor</option>
-                  <option value="Lay Leader">Lay Leader</option>
-                  <option value="Seminarian">Seminarian</option>
-                  <option value="Mentor">Mentor</option>
-                  <option value="Field Mentor">Field Mentor</option>
-                  <option value="Director">Director</option>
+                  {role === "mentor" ? (
+                    <>
+                      <option value="Mentor">Mentor</option>
+                      <option value="Field Mentor">Field Mentor</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="Pastor">Pastor</option>
+                      <option value="Lay Leader">Lay Leader</option>
+                      <option value="Seminarian">Seminarian</option>
+                    </>
+                  )}
                 </select>
                 <input
                   name="yearsInMinistry"
@@ -383,7 +392,7 @@ export default function InterestForm() {
                 />
                 <select
                   name="interestSelect"
-                  className="form-input text-gray-500"
+                  className="form-input"
                   defaultValue=""
                 >
                   <option value="" disabled>

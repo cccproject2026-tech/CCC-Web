@@ -55,6 +55,19 @@ body {
   @apply w-full px-4 py-2 rounded-md border border-[#47A3FF]/40 bg-white/5 text-white placeholder-gray-300 focus:outline-none focus:ring-1 focus:ring-[#47A3FF];
 }
 
+select.form-input {
+  @apply bg-[#0a3a52] text-white;
+  color-scheme: dark;
+}
+
+select.form-input option {
+  @apply bg-[#0a3a52] text-white;
+}
+
+select.form-input option:hover {
+  @apply bg-[#0f4a76];
+}
+
 @keyframes slide-left {
   from {
     transform: translateX(100%);
