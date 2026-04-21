@@ -352,56 +352,9 @@ function AssessmentsPageContent() {
         setLoadingAssessments(true);
         setListError(null);
 
-        const res = await apiGetAssessments({
-          search: debouncedSearch || undefined,
-        });
-
-          const idStatusRows = assessmentProgress
-            .map((p: any) => ({
-              assessmentId: extractAssessmentIdFromProgressRow(p),
-              status: normalizeDirectorAssessmentStatus(p?.status),
-            }))
-            .filter((p: { assessmentId: string }) => p.assessmentId !== "");
-
-          const uniqById = idStatusRows.filter(
-            (row: { assessmentId: string }, idx: number, arr: Array<{ assessmentId: string }>) =>
-              arr.findIndex((x) => x.assessmentId === row.assessmentId) === idx,
-          );
-
-          const details = await Promise.allSettled(
-            uniqById.map(async (row: { assessmentId: string; status: DirectorAssessmentStatus }) => {
-              const detailRes = await apiGetAssessmentById(row.assessmentId);
-              const detail = parseAssessmentDetailPayload(detailRes.data);
-              if (!detail) return null;
-              const raw = (detail as any)?.bannerImage;
-              const resolved = (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
-              return {
-                ...(detail as any),
-                id: String((detail as any)._id ?? row.assessmentId),
-                image: resolved,
-                title: String((detail as any).name ?? (detail as any).title ?? "Untitled"),
-                _selectedPastorStatus: row.status,
-              };
-            }),
-          );
-
-          const assigned = details
-            .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
-            .map((r) => r.value)
-            .filter((v) => v != null);
-
-          const q = searchQuery.trim().toLowerCase();
-          const filteredAssigned = !q
-            ? assigned
-            : assigned.filter((a: any) => {
-              const title = String(a?.title || "").toLowerCase();
-              const desc = String(a?.description || "").toLowerCase();
-              return title.includes(q) || desc.includes(q);
-            });
-          setAssessments(filteredAssigned);
-        } else {
+        if (!assignUserFromQuery) {
           const res = await apiGetAssessments({
-            search: searchQuery || undefined,
+            search: debouncedSearch || undefined,
           });
 
           const parsed = parseAssessmentsListPayload(res.data);
@@ -418,29 +371,45 @@ function AssessmentsPageContent() {
             })
             : [];
 
-          if (assignUserFromQuery) {
-            try {
-              const progRes = await apiGetUserProgress(assignUserFromQuery);
-              const pr = unwrapProgressData(progRes);
-              const rows = pr?.assessments ?? [];
-              const allowed = new Set<string>();
-              for (const row of rows) {
-                const aid = (row as { assessmentId?: string }).assessmentId;
-                if (aid != null && String(aid).trim() !== "") {
-                  allowed.add(String(aid).trim());
-                }
+          setAssessments(mapped);
+        } else {
+          const res = await apiGetAssessments({
+            search: debouncedSearch || undefined,
+          });
+
+          const parsed = parseAssessmentsListPayload(res.data);
+          const mapped = Array.isArray(parsed)
+            ? parsed.map((a: any) => {
+              const raw = (a as any)?.bannerImage;
+              const resolved = (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
+              return {
+                ...(a as any),
+                id: String((a as any)._id ?? (a as any).id),
+                image: resolved,
+                title: String((a as any).name ?? (a as any).title ?? "Untitled"),
+              };
+            })
+            : [];
+
+          try {
+            const progRes = await apiGetUserProgress(assignUserFromQuery);
+            const pr = unwrapProgressData(progRes);
+            const rows = pr?.assessments ?? [];
+            const allowed = new Set<string>();
+            for (const row of rows) {
+              const aid = (row as { assessmentId?: string }).assessmentId;
+              if (aid != null && String(aid).trim() !== "") {
+                allowed.add(String(aid).trim());
               }
-              if (allowed.size === 0) {
-                setAssessments([]);
-              } else {
-                setAssessments(mapped.filter((a) => allowed.has(String(a.id))));
-              }
-            } catch (e) {
-              console.error("Failed to load pastor assessment assignments", e);
-              setAssessments([]);
             }
-          } else {
-            setAssessments(mapped);
+            if (allowed.size === 0) {
+              setAssessments([]);
+            } else {
+              setAssessments(mapped.filter((a) => allowed.has(String(a.id))));
+            }
+          } catch (e) {
+            console.error("Failed to load pastor assessment assignments", e);
+            setAssessments([]);
           }
         }
       } catch (error) {
