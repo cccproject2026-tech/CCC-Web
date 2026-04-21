@@ -127,12 +127,23 @@ const router = useRouter();
         </div>
 
         <div className="flex-1 min-w-0">
-          <h3 className="text-base font-bold text-gray-900 mb-0.5">
+          {/* <h3 className="text-base font-bold text-gray-900 mb-0.5">
             {data.user.email}
           </h3>
           <p className="text-xs text-gray-600 capitalize">
             {data.user.role}
-          </p>
+          </p> */}
+
+        <h3 className="text-base font-bold text-gray-900 mb-0.5">
+    {data.user.email || "Unknown"}
+  </h3>
+
+  <p className="text-xs text-gray-600">
+    {data.user.role
+      ? data.user.role.charAt(0).toUpperCase() + data.user.role.slice(1)
+      : "No role"}
+  </p>
+  
 
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-2 mt-1.5">

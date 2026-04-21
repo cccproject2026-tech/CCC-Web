@@ -172,19 +172,22 @@ const Page: React.FC = () => {
             <>
               <div className="flex flex-col gap-4">
                 {filteredCards.map((app) => {
-                  const viewSlug = microGrantListDetailSlug(app);
-                  return (
-                    <MicroGrantCard
-                      key={app._id}
-                      variant="directorGlass"
-                      image={UserProfile}
-                      name={applicantDisplayName(app)}
-                      role={churchLabel(app)}
-                      date={app.createdAt ? new Date(app.createdAt).toLocaleDateString() : "—"}
-                      slug={viewSlug}
-                    />
-                  );
-                })}
+  const viewSlug = microGrantListDetailSlug(app);
+  const user =
+    app.userId && typeof app.userId === "object" ? (app.userId as any) : null;
+
+  return (
+    <MicroGrantCard
+      key={app._id}
+      variant="directorGlass"
+      image={UserProfile}
+      name={user?.email || "Unknown"}
+      role={churchLabel(app) ? `Church: ${churchLabel(app)}` : "Church: Not provided"}
+      date={app.createdAt ? new Date(app.createdAt).toLocaleDateString() : "—"}
+      slug={viewSlug}
+    />
+  );
+})}
               </div>
 
               {filteredCards.length === 0 ? (
