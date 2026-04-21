@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { isAxiosError } from "axios";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -65,7 +65,7 @@ function axiosErrorMessage(err: unknown): string {
   return "Something went wrong. Please try again.";
 }
 
-export default function InterestForm() {
+function InterestFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const role = searchParams.get("role") || "pastor";
@@ -486,5 +486,13 @@ export default function InterestForm() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function InterestForm() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#062946] text-white flex items-center justify-center">Loading...</div>}>
+      <InterestFormContent />
+    </Suspense>
   );
 }
