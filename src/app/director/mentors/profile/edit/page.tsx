@@ -1,23 +1,34 @@
 "use client";
-import { useEffect, useState, Suspense } from "react";
+
+import { useEffect, useState, Suspense, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
-import AppHero from "@/app/Components/Hero/AppHero";import ConfirmModal from "@/app/Components/ConfirmModal";
+import Link from "next/link";
+import ConfirmModal from "@/app/Components/ConfirmModal";
 import ProfileForm, {
   PersonalInfo,
   ChurchInfo,
   OtherInfo,
 } from "@/app/Components/ProfileForm";
+import DirectorHero from "@/app/director/DirectorHero";
+import {
+  directorBtnPrimary,
+  directorBtnSecondary,
+  directorGlassCard,
+  directorPageContainer,
+  directorPageRoot,
+  directorSpinner,
+} from "@/app/director/directorUi";
 import MentorBg from "@/app/Assets/mentor-bg.png";
 import Mentor1 from "@/app/Assets/mentor1.png";
 import { getUserById, updateUserById } from "@/app/Services/mentors.service";
+import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 
 function EditMentorProfileContent() {
   const router = useRouter();
-
   const searchParams = useSearchParams();
   const mentorId = searchParams.get("id");
-  // Seed data – replace with real fetch later
+
   const [personal, setPersonal] = useState<PersonalInfo>({
     firstName: "",
     lastName: "",
@@ -54,37 +65,32 @@ function EditMentorProfileContent() {
     communityServiceProjects: "",
   });
 
-  const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [profileImg, setProfileImg] = useState<string | typeof Mentor1>(Mentor1);
+  const [roleLabel, setRoleLabel] = useState("Mentor");
 
   const [interests, setInterests] = useState<string>("");
   const [comments, setComments] = useState<string>("");
 
   const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [showDeleteDocConfirm, setShowDeleteDocConfirm] = useState<
-    string | null
-  >(null);
+  const [showDeleteDocConfirm, setShowDeleteDocConfirm] = useState<string | null>(null);
   const [showDocsModal, setShowDocsModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const [documents, setDocuments] = useState([
-    { id: "1", name: "My Documents 1.pdf", size: "3 Oct 2024 · 9:41 am" },
-    { id: "2", name: "My Documents 2.pdf", size: "3 Oct 2024 · 9:41 am" },
-    { id: "3", name: "My Educational 1.pdf", size: "3 Oct 2024 · 9:41 am" },
-    { id: "4", name: "My Documents 1.pdf", size: "15 Oct 2024 · 9:41 am" },
-    {
-      id: "5",
-      name: "My Educational Documents 1.pdf",
-      size: "12 Oct 2024 · 9:41 am",
-    },
-    { id: "6", name: "My Documents 1.pdf", size: "11 Oct 2024 · 9:41 am" },
-  ] as { id: string; name: string; size: string }[]);
+  const [documents, setDocuments] = useState<{ id: string; name: string; size: string }[]>([]);
 
-  const [newDocuments] = useState([
-    { id: "n1", name: "My Documents 1.pdf", size: "20 Oct 2024 · 9:41 am" },
-    { id: "n2", name: "My Documents 2.pdf", size: "20 Oct 2024 · 9:41 am" },
-    { id: "n3", name: "My Educational 1.pdf", size: "20 Oct 2024 · 9:41 am" },
-  ]);
+  const displayName = useMemo(
+    () => `${personal.firstName} ${personal.lastName}`.trim() || "Mentor",
+    [personal.firstName, personal.lastName],
+  );
+
+  const bioPreview = useMemo(() => {
+    const t = (other.communityServiceProjects || "").trim();
+    if (t.length > 180) return `${t.slice(0, 177)}…`;
+    return t || "No summary on file yet.";
+  }, [other.communityServiceProjects]);
 
   const buildUpdatePayload = () => {
     return {
@@ -92,18 +98,12 @@ function EditMentorProfileContent() {
       lastName: personal.lastName,
       phoneNumber: personal.phoneNumber,
       email: personal.email,
-
       title: other.title,
       yearsInMinistry: other.yearsInMinistry,
       conference: other.conference,
       currentCommunityProjects: other.communityServiceProjects,
-
-      interests: interests
-        ? interests.split(",").map(i => i.trim()).filter(Boolean)
-        : [],
-
+      interests: interests ? interests.split(",").map((i) => i.trim()).filter(Boolean) : [],
       comments,
-
       interest: {
         churchDetails: [
           {
@@ -127,11 +127,8 @@ function EditMentorProfileContent() {
             country: church2.country,
           },
         ].filter(
-          c =>
-            c.churchName ||
-            c.churchPhone ||
-            c.churchWebsite ||
-            c.churchAddress
+          (c) =>
+            c.churchName || c.churchPhone || c.churchWebsite || c.churchAddress,
         ),
       },
     };
@@ -142,8 +139,7 @@ function EditMentorProfileContent() {
 
     const fetchUser = async () => {
       try {
-        setLoading(true);
-
+        setPageLoading(true);
         const res = await getUserById(mentorId);
         const user = res.data.data;
         setPersonal({
@@ -187,15 +183,40 @@ function EditMentorProfileContent() {
         setInterests(
           Array.isArray(user.interests)
             ? user.interests.join(", ")
-            : user.interests ?? ""
+            : user.interests ?? "",
         );
-
         setComments(user.comments ?? "");
 
+        const rawPic = user.profilePicture;
+        if (typeof rawPic === "string" && rawPic.trim()) {
+          const u = resolveApiMediaUrl(rawPic) || rawPic;
+          setProfileImg(u);
+        } else {
+          setProfileImg(Mentor1);
+        }
+
+        setRoleLabel(
+          typeof user.role === "string" && user.role.trim()
+            ? user.role.replace(/-/g, " ")
+            : "Mentor",
+        );
+
+        const docs = user.uploadedDocuments;
+        if (Array.isArray(docs) && docs.length > 0) {
+          setDocuments(
+            docs.map((d: { fileName?: string; uploadedAt?: string }, i: number) => ({
+              id: String(i),
+              name: d.fileName || "Document",
+              size: d.uploadedAt || "",
+            })),
+          );
+        } else {
+          setDocuments([]);
+        }
       } catch (err) {
         console.error("Failed to fetch user", err);
       } finally {
-        setLoading(false);
+        setPageLoading(false);
       }
     };
 
@@ -203,24 +224,20 @@ function EditMentorProfileContent() {
   }, [mentorId]);
 
   const handleSave = async () => {
+    if (!mentorId) return;
     try {
       setShowSaveConfirm(false);
-      setLoading(true);
-
-      const payload = buildUpdatePayload();
-
-      await updateUserById(mentorId!, payload);
-
-      setToast("Changes Saved Successfully");
-
+      setSaving(true);
+      await updateUserById(mentorId, buildUpdatePayload());
+      setToast("Changes saved successfully");
       setTimeout(() => {
         setToast(null);
-        router.push(`/director/mentors/profile?id=${mentorId}`);
+        router.push(`/director/mentors/profile?id=${encodeURIComponent(mentorId)}`);
       }, 1200);
-
     } catch (err) {
       console.error("Update failed", err);
       setToast("Failed to save changes");
+      setTimeout(() => setToast(null), 4000);
     } finally {
       setLoading(false);
     }
@@ -228,11 +245,12 @@ function EditMentorProfileContent() {
 
   const handleCancel = () => {
     setShowCancelConfirm(false);
-    router.push(`/director/mentors/profile?id=${mentorId}`);
+    if (!mentorId) return;
+    router.push(`/director/mentors/profile?id=${encodeURIComponent(mentorId)}`);
   };
 
   const handleDownload = (_name: string) => {
-    setToast("Document Downloaded Successfully");
+    setToast("Download started");
     setTimeout(() => setToast(null), 1200);
   };
 
@@ -240,278 +258,273 @@ function EditMentorProfileContent() {
     if (!showDeleteDocConfirm) return;
     setDocuments((prev) => prev.filter((d) => d.id !== showDeleteDocConfirm));
     setShowDeleteDocConfirm(null);
-    setToast("Documents Deleted");
-    setTimeout(() => setToast(null), 1200);
+    setToast("Removed from list (save profile to persist server changes if applicable)");
+    setTimeout(() => setToast(null), 2500);
   };
 
-  if (loading) {
+  if (!mentorId) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <p className="text-white text-lg">Loading mentor details...</p>
+      <div className={directorPageRoot}>
+        <div className={`${directorPageContainer} flex flex-1 flex-col items-center justify-center gap-4 px-4 py-20`}>
+          <p className="text-center text-white/85">Missing mentor id.</p>
+          <Link href="/director/mentors" className={`${directorBtnPrimary}`}>
+            Back to mentors
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (pageLoading) {
+    return (
+      <div className={directorPageRoot}>
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 py-24">
+          <div className={directorSpinner} />
+          <p className="text-sm font-medium text-white/80">Loading mentor…</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
-      <AppHero
-        title={`${personal.firstName} ${personal.lastName}`}
-        backgroundImageUrl={MentorBg.src}
-        breadcrumbItems={[
-          { label: "Mentors", href: "/director/mentors" },
-          { label: "Robert Fox" },
-        ]}
-      />
+    <div className={directorPageRoot}>
+      <div className={`${directorPageContainer} px-4 pt-3 sm:px-6 lg:px-10 sm:pt-5`}>
+        <DirectorHero
+          title={displayName}
+          subtitle="Edit profile, church details, and ministry information."
+          image={MentorBg}
+          breadcrumbItems={[
+            { label: "Home", href: "/director/home" },
+            { label: "Mentors", href: "/director/mentors" },
+            { label: "Edit profile" },
+          ]}
+        />
+      </div>
 
-      <section className="px-6 md:px-12 lg:px-20 py-10 bg-gradient-to-b from-[#5BA3D0] to-[#6BB5E0]">
-        <div className="max-w-[1400px] mx-auto">
-          {/* Left Sidebar & Form */}
-          <div className="flex gap-8">
-            {/* Left Sidebar - Profile Card */}
-            <div className="w-[280px] flex-shrink-0">
-              <div className="bg-white rounded-xl p-6 shadow-lg">
-                {/* Profile Image */}
-                <div className="flex flex-col items-center mb-6">
-                  <div className="w-[120px] h-[120px] rounded-full overflow-hidden bg-gray-100 mb-4 relative">
+      <section className="relative flex-1 pb-12 pt-2">
+        <div className={`${directorPageContainer} px-4 sm:px-6 lg:px-10`}>
+          <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
+            {/* Sidebar */}
+            <aside className="w-full shrink-0 lg:w-[300px]">
+              <div className={`${directorGlassCard} p-5 sm:p-6`}>
+                <div className="mb-6 flex flex-col items-center text-center">
+                  <div className="relative mb-4 h-[120px] w-[120px] overflow-hidden rounded-full border border-white/20 bg-white/10 ring-2 ring-white/10">
                     <Image
-                      src={Mentor1}
-                      alt="Robert Fox"
-                      className="w-full h-full object-cover"
+                      src={profileImg}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      unoptimized={
+                        typeof profileImg === "string" &&
+                        (profileImg.startsWith("blob:") || isRemoteImageSrc(profileImg))
+                      }
                     />
-                    {/* Edit icon badge */}
-                    <button className="absolute bottom-0 right-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-lg">
-                      <i className="fa-solid fa-pencil text-xs"></i>
-                    </button>
                   </div>
-                  <h3 className="text-[16px] font-bold text-[#1A2E7A] text-center">
-                    Robert Fox
-                  </h3>
-                  <p className="text-[12px] text-gray-500 mb-1">Mentor</p>
+                  <h2 className="text-lg font-bold text-white">{displayName}</h2>
+                  <p className="mt-1 text-xs capitalize text-[#8ec5eb]/90">{roleLabel}</p>
                 </div>
 
-                {/* Profile Information */}
-                <div className="mb-6 pb-6 border-b border-gray-200">
-                  <h4 className="text-[12px] font-semibold text-gray-600 mb-3">
-                    Profile Information
-                  </h4>
-                  <p className="text-[11px] text-gray-600 leading-relaxed">
-                    Lorem ipsum dolor sit amet, consectetur adipiscing eip ex ea
-                    commodo consequat. Duis aute consectetur adipiscing
+                <div className="mb-6 border-b border-white/10 pb-6">
+                  <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-white/50">
+                    Summary
+                  </h3>
+                  <p className="text-[13px] leading-relaxed text-white/75">{bioPreview}</p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowDocsModal(true)}
+                  className="flex w-full items-center justify-between rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-left transition hover:bg-white/10"
+                >
+                  <span className="flex items-center gap-2 text-[13px] font-semibold text-white">
+                    <i className="fa-regular fa-file-lines text-[#8ec5eb]" />
+                    Documents
+                  </span>
+                  <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-0.5 text-[11px] font-bold text-[#cde2f2]">
+                    {documents.length}
+                  </span>
+                </button>
+              </div>
+            </aside>
+
+            {/* Form */}
+            <div className="min-w-0 flex-1">
+              <div className={`${directorGlassCard} overflow-hidden`}>
+                <div className="border-b border-white/10 bg-white/[0.06] px-5 py-4 sm:px-8">
+                  <h2 className="text-lg font-bold text-white sm:text-xl">Personal information</h2>
+                  <p className="mt-1 text-sm text-white/55">
+                    Update details visible to your team. Required fields are marked on the form.
                   </p>
                 </div>
-
-                {/* Documents */}
-                <div className="mb-6">
-                  <button
-                    onClick={() => setShowDocsModal(true)}
-                    className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition"
-                  >
-                    <div className="flex items-center gap-2">
-                      <i className="fa-regular fa-file-lines text-blue-600 text-sm"></i>
-                      <span className="text-[13px] font-semibold text-gray-700">
-                        Documents
-                      </span>
-                    </div>
-                    <span className="text-[12px] bg-white text-gray-700 px-2 py-1 rounded-full font-semibold border border-gray-200">
-                      {documents.length}
-                    </span>
-                  </button>
+                <div className="bg-white/[0.04] px-3 py-5 sm:px-6 sm:py-8">
+                  <ProfileForm
+                    title="Details"
+                    headerActions={
+                      <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowCancelConfirm(true)}
+                          className={directorBtnSecondary}
+                          disabled={saving}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowSaveConfirm(true)}
+                          className={directorBtnPrimary}
+                          disabled={saving}
+                        >
+                          {saving ? "Saving…" : "Save"}
+                        </button>
+                      </div>
+                    }
+                    personal={personal}
+                    church1={church1}
+                    church2={church2}
+                    other={other}
+                    interests={interests}
+                    comments={comments}
+                    showInterests={false}
+                    showComments={false}
+                    editable
+                    onPersonalChange={setPersonal}
+                    onChurch1Change={setChurch1}
+                    onChurch2Change={setChurch2}
+                    onOtherChange={setOther}
+                    onInterestsChange={setInterests}
+                    onCommentsChange={setComments}
+                  />
                 </div>
               </div>
-            </div>
-
-            {/* Right Content - Form */}
-            <div className="flex-1">
-              <ProfileForm
-                title="Personal Information"
-                headerActions={
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => setShowCancelConfirm(true)}
-                      className="px-4 py-2 bg-white border-2 border-gray-300 text-gray-700 rounded-lg text-[13px] font-semibold hover:bg-gray-50 transition-all"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => setShowSaveConfirm(true)}
-                      className="px-4 py-2 bg-white border-2 border-blue-600 text-blue-600 rounded-lg text-[13px] font-semibold hover:bg-blue-50 transition-all"
-                    >
-                      Save
-                    </button>
-                  </div>
-                }
-                personal={personal}
-                church1={church1}
-                church2={church2}
-                other={other}
-                interests={interests}
-                comments={comments}
-                showInterests={false}
-                showComments={false}
-                editable
-                onPersonalChange={setPersonal}
-                onChurch1Change={setChurch1}
-                onChurch2Change={setChurch2}
-                onOtherChange={setOther}
-                onInterestsChange={setInterests}
-                onCommentsChange={setComments}
-              />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Toast */}
-      {toast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-fade-in">
-          <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3 border border-gray-100">
-            <i className="fa-solid fa-circle-check text-green-500 text-xl"></i>
-            <span className="text-[#2E3B8E] font-semibold text-[15px]">
-              {toast}
-            </span>
+      {toast ? (
+        <div className="fixed bottom-6 left-1/2 z-[100] max-w-[min(100%,22rem)] -translate-x-1/2 animate-fade-in">
+          <div className="rounded-xl border border-white/15 bg-[#041f35]/95 px-5 py-3 text-center text-sm font-semibold text-white shadow-xl backdrop-blur-md">
+            {toast}
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Save confirmation */}
       <ConfirmModal
         isOpen={showSaveConfirm}
         onClose={() => setShowSaveConfirm(false)}
         onConfirm={handleSave}
-        title="Are you sure want to save changes ?"
-        message=""
+        title="Save changes?"
+        message="Your updates will be stored for this mentor."
         confirmText="Save"
-        cancelText="Cancel"
-        confirmColor="bg-blue-600 hover:bg-blue-700"
+        cancelText="Back"
+        confirmColor="bg-[#2E3B8E] hover:bg-[#1F2A6E]"
         icon="fa-regular fa-floppy-disk"
-        iconColor="text-blue-600 bg-blue-100"
+        iconColor="text-[#2E3B8E] bg-blue-100"
+        pendingConfirmText="Saving…"
       />
 
-      {/* Cancel confirmation */}
       <ConfirmModal
         isOpen={showCancelConfirm}
         onClose={() => setShowCancelConfirm(false)}
         onConfirm={handleCancel}
-        title="Are you sure want to save changes ?"
-        message=""
-        confirmText="Cancel"
-        cancelText="Save"
+        title="Discard changes?"
+        message="You will lose unsaved edits on this page."
+        confirmText="Discard"
+        cancelText="Keep editing"
         confirmColor="bg-gray-600 hover:bg-gray-700"
         icon="fa-regular fa-circle-xmark"
         iconColor="text-gray-600 bg-gray-100"
       />
 
-      {/* Delete document confirmation */}
       <ConfirmModal
         isOpen={!!showDeleteDocConfirm}
         onClose={() => setShowDeleteDocConfirm(null)}
         onConfirm={handleDeleteDoc}
-        title="Are you sure want to delete File ?"
-        message=""
-        confirmText="Delete"
+        title="Remove this document?"
+        message="It will be removed from this list."
+        confirmText="Remove"
         cancelText="Cancel"
         confirmColor="bg-red-600 hover:bg-red-700"
         icon="fa-regular fa-trash-can"
         iconColor="text-red-600 bg-red-100"
       />
 
-      {/* Documents Modal */}
-      {showDocsModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white rounded-xl w-full max-w-3xl shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-[20px] font-bold text-gray-900">Documents</h3>
+      {showDocsModal ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
+          <div className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
+              <h3 className="text-lg font-bold text-gray-900">Documents</h3>
               <button
+                type="button"
                 onClick={() => setShowDocsModal(false)}
-                className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200"
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200"
+                aria-label="Close"
               >
-                <i className="fa-solid fa-xmark"></i>
+                <i className="fa-solid fa-xmark text-gray-600" />
               </button>
             </div>
-
-            {/* Content */}
-            <div className="p-6 max-h-[70vh] overflow-auto">
-              {/* New Documents Section */}
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-[15px] font-bold text-gray-900">
-                    3 New Documents Uploaded
-                  </h4>
-                  <button className="px-3 py-1.5 bg-[#2E3B8E] text-white rounded-md text-[12px] font-semibold hover:bg-[#3A4BA0] transition flex items-center gap-2">
-                    3 <i className="fa-solid fa-download text-xs"></i>
-                  </button>
-                </div>
-                <div className="space-y-2">
-                  {newDocuments.map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-gray-50"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <i className="fa-regular fa-file-pdf text-red-500 text-xl"></i>
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-semibold text-gray-800 truncate">
-                            {doc.name}
-                          </p>
-                          <p className="text-[11px] text-gray-500">
-                            {doc.size}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleDownload(doc.name)}
-                        className="w-8 h-8 rounded-md bg-white flex items-center justify-center hover:bg-gray-100 border border-gray-200 text-blue-600"
-                      >
-                        <i className="fa-solid fa-download text-xs"></i>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Document Library */}
-              <div>
-                <h4 className="text-[15px] font-bold text-gray-900 mb-4">
-                  Document Library
-                </h4>
+            <div className="max-h-[60vh] overflow-auto p-5">
+              {documents.length === 0 ? (
+                <p className="py-10 text-center text-sm text-gray-600">No documents on file.</p>
+              ) : (
                 <div className="space-y-2">
                   {documents.map((doc) => (
                     <div
                       key={doc.id}
-                      className="flex items-center justify-between p-3 rounded-lg bg-gray-50"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <i className="fa-regular fa-file-pdf text-red-500 text-xl"></i>
+                      <div className="min-w-0 flex items-center gap-3">
+                        <i className="fa-regular fa-file-pdf shrink-0 text-xl text-red-500" />
                         <div className="min-w-0">
-                          <p className="text-[13px] font-semibold text-gray-800 truncate">
-                            {doc.name}
-                          </p>
-                          <p className="text-[11px] text-gray-500">
-                            {doc.size}
-                          </p>
+                          <p className="truncate text-sm font-semibold text-gray-900">{doc.name}</p>
+                          {doc.size ? (
+                            <p className="text-xs text-gray-500">{doc.size}</p>
+                          ) : null}
                         </div>
                       </div>
-                      <button
-                        onClick={() => setShowDeleteDocConfirm(doc.id)}
-                        className="w-8 h-8 rounded-md bg-white flex items-center justify-center hover:bg-red-50 border border-gray-200 text-red-600"
-                      >
-                        <i className="fa-regular fa-trash-can text-xs"></i>
-                      </button>
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => handleDownload(doc.name)}
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-blue-600 hover:bg-gray-100"
+                          aria-label="Download"
+                        >
+                          <i className="fa-solid fa-download text-xs" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowDeleteDocConfirm(doc.id)}
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-red-600 hover:bg-red-50"
+                          aria-label="Remove"
+                        >
+                          <i className="fa-regular fa-trash-can text-xs" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
-      )}    </div>
+      ) : null}
+    </div>
   );
 }
 
 export default function EditMentorProfilePage() {
   return (
-    <Suspense>
+    <Suspense
+      fallback={
+        <div className={directorPageRoot}>
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 py-24">
+            <div className={directorSpinner} />
+            <p className="text-sm text-white/80">Loading…</p>
+          </div>
+        </div>
+      }
+    >
       <EditMentorProfileContent />
     </Suspense>
   );

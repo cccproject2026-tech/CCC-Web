@@ -169,9 +169,50 @@ export function flattenAssignedAssessmentRow(item: unknown): FlatAssignedAssessm
   };
 }
 
-// POST /assessments
+/**
+ * Human-readable message from failed create/update (Nest/class-validator often uses
+ * `message: string[]` or nested `errors`).
+ */
+export function formatAssessmentApiErrorMessage(err: unknown): string {
+  const ex = err as { response?: { status?: number; data?: unknown } };
+  const status = ex.response?.status;
+  const data = ex.response?.data;
+  if (data == null) {
+    return status ? `Request failed (HTTP ${status})` : "Request failed";
+  }
+  if (typeof data === "string") {
+    const s = data.trim();
+    return s ? (status ? `${s} (HTTP ${status})` : s) : status ? `Request failed (HTTP ${status})` : "Request failed";
+  }
+  if (typeof data !== "object" || data === null) {
+    return status ? `Request failed (HTTP ${status})` : "Request failed";
+  }
+  const o = data as Record<string, unknown>;
+  const parts: string[] = [];
+  if (typeof o.message === "string") parts.push(o.message);
+  else if (Array.isArray(o.message)) parts.push(...o.message.map(String));
+  if (typeof o.error === "string" && o.error !== "Bad Request") parts.push(o.error);
+  if (Array.isArray(o.errors)) {
+    for (const item of o.errors) {
+      if (typeof item === "string") parts.push(item);
+      else if (item && typeof item === "object" && item !== null) {
+        const row = item as Record<string, unknown>;
+        if (typeof row.message === "string") parts.push(row.message);
+        const c = row.constraints;
+        if (c && typeof c === "object" && c !== null) {
+          parts.push(...Object.values(c as Record<string, string>).map(String));
+        }
+      }
+    }
+  }
+  const msg = parts.filter(Boolean).join(" · ");
+  const base = msg.trim() || (status && status >= 500 ? "Internal server error" : "Validation failed");
+  return status ? `${base} (HTTP ${status})` : base;
+}
+
+// POST /assessment — same resource prefix as GET/PATCH (plural /assessments returns 404 on many backends)
 export const apiCreateAssessment = (payload: CreateAssessmentPayload) =>
-  axiosInstance.post<{ success: boolean; data: AssessmentResponse }>("/assessments", payload);
+  axiosInstance.post<{ success: boolean; data: AssessmentResponse }>("/assessment", payload);
 
 /** List calls can be slow on large datasets; avoid default 10s axios timeout. */
 const GET_ASSESSMENTS_TIMEOUT_MS = 60_000;

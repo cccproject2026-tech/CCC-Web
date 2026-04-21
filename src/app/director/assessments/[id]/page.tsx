@@ -14,7 +14,35 @@ import {
   mapAssessmentFromApi,
   buildSectionsPayload,
   type Section,
+  type Layer as MapperLayer,
 } from "@/app/Services/utils/assessment-mapper";
+
+/** New section for the editor — matches `mapAssessmentFromApi` / `buildSectionsPayload` shape. */
+function createSectionFromModal(
+  name: string,
+  guidelines: string,
+  layerChoices: string[][],
+): Section {
+  const layers: MapperLayer[] = layerChoices.map((choiceTexts, i) => {
+    const cleaned = choiceTexts.map((t) => t.trim()).filter(Boolean);
+    const texts = cleaned.length > 0 ? cleaned : ["Option 1"];
+    return {
+      id: crypto.randomUUID(),
+      name: `Layer ${i + 1}`,
+      choices: texts.map((text, j) => ({
+        id: crypto.randomUUID(),
+        text: text || `Option ${j + 1}`,
+      })),
+      recommendations: [],
+    };
+  });
+  return {
+    id: crypto.randomUUID(),
+    name: name.trim(),
+    description: (guidelines || "").trim(),
+    layers,
+  };
+}
 
 export default function ViewEditAssessmentPage() {
   const router = useRouter();
@@ -40,12 +68,16 @@ export default function ViewEditAssessmentPage() {
   const [newSectionName, setNewSectionName] = useState("");
   const [newSectionGuidelines, setNewSectionGuidelines] = useState("");
   const [newSectionLayers, setNewSectionLayers] = useState(2);
-  const [newChoiceText, setNewChoiceText] = useState("");
+  /** Per-layer choice labels while building a new section in the modal (each layer ≥ 1 row). */
+  const [newSectionLayerChoices, setNewSectionLayerChoices] = useState<
+    string[][]
+  >([[''], ['']]);
 
-  // Instructions state
-  const [instructions, setInstructions] = useState([]);
+  type InstructionRow = { id: string; text: string; checked: boolean };
+  const [instructions, setInstructions] = useState<InstructionRow[]>([]);
 
   const [sections, setSections] = useState<Section[]>([]);
+  const [savingSection, setSavingSection] = useState(false);
 
   useEffect(() => {
     if (!params?.id) return;
@@ -54,7 +86,9 @@ export default function ViewEditAssessmentPage() {
       setLoadError(false);
       try {
         const res = await apiGetAssessmentById(params.id as string);
-        const raw = parseAssessmentDetailPayload(res.data);
+        const raw = parseAssessmentDetailPayload(
+          (res.data as { data?: unknown })?.data ?? res.data,
+        );
         if (!raw) {
           console.error("Invalid assessment payload");
           setLoadError(true);
@@ -78,34 +112,107 @@ export default function ViewEditAssessmentPage() {
     fetchAssessment();
   }, [params?.id]);
 
-  const handleAddChoice = (sectionId: string, layerId: string) => {
-    if (!newChoiceText.trim()) return;
+  useEffect(() => {
+    setNewSectionLayerChoices((prev) => {
+      const n = newSectionLayers;
+      const next: string[][] = [];
+      for (let i = 0; i < n; i++) {
+        next[i] = prev[i]?.length ? [...prev[i]] : [""];
+      }
+      return next;
+    });
+  }, [newSectionLayers]);
 
-    setSections(prev =>
-      prev.map(section =>
+  const resetAddSectionForm = () => {
+    setNewSectionName("");
+    setNewSectionGuidelines("");
+    setNewSectionLayers(2);
+    setNewSectionLayerChoices([[''], ['']]);
+  };
+
+  const openAddSectionModal = () => {
+    resetAddSectionForm();
+    setShowAddSectionModal(true);
+  };
+
+  const closeAddSectionModal = () => {
+    setShowAddSectionModal(false);
+    resetAddSectionForm();
+  };
+
+  const appendModalChoice = (layerIdx: number) => {
+    setNewSectionLayerChoices((prev) =>
+      prev.map((row, i) => (i === layerIdx ? [...row, ""] : [...row])),
+    );
+  };
+
+  const updateModalChoice = (
+    layerIdx: number,
+    choiceIdx: number,
+    value: string,
+  ) => {
+    setNewSectionLayerChoices((prev) =>
+      prev.map((row, i) => {
+        if (i !== layerIdx) return [...row];
+        const r = [...row];
+        r[choiceIdx] = value;
+        return r;
+      }),
+    );
+  };
+
+  /** Append a new choice to a layer (no modal — edit text in place). */
+  const handleAppendChoice = (sectionId: string, layerId: string) => {
+    setSections((prev) =>
+      prev.map((section) =>
         section.id !== sectionId
           ? section
           : {
-            ...section,
-            layers: section.layers.map(layer =>
-              layer.id !== layerId
-                ? layer
-                : {
+              ...section,
+              layers: section.layers.map((layer) => {
+                if (layer.id !== layerId) return layer;
+                const n = layer.choices.length + 1;
+                return {
                   ...layer,
                   choices: [
                     ...layer.choices,
                     {
                       id: crypto.randomUUID(),
-                      text: newChoiceText,
+                      text: `Option ${n}`,
                     },
                   ],
-                }
-            ),
-          }
-      )
+                };
+              }),
+            },
+      ),
     );
+  };
 
-    setNewChoiceText("");
+  const handleUpdateChoiceText = (
+    sectionId: string,
+    layerId: string,
+    choiceId: string,
+    text: string,
+  ) => {
+    setSections((prev) =>
+      prev.map((section) =>
+        section.id !== sectionId
+          ? section
+          : {
+              ...section,
+              layers: section.layers.map((layer) =>
+                layer.id !== layerId
+                  ? layer
+                  : {
+                      ...layer,
+                      choices: layer.choices.map((c) =>
+                        c.id === choiceId ? { ...c, text } : c,
+                      ),
+                    },
+              ),
+            },
+      ),
+    );
   };
 
   const showToast = (message: string) => {
@@ -146,19 +253,57 @@ export default function ViewEditAssessmentPage() {
     setShowRecommendationsModal(false);
   };
 
-  const handleAddSection = () => {
-    if (!newSectionName) return;
+  const handleAddSection = async () => {
+    if (!newSectionName.trim()) return;
 
-    showToast("Section Added Successfully");
+    const next = createSectionFromModal(
+      newSectionName,
+      newSectionGuidelines,
+      newSectionLayerChoices,
+    );
+    const merged = [...sections, next];
+
+    setSections(merged);
+    setSelectedSection(next.id);
     setShowAddSectionModal(false);
-    setNewSectionName("");
-    setNewSectionGuidelines("");
-    setNewSectionLayers(2);
+    resetAddSectionForm();
+
+    setSavingSection(true);
+    try {
+      await apiUpdateSections(assessment.id, buildSectionsPayload(merged) as any);
+      showToast("Section added and saved");
+    } catch (e) {
+      console.error(e);
+      showToast(
+        "Section added here — save failed on server. Use “Save changes” to retry.",
+      );
+    } finally {
+      setSavingSection(false);
+    }
   };
 
   const handleAddLayer = () => {
-    showToast("Layer Added Successfully");
+    if (!selectedSection) return;
+    setSections((prev) =>
+      prev.map((section) => {
+        if (section.id !== selectedSection) return section;
+        const nextNum = section.layers.length + 1;
+        return {
+          ...section,
+          layers: [
+            ...section.layers,
+            {
+              id: crypto.randomUUID(),
+              name: `Layer ${nextNum}`,
+              choices: [{ id: crypto.randomUUID(), text: "Option 1" }],
+              recommendations: [],
+            },
+          ],
+        };
+      }),
+    );
     setShowAddLayerModal(false);
+    showToast("Layer added — click Save changes to persist.");
   };
 
   const handleDeleteInstructions = () => {
@@ -170,7 +315,7 @@ export default function ViewEditAssessmentPage() {
     try {
       await apiUpdateInstructions(
         assessment.id,
-        instructions.filter(i => i.checked).map(i => i.text)
+        instructions.filter((i) => i.checked).map((i) => i.text),
       );
 
       showToast("Survey Edited Successfully");
@@ -252,7 +397,7 @@ export default function ViewEditAssessmentPage() {
             <div className="mb-4 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                onClick={() => setShowAddSectionModal(true)}
+                onClick={openAddSectionModal}
                 className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
               >
                 <i className="fa-solid fa-plus"></i>
@@ -390,10 +535,10 @@ export default function ViewEditAssessmentPage() {
                         </button>
                       </div>
 
-                      <div className="space-y-2 mb-4">
+                      <div className="mb-4 space-y-2">
                         {layer.choices.map((choice, choiceIdx) => (
                           <div
-                            key={choiceIdx}
+                            key={choice.id}
                             className={`flex items-center gap-3 rounded-lg border p-3 text-white transition-all ${
                               selectedChoices.includes(layerIdx * 10 + choiceIdx)
                                 ? "border-[#8ec5eb] ring-2 ring-[#8ec5eb]/40"
@@ -408,18 +553,36 @@ export default function ViewEditAssessmentPage() {
                               <input
                                 type="checkbox"
                                 checked={selectedChoices.includes(
-                                  layerIdx * 10 + choiceIdx
+                                  layerIdx * 10 + choiceIdx,
                                 )}
                                 onChange={() =>
                                   handleSelectChoice(layerIdx * 10 + choiceIdx)
                                 }
-                                className="w-5 h-5 text-[#2E3B8E] rounded focus:ring-[#2E3B8E]"
+                                className="h-5 w-5 rounded text-[#2E3B8E] focus:ring-[#2E3B8E]"
                               />
                             )}
-                            <span className="text-sm font-semibold">
+                            <span className="w-7 shrink-0 text-sm font-semibold">
                               {choiceIdx + 1}.
                             </span>
-                            <span className="text-sm flex-1">{choice.text}</span>
+                            {isSelectionMode ? (
+                              <span className="flex-1 text-sm">{choice.text}</span>
+                            ) : (
+                              <input
+                                type="text"
+                                value={choice.text}
+                                onChange={(e) =>
+                                  handleUpdateChoiceText(
+                                    selectedSectionData.id,
+                                    layer.id,
+                                    choice.id,
+                                    e.target.value,
+                                  )
+                                }
+                                onClick={(e) => e.stopPropagation()}
+                                placeholder="Choice text"
+                                className="min-w-0 flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 outline-none focus:border-[#8ec5eb]/50 focus:ring-1 focus:ring-[#8ec5eb]/30"
+                              />
+                            )}
                           </div>
                         ))}
                       </div>
@@ -427,6 +590,12 @@ export default function ViewEditAssessmentPage() {
                       <div className="flex justify-end">
                         <button
                           type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (selectedSectionData) {
+                              handleAppendChoice(selectedSectionData.id, layer.id);
+                            }
+                          }}
                           className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
                         >
                           <i className="fa-solid fa-plus"></i>
@@ -474,7 +643,8 @@ export default function ViewEditAssessmentPage() {
             <div className="sticky top-0 bg-white border-b p-6 flex justify-between items-center z-10">
               <h3 className="text-2xl font-bold text-gray-900">Add Section</h3>
               <button
-                onClick={() => setShowAddSectionModal(false)}
+                type="button"
+                onClick={closeAddSectionModal}
                 className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg"
               >
                 <i className="fa-solid fa-xmark text-gray-600"></i>
@@ -535,70 +705,51 @@ export default function ViewEditAssessmentPage() {
                     <label className="text-base font-bold text-gray-900">
                       Layer {i + 1}
                     </label>
-                    <button className="px-3 py-1 bg-white border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg text-sm font-semibold hover:bg-blue-50 flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => appendModalChoice(i)}
+                      className="px-3 py-1 bg-white border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg text-sm font-semibold hover:bg-blue-50 flex items-center gap-1"
+                    >
                       <i className="fa-solid fa-plus"></i>
                       Choice
                     </button>
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Choice 1"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900 placeholder-gray-400"
-                  />
+                  <div className="space-y-2">
+                    {(newSectionLayerChoices[i] ?? [""]).map((text, j) => (
+                      <input
+                        key={`${i}-${j}`}
+                        type="text"
+                        value={text}
+                        onChange={(e) =>
+                          updateModalChoice(i, j, e.target.value)
+                        }
+                        placeholder={`Choice ${j + 1}`}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900 placeholder-gray-400"
+                      />
+                    ))}
+                  </div>
                 </div>
               ))}
-
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-base font-bold text-gray-900">
-                    Layer 1 - Customized Development Plans
-                  </label>
-                  <button className="px-3 py-1 bg-white border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg text-sm font-semibold hover:bg-blue-50 flex items-center gap-1">
-                    <i className="fa-solid fa-plus"></i>
-                    Plan
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Choice 1"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900 placeholder-gray-400"
-                />
-              </div>
-
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-base font-bold text-gray-900">
-                    Layer 2 - Customized Development Plans
-                  </label>
-                  <button className="px-3 py-1 bg-white border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg text-sm font-semibold hover:bg-blue-50 flex items-center gap-1">
-                    <i className="fa-solid fa-plus"></i>
-                    Plan
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Choice 1"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900 placeholder-gray-400"
-                />
-              </div>
             </div>
 
             <div className="sticky bottom-0 bg-white border-t p-6 flex justify-between gap-4">
               <button
-                onClick={() => setShowAddSectionModal(false)}
+                type="button"
+                onClick={closeAddSectionModal}
                 className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
-                onClick={handleAddSection}
-                disabled={!newSectionName}
-                className={`flex-1 px-6 py-3 rounded-lg font-semibold ${newSectionName
+                type="button"
+                onClick={() => void handleAddSection()}
+                disabled={!newSectionName.trim() || savingSection}
+                className={`flex-1 px-6 py-3 rounded-lg font-semibold ${newSectionName.trim() && !savingSection
                   ? "bg-[#2E3B8E] text-white hover:bg-[#1F2A6E]"
                   : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
               >
-                Create Section
+                {savingSection ? "Saving…" : "Create Section"}
               </button>
             </div>
           </div>

@@ -43,17 +43,16 @@ export default function CreateAssessmentPage() {
       name: assessmentName,
       description,
       instructions: instructions.filter(i => i.trim() !== ""),
-      type: 'CMA' as const,
+      type: "CMA" as const,
       sections: sections.map((section, sectionIdx) => ({
-        name: section.name,
+        title: section.name,
         description: section.guidelines,
         layers: section.layers.map((layer, layerIdx) => ({
-          question: `Layer ${layerIdx + 1}`,
+          title: `Layer ${layerIdx + 1}`,
           choices: layer.choices
             .filter(c => c.trim() !== "")
-            .map((choice, idx) => ({ 
-              label: choice,
-              value: `choice_${idx}` 
+            .map((choice) => ({ 
+              text: choice,
             })),
         })),
       })),

@@ -314,6 +314,7 @@ function AssessmentsPageContent() {
   const searchParams = useSearchParams();
   const assignUserFromQuery = searchParams.get("assignUser");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedAssessments, setSelectedAssessments] = useState<string[]>([]);
   const [isSelectionMode, setIsSelectionMode] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -351,12 +352,9 @@ function AssessmentsPageContent() {
         setLoadingAssessments(true);
         setListError(null);
 
-        if (selectedMenteeId) {
-          const progressRes = await apiGetUserProgress(selectedMenteeId);
-          const progressData = unwrapProgressData(progressRes);
-          const assessmentProgress = Array.isArray(progressData?.assessments)
-            ? progressData.assessments
-            : [];
+        const res = await apiGetAssessments({
+          search: debouncedSearch || undefined,
+        });
 
           const idStatusRows = assessmentProgress
             .map((p: any) => ({
@@ -573,7 +571,7 @@ function AssessmentsPageContent() {
       setSelectedAssessments([]);
     } catch (err) {
       console.error(err);
-      setToast("Failed to delete assessments");
+      setToast(getApiErrorMessage(err, "Failed to delete assessments"));
     } finally {
       setLoading(false);
       setTimeout(() => setToast(null), 3000);
@@ -1142,7 +1140,7 @@ function AssessmentsPageContent() {
         cancelText="Cancel"
         icon="fa-solid fa-trash"
         iconColor="text-red-600 bg-red-50"
-        confirmColor="bg-[#2E3B8E] hover:bg-[#1F2A6E]"
+        confirmColor="bg-red-600 hover:bg-red-700"
         pendingConfirmText="Deleting…"
       />
 

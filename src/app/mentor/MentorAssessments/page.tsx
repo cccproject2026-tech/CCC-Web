@@ -702,6 +702,7 @@ export default function MentorAssessments() {
         description: formDesc,
         instructions: formInstructions.filter((i) => i.trim() !== ""),
         sections: formSections,
+        type: "CMA" as const,
       };
 
       const res = await apiCreateAssessment(payload);
