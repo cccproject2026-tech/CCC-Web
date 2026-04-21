@@ -12,10 +12,10 @@ import SearchBar from "@/app/Components/SearchBar";
 import FeaturedAvatars, {
   FeaturedAvatarItem,
 } from "@/app/Components/FeaturedAvatars";
-import ConfirmModal from "@/app/Components/ConfirmModal";
 import ScheduleMeetingModal from "@/app/Components/ScheduleMeetingModal";
 import AssignMenteesModal from "@/app/Components/AssignMenteesModal";
 import ListMenteesModal from "@/app/Components/ListMenteesModal";
+import RemoveMenteesModal from "@/app/Components/RemoveMenteesModal";
 import MentorBg from "../../Assets/mentor-bg.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
@@ -117,8 +117,8 @@ const MentorGridCard = memo(({
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#062946]/60 to-transparent" />
 
-        <div className="absolute right-2 top-2">
-          <div className="relative">
+        <div className="absolute right-2 top-2 z-[50]">
+          <div className="relative" data-mentor-menu="true">
             <button
               type="button"
               onClick={(e) => {
@@ -131,7 +131,7 @@ const MentorGridCard = memo(({
             </button>
 
             {isMenuOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 min-w-[240px] rounded-xl border border-white/15 bg-[#041f35]/98 py-2 pl-1 pr-1 shadow-2xl backdrop-blur-md">
+              <div className="absolute right-0 top-full z-[60] mt-2 min-w-[240px] rounded-xl border border-white/15 bg-[#041f35]/98 py-2 pl-1 pr-1 shadow-2xl backdrop-blur-md">
                 {optionsMenuItems.map((item, index) => (
                   <button
                     key={index}
@@ -274,7 +274,7 @@ const MentorListCard = memo(({
           <button type="button" className="p-1 transition hover:opacity-80" aria-label="Call">
             <i className="fa-solid fa-phone text-[16px] md:text-[17px]" />
           </button>
-          <div className="relative">
+          <div className="relative z-[50]" data-mentor-menu="true">
             <button
               type="button"
               onClick={(e) => {
@@ -287,7 +287,7 @@ const MentorListCard = memo(({
             </button>
 
             {isMenuOpen && (
-              <div className="absolute right-0 top-full z-50 mt-2 min-w-[240px] rounded-xl border border-white/15 bg-[#041f35]/98 py-2 pl-1 pr-1 shadow-2xl backdrop-blur-md">
+              <div className="absolute right-0 top-full z-[60] mt-2 min-w-[240px] rounded-xl border border-white/15 bg-[#041f35]/98 py-2 pl-1 pr-1 shadow-2xl backdrop-blur-md">
                 {optionsMenuItems.map((item, index) => (
                   <button
                     key={index}
@@ -412,6 +412,22 @@ export default function MyMentorsPage() {
     fetchMentors();
   }, [activeFilter, debouncedQuery, currentPage]);
 
+  /** Close mentor ⋮ menu on outside click (overlay is only for sort — avoids blocking card menus). */
+  useEffect(() => {
+    if (!openMenuId) return;
+    const close = (e: MouseEvent | TouchEvent) => {
+      const t = e.target;
+      if (t instanceof Element && t.closest("[data-mentor-menu]")) return;
+      setOpenMenuId(null);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("touchstart", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("touchstart", close);
+    };
+  }, [openMenuId]);
+
   const featuredMentors = useMemo(() => allMentors.slice(0, 6), [allMentors]);
   const featuredItems: FeaturedAvatarItem[] = useMemo(
     () =>
@@ -502,7 +518,9 @@ export default function MyMentorsPage() {
         handleRemoveMentee(mentor);
         break;
       case "Edit Profile":
-        router.push(`/director/mentors/profile/edit?id=${mentor.id}`);
+        router.push(
+          `/director/mentors/profile/edit?id=${encodeURIComponent(mentor.id)}`,
+        );
         setOpenMenuId(null);
         break;
       default:
@@ -593,8 +611,11 @@ export default function MyMentorsPage() {
             <span className="text-[14px] font-semibold whitespace-nowrap text-white sm:text-[15px]">
               Sort By
             </span>
-            <div className="relative w-full sm:w-auto sm:min-w-[200px]">
+            <div
+              className={`relative w-full sm:w-auto sm:min-w-[200px] ${showSortMenu ? "z-[50]" : ""}`}
+            >
               <button
+                type="button"
                 onClick={() => setShowSortMenu(!showSortMenu)}
                 className="flex min-w-[160px] w-full items-center justify-between gap-3 rounded-lg border border-white/15 bg-white/10 px-4 py-2.5 text-[13px] font-medium text-white shadow-sm transition-all hover:bg-white/15 sm:w-auto sm:min-w-[180px] sm:text-[14px]"
               >
@@ -603,7 +624,7 @@ export default function MyMentorsPage() {
               </button>
 
               {showSortMenu && (
-                <div className="absolute right-0 top-full z-50 mt-2 min-w-[200px] rounded-xl border border-white/15 bg-[#041f35]/98 py-2 px-1 shadow-2xl backdrop-blur-md">
+                <div className="absolute right-0 top-full z-[60] mt-2 min-w-[200px] rounded-xl border border-white/15 bg-[#041f35]/98 py-2 px-1 shadow-2xl backdrop-blur-md">
                   {sortOptions.map((option) => (
                     <button
                       key={option}
@@ -809,21 +830,62 @@ export default function MyMentorsPage() {
         } : undefined}
       />
 
-      {/* Remove Mentee Modal */}
-      <ConfirmModal
+      <RemoveMenteesModal
         isOpen={showRemoveModal}
         onClose={() => setShowRemoveModal(false)}
-        onConfirm={() => {
-          setToast({ message: "Mentee Removed Successfully", type: 'success' });
+        mentorId={selectedMentor?.id ?? null}
+        mentorName={selectedMentor?.name ?? null}
+        onSuccess={(message) => {
+          setToast({ message, type: "success" });
           setTimeout(() => setToast(null), 3000);
+          const refresh = async () => {
+            try {
+              const search =
+                debouncedQuery.length > 0 ? debouncedQuery : undefined;
+              const base = {
+                search,
+                page: currentPage,
+                limit: PAGE_SIZE,
+              };
+              const response =
+                activeFilter === "All"
+                  ? await apiGetAllUsers({
+                      ...base,
+                      role: "mentor",
+                      roleMatch: "mixed",
+                    })
+                  : activeFilter === "Mentors"
+                    ? await apiGetAllUsers({
+                        ...base,
+                        role: "mentor",
+                        roleMatch: "exact",
+                      })
+                    : activeFilter === "Field Mentor"
+                      ? await apiGetAllUsers({
+                          ...base,
+                          role: "field-mentor",
+                        })
+                      : await apiGetAllUsers({
+                          ...base,
+                          role: "mentor",
+                          roleMatch: "mixed",
+                        });
+              const { users, total, totalPages: tp } = response.data.data;
+              setAllMentors(
+                users.map((u: any, i: number) => convertUserToMentor(u, i)),
+              );
+              setTotalCount(total);
+              setTotalPages(tp);
+            } catch (error) {
+              console.error("Error refreshing mentors:", error);
+            }
+          };
+          void refresh();
         }}
-        title="Remove a Mentee"
-        message={`Remove a mentee from ${selectedMentor?.name}. This action cannot be undone.`}
-        confirmText="Remove"
-        cancelText="Cancel"
-        confirmColor="bg-red-600 hover:bg-red-700"
-        icon="fa-solid fa-user-minus"
-        iconColor="text-red-500 bg-red-100"
+        onError={(message) => {
+          setToast({ message, type: "error" });
+          setTimeout(() => setToast(null), 4000);
+        }}
       />
 
       {/* List Mentees Modal */}
@@ -846,16 +908,14 @@ export default function MyMentorsPage() {
         </div>
       )}
 
-      {/* Click outside to close menus */}
-      {(showSortMenu || openMenuId) && (
+      {/* Dismiss sort dropdown only (mentor ⋮ menus use document listeners + z-index). */}
+      {showSortMenu ? (
         <div
-          className="fixed inset-0 z-40"
-          onClick={() => {
-            setShowSortMenu(false);
-            setOpenMenuId(null);
-          }}
-        ></div>
-      )}
+          className="fixed inset-0 z-30"
+          aria-hidden
+          onClick={() => setShowSortMenu(false)}
+        />
+      ) : null}
     </div>
   );
 }

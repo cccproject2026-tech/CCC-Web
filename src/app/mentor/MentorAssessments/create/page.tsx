@@ -37,7 +37,7 @@ export default function CreateAssessmentPage() {
       name: assessmentName,
       description,
       instructions: instructions.filter(i => i.trim() !== ""),
-      type: "CMA", // or "PMP" – must come from UI later
+      type: "CMA" as const,
       sections: sections.map((section, sectionIdx) => ({
         title: section.name,
         description: section.guidelines,

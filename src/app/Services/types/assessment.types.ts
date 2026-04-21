@@ -1,7 +1,7 @@
 // Assessment types matching CCC-Backend assessment module DTOs
 
 export type AssessmentStatus = 'assigned' | 'in_progress' | 'submitted' | 'reviewed';
-export type AssessmentType = 'CMA' | 'standard';
+export type AssessmentType = 'CMA' | 'standard' | 'PMP';
 
 // ─── Choices / Layers / Sections ─────────────────────────────────────────────
 
@@ -9,6 +9,7 @@ export interface Choice {
   label: string;
   value: string;
   score?: number;
+  text?: string;
 }
 
 export interface RecommendationLevel {
@@ -23,6 +24,8 @@ export interface Layer {
   question: string;
   choices: Choice[];
   allowMultiple?: boolean;
+  /** Optional per-layer recommendation lines (create / update payloads). */
+  recommendations?: string[];
 }
 
 export interface PreSurveyQuestion {
@@ -30,6 +33,17 @@ export interface PreSurveyQuestion {
   question: string;
   choices: Choice[];
   allowMultiple?: boolean;
+}
+
+/**
+ * POST /assessment pre-survey entries — matches CCC-Director-Mobile `create-assessment.tsx`
+ * (`preSurvey` array, not `preSurveyQuestions` with choice lists).
+ */
+export interface CreatePreSurveyEntryPayload {
+  text: string;
+  type: 'text' | 'number';
+  placeholder: string;
+  required: boolean;
 }
 
 export interface SectionRecommendation {
@@ -77,13 +91,30 @@ export interface AssessmentAssigned {
   appointmentId?: string;
 }
 
+/**
+ * Section body for POST /assessment — matches PATCH `/assessment/:id/sections`
+ * (`buildSectionsPayload`) and mentor create wizard (title + choices with `text`).
+ */
+export interface AssessmentSectionCreateBody {
+  title: string;
+  description?: string;
+  layers: Array<{
+    title: string;
+    choices: Array<{ text: string }>;
+  }>;
+  /** Per-section CDP levels — matches CCC-Director-Mobile create payload. */
+  recommendations?: Array<{ level: 1 | 2 | 3 | 4; items: string[] }>;
+}
+
+/** POST /assessment — aligned with CCC-Director-Mobile `CreateAssessmentRequest`. */
 export interface CreateAssessmentPayload {
   name: string;
-  description?: string;
-  instructions?: string[];
-  type?: AssessmentType;
-  sections: Section[];
-  preSurveyQuestions?: PreSurveyQuestion[];
+  description: string;
+  instructions: string[];
+  type: 'CMA' | 'PMP';
+  sections: AssessmentSectionCreateBody[];
+  /** Mobile sends `preSurvey` (not `preSurveyQuestions`). */
+  preSurvey?: CreatePreSurveyEntryPayload[];
 }
 
 export interface UpdateAssessmentPayload extends Partial<CreateAssessmentPayload> {}
