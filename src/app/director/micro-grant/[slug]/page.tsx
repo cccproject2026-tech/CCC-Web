@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, ReactNode } from "react";
-import { useParams } from "next/navigation";
+import { useParams , useRouter} from "next/navigation";
 import Image from "next/image";
 
 import MicroGrantDetailHero from "@/app/Components/Hero/MicroGrantDetailHero";
@@ -20,6 +20,9 @@ const Page: React.FC = () => {
   const [data, setData] = useState<MicroGrantResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
+const [statusMessage, setStatusMessage] = useState("");
+
+const router = useRouter();
   const params = useParams();
   const raw = params?.slug;
   const userId =
@@ -43,20 +46,50 @@ const Page: React.FC = () => {
     fetchData();
   }, [userId]);
 
-  const handleStatusChange = async (
-    applicationId: string,
-    status: 'new' | 'pending' | 'accepted' | 'rejected'
-  ) => {
-    try {
-      await updateMicroGrantStatus(applicationId, status);
+  // const handleStatusChange = async (
+  //   applicationId: string,
+  //   status: 'new' | 'pending' | 'accepted' | 'rejected'
+  // ) => {
+  //   try {
+  //     await updateMicroGrantStatus(applicationId, status);
 
-      // update UI optimistically or refetch
-      console.log('Status updated successfully');
-    } catch (error) {
-      console.log('Failed to update status');
-      console.error(error);
-    }
-  };
+  //     // update UI optimistically or refetch
+  //     console.log('Status updated successfully');
+  //   } catch (error) {
+  //     console.log('Failed to update status');
+  //     console.error(error);
+  //   }
+  // };
+
+ const handleStatusChange = async (
+  applicationId: string,
+  status: "new" | "pending" | "accepted" | "rejected"
+) => {
+  try {
+    const res = await updateMicroGrantStatus(applicationId, status);
+
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        application: {
+          ...prev.application,
+          status: res?.data?.data?.status ?? status,
+        },
+      };
+    });
+
+    setStatusMessage(`Application ${status} successfully`);
+
+    setTimeout(() => {
+      router.push("/director/micro-grant");
+    }, 1200);
+  } catch (error) {
+    console.log("Failed to update status");
+    console.error(error);
+    setStatusMessage(`Failed to update application status to ${status}`);
+  }
+};
 
 
   if (loading) {
@@ -245,7 +278,16 @@ const Page: React.FC = () => {
               <p>⭐ Grant report required upon completion</p>
               <p>⭐ Unused funds must be returned</p>
 
-              <div className="flex justify-between mt-8">
+
+{statusMessage ? (
+  <div className="rounded-lg bg-white/10 px-4 py-3 text-sm font-medium text-white">
+    {statusMessage}
+  </div>
+) : null}
+
+
+
+              {/* <div className="flex justify-between mt-8">
                 <button
                   onClick={() => setActiveStep(1)}
                   className="bg-gray-400 px-6 py-2 rounded-lg"
@@ -264,7 +306,37 @@ const Page: React.FC = () => {
                     ACCEPT
                   </button>
                 </div>
-              </div>
+              </div> */}
+
+<div className="flex justify-between mt-8">
+  <button
+    type="button"
+    onClick={() => setActiveStep(1)}
+    className="bg-gray-400 px-6 py-2 rounded-lg"
+  >
+    Back
+  </button>
+
+  <div>
+    <button
+      type="button"
+      onClick={() => handleStatusChange(data.application._id, "rejected")}
+      className="bg-white text-[#1d538d] px-6 py-2 rounded-lg font-semibold mr-2"
+    >
+      REJECT
+    </button>
+
+    <button
+      type="button"
+      onClick={() => handleStatusChange(data.application._id, "accepted")}
+      className="bg-[#1d538d] text-white px-6 py-2 rounded-lg"
+    >
+      ACCEPT
+    </button>
+  </div>
+</div>
+
+
             </div>
           )}
         </div>

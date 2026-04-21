@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { isAxiosError } from "axios";
 import MentorHeader from "@/app/Components/MentorHeader";
@@ -53,6 +54,7 @@ export default function NoteDetailContent({
   const Header =
     variant === "mentor" ? MentorHeader : variant === "pastor" ? PastorHeader : null;
   const { userId, displayName } = useNotesSession(variant);
+  const searchParams = useSearchParams();
   const glassPanel = variant === "director" ? directorGlassCard : glassPanelPastor;
 
   const [note, setNote] = useState<Note | null>(null);
@@ -65,75 +67,364 @@ export default function NoteDetailContent({
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionOk, setActionOk] = useState<string | null>(null);
 
-  const loadOne = useCallback(async () => {
-    if (!userId || !noteId) {
-      setLoading(false);
-      setError("Missing session or note.");
+//   const loadOne = useCallback(async () => {
+//     if (!userId || !noteId) {
+//       setLoading(false);
+//       setError("Missing session or note.");
+//       return;
+//     }
+//     setLoading(true);
+//     setError(null);
+//     try {
+//       // const n = await fetchNoteById(userId, noteId);
+//       // setNote(n);
+//       // setDraft(noteBody(n ?? {}));
+//       const n = await fetchNoteById(userId, noteId);
+
+// // if (!n) {
+// //   setError("Note not found.");
+// //   setNote(null);
+// //   return;
+// // }
+// if (!n) {
+//   setError("Note not found in server.");
+//   setNote(null);
+//   return;
+// }
+
+// setNote(n);
+
+// const content =
+//   typeof n.content === "string"
+//     ? n.content
+//     : noteBody(n);
+
+// setDraft(content);
+//     } catch (e) {
+//       console.error(e);
+//       setError(extractApiErrorMessage(e));
+//       setNote(null);
+//     } finally {
+//       setLoading(false);
+//     }
+//   }, [userId, noteId]);
+
+// const loadOne = useCallback(async () => {
+//   if (!userId || !noteId) {
+//     setLoading(false);
+//     setError("Missing session or note.");
+//     return;
+//   }
+
+//   setLoading(true);
+//   setError(null);
+
+//   try {
+//     // ✅ NEW: get note from URL (this is the key fix)
+//     const noteParam = searchParams.get("note");
+
+//     if (noteParam) {
+//       const parsed = JSON.parse(noteParam);
+
+//       setNote(parsed);
+//       setDraft(parsed.content || "");
+
+//       setLoading(false);
+//       return;
+//     }
+
+//     // 🔁 fallback (only if user refreshes page)
+//     const n = await fetchNoteById(userId, noteId);
+
+//     if (!n) {
+//       setError("Note not found.");
+//       setNote(null);
+//       return;
+//     }
+
+//     setNote(n);
+//     setDraft(n.content || "");
+
+//   } catch (e) {
+//     console.error(e);
+//     setError("Failed to load note.");
+//     setNote(null);
+//   } finally {
+//     setLoading(false);
+//   }
+// }, [userId, noteId, searchParams]);
+//--2
+// const loadOne = useCallback(async () => {
+//   if (!userId || !noteId) {
+//     setLoading(false);
+//     setError("Missing session or note.");
+//     return;
+//   }
+
+//   setLoading(true);
+//   setError(null);
+
+//   try {
+//     const noteParam = searchParams.get("note");
+
+//     // 1) Show passed note immediately for fast UI
+//     if (noteParam) {
+//       const parsed = JSON.parse(noteParam);
+//       setNote(parsed);
+//       setDraft(parsed.content || "");
+//     }
+
+//     // 2) Always fetch latest note from backend and override stale URL data
+//     const fresh = await fetchNoteById(userId, noteId);
+
+//     if (fresh) {
+//       setNote(fresh);
+//       setDraft(typeof fresh.content === "string" ? fresh.content : "");
+//     } else if (!noteParam) {
+//       setError("Note not found.");
+//       setNote(null);
+//     }
+//   } catch (e) {
+//     console.error(e);
+//     setError("Failed to load note.");
+//     setNote(null);
+//   } finally {
+//     setLoading(false);
+//   }
+// }, [userId, noteId, searchParams]);
+
+
+const loadOne = useCallback(async () => {
+  if (!userId || !noteId) {
+    setLoading(false);
+    setError("Missing session or note.");
+    return;
+  }
+
+  setLoading(true);
+  setError(null);
+
+  try {
+    const noteParam = searchParams.get("note");
+
+    // ✅ if note is passed from Previous list, trust it and stop here
+    if (noteParam) {
+      const parsed = JSON.parse(noteParam);
+      setNote(parsed);
+      setDraft(typeof parsed.content === "string" ? parsed.content : "");
       return;
     }
-    setLoading(true);
-    setError(null);
-    try {
-      const n = await fetchNoteById(userId, noteId);
-      setNote(n);
-      setDraft(noteBody(n ?? {}));
-    } catch (e) {
-      console.error(e);
-      setError(extractApiErrorMessage(e));
-      setNote(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, noteId]);
 
+    // only fallback when page is opened directly / refreshed
+    const fresh = await fetchNoteById(userId, noteId);
+
+    if (fresh) {
+      setNote(fresh);
+      setDraft(typeof fresh.content === "string" ? fresh.content : "");
+    } else {
+      setError("Note not found.");
+      setNote(null);
+    }
+  } catch (e) {
+    console.error(e);
+    setError("Failed to load note.");
+    setNote(null);
+  } finally {
+    setLoading(false);
+  }
+}, [userId, noteId, searchParams]);
   useEffect(() => {
     loadOne();
   }, [loadOne]);
 
-  useEffect(() => {
-    if (note && editing) setDraft(noteBody(note));
-  }, [note, editing]);
+  // useEffect(() => {
+  //   if (note && editing) setDraft(noteBody(note));
+  // }, [note, editing]);
+  // this is overwriting the my upated text
 
-  const handleSaveEdit = async () => {
-    if (!userId || !noteId) return;
-    const text = draft.trim();
-    if (!text) {
-      setActionError("Note cannot be empty.");
-      return;
-    }
-    setSaving(true);
-    setActionError(null);
-    setActionOk(null);
-    try {
-      const updated = await updateNoteBestEffort(userId, noteId, text);
-      if (updated) setNote(updated);
-      else await loadOne();
-      setEditing(false);
-      setActionOk("Note updated.");
-      setTimeout(() => setActionOk(null), 2000);
-    } catch (e) {
-      console.error(e);
-      setActionError(extractApiErrorMessage(e));
-    } finally {
-      setSaving(false);
-    }
-  };
+  // const handleSaveEdit = async () => {
+  //   if (!userId || !noteId) return;
+  //   const text = draft.trim();
+  //   if (!text) {
+  //     setActionError("Note cannot be empty.");
+  //     return;
+  //   }
+  //   setSaving(true);
+  //   setActionError(null);
+  //   setActionOk(null);
+  //   try {
+  //     const updated = await updateNoteBestEffort(userId, noteId, text);
+  //     if (updated) setNote(updated);
+  //     else await loadOne();
+  //     setEditing(false);
+  //     setActionOk("Note updated.");
+  //     setTimeout(() => setActionOk(null), 2000);
+  //   } catch (e) {
+  //     console.error(e);
+  //     setActionError(extractApiErrorMessage(e));
+  //   } finally {
+  //     setSaving(false);
+  //   }
+  // };
 
-  const handleDelete = async () => {
-    if (!userId || !noteId) return;
-    if (!window.confirm("Delete this note permanently?")) return;
-    setDeleting(true);
-    setActionError(null);
-    try {
-      await deleteNoteSafe(userId, noteId);
-      router.push(basePath);
-    } catch (e) {
-      console.error(e);
-      setActionError(extractApiErrorMessage(e));
-    } finally {
-      setDeleting(false);
+
+  // -> use to change old logic
+//   const handleSaveEdit = async () => {
+//   if (!userId || !noteId) return;
+
+//   const text = draft.trim();
+//   if (!text) {
+//     setActionError("Note cannot be empty.");
+//     return;
+//   }
+
+//   setSaving(true);
+//   setActionError(null);
+//   setActionOk(null);
+
+//   try {
+//     const updated = await updateNoteBestEffort(userId, noteId, text);
+
+//     if (updated) {
+//       setNote(updated);
+
+//       // 🔥 IMPORTANT FIX (this was missing)
+//       setDraft(typeof updated.content === "string" ? updated.content : "");
+//     } else {
+//       await loadOne();
+//     }
+
+//     setEditing(false);
+//     setActionOk("Note updated.");
+//     setTimeout(() => setActionOk(null), 2000);
+
+//   } catch (e) {
+//     console.error(e);
+//     setActionError(extractApiErrorMessage(e));
+//   } finally {
+//     setSaving(false);
+//   }
+// };
+
+  // const handleDelete = async () => {
+  //   if (!userId || !noteId) return;
+  //   if (!window.confirm("Delete this note permanently?")) return;
+  //   setDeleting(true);
+  //   setActionError(null);
+  //   try {
+  //     await deleteNoteSafe(userId, noteId);
+  //     router.push(basePath);
+  //   } catch (e) {
+  //     console.error(e);
+  //     setActionError(extractApiErrorMessage(e));
+  //   } finally {
+  //     setDeleting(false);
+  //   }
+  // };
+
+//-> test
+const handleSaveEdit = async () => {
+  if (!userId || !noteId) return;
+
+  const text = draft.trim();
+  if (!text) {
+    setActionError("Note cannot be empty.");
+    return;
+  }
+
+  setSaving(true);
+  setActionError(null);
+  setActionOk(null);
+
+  try {
+    const updated = await updateNoteBestEffort(userId, noteId, text);
+
+    if (updated) {
+      setNote(updated);
+      setDraft(typeof updated.content === "string" ? updated.content : "");
+
+      const notesStorageKey = `notes:${variant}:${userId ?? "guest"}`;
+
+      try {
+        const cached = sessionStorage.getItem(notesStorageKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            const patched = parsed.map((n: any) =>
+              String(n?._id) === String(noteId)
+                ? { ...n, ...updated, content: updated.content }
+                : n
+            );
+            sessionStorage.setItem(notesStorageKey, JSON.stringify(patched));
+          }
+        }
+      } catch (cacheErr) {
+        console.error("Failed to update notes cache after edit:", cacheErr);
+      }
+    } else {
+      await loadOne();
     }
-  };
+
+    setEditing(false);
+    setActionOk("Note updated.");
+    setTimeout(() => setActionOk(null), 2000);
+
+    // router.replace(basePath);
+    window.location.href = basePath;
+
+  } catch (e) {
+    console.error(e);
+    setActionError(extractApiErrorMessage(e));
+  } finally {
+    setSaving(false);
+  }
+};
+
+
+ const handleDelete = async () => {
+  if (!userId || !noteId) return;
+  if (!window.confirm("Delete this note permanently?")) return;
+
+  setDeleting(true);
+  setActionError(null);
+
+  try {
+    await deleteNoteSafe(userId, noteId);
+
+    const notesStorageKey = `notes:${variant}:${userId ?? "guest"}`;
+    const deletedKey = `deletedNotes:${variant}:${userId ?? "guest"}`;
+
+    try {
+      const cached = sessionStorage.getItem(notesStorageKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter(
+            (n: any) => String(n?._id) !== String(noteId)
+          );
+          sessionStorage.setItem(notesStorageKey, JSON.stringify(filtered));
+        }
+      }
+
+      const deletedRaw = sessionStorage.getItem(deletedKey);
+      const deletedIds: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
+      if (!deletedIds.includes(String(noteId))) {
+        deletedIds.push(String(noteId));
+        sessionStorage.setItem(deletedKey, JSON.stringify(deletedIds));
+      }
+    } catch (cacheErr) {
+      console.error("Failed to update notes cache after delete:", cacheErr);
+    }
+
+    router.replace(basePath);
+    router.refresh();
+  } catch (e) {
+    console.error(e);
+    setActionError(extractApiErrorMessage(e));
+  } finally {
+    setDeleting(false);
+  }
+};
 
   const MainTag = variant === "director" ? "div" : "main";
 
@@ -240,7 +531,9 @@ export default function NoteDetailContent({
                   />
                 ) : (
                   <div className="mt-6 whitespace-pre-wrap rounded-2xl border border-white/10 bg-[#041f35]/60 px-4 py-4 text-sm leading-relaxed text-[#d9ebf8]">
-                    {noteBody(note)}
+                    {/* {noteBody(note)} */}
+                    {typeof note.content === "string" ? note.content : noteBody(note)}
+
                   </div>
                 )}
               </>
