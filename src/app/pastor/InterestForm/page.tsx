@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, Suspense } from "react";
+
+import { Country, State } from "country-state-city";
+
 import { isAxiosError } from "axios";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -98,52 +101,159 @@ function InterestFormContent() {
     setErrors((prev) => { const e = { ...prev }; delete e[k]; return e; });
   };
 
+const sanitizeName = (value: string) => value.replace(/[^A-Za-z\s'-]/g, "");
+
+
+
+  // const setChurchField = (idx: number, k: keyof ChurchRow, v: string) => {
+  //   setChurches((prev) => prev.map((c, i) => (i === idx ? { ...c, [k]: v } : c)));
+  //   const errKey = idx === 0 ? k : `${k}_${idx}`;
+  //   setErrors((prev) => { const e = { ...prev }; delete e[errKey]; return e; });
+  // };
+
   const setChurchField = (idx: number, k: keyof ChurchRow, v: string) => {
-    setChurches((prev) => prev.map((c, i) => (i === idx ? { ...c, [k]: v } : c)));
-    const errKey = idx === 0 ? k : `${k}_${idx}`;
-    setErrors((prev) => { const e = { ...prev }; delete e[errKey]; return e; });
-  };
+  setChurches((prev) =>
+    prev.map((c, i) => {
+      if (i !== idx) return c;
+
+      if (k === "country") {
+        return { ...c, country: v, state: "" };
+      }
+
+      return { ...c, [k]: v };
+    })
+  );
+
+  const errKey = idx === 0 ? k : `${k}_${idx}`;
+  setErrors((prev) => {
+    const e = { ...prev };
+    delete e[errKey];
+
+    if (k === "country") {
+      const stateKey = idx === 0 ? "state" : `state_${idx}`;
+      delete e[stateKey];
+    }
+
+    return e;
+  });
+};
 
   const addChurch = () => setChurches((prev) => [...prev, emptyChurch()]);
   const removeChurch = (idx: number) => setChurches((prev) => prev.filter((_, i) => i !== idx));
 
-  const validate = (): boolean => {
-    const errs: Record<string, string> = {};
+  // const validate = (): boolean => {
+  //   const errs: Record<string, string> = {};
 
-    if (!form.firstName.trim()) errs.firstName = "First Name is required.";
-    if (!form.lastName.trim()) errs.lastName = "Last Name is required.";
-    if (!form.phoneNumber.trim()) {
-      errs.phoneNumber = "Phone Number is required.";
-    } else if (!/^\+?[\d\s\-()\u00d7]{7,20}$/.test(form.phoneNumber.trim())) {
-      errs.phoneNumber = "Enter a valid phone number.";
+  //   if (!form.firstName.trim()) errs.firstName = "First Name is required.";
+  //   if (!form.lastName.trim()) errs.lastName = "Last Name is required.";
+  //   if (!form.phoneNumber.trim()) {
+  //     errs.phoneNumber = "Phone Number is required.";
+  //   } else if (!/^\+?[\d\s\-()\u00d7]{7,20}$/.test(form.phoneNumber.trim())) {
+  //     errs.phoneNumber = "Enter a valid phone number.";
+  //   }
+  //   if (!form.email.trim()) {
+  //     errs.email = "Email is required.";
+  //   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+  //     errs.email = "Enter a valid email address.";
+  //   }
+
+  //   churches.forEach((c, i) => {
+  //     const p = i === 0 ? "" : `_${i}`;
+  //     if (!c.churchName.trim()) errs[`churchName${p}`] = "Church Name is required.";
+  //     if (!c.churchPhone.trim()) errs[`churchPhone${p}`] = "Church Phone is required.";
+  //     // churchWebsite is optional
+  //     if (!c.churchAddress.trim()) errs[`churchAddress${p}`] = "Church Address is required.";
+  //     if (!c.city.trim()) errs[`city${p}`] = "City is required.";
+  //     if (!c.state) errs[`state${p}`] = "State is required.";
+  //     if (!c.zipCode.trim()) errs[`zipCode${p}`] = "Zip Code is required.";
+  //     if (!c.country) errs[`country${p}`] = "Country is required.";
+  //   });
+
+  //   if (!form.yearsInMinistry.trim()) errs.yearsInMinistry = "Years in Ministry is required.";
+  //   if (!form.conference.trim()) errs.conference = "Conference is required.";
+  //   if (!form.currentProjects.trim()) errs.currentProjects = "Current Community Service Projects is required.";
+  //   if (!form.interestSelect) errs.interestSelect = "Please select an interest.";
+  //   // comments is optional
+
+  //   setErrors(errs);
+  //   return Object.keys(errs).length === 0;
+  // };
+
+  const countryOptions = Country.getAllCountries();
+
+const getStateOptions = (countryName: string) => {
+  const selectedCountry = countryOptions.find((c) => c.name === countryName);
+  if (!selectedCountry) return [];
+  return State.getStatesOfCountry(selectedCountry.isoCode);
+};
+
+const validate = (): boolean => {
+  const errs: Record<string, string> = {};
+  const nameRegex = /^[A-Za-z\s'-]+$/;
+
+  if (!form.firstName.trim()) {
+    errs.firstName = "First Name is required.";
+  } else if (!nameRegex.test(form.firstName.trim())) {
+    errs.firstName = "First Name should contain only letters.";
+  }
+
+  if (!form.lastName.trim()) {
+    errs.lastName = "Last Name is required.";
+  } else if (!nameRegex.test(form.lastName.trim())) {
+    errs.lastName = "Last Name should contain only letters.";
+  }
+
+  if (!form.phoneNumber.trim()) {
+    errs.phoneNumber = "Phone Number is required.";
+  } else if (!/^\+?[\d\s\-()\u00d7]{7,20}$/.test(form.phoneNumber.trim())) {
+    errs.phoneNumber = "Enter a valid phone number.";
+  }
+
+  if (!form.email.trim()) {
+    errs.email = "Email is required.";
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+    errs.email = "Enter a valid email address.";
+  }
+
+  churches.forEach((c, i) => {
+    const p = i === 0 ? "" : `_${i}`;
+
+    if (!c.churchName.trim()) errs[`churchName${p}`] = "Church Name is required.";
+    if (!c.churchPhone.trim()) errs[`churchPhone${p}`] = "Church Phone is required.";
+    // churchWebsite is optional
+    // churchWebsite is optional, but if entered it must be valid
+if (c.churchWebsite.trim()) {
+  const websiteValue = c.churchWebsite.trim();
+  const websiteRegex = /^(https?:\/\/)?([\w-]+\.)+[\w-]{2,}(\/.*)?$/i;
+
+  if (!websiteRegex.test(websiteValue)) {
+    errs[`churchWebsite${p}`] = "Enter a valid website URL.";
+  }
+}
+    if (!c.churchAddress.trim()) errs[`churchAddress${p}`] = "Church Address is required.";
+
+    if (!c.city.trim()) {
+      errs[`city${p}`] = "City is required.";
+    } else if (!nameRegex.test(c.city.trim())) {
+      errs[`city${p}`] = "City should contain only letters.";
     }
-    if (!form.email.trim()) {
-      errs.email = "Email is required.";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      errs.email = "Enter a valid email address.";
-    }
 
-    churches.forEach((c, i) => {
-      const p = i === 0 ? "" : `_${i}`;
-      if (!c.churchName.trim()) errs[`churchName${p}`] = "Church Name is required.";
-      if (!c.churchPhone.trim()) errs[`churchPhone${p}`] = "Church Phone is required.";
-      // churchWebsite is optional
-      if (!c.churchAddress.trim()) errs[`churchAddress${p}`] = "Church Address is required.";
-      if (!c.city.trim()) errs[`city${p}`] = "City is required.";
-      if (!c.state) errs[`state${p}`] = "State is required.";
-      if (!c.zipCode.trim()) errs[`zipCode${p}`] = "Zip Code is required.";
-      if (!c.country) errs[`country${p}`] = "Country is required.";
-    });
+    if (!c.state) errs[`state${p}`] = "State is required.";
+    if (!c.zipCode.trim()) errs[`zipCode${p}`] = "Zip Code is required.";
+    if (!c.country) errs[`country${p}`] = "Country is required.";
+  });
 
-    if (!form.yearsInMinistry.trim()) errs.yearsInMinistry = "Years in Ministry is required.";
-    if (!form.conference.trim()) errs.conference = "Conference is required.";
-    if (!form.currentProjects.trim()) errs.currentProjects = "Current Community Service Projects is required.";
-    if (!form.interestSelect) errs.interestSelect = "Please select an interest.";
-    // comments is optional
+  if (!form.yearsInMinistry.trim()) errs.yearsInMinistry = "Years in Ministry is required.";
+  if (!form.conference.trim()) errs.conference = "Conference is required.";
+  if (!form.currentProjects.trim()) errs.currentProjects = "Current Community Service Projects is required.";
+  if (!form.interestSelect) errs.interestSelect = "Please select an interest.";
+  // comments is optional
 
-    setErrors(errs);
-    return Object.keys(errs).length === 0;
-  };
+  setErrors(errs);
+  return Object.keys(errs).length === 0;
+};
+
+
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -266,7 +376,8 @@ function InterestFormContent() {
                       type="text"
                       placeholder="First Name *"
                       value={form.firstName}
-                      onChange={(e) => setField("firstName", e.target.value)}
+                      // onChange={(e) => setField("firstName", e.target.value)}
+                      onChange={(e) => setField("firstName", sanitizeName(e.target.value))}
                       className={inputCls("firstName")}
                     />
                     <Err k="firstName" />
@@ -276,7 +387,8 @@ function InterestFormContent() {
                       type="text"
                       placeholder="Last Name *"
                       value={form.lastName}
-                      onChange={(e) => setField("lastName", e.target.value)}
+                      // onChange={(e) => setField("lastName", e.target.value)}
+                      onChange={(e) => setField("lastName", sanitizeName(e.target.value))}
                       className={inputCls("lastName")}
                     />
                     <Err k="lastName" />
@@ -328,13 +440,22 @@ function InterestFormContent() {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <input
+                        {/* <input
                           type="text"
                           placeholder="Church Name *"
                           value={church.churchName}
-                          onChange={(e) => setChurchField(idx, "churchName", e.target.value)}
+                          // onChange={(e) => setChurchField(idx, "churchName", e.target.value)}
+                          onChange={(e) => setChurchField(idx, "city", sanitizeName(e.target.value))}
                           className={inputCls(`churchName${p}`)}
-                        />
+                        /> */}
+
+                        <input
+  type="text"
+  placeholder="Church Name *"
+  value={church.churchName}
+  onChange={(e) => setChurchField(idx, "churchName", e.target.value)}
+  className={inputCls(`churchName${p}`)}
+/>
                         <Err k={`churchName${p}`} />
                       </div>
                       <div>
@@ -350,7 +471,7 @@ function InterestFormContent() {
                         />
                         <Err k={`churchPhone${p}`} />
                       </div>
-                      <div>
+                      {/* <div>
                         <input
                           type="text"
                           placeholder="Church Website"
@@ -358,7 +479,17 @@ function InterestFormContent() {
                           onChange={(e) => setChurchField(idx, "churchWebsite", e.target.value)}
                           className="form-input"
                         />
-                      </div>
+                      </div> */}
+                      <div>
+  <input
+    type="text"
+    placeholder="Church Website"
+    value={church.churchWebsite}
+    onChange={(e) => setChurchField(idx, "churchWebsite", e.target.value)}
+    className={inputCls(`churchWebsite${p}`)}
+  />
+  <Err k={`churchWebsite${p}`} />
+</div>
                       <div>
                         <input
                           type="text"
@@ -370,16 +501,16 @@ function InterestFormContent() {
                         <Err k={`churchAddress${p}`} />
                       </div>
                       <div>
-                        <input
-                          type="text"
-                          placeholder="City *"
-                          value={church.city}
-                          onChange={(e) => setChurchField(idx, "city", e.target.value)}
-                          className={inputCls(`city${p}`)}
-                        />
+                      <input
+  type="text"
+  placeholder="City *"
+  value={church.city}
+  onChange={(e) => setChurchField(idx, "city", sanitizeName(e.target.value))}
+  className={inputCls(`city${p}`)}
+/>
                         <Err k={`city${p}`} />
                       </div>
-                      <div>
+                      {/* <div>
                         <select
                           value={church.state}
                           onChange={(e) => setChurchField(idx, "state", e.target.value)}
@@ -448,7 +579,29 @@ function InterestFormContent() {
                           <option value="Newfoundland and Labrador">Newfoundland and Labrador</option>
                         </select>
                         <Err k={`state${p}`} />
-                      </div>
+                      </div> */}
+
+<div>
+  <select
+    value={church.state}
+    onChange={(e) => setChurchField(idx, "state", e.target.value)}
+    className={inputCls(`state${p}`)}
+    disabled={!church.country}
+  >
+    <option value="" disabled>
+      {church.country ? "State / Province *" : "Select Country First"}
+    </option>
+    {getStateOptions(church.country).map((state) => (
+      <option key={state.isoCode} value={state.name}>
+        {state.name}
+      </option>
+    ))}
+  </select>
+  <Err k={`state${p}`} />
+</div>
+
+
+
                       <div>
                         <input
                           type="text"
@@ -459,7 +612,7 @@ function InterestFormContent() {
                         />
                         <Err k={`zipCode${p}`} />
                       </div>
-                      <div>
+                      {/* <div>
                         <select
                           value={church.country}
                           onChange={(e) => setChurchField(idx, "country", e.target.value)}
@@ -470,7 +623,23 @@ function InterestFormContent() {
                           <option value="Canada">Canada</option>
                         </select>
                         <Err k={`country${p}`} />
-                      </div>
+                      </div> */}
+
+                      <div>
+  <select
+    value={church.country}
+    onChange={(e) => setChurchField(idx, "country", e.target.value)}
+    className={inputCls(`country${p}`)}
+  >
+    <option value="" disabled>Country *</option>
+    {countryOptions.map((country) => (
+      <option key={country.isoCode} value={country.name}>
+        {country.name}
+      </option>
+    ))}
+  </select>
+  <Err k={`country${p}`} />
+</div>
                     </div>
                   </div>
                 );

@@ -365,6 +365,107 @@ function JumpStartContent() {
     return `url(${HeroBg.src})`;
   }, [roadmap?.imageUrl]);
 
+  const hasRequiredSignature = useMemo(() => {
+  const checkExtras = (
+    items: ExtraComponent[] | undefined,
+    parentFieldKey = "",
+  ): boolean => {
+    if (!items?.length) return true;
+
+    for (const extra of items) {
+      const fieldKey = fieldKeyFor(parentFieldKey, extra);
+
+      if (extra.type === "SIGNATURE") {
+        if (!formData[fieldKey]) return false;
+      }
+
+      if (extra.checkboxes?.length) {
+        if (!checkExtras(extra.checkboxes, fieldKey)) return false;
+      }
+
+      if (extra.type === "SECTION" && extra.sections?.length) {
+        if (!checkExtras(extra.sections, fieldKey)) return false;
+      }
+    }
+
+    return true;
+  };
+
+  return checkExtras(roadmap?.extras as ExtraComponent[] | undefined, "extra");
+}, [roadmap?.extras, formData]);
+
+const hasRequiredUploads = useMemo(() => {
+  const checkExtras = (
+    items: ExtraComponent[] | undefined,
+    parentFieldKey = "",
+  ): boolean => {
+    if (!items?.length) return true;
+
+    for (const extra of items) {
+      const fieldKey = fieldKeyFor(parentFieldKey, extra);
+
+      if (extra.type === "UPLOAD") {
+        const hasUploadedFile = !!uploadedFiles[fieldKey];
+        const hasSavedUpload =
+          formData[fieldKey] === true || formData[fieldKey] === "true";
+
+        if (!hasUploadedFile && !hasSavedUpload) return false;
+      }
+
+      if (extra.checkboxes?.length) {
+        if (!checkExtras(extra.checkboxes, fieldKey)) return false;
+      }
+
+      if (extra.type === "SECTION" && extra.sections?.length) {
+        if (!checkExtras(extra.sections, fieldKey)) return false;
+      }
+    }
+
+    return true;
+  };
+
+  return checkExtras(roadmap?.extras as ExtraComponent[] | undefined, "extra");
+}, [roadmap?.extras, uploadedFiles, formData]);
+
+
+const hasRequiredSubmissions = useMemo(() => {
+  const checkExtras = (
+    items: ExtraComponent[] | undefined,
+    parentFieldKey = "",
+  ): boolean => {
+    if (!items?.length) return true;
+
+    for (const extra of items) {
+      const fieldKey = fieldKeyFor(parentFieldKey, extra);
+
+      if (extra.type === "CHECKBOX") {
+        if (!formData[fieldKey]) return false;
+      }
+
+      // if (extra.type === "ASSESSMENT") {
+      //   if (!formData[fieldKey]) return false;
+      // }
+
+      if (extra.type === "TEXT_FIELD" || extra.type === "TEXT_AREA") {
+  const value = formData[fieldKey];
+  if (value == null || String(value).trim() === "") return false;
+}
+
+      if (extra.checkboxes?.length) {
+        if (!checkExtras(extra.checkboxes, fieldKey)) return false;
+      }
+
+      if (extra.type === "SECTION" && extra.sections?.length) {
+        if (!checkExtras(extra.sections, fieldKey)) return false;
+      }
+    }
+
+    return true;
+  };
+
+  return checkExtras(roadmap?.extras as ExtraComponent[] | undefined, "extra");
+}, [roadmap?.extras, formData]);
+
   useEffect(() => {
     if (!nestedItemId) return;
     const fetchRoadmap = async () => {
@@ -634,6 +735,24 @@ function JumpStartContent() {
       setTimeout(() => setCompleteFeedback(null), 4000);
       return;
     }
+    if (!hasRequiredSignature) {
+  setCompleteFeedback("Digital signature is required before marking this roadmap as completed.");
+  setTimeout(() => setCompleteFeedback(null), 4000);
+  return;
+}
+
+if (!hasRequiredUploads) {
+  setCompleteFeedback("Required document upload is needed before marking this roadmap as completed.");
+  setTimeout(() => setCompleteFeedback(null), 4000);
+  return;
+}
+
+if (!hasRequiredSubmissions) {
+  setCompleteFeedback("Please finish all required submissions before marking this roadmap as completed.");
+  setTimeout(() => setCompleteFeedback(null), 4000);
+  return;
+}
+
     const roadMapId = parentRoadmapId || nestedItemId;
     const nestedRoadmapId = parentRoadmapId ? nestedItemId : undefined;
     const totalSteps = Math.max(1, Number(roadmap?.totalSteps) || 1);
@@ -771,7 +890,8 @@ function JumpStartContent() {
       if (canvas) {
         const ctx = canvas.getContext("2d");
         if (ctx) {
-          ctx.fillStyle = "#ffffff";
+          // ctx.fillStyle = "#ffffff";
+          ctx.fillStyle = "#f8fafc";
           ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
       }
@@ -835,7 +955,8 @@ function JumpStartContent() {
     if (canvas) {
       const ctx = canvas.getContext("2d");
       if (ctx) {
-        ctx.fillStyle = "#ffffff";
+        // ctx.fillStyle = "#ffffff";
+        ctx.fillStyle = "#f8fafc";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
       }
     }
@@ -1287,7 +1408,22 @@ function JumpStartContent() {
                     <button
                       type="button"
                       onClick={handleMarkComplete}
-                      disabled={completeLoading || listAlignedStatus === "Completed"}
+                      // disabled={completeLoading || listAlignedStatus === "Completed"}
+                      // disabled={completeLoading || listAlignedStatus === "Completed" || !hasRequiredSignature}
+//                       disabled={
+//   completeLoading ||
+//   listAlignedStatus === "Completed" ||
+//   !hasRequiredSignature ||
+//   !hasRequiredUploads
+// }
+
+disabled={
+  completeLoading ||
+  listAlignedStatus === "Completed" ||
+  !hasRequiredSignature ||
+  !hasRequiredUploads ||
+  !hasRequiredSubmissions
+}
                       className="rounded-md bg-white px-6 py-2 text-sm font-semibold text-[#0f4a76] shadow transition hover:bg-[#e7f1fa] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {completeLoading
@@ -1537,7 +1673,8 @@ function JumpStartContent() {
                   onTouchStart={startDrawing}
                   onTouchMove={draw}
                   onTouchEnd={stopDrawing}
-                  className="w-full border-2 border-[#5A8DCB] rounded-md bg-white cursor-crosshair"
+                  // className="w-full border-2 border-[#5A8DCB] rounded-md bg-white cursor-crosshair"
+                  className="w-full border-2 border-[#8ec5eb] rounded-md bg-[#f8fafc] cursor-crosshair shadow-inner"
                 />
               </div>
 
