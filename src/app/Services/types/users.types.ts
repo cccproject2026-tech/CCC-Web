@@ -94,6 +94,8 @@ export interface GetUsersParams {
   limit?: number;
   search?: string;
   roleMatch?: 'exact' | 'mixed';
+  /** Cache buster (mobile sends `t` on mentor list) */
+  t?: number;
 }
 
 export interface GetUsersResponse {

@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import Image from "next/image";
+import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import { isRemoteImageSrc } from "@/app/utils/image";
 import {
@@ -13,7 +13,7 @@ interface PersonListCardProps {
   name: string;
   role?: string;
   description: string;
-  image: string;
+  image: string | StaticImageData;
   isNew?: boolean;
   badge?: {
     text: string;

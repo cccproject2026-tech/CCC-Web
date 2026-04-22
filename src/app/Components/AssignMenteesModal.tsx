@@ -6,6 +6,24 @@ import Mentor1 from "../Assets/mentor1.png";
 import Mentor2 from "../Assets/mentor2.png";
 import Mentor3 from "../Assets/mentor3.png";
 import { apiGetAllUsers, apiAssignUsers } from "@/app/Services/users.service";
+import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
+
+function unwrapGetUsersList(res: { data?: unknown }): any[] {
+  const root = res?.data as Record<string, unknown> | undefined;
+  if (root == null) return [];
+  const body =
+    root.data != null && typeof root.data === "object" && !Array.isArray(root.data)
+      ? (root.data as Record<string, unknown>)
+      : root;
+  const users = (body as { users?: unknown }).users;
+  if (Array.isArray(users)) return users;
+  if (Array.isArray(body)) return body as any[];
+  return [];
+}
+
+function userRowId(u: { id?: string; _id?: string }): string {
+  return String(u.id ?? u._id ?? "");
+}
 
 interface AssignMenteesModalProps {
   isOpen: boolean;
@@ -66,18 +84,21 @@ export default function AssignMenteesModal({
         limit: 9999, // Get all users without pagination
       });
 
-      const users = response.data.data.users;
+      const users = unwrapGetUsersList(response);
 
-      // Filter out users that are already assigned to this mentor
-      const assignedIds = mentor?.assignedIds || [];
-      const filteredUsers = users.filter((user: any) => {
-        const userId = user.id || user._id;
-        return !assignedIds.includes(userId);
+      // Filter out users that are already assigned to this mentor (normalize ids for API parity)
+      const assignedSet = new Set(
+        (mentor?.assignedIds ?? []).map((x) => String(x).trim()).filter(Boolean),
+      );
+      const filteredUsers = users.filter((user: { id?: string; _id?: string }) => {
+        const id = userRowId(user);
+        if (!id) return false;
+        return !assignedSet.has(id);
       });
 
       // Transform users to Person format
       const people: Person[] = filteredUsers.map((user: any, index: number) => ({
-        id: user.id || user._id,
+        id: userRowId(user),
         firstName: user.firstName,
         lastName: user.lastName,
         name: `${user.firstName} ${user.lastName}`,
@@ -91,7 +112,7 @@ export default function AssignMenteesModal({
       setAvailablePeople(people);
     } catch (err) {
       console.error("Error fetching users:", err);
-      setError("Failed to load available users");
+      setError(extractApiErrorMessage(err) || "Failed to load available users");
       setAvailablePeople([]);
     } finally {
       setLoading(false);
@@ -139,8 +160,9 @@ export default function AssignMenteesModal({
 
   const getSelectedSummary = () => {
     if (selectedPeople.length === 0) return "";
-    const selectedNames = filteredPeople
-      .filter((p) => selectedPeople.includes(p.id))
+    const selectedSet = new Set(selectedPeople.map((id) => String(id)));
+    const selectedNames = availablePeople
+      .filter((p) => selectedSet.has(String(p.id)))
       .slice(0, 3);
     const firstNames = selectedNames.map((p) => p.name);
     if (selectedPeople.length > 3) {

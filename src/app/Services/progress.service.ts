@@ -26,7 +26,16 @@ export const apiGetOverallProgress = (roles?: string | string[]) => {
   const rolesParam = Array.isArray(roles) ? roles.join(",") : roles;
   return axiosInstance.get<{ success: boolean; data: UserOverallProgress[] }>(
     "/progress/overview/all",
-    { params: rolesParam ? { roles: rolesParam } : undefined },
+    {
+      params: {
+        ...(rolesParam ? { roles: rolesParam } : {}),
+        _cb: Date.now(),
+      },
+      headers: {
+        "Cache-Control": "no-cache",
+        Pragma: "no-cache",
+      },
+    },
   );
 };
 

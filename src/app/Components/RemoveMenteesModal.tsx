@@ -6,6 +6,7 @@ import Mentor1 from "../Assets/mentor1.png";
 import Mentor2 from "../Assets/mentor2.png";
 import Mentor3 from "../Assets/mentor3.png";
 import { apiGetAssignedUsers, apiRemoveAssignedUsers } from "@/app/Services/users.service";
+import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
 import { isRemoteImageSrc } from "@/app/utils/image";
 
 interface RemoveMenteesModalProps {
@@ -18,13 +19,26 @@ interface RemoveMenteesModalProps {
 }
 
 interface Mentee {
-  _id: string;
+  _id?: string;
+  id?: string;
   firstName: string;
   lastName: string;
   email: string;
   role: string;
   status: string;
   profilePicture?: string;
+}
+
+function unwrapAssignedUsersList(res: { data?: unknown }): Mentee[] {
+  const top = res?.data as Record<string, unknown> | any[] | undefined;
+  if (top == null) return [];
+  if (Array.isArray(top)) return top as Mentee[];
+  const inner = (top as { data?: unknown }).data;
+  if (Array.isArray(inner)) return inner as Mentee[];
+  if (inner && typeof inner === "object" && Array.isArray((inner as { data?: unknown }).data)) {
+    return (inner as { data: Mentee[] }).data;
+  }
+  return [];
 }
 
 export default function RemoveMenteesModal({
@@ -61,10 +75,10 @@ export default function RemoveMenteesModal({
     setError(null);
     try {
       const response = await apiGetAssignedUsers(mentorId);
-      setMentees(response.data.data || []);
+      setMentees(unwrapAssignedUsersList(response));
     } catch (err) {
       console.error(err);
-      setError("Failed to load mentees");
+      setError(extractApiErrorMessage(err) || "Failed to load mentees");
       setMentees([]);
     } finally {
       setLoading(false);
@@ -162,7 +176,8 @@ export default function RemoveMenteesModal({
           ) : (
             <div className="space-y-2">
               {filtered.map((m, index) => {
-                const id = m._id;
+                const id = String(m._id ?? m.id ?? "");
+                if (!id) return null;
                 const checked = selected.includes(id);
                 return (
                   <button
