@@ -1,13 +1,14 @@
 "use client";
 import { useRouter, useParams } from "next/navigation";
+import { useRef } from "react";
 import Image from "next/image";
-import AppHeader from "@/app/Components/Header/AppHeader";
 import CCCLogo from "@/app/Assets/CCCLogo.png";
 
 export default function ExpectedOutcomePage() {
   const router = useRouter();
   const params = useParams();
   const period = (params?.period as string) || "";
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // Map period to title
   const getTitle = (period: string) => {
@@ -35,9 +36,57 @@ export default function ExpectedOutcomePage() {
     "Church members will begin to feel a sense of hope for the future and begin expecting God to do something exciting in their church.",
   ];
 
-  const handleSavePDF = () => {
-    console.log("Save PDF clicked");
-    // Implement PDF generation/download functionality
+  const handleSavePDF = async () => {
+    if (!contentRef.current) return;
+
+    try {
+      const html2pdf = (await import("html2pdf.js")).default;
+      const title = getTitle(period);
+
+      // Create a simplified HTML structure for PDF (avoids oklch() color issues)
+      const element = document.createElement("div");
+      element.innerHTML = `
+        <div style="font-family: Arial, sans-serif; padding: 20px;">
+          <div style="margin-bottom: 20px; text-align: center;">
+            <img src="${CCCLogo.src}" alt="CCC Logo" style="width: 250px; height: auto;" />
+          </div>
+          
+          <h1 style="color: #2E3B8E; font-size: 24px; margin-bottom: 20px; text-align: left;">
+            ${title}
+          </h1>
+          
+          <hr style="border: none; border-top: 1px solid #ccc; margin-bottom: 20px;" />
+          
+          <div style="margin-top: 20px;">
+            ${expectedOutcomes
+          .map(
+            (outcome) => `
+              <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                <div style="color: #FFB800; font-size: 16px; flex-shrink: 0;">★</div>
+                <p style="color: #2E3B8E; font-size: 14px; line-height: 1.6; margin: 0;">
+                  ${outcome}
+                </p>
+              </div>
+            `
+          )
+          .join("")}
+          </div>
+        </div>
+      `;
+
+      const opt = {
+        margin: 10,
+        filename: `${title.replace(/\s+/g, "-").toLowerCase()}.pdf`,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
+      };
+
+      html2pdf().set(opt).from(element).save();
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Failed to generate PDF. Please try again.");
+    }
   };
 
   return (
@@ -64,7 +113,7 @@ export default function ExpectedOutcomePage() {
           </div>
 
           {/* Main Card */}
-          <div className="bg-white rounded-xl shadow-lg p-8 md:p-12">
+          <div ref={contentRef} className="bg-white rounded-xl shadow-lg p-8 md:p-12">
             {/* Logo Section - First */}
             <div className="mb-8">
               <Image

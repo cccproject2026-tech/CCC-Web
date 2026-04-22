@@ -108,6 +108,30 @@ function SelfRevitalizationContent() {
       itemStatus: item.status != null && String(item.status).trim() !== "" ? String(item.status) : undefined,
       endDate: typeof item.endDate === "string" ? item.endDate : undefined,
     });
+
+    // If derived says "Not Started", check raw progress data — API sometimes returns
+    // completedSteps > 0 with totalSteps: 0 and pct: 0 and status: "not_started" which
+    // mapNestedStatus cannot detect. Compute directly from completedSteps in that case.
+    if (derived === "Not Started" && progressData) {
+      const parentPr = (progressData.roadmaps ?? []).find(
+        (rp) => String(rp.roadMapId ?? "").trim() === roadmapId,
+      );
+      if (parentPr) {
+        const nestedPr = (parentPr.nestedRoadmaps ?? []).find(
+          (np) => String(np.nestedRoadmapId ?? "").trim() === tid,
+        );
+        if (nestedPr) {
+          const completed = Number(nestedPr.completedSteps) || 0;
+          const total = Number(nestedPr.totalSteps) || 0;
+          // Only compute from steps when totalSteps > 0; otherwise keep "Not Started"
+          if (total > 0) {
+            if (completed >= total) return "Completed";
+            if (completed > 0) return "In-progress";
+          }
+        }
+      }
+    }
+
     if (derived === "In-progress") return "In-progress";
     return derived;
   };

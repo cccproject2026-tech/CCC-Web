@@ -121,7 +121,49 @@ function PhasePageContent() {
         const merged = roadmap ? mergeProgressOntoRoadmaps([roadmap as any], progress)[0] : null;
 
         setPhase((merged ?? roadmap) as Record<string, unknown> | null);
-        const nested = (merged ?? roadmap)?.roadmaps;
+        let nested = (merged ?? roadmap)?.roadmaps;
+        
+        // Manually enrich nested tasks with progress data from the original progress response
+        if (Array.isArray(nested) && progress) {
+          const roadmapId = String(roadmap?._id ?? roadmap?.id ?? "");
+          const roadmapProgress = (progress as any)?.roadmaps?.find((rp: any) => 
+            String(rp.roadMapId ?? rp.roadMapid ?? "") === roadmapId
+          );
+          
+          if (roadmapProgress?.nestedRoadmaps?.length > 0) {
+            nested = (nested as Record<string, unknown>[]).map((task) => {
+              const taskId = String(task._id ?? task.id ?? "");
+              const nestedProg = roadmapProgress.nestedRoadmaps.find((np: any) => 
+                String(np.nestedRoadmapId ?? np.nestedRoadmapid ?? "") === taskId
+              );
+              if (nestedProg) {
+                const completed = nestedProg.completedSteps ?? 0;
+                const total = nestedProg.totalSteps ?? 0;
+                // Only compute status from steps if total > 0
+                let computedStatus = nestedProg.status || "not_started";
+                if (total > 0) {
+                  if (completed >= total) {
+                    computedStatus = "completed";
+                  } else if (completed > 0) {
+                    computedStatus = "in_progress";
+                  } else {
+                    computedStatus = "not_started";
+                  }
+                }
+                return {
+                  ...task,
+                  progress: {
+                    status: computedStatus,
+                    completedSteps: completed,
+                    totalSteps: total,
+                  },
+                };
+              }
+              return task;
+            });
+          }
+        }
+        
         setTasks(Array.isArray(nested) ? (nested as Record<string, unknown>[]) : []);
 
         console.debug("[mentor/phase] loaded phase", {
