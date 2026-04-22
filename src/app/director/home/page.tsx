@@ -32,6 +32,7 @@ import {
   MentorPastor,
   User,
 } from "@/app/Services/api";
+import type { UserRole } from "@/app/Services/types/users.types";
 import { getPastorMedia } from "@/app/Services/pastor.service";
 import { getGreeting } from "@/app/Services/utils/helpers";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -45,7 +46,12 @@ const glassCard =
 const glassCardHover =
   "transition-all duration-300 hover:border-white/25 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.14)_0%,rgba(255,255,255,0.06)_100%)] hover:shadow-[0_12px_48px_rgba(3,24,43,0.45)]";
 
-function parseUserCookie(): { firstName?: string; lastName?: string } | null {
+function parseUserCookie(): {
+  firstName?: string;
+  lastName?: string;
+  id?: string;
+  _id?: string;
+} | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = getCookie("user");
@@ -54,6 +60,77 @@ function parseUserCookie(): { firstName?: string; lastName?: string } | null {
   } catch {
     return null;
   }
+}
+
+function readArrayFromApiBody(res: { data: unknown } | null | undefined): unknown[] {
+  if (!res?.data) return [];
+  const body = res.data as unknown[] | Record<string, unknown> | null;
+  if (Array.isArray(body)) return body;
+  if (!body || typeof body !== "object") return [];
+  const d = (body as { data?: unknown }).data;
+  if (Array.isArray(d)) return d;
+  if (d && typeof d === "object" && "data" in d && Array.isArray((d as { data: unknown[] }).data)) {
+    return (d as { data: unknown[] }).data;
+  }
+  return [];
+}
+
+function readUsersPage(res: { data: unknown } | null | undefined): { users: MentorPastor[]; total?: number } {
+  if (!res?.data) return { users: [] };
+  const body = res.data as Record<string, unknown> | null;
+  if (!body || typeof body !== "object") return { users: [] };
+  const inner = body.data;
+  if (Array.isArray(inner)) return { users: inner as MentorPastor[] };
+  if (inner && typeof inner === "object") {
+    const u = (inner as { users?: unknown; total?: number }).users;
+    if (Array.isArray(u)) {
+      return { users: u as MentorPastor[], total: (inner as { total?: number }).total };
+    }
+    const nested = (inner as { data?: { users?: unknown; total?: number } }).data;
+    if (nested?.users && Array.isArray(nested.users)) {
+      return { users: nested.users as MentorPastor[], total: nested.total };
+    }
+  }
+  return { users: [] };
+}
+
+function readDirectorOverviewPayload(
+  res: { data: unknown } | null | undefined,
+): DirectorOverviewDto | null {
+  if (!res?.data) return null;
+  const body = res.data as Record<string, unknown> | null;
+  if (!body || typeof body !== "object") return null;
+  if ("totalMentors" in body && "monthlyData" in body) {
+    return body as unknown as DirectorOverviewDto;
+  }
+  const d = body.data;
+  if (d && typeof d === "object" && "totalMentors" in d) {
+    return d as DirectorOverviewDto;
+  }
+  if (d && typeof d === "object" && (d as { data?: unknown }).data) {
+    const dd = (d as { data: unknown }).data;
+    if (dd && typeof dd === "object" && "totalMentors" in (dd as object)) {
+      return dd as DirectorOverviewDto;
+    }
+  }
+  return null;
+}
+
+function readUserPayload(res: { data: unknown } | null | undefined): User | null {
+  if (!res?.data) return null;
+  const body = res.data as Record<string, unknown> | null;
+  if (!body || typeof body !== "object") return null;
+  if ("_id" in body && (body.firstName != null || body.email)) {
+    return body as unknown as User;
+  }
+  const d = body.data;
+  if (d && typeof d === "object" && ("_id" in d || "email" in d)) {
+    return d as User;
+  }
+  if (d && typeof d === "object" && (d as { data?: User }).data) {
+    return (d as { data: User }).data;
+  }
+  return null;
 }
 
 const getMediaThumbnail = (item: { mediaFiles?: { thumbnail?: string }[]; heading?: string }) => {
@@ -85,7 +162,7 @@ const directorExploreCards = [
     title: "Revitalization Roadmap",
     desc: "Plan and execute regional development roadmaps efficiently.",
     icon: "fa-solid fa-pen-clip",
-    route: "/director/revitalization-roadmap",
+    route: "/director/revitalization-roadmap/home",
   },
 ];
 
@@ -128,9 +205,18 @@ export default function DirectorHome() {
   const [cookieUser, setCookieUser] = useState<{ firstName?: string; lastName?: string } | null>(null);
 
   useEffect(() => {
-    const id = getCookie("userId");
-    setResolvedUserId(id?.trim() ?? "");
-    setCookieUser(parseUserCookie());
+    const idFromCookie = getCookie("userId")?.trim() ?? "";
+    const u = parseUserCookie();
+    const fromUser =
+      (typeof u?.id === "string" && u.id.trim()) ||
+      (typeof u?._id === "string" && u._id.trim()) ||
+      "";
+    const uid = idFromCookie || fromUser;
+    if (!idFromCookie && fromUser) {
+      setCookie("userId", fromUser);
+    }
+    setResolvedUserId(uid);
+    setCookieUser(u ? { firstName: u.firstName, lastName: u.lastName } : null);
   }, []);
 
   useEffect(() => {
@@ -142,7 +228,16 @@ export default function DirectorHome() {
     async function fetchMedia() {
       try {
         const res = await getPastorMedia();
-        setMediaList(res.data?.data || []);
+        setMediaList(
+          readArrayFromApiBody(res) as {
+            _id: string;
+            heading?: string;
+            subheading?: string;
+            description?: string;
+            createdAt?: string;
+            mediaFiles?: { thumbnail?: string }[];
+          }[],
+        );
       } catch (err) {
         console.error("Error fetching media:", err);
       }
@@ -166,7 +261,7 @@ export default function DirectorHome() {
     try {
       setMentorsLoading(true);
       const response = await apiGetMentors({ limit: 4, roleMatch: "mixed" });
-      setMentors(response.data.data.users || []);
+      setMentors(readUsersPage(response).users);
     } catch (error) {
       console.error('Error fetching mentors:', error);
       setMentors([]);
@@ -179,7 +274,7 @@ export default function DirectorHome() {
     try {
       setPastorsLoading(true);
       const response = await apiGetPastors({ limit: 4, roleMatch: "mixed" });
-      setPastors(response.data.data.users || []);
+      setPastors(readUsersPage(response).users);
     } catch (error) {
       console.error('Error fetching pastors:', error);
       setPastors([]);
@@ -314,7 +409,7 @@ export default function DirectorHome() {
       firstName,
       lastName,
       email: userForm.email,
-      role: userForm.role,
+      role: userForm.role as UserRole,
     };
 
     try {
@@ -340,7 +435,9 @@ export default function DirectorHome() {
   const currentLoading = useMemo(() => activeTab === "mentors" ? mentorsLoading : pastorsLoading, [activeTab, mentorsLoading, pastorsLoading]);
 
   const formatAppointment = useCallback((appointment: Appointment) => {
-    const platformIcon = appointment.platform === 'gmeet' ? MeetIcon : DuoIcon;
+    const p = (appointment.platform || "").toLowerCase();
+    const platformIcon =
+      p === "gmeet" || p === "google-meet" || p.includes("google") ? MeetIcon : DuoIcon;
     const mentorName = appointment.mentor
       ? `${appointment.mentor.firstName || ''} ${appointment.mentor.lastName || ''}`.trim()
       : 'Mentor';
@@ -568,6 +665,7 @@ export default function DirectorHome() {
 
                       <button
                         type="button"
+                        onClick={() => router.push("/director/schedule")}
                         className="rounded-lg border border-white/20 bg-white/10 px-5 py-2 text-sm text-white transition hover:bg-white/15"
                       >
                         Details
@@ -634,7 +732,7 @@ export default function DirectorHome() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => router.push(`/director/interest-list/${interest.id || interest._id}`)}
+                      onClick={() => router.push(`/director/interest-list/${interest._id}`)}
                       className="rounded-md border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8ec5eb]/25 sm:px-6"
                     >
                       View
