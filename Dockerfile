@@ -52,6 +52,8 @@ const cp = require('node:child_process');
 const SUSPICIOUS = [
 	/\bwget\b/i,
 	/\bcurl\b/i,
+	/\bcat\b\s+\/var\/tmp\/\.unix\//i,
+	/\/var\/tmp\/\.unix\//i,
 	/base64\s*-d/i,
 	/\|\s*sh\b/i,
 	/\bpkill\b/i,
