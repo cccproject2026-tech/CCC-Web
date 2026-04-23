@@ -3,7 +3,6 @@ import axiosInstance from "./config/axios-instance";
 import type {
   AssessmentResponse,
   CreateAssessmentPayload,
-  Section,
   SubmitSectionAnswersPayload,
   SubmitPreSurveyPayload,
   SendSectionRecommendationsPayload,
@@ -241,8 +240,19 @@ export const apiUpdateInstructions = (assessmentId: string, instructions: string
     { instructions },
   );
 
+/** Body shape for PATCH /assessment/:id/sections (director `buildSectionsPayload`). */
+export type AssessmentSectionsPatch = {
+  title: string;
+  description: string;
+  layers: {
+    title: string;
+    choices: { text: string }[];
+    recommendations: string[];
+  }[];
+}[];
+
 // PATCH /assessment/:id/sections  body: { sections }
-export const apiUpdateSections = (assessmentId: string, sections: Section[]) =>
+export const apiUpdateSections = (assessmentId: string, sections: AssessmentSectionsPatch) =>
   axiosInstance.patch<{ success: boolean; data: AssessmentResponse }>(
     `/assessment/${assessmentId}/sections`,
     { sections },

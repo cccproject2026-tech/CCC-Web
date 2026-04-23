@@ -1,5 +1,6 @@
 "use client";
 <<<<<<< HEAD
+<<<<<<< HEAD
 import { useCallback, useEffect, useState } from "react";
 import Image, { type StaticImageData } from "next/image";
 import { apiGetWeeklyAvailability } from "@/app/Services/appointments.service";
@@ -42,12 +43,28 @@ export type ScheduleModalMentor = {
   menteeCount: number;
 };
 >>>>>>> ba12e32 (redoo changes)
+=======
+import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
+import { isRemoteImageSrc } from "@/app/utils/image";
+
+export type ScheduleMeetingFormData = {
+  dateYmd: string;
+  timeSlot: string;
+  meetingOption: string;
+  notes: string;
+};
+>>>>>>> 1a4b107 (changes)
 
 interface ScheduleMeetingModalProps {
   isOpen: boolean;
   onClose: () => void;
 <<<<<<< HEAD
+<<<<<<< HEAD
   onConfirm: (meetingData: ScheduleMeetingConfirmPayload) => void | Promise<void>;
+=======
+  onConfirm: (data: ScheduleMeetingFormData) => void | Promise<void>;
+>>>>>>> 1a4b107 (changes)
   mentor: {
     id: string;
     name: string;
@@ -84,12 +101,32 @@ function isPastDay(year: number, month: number, day: number): boolean {
   return candidate < today;
 }
 
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function toYmd(year: number, monthIndex0: number, day: number) {
+  return `${year}-${pad2(monthIndex0 + 1)}-${pad2(day)}`;
+}
+
+function generateCalendarDates(year: number, monthIndex0: number) {
+  const firstDay = new Date(year, monthIndex0, 1);
+  const lastDay = new Date(year, monthIndex0 + 1, 0);
+  const daysInMonth = lastDay.getDate();
+  const startingDayOfWeek = firstDay.getDay();
+  const dates: (number | null)[] = [];
+  for (let i = 0; i < startingDayOfWeek; i++) dates.push(null);
+  for (let day = 1; day <= daysInMonth; day++) dates.push(day);
+  return dates;
+}
+
 export default function ScheduleMeetingModal({
   isOpen,
   onClose,
   onConfirm,
   mentor,
 }: ScheduleMeetingModalProps) {
+<<<<<<< HEAD
 <<<<<<< HEAD
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth());
@@ -108,6 +145,18 @@ export default function ScheduleMeetingModal({
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 >>>>>>> ba12e32 (redoo changes)
+=======
+  const [viewMonth, setViewMonth] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [selectedDateYmd, setSelectedDateYmd] = useState<string>("");
+  const [selectedTime, setSelectedTime] = useState<string>("");
+  const [meetingOption, setMeetingOption] = useState<string>("");
+  const [notes, setNotes] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+>>>>>>> 1a4b107 (changes)
 
   const monthNames = [
     "January", "February", "March", "April", "May", "June",
@@ -127,6 +176,7 @@ export default function ScheduleMeetingModal({
     setSubmitting(false);
   }, []);
 
+<<<<<<< HEAD
 <<<<<<< HEAD
   useEffect(() => {
     if (isOpen && mentor?.id) resetForm();
@@ -236,6 +286,68 @@ export default function ScheduleMeetingModal({
       setSaving(false);
     }
   }, [isOpen]);
+=======
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+  ];
+
+  const y = viewMonth.getFullYear();
+  const m = viewMonth.getMonth();
+  const calendarDates = generateCalendarDates(y, m);
+
+  const resetForm = useCallback(() => {
+    setSelectedDateYmd("");
+    setSelectedTime("");
+    setMeetingOption("");
+    setNotes("");
+    setFormError(null);
+    const d = new Date();
+    setViewMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      resetForm();
+    }
+  }, [isOpen, resetForm]);
+
+  const goPrevMonth = () => {
+    setViewMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+  };
+  const goNextMonth = () => {
+    setViewMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+  };
+
+  const pickDay = (day: number | null) => {
+    if (day == null) return;
+    setSelectedDateYmd(toYmd(y, m, day));
+    setFormError(null);
+  };
+
+  const handleSchedule = async () => {
+    if (!mentor) return;
+    if (!selectedDateYmd || !selectedTime || !meetingOption) {
+      setFormError("Please select a date, time, and meeting type.");
+      return;
+    }
+    setIsSubmitting(true);
+    setFormError(null);
+    try {
+      await onConfirm({
+        dateYmd: selectedDateYmd,
+        timeSlot: selectedTime,
+        meetingOption,
+        notes: notes.trim(),
+      });
+      onClose();
+    } catch {
+      // Parent may toast; keep modal open so user can retry
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+>>>>>>> 1a4b107 (changes)
 
   if (!isOpen || !mentor) return null;
 
@@ -317,9 +429,12 @@ export default function ScheduleMeetingModal({
 <<<<<<< HEAD
             className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-all"
             aria-label="Close"
+<<<<<<< HEAD
 =======
             className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 transition-all hover:bg-gray-200"
 >>>>>>> ba12e32 (redoo changes)
+=======
+>>>>>>> 1a4b107 (changes)
           >
             <i className="fa-solid fa-xmark text-gray-600" />
           </button>
@@ -327,20 +442,31 @@ export default function ScheduleMeetingModal({
 
         <div className="p-6">
 <<<<<<< HEAD
+<<<<<<< HEAD
           <div className="text-center mb-6">
 =======
           {/* Mentor profile */}
           <div className="mb-6 text-center">
 >>>>>>> ba12e32 (redoo changes)
             <div className="relative mx-auto mb-4 h-28 w-28 overflow-hidden rounded-full bg-gray-100">
+=======
+          <div className="text-center mb-6">
+            <div className="relative w-28 h-28 rounded-full overflow-hidden bg-gray-100 mx-auto mb-4">
+>>>>>>> 1a4b107 (changes)
               <Image
                 src={mentor.img}
                 alt={mentor.name}
                 fill
 <<<<<<< HEAD
+<<<<<<< HEAD
                 sizes="112px"
                 className="object-cover"
                 unoptimized={typeof mentor.img === "string" && isRemoteImageSrc(mentor.img)}
+=======
+                className="object-cover"
+                unoptimized={isRemoteImageSrc(mentor.img)}
+                sizes="112px"
+>>>>>>> 1a4b107 (changes)
               />
             </div>
             <h3 className="text-[20px] font-bold text-gray-900 mb-2">{mentor.name}</h3>
@@ -361,6 +487,7 @@ export default function ScheduleMeetingModal({
             </div>
 <<<<<<< HEAD
             <div className="flex items-center justify-center gap-4 text-[#2E3B8E] text-[18px] mb-4">
+<<<<<<< HEAD
 =======
             <div className="mb-4 flex items-center justify-center gap-4 text-[18px] text-[#2E3B8E]">
 >>>>>>> ba12e32 (redoo changes)
@@ -368,6 +495,12 @@ export default function ScheduleMeetingModal({
               <i className="fa-regular fa-comment" />
               <i className="fa-brands fa-whatsapp" />
               <i className="fa-solid fa-phone" />
+=======
+              <i className="fa-regular fa-envelope" aria-hidden />
+              <i className="fa-regular fa-comment" aria-hidden />
+              <i className="fa-brands fa-whatsapp" aria-hidden />
+              <i className="fa-solid fa-phone" aria-hidden />
+>>>>>>> 1a4b107 (changes)
             </div>
           </div>
 
@@ -377,6 +510,7 @@ export default function ScheduleMeetingModal({
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+<<<<<<< HEAD
               placeholder="Add notes about this mentor..."
               className="w-full h-28 px-4 py-3 border border-gray-300 rounded-lg text-[14px] text-black placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
 =======
@@ -387,6 +521,10 @@ export default function ScheduleMeetingModal({
               placeholder="Add notes about this meeting…"
               className="h-28 w-full resize-none rounded-lg border border-gray-300 px-4 py-3 text-[14px] text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
 >>>>>>> ba12e32 (redoo changes)
+=======
+              placeholder="Add notes for this meeting…"
+              className="w-full h-28 px-4 py-3 border border-gray-300 rounded-lg text-[14px] text-black placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+>>>>>>> 1a4b107 (changes)
             />
           </div>
 
@@ -420,9 +558,14 @@ export default function ScheduleMeetingModal({
                   <div className="h-8 w-8" aria-hidden />
 >>>>>>> ba12e32 (redoo changes)
                   <h6 className="text-[16px] font-semibold">
+<<<<<<< HEAD
                     {monthNames[viewMonth]} {viewYear}
                   </h6>
 <<<<<<< HEAD
+=======
+                    {monthNames[m]} {y}
+                  </h6>
+>>>>>>> 1a4b107 (changes)
                   <button
                     type="button"
                     onClick={goNextMonth}
@@ -436,11 +579,19 @@ export default function ScheduleMeetingModal({
 >>>>>>> ba12e32 (redoo changes)
                 </div>
 
+<<<<<<< HEAD
                 <div className="mb-2 grid grid-cols-7 gap-1">
                   {["S", "M", "T", "W", "T", "F", "S"].map((day) => (
                     <div
                       key={day}
                       className="py-2 text-center text-[12px] font-semibold text-white/70"
+=======
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {["S", "M", "T", "W", "T", "F", "S"].map((day, i) => (
+                    <div
+                      key={`${day}-${i}`}
+                      className="text-center text-[12px] font-semibold text-white/70 py-2"
+>>>>>>> 1a4b107 (changes)
                     >
                       {day}
                     </div>
@@ -448,6 +599,7 @@ export default function ScheduleMeetingModal({
                 </div>
 
                 <div className="grid grid-cols-7 gap-1">
+<<<<<<< HEAD
 <<<<<<< HEAD
                   {calendarDates.map((date, index) => {
                     if (!date) {
@@ -483,19 +635,40 @@ export default function ScheduleMeetingModal({
                         if (date == null) return;
                         setSelectedYmd(ymdForDay(date));
                       }}
+=======
+                  {calendarDates.map((date, index) => {
+                    const ymd =
+                      date != null ? toYmd(y, m, date) : "";
+                    return (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => pickDay(date)}
+>>>>>>> 1a4b107 (changes)
                       disabled={!date}
                       className={`h-8 w-8 text-[12px] font-medium transition-all ${
                         !date
                           ? "invisible"
+<<<<<<< HEAD
                           : selectedYmd === ymdForDay(date)
                             ? "rounded-lg bg-white text-[#2E3B8E]"
                             : "rounded-lg text-white hover:bg-white/10"
+=======
+                          : selectedDateYmd === ymd
+                            ? "bg-white text-[#2E3B8E]"
+                            : "text-white hover:bg-white/10"
+>>>>>>> 1a4b107 (changes)
                       }`}
                     >
                       {date}
                     </button>
+<<<<<<< HEAD
                   ))}
 >>>>>>> ba12e32 (redoo changes)
+=======
+                    );
+                  })}
+>>>>>>> 1a4b107 (changes)
                 </div>
               </div>
             </div>
@@ -532,10 +705,19 @@ export default function ScheduleMeetingModal({
               <div className="grid grid-cols-2 gap-2">
                 {timeSlots.map((time) => (
                   <button
+                    type="button"
                     key={time}
+<<<<<<< HEAD
                     type="button"
                     onClick={() => setSelectedTime(time)}
                     className={`rounded-lg border px-3 py-2 text-[13px] font-medium transition-all ${
+=======
+                    onClick={() => {
+                      setSelectedTime(time);
+                      setFormError(null);
+                    }}
+                    className={`px-3 py-2 rounded-lg text-[13px] font-medium transition-all border ${
+>>>>>>> 1a4b107 (changes)
                       selectedTime === time
                         ? "border-[#2E3B8E] bg-[#2E3B8E] text-white"
                         : "border-[#2E3B8E]/30 bg-white text-[#2E3B8E] hover:bg-[#f7f9ff]"
@@ -547,6 +729,7 @@ export default function ScheduleMeetingModal({
               </div>
             </div>
 
+<<<<<<< HEAD
             {/* Meeting Option */}
             <div className="mb-2">
               <h5 className="mb-3 text-[14px] font-semibold text-gray-700">Preferred meeting option</h5>
@@ -560,6 +743,20 @@ export default function ScheduleMeetingModal({
 =======
                   className="w-full appearance-none rounded-lg border border-gray-300 px-4 py-3 pr-10 text-[14px] text-black focus:outline-none focus:ring-2 focus:ring-[#2E3B8E]"
 >>>>>>> ba12e32 (redoo changes)
+=======
+            <div className="mb-6">
+              <h5 className="text-[14px] font-semibold text-gray-700 mb-3">
+                Preferred Meeting Option
+              </h5>
+              <div className="relative">
+                <select
+                  value={meetingOption}
+                  onChange={(e) => {
+                    setMeetingOption(e.target.value);
+                    setFormError(null);
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-[14px] text-black focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] appearance-none"
+>>>>>>> 1a4b107 (changes)
                 >
                   <option value="">Select meeting option</option>
                   {MEETING_PLATFORMS.map((p) => (
@@ -575,6 +772,13 @@ export default function ScheduleMeetingModal({
         </div>
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+        {formError && (
+          <p className="px-6 pb-2 text-sm text-red-600">{formError}</p>
+        )}
+
+>>>>>>> 1a4b107 (changes)
         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
 =======
         {formError ? (
@@ -589,13 +793,19 @@ export default function ScheduleMeetingModal({
           <button
             type="button"
             onClick={onClose}
+<<<<<<< HEAD
             disabled={saving}
             className="rounded-lg border border-[#2E3B8E] px-6 py-3 text-[14px] font-semibold text-[#2E3B8E] transition-all hover:bg-[#F2F5FF] disabled:opacity-50"
+=======
+            disabled={isSubmitting}
+            className="px-6 py-3 border border-[#2E3B8E] text-[#2E3B8E] rounded-lg text-[14px] font-semibold hover:bg-[#F2F5FF] transition-all disabled:opacity-50"
+>>>>>>> 1a4b107 (changes)
           >
             Cancel
           </button>
           <button
             type="button"
+<<<<<<< HEAD
 <<<<<<< HEAD
             disabled={submitting}
             onClick={() => void handleSubmit()}
@@ -609,6 +819,13 @@ export default function ScheduleMeetingModal({
           >
             {saving ? "Scheduling…" : "Schedule"}
 >>>>>>> ba12e32 (redoo changes)
+=======
+            onClick={handleSchedule}
+            disabled={isSubmitting}
+            className="px-6 py-3 bg-[#2E3B8E] text-white rounded-lg text-[14px] font-semibold hover:bg-[#243a8a] transition-all shadow-md disabled:opacity-60"
+          >
+            {isSubmitting ? "Scheduling…" : "Schedule"}
+>>>>>>> 1a4b107 (changes)
           </button>
         </div>
       </div>

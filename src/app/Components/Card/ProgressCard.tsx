@@ -12,8 +12,8 @@ interface ProgressCardProps {
   name: string;
   description?: string;
   progress: number; // 0-100
-  /** `director` — dark glass card for RoleShell (matches mentees/mentors). */
-  variant?: "default" | "director";
+  /** `directorGlass` — dark glass card for RoleShell (matches mentees/mentors). Default `light` for white cards. */
+  variant?: "light" | "directorGlass";
   showCompleteButton?: boolean; // Show "Mark as Complete" button when progress is 100%
   slug?: string; // Slug for navigation
   /** Dark glass (director shell); default is light for legacy light backgrounds. */
@@ -30,7 +30,11 @@ export default function ProgressCard({
   name,
   description = "Sub text area write something here. That you can read more about him",
   progress,
+<<<<<<< HEAD
   variant = "default",
+=======
+  variant = "light",
+>>>>>>> 1a4b107 (changes)
   showCompleteButton = false,
   slug,
   onCompleteClick,
@@ -190,7 +194,10 @@ export default function ProgressCard({
             {isComplete && showCompleteButton && (
               <button
                 type="button"
+<<<<<<< HEAD
                 type="button"
+=======
+>>>>>>> 1a4b107 (changes)
                 onClick={onCompleteClick}
                 className={
                   isGlass

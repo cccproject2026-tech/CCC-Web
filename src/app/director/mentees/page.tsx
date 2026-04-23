@@ -620,11 +620,20 @@ export default function MenteesPage() {
               items={featuredItems}
               showDivider
               className="mb-2"
+<<<<<<< HEAD
               onItemClick={(item) =>
                 router.push(
                   `/director/mentees/profile/${encodeURIComponent(String(item.id))}`
                 )
               }
+=======
+              selectedId={selectedMentee}
+              onItemClick={(item) => {
+                setSelectedMentee((prev) =>
+                  prev === String(item.id) ? null : String(item.id)
+                );
+              }}
+>>>>>>> 1a4b107 (changes)
             />
           )}
         </div>
