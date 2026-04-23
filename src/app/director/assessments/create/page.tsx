@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import DirectorHero from "../../DirectorHero";
@@ -82,6 +82,7 @@ export default function CreateAssessmentPage() {
   ]);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
 
   const showToast = (message: string) => {
     setToast(message);
@@ -630,6 +631,7 @@ export default function CreateAssessmentPage() {
                 ) : null}
               </div>
               <input
+                ref={bannerInputRef}
                 type="file"
                 accept="image/*"
                 className="sr-only"
@@ -642,13 +644,31 @@ export default function CreateAssessmentPage() {
                   setBannerPreview(f ? URL.createObjectURL(f) : null);
                 }}
               />
-              <label
-                htmlFor="assessment-banner-create"
-                className="mt-2 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/25 bg-white/[0.04] px-4 py-10 transition hover:border-[#8ec5eb]/40"
-              >
+              <div className="mt-2 space-y-3 rounded-2xl border-2 border-dashed border-white/25 bg-white/[0.04] px-4 py-6">
+                <div className="flex flex-wrap justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => bannerInputRef.current?.click()}
+                    className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                  >
+                    {bannerPreview ? "Replace banner" : "Upload banner"}
+                  </button>
+                </div>
                 {bannerPreview ? (
-                  <div className="relative h-40 w-full max-w-md overflow-hidden rounded-xl">
-                    {/* Use <img> for blob: — Next Image can fail on some local blob: URLs in dev */}
+                  <div
+                    className="relative h-40 w-full max-w-md mx-auto cursor-pointer overflow-hidden rounded-xl"
+                    onClick={() => bannerInputRef.current?.click()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        bannerInputRef.current?.click();
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Change banner image"
+                  >
+                    {/* <img> for blob:/data: — most reliable; Next Image can block some picks */}
                     {bannerPreview.startsWith("blob:") || bannerPreview.startsWith("data:") ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -657,23 +677,31 @@ export default function CreateAssessmentPage() {
                         className="h-40 w-full object-cover"
                       />
                     ) : (
-                    <Image
-                      src={bannerPreview}
-                      alt=""
-                      fill
-                      className="object-cover"
-                      unoptimized={isRemoteImageSrc(bannerPreview)}
-                    />
+                      <Image
+                        src={bannerPreview}
+                        alt=""
+                        width={800}
+                        height={320}
+                        className="h-40 w-full object-cover"
+                        unoptimized={isRemoteImageSrc(bannerPreview)}
+                      />
                     )}
+                    <p className="absolute bottom-2 left-1/2 w-[90%] -translate-x-1/2 rounded bg-black/55 px-2 py-1 text-center text-xs text-white/90">
+                      Click to replace
+                    </p>
                   </div>
                 ) : (
-                  <>
+                  <button
+                    type="button"
+                    onClick={() => bannerInputRef.current?.click()}
+                    className="flex w-full flex-col items-center justify-center gap-2 py-6 text-center transition hover:border-[#8ec5eb]/40"
+                  >
                     <i className="fa-solid fa-cloud-arrow-up text-2xl text-[#8ec5eb]" />
-                    <span className="text-sm font-semibold text-white">Click to upload banner</span>
+                    <span className="text-sm font-semibold text-white">Or click here to choose a file</span>
                     <span className="text-xs text-white/50">PNG or JPG — max 10 MB</span>
-                  </>
+                  </button>
                 )}
-              </label>
+              </div>
             </div>
 
             <div className="mt-10 flex flex-wrap justify-end gap-3 border-t border-white/10 pt-8">

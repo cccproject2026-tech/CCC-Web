@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import DirectorHero from "../../DirectorHero";
@@ -98,6 +98,7 @@ export default function ViewEditAssessmentPage() {
   /** `blob:` preview for a newly picked file; revoke on clear/unmount. */
   const [bannerLocalUrl, setBannerLocalUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!params?.id) return;
@@ -167,9 +168,15 @@ export default function ViewEditAssessmentPage() {
   };
 
   const appendModalChoice = (layerIdx: number) => {
-    setNewSectionLayerChoices((prev) =>
-      prev.map((row, i) => (i === layerIdx ? [...row, ""] : [...row])),
-    );
+    setNewSectionLayerChoices((prev) => {
+      const n = newSectionLayers;
+      const base = Array.from({ length: n }, (_, i) =>
+        Array.isArray(prev[i]) ? [...(prev[i] as string[])] : [""],
+      );
+      const row = base[layerIdx] ?? [""];
+      base[layerIdx] = [...row, ""];
+      return base;
+    });
   };
 
   const removeModalChoice = (layerIdx: number, choiceIdx: number) => {
@@ -332,10 +339,11 @@ export default function ViewEditAssessmentPage() {
   const handleAddSection = async () => {
     if (!newSectionName.trim()) return;
 
+    const choiceMatrix = newSectionLayerChoices.slice(0, newSectionLayers);
     const next = createSectionFromModal(
       newSectionName,
       newSectionGuidelines,
-      newSectionLayerChoices,
+      choiceMatrix,
     );
     const merged = [...sections, next];
 
@@ -416,7 +424,12 @@ export default function ViewEditAssessmentPage() {
         const body = res.data as Record<string, unknown> | undefined;
         let newUrl: string | undefined;
         if (body?.data != null && typeof body.data === "object" && body.data !== null) {
-          newUrl = (body.data as { bannerImage?: string }).bannerImage;
+          const d = body.data as Record<string, unknown>;
+          if (typeof d.bannerImage === "string") newUrl = d.bannerImage;
+          else if (d.data != null && typeof d.data === "object" && d.data !== null) {
+            const d2 = d.data as { bannerImage?: string };
+            if (typeof d2.bannerImage === "string") newUrl = d2.bannerImage;
+          }
         }
         if (!newUrl && typeof body?.bannerImage === "string") newUrl = body.bannerImage;
         if (typeof newUrl === "string" && newUrl.trim()) {
@@ -575,6 +588,7 @@ export default function ViewEditAssessmentPage() {
                 Shown on assessment cards. Choose a file, then use Save changes to upload.
               </p>
               <input
+                ref={bannerInputRef}
                 type="file"
                 accept="image/*"
                 className="sr-only"
@@ -587,18 +601,30 @@ export default function ViewEditAssessmentPage() {
                   setBannerLocalUrl(f ? URL.createObjectURL(f) : null);
                 }}
               />
-              <label
-                htmlFor="assessment-banner-edit"
-                className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/25 bg-white/[0.04] px-4 py-8 transition hover:border-[#8ec5eb]/40"
-              >
-                {!resolvedBannerForDisplay ? (
-                  <>
-                    <i className="fa-solid fa-cloud-arrow-up text-2xl text-[#8ec5eb]" />
-                    <span className="text-sm font-semibold text-white">Click to upload or replace banner</span>
-                    <span className="text-xs text-white/50">PNG or JPG — max 10 MB</span>
-                  </>
-                ) : (
-                  <div className="relative h-36 w-full max-w-md overflow-hidden rounded-xl">
+              <div className="space-y-3 rounded-2xl border-2 border-dashed border-white/25 bg-white/[0.04] px-4 py-4">
+                <div className="flex flex-wrap justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => bannerInputRef.current?.click()}
+                    className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                  >
+                    {resolvedBannerForDisplay ? "Change banner" : "Upload banner"}
+                  </button>
+                </div>
+                {resolvedBannerForDisplay ? (
+                  <div
+                    className="relative mx-auto h-36 w-full max-w-md cursor-pointer overflow-hidden rounded-xl"
+                    onClick={() => bannerInputRef.current?.click()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        bannerInputRef.current?.click();
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Change banner image"
+                  >
                     {resolvedBannerForDisplay.startsWith("blob:") ||
                     resolvedBannerForDisplay.startsWith("data:") ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -607,14 +633,27 @@ export default function ViewEditAssessmentPage() {
                       <Image
                         src={resolvedBannerForDisplay}
                         alt=""
-                        fill
-                        className="object-cover"
+                        width={800}
+                        height={288}
+                        className="h-36 w-full object-cover"
                         unoptimized={isRemoteImageSrc(resolvedBannerForDisplay)}
                       />
                     )}
+                    <p className="absolute bottom-2 left-1/2 w-[90%] -translate-x-1/2 rounded bg-black/55 px-2 py-1 text-center text-xs text-white/90">
+                      Click to replace
+                    </p>
                   </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => bannerInputRef.current?.click()}
+                    className="flex w-full flex-col items-center gap-2 py-6"
+                  >
+                    <i className="fa-solid fa-cloud-arrow-up text-2xl text-[#8ec5eb]" />
+                    <span className="text-sm font-semibold text-white">Choose an image (PNG or JPG)</span>
+                  </button>
                 )}
-              </label>
+              </div>
             </div>
 
             {selectedSectionData ? (
@@ -876,10 +915,11 @@ export default function ViewEditAssessmentPage() {
                   id="add-section-layer-count"
                   value={newSectionLayers}
                   onChange={(e) => setNewSectionLayers(Number(e.target.value))}
-                  className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2E3B8E]"
+                  className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] [&>option]:bg-white [&>option]:text-gray-900"
+                  style={{ colorScheme: "light" }}
                 >
                   {[1, 2, 3, 4, 5, 6].map((num) => (
-                    <option key={num} value={num} className="text-gray-900">
+                    <option key={num} value={num} className="bg-white text-gray-900">
                       {num} {num === 1 ? "level" : "levels"}
                     </option>
                   ))}
@@ -1181,28 +1221,41 @@ export default function ViewEditAssessmentPage() {
 
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {instructions.map((instruction) => (
-                  <label
+                  <div
                     key={instruction.id}
-                    className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                    className="flex items-start gap-2 rounded-lg border border-gray-200 p-3 hover:bg-gray-50"
                   >
-                    <input
-                      type="checkbox"
-                      checked={instruction.checked}
-                      onChange={() => {
-                        setInstructions(
-                          instructions.map((inst) =>
-                            inst.id === instruction.id
-                              ? { ...inst, checked: !inst.checked }
-                              : inst
-                          )
-                        );
-                      }}
-                      className="w-5 h-5 text-[#2E3B8E] rounded mt-0.5"
-                    />
-                    <span className="text-gray-700 text-sm">
-                      {instruction.text}
-                    </span>
-                  </label>
+                    <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={instruction.checked}
+                        onChange={() => {
+                          setInstructions(
+                            instructions.map((inst) =>
+                              inst.id === instruction.id
+                                ? { ...inst, checked: !inst.checked }
+                                : inst,
+                            ),
+                          );
+                        }}
+                        className="mt-0.5 h-5 w-5 rounded text-[#2E3B8E]"
+                      />
+                      <span className="text-sm text-gray-700">{instruction.text}</span>
+                    </label>
+                    {instructions.length > 1 ? (
+                      <button
+                        type="button"
+                        title="Remove this instruction from the list"
+                        aria-label="Remove instruction"
+                        onClick={() =>
+                          setInstructions((prev) => prev.filter((i) => i.id !== instruction.id))
+                        }
+                        className="shrink-0 rounded-lg border border-red-200 px-2 py-1.5 text-red-600 hover:bg-red-50"
+                      >
+                        <i className="fa-solid fa-trash text-sm" />
+                      </button>
+                    ) : null}
+                  </div>
                 ))}
               </div>
             </div>
