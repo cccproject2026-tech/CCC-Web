@@ -3,7 +3,6 @@ import axiosInstance from "./config/axios-instance";
 import type {
   AssessmentResponse,
   CreateAssessmentPayload,
-  Section,
   SubmitSectionAnswersPayload,
   SubmitPreSurveyPayload,
   SendSectionRecommendationsPayload,
@@ -217,11 +216,12 @@ export const apiCreateAssessment = (payload: CreateAssessmentPayload) =>
 /** List calls can be slow on large datasets; avoid default 10s axios timeout. */
 const GET_ASSESSMENTS_TIMEOUT_MS = 60_000;
 
-// GET /assessment?search=
-export const apiGetAssessments = (params?: { search?: string }) =>
+// GET /assessment?search=  (optional _t to avoid stale list caches after editor save)
+export const apiGetAssessments = (params?: { search?: string; _t?: number }) =>
   axiosInstance.get<{ success: boolean; data: AssessmentResponse[] }>("/assessment", {
-    params,
+    params: params ? { ...params, _t: params._t ?? Date.now() } : { _t: Date.now() },
     timeout: GET_ASSESSMENTS_TIMEOUT_MS,
+    headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
   });
 
 // GET /assessment/:id
@@ -241,21 +241,33 @@ export const apiUpdateInstructions = (assessmentId: string, instructions: string
     { instructions },
   );
 
+/** Body shape for PATCH /assessment/:id/sections (director `buildSectionsPayload`). */
+export type AssessmentSectionsPatch = {
+  title: string;
+  description: string;
+  layers: {
+    title: string;
+    choices: { text: string }[];
+    recommendations: string[];
+  }[];
+}[];
+
 // PATCH /assessment/:id/sections  body: { sections }
-export const apiUpdateSections = (assessmentId: string, sections: Section[]) =>
+export const apiUpdateSections = (assessmentId: string, sections: AssessmentSectionsPatch) =>
   axiosInstance.patch<{ success: boolean; data: AssessmentResponse }>(
     `/assessment/${assessmentId}/sections`,
     { sections },
   );
 
 // POST /assessment/:id/banner  (multipart, field: image)
+// Do not set Content-Type manually — the boundary is required; axios/browser set it for FormData.
 export const apiUploadAssessmentBanner = (assessmentId: string, file: File) => {
   const formData = new FormData();
   formData.append("image", file);
   return axiosInstance.post<{ success: boolean; data: { bannerImage: string } }>(
     `/assessment/${assessmentId}/banner`,
     formData,
-    { headers: { "Content-Type": "multipart/form-data" } },
+    { timeout: 60_000 },
   );
 };
 

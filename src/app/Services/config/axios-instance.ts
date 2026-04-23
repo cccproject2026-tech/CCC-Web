@@ -103,6 +103,18 @@ const refreshClient = axios.create({
 // --------------------------------------------------
 axiosInstance.interceptors.request.use(
   (config) => {
+    // FormData: remove default application/json / bare multipart so the runtime sets the boundary
+    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+      if (config.headers instanceof AxiosHeaders) {
+        config.headers.delete("Content-Type");
+      } else {
+        const h = config.headers as Record<string, unknown>;
+        if (h) {
+          delete h["Content-Type"];
+          delete h["content-type"];
+        }
+      }
+    }
     /** Public routes (e.g. interest registration) must not send a user token or the API may validate differently and return 400. */
     if (config.skipAuth) {
       if (config.headers instanceof AxiosHeaders) {

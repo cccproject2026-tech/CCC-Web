@@ -4,10 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import ProgressCard from "@/app/Components/Card/ProgressCard";
 import DirectorHero from "../DirectorHero";
-import {
-  directorGlassCard,
-  directorPageRoot,
-} from "../directorUi";
+import { directorGlassCard, directorPageRoot } from "../directorUi";
 import SearchBar from "@/app/Components/SearchBar";
 import FeaturedAvatars, {
   FeaturedAvatarItem,
@@ -16,6 +13,7 @@ import ProgressBg from "../../Assets/progress-bg.jpg";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
+import { resolveApiMediaUrl } from "@/app/utils/image";
 import {
   apiGetOverallProgress,
   extractUserIdFromOverallProgressRow,
@@ -23,7 +21,6 @@ import {
 } from "@/app/Services/progress.service";
 import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
 import type { UserOverallProgress } from "@/app/Services/types";
-import { resolveApiMediaUrl } from "@/app/utils/image";
 
 const PLACEHOLDER_IMAGES = [Mentor1, Mentor2, Mentor3] as const;
 
@@ -255,9 +252,7 @@ export default function TrackProgressPage() {
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20">
               <div className="mb-4 h-12 w-12 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
-              <p className="text-lg font-medium text-white">
-                Loading progress…
-              </p>
+              <p className="text-lg font-medium text-white">Loading progress…</p>
             </div>
           ) : error ? (
             <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-4 text-center">
@@ -270,57 +265,56 @@ export default function TrackProgressPage() {
                 Retry
               </button>
             </div>
+          ) : filteredData.length === 0 ? (
+            <div
+              className={`${directorGlassCard} mx-auto max-w-lg px-8 py-14 text-center`}
+            >
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.06]">
+                <i
+                  className="fa-solid fa-chart-line text-3xl text-[#8ec5eb]/80"
+                  aria-hidden
+                />
+              </div>
+              <p className="text-base font-semibold text-white sm:text-lg">
+                {progressData.length === 0
+                  ? "No progress data yet"
+                  : "No matching users"}
+              </p>
+              <p className="mt-2 text-sm text-white/55">
+                {progressData.length === 0
+                  ? "When mentors and pastors have activity, their completion will appear here."
+                  : "Try a different search or switch the filter above."}
+              </p>
+            </div>
           ) : (
-            <>
-              {filteredData.length > 0 ? (
+            <div
+              className={
+                viewMode === "list"
+                  ? "flex flex-col gap-4"
+                  : "grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 md:gap-5"
+              }
+            >
+              {filteredData.map((item) => (
                 <div
-                  className={
-                    viewMode === "list"
-                      ? "flex flex-col gap-4"
-                      : "grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 md:gap-5"
-                  }
+                  key={item.userId}
+                  className={viewMode === "list" ? "min-w-0" : "h-full min-w-0"}
                 >
-                  {filteredData.map((item) => (
-                    <div
-                      key={item.userId}
-                      className={
-                        viewMode === "list" ? "min-w-0" : "min-w-0 h-full"
-                      }
-                    >
-                      <ProgressCard
-                        variant="director"
-                        image={item.profileImage}
-                        name={item.fullName}
-                        description={item.role}
-                        progress={item.progress}
-                        slug={item.userId}
-                        showCompleteButton={false}
-                        onEmailClick={(e) => e.stopPropagation()}
-                        onMessageClick={(e) => e.stopPropagation()}
-                        onWhatsAppClick={(e) => e.stopPropagation()}
-                        onPhoneClick={(e) => e.stopPropagation()}
-                      />
-                    </div>
-                  ))}
+                  <ProgressCard
+                    variant="directorGlass"
+                    image={item.profileImage}
+                    name={item.fullName}
+                    description={item.role}
+                    progress={item.progress}
+                    slug={item.userId}
+                    showCompleteButton={false}
+                    onEmailClick={(e) => e.stopPropagation()}
+                    onMessageClick={(e) => e.stopPropagation()}
+                    onWhatsAppClick={(e) => e.stopPropagation()}
+                    onPhoneClick={(e) => e.stopPropagation()}
+                  />
                 </div>
-              ) : null}
-
-              {!loading && !error && filteredData.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-center">
-                  <i className="fa-solid fa-chart-line mb-4 text-5xl text-white/40" />
-                  <p className="text-lg font-medium text-white">
-                    {progressData.length === 0
-                      ? "No progress data yet."
-                      : "No entries match your search or filter."}
-                  </p>
-                  <p className="mt-2 text-sm text-white/60">
-                    {progressData.length === 0
-                      ? "Once mentors and pastors have roadmap activity, they will appear here."
-                      : "Try a different search or tab."}
-                  </p>
-                </div>
-              ) : null}
-            </>
+              ))}
+            </div>
           )}
         </div>
       </section>

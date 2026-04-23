@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import DirectorHero from "../../DirectorHero";
@@ -82,6 +82,7 @@ export default function CreateAssessmentPage() {
   ]);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
 
   const showToast = (message: string) => {
     setToast(message);
@@ -90,23 +91,22 @@ export default function CreateAssessmentPage() {
 
   const handleAddInstruction = () => setInstructions([...instructions, ""]);
 
+  const handleRemoveInstruction = (index: number) => {
+    setInstructions((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
+
   const handleUpdateInstruction = (index: number, value: string) => {
     const updated = [...instructions];
     updated[index] = value;
     setInstructions(updated);
   };
 
-  const handleRemoveInstruction = (index: number) => {
-    if (instructions.length <= 1) {
-      showToast("At least one instruction is required");
-      return;
-    }
-    const updated = instructions.filter((_, idx) => idx !== index);
-    setInstructions(updated);
-  };
-
   const handleAddSection = () => {
     setSections([...sections, defaultSection()]);
+  };
+
+  const handleRemoveSection = (sectionIdx: number) => {
+    setSections((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== sectionIdx)));
   };
 
   const handleUpdateSection = (sectionIdx: number, field: string, value: unknown) => {
@@ -134,14 +134,18 @@ export default function CreateAssessmentPage() {
   };
 
   const handleRemoveLayerChoice = (sectionIdx: number, layerIdx: number, choiceIdx: number) => {
-    const updated = [...sections];
-    const choices = updated[sectionIdx].layers[layerIdx].choices;
-    if (choices.length <= 1) {
-      showToast("At least one choice is required per layer");
-      return;
-    }
-    choices.splice(choiceIdx, 1);
-    setSections(updated);
+    setSections((prev) => {
+      if (prev[sectionIdx]?.layers[layerIdx]?.choices.length <= 1) return prev;
+      const next = [...prev];
+      const copy = { ...next[sectionIdx] };
+      const layers = [...copy.layers];
+      const layer = { ...layers[layerIdx] };
+      layer.choices = layer.choices.filter((_, j) => j !== choiceIdx);
+      layers[layerIdx] = layer;
+      copy.layers = layers;
+      next[sectionIdx] = copy;
+      return next;
+    });
   };
 
   const handleUpdatePlanItem = (
@@ -159,6 +163,21 @@ export default function CreateAssessmentPage() {
     const updated = [...sections];
     updated[sectionIdx].plans[planIdx].items.push("");
     setSections(updated);
+  };
+
+  const handleRemovePlanItem = (sectionIdx: number, planIdx: number, itemIdx: number) => {
+    setSections((prev) => {
+      if (prev[sectionIdx]?.plans[planIdx]?.items.length <= 1) return prev;
+      const next = [...prev];
+      const copy = { ...next[sectionIdx] };
+      const plans = [...copy.plans];
+      const plan = { ...plans[planIdx] };
+      plan.items = plan.items.filter((_, j) => j !== itemIdx);
+      plans[planIdx] = plan;
+      copy.plans = plans;
+      next[sectionIdx] = copy;
+      return next;
+    });
   };
 
   const handleUpdatePreSurvey = (
@@ -262,6 +281,7 @@ export default function CreateAssessmentPage() {
 
       showToast("Assessment created successfully");
       setTimeout(() => {
+        if (!newId) router.refresh();
         router.push(newId ? `/director/assessments/${newId}` : "/director/assessments");
       }, 800);
     } catch (err: unknown) {
@@ -357,14 +377,25 @@ export default function CreateAssessmentPage() {
               </div>
               <div className="space-y-3">
                 {instructions.map((instruction, idx) => (
-                  <input
-                    key={idx}
-                    type="text"
-                    value={instruction}
-                    onChange={(e) => handleUpdateInstruction(idx, e.target.value)}
-                    placeholder={`Instruction ${idx + 1}`}
-                    className={directorInputClass}
-                  />
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={instruction}
+                      onChange={(e) => handleUpdateInstruction(idx, e.target.value)}
+                      placeholder={`Instruction ${idx + 1}`}
+                      className={directorInputClass + " min-w-0 flex-1"}
+                    />
+                    {instructions.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveInstruction(idx)}
+                        className="shrink-0 rounded-lg border border-red-400/30 bg-red-500/15 px-3 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/25"
+                        aria-label={`Remove instruction ${idx + 1}`}
+                      >
+                        <i className="fa-solid fa-trash" />
+                      </button>
+                    ) : null}
+                  </div>
                 ))}
               </div>
             </div>
@@ -455,7 +486,19 @@ export default function CreateAssessmentPage() {
                   key={section.id}
                   className="space-y-4 rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6"
                 >
-                  <h3 className="text-base font-semibold text-[#8ec5eb]">Section {sectionIdx + 1}</h3>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-base font-semibold text-[#8ec5eb]">Section {sectionIdx + 1}</h3>
+                    {sections.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSection(sectionIdx)}
+                        className="rounded-lg border border-red-400/30 bg-red-500/15 px-3 py-1.5 text-sm font-semibold text-red-200 hover:bg-red-500/25"
+                      >
+                        <i className="fa-solid fa-trash mr-1" />
+                        Remove section
+                      </button>
+                    ) : null}
+                  </div>
 
                   <div>
                     <label className={directorLabelClass}>Section name</label>
@@ -494,58 +537,101 @@ export default function CreateAssessmentPage() {
                         </button>
                       </div>
                       {layer.choices.map((choice, choiceIdx) => (
-                        <input
-                          type="text"
-                          value={choice}
-                          onChange={(e) =>
-                            handleUpdateLayerChoice(sectionIdx, layerIdx, choiceIdx, e.target.value)
-                          }
-                          placeholder={`Choice ${choiceIdx + 1}`}
-                          className={`${directorInputClass} mb-2`}
-                        />
+                        <div key={choiceIdx} className="mb-2 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={choice}
+                            onChange={(e) =>
+                              handleUpdateLayerChoice(
+                                sectionIdx,
+                                layerIdx,
+                                choiceIdx,
+                                e.target.value,
+                              )
+                            }
+                            placeholder={`Choice ${choiceIdx + 1}`}
+                            className={directorInputClass + " min-w-0 flex-1"}
+                          />
+                          {layer.choices.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleRemoveLayerChoice(sectionIdx, layerIdx, choiceIdx)
+                              }
+                              className="shrink-0 rounded-lg border border-red-400/30 bg-red-500/15 px-2.5 py-2 text-sm text-red-200 hover:bg-red-500/25"
+                              aria-label={`Remove choice ${choiceIdx + 1}`}
+                            >
+                              <i className="fa-solid fa-trash" />
+                            </button>
+                          ) : null}
+                        </div>
                       ))}
                     </div>
                   ))}
 
-                  {/* Customized Development Plans - MUST BE 4 LEVELS */}
-                {section.plans.map((plan, planIdx) => (
-                  <div key={plan.id}>
-                    <div className="mb-2 flex items-center justify-between">
-                      <label className="text-sm font-semibold text-[#cde2f2]">{plan.name}</label>
-                      <button
-                        type="button"
-                        onClick={() => handleAddPlanItem(sectionIdx, planIdx)}
-                        className={directorBtnSecondary}
-                      >
-                        <i className="fa-solid fa-plus" />
-                        Plan
-                      </button>
-                    </div>
-                    {plan.items.map((item, itemIdx) => (
-                      <div key={itemIdx} className="mb-2 flex gap-2">
-                        <input
-                          type="text"
-                          value={item}
-                          onChange={(e) =>
-                            handleUpdatePlanItem(sectionIdx, planIdx, itemIdx, e.target.value)
-                          }
-                          placeholder={`Plan item ${itemIdx + 1}`}
-                          className={`${directorInputClass} mb-2`}
-                        />
+                  {section.plans.map((plan, planIdx) => (
+                    <div key={plan.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-white/85">{plan.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleAddPlanItem(sectionIdx, planIdx)}
+                          className="text-xs font-semibold text-[#8ec5eb] hover:underline"
+                        >
+                          + Item
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            ))}
+                      {plan.items.map((item, itemIdx) => (
+                        <div key={itemIdx} className="mb-2 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={item}
+                            onChange={(e) =>
+                              handleUpdatePlanItem(sectionIdx, planIdx, itemIdx, e.target.value)
+                            }
+                            placeholder={`Plan item ${itemIdx + 1}`}
+                            className={directorInputClass + " min-w-0 flex-1"}
+                          />
+                          {plan.items.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePlanItem(sectionIdx, planIdx, itemIdx)}
+                              className="shrink-0 rounded-lg border border-red-400/30 bg-red-500/15 px-2.5 py-2 text-sm text-red-200 hover:bg-red-500/25"
+                              aria-label={`Remove plan item ${itemIdx + 1}`}
+                            >
+                              <i className="fa-solid fa-trash" />
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
 
             <div className="mt-8">
-              <label className={`${directorLabelClass} flex items-center gap-2`}>
-                <i className="fa-solid fa-image text-[#8ec5eb]" />
-                Banner image (optional)
-              </label>
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <span className={`${directorLabelClass} mb-0 flex items-center gap-2`}>
+                  <i className="fa-solid fa-image text-[#8ec5eb]" />
+                  Banner image (optional)
+                </span>
+                {bannerFile || bannerPreview ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (bannerPreview?.startsWith("blob:")) URL.revokeObjectURL(bannerPreview);
+                      setBannerFile(null);
+                      setBannerPreview(null);
+                    }}
+                    className="text-sm font-semibold text-red-300/90 hover:underline"
+                  >
+                    Remove image
+                  </button>
+                ) : null}
+              </div>
               <input
+                ref={bannerInputRef}
                 type="file"
                 accept="image/*"
                 className="sr-only"
@@ -558,30 +644,64 @@ export default function CreateAssessmentPage() {
                   setBannerPreview(f ? URL.createObjectURL(f) : null);
                 }}
               />
-              <label
-                htmlFor="assessment-banner-create"
-                className="mt-2 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/25 bg-white/[0.04] px-4 py-10 transition hover:border-[#8ec5eb]/40"
-              >
+              <div className="mt-2 space-y-3 rounded-2xl border-2 border-dashed border-white/25 bg-white/[0.04] px-4 py-6">
+                <div className="flex flex-wrap justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => bannerInputRef.current?.click()}
+                    className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                  >
+                    {bannerPreview ? "Replace banner" : "Upload banner"}
+                  </button>
+                </div>
                 {bannerPreview ? (
-                  <div className="relative h-40 w-full max-w-md overflow-hidden rounded-xl">
-                    <Image
-                      src={bannerPreview}
-                      alt=""
-                      fill
-                      className="object-cover"
-                      unoptimized={
-                        bannerPreview.startsWith("blob:") || isRemoteImageSrc(bannerPreview)
+                  <div
+                    className="relative h-40 w-full max-w-md mx-auto cursor-pointer overflow-hidden rounded-xl"
+                    onClick={() => bannerInputRef.current?.click()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        bannerInputRef.current?.click();
                       }
-                    />
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Change banner image"
+                  >
+                    {/* <img> for blob:/data: — most reliable; Next Image can block some picks */}
+                    {bannerPreview.startsWith("blob:") || bannerPreview.startsWith("data:") ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={bannerPreview}
+                        alt=""
+                        className="h-40 w-full object-cover"
+                      />
+                    ) : (
+                      <Image
+                        src={bannerPreview}
+                        alt=""
+                        width={800}
+                        height={320}
+                        className="h-40 w-full object-cover"
+                        unoptimized={isRemoteImageSrc(bannerPreview)}
+                      />
+                    )}
+                    <p className="absolute bottom-2 left-1/2 w-[90%] -translate-x-1/2 rounded bg-black/55 px-2 py-1 text-center text-xs text-white/90">
+                      Click to replace
+                    </p>
                   </div>
                 ) : (
-                  <>
+                  <button
+                    type="button"
+                    onClick={() => bannerInputRef.current?.click()}
+                    className="flex w-full flex-col items-center justify-center gap-2 py-6 text-center transition hover:border-[#8ec5eb]/40"
+                  >
                     <i className="fa-solid fa-cloud-arrow-up text-2xl text-[#8ec5eb]" />
-                    <span className="text-sm font-semibold text-white">Click to upload banner</span>
+                    <span className="text-sm font-semibold text-white">Or click here to choose a file</span>
                     <span className="text-xs text-white/50">PNG or JPG — max 10 MB</span>
-                  </>
+                  </button>
                 )}
-              </label>
+              </div>
             </div>
 
             <div className="mt-10 flex flex-wrap justify-end gap-3 border-t border-white/10 pt-8">

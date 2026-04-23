@@ -302,14 +302,14 @@ export default function ChurchEmpowermentDetailPage() {
             label: "Pastor's Roadmaps",
             href: "/director/revitalization-roadmap",
           },
-          { label: "John Ross", href: "/director/revitalization-roadmap/home" },
+          { label: "John Ross", href: "/director/revitalization-roadmap" },
           {
             label: "Revitalization Roadmap",
-            href: "/director/revitalization-roadmap/home",
+            href: "/director/revitalization-roadmap",
           },
           {
             label: "Church Empowerment Phase",
-            href: "/director/revitalization-roadmap/home/church-empowerment",
+            href: "/director/revitalization-roadmap/church-empowerment",
           },
           { label: title },
         ]}
@@ -445,7 +445,7 @@ export default function ChurchEmpowermentDetailPage() {
                       <button
                         onClick={() =>
                           router.push(
-                            `/director/revitalization-roadmap/home/church-empowerment/${slug}/shared-media`
+                            `/director/revitalization-roadmap/church-empowerment/${slug}/shared-media`
                           )
                         }
                         className="bg-[#2E3B8E] text-white rounded-lg px-6 py-2.5 text-sm font-semibold hover:bg-[#1F2A6E] transition-all"

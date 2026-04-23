@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import RoadmapCard from "@/app/Components/RoadmapCard";
 import FeaturedAvatars from "@/app/Components/FeaturedAvatars";
 import MentorCard from "@/app/Components/Card/MentorCard";
@@ -37,6 +37,7 @@ const glassTrigger =
 
 export default function RevitalizationRoadmapPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const [activeTab, setActiveTab] = useState("roadmap-library");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("least-mentees");
@@ -141,8 +142,9 @@ export default function RevitalizationRoadmapPage() {
   }, []);
 
   useEffect(() => {
+    if (pathname !== "/director/revitalization-roadmap") return;
     fetchRoadmaps();
-  }, [fetchRoadmaps]);
+  }, [pathname, fetchRoadmaps]);
 
   // When returning to this tab (back navigation / restored state), refetch so newly created roadmaps appear.
   useEffect(() => {

@@ -272,14 +272,14 @@ export default function ChurchEmpowermentPhasePage() {
   const handleCardClick = (itemId: number, title: string) => {
     const slug = titleToSlug(title);
     router.push(
-      `/director/revitalization-roadmap/home/church-empowerment/${slug}`
+      `/director/revitalization-roadmap/church-empowerment/${slug}`
     );
   };
 
   const handleViewClick = (itemId: number, title: string) => {
     const slug = titleToSlug(title);
     router.push(
-      `/director/revitalization-roadmap/home/church-empowerment/${slug}`
+      `/director/revitalization-roadmap/church-empowerment/${slug}`
     );
   };
 
@@ -294,10 +294,10 @@ export default function ChurchEmpowermentPhasePage() {
             label: "Pastor's Roadmaps",
             href: "/director/revitalization-roadmap",
           },
-          { label: "John Ross", href: "/director/revitalization-roadmap/home" },
+          { label: "John Ross", href: "/director/revitalization-roadmap" },
           {
             label: "Revitalization Roadmap",
-            href: "/director/revitalization-roadmap/home",
+            href: "/director/revitalization-roadmap",
           },
           { label: "Church Empowerment Phase" },
         ]}

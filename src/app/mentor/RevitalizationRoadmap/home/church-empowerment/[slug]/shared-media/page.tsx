@@ -148,18 +148,18 @@ export default function SharedMediaPage() {
             label: "Pastor's Roadmaps",
             href: "/director/revitalization-roadmap",
           },
-          { label: "John Ross", href: "/director/revitalization-roadmap/home" },
+          { label: "John Ross", href: "/director/revitalization-roadmap" },
           {
             label: "Revitalization Roadmap",
-            href: "/director/revitalization-roadmap/home",
+            href: "/director/revitalization-roadmap",
           },
           {
             label: "Church Empowerment Phase",
-            href: "/director/revitalization-roadmap/home/church-empowerment",
+            href: "/director/revitalization-roadmap/church-empowerment",
           },
           {
             label: title,
-            href: `/director/revitalization-roadmap/home/church-empowerment/${slug}`,
+            href: `/director/revitalization-roadmap/church-empowerment/${slug}`,
           },
           { label: "Shared Media" },
         ]}

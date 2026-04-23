@@ -162,7 +162,7 @@ const directorExploreCards = [
     title: "Revitalization Roadmap",
     desc: "Plan and execute regional development roadmaps efficiently.",
     icon: "fa-solid fa-pen-clip",
-    route: "/director/revitalization-roadmap/home",
+    route: "/director/revitalization-roadmap",
   },
 ];
 

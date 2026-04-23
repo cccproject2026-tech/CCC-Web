@@ -125,14 +125,14 @@ export default function SelfRevitalizationPhasePage() {
   const handleCardClick = (itemId: number, title: string) => {
     const slug = titleToSlug(title);
     router.push(
-      `/director/revitalization-roadmap/home/self-revitalization/${slug}`
+      `/director/revitalization-roadmap/self-revitalization/${slug}`
     );
   };
 
   const handleViewClick = (itemId: number, title: string) => {
     const slug = titleToSlug(title);
     router.push(
-      `/director/revitalization-roadmap/home/self-revitalization/${slug}`
+      `/director/revitalization-roadmap/self-revitalization/${slug}`
     );
   };
 
@@ -147,10 +147,10 @@ export default function SelfRevitalizationPhasePage() {
             label: "Pastor's Roadmaps",
             href: "/director/revitalization-roadmap",
           },
-          { label: "John Ross", href: "/director/revitalization-roadmap/home" },
+          { label: "John Ross", href: "/director/revitalization-roadmap" },
           {
             label: "Revitalization Roadmap",
-            href: "/director/revitalization-roadmap/home",
+            href: "/director/revitalization-roadmap",
           },
           { label: "Self Revitalization Phase" },
         ]}

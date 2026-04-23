@@ -244,14 +244,14 @@ export default function SelfRevitalizationDetailPage() {
             label: "Pastor's Roadmaps",
             href: "/director/revitalization-roadmap",
           },
-          { label: "John Ross", href: "/director/revitalization-roadmap/home" },
+          { label: "John Ross", href: "/director/revitalization-roadmap" },
           {
             label: "Revitalization Roadmap",
-            href: "/director/revitalization-roadmap/home",
+            href: "/director/revitalization-roadmap",
           },
           {
             label: "Community Revitalization and Multiplication Phase",
-            href: "/director/revitalization-roadmap/home/community-revitalization-and-multiplication",
+            href: "/director/revitalization-roadmap/community-revitalization-and-multiplication",
           },
           { label: title },
         ]}
@@ -1004,7 +1004,7 @@ export default function SelfRevitalizationDetailPage() {
                   onClick={() => {
                     setShowSurveyModal(false);
                     router.push(
-                      `/director/revitalization-roadmap/home/self-revitalization/${slug}/survey`
+                      `/director/revitalization-roadmap/self-revitalization/${slug}/survey`
                     );
                   }}
                   className="bg-[#2E3B8E] text-white rounded-lg px-8 py-3 text-sm font-semibold hover:bg-[#1F2A6E] transition-all"
@@ -1188,7 +1188,7 @@ export default function SelfRevitalizationDetailPage() {
                         setShowCMAModal(false);
                         setCmaModalStep(1);
                         router.push(
-                          `/director/revitalization-roadmap/home/community-revitalization-and-multiplication/${slug}/survey`
+                          `/director/revitalization-roadmap/community-revitalization-and-multiplication/${slug}/survey`
                         );
                       }}
                       className="bg-[#2E3B8E] text-white rounded-lg px-8 py-3 text-sm font-semibold hover:bg-[#1F2A6E] transition-all"
