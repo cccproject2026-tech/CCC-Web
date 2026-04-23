@@ -90,6 +90,10 @@ export default function CreateAssessmentPage() {
 
   const handleAddInstruction = () => setInstructions([...instructions, ""]);
 
+  const handleRemoveInstruction = (index: number) => {
+    setInstructions((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
+
   const handleUpdateInstruction = (index: number, value: string) => {
     const updated = [...instructions];
     updated[index] = value;
@@ -98,6 +102,10 @@ export default function CreateAssessmentPage() {
 
   const handleAddSection = () => {
     setSections([...sections, defaultSection()]);
+  };
+
+  const handleRemoveSection = (sectionIdx: number) => {
+    setSections((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== sectionIdx)));
   };
 
   const handleUpdateSection = (sectionIdx: number, field: string, value: unknown) => {
@@ -124,6 +132,21 @@ export default function CreateAssessmentPage() {
     setSections(updated);
   };
 
+  const handleRemoveLayerChoice = (sectionIdx: number, layerIdx: number, choiceIdx: number) => {
+    setSections((prev) => {
+      if (prev[sectionIdx]?.layers[layerIdx]?.choices.length <= 1) return prev;
+      const next = [...prev];
+      const copy = { ...next[sectionIdx] };
+      const layers = [...copy.layers];
+      const layer = { ...layers[layerIdx] };
+      layer.choices = layer.choices.filter((_, j) => j !== choiceIdx);
+      layers[layerIdx] = layer;
+      copy.layers = layers;
+      next[sectionIdx] = copy;
+      return next;
+    });
+  };
+
   const handleUpdatePlanItem = (
     sectionIdx: number,
     planIdx: number,
@@ -139,6 +162,21 @@ export default function CreateAssessmentPage() {
     const updated = [...sections];
     updated[sectionIdx].plans[planIdx].items.push("");
     setSections(updated);
+  };
+
+  const handleRemovePlanItem = (sectionIdx: number, planIdx: number, itemIdx: number) => {
+    setSections((prev) => {
+      if (prev[sectionIdx]?.plans[planIdx]?.items.length <= 1) return prev;
+      const next = [...prev];
+      const copy = { ...next[sectionIdx] };
+      const plans = [...copy.plans];
+      const plan = { ...plans[planIdx] };
+      plan.items = plan.items.filter((_, j) => j !== itemIdx);
+      plans[planIdx] = plan;
+      copy.plans = plans;
+      next[sectionIdx] = copy;
+      return next;
+    });
   };
 
   const handleUpdatePreSurvey = (
@@ -337,14 +375,25 @@ export default function CreateAssessmentPage() {
               </div>
               <div className="space-y-3">
                 {instructions.map((instruction, idx) => (
-                  <input
-                    key={idx}
-                    type="text"
-                    value={instruction}
-                    onChange={(e) => handleUpdateInstruction(idx, e.target.value)}
-                    placeholder={`Instruction ${idx + 1}`}
-                    className={directorInputClass}
-                  />
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={instruction}
+                      onChange={(e) => handleUpdateInstruction(idx, e.target.value)}
+                      placeholder={`Instruction ${idx + 1}`}
+                      className={directorInputClass + " min-w-0 flex-1"}
+                    />
+                    {instructions.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveInstruction(idx)}
+                        className="shrink-0 rounded-lg border border-red-400/30 bg-red-500/15 px-3 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/25"
+                        aria-label={`Remove instruction ${idx + 1}`}
+                      >
+                        <i className="fa-solid fa-trash" />
+                      </button>
+                    ) : null}
+                  </div>
                 ))}
               </div>
             </div>
@@ -435,7 +484,19 @@ export default function CreateAssessmentPage() {
                   key={section.id}
                   className="space-y-4 rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6"
                 >
-                  <h3 className="text-base font-semibold text-[#8ec5eb]">Section {sectionIdx + 1}</h3>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-base font-semibold text-[#8ec5eb]">Section {sectionIdx + 1}</h3>
+                    {sections.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSection(sectionIdx)}
+                        className="rounded-lg border border-red-400/30 bg-red-500/15 px-3 py-1.5 text-sm font-semibold text-red-200 hover:bg-red-500/25"
+                      >
+                        <i className="fa-solid fa-trash mr-1" />
+                        Remove section
+                      </button>
+                    ) : null}
+                  </div>
 
                   <div>
                     <label className={directorLabelClass}>Section name</label>
@@ -474,16 +535,34 @@ export default function CreateAssessmentPage() {
                         </button>
                       </div>
                       {layer.choices.map((choice, choiceIdx) => (
-                        <input
-                          key={choiceIdx}
-                          type="text"
-                          value={choice}
-                          onChange={(e) =>
-                            handleUpdateLayerChoice(sectionIdx, layerIdx, choiceIdx, e.target.value)
-                          }
-                          placeholder={`Choice ${choiceIdx + 1}`}
-                          className={`${directorInputClass} mb-2`}
-                        />
+                        <div key={choiceIdx} className="mb-2 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={choice}
+                            onChange={(e) =>
+                              handleUpdateLayerChoice(
+                                sectionIdx,
+                                layerIdx,
+                                choiceIdx,
+                                e.target.value,
+                              )
+                            }
+                            placeholder={`Choice ${choiceIdx + 1}`}
+                            className={directorInputClass + " min-w-0 flex-1"}
+                          />
+                          {layer.choices.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleRemoveLayerChoice(sectionIdx, layerIdx, choiceIdx)
+                              }
+                              className="shrink-0 rounded-lg border border-red-400/30 bg-red-500/15 px-2.5 py-2 text-sm text-red-200 hover:bg-red-500/25"
+                              aria-label={`Remove choice ${choiceIdx + 1}`}
+                            >
+                              <i className="fa-solid fa-trash" />
+                            </button>
+                          ) : null}
+                        </div>
                       ))}
                     </div>
                   ))}
@@ -501,16 +580,27 @@ export default function CreateAssessmentPage() {
                         </button>
                       </div>
                       {plan.items.map((item, itemIdx) => (
-                        <input
-                          key={itemIdx}
-                          type="text"
-                          value={item}
-                          onChange={(e) =>
-                            handleUpdatePlanItem(sectionIdx, planIdx, itemIdx, e.target.value)
-                          }
-                          placeholder={`Plan item ${itemIdx + 1}`}
-                          className={`${directorInputClass} mb-2`}
-                        />
+                        <div key={itemIdx} className="mb-2 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={item}
+                            onChange={(e) =>
+                              handleUpdatePlanItem(sectionIdx, planIdx, itemIdx, e.target.value)
+                            }
+                            placeholder={`Plan item ${itemIdx + 1}`}
+                            className={directorInputClass + " min-w-0 flex-1"}
+                          />
+                          {plan.items.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePlanItem(sectionIdx, planIdx, itemIdx)}
+                              className="shrink-0 rounded-lg border border-red-400/30 bg-red-500/15 px-2.5 py-2 text-sm text-red-200 hover:bg-red-500/25"
+                              aria-label={`Remove plan item ${itemIdx + 1}`}
+                            >
+                              <i className="fa-solid fa-trash" />
+                            </button>
+                          ) : null}
+                        </div>
                       ))}
                     </div>
                   ))}
@@ -519,10 +609,25 @@ export default function CreateAssessmentPage() {
             </div>
 
             <div className="mt-8">
-              <label className={`${directorLabelClass} flex items-center gap-2`}>
-                <i className="fa-solid fa-image text-[#8ec5eb]" />
-                Banner image (optional)
-              </label>
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <span className={`${directorLabelClass} mb-0 flex items-center gap-2`}>
+                  <i className="fa-solid fa-image text-[#8ec5eb]" />
+                  Banner image (optional)
+                </span>
+                {bannerFile || bannerPreview ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (bannerPreview?.startsWith("blob:")) URL.revokeObjectURL(bannerPreview);
+                      setBannerFile(null);
+                      setBannerPreview(null);
+                    }}
+                    className="text-sm font-semibold text-red-300/90 hover:underline"
+                  >
+                    Remove image
+                  </button>
+                ) : null}
+              </div>
               <input
                 type="file"
                 accept="image/*"
@@ -542,15 +647,23 @@ export default function CreateAssessmentPage() {
               >
                 {bannerPreview ? (
                   <div className="relative h-40 w-full max-w-md overflow-hidden rounded-xl">
+                    {/* Use <img> for blob: — Next Image can fail on some local blob: URLs in dev */}
+                    {bannerPreview.startsWith("blob:") || bannerPreview.startsWith("data:") ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={bannerPreview}
+                        alt=""
+                        className="h-40 w-full object-cover"
+                      />
+                    ) : (
                     <Image
                       src={bannerPreview}
                       alt=""
                       fill
                       className="object-cover"
-                      unoptimized={
-                        bannerPreview.startsWith("blob:") || isRemoteImageSrc(bannerPreview)
-                      }
+                      unoptimized={isRemoteImageSrc(bannerPreview)}
                     />
+                    )}
                   </div>
                 ) : (
                   <>

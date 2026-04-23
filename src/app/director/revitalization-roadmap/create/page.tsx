@@ -39,7 +39,13 @@ function unwrapRoadmap(res: unknown): RoadmapDoc | null {
   const data = r.data;
   if (data && typeof data === "object" && !Array.isArray(data)) {
     const inner = data as Record<string, unknown>;
-    if (inner.data && typeof inner.data === "object") return inner.data as RoadmapDoc;
+    if (
+      inner.data != null &&
+      typeof inner.data === "object" &&
+      !Array.isArray(inner.data)
+    ) {
+      return inner.data as RoadmapDoc;
+    }
     return data as RoadmapDoc;
   }
   if ("_id" in r || "name" in r) return r as RoadmapDoc;

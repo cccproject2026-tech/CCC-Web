@@ -249,13 +249,14 @@ export const apiUpdateSections = (assessmentId: string, sections: Section[]) =>
   );
 
 // POST /assessment/:id/banner  (multipart, field: image)
+// Do not set Content-Type manually — the boundary is required; axios/browser set it for FormData.
 export const apiUploadAssessmentBanner = (assessmentId: string, file: File) => {
   const formData = new FormData();
   formData.append("image", file);
   return axiosInstance.post<{ success: boolean; data: { bannerImage: string } }>(
     `/assessment/${assessmentId}/banner`,
     formData,
-    { headers: { "Content-Type": "multipart/form-data" } },
+    { timeout: 60_000 },
   );
 };
 

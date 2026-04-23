@@ -6,16 +6,28 @@ import ProgressCard from "@/app/Components/Card/ProgressCard";
 import DirectorHero from "../DirectorHero";
 import {
   directorGlassCard,
+<<<<<<< HEAD
   directorPageRoot,
 } from "../directorUi";
+=======
+  directorPageContainer,
+  directorPageRoot,
+  directorSpinner,
+} from "../directorUi";
+import { DirectorFilterSection } from "../ui";
+>>>>>>> ba12e32 (redoo changes)
 import SearchBar from "@/app/Components/SearchBar";
 import FeaturedAvatars, {
   FeaturedAvatarItem,
 } from "@/app/Components/FeaturedAvatars";
 import ProgressBg from "../../Assets/progress-bg.jpg";
 import Mentor1 from "../../Assets/mentor1.png";
+<<<<<<< HEAD
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
+=======
+import { resolveApiMediaUrl } from "@/app/utils/image";
+>>>>>>> ba12e32 (redoo changes)
 import {
   apiGetOverallProgress,
   extractUserIdFromOverallProgressRow,
@@ -51,18 +63,32 @@ function normalizeRow(
 ): ProgressListItem | null {
   const userId = extractUserIdFromOverallProgressRow(item);
   if (!userId) return null;
+<<<<<<< HEAD
   const fullName =
     `${item.firstName ?? ""} ${item.lastName ?? ""}`.trim() ||
     item.email ||
     "Unknown";
+=======
+  const fullName = `${item.firstName ?? ""} ${item.lastName ?? ""}`.trim() || item.email || "Unknown";
+  const rawPic = item.profilePicture;
+  const profileImage =
+    typeof rawPic === "string" && rawPic.trim()
+      ? resolveApiMediaUrl(rawPic) ?? rawPic
+      : undefined;
+>>>>>>> ba12e32 (redoo changes)
   return {
     userId,
     fullName,
     role: item.role ?? "—",
+<<<<<<< HEAD
     progress: Math.round(
       Math.min(100, Math.max(0, item.overallProgress ?? 0)),
     ),
     profileImage: imageForItem(item.profilePicture, index),
+=======
+    progress: Math.round(Math.min(100, Math.max(0, item.overallProgress ?? 0))),
+    profileImage,
+>>>>>>> ba12e32 (redoo changes)
   };
 }
 
@@ -203,6 +229,7 @@ export default function TrackProgressPage() {
         </div>
       </section>
 
+<<<<<<< HEAD
       <section className="relative pb-6 pt-2 md:pb-8">
         <div className="mx-auto flex max-w-[1400px] flex-col items-stretch gap-4">
           <div
@@ -257,6 +284,22 @@ export default function TrackProgressPage() {
               <div className="mb-4 h-12 w-12 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
               <p className="text-lg font-medium text-white">
                 Loading progress…
+=======
+          {!loading && !error && filteredData.length === 0 && (
+            <div
+              className={`${directorGlassCard} mx-auto max-w-lg px-8 py-14 text-center`}
+            >
+              <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.06]">
+                <i className="fa-solid fa-chart-line text-3xl text-[#8ec5eb]/80" aria-hidden />
+              </div>
+              <p className="text-base font-semibold text-white sm:text-lg">
+                {progressData.length === 0 ? "No progress data yet" : "No matching users"}
+              </p>
+              <p className="mt-2 text-sm text-white/55">
+                {progressData.length === 0
+                  ? "When mentors and pastors have activity, their completion will appear here."
+                  : "Try a different search or switch the filter above."}
+>>>>>>> ba12e32 (redoo changes)
               </p>
             </div>
           ) : error ? (

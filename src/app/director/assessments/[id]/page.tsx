@@ -1,15 +1,24 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
+import Image from "next/image";
 import DirectorHero from "../../DirectorHero";
 import AssessmentBg from "../../../Assets/assessment-bg.png";
-import { directorGlassCard, directorPageRoot, directorSpinner } from "../../directorUi";
+import {
+  directorGlassCard,
+  directorLabelClass,
+  directorPageRoot,
+  directorSpinner,
+} from "../../directorUi";
 import {
   apiGetAssessmentById,
   apiUpdateInstructions,
   apiUpdateSections,
+  apiUploadAssessmentBanner,
+  formatAssessmentApiErrorMessage,
   parseAssessmentDetailPayload,
 } from "@/app/Services/assessment.service";
+import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 import {
   mapAssessmentFromApi,
   buildSectionsPayload,
@@ -50,7 +59,8 @@ export default function ViewEditAssessmentPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [selectedSection, setSelectedSection] = useState<string>("");
   const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [selectedChoices, setSelectedChoices] = useState<number[]>([]);
+  /** Choice IDs within the currently selected section (unique across layers). */
+  const [selectedChoices, setSelectedChoices] = useState<string[]>([]);
   const [assessment, setAssessment] = useState<any>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -64,20 +74,30 @@ export default function ViewEditAssessmentPage() {
   const [recSelectionMode, setRecSelectionMode] = useState(false);
   const [selectedRecs, setSelectedRecs] = useState<string[]>([]);
 
+  /** Aligned with create assessment wizard: 4 levels per section by default. */
+  const DEFAULT_NEW_SECTION_LAYERS = 4;
+  const buildEmptyLayerMatrix = (n: number) =>
+    Array.from({ length: n }, () => [""] as string[]);
+
   // Form state for Add Section
   const [newSectionName, setNewSectionName] = useState("");
   const [newSectionGuidelines, setNewSectionGuidelines] = useState("");
-  const [newSectionLayers, setNewSectionLayers] = useState(2);
+  const [newSectionLayers, setNewSectionLayers] = useState(DEFAULT_NEW_SECTION_LAYERS);
   /** Per-layer choice labels while building a new section in the modal (each layer ≥ 1 row). */
-  const [newSectionLayerChoices, setNewSectionLayerChoices] = useState<
-    string[][]
-  >([[''], ['']]);
+  const [newSectionLayerChoices, setNewSectionLayerChoices] = useState<string[][]>(() =>
+    buildEmptyLayerMatrix(DEFAULT_NEW_SECTION_LAYERS),
+  );
 
   type InstructionRow = { id: string; text: string; checked: boolean };
   const [instructions, setInstructions] = useState<InstructionRow[]>([]);
 
   const [sections, setSections] = useState<Section[]>([]);
   const [savingSection, setSavingSection] = useState(false);
+  /** New banner file; uploaded with “Save changes”. */
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  /** `blob:` preview for a newly picked file; revoke on clear/unmount. */
+  const [bannerLocalUrl, setBannerLocalUrl] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!params?.id) return;
@@ -113,6 +133,12 @@ export default function ViewEditAssessmentPage() {
   }, [params?.id]);
 
   useEffect(() => {
+    return () => {
+      if (bannerLocalUrl?.startsWith("blob:")) URL.revokeObjectURL(bannerLocalUrl);
+    };
+  }, [bannerLocalUrl]);
+
+  useEffect(() => {
     setNewSectionLayerChoices((prev) => {
       const n = newSectionLayers;
       const next: string[][] = [];
@@ -126,8 +152,8 @@ export default function ViewEditAssessmentPage() {
   const resetAddSectionForm = () => {
     setNewSectionName("");
     setNewSectionGuidelines("");
-    setNewSectionLayers(2);
-    setNewSectionLayerChoices([[''], ['']]);
+    setNewSectionLayers(DEFAULT_NEW_SECTION_LAYERS);
+    setNewSectionLayerChoices(buildEmptyLayerMatrix(DEFAULT_NEW_SECTION_LAYERS));
   };
 
   const openAddSectionModal = () => {
@@ -143,6 +169,16 @@ export default function ViewEditAssessmentPage() {
   const appendModalChoice = (layerIdx: number) => {
     setNewSectionLayerChoices((prev) =>
       prev.map((row, i) => (i === layerIdx ? [...row, ""] : [...row])),
+    );
+  };
+
+  const removeModalChoice = (layerIdx: number, choiceIdx: number) => {
+    setNewSectionLayerChoices((prev) =>
+      prev.map((row, i) => {
+        if (i !== layerIdx) return [...row];
+        if (row.length <= 1) return [...row];
+        return row.filter((_, j) => j !== choiceIdx);
+      }),
     );
   };
 
@@ -220,18 +256,58 @@ export default function ViewEditAssessmentPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSelectChoice = (choiceIdx: number) => {
-    if (selectedChoices.includes(choiceIdx)) {
-      setSelectedChoices(selectedChoices.filter((idx) => idx !== choiceIdx));
-    } else {
-      setSelectedChoices([...selectedChoices, choiceIdx]);
-    }
+  const handleSelectChoice = (choiceId: string) => {
+    setSelectedChoices((prev) =>
+      prev.includes(choiceId) ? prev.filter((id) => id !== choiceId) : [...prev, choiceId],
+    );
   };
 
   const handleDeleteSelected = () => {
-    showToast("Choices of Survey has been Deleted");
+    if (!selectedSection) {
+      setIsSelectionMode(false);
+      return;
+    }
+    setSections((prev) =>
+      prev.map((section) => {
+        if (section.id !== selectedSection) return section;
+        return {
+          ...section,
+          layers: section.layers.map((layer) => {
+            const next = layer.choices.filter((c) => !selectedChoices.includes(c.id));
+            if (next.length === 0) {
+              return {
+                ...layer,
+                choices: [{ id: crypto.randomUUID(), text: "Option 1" }],
+              };
+            }
+            return { ...layer, choices: next };
+          }),
+        };
+      }),
+    );
+    showToast("Selected choices removed");
     setSelectedChoices([]);
     setIsSelectionMode(false);
+  };
+
+  const handleDeleteSingleChoice = (sectionId: string, layerId: string, choiceId: string) => {
+    setSections((prev) =>
+      prev.map((section) => {
+        if (section.id !== sectionId) return section;
+        return {
+          ...section,
+          layers: section.layers.map((layer) => {
+            if (layer.id !== layerId) return layer;
+            if (layer.choices.length <= 1) return layer;
+            return {
+              ...layer,
+              choices: layer.choices.filter((c) => c.id !== choiceId),
+            };
+          }),
+        };
+      }),
+    );
+    setSelectedChoices((s) => s.filter((id) => id !== choiceId));
   };
 
   const handleSelectRec = (recId: string) => {
@@ -325,17 +401,41 @@ export default function ViewEditAssessmentPage() {
     }
   };
 
+  const clearPendingBanner = () => {
+    if (bannerLocalUrl?.startsWith("blob:")) URL.revokeObjectURL(bannerLocalUrl);
+    setBannerLocalUrl(null);
+    setBannerFile(null);
+  };
+
   const handleSaveChanges = async () => {
+    if (!assessment?.id) return;
+    setSaving(true);
     try {
-      await apiUpdateSections(
-        assessment.id,
-        buildSectionsPayload(sections)
-      );
+      if (bannerFile) {
+        const res = await apiUploadAssessmentBanner(assessment.id, bannerFile);
+        const body = res.data as Record<string, unknown> | undefined;
+        let newUrl: string | undefined;
+        if (body?.data != null && typeof body.data === "object" && body.data !== null) {
+          newUrl = (body.data as { bannerImage?: string }).bannerImage;
+        }
+        if (!newUrl && typeof body?.bannerImage === "string") newUrl = body.bannerImage;
+        if (typeof newUrl === "string" && newUrl.trim()) {
+          setAssessment((a: { bannerImage?: string } | null) =>
+            a ? { ...a, bannerImage: newUrl } : a,
+          );
+        }
+        clearPendingBanner();
+      }
+
+      await apiUpdateSections(assessment.id, buildSectionsPayload(sections));
 
       showToast("Survey Edited Successfully");
       router.push("/director/assessments");
     } catch (e) {
       console.error(e);
+      showToast(formatAssessmentApiErrorMessage(e));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -343,6 +443,14 @@ export default function ViewEditAssessmentPage() {
   const currentLayer = selectedSectionData?.layers.find(
     (l) => l.id === currentLayerId
   );
+  const currentLayerIndex =
+    currentLayer && selectedSectionData
+      ? selectedSectionData.layers.findIndex((l) => l.id === currentLayer.id)
+      : 0;
+
+  const resolvedBannerForDisplay = assessment
+    ? bannerLocalUrl || resolveApiMediaUrl(assessment.bannerImage) || ""
+    : "";
 
   if (!assessment) {
     return (
@@ -446,6 +554,68 @@ export default function ViewEditAssessmentPage() {
 
           {/* Main Content Area */}
           <div className={`min-w-0 flex-1 ${directorGlassCard} p-5 sm:p-6`}>
+            <div className="mb-6 rounded-xl border border-white/15 bg-white/[0.04] p-4 sm:p-5">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <span className={`${directorLabelClass} mb-0 flex items-center gap-2`}>
+                  <i className="fa-solid fa-image text-[#8ec5eb]" />
+                  Banner image
+                </span>
+                {bannerFile || bannerLocalUrl ? (
+                  <button
+                    type="button"
+                    onClick={clearPendingBanner}
+                    className="text-sm font-semibold text-red-300/90 hover:underline"
+                  >
+                    Discard new image
+                  </button>
+                ) : null}
+              </div>
+              <p className="mb-3 text-xs text-white/55">
+                Shown on assessment cards. Choose a file, then use Save changes to upload.
+              </p>
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                id="assessment-banner-edit"
+                onChange={(e) => {
+                  const f = e.target.files?.[0] || null;
+                  e.target.value = "";
+                  if (bannerLocalUrl?.startsWith("blob:")) URL.revokeObjectURL(bannerLocalUrl);
+                  setBannerFile(f);
+                  setBannerLocalUrl(f ? URL.createObjectURL(f) : null);
+                }}
+              />
+              <label
+                htmlFor="assessment-banner-edit"
+                className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/25 bg-white/[0.04] px-4 py-8 transition hover:border-[#8ec5eb]/40"
+              >
+                {!resolvedBannerForDisplay ? (
+                  <>
+                    <i className="fa-solid fa-cloud-arrow-up text-2xl text-[#8ec5eb]" />
+                    <span className="text-sm font-semibold text-white">Click to upload or replace banner</span>
+                    <span className="text-xs text-white/50">PNG or JPG — max 10 MB</span>
+                  </>
+                ) : (
+                  <div className="relative h-36 w-full max-w-md overflow-hidden rounded-xl">
+                    {resolvedBannerForDisplay.startsWith("blob:") ||
+                    resolvedBannerForDisplay.startsWith("data:") ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={resolvedBannerForDisplay} alt="" className="h-36 w-full object-cover" />
+                    ) : (
+                      <Image
+                        src={resolvedBannerForDisplay}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        unoptimized={isRemoteImageSrc(resolvedBannerForDisplay)}
+                      />
+                    )}
+                  </div>
+                )}
+              </label>
+            </div>
+
             {selectedSectionData ? (
               <>
                 {/* Help Text */}
@@ -540,24 +710,20 @@ export default function ViewEditAssessmentPage() {
                           <div
                             key={choice.id}
                             className={`flex items-center gap-3 rounded-lg border p-3 text-white transition-all ${
-                              selectedChoices.includes(layerIdx * 10 + choiceIdx)
+                              selectedChoices.includes(choice.id)
                                 ? "border-[#8ec5eb] ring-2 ring-[#8ec5eb]/40"
                                 : "border-white/15 bg-white/5"
                             } ${isSelectionMode ? "cursor-pointer hover:border-[#8ec5eb]/50" : ""}`}
                             onClick={() =>
-                              isSelectionMode &&
-                              handleSelectChoice(layerIdx * 10 + choiceIdx)
+                              isSelectionMode && handleSelectChoice(choice.id)
                             }
+                            role="group"
                           >
                             {isSelectionMode && (
                               <input
                                 type="checkbox"
-                                checked={selectedChoices.includes(
-                                  layerIdx * 10 + choiceIdx,
-                                )}
-                                onChange={() =>
-                                  handleSelectChoice(layerIdx * 10 + choiceIdx)
-                                }
+                                checked={selectedChoices.includes(choice.id)}
+                                onChange={() => handleSelectChoice(choice.id)}
                                 className="h-5 w-5 rounded text-[#2E3B8E] focus:ring-[#2E3B8E]"
                               />
                             )}
@@ -582,6 +748,24 @@ export default function ViewEditAssessmentPage() {
                                 placeholder="Choice text"
                                 className="min-w-0 flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 outline-none focus:border-[#8ec5eb]/50 focus:ring-1 focus:ring-[#8ec5eb]/30"
                               />
+                            )}
+                            {!isSelectionMode && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteSingleChoice(
+                                    selectedSectionData.id,
+                                    layer.id,
+                                    choice.id,
+                                  );
+                                }}
+                                className="shrink-0 rounded-lg border border-red-400/30 bg-red-500/20 px-2.5 py-1.5 text-sm text-red-100 hover:bg-red-500/30"
+                                title="Remove choice"
+                                aria-label="Remove choice"
+                              >
+                                <i className="fa-solid fa-trash" />
+                              </button>
                             )}
                           </div>
                         ))}
@@ -628,10 +812,11 @@ export default function ViewEditAssessmentPage() {
           </button>
           <button
             type="button"
-            onClick={handleSaveChanges}
-            className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-8 py-3 text-sm font-semibold text-white shadow-[0_0_0_1px_rgba(142,197,235,0.15)] transition hover:bg-[#8ec5eb]/30"
+            onClick={() => void handleSaveChanges()}
+            disabled={saving}
+            className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-8 py-3 text-sm font-semibold text-white shadow-[0_0_0_1px_rgba(142,197,235,0.15)] transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Save changes
+            {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
       </section>
@@ -683,32 +868,34 @@ export default function ViewEditAssessmentPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Number of Layers
+                <label className="mb-2 block text-sm font-medium text-gray-700" htmlFor="add-section-layer-count">
+                  Number of levels (layers)
                 </label>
                 <select
+                  id="add-section-layer-count"
                   value={newSectionLayers}
                   onChange={(e) => setNewSectionLayers(Number(e.target.value))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900"
+                  className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2E3B8E]"
                 >
-                  {[2, 3, 4, 5].map((num) => (
-                    <option key={num} value={num}>
-                      {num}
+                  {[1, 2, 3, 4, 5, 6].map((num) => (
+                    <option key={num} value={num} className="text-gray-900">
+                      {num} {num === 1 ? "level" : "levels"}
                     </option>
                   ))}
                 </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  Create flow uses four levels; pick how many you need for this section.
+                </p>
               </div>
 
               {Array.from({ length: newSectionLayers }).map((_, i) => (
-                <div key={i} className="border-t pt-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="text-base font-bold text-gray-900">
-                      Layer {i + 1}
-                    </label>
+                <div key={`layer-block-${i}`} className="border-t border-gray-200 pt-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <label className="text-base font-bold text-gray-900">Level {i + 1}</label>
                     <button
                       type="button"
                       onClick={() => appendModalChoice(i)}
-                      className="px-3 py-1 bg-white border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg text-sm font-semibold hover:bg-blue-50 flex items-center gap-1"
+                      className="flex items-center gap-1 rounded-lg border-2 border-[#2E3B8E] bg-white px-3 py-1 text-sm font-semibold text-[#2E3B8E] hover:bg-blue-50"
                     >
                       <i className="fa-solid fa-plus"></i>
                       Choice
@@ -716,16 +903,26 @@ export default function ViewEditAssessmentPage() {
                   </div>
                   <div className="space-y-2">
                     {(newSectionLayerChoices[i] ?? [""]).map((text, j) => (
-                      <input
-                        key={`${i}-${j}`}
-                        type="text"
-                        value={text}
-                        onChange={(e) =>
-                          updateModalChoice(i, j, e.target.value)
-                        }
-                        placeholder={`Choice ${j + 1}`}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900 placeholder-gray-400"
-                      />
+                      <div key={`${i}-${j}`} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={text}
+                          onChange={(e) => updateModalChoice(i, j, e.target.value)}
+                          placeholder={`Choice ${j + 1}`}
+                          className="min-w-0 flex-1 rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2E3B8E]"
+                        />
+                        {(newSectionLayerChoices[i] ?? [""]).length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => removeModalChoice(i, j)}
+                            className="shrink-0 rounded-lg border border-red-200 px-2.5 py-2 text-sm text-red-600 hover:bg-red-50"
+                            aria-label={`Remove choice ${j + 1}`}
+                            title="Remove"
+                          >
+                            <i className="fa-solid fa-trash" />
+                          </button>
+                        ) : null}
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -831,7 +1028,7 @@ export default function ViewEditAssessmentPage() {
           <div className="bg-[#2E3B8E] rounded-2xl w-full max-w-md shadow-2xl">
             <div className="p-6 border-b border-white/20 flex justify-between items-center">
               <h3 className="text-xl font-bold text-white">
-                Layer {currentLayerId} - Recommendations
+                Level {currentLayerIndex + 1} — recommendations
               </h3>
               <button
                 onClick={() => {

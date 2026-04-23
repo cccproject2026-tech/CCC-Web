@@ -1,4 +1,5 @@
 "use client";
+<<<<<<< HEAD
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -7,6 +8,12 @@ import {
   directorGlassCard,
   directorPageRoot,
 } from "../directorUi";
+=======
+import { useMemo, useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import DirectorHero from "../DirectorHero";
+import { directorGlassCard, directorPageRoot } from "../directorUi";
+>>>>>>> ba12e32 (redoo changes)
 import SearchBar from "@/app/Components/SearchBar";
 import FeaturedAvatars, {
   FeaturedAvatarItem,
@@ -20,6 +27,7 @@ import MentorBg from "../../Assets/mentor-bg.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
+<<<<<<< HEAD
 import { apiCreateAppointment } from "@/app/Services/appointments.service";
 import {
   extractApiErrorMessage,
@@ -42,6 +50,13 @@ import { deriveOverallProgressPercent } from "@/app/utils/user-progress-display"
 import { resolveApiMediaUrl } from "@/app/utils/image";
 import { getCookie } from "@/app/utils/cookies";
 import { parseMentorUsersListResponse } from "./parseMentorUsersResponse";
+=======
+import { apiGetAllUsers } from "@/app/Services/users.service";
+import { apiCreateAppointment } from "@/app/Services/appointments.service";
+import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
+import { resolveApiMediaUrl } from "@/app/utils/image";
+import { getCookie } from "@/app/utils/cookies";
+>>>>>>> ba12e32 (redoo changes)
 
 const IMAGE_POOL = [Mentor1, Mentor2, Mentor3];
 
@@ -61,6 +76,7 @@ export interface MentorRow {
   createdAt?: string;
 }
 
+<<<<<<< HEAD
 type MentorSortKey =
   | { kind: "latest" }
   | { kind: "phase_self" | "phase_church" | "phase_community" }
@@ -129,10 +145,16 @@ function countryFromUserRecord(user: Record<string, unknown>): string {
 }
 
 function profileImageForUser(user: Record<string, unknown>, index: number) {
+=======
+const AVATAR_POOL = [Mentor1, Mentor2, Mentor3];
+
+function mentorProfileImage(user: any, index: number) {
+>>>>>>> ba12e32 (redoo changes)
   const raw = user.profilePicture;
   if (typeof raw === "string" && raw.trim()) {
     return resolveApiMediaUrl(raw) ?? raw;
   }
+<<<<<<< HEAD
   return IMAGE_POOL[index % IMAGE_POOL.length];
 }
 
@@ -224,9 +246,28 @@ function mapUserToMentorRow(
     phase: seedPhase,
     country: country || undefined,
     createdAt,
+=======
+  return AVATAR_POOL[index % AVATAR_POOL.length];
+}
+
+/** Helper function to convert User to Mentor (index = stable fallback avatar) */
+const convertUserToMentor = (user: any, index: number): Mentor => {
+  return {
+    id: user.id || user._id,
+    name: `${user.firstName} ${user.lastName}`,
+    role: user.role,
+    description: `${user.role} with ${user.assignedId?.length || 0} assigned mentees`,
+    img: mentorProfileImage(user, index),
+    menteeCount: user.assignedId?.length || 0,
+    isFeatured: false,
+    lastContact: undefined,
+    status: user.status,
+    assignedIds: user.assignedId || [],
+>>>>>>> ba12e32 (redoo changes)
   };
 }
 
+<<<<<<< HEAD
 function resolveDirectorUserId(): string {
   const fromId = getCookie("userId")?.trim();
   if (fromId) return fromId;
@@ -244,6 +285,8 @@ function resolveDirectorUserId(): string {
   }
 }
 
+=======
+>>>>>>> ba12e32 (redoo changes)
 export default function MyMentorsPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -258,11 +301,16 @@ export default function MyMentorsPage() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [showListMenteesModal, setShowListMenteesModal] = useState(false);
+<<<<<<< HEAD
   const [selectedMentor, setSelectedMentor] = useState<MentorRow | null>(null);
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error";
   } | null>(null);
+=======
+  const [selectedMentor, setSelectedMentor] = useState<Mentor | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+>>>>>>> ba12e32 (redoo changes)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const [allMentors, setAllMentors] = useState<MentorRow[]>([]);
@@ -405,12 +453,18 @@ export default function MyMentorsPage() {
         /* keep list */
       }
     };
+<<<<<<< HEAD
     void hydrateProgress();
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mentorIdsKey]);
+=======
+
+    fetchMentors();
+  }, [activeFilter, debouncedQuery, currentPage]);
+>>>>>>> ba12e32 (redoo changes)
 
   const featuredMentors = useMemo(() => allMentors.slice(0, 6), [allMentors]);
   const featuredItems: FeaturedAvatarItem[] = useMemo(
@@ -428,6 +482,7 @@ export default function MyMentorsPage() {
     [allMentors],
   );
 
+<<<<<<< HEAD
   const uniqueCountries = useMemo(() => {
     const s = new Set<string>();
     for (const m of allMentors) {
@@ -480,37 +535,107 @@ export default function MyMentorsPage() {
 
   const getMentorOptions = useCallback(
     (m: MentorRow) => [
+=======
+    // Sort
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "Least Mentees":
+          return a.menteeCount - b.menteeCount;
+        case "Most Mentees":
+          return b.menteeCount - a.menteeCount;
+        case "Name A-Z":
+          return a.name.localeCompare(b.name);
+        case "Name Z-A":
+          return b.name.localeCompare(a.name);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [allMentors, sortBy]);
+
+  const sortOptions = [
+    "Least Mentees",
+    "Most Mentees",
+    "Name A-Z",
+    "Name Z-A",
+    "Last Contacted",
+  ];
+
+  const filterOptions = [
+    { label: "All", value: "All" },
+    { label: "Mentors", value: "Mentors" },
+    { label: "Field Mentor", value: "Field Mentor" },
+  ];
+
+  const handleScheduleMeeting = useCallback((mentor: Mentor) => {
+    setSelectedMentor(mentor);
+    setShowScheduleModal(true);
+  }, []);
+
+  const handleAssignMentees = useCallback((mentor: Mentor) => {
+    setSelectedMentor(mentor);
+    setShowAssignModal(true);
+  }, []);
+
+  const handleRemoveMentee = useCallback((mentor: Mentor) => {
+    setSelectedMentor(mentor);
+    setShowRemoveModal(true);
+  }, []);
+
+  const handleListMentees = useCallback((mentor: Mentor) => {
+    setSelectedMentor(mentor);
+    setShowListMenteesModal(true);
+  }, []);
+
+  const getMentorOptions = useCallback(
+    (m: Mentor) => [
+>>>>>>> ba12e32 (redoo changes)
       {
         icon: "fa-solid fa-users",
         label: "List of Mentees",
         color: "text-[#8ec5eb]",
+<<<<<<< HEAD
         onClick: () => {
           setSelectedMentor(m);
           setShowListMenteesModal(true);
         },
+=======
+        onClick: () => handleListMentees(m),
+>>>>>>> ba12e32 (redoo changes)
       },
       {
         icon: "fa-solid fa-user-plus",
         label: "Assign New Mentee",
         color: "text-[#8ec5eb]",
+<<<<<<< HEAD
         onClick: () => {
           setSelectedMentor(m);
           setShowAssignModal(true);
         },
+=======
+        onClick: () => handleAssignMentees(m),
+>>>>>>> ba12e32 (redoo changes)
       },
       {
         icon: "fa-solid fa-user-minus",
         label: "Remove a Mentee",
         color: "text-[#8ec5eb]",
+<<<<<<< HEAD
         onClick: () => {
           setSelectedMentor(m);
           setShowRemoveModal(true);
         },
+=======
+        onClick: () => handleRemoveMentee(m),
+>>>>>>> ba12e32 (redoo changes)
       },
       {
         icon: "fa-regular fa-calendar",
         label: "Schedule an Appointment",
         color: "text-[#8ec5eb]",
+<<<<<<< HEAD
         onClick: () => {
           if (!m.id) {
             setToast({
@@ -523,11 +648,15 @@ export default function MyMentorsPage() {
           setSelectedMentor(m);
           setShowScheduleModal(true);
         },
+=======
+        onClick: () => handleScheduleMeeting(m),
+>>>>>>> ba12e32 (redoo changes)
       },
       {
         icon: "fa-regular fa-pen-to-square",
         label: "Edit Profile",
         color: "text-[#8ec5eb]",
+<<<<<<< HEAD
         onClick: () => {
           router.push(
             `/director/mentors/profile/edit?id=${encodeURIComponent(m.id)}`,
@@ -536,6 +665,19 @@ export default function MyMentorsPage() {
       },
     ],
     [router],
+=======
+        onClick: () =>
+          router.push(`/director/mentors/profile/edit?id=${encodeURIComponent(m.id)}`),
+      },
+    ],
+    [
+      router,
+      handleScheduleMeeting,
+      handleAssignMentees,
+      handleRemoveMentee,
+      handleListMentees,
+    ],
+>>>>>>> ba12e32 (redoo changes)
   );
 
   return (
@@ -917,11 +1059,21 @@ export default function MyMentorsPage() {
               <div className="mb-4 h-12 w-12 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
               <p className="text-lg font-medium text-white">Loading mentors…</p>
             </div>
+<<<<<<< HEAD
           ) : sortedMentors.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <i className="fa-solid fa-user-group mb-4 text-5xl text-white/40" />
               <p className="text-lg font-medium text-white">No mentors found</p>
               <p className="mt-2 text-sm text-white/60">Try another search or tab.</p>
+=======
+          ) : filteredMentors.length === 0 ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="text-center">
+                <i className="fa-solid fa-users text-white text-5xl mb-4 opacity-50"></i>
+                <p className="text-white text-lg font-medium">No mentors found</p>
+                <p className="text-white/70 text-sm mt-2">Try adjusting your search or filters</p>
+              </div>
+>>>>>>> ba12e32 (redoo changes)
             </div>
           ) : (
             <div
@@ -931,13 +1083,18 @@ export default function MyMentorsPage() {
                   : "grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 md:gap-5"
               }
             >
+<<<<<<< HEAD
               {sortedMentors.map((m) => (
+=======
+              {filteredMentors.map((m) => (
+>>>>>>> ba12e32 (redoo changes)
                 <PersonListCard
                   key={m.id}
                   id={m.id}
                   name={m.name}
                   role={m.role}
                   description={m.description}
+<<<<<<< HEAD
                   image={m.img}
                   variant="glass"
                   listLayout={viewMode === "list"}
@@ -947,6 +1104,13 @@ export default function MyMentorsPage() {
                       ? { phase: m.phase, value: m.progress }
                       : undefined
                   }
+=======
+                  image={m.img as string}
+                  variant="glass"
+                  listLayout={viewMode === "list"}
+                  menteeCount={m.menteeCount}
+                  profileLink={`/director/mentors/profile/${m.id}`}
+>>>>>>> ba12e32 (redoo changes)
                   optionsMenu={getMentorOptions(m)}
                 />
               ))}
@@ -1025,6 +1189,7 @@ export default function MyMentorsPage() {
           setShowScheduleModal(false);
           setSelectedMentor(null);
         }}
+<<<<<<< HEAD
         onConfirm={async (meetingData) => {
           if (!selectedMentor) return;
           const directorId = resolveDirectorUserId();
@@ -1035,11 +1200,21 @@ export default function MyMentorsPage() {
             });
             setTimeout(() => setToast(null), 4000);
             return;
+=======
+        onConfirm={async (data) => {
+          const directorId = getCookie("userId")?.trim();
+          if (!directorId) {
+            throw new Error("Your session is missing. Please sign in again.");
+          }
+          if (!selectedMentor?.id) {
+            throw new Error("No mentor selected.");
+>>>>>>> ba12e32 (redoo changes)
           }
           try {
             await apiCreateAppointment({
               userId: directorId,
               mentorId: selectedMentor.id,
+<<<<<<< HEAD
               meetingDate: parseSlotStartToIso(
                 meetingData.selectedYmd,
                 meetingData.selectedTime,
@@ -1060,8 +1235,28 @@ export default function MyMentorsPage() {
             });
             setTimeout(() => setToast(null), 5000);
           }
+=======
+              meetingDate: data.meetingDateIso,
+              platform: data.platform,
+              notes: data.notes.trim() || "Scheduled by director (Mentors)",
+            });
+          } catch (err) {
+            throw new Error(extractApiErrorMessage(err));
+          }
+          setToast({ message: "Meeting scheduled successfully", type: "success" });
+          setTimeout(() => setToast(null), 3000);
+>>>>>>> ba12e32 (redoo changes)
         }}
-        mentor={selectedMentor}
+        mentor={
+          selectedMentor
+            ? {
+                id: selectedMentor.id,
+                name: selectedMentor.name,
+                img: selectedMentor.img,
+                menteeCount: selectedMentor.menteeCount,
+              }
+            : null
+        }
       />
 
       <AssignMenteesModal
