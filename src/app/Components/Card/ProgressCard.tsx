@@ -16,8 +16,6 @@ interface ProgressCardProps {
   variant?: "light" | "directorGlass";
   showCompleteButton?: boolean; // Show "Mark as Complete" button when progress is 100%
   slug?: string; // Slug for navigation
-  /** Dark glass (director shell); default is light for legacy light backgrounds. */
-  variant?: "light" | "directorGlass";
   onCompleteClick?: (e: React.MouseEvent) => void;
   onEmailClick?: (e: React.MouseEvent) => void;
   onMessageClick?: (e: React.MouseEvent) => void;
@@ -30,11 +28,7 @@ export default function ProgressCard({
   name,
   description = "Sub text area write something here. That you can read more about him",
   progress,
-<<<<<<< HEAD
-  variant = "default",
-=======
   variant = "light",
->>>>>>> 1a4b107 (changes)
   showCompleteButton = false,
   slug,
   onCompleteClick,
@@ -42,7 +36,6 @@ export default function ProgressCard({
   onMessageClick,
   onWhatsAppClick,
   onPhoneClick,
-  variant = "light",
 }: ProgressCardProps) {
   const router = useRouter();
   const isComplete = progress === 100;
@@ -158,7 +151,6 @@ export default function ProgressCard({
                 onClick={onEmailClick}
                 className="transition hover:opacity-80"
                 aria-label="Send email"
-                type="button"
               >
                 <i className="fa-regular fa-envelope text-base sm:text-lg" />
               </button>
@@ -167,7 +159,6 @@ export default function ProgressCard({
                 onClick={onMessageClick}
                 className="transition hover:opacity-80"
                 aria-label="Send message"
-                type="button"
               >
                 <i className="fa-regular fa-comment-dots text-base sm:text-lg" />
               </button>
@@ -176,7 +167,6 @@ export default function ProgressCard({
                 onClick={onWhatsAppClick}
                 className="transition hover:opacity-80"
                 aria-label="WhatsApp"
-                type="button"
               >
                 <i className="fa-brands fa-whatsapp text-base sm:text-lg" />
               </button>
@@ -185,7 +175,6 @@ export default function ProgressCard({
                 onClick={onPhoneClick}
                 className="transition hover:opacity-80"
                 aria-label="Call"
-                type="button"
               >
                 <i className="fa-solid fa-phone text-base sm:text-lg" />
               </button>
@@ -194,10 +183,6 @@ export default function ProgressCard({
             {isComplete && showCompleteButton && (
               <button
                 type="button"
-<<<<<<< HEAD
-                type="button"
-=======
->>>>>>> 1a4b107 (changes)
                 onClick={onCompleteClick}
                 className={
                   isGlass

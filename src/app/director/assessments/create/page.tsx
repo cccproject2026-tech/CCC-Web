@@ -280,6 +280,7 @@ export default function CreateAssessmentPage() {
 
       showToast("Assessment created successfully");
       setTimeout(() => {
+        if (!newId) router.refresh();
         router.push(newId ? `/director/assessments/${newId}` : "/director/assessments");
       }, 800);
     } catch (err: unknown) {

@@ -305,6 +305,7 @@ function CreateRoadmapStepOnePage() {
           },
           bannerFile ?? undefined
         );
+        router.refresh();
         router.push("/director/revitalization-roadmap");
         return;
       }

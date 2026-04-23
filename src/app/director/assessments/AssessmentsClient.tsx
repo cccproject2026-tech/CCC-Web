@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import DirectorHero from "../DirectorHero";
 import {
@@ -57,6 +57,7 @@ const mapUserToAssignUser = (user: any): AssignUserRow => ({
 
 function AssessmentsPageContent() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const assignUserFromQuery = searchParams.get("assignUser");
   const [searchQuery, setSearchQuery] = useState("");
@@ -74,9 +75,17 @@ function AssessmentsPageContent() {
   const [userSearch, setUserSearch] = useState("");
   const [loadingAssessments, setLoadingAssessments] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
+  const [listRefetchKey, setListRefetchKey] = useState(0);
   const lastAssignBootstrap = useRef<string | null>(null);
 
   useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (pathname !== "/director/assessments") return;
+
     const fetchAssessments = async () => {
       try {
         setLoadingAssessments(true);
@@ -84,6 +93,7 @@ function AssessmentsPageContent() {
 
         const res = await apiGetAssessments({
           search: debouncedSearch || undefined,
+          _t: Date.now(),
         });
 
         const body = res?.data;
@@ -144,7 +154,16 @@ function AssessmentsPageContent() {
     };
 
     fetchAssessments();
-  }, [searchQuery, assignUserFromQuery]);
+  }, [pathname, debouncedSearch, assignUserFromQuery, listRefetchKey]);
+
+  useEffect(() => {
+    if (pathname !== "/director/assessments") return;
+    const onVis = () => {
+      if (document.visibilityState === "visible") setListRefetchKey((k) => k + 1);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [pathname]);
 
   useEffect(() => {
     if (!assignUserFromQuery) return;

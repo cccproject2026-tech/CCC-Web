@@ -430,6 +430,7 @@ export default function ViewEditAssessmentPage() {
       await apiUpdateSections(assessment.id, buildSectionsPayload(sections));
 
       showToast("Survey Edited Successfully");
+      router.refresh();
       router.push("/director/assessments");
     } catch (e) {
       console.error(e);

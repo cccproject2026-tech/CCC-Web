@@ -216,11 +216,12 @@ export const apiCreateAssessment = (payload: CreateAssessmentPayload) =>
 /** List calls can be slow on large datasets; avoid default 10s axios timeout. */
 const GET_ASSESSMENTS_TIMEOUT_MS = 60_000;
 
-// GET /assessment?search=
-export const apiGetAssessments = (params?: { search?: string }) =>
+// GET /assessment?search=  (optional _t to avoid stale list caches after editor save)
+export const apiGetAssessments = (params?: { search?: string; _t?: number }) =>
   axiosInstance.get<{ success: boolean; data: AssessmentResponse[] }>("/assessment", {
-    params,
+    params: params ? { ...params, _t: params._t ?? Date.now() } : { _t: Date.now() },
     timeout: GET_ASSESSMENTS_TIMEOUT_MS,
+    headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
   });
 
 // GET /assessment/:id

@@ -13,14 +13,14 @@ import Card6 from "@/app/Assets/card6.png";
 import Card7 from "@/app/Assets/card7.png";
 import Card8 from "@/app/Assets/card8.png";
 
-export default function CommunityRevitalizationAndMultiplicationPage() {
+export default function ChurchEmpowermentPhasePage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTab, setFilterTab] = useState<
     "Church" | "Pastor" | "Due" | "Not Started" | "Completed"
   >("Church");
 
-  // Roadmap items data for Community Revitalization and Multiplication Phase
+  // Roadmap items data for Church Empowerment Phase
   interface RoadmapItem {
     id: number;
     title: string;
@@ -31,71 +31,209 @@ export default function CommunityRevitalizationAndMultiplicationPage() {
     showDateSelector: boolean;
     dateLabel?: string;
     category: "Church" | "Pastor";
+    month3Date?: boolean;
+    month4Date?: boolean;
   }
 
   const roadmapItems: RoadmapItem[] = [
+    // Church Category Items
     {
       id: 1,
-      title: "Inactive Member List",
-      description: "Develop an inactive member list and a relational map",
+      title: "Community Engagement Project",
+      description:
+        "Complete a community engagement project with the member/disciple and share the stories of God's work",
       status: "Not Started",
-      completionTime: "Months 10-12",
+      completionTime: "Months 3-4",
       img: Card1,
       showDateSelector: true,
-      dateLabel: "Meeting Date 1",
+      dateLabel: "Date of the Project",
       category: "Church",
     },
     {
       id: 2,
-      title: "Doorway Events",
+      title: "Facility Review",
       description:
-        "Schedule at least three intentional \"doorway\" events on your church calendar and invite inactive members to attend",
+        "Complete a review of your facility and make the necessary minor adjustments to make it more visitor friendly",
       status: "Not Started",
-      completionTime: "Months 10-12",
+      completionTime: "Months 3-4",
       img: Card2,
       showDateSelector: false,
       category: "Church",
     },
     {
       id: 3,
-      title: "CMA Assessment",
+      title: "Welcome Team",
       description:
-        "Review the first CMA Assessment survey and retake the survey for revitalization results",
+        "Develop a welcome team strategy and begin implementing that strategy, include a secret guest",
       status: "Not Started",
-      completionTime: "Months 10-12",
+      completionTime: "Months 3-4",
       img: Card3,
       showDateSelector: true,
-      dateLabel: "Completion Date",
+      dateLabel: "Secret Guest Date",
       category: "Church",
     },
     {
       id: 4,
-      title: "Attendance",
-      description: "Develop an intentional strategy for noticing lack of attendance",
+      title: "Guest Contact Information",
+      description:
+        "Begin collecting guest contact information and measure guest follow-up",
       status: "Not Started",
-      completionTime: "Months 10-12",
+      completionTime: "Months 3-4",
       img: Card4,
       showDateSelector: false,
       category: "Church",
     },
     {
       id: 5,
-      title: "Final Revitalization Review",
-      description: "Celebrate wins and identify next steps for growth",
+      title: "Community Assessment",
+      description:
+        "Refine your understanding of the needs in your community by using a community assessment tool",
       status: "Not Started",
-      completionTime: "Months 10-12",
+      completionTime: "Months 5-6",
       img: Card5,
-      showDateSelector: true,
-      dateLabel: "Praise and Thanksgiving Date",
+      showDateSelector: false,
       category: "Church",
     },
     {
       id: 6,
-      title: "Community Growth Strategy",
-      description: "Develop strategies for community multiplication and growth",
+      title: "Community Engagement Events",
+      description:
+        "Plan two community engagement events with at least 1 follow-up bridge event that addresses felt needs in the community",
       status: "Not Started",
-      completionTime: "Months 10-12",
+      completionTime: "Months 5-6",
       img: Card6,
+      showDateSelector: false,
+      category: "Church",
+    },
+    {
+      id: 7,
+      title: "Empower Ministry Leaders",
+      description:
+        "Begin empowering ministry leaders into calendar activities in the worship service and offering a regular new member opportunities to come to the church service. Include a lay Bible worker role",
+      status: "Not Started",
+      completionTime: "Months 7-9",
+      img: Card7,
+      showDateSelector: false,
+      category: "Church",
+    },
+    // Pastor Category Items
+    {
+      id: 8,
+      title: "God's Vision Team",
+      description: "Finalize the teams vision for the church",
+      status: "Not Started",
+      completionTime: "Months 3-4",
+      img: Card1,
+      showDateSelector: false,
+      category: "Pastor",
+    },
+    {
+      id: 9,
+      title: "Calendar",
+      description:
+        "Finalize a vision team meeting schedule through the end of the year",
+      status: "Not Started",
+      completionTime: "Months 3-4",
+      img: Card2,
+      showDateSelector: false,
+      category: "Pastor",
+    },
+    {
+      id: 10,
+      title: "Prayer",
+      description:
+        "Prioritize church prayer times and meet consistently for prayer with your congregation",
+      status: "Not Started",
+      completionTime: "Months 3-4",
+      img: Card3,
+      showDateSelector: false,
+      category: "Pastor",
+    },
+    {
+      id: 11,
+      title: "Mentoring Conversations",
+      description: "Schedule two mentoring conversations with your mentor",
+      status: "Not Started",
+      completionTime: "Months 3-4",
+      img: Card4,
+      showDateSelector: true,
+      dateLabel: "Month 3 meeting date",
+      month3Date: true,
+      month4Date: true,
+      category: "Pastor",
+    },
+    {
+      id: 12,
+      title: "Welcome Team",
+      description:
+        'Lead the church board and/or nominating committee to implement a "welcome team" strategy',
+      status: "Not Started",
+      completionTime: "Months 3-4",
+      img: Card5,
+      showDateSelector: false,
+      category: "Pastor",
+    },
+    {
+      id: 13,
+      title: "Secret Guest",
+      description:
+        'Process the "secret quest" visit with your church and incorporate findings into your welcome team strategy',
+      status: "Not Started",
+      completionTime: "Months 3-4",
+      img: Card6,
+      showDateSelector: false,
+      category: "Pastor",
+    },
+    {
+      id: 14,
+      title: "God-Moments",
+      description:
+        "Celebrate wins with your church by sharing special moments and miracles that are happening in your congregation",
+      status: "Not Started",
+      completionTime: "Months 3-4",
+      img: Card7,
+      showDateSelector: false,
+      category: "Pastor",
+    },
+    {
+      id: 15,
+      title: "Share your Vision",
+      description: "Make an effort to continually share your vision with the church",
+      status: "Not Started",
+      completionTime: "Months 5-6",
+      img: Card8,
+      showDateSelector: false,
+      category: "Pastor",
+    },
+    {
+      id: 16,
+      title: "Calendar of Events",
+      description:
+        "Develop a calendar with your church of events for the year that includes at least two community engagement events and their follow-up events",
+      status: "Not Started",
+      completionTime: "Months 5-6",
+      img: Card1,
+      showDateSelector: false,
+      category: "Pastor",
+    },
+    {
+      id: 17,
+      title: "Preaching Calendar",
+      description:
+        "Coordinate a preaching calendar for the year that focuses a growing relationship with Christ and with each ministry leader",
+      status: "Not Started",
+      completionTime: "Months 7-9",
+      img: Card2,
+      showDateSelector: false,
+      category: "Pastor",
+    },
+    {
+      id: 18,
+      title: "Proclamation Event Team",
+      description: "Recruit a proclamation event team",
+      status: "Not Started",
+      completionTime: "Months 7-9",
+      img: Card3,
       showDateSelector: false,
       category: "Pastor",
     },
@@ -104,7 +242,7 @@ export default function CommunityRevitalizationAndMultiplicationPage() {
   // Filter roadmap items based on filter tab and search query
   const filteredItems = roadmapItems.filter((item) => {
     let matchesFilter = false;
-
+    
     if (filterTab === "Church" || filterTab === "Pastor") {
       matchesFilter = item.category === filterTab;
     } else if (filterTab === "Due") {
@@ -114,7 +252,7 @@ export default function CommunityRevitalizationAndMultiplicationPage() {
     } else if (filterTab === "Completed") {
       matchesFilter = item.status === "Completed";
     }
-
+    
     const matchesSearch =
       item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description.toLowerCase().includes(searchQuery.toLowerCase());
@@ -132,14 +270,14 @@ export default function CommunityRevitalizationAndMultiplicationPage() {
   const handleCardClick = (itemId: number, title: string) => {
     const slug = titleToSlug(title);
     router.push(
-      `/director/revitalization-roadmap/home/community-revitalization-and-multiplication/${slug}`
+      `/director/revitalization-roadmap/church-empowerment/${slug}`
     );
   };
 
   const handleViewClick = (itemId: number, title: string) => {
     const slug = titleToSlug(title);
     router.push(
-      `/director/revitalization-roadmap/home/community-revitalization-and-multiplication/${slug}`
+      `/director/revitalization-roadmap/church-empowerment/${slug}`
     );
   };
 
@@ -148,18 +286,18 @@ export default function CommunityRevitalizationAndMultiplicationPage() {
       {/* Hero Section with Breadcrumbs */}
       <JumpStartHero
         backgroundImageUrl={SelfRevitalizationHeroBg.src}
-        title="Community Revitalization and Multiplication Phase"
+        title="Church Empowerment Phase"
         breadcrumbItems={[
           {
             label: "Pastor's Roadmaps",
             href: "/director/revitalization-roadmap",
           },
-          { label: "John Ross", href: "/director/revitalization-roadmap/home" },
+          { label: "John Ross", href: "/director/revitalization-roadmap" },
           {
             label: "Revitalization Roadmap",
-            href: "/director/revitalization-roadmap/home",
+            href: "/director/revitalization-roadmap",
           },
-          { label: "Community Revitalization and Multiplication Phase" },
+          { label: "Church Empowerment Phase" },
         ]}
         heightClasses="h-[240px]"
       />
@@ -254,7 +392,6 @@ export default function CommunityRevitalizationAndMultiplicationPage() {
                 status={item.status}
                 completionTime={item.completionTime}
                 showDateSelector={item.showDateSelector}
-                dateLabel={item.dateLabel}
                 onViewClick={() => handleViewClick(item.id, item.title)}
                 onCardClick={() => handleCardClick(item.id, item.title)}
               />
