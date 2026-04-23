@@ -33,6 +33,7 @@ import {
   appointmentEntityId,
   extractApiErrorMessage,
   parseSlotStartToIso,
+  slotDateToYmd,
   slotToHHmm,
   uiMeetingModeToPlatform,
   unwrapAppointmentsAxiosData,
@@ -78,6 +79,17 @@ const period = (p: unknown, fallback: "AM" | "PM"): "AM" | "PM" => {
   if (s === "PM" || s.startsWith("P")) return "PM";
   if (s === "AM" || s.startsWith("A")) return "AM";
   return fallback;
+};
+
+/** Convert a time string ("09:00") + period ("AM"/"PM") to total minutes since midnight */
+const slotToMins = (time: string, p: string): number => {
+  const [hStr, mStr] = (time || "00:00").split(":");
+  let h = parseInt(hStr, 10) || 0;
+  const m = parseInt(mStr, 10) || 0;
+  const isPM = p.toUpperCase() === "PM";
+  if (isPM && h !== 12) h += 12;
+  if (!isPM && h === 12) h = 0;
+  return h * 60 + m;
 };
 
 // ─── Check if a date is in the past ───────────────────────────────────────────
@@ -141,6 +153,7 @@ function DirectorScheduleContent() {
   const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
   const [isAddSlotModalOpen, setIsAddSlotModalOpen] = useState(false);
   const [newSlot, setNewSlot] = useState<any>(null);
+  const [slotError, setSlotError] = useState<string | null>(null);
 
   // schedule drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -283,20 +296,28 @@ function DirectorScheduleContent() {
   useEffect(() => {
     if (!meetingDate) return;
 
-    // Static time slots for pastors (9 AM to 5 PM, hourly)
-    const staticPastorSlots = Array.from({ length: 8 }, (_, i) => {
-      const hour = 9 + i;
-      const startTime = hour > 12 ? hour - 12 : hour === 12 ? 12 : hour;
-      const period = hour >= 12 ? "PM" : "AM";
-      const endHour = hour + 1;
-      const endTime = endHour > 12 ? endHour - 12 : endHour === 12 ? 12 : endHour;
-      const endPeriod = endHour >= 12 ? "PM" : "AM";
-      return `${String(startTime).padStart(2, "0")}:00 ${period} - ${String(endTime).padStart(2, "0")}:00 ${endPeriod}`;
-    });
-
     if (scheduleRecipientType === "pastor") {
-      // For pastors, use static slots
-      setAvailableSlots(staticPastorSlots);
+      // For pastors: derive available slots from the director's own monthly availability
+      const normalize = (t: string) => t.replace(/\s+/g, "").toLowerCase();
+      const bookedSlots = appointments
+        .filter((a) => a.meetingDate.startsWith(meetingDate))
+        .map((a) => {
+          const d = new Date(a.meetingDate);
+          return normalize(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+        });
+      const daySlots = scheduleMonthlyAvailabilitySlots.filter((s: any) => {
+        const ymd = slotDateToYmd(s?.date ?? s?.day ?? s?.calendarDate ?? s?.meetingDate ?? s?.dateString);
+        return ymd === meetingDate;
+      });
+      const formatted = daySlots
+        .flatMap((s: any) =>
+          (s.slots || []).map(
+            (slot: any) =>
+              `${slot.startTime ?? "00:00"} ${(slot.startPeriod ?? "AM").toUpperCase()} - ${slot.endTime ?? "00:00"} ${(slot.endPeriod ?? "PM").toUpperCase()}`,
+          ),
+        )
+        .filter((slot: string) => !bookedSlots.includes(normalize(slot.split(" - ")[0])));
+      setAvailableSlots(formatted);
     } else if (scheduleRecipientType === "mentor" && (selectedRecipient?._id || selectedRecipient?.id)) {
       // For mentors, fetch their availability
       const mentorId = selectedRecipient._id || selectedRecipient.id;
@@ -341,7 +362,7 @@ function DirectorScheduleContent() {
     } else {
       setAvailableSlots([]);
     }
-  }, [meetingDate, scheduleRecipientType, selectedRecipient, appointments]);
+  }, [meetingDate, scheduleRecipientType, selectedRecipient, appointments, scheduleMonthlyAvailabilitySlots]);
 
   // ── Schedule drawer calendar navigation handlers ──────────────────────────────
   const handleSchedulePrevMonth = () => {
@@ -362,23 +383,35 @@ function DirectorScheduleContent() {
     }
   };
 
-  // ── Fetch mentor availability for schedule calendar ──────────────────────────
+  // ── Fetch availability for schedule calendar (mentor: mentor's slots; pastor: director's own slots) ──
   useEffect(() => {
-    if (drawerStep !== 2 || scheduleRecipientType !== "mentor" || !selectedRecipient) {
+    if (drawerStep !== 2) {
       setScheduleMonthlyAvailabilitySlots([]);
       setScheduleAvailabilityLoading(false);
       return;
     }
 
-    const mentorId = String(selectedRecipient._id || selectedRecipient.id || "").trim();
-    if (!mentorId) return;
+    let targetId: string;
+    if (scheduleRecipientType === "mentor") {
+      if (!selectedRecipient) {
+        setScheduleMonthlyAvailabilitySlots([]);
+        setScheduleAvailabilityLoading(false);
+        return;
+      }
+      targetId = String(selectedRecipient._id || selectedRecipient.id || "").trim();
+    } else {
+      // pastor: show director's own available dates/slots
+      if (!directorId) return;
+      targetId = directorId;
+    }
+
+    if (!targetId) return;
 
     let cancelled = false;
     (async () => {
       try {
         setScheduleAvailabilityLoading(true);
-        // Use year/month parameters format
-        const res = await axiosInstance.get(`/appointments/availability/${mentorId}/month`, {
+        const res = await axiosInstance.get(`/appointments/availability/${targetId}/month`, {
           params: {
             year: scheduleYear,
             month: scheduleMonth + 1,
@@ -389,7 +422,6 @@ function DirectorScheduleContent() {
 
         if (!cancelled) {
           setScheduleMonthlyAvailabilitySlots(slots);
-          // Convert schedule calendar date to YYYY-MM-DD format and update meetingDate
           const selectedDateStr = `${scheduleYear}-${String(scheduleMonth + 1).padStart(2, "0")}-${String(scheduleSelectedDate).padStart(2, "0")}`;
           setMeetingDate(selectedDateStr);
         }
@@ -406,7 +438,7 @@ function DirectorScheduleContent() {
     return () => {
       cancelled = true;
     };
-  }, [drawerStep, scheduleRecipientType, selectedRecipient, scheduleYear, scheduleMonth, scheduleSelectedDate]);
+  }, [drawerStep, scheduleRecipientType, selectedRecipient, directorId, scheduleYear, scheduleMonth, scheduleSelectedDate]);
 
   // ── Fetch selected mentor's availability for today ────────────────────────────
   useEffect(() => {
@@ -551,11 +583,12 @@ function DirectorScheduleContent() {
     selectedAvailabilityDay === null ? null : availability.find((d) => d.day === selectedAvailabilityDay) || null;
 
   // ── Save availability ─────────────────────────────────────────────────────────
-  const handleSaveAvailability = async () => {
+  const handleSaveAvailability = async (overrideAvail?: any[]) => {
     if (!directorId) return;
-    const enabled = availability.filter((d) => d.enabled && d.slots?.length > 0);
+    const avail = overrideAvail ?? availability;
+    const enabled = avail.filter((d) => d.enabled && d.slots?.length > 0);
     if (enabled.length === 0) {
-      showToast("Please add at least one availability slot");
+      if (!overrideAvail) showToast("Please add at least one availability slot");
       return;
     }
     const dated = enabled.map((d) => ({ date: resolveAvailabilityRowDate(d), uiSlots: d.slots || [] }));
@@ -1163,17 +1196,7 @@ function DirectorScheduleContent() {
                   </div>
                 ) : (
                   <div className={`${directorGlassCard} p-4 sm:p-5`}>
-                    <div className="mb-4 flex flex-wrap items-center gap-3 border-b border-white/15 pb-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedDayData.enabled || false}
-                        onChange={() =>
-                          setAvailability((prev) =>
-                            prev.map((d) => d.day === selectedAvailabilityDay ? { ...d, enabled: !d.enabled } : d),
-                          )
-                        }
-                        className="accent-[#8ec5eb]"
-                      />
+                    <div className="mb-4 border-b border-white/15 pb-4">
                       <p className="text-sm font-medium text-[#d9ebf8]">
                         {DAY_LABELS[selectedDayData.day as number]} —{" "}
                         {new Date(`${resolveAvailabilityRowDate(selectedDayData)}T12:00:00`).toLocaleDateString()}
@@ -1182,7 +1205,25 @@ function DirectorScheduleContent() {
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {(selectedDayData.slots || []).map((slot: any, i: number) => (
                         <div key={i} className="rounded-lg border border-white/15 bg-white/[0.03] p-2">
-                          <div className="mb-1 text-[11px] text-[#cde2f2]">Slot {i + 1}</div>
+                          <div className="mb-1 flex items-center justify-between">
+                            <span className="text-[11px] text-[#cde2f2]">Slot {i + 1}</span>
+                            <button
+                              type="button"
+                              aria-label={`Delete slot ${i + 1}`}
+                              onClick={() => {
+                                const newAvail = availability.map((d) =>
+                                  d.day === selectedAvailabilityDay
+                                    ? { ...d, slots: d.slots.filter((_: any, idx: number) => idx !== i), enabled: d.slots.length > 1 ? d.enabled : false }
+                                    : d,
+                                );
+                                setAvailability(newAvail);
+                                void handleSaveAvailability(newAvail);
+                              }}
+                              className="rounded p-0.5 text-red-400 transition hover:bg-red-400/15 hover:text-red-300"
+                            >
+                              <i className="fa-solid fa-trash-can text-[11px]" />
+                            </button>
+                          </div>
                           <div className="flex items-center gap-1.5">
                             <select
                               className="rounded border border-white/15 bg-white/10 px-1.5 py-1 text-[11px] text-white outline-none [&>option]:bg-[#062946]"
@@ -1231,6 +1272,7 @@ function DirectorScheduleContent() {
                         className={`${directorBtnSecondary} px-3 py-1.5 text-xs`}
                         onClick={() => {
                           setNewSlot({ startTime: "09:00", startPeriod: "AM", endTime: "10:00", endPeriod: "AM" });
+                          setSlotError(null);
                           setIsAddSlotModalOpen(true);
                         }}
                       >
@@ -1240,7 +1282,7 @@ function DirectorScheduleContent() {
                   </div>
                 )}
                 <div className="mt-6">
-                  <button type="button" onClick={handleSaveAvailability} className={directorBtnPrimary}>
+                  <button type="button" onClick={() => handleSaveAvailability()} className={directorBtnPrimary}>
                     Save availability
                   </button>
                 </div>
@@ -1253,11 +1295,14 @@ function DirectorScheduleContent() {
             <>
               <div
                 className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
-                onClick={() => { setIsAddSlotModalOpen(false); setNewSlot(null); }}
+                onClick={() => { setIsAddSlotModalOpen(false); setNewSlot(null); setSlotError(null); }}
                 aria-hidden
               />
               <div className="fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/20 bg-[#041f35] p-5 text-white shadow-2xl">
                 <h3 className="mb-4 text-base font-semibold">Add new slot</h3>
+                {slotError && (
+                  <p className="mb-3 rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{slotError}</p>
+                )}
                 <div className="mb-5 flex items-center gap-2">
                   <select
                     className={directorSelectDark}
@@ -1276,13 +1321,29 @@ function DirectorScheduleContent() {
                   </select>
                 </div>
                 <div className="flex justify-end gap-3">
-                  <button type="button" className={directorBtnSecondary} onClick={() => { setIsAddSlotModalOpen(false); setNewSlot(null); }}>
+                  <button type="button" className={directorBtnSecondary} onClick={() => { setIsAddSlotModalOpen(false); setNewSlot(null); setSlotError(null); }}>
                     Cancel
                   </button>
                   <button
                     type="button"
                     className={directorBtnPrimary}
                     onClick={() => {
+                      const newStart = slotToMins(newSlot.startTime, newSlot.startPeriod);
+                      const newEnd   = slotToMins(newSlot.endTime,   newSlot.endPeriod);
+                      if (newEnd <= newStart) {
+                        setSlotError("End time must be after start time.");
+                        return;
+                      }
+                      const daySlots = (availability.find((d) => d.day === selectedAvailabilityDay)?.slots || []) as any[];
+                      const overlaps = daySlots.some((s: any) => {
+                        const sStart = slotToMins(s.startTime, s.startPeriod);
+                        const sEnd   = slotToMins(s.endTime,   s.endPeriod);
+                        return newStart < sEnd && newEnd > sStart;
+                      });
+                      if (overlaps) {
+                        setSlotError("This time range overlaps with an existing slot.");
+                        return;
+                      }
                       setAvailability((prev) =>
                         prev.map((d) =>
                           d.day === selectedAvailabilityDay
@@ -1291,6 +1352,7 @@ function DirectorScheduleContent() {
                         ),
                       );
                       setIsAddSlotModalOpen(false);
+                      setSlotError(null);
                       setNewSlot(null);
                     }}
                   >
@@ -1521,13 +1583,22 @@ function DirectorScheduleContent() {
                       </>
                     ) : (
                       <>
-                        <p className="mb-2 text-sm text-[#cde2f2]">Select date</p>
-                        <input
-                          type="date"
-                          value={meetingDate}
-                          min={new Date().toISOString().split("T")[0]}
-                          onChange={(e) => { setMeetingDate(e.target.value); setSelectedSlot(""); }}
-                          className={directorDateInput}
+                        <p className="mb-3 text-sm text-[#cde2f2]">Your Availability</p>
+                        <AvailabilityCalendar
+                          mentorId={directorId ?? ""}
+                          currentMonth={scheduleMonth}
+                          currentYear={scheduleYear}
+                          selectedDate={scheduleSelectedDate}
+                          onDateSelect={(day) => {
+                            setScheduleSelectedDate(day);
+                            const dateStr = `${scheduleYear}-${String(scheduleMonth + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                            setMeetingDate(dateStr);
+                            setSelectedSlot("");
+                          }}
+                          onPrevMonth={handleSchedulePrevMonth}
+                          onNextMonth={handleScheduleNextMonth}
+                          availabilitySlots={scheduleMonthlyAvailabilitySlots}
+                          isLoading={scheduleAvailabilityLoading}
                         />
                       </>
                     )}
