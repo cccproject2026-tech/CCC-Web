@@ -1,12 +1,27 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   /* options here */
   output: "standalone",
 
+  /** Pin workspace root to this project so Next.js doesn't pick up the
+   *  lockfile at C:\Users\anant\package-lock.json as the monorepo root. */
+  outputFileTracingRoot: path.join(__dirname),
+
   /** App Router paths are case-sensitive in production; normalize legacy lowercase links from breadcrumbs/old bookmarks */
   async redirects() {
     return [
+      {
+        source: "/director/revitalization-roadmap/home",
+        destination: "/director/revitalization-roadmap",
+        permanent: true,
+      },
+      {
+        source: "/director/revitalization-roadmap/home/:path*",
+        destination: "/director/revitalization-roadmap/:path*",
+        permanent: true,
+      },
       /** Do not add /pastor/assessments → /pastor/Assessments redirects here: on case-insensitive
        *  hosts the matcher can match both casings and cause ERR_TOO_MANY_REDIRECTS. In-app links use `/pastor/Assessments/...`. */
       {

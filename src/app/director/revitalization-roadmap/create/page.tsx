@@ -34,16 +34,67 @@ type RoadmapDoc = {
 };
 
 function unwrapRoadmap(res: unknown): RoadmapDoc | null {
-  if (!res || typeof res !== "object") return null;
-  const r = res as Record<string, unknown>;
-  const data = r.data;
-  if (data && typeof data === "object" && !Array.isArray(data)) {
-    const inner = data as Record<string, unknown>;
-    if (inner.data && typeof inner.data === "object") return inner.data as RoadmapDoc;
-    return data as RoadmapDoc;
+  if (res == null) return null;
+  if (typeof res === "string") {
+    try {
+      return unwrapRoadmap(JSON.parse(res));
+    } catch {
+      return null;
+    }
   }
-  if ("_id" in r || "name" in r) return r as RoadmapDoc;
-  return null;
+  if (typeof res !== "object" || Array.isArray(res)) return null;
+  const r = res as Record<string, unknown>;
+
+  const isDoc = (o: unknown): o is RoadmapDoc =>
+    Boolean(
+      o &&
+        typeof o === "object" &&
+        !Array.isArray(o) &&
+        ("_id" in (o as object) ||
+          "name" in (o as object) ||
+          "title" in (o as object) ||
+          "roadmaps" in (o as object) ||
+          "type" in (o as object) ||
+          "roadMapDetails" in (o as object) ||
+          "duration" in (o as object)),
+    );
+
+  const fromInner = (o: unknown): RoadmapDoc | null => {
+    if (!o || typeof o !== "object" || Array.isArray(o)) return null;
+    const x = o as Record<string, unknown>;
+    if (typeof x.roadmap === "object" && x.roadmap && !Array.isArray(x.roadmap)) {
+      return fromInner(x.roadmap) ?? (isDoc(x.roadmap) ? (x.roadmap as RoadmapDoc) : null);
+    }
+    if (typeof x.roadMap === "object" && x.roadMap && !Array.isArray(x.roadMap)) {
+      return fromInner(x.roadMap) ?? (isDoc(x.roadMap) ? (x.roadMap as RoadmapDoc) : null);
+    }
+    if (x.result && typeof x.result === "object" && !Array.isArray(x.result)) {
+      return fromInner(x.result);
+    }
+    if (isDoc(o)) return o as RoadmapDoc;
+    if (x.data && typeof x.data === "object" && !Array.isArray(x.data)) {
+      return fromInner(x.data);
+    }
+    return null;
+  };
+
+  if (r.data != null) {
+    const data = r.data;
+    if (typeof data === "object" && !Array.isArray(data)) {
+      const inner = data as Record<string, unknown>;
+      if (inner.data != null && typeof inner.data === "object" && !Array.isArray(inner.data)) {
+        const d = fromInner(inner.data);
+        if (d) return d;
+      }
+      const d2 = fromInner(data);
+      if (d2) return d2;
+    }
+  }
+  if (r.result && typeof r.result === "object") {
+    const d3 = fromInner(r.result);
+    if (d3) return d3;
+  }
+  return fromInner(r);
 }
 
 function mapApiTypeToSelect(apiType: string | undefined): string {
@@ -81,6 +132,11 @@ function deriveEditFormValues(
   bannerUrl: string | null;
 } {
   const nested0 = Array.isArray(doc.roadmaps) && doc.roadmaps.length > 0 ? doc.roadmaps[0] : null;
+  const root = doc as Record<string, unknown>;
+  const nest = nested0 as Record<string, unknown> | null;
+
+  const firstNonEmpty = (...parts: (string | undefined)[]) =>
+    parts.map((p) => (p ?? "").trim()).find(Boolean) ?? "";
 
   const apiType = mapApiTypeToSelect(doc.type);
   const typeFromUrl = url.type?.trim().toLowerCase();
@@ -91,26 +147,32 @@ function deriveEditFormValues(
         ? "Single"
         : apiType;
 
-  const name =
-    (doc.name ?? "").trim() ||
-    (nested0?.name && String(nested0.name).trim()) ||
-    (url.name ? safeDecodeURIComponent(url.name) : "").trim();
+  const name = firstNonEmpty(
+    (doc.name ?? "").trim() || undefined,
+    typeof root.title === "string" ? root.title : undefined,
+    typeof root.roadMapName === "string" ? root.roadMapName : undefined,
+    typeof root.label === "string" ? root.label : undefined,
+    nested0?.name ? String(nested0.name).trim() : undefined,
+    nest && typeof nest.title === "string" ? nest.title : undefined,
+    url.name ? safeDecodeURIComponent(url.name) : undefined,
+  );
 
-  const subheading =
-    [
-      doc.description,
-      doc.roadMapDetails,
-      nested0?.roadMapDetails,
-      nested0?.description,
-    ]
-      .map((x) => (typeof x === "string" ? x.trim() : ""))
-      .find(Boolean) ||
-    (url.subheading ? safeDecodeURIComponent(url.subheading) : "").trim();
+  const subheading = firstNonEmpty(
+    ...[doc.description, doc.roadMapDetails, root.subheading, root.roadMapDetails, root.details].map(
+      (x) => (typeof x === "string" ? x.trim() : undefined),
+    ),
+    nested0?.roadMapDetails ? String(nested0.roadMapDetails).trim() : undefined,
+    nested0?.description ? String(nested0.description).trim() : undefined,
+    nest && typeof nest.roadMapDetails === "string" ? nest.roadMapDetails : undefined,
+    url.subheading ? safeDecodeURIComponent(url.subheading) : undefined,
+  );
 
-  const duration =
-    (doc.duration && String(doc.duration).trim()) ||
-    (nested0?.duration && String(nested0.duration).trim()) ||
-    (url.completionTime ? safeDecodeURIComponent(url.completionTime) : "").trim();
+  const duration = firstNonEmpty(
+    doc.duration ? String(doc.duration).trim() : undefined,
+    nested0?.duration ? String(nested0.duration).trim() : undefined,
+    nest && typeof nest.duration === "string" ? nest.duration : undefined,
+    url.completionTime ? safeDecodeURIComponent(url.completionTime) : undefined,
+  );
 
   const divisions =
     Array.isArray(doc.divisions) && doc.divisions.length ? [...doc.divisions] : [];
@@ -176,6 +238,7 @@ function CreateRoadmapStepOnePage() {
   const [fetchLoading, setFetchLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
   const bannerBlobUrlRef = useRef<string | null>(null);
+  const bannerFileInputRef = useRef<HTMLInputElement | null>(null);
   const bannerInputId = useId();
 
   useEffect(() => {
@@ -299,6 +362,7 @@ function CreateRoadmapStepOnePage() {
           },
           bannerFile ?? undefined
         );
+        router.refresh();
         router.push("/director/revitalization-roadmap");
         return;
       }
@@ -530,21 +594,39 @@ function CreateRoadmapStepOnePage() {
             ) : null}
 
             <div>
-              <span className="mb-1 block text-sm font-medium text-white/90" id={`${bannerInputId}-label`}>
-                Banner
-              </span>
-              <label
-                htmlFor={bannerInputId}
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <span className="block text-sm font-medium text-white/90" id={`${bannerInputId}-label`}>
+                  Banner
+                </span>
+                {bannerPreview ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (bannerBlobUrlRef.current) {
+                        URL.revokeObjectURL(bannerBlobUrlRef.current);
+                        bannerBlobUrlRef.current = null;
+                      }
+                      setBannerFile(null);
+                      setBannerPreview(null);
+                    }}
+                    className="text-sm font-semibold text-red-300/90 hover:underline"
+                  >
+                    Remove image
+                  </button>
+                ) : null}
+              </div>
+              <div
                 onDragOver={handleBannerDragOver}
                 onDragLeave={handleBannerDragLeave}
                 onDrop={handleBannerDrop}
-                className={`relative mt-1 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-10 transition ${
+                className={`relative mt-1 rounded-xl border-2 border-dashed px-4 py-6 transition ${
                   bannerDragOver
                     ? "border-[#8ec5eb] bg-[#8ec5eb]/20 ring-2 ring-[#8ec5eb]/40"
                     : "border-[#8ec5eb]/35 bg-[#8ec5eb]/5 hover:border-[#8ec5eb]/55 hover:bg-[#8ec5eb]/10"
                 }`}
               >
                 <input
+                  ref={bannerFileInputRef}
                   id={bannerInputId}
                   type="file"
                   accept="image/*"
@@ -552,33 +634,67 @@ function CreateRoadmapStepOnePage() {
                   onChange={handleBannerChange}
                   aria-labelledby={`${bannerInputId}-label`}
                 />
+                <div className="mb-3 flex flex-wrap justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => bannerFileInputRef.current?.click()}
+                    className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                  >
+                    {bannerPreview ? "Replace image" : "Upload image"}
+                  </button>
+                </div>
                 {bannerPreview ? (
-                  <div className="relative h-36 w-full overflow-hidden rounded-lg">
-                    <Image
-                      src={bannerPreview}
-                      alt=""
-                      fill
-                      className="object-cover"
-                      unoptimized={
-                        bannerPreview.startsWith("blob:") || isRemoteImageSrc(bannerPreview)
+                  <div
+                    className="relative mx-auto h-36 w-full max-w-md cursor-pointer overflow-hidden rounded-lg"
+                    onClick={() => bannerFileInputRef.current?.click()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        bannerFileInputRef.current?.click();
                       }
-                    />
-                    <span className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-md bg-black/50 px-2 py-1 text-xs text-white/90">
-                      Click or drop to replace
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Change banner image"
+                  >
+                    {bannerPreview.startsWith("blob:") || bannerPreview.startsWith("data:") ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={bannerPreview}
+                        alt=""
+                        className="h-36 w-full object-cover"
+                      />
+                    ) : (
+                      <Image
+                        src={bannerPreview}
+                        alt=""
+                        width={800}
+                        height={288}
+                        sizes="(max-width: 768px) 100vw, 640px"
+                        className="h-36 w-full object-cover"
+                        unoptimized={isRemoteImageSrc(bannerPreview)}
+                      />
+                    )}
+                    <span className="pointer-events-none absolute bottom-2 left-1/2 w-[90%] -translate-x-1/2 rounded-md bg-black/50 px-2 py-1 text-center text-xs text-white/90">
+                      Click to replace
                     </span>
                   </div>
                 ) : (
-                  <>
+                  <button
+                    type="button"
+                    onClick={() => bannerFileInputRef.current?.click()}
+                    className="flex w-full flex-col items-center py-4"
+                  >
                     <i
                       className={`fa-solid mb-2 text-2xl text-[#8ec5eb] ${bannerDragOver ? "fa-file-image" : "fa-cloud-arrow-up"}`}
                     />
                     <span className="text-center text-sm text-white/80">
-                      {bannerDragOver ? "Drop image here" : "Drag & drop or click to upload"}
+                      {bannerDragOver ? "Drop image here" : "Or click here to choose a file"}
                     </span>
                     <span className="mt-1 text-xs text-white/45">PNG, JPG — optional</span>
-                  </>
+                  </button>
                 )}
-              </label>
+              </div>
             </div>
           </div>
 

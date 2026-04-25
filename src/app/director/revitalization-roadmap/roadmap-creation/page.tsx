@@ -23,6 +23,8 @@ import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 type RoadmapDoc = {
   _id?: string;
   name?: string;
+  /** Some API responses use `title` for the display name. */
+  title?: string;
   /** Parent roadmap card copy (e.g. Self Revitalization Phase library card). */
   description?: string;
   roadMapDetails?: string;
@@ -32,16 +34,48 @@ type RoadmapDoc = {
   roadmaps?: any[];
 };
 
+/**
+ * Unwraps GET /roadmaps/:id (and similar) bodies — same rules as `create/page.tsx`, plus
+ * avoid treating `data: [...]` as a nested document.
+ */
 function unwrapRoadmap(res: unknown): RoadmapDoc | null {
   if (!res || typeof res !== "object") return null;
   const r = res as Record<string, unknown>;
-  const data = (r as any).data;
+  const data = r.data;
   if (data && typeof data === "object" && !Array.isArray(data)) {
     const inner = data as Record<string, unknown>;
-    if (inner.data && typeof inner.data === "object") return inner.data as RoadmapDoc;
+    if (
+      inner.data != null &&
+      typeof inner.data === "object" &&
+      !Array.isArray(inner.data)
+    ) {
+      return inner.data as RoadmapDoc;
+    }
     return data as RoadmapDoc;
   }
-  return r as RoadmapDoc;
+  if ("_id" in r || "name" in r || "title" in r) return r as RoadmapDoc;
+  return null;
+}
+
+/** Backend sometimes returns `roadmaps: { items: [...] }` or nested `title` instead of `name`. */
+function normalizeParentRoadmapDoc(doc: RoadmapDoc | null): RoadmapDoc | null {
+  if (!doc) return null;
+  const nameFromTitle = (o: any) => safeString(o?.name) || safeString(o?.title);
+  let roadmaps: any[] = [];
+  const raw = doc.roadmaps as any;
+  if (Array.isArray(raw)) roadmaps = raw;
+  else if (raw && typeof raw === "object" && Array.isArray(raw.items)) roadmaps = raw.items;
+
+  const withNames = roadmaps.map((n) => ({
+    ...n,
+    name: nameFromTitle(n) || n?.name,
+  }));
+
+  return {
+    ...doc,
+    name: nameFromTitle(doc) || safeString((doc as any).title) || doc.name,
+    roadmaps: withNames,
+  };
 }
 
 /** GET /roadmaps/:id/nested/:nestedId — canonical nested item when parent list is stale or partial. */
@@ -239,7 +273,7 @@ export default function DirectorRoadmapCreationPage() {
       setError(null);
       try {
         const res = await apiGetRoadmapById(roadmapId);
-        const doc = unwrapRoadmap(res.data);
+        const doc = normalizeParentRoadmapDoc(unwrapRoadmap(res.data));
         if (cancelled) return;
         setParent(doc);
       } catch (e) {
@@ -363,7 +397,7 @@ export default function DirectorRoadmapCreationPage() {
     const nested = nestedForPhase;
     const fromApi = nested
       ? {
-          name: safeString(nested.name),
+          name: safeString(nested.name || (nested as { title?: string }).title),
           subheading: safeString(
             nested.roadMapDetails || nested.description || (nested as any).road_map_details || "",
           ),
@@ -424,10 +458,15 @@ export default function DirectorRoadmapCreationPage() {
     };
 
     const nested = nestedForSingle;
-    const parentTitle = safeString(parent.name);
-    nestedPhaseNameForApiRef.current = nested ? safeString(nested.name) || parentTitle : "";
+    const parentTitle =
+      safeString(parent.name) || safeString((parent as { title?: string }).title);
+    const nestedTitle = nested
+      ? safeString(nested.name || (nested as { title?: string }).title)
+      : "";
+    nestedPhaseNameForApiRef.current = nested ? nestedTitle || parentTitle : "";
 
-    setName(parentTitle || urlSeed.name || "");
+    /** Library parent name, else nested template title, else query (some APIs omit parent.name). */
+    setName((parentTitle || nestedTitle || urlSeed.name || "").trim());
 
     const fromNested = nested
       ? {

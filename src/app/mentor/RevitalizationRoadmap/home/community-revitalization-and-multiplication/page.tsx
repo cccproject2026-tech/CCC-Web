@@ -134,14 +134,14 @@ export default function CommunityRevitalizationAndMultiplicationPage() {
   const handleCardClick = (itemId: number, title: string) => {
     const slug = titleToSlug(title);
     router.push(
-      `/director/revitalization-roadmap/home/community-revitalization-and-multiplication/${slug}`
+      `/director/revitalization-roadmap/community-revitalization-and-multiplication/${slug}`
     );
   };
 
   const handleViewClick = (itemId: number, title: string) => {
     const slug = titleToSlug(title);
     router.push(
-      `/director/revitalization-roadmap/home/community-revitalization-and-multiplication/${slug}`
+      `/director/revitalization-roadmap/community-revitalization-and-multiplication/${slug}`
     );
   };
 
@@ -156,10 +156,10 @@ export default function CommunityRevitalizationAndMultiplicationPage() {
             label: "Pastor's Roadmaps",
             href: "/director/revitalization-roadmap",
           },
-          { label: "John Ross", href: "/director/revitalization-roadmap/home" },
+          { label: "John Ross", href: "/director/revitalization-roadmap" },
           {
             label: "Revitalization Roadmap",
-            href: "/director/revitalization-roadmap/home",
+            href: "/director/revitalization-roadmap",
           },
           { label: "Community Revitalization and Multiplication Phase" },
         ]}

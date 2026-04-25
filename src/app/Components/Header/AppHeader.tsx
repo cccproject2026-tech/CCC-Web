@@ -249,7 +249,7 @@ export default function AppHeader({ showFullHeader = false }) {
                           {searchResults.roadmaps.slice(0, 4).map((item: { _id?: string; id?: string; name?: string; title?: string }) => (
                             <Link
                               key={item._id || item.id}
-                              href="/director/revitalization-roadmap/home"
+                              href="/director/revitalization-roadmap"
                               className="mb-1 block rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/15"
                               onClick={() => setShowSearch(false)}
                             >

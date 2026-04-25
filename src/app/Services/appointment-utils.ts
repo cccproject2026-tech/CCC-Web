@@ -119,6 +119,7 @@ export function uiMeetingModeToPlatform(mode: string): string {
   if (m.includes("team")) return "teams";
   if (m.includes("whatsapp") || m.includes("phone") || m.includes("duo")) return "phone";
   if (m.includes("person")) return "in-person";
+  if (m.includes("conference")) return "in-person";
   return "zoom";
 }
 

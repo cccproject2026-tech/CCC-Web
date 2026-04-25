@@ -612,8 +612,8 @@ function MentorScheduleContent() {
   /**
    * Backend shapes differ; try several payloads (date-based like GET /week, then HH:mm, then weekday template).
    */
-  const buildAvailabilityPayloadVariants = (): Record<string, unknown>[] => {
-    const enabled = availability.filter(
+  const buildAvailabilityPayloadVariantsWith = (avail: any[]): Record<string, unknown>[] => {
+    const enabled = avail.filter(
       (d) => d.enabled && Array.isArray(d.slots) && d.slots.length > 0,
     );
     if (!mentorId || enabled.length === 0) return [];
@@ -632,7 +632,6 @@ function MentorScheduleContent() {
 
     const variants: Record<string, unknown>[] = [];
 
-    // Minimal body (some APIs reject extra fields)
     variants.push({
       mentorId,
       meetingDuration: 60,
@@ -709,20 +708,23 @@ function MentorScheduleContent() {
     });
   };
 
-  const handleSaveAvailability = async () => {
+  const handleSaveAvailability = async (overrideAvail?: any[]) => {
     if (!mentorId) return;
 
-    const hasValidSlots = availability.some(
+    const avail = overrideAvail ?? availability;
+    const hasValidSlots = avail.some(
       (day) => day.enabled && day.slots && day.slots.length > 0,
     );
 
     if (!hasValidSlots) {
-      setToastMessage("Please add at least one availability slot");
-      setTimeout(() => setToastMessage(null), 3000);
+      if (!overrideAvail) {
+        setToastMessage("Please add at least one availability slot");
+        setTimeout(() => setToastMessage(null), 3000);
+      }
       return;
     }
 
-    const variants = buildAvailabilityPayloadVariants();
+    const variants = buildAvailabilityPayloadVariantsWith(avail);
     let lastError: unknown = null;
 
     try {
@@ -1385,7 +1387,25 @@ function MentorScheduleContent() {
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-2">
                       {(selectedDayData.slots || []).map((slot: any, i: number) => (
                         <div key={i} className="rounded-lg border border-white/15 bg-white/[0.03] p-2">
-                          <div className="mb-1 text-[11px] text-[#cde2f2]">Slot {i + 1}</div>
+                          <div className="mb-1 flex items-center justify-between">
+                            <span className="text-[11px] text-[#cde2f2]">Slot {i + 1}</span>
+                            <button
+                              type="button"
+                              aria-label={`Delete slot ${i + 1}`}
+                              onClick={() => {
+                                const newAvail = availability.map((d) =>
+                                  d.day === selectedDayOfWeek
+                                    ? { ...d, slots: d.slots.filter((_: any, idx: number) => idx !== i), enabled: d.slots.length > 1 ? d.enabled : false }
+                                    : d,
+                                );
+                                setAvailability(newAvail);
+                                void handleSaveAvailability(newAvail);
+                              }}
+                              className="rounded p-0.5 text-red-400 transition hover:bg-red-400/15 hover:text-red-300"
+                            >
+                              <i className="fa-solid fa-trash-can text-[11px]" />
+                            </button>
+                          </div>
                           <div className="flex items-center gap-1.5">
                           <select
                             className={`${mentorSelectDark} min-h-[34px] px-2 py-1 text-[11px]`}
@@ -1469,7 +1489,7 @@ function MentorScheduleContent() {
                 <div className="mt-6">
                   <button
                     type="button"
-                    onClick={handleSaveAvailability}
+                    onClick={() => handleSaveAvailability()}
                     className={mentorPrimaryCta}
                   >
                     Save availability
