@@ -100,7 +100,7 @@ function InterestFormContent() {
     setForm((prev) => ({ ...prev, [k]: v }));
     setErrors((prev) => { const e = { ...prev }; delete e[k]; return e; });
   };
-
+// Restrict name-like fields to letters, spaces, apostrophes, and hyphens.
 const sanitizeName = (value: string) => value.replace(/[^A-Za-z\s'-]/g, "");
 
 
@@ -111,6 +111,7 @@ const sanitizeName = (value: string) => value.replace(/[^A-Za-z\s'-]/g, "");
   //   setErrors((prev) => { const e = { ...prev }; delete e[errKey]; return e; });
   // };
 
+// Reset state whenever country changes so state/province always matches the selected country.
   const setChurchField = (idx: number, k: keyof ChurchRow, v: string) => {
   setChurches((prev) =>
     prev.map((c, i) => {
@@ -178,7 +179,7 @@ const sanitizeName = (value: string) => value.replace(/[^A-Za-z\s'-]/g, "");
   //   setErrors(errs);
   //   return Object.keys(errs).length === 0;
   // };
-
+/// Country/state data is powered by country-state-city so the dropdown supports more than US/Canada.
   const countryOptions = Country.getAllCountries();
 
 const getStateOptions = (countryName: string) => {
@@ -222,6 +223,7 @@ const validate = (): boolean => {
     if (!c.churchPhone.trim()) errs[`churchPhone${p}`] = "Church Phone is required.";
     // churchWebsite is optional
     // churchWebsite is optional, but if entered it must be valid
+
 if (c.churchWebsite.trim()) {
   const websiteValue = c.churchWebsite.trim();
   const websiteRegex = /^(https?:\/\/)?([\w-]+\.)+[\w-]{2,}(\/.*)?$/i;
