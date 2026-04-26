@@ -44,6 +44,7 @@ export default function InterestDetailPage() {
   const [activeTab, setActiveTab] = useState<"details" | "interests" | "history">("details");
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showAcceptedModal, setShowAcceptedModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
 const [assignUsers, setAssignUsers] = useState<any[]>([]);
@@ -200,6 +201,26 @@ const handleAssign = async () => {
     }
   };
 
+  const handlePending = async () => {
+  if (!interestData?.userId) {
+    setToast("Missing user id — cannot move to pending.");
+    setTimeout(() => setToast(null), 3000);
+    return;
+  }
+
+  try {
+    await apiUpdateInterestStatus(interestData.userId, "pending");
+    // setInterestData({ ...interestData, status: "pending" });
+    setInterestData({ ...interestData, status: "pending" as const });
+    setToast("Interest moved to pending successfully");
+    setTimeout(() => setToast(null), 3000);
+  } catch (error) {
+    console.error("Failed to move interest to pending", error);
+    setToast("Failed to move interest to pending");
+    setTimeout(() => setToast(null), 3000);
+  }
+};
+
   const handleAccept = async () => {
     if (!interestData?.userId) {
       setToast("Missing user id — cannot accept.");
@@ -228,7 +249,8 @@ const handleAssign = async () => {
 
   setInterestData(updatedInterest);
   setToast("Interest accepted successfully. Please continue with assignment.");
-  setShowAssignModal(true);
+  // setShowAssignModal(true);
+  setShowAcceptedModal(true);
   setTimeout(() => setToast(null), 3000);
 } catch (error) {
   console.error("Failed to accept interest", error);
@@ -442,17 +464,7 @@ const assignModalDescription = isMentorInterest
                   </dl>
 
                   <div className="mt-6 space-y-2 border-t border-white/10 pt-6">
-                  {interestData.status === "accepted" && (
-
-                    <button
-                      type="button"
-                      onClick={() => setShowAssignModal(true)}
-                      className="w-full rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 py-3 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
-                    >
-                      {/* Assign to mentor */}
-                      {assignButtonLabel}
-                    </button>
-                    )}
+                 
                     <button
                       type="button"
                       onClick={handleAccept}
@@ -469,6 +481,14 @@ const assignModalDescription = isMentorInterest
                     >
                       Reject interest
                     </button>
+                    <button
+  type="button"
+  onClick={handlePending}
+  disabled={interestData.status === "pending"}
+  className="w-full rounded-xl border border-amber-400/40 bg-amber-500/20 py-3 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+>
+  Add to pending
+</button>
                   </div>
                 </div>
               </div>
@@ -679,6 +699,51 @@ const assignModalDescription = isMentorInterest
           </div>
         </div>
       ) : null}
+
+      {showAcceptedModal ? (
+  <div
+    className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div className={`${directorGlassCard} w-full max-w-md overflow-hidden`}>
+      <div className="p-6 text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white">
+          <i className="fa-solid fa-check text-2xl" />
+        </div>
+
+        <h3 className="text-lg font-semibold text-white">
+          Interest Form Accepted!
+        </h3>
+
+        <p className="mt-2 text-sm text-[#cde2f2]/90">
+          Log-in credentials have been sent to respective email ID
+        </p>
+
+        <div className="mt-6 flex gap-3">
+          <button
+            type="button"
+            onClick={() => setShowAcceptedModal(false)}
+            className="flex-1 rounded-xl border border-white/20 py-2.5 text-sm font-semibold text-white/90 transition hover:bg-white/10"
+          >
+            Later
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowAcceptedModal(false);
+              setShowAssignModal(true);
+            }}
+            className="flex-1 rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+          >
+            {assignButtonLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+) : null}
 
       {showAssignModal ? (
         <div
