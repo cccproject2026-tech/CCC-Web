@@ -829,7 +829,7 @@ export default function PastorAppointmentsPage() {
                         </div>
                       </div>
 
-                      {/* 3 DOT MENU */
+                      {/* 3 DOT MENU */}
                       <div className="absolute top-3 right-3">
                         <button
                           onClick={() =>

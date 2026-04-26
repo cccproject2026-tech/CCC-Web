@@ -19,7 +19,7 @@ import type {
   AppointmentResponse,
   TranscriptSummaryResponseDto,
 } from "@/app/Services/types/appointments.types";
-import UserProfile from "../../Assets/user-profile.png";
+import UserProfile from "../../../Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 type TranscriptSummary = {
