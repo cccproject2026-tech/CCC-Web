@@ -76,11 +76,20 @@ export default function InterestDetailPage() {
     fetchInterest();
   }, [slug]);
 
+  // const handleAssign = () => {
+  //   setShowAssignModal(false);
+  //   // setToast("Interest assigned to mentor successfully");
+  //   setToast(assignSuccessMessage);
+  //   setTimeout(() => setToast(null), 3000);
+  // };
   const handleAssign = () => {
-    setShowAssignModal(false);
-    setToast("Interest assigned to mentor successfully");
-    setTimeout(() => setToast(null), 3000);
-  };
+  setShowAssignModal(false);
+  setToast(assignSuccessMessage);
+
+  setTimeout(() => {
+    router.push("/director/interest-list");
+  }, 1200);
+};
 
   const handleReject = async () => {
     if (!interestData?.userId) {
@@ -110,16 +119,34 @@ export default function InterestDetailPage() {
       return;
     }
 
+    // try {
+    //   await apiUpdateInterestStatus(interestData.userId, "accepted");
+    //   setInterestData({ ...interestData, status: "accepted" });
+    //   setToast("Interest accepted successfully");
+    //   setTimeout(() => router.back(), 1200);
+    // } catch (error) {
+    //   console.error("Failed to accept interest", error);
+    //   setToast("Failed to accept interest");
+    //   setTimeout(() => setToast(null), 3000);
+    // }
+
     try {
-      await apiUpdateInterestStatus(interestData.userId, "accepted");
-      setInterestData({ ...interestData, status: "accepted" });
-      setToast("Interest accepted successfully");
-      setTimeout(() => router.back(), 1200);
-    } catch (error) {
-      console.error("Failed to accept interest", error);
-      setToast("Failed to accept interest");
-      setTimeout(() => setToast(null), 3000);
-    }
+  await apiUpdateInterestStatus(interestData.userId, "accepted");
+
+  const updatedInterest = {
+    ...interestData,
+    status: "accepted" as const,
+  };
+
+  setInterestData(updatedInterest);
+  setToast("Interest accepted successfully. Please continue with assignment.");
+  setShowAssignModal(true);
+  setTimeout(() => setToast(null), 3000);
+} catch (error) {
+  console.error("Failed to accept interest", error);
+  setToast("Failed to accept interest");
+  setTimeout(() => setToast(null), 3000);
+}
   };
 
   if (loading) {
@@ -161,6 +188,19 @@ export default function InterestDetailPage() {
   const church = interestData.churchDetails?.[0];
   const interestsList = interestData.interests ?? [];
   const fullName = `${interestData.firstName} ${interestData.lastName}`.trim();
+  const isMentorInterest = String(interestData.title ?? "")
+  .toLowerCase()
+  .includes("mentor");
+
+const assignButtonLabel = isMentorInterest ? "Assign to Mentee" : "Assign to Mentor";
+const assignSuccessMessage = isMentorInterest
+  ? "Interest assigned to mentee successfully"
+  : "Interest assigned to mentor successfully";
+const assignModalTitle = isMentorInterest ? "Assign to mentee" : "Assign to mentor";
+const assignModalDescription = isMentorInterest
+  ? "Select a mentee to assign this interest to."
+  : "Select a mentor to assign this interest to.";
+  const churches = interestData.churchDetails ?? [];
 
   return (
     <div className={directorPageRoot}>
@@ -239,7 +279,7 @@ export default function InterestDetailPage() {
                         <dd className="text-[#d9ebf8]">{interestData.phoneNumber ?? "—"}</dd>
                       </div>
                     </div>
-                    <div className="flex gap-3">
+                    {/* <div className="flex gap-3">
                       <i className="fa-solid fa-church mt-0.5 w-5 text-center text-[#8ec5eb]" />
                       <div>
                         <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#8ec5eb]/80">
@@ -253,17 +293,76 @@ export default function InterestDetailPage() {
                           <dd className="mt-1 text-xs text-white/55">{church.churchAddress}</dd>
                         ) : null}
                       </div>
-                    </div>
+                    </div> */}
+<div className="flex gap-3">
+  <i className="fa-solid fa-church mt-0.5 w-5 text-center text-[#8ec5eb]" />
+  <div className="min-w-0 flex-1">
+    <dt className="text-[11px] font-semibold uppercase tracking-wide text-[#8ec5eb]/80">
+      Church Information
+    </dt>
+
+    {churches.length > 0 ? (
+      <div className="mt-2 space-y-3">
+        {churches.map((church, index) => (
+          <div
+            key={`${church.churchName}-${index}`}
+            className="border-b border-white/10 pb-3 last:border-b-0 last:pb-0"
+          >
+            <dd className="text-[#d9ebf8]">
+              {church.churchName || `Church ${index + 1}`}
+            </dd>
+
+            <dd className="mt-0.5 text-xs text-[#cde2f2]/90">
+              {formatChurchLocation(church)}
+            </dd>
+
+            {church.churchAddress ? (
+              <dd className="mt-1 text-xs text-white/55">
+                {church.churchAddress}
+              </dd>
+            ) : null}
+
+            {church.churchPhone ? (
+              <dd className="mt-1 text-xs text-white/55">
+                Phone: {church.churchPhone}
+              </dd>
+            ) : null}
+
+            {church.zipCode ? (
+              <dd className="mt-1 text-xs text-white/55">
+                Zip Code: {church.zipCode}
+              </dd>
+            ) : null}
+
+            {church.churchWebsite ? (
+              <dd className="mt-1 break-all text-xs text-white/55">
+                {church.churchWebsite}
+              </dd>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    ) : (
+      <dd className="text-[#d9ebf8]">—</dd>
+    )}
+  </div>
+</div>
+
+
                   </dl>
 
                   <div className="mt-6 space-y-2 border-t border-white/10 pt-6">
+                  {interestData.status === "accepted" && (
+
                     <button
                       type="button"
                       onClick={() => setShowAssignModal(true)}
                       className="w-full rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 py-3 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
                     >
-                      Assign to mentor
+                      {/* Assign to mentor */}
+                      {assignButtonLabel}
                     </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleAccept}
@@ -335,6 +434,43 @@ export default function InterestDetailPage() {
                           </div>
                         </div>
                       </div>
+
+{/* <div>
+  <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#8ec5eb]">
+    Church information
+  </h3>
+
+  {churches.length > 0 ? (
+    <div className="space-y-4">
+      {churches.map((church, index) => (
+        <div
+          key={`${church.churchName}-${index}`}
+          className="rounded-xl border border-white/10 bg-[#041f35]/35 px-4 py-3 text-sm text-[#cde2f2]"
+        >
+          <p className="mb-2 font-semibold text-white">
+            Church {index + 1}
+          </p>
+          <p><span className="text-[#8ec5eb]">Name:</span> {church.churchName || "—"}</p>
+          <p><span className="text-[#8ec5eb]">Phone:</span> {church.churchPhone || "—"}</p>
+          <p><span className="text-[#8ec5eb]">Website:</span> {church.churchWebsite || "—"}</p>
+          <p><span className="text-[#8ec5eb]">Address:</span> {church.churchAddress || "—"}</p>
+          <p><span className="text-[#8ec5eb]">City:</span> {church.city || "—"}</p>
+          <p><span className="text-[#8ec5eb]">State:</span> {church.state || "—"}</p>
+          <p><span className="text-[#8ec5eb]">Zip Code:</span> {church.zipCode || "—"}</p>
+          <p><span className="text-[#8ec5eb]">Country:</span> {church.country || "—"}</p>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p className="rounded-xl border border-white/10 bg-[#041f35]/35 px-4 py-3 text-sm text-[#cde2f2]">
+      —
+    </p>
+  )}
+</div> */}
+
+
+
+
 
                       <div>
                         <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-[#8ec5eb]">
@@ -463,25 +599,38 @@ export default function InterestDetailPage() {
         >
           <div className={`${directorGlassCard} w-full max-w-md overflow-hidden`}>
             <div className={panelInner}>
-              <h3 id="assign-title" className="text-lg font-semibold text-white">
+              {/* <h3 id="assign-title" className="text-lg font-semibold text-white">
                 Assign to mentor
               </h3>
               <p className="mt-2 text-sm text-[#cde2f2]/90">
                 Select a mentor to assign this interest to.
-              </p>
+              </p> */}
+<h3 id="assign-title" className="text-lg font-semibold text-white">
+  {assignModalTitle}
+</h3>
+<p className="mt-2 text-sm text-[#cde2f2]/90">
+  {assignModalDescription}
+</p>
+
               <div className="mt-5 space-y-2">
                 <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-3 py-3 transition hover:bg-white/10">
                   <input type="radio" name="mentor" className="accent-[#8ec5eb]" />
                   <div>
                     <p className="font-medium text-white">John Doe</p>
-                    <p className="text-xs text-[#cde2f2]/70">Mentor</p>
+                    {/* <p className="text-xs text-[#cde2f2]/70">Mentor</p> */}
+                    <p className="text-xs text-[#cde2f2]/70">
+  {isMentorInterest ? "Mentee" : "Mentor"}
+</p>
                   </div>
                 </label>
                 <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-3 py-3 transition hover:bg-white/10">
                   <input type="radio" name="mentor" className="accent-[#8ec5eb]" />
                   <div>
                     <p className="font-medium text-white">Jacob Jones</p>
-                    <p className="text-xs text-[#cde2f2]/70">Field mentor</p>
+                    {/* <p className="text-xs text-[#cde2f2]/70">Field mentor</p> */}
+                    <p className="text-xs text-[#cde2f2]/70">
+  {isMentorInterest ? "Mentee" : "Field mentor"}
+</p>
                   </div>
                 </label>
               </div>

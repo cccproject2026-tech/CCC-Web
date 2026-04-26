@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import PastorHeader from "@/app/Components/PastorHeader";
+// import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/hero-bg.png";
 
 /**
@@ -14,7 +14,7 @@ export default function ThankyouPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-transparent text-white font-[Albert_Sans]">
-      <PastorHeader showFullHeader={true} />
+      {/* <PastorHeader showFullHeader={true} /> */}
 
       <section
         className="relative flex-1 overflow-hidden bg-cover bg-top px-4 pb-16 pt-6 sm:px-8 lg:px-20"
