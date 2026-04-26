@@ -15,8 +15,9 @@ import {
 } from "../../directorUi";
 import {
   apiAddNestedRoadmapItem,
-  apiGetRoadmapById,
   apiGetAssessments,
+  apiGetNestedRoadmapItem,
+  apiGetRoadmapById,
   apiUpdateNestedRoadmapItem,
   apiUpdateRoadmap,
 } from "@/app/Services/api";
@@ -41,6 +42,42 @@ function unwrapRoadmap(res: unknown): RoadmapDoc | null {
 
 function safeString(v: unknown): string {
   return typeof v === "string" ? v : v == null ? "" : String(v);
+}
+
+/** Same as creation editor — APIs may return `roadMapDetails` as `string` or `{ en: "..." }`. */
+function roadmapDetailText(raw: unknown): string {
+  if (raw == null) return "";
+  if (typeof raw === "string") return raw.trim();
+  if (typeof raw === "object" && raw !== null) {
+    const o = raw as Record<string, unknown>;
+    if (typeof o.en === "string" && o.en.trim()) return o.en.trim();
+    if (typeof o.text === "string" && o.text.trim()) return o.text.trim();
+  }
+  const s = String(raw).trim();
+  return s && s !== "[object Object]" ? s : "";
+}
+
+function roadmapChildrenFromDoc(doc: RoadmapDoc | null): any[] {
+  if (!doc?.roadmaps) return [];
+  const r = doc.roadmaps as unknown;
+  if (Array.isArray(r)) return r;
+  if (r && typeof r === "object" && Array.isArray((r as { items?: unknown[] }).items)) {
+    return (r as { items: any[] }).items;
+  }
+  return [];
+}
+
+/** GET /roadmaps/:id/nested/:nestedId — same unwrap as roadmap-creation (canonical nested fields). */
+function unwrapNestedRoadmapItem(res: unknown): any | null {
+  if (!res || typeof res !== "object") return null;
+  const r = res as Record<string, unknown>;
+  const data = (r as { data?: unknown }).data;
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const inner = data as Record<string, unknown>;
+    if (inner.data && typeof inner.data === "object") return inner.data;
+    return data;
+  }
+  return (r as { data?: unknown }).data ?? null;
 }
 
 function safeDecodeURIComponent(s: string): string {
@@ -225,6 +262,7 @@ export default function DirectorRoadmapFormPage() {
     () => ({
       name: safeString(sp.get("name") || ""),
       subheading: safeString(sp.get("subheading") || ""),
+      longDescription: safeString(sp.get("longDescription") || ""),
       completionTime: safeString(sp.get("completionTime") || ""),
       selectedDivision: safeString(sp.get("selectedDivision") || "All") || "All",
       bannerImage: safeString(sp.get("bannerImage") || ""),
@@ -239,6 +277,8 @@ export default function DirectorRoadmapFormPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /** Nested template title (phase / single row) — editable on this page; not the parent library name. */
+  const [nestedItemTitle, setNestedItemTitle] = useState("");
   const [churchVerbiage, setChurchVerbiage] = useState("");
   const [descriptionVerbiage, setDescriptionVerbiage] = useState("");
   const [customFields, setCustomFields] = useState<any[]>([]);
@@ -280,8 +320,9 @@ export default function DirectorRoadmapFormPage() {
 
   const heroTitle = useMemo(() => {
     if (!isEditMode) return "Roadmap";
+    if (nestedItemTitle.trim()) return nestedItemTitle.trim();
     return safeDecodeURIComponent(roadmapData.name.trim()) || "Roadmap";
-  }, [isEditMode, roadmapData.name]);
+  }, [isEditMode, nestedItemTitle, roadmapData.name]);
 
   const heroImageSrc = !isEditMode
     ? bannerPreview || null
@@ -561,6 +602,7 @@ export default function DirectorRoadmapFormPage() {
 
         /** New task / template: start with empty fields; ignore URL and nested row copy. */
         if (!isEditMode) {
+          setNestedItemTitle("");
           setChurchVerbiage("");
           setDescriptionVerbiage("");
           setCustomFields([]);
@@ -569,15 +611,49 @@ export default function DirectorRoadmapFormPage() {
           return;
         }
 
-        // Mobile parity: editing uses extras from selected nested roadmap (phase uses nestedRoadmapId, single uses [0])
-        const selectedNested =
-          roadmapType === "phase" && nestedRoadmapId
-            ? doc?.roadmaps?.find((r) => String(r._id) === nestedRoadmapId)
-            : doc?.roadmaps?.[0];
+        // Mobile parity: editing uses extras from selected nested roadmap. Prefer GET /nested/:id
+        // so name / verbiage / description match the server after edits on the phase list.
+        const list = roadmapChildrenFromDoc(doc);
+        const fromList =
+          nestedRoadmapId
+            ? list.find((r) => String((r as { _id?: string })._id) === nestedRoadmapId)
+            : list[0];
 
-        const nested = selectedNested ?? null;
-        setChurchVerbiage(safeString(nested?.roadMapDetails || ""));
-        setDescriptionVerbiage(safeString((nested as any)?.description || ""));
+        let fromNestedGet: any = null;
+        if (nestedRoadmapId) {
+          try {
+            const nRes = await apiGetNestedRoadmapItem(roadmapId, nestedRoadmapId);
+            if (!cancelled) {
+              fromNestedGet = unwrapNestedRoadmapItem(nRes.data);
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        if (
+          fromNestedGet &&
+          String((fromNestedGet as { _id?: string })._id) !== String(nestedRoadmapId)
+        ) {
+          fromNestedGet = null;
+        }
+        const nested =
+          fromList && fromNestedGet
+            ? { ...fromList, ...fromNestedGet }
+            : fromNestedGet ?? fromList ?? null;
+        const nTitle =
+          (nested as { name?: string; title?: string } | null)?.name ||
+          (nested as { name?: string; title?: string } | null)?.title;
+        setNestedItemTitle(
+          safeString(nTitle) || safeDecodeURIComponent(roadmapData.name.trim()),
+        );
+        const fromUrl = safeString(roadmapData.subheading);
+        const fromUrlDesc = safeString(roadmapData.longDescription);
+        const rmd =
+          roadmapDetailText((nested as { roadMapDetails?: unknown } | null)?.roadMapDetails) ||
+          roadmapDetailText((nested as { road_map_details?: unknown } | null)?.road_map_details);
+        const ddesc = roadmapDetailText((nested as { description?: unknown } | null)?.description);
+        setChurchVerbiage(rmd || fromUrl);
+        setDescriptionVerbiage(ddesc || fromUrlDesc || rmd || fromUrl);
         setCustomFields(transformExtrasToFields(((nested as any)?.extras || []) as any[]));
 
         // Mobile parity for banner: prefer param bannerImage; fall back to nested.imageUrl.
@@ -611,7 +687,7 @@ export default function DirectorRoadmapFormPage() {
     return () => {
       cancelled = true;
     };
-  }, [roadmapId, roadmapType, nestedRoadmapId, roadmapData.bannerImage, isEditMode]);
+  }, [roadmapId, roadmapType, nestedRoadmapId, roadmapData, isEditMode]);
 
   useEffect(() => {
     if (!saveToast) return;
@@ -632,6 +708,15 @@ export default function DirectorRoadmapFormPage() {
     if (viewOnly) return;
     setSaveToast(null);
     setError(null);
+
+    if (
+      isEditMode &&
+      (roadmapType === "phase" || roadmapType === "single") &&
+      !nestedItemTitle.trim()
+    ) {
+      setError(roadmapType === "phase" ? "Please enter a phase name." : "Please enter a roadmap name.");
+      return;
+    }
 
     if (!churchVerbiage.trim() || !descriptionVerbiage.trim()) {
       setError("Please fill in Roadmap Verbiage and Description.");
@@ -659,6 +744,7 @@ export default function DirectorRoadmapFormPage() {
       // Payload common to nested template item
       const nestedPayloadBase: Partial<NestedRoadMapItem> & { description?: string } = {
         name:
+          nestedItemTitle.trim() ||
           (roadmapData.name || "").trim() ||
           churchVerbiage.trim() ||
           safeString(parent.name) ||
@@ -792,10 +878,36 @@ export default function DirectorRoadmapFormPage() {
               </div>
 
               <div className="space-y-8">
+                {isEditMode && (roadmapType === "phase" || roadmapType === "single") && !viewOnly ? (
+                  <div>
+                    <label className={directorLabelClass} htmlFor="nested-item-title">
+                      {roadmapType === "phase" ? "Phase name" : "Roadmap name"}{" "}
+                      <span className="text-red-300">*</span>
+                    </label>
+                    <p className="mb-2 text-xs text-white/50">
+                      {roadmapType === "phase"
+                        ? "Title for this phase in the list and in the header above."
+                        : "Title for this roadmap in the list and in the header above."}
+                    </p>
+                    <input
+                      id="nested-item-title"
+                      type="text"
+                      value={nestedItemTitle}
+                      onChange={(e) => setNestedItemTitle(e.target.value)}
+                      className={directorInputClass}
+                      autoComplete="off"
+                      placeholder={roadmapType === "phase" ? "e.g. Self Revitalization Phase" : "Roadmap title"}
+                    />
+                  </div>
+                ) : null}
+
                 <div>
                   <label className={directorLabelClass}>
                     Roadmap Verbiage {!viewOnly ? <span className="text-red-300">*</span> : null}
                   </label>
+                  <p className="mb-2 text-xs text-white/50">
+                    Subheading on the step card; often a short one-liner. Required.
+                  </p>
                   <input
                     type="text"
                     value={churchVerbiage}
@@ -810,6 +922,7 @@ export default function DirectorRoadmapFormPage() {
                   <label className={directorLabelClass}>
                     Description {!viewOnly ? <span className="text-red-300">*</span> : null}
                   </label>
+                  <p className="mb-2 text-xs text-white/50">Longer description for this step. Required.</p>
                   <textarea
                     value={descriptionVerbiage}
                     readOnly={viewOnly}

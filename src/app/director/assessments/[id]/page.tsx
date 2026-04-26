@@ -1,17 +1,23 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import DirectorHero from "../../DirectorHero";
-import AssessmentBg from "../../../Assets/assessment-bg.png";
 import {
+  directorBtnPrimary,
+  directorBtnSecondary,
   directorGlassCard,
+  directorInputClass,
   directorLabelClass,
+  directorPageContainer,
   directorPageRoot,
   directorSpinner,
 } from "../../directorUi";
+import AssessmentBg from "../../../Assets/assessment-bg.png";
 import {
   apiGetAssessmentById,
+  apiPatchAssessment,
   apiUpdateInstructions,
   apiUpdateSections,
   apiUploadAssessmentBanner,
@@ -20,85 +26,78 @@ import {
 } from "@/app/Services/assessment.service";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 import {
-  mapAssessmentFromApi,
+  buildPreSurveyPayloadForDirectorCreate,
   buildSectionsPayload,
-  type Section,
-  type Layer as MapperLayer,
+  directorEditWizardToSection,
+  mapAssessmentFromApi,
+  newDirectorEditSection,
+  sectionToDirectorEditWizard,
+  WIZARD_LAYER_COUNT,
 } from "@/app/Services/utils/assessment-mapper";
 
-/** New section for the editor — matches `mapAssessmentFromApi` / `buildSectionsPayload` shape. */
-function createSectionFromModal(
-  name: string,
-  guidelines: string,
-  layerChoices: string[][],
-): Section {
-  const layers: MapperLayer[] = layerChoices.map((choiceTexts, i) => {
-    const cleaned = choiceTexts.map((t) => t.trim()).filter(Boolean);
-    const texts = cleaned.length > 0 ? cleaned : ["Option 1"];
+type PreSurveyRow = {
+  id: number;
+  text: string;
+  type: "text" | "number";
+  placeholder: string;
+};
+
+const defaultPreSurveyRow = (): PreSurveyRow => ({
+  id: Date.now(),
+  text: "",
+  type: "number",
+  placeholder: "Enter number",
+});
+
+function preSurveyFromApiDetail(raw: unknown): PreSurveyRow[] {
+  const d = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+  const arr = d?.preSurvey;
+  if (!Array.isArray(arr) || arr.length === 0) {
+    return [{ id: 1, text: "", type: "number", placeholder: "Enter number" }];
+  }
+  return arr.map((q: unknown, i: number) => {
+    const qo = q && typeof q === "object" ? (q as Record<string, unknown>) : {};
+    const t = String(qo.text ?? (qo as { question?: string }).question ?? "");
+    const typ = qo.type === "text" ? "text" : "number";
     return {
-      id: crypto.randomUUID(),
-      name: `Layer ${i + 1}`,
-      choices: texts.map((text, j) => ({
-        id: crypto.randomUUID(),
-        text: text || `Option ${j + 1}`,
-      })),
-      recommendations: [],
+      id: i + 1,
+      text: t,
+      type: typ,
+      placeholder: String(qo.placeholder ?? " "),
     };
   });
-  return {
-    id: crypto.randomUUID(),
-    name: name.trim(),
-    description: (guidelines || "").trim(),
-    layers,
-  };
 }
 
 export default function ViewEditAssessmentPage() {
   const router = useRouter();
   const params = useParams();
   const [toast, setToast] = useState<string | null>(null);
-  const [selectedSection, setSelectedSection] = useState<string>("");
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  /** Choice IDs within the currently selected section (unique across layers). */
-  const [selectedChoices, setSelectedChoices] = useState<string[]>([]);
-  const [assessment, setAssessment] = useState<any>(null);
   const [loadError, setLoadError] = useState(false);
-
-  // Modals
-  const [showAddSectionModal, setShowAddSectionModal] = useState(false);
-  const [showAddLayerModal, setShowAddLayerModal] = useState(false);
-  const [showRecommendationsModal, setShowRecommendationsModal] =
-    useState(false);
-  const [showInstructionsModal, setShowInstructionsModal] = useState(false);
-  const [currentLayerId, setCurrentLayerId] = useState<string | null>(null);
-  const [recSelectionMode, setRecSelectionMode] = useState(false);
-  const [selectedRecs, setSelectedRecs] = useState<string[]>([]);
-
-  /** Aligned with create assessment wizard: 4 levels per section by default. */
-  const DEFAULT_NEW_SECTION_LAYERS = 4;
-  const buildEmptyLayerMatrix = (n: number) =>
-    Array.from({ length: n }, () => [""] as string[]);
-
-  // Form state for Add Section
-  const [newSectionName, setNewSectionName] = useState("");
-  const [newSectionGuidelines, setNewSectionGuidelines] = useState("");
-  const [newSectionLayers, setNewSectionLayers] = useState(DEFAULT_NEW_SECTION_LAYERS);
-  /** Per-layer choice labels while building a new section in the modal (each layer ≥ 1 row). */
-  const [newSectionLayerChoices, setNewSectionLayerChoices] = useState<string[][]>(() =>
-    buildEmptyLayerMatrix(DEFAULT_NEW_SECTION_LAYERS),
-  );
-
-  type InstructionRow = { id: string; text: string; checked: boolean };
-  const [instructions, setInstructions] = useState<InstructionRow[]>([]);
-
-  const [sections, setSections] = useState<Section[]>([]);
-  const [savingSection, setSavingSection] = useState(false);
-  /** New banner file; uploaded with “Save changes”. */
-  const [bannerFile, setBannerFile] = useState<File | null>(null);
-  /** `blob:` preview for a newly picked file; revoke on clear/unmount. */
-  const [bannerLocalUrl, setBannerLocalUrl] = useState<string | null>(null);
+  const [assessment, setAssessment] = useState<{
+    id: string;
+    name?: string;
+    description?: string;
+    type?: string;
+    bannerImage?: string;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [assessmentName, setAssessmentName] = useState("");
+  const [description, setDescription] = useState("");
+  const [hasPreSurvey, setHasPreSurvey] = useState(false);
+  const [instructions, setInstructions] = useState([""]);
+  const [preSurveyRows, setPreSurveyRows] = useState<PreSurveyRow[]>([defaultPreSurveyRow()]);
+  const [wizardSections, setWizardSections] = useState(
+    [newDirectorEditSection()],
+  );
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const scrollToId = useCallback((id: string) => {
+    if (typeof document === "undefined") return;
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   useEffect(() => {
     if (!params?.id) return;
@@ -107,316 +106,253 @@ export default function ViewEditAssessmentPage() {
       setLoadError(false);
       try {
         const res = await apiGetAssessmentById(params.id as string);
-        const raw = parseAssessmentDetailPayload(
-          (res.data as { data?: unknown })?.data ?? res.data,
-        );
+        const rawBody = (res.data as { data?: unknown })?.data ?? res.data;
+        const raw = parseAssessmentDetailPayload(rawBody);
         if (!raw) {
           console.error("Invalid assessment payload");
           setLoadError(true);
           return;
         }
         const mapped = mapAssessmentFromApi(raw);
-
-        setAssessment(mapped);
-        setSections(mapped.sections);
-        setInstructions(mapped.instructions);
-
-        if (mapped.sections.length > 0) {
-          setSelectedSection(mapped.sections[0].id);
-        }
+        setAssessment({
+          id: String(mapped.id ?? (raw as { _id?: string })._id ?? params.id),
+          name: mapped.name,
+          description: mapped.description,
+          type: mapped.type,
+          bannerImage: mapped.bannerImage,
+        });
+        setAssessmentName(mapped.name || "");
+        setDescription(mapped.description || "");
+        setHasPreSurvey(
+          (mapped.type as string) === "CMA" || preSurveyFromApiDetail(raw).some((r) => r.text.trim().length > 0),
+        );
+        setInstructions(
+          mapped.instructions.length > 0 ? mapped.instructions.map((i) => i.text) : [""],
+        );
+        setWizardSections(
+          mapped.sections.length > 0
+            ? mapped.sections.map(sectionToDirectorEditWizard)
+            : [newDirectorEditSection()],
+        );
+        setPreSurveyRows(preSurveyFromApiDetail(raw));
+        const mUrl = resolveApiMediaUrl(mapped.bannerImage) || "";
+        if (mUrl) setBannerPreview(mUrl);
       } catch (error) {
         console.error("Failed to fetch assessment", error);
         setLoadError(true);
       }
     };
 
-    fetchAssessment();
+    void fetchAssessment();
   }, [params?.id]);
 
   useEffect(() => {
     return () => {
-      if (bannerLocalUrl?.startsWith("blob:")) URL.revokeObjectURL(bannerLocalUrl);
+      if (bannerPreview?.startsWith("blob:")) URL.revokeObjectURL(bannerPreview);
     };
-  }, [bannerLocalUrl]);
+  }, [bannerPreview]);
 
-  useEffect(() => {
-    setNewSectionLayerChoices((prev) => {
-      const n = newSectionLayers;
-      const next: string[][] = [];
-      for (let i = 0; i < n; i++) {
-        next[i] = prev[i]?.length ? [...prev[i]] : [""];
-      }
-      return next;
-    });
-  }, [newSectionLayers]);
-
-  const resetAddSectionForm = () => {
-    setNewSectionName("");
-    setNewSectionGuidelines("");
-    setNewSectionLayers(DEFAULT_NEW_SECTION_LAYERS);
-    setNewSectionLayerChoices(buildEmptyLayerMatrix(DEFAULT_NEW_SECTION_LAYERS));
+  const showToast = (message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(null), 4000);
   };
 
-  const openAddSectionModal = () => {
-    resetAddSectionForm();
-    setShowAddSectionModal(true);
+  const handleAddInstruction = () => setInstructions([...instructions, ""]);
+  const handleRemoveInstruction = (index: number) => {
+    setInstructions((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)));
+  };
+  const handleUpdateInstruction = (index: number, value: string) => {
+    const u = [...instructions];
+    u[index] = value;
+    setInstructions(u);
   };
 
-  const closeAddSectionModal = () => {
-    setShowAddSectionModal(false);
-    resetAddSectionForm();
+  const handleAddSection = () => setWizardSections((prev) => [...prev, newDirectorEditSection()]);
+
+  const handleRemoveSection = (sectionIdx: number) => {
+    setWizardSections((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== sectionIdx)));
   };
 
-  const appendModalChoice = (layerIdx: number) => {
-    setNewSectionLayerChoices((prev) => {
-      const n = newSectionLayers;
-      const base = Array.from({ length: n }, (_, i) =>
-        Array.isArray(prev[i]) ? [...(prev[i] as string[])] : [""],
-      );
-      const row = base[layerIdx] ?? [""];
-      base[layerIdx] = [...row, ""];
-      return base;
+  const handleUpdateSection = (sectionIdx: number, field: string, value: unknown) => {
+    setWizardSections((prev) => {
+      const n = [...prev];
+      n[sectionIdx] = { ...n[sectionIdx], [field]: value } as (typeof n)[0];
+      return n;
     });
   };
 
-  const removeModalChoice = (layerIdx: number, choiceIdx: number) => {
-    setNewSectionLayerChoices((prev) =>
-      prev.map((row, i) => {
-        if (i !== layerIdx) return [...row];
-        if (row.length <= 1) return [...row];
-        return row.filter((_, j) => j !== choiceIdx);
-      }),
-    );
-  };
-
-  const updateModalChoice = (
+  const handleUpdateLayerChoice = (
+    sectionIdx: number,
     layerIdx: number,
     choiceIdx: number,
     value: string,
   ) => {
-    setNewSectionLayerChoices((prev) =>
-      prev.map((row, i) => {
-        if (i !== layerIdx) return [...row];
-        const r = [...row];
-        r[choiceIdx] = value;
-        return r;
-      }),
-    );
+    setWizardSections((prev) => {
+      const next = [...prev];
+      const copy = { ...next[sectionIdx] };
+      const layers = copy.layers.map((L, i) => {
+        if (i !== layerIdx) return L;
+        return {
+          ...L,
+          choices: L.choices.map((c, j) => (j === choiceIdx ? value : c)),
+        };
+      });
+      copy.layers = layers;
+      next[sectionIdx] = copy;
+      return next;
+    });
   };
 
-  /** Append a new choice to a layer (no modal — edit text in place). */
-  const handleAppendChoice = (sectionId: string, layerId: string) => {
-    setSections((prev) =>
-      prev.map((section) =>
-        section.id !== sectionId
-          ? section
-          : {
-              ...section,
-              layers: section.layers.map((layer) => {
-                if (layer.id !== layerId) return layer;
-                const n = layer.choices.length + 1;
-                return {
-                  ...layer,
-                  choices: [
-                    ...layer.choices,
-                    {
-                      id: crypto.randomUUID(),
-                      text: `Option ${n}`,
-                    },
-                  ],
-                };
-              }),
-            },
-      ),
-    );
+  const handleAddLayerChoice = (sectionIdx: number, layerIdx: number) => {
+    setWizardSections((prev) => {
+      const n = [...prev];
+      const copy = { ...n[sectionIdx] };
+      const layers = [...copy.layers];
+      const layer = { ...layers[layerIdx] };
+      layer.choices = [...layer.choices, ""];
+      layers[layerIdx] = layer;
+      copy.layers = layers;
+      n[sectionIdx] = copy;
+      return n;
+    });
   };
 
-  const handleUpdateChoiceText = (
-    sectionId: string,
-    layerId: string,
-    choiceId: string,
-    text: string,
+  const handleRemoveLayerChoice = (sectionIdx: number, layerIdx: number, choiceIdx: number) => {
+    setWizardSections((prev) => {
+      if (prev[sectionIdx]?.layers[layerIdx]?.choices.length <= 1) return prev;
+      const next = [...prev];
+      const copy = { ...next[sectionIdx] };
+      const layers = [...copy.layers];
+      const layer = { ...layers[layerIdx] };
+      layer.choices = layer.choices.filter((_, j) => j !== choiceIdx);
+      layers[layerIdx] = layer;
+      copy.layers = layers;
+      next[sectionIdx] = copy;
+      return next;
+    });
+  };
+
+  const handleUpdateLayerNotes = (sectionIdx: number, layerIdx: number, value: string) => {
+    setWizardSections((prev) => {
+      const next = [...prev];
+      const copy = { ...next[sectionIdx] };
+      const layers = copy.layers.map((L, i) => (i === layerIdx ? { ...L, notes: value } : L));
+      copy.layers = layers;
+      next[sectionIdx] = copy;
+      return next;
+    });
+  };
+
+  const handleUpdatePlanItem = (
+    sectionIdx: number,
+    planIdx: number,
+    itemIdx: number,
+    value: string,
   ) => {
-    setSections((prev) =>
-      prev.map((section) =>
-        section.id !== sectionId
-          ? section
-          : {
-              ...section,
-              layers: section.layers.map((layer) =>
-                layer.id !== layerId
-                  ? layer
-                  : {
-                      ...layer,
-                      choices: layer.choices.map((c) =>
-                        c.id === choiceId ? { ...c, text } : c,
-                      ),
-                    },
-              ),
-            },
-      ),
-    );
+    setWizardSections((prev) => {
+      const next = [...prev];
+      const copy = { ...next[sectionIdx] };
+      const plans = [...copy.plans];
+      const p = { ...plans[planIdx] };
+      p.items = p.items.map((x, j) => (j === itemIdx ? value : x));
+      plans[planIdx] = p;
+      copy.plans = plans;
+      next[sectionIdx] = copy;
+      return next;
+    });
   };
 
-  const showToast = (message: string) => {
-    setToast(message);
-    setTimeout(() => setToast(null), 3000);
+  const handleAddPlanItem = (sectionIdx: number, planIdx: number) => {
+    setWizardSections((prev) => {
+      const next = [...prev];
+      const copy = { ...next[sectionIdx] };
+      const plans = [...copy.plans];
+      const p = { ...plans[planIdx], items: [...plans[planIdx].items, ""] };
+      plans[planIdx] = p;
+      copy.plans = plans;
+      next[sectionIdx] = copy;
+      return next;
+    });
   };
 
-  const handleSelectChoice = (choiceId: string) => {
-    setSelectedChoices((prev) =>
-      prev.includes(choiceId) ? prev.filter((id) => id !== choiceId) : [...prev, choiceId],
-    );
+  const handleRemovePlanItem = (sectionIdx: number, planIdx: number, itemIdx: number) => {
+    setWizardSections((prev) => {
+      if (prev[sectionIdx]?.plans[planIdx]?.items.length <= 1) return prev;
+      const next = [...prev];
+      const copy = { ...next[sectionIdx] };
+      const plans = copy.plans.map((pl, i) => {
+        if (i !== planIdx) return pl;
+        return { ...pl, items: pl.items.filter((_, j) => j !== itemIdx) };
+      });
+      copy.plans = plans;
+      next[sectionIdx] = copy;
+      return next;
+    });
   };
 
-  const handleDeleteSelected = () => {
-    if (!selectedSection) {
-      setIsSelectionMode(false);
-      return;
-    }
-    setSections((prev) =>
-      prev.map((section) => {
-        if (section.id !== selectedSection) return section;
-        return {
-          ...section,
-          layers: section.layers.map((layer) => {
-            const next = layer.choices.filter((c) => !selectedChoices.includes(c.id));
-            if (next.length === 0) {
-              return {
-                ...layer,
-                choices: [{ id: crypto.randomUUID(), text: "Option 1" }],
-              };
-            }
-            return { ...layer, choices: next };
-          }),
-        };
-      }),
-    );
-    showToast("Selected choices removed");
-    setSelectedChoices([]);
-    setIsSelectionMode(false);
+  const handleUpdatePreSurvey = (
+    idx: number,
+    field: keyof Pick<PreSurveyRow, "text" | "type" | "placeholder">,
+    value: string,
+  ) => {
+    setPreSurveyRows((prev) => {
+      const n = [...prev];
+      if (field === "type" && (value === "text" || value === "number")) {
+        n[idx] = { ...n[idx], type: value };
+      } else if (field === "text" || field === "placeholder") {
+        n[idx] = { ...n[idx], [field]: value };
+      }
+      return n;
+    });
   };
 
-  const handleDeleteSingleChoice = (sectionId: string, layerId: string, choiceId: string) => {
-    setSections((prev) =>
-      prev.map((section) => {
-        if (section.id !== sectionId) return section;
-        return {
-          ...section,
-          layers: section.layers.map((layer) => {
-            if (layer.id !== layerId) return layer;
-            if (layer.choices.length <= 1) return layer;
-            return {
-              ...layer,
-              choices: layer.choices.filter((c) => c.id !== choiceId),
-            };
-          }),
-        };
-      }),
-    );
-    setSelectedChoices((s) => s.filter((id) => id !== choiceId));
+  const handleAddPreSurveyQuestion = () => {
+    setPreSurveyRows((prev) => [...prev, defaultPreSurveyRow()]);
   };
-
-  const handleSelectRec = (recId: string) => {
-    if (selectedRecs.includes(recId)) {
-      setSelectedRecs(selectedRecs.filter((id) => id !== recId));
-    } else {
-      setSelectedRecs([...selectedRecs, recId]);
-    }
-  };
-
-  const handleDeleteRecs = () => {
-    showToast("Deleted Suggestions");
-    setSelectedRecs([]);
-    setRecSelectionMode(false);
-  };
-
-  const handleSaveRecommendations = () => {
-    showToast("Suggestions Edited Successfully");
-    setShowRecommendationsModal(false);
-  };
-
-  const handleAddSection = async () => {
-    if (!newSectionName.trim()) return;
-
-    const choiceMatrix = newSectionLayerChoices.slice(0, newSectionLayers);
-    const next = createSectionFromModal(
-      newSectionName,
-      newSectionGuidelines,
-      choiceMatrix,
-    );
-    const merged = [...sections, next];
-
-    setSections(merged);
-    setSelectedSection(next.id);
-    setShowAddSectionModal(false);
-    resetAddSectionForm();
-
-    setSavingSection(true);
-    try {
-      await apiUpdateSections(assessment.id, buildSectionsPayload(merged) as any);
-      showToast("Section added and saved");
-    } catch (e) {
-      console.error(e);
-      showToast(
-        "Section added here — save failed on server. Use “Save changes” to retry.",
-      );
-    } finally {
-      setSavingSection(false);
-    }
-  };
-
-  const handleAddLayer = () => {
-    if (!selectedSection) return;
-    setSections((prev) =>
-      prev.map((section) => {
-        if (section.id !== selectedSection) return section;
-        const nextNum = section.layers.length + 1;
-        return {
-          ...section,
-          layers: [
-            ...section.layers,
-            {
-              id: crypto.randomUUID(),
-              name: `Layer ${nextNum}`,
-              choices: [{ id: crypto.randomUUID(), text: "Option 1" }],
-              recommendations: [],
-            },
-          ],
-        };
-      }),
-    );
-    setShowAddLayerModal(false);
-    showToast("Layer added — click Save changes to persist.");
-  };
-
-  const handleDeleteInstructions = () => {
-    showToast("Deleted Survey Instructions");
-    setShowInstructionsModal(false);
-  };
-
-  const handleSaveInstructions = async () => {
-    try {
-      await apiUpdateInstructions(
-        assessment.id,
-        instructions.filter((i) => i.checked).map((i) => i.text),
-      );
-
-      showToast("Survey Edited Successfully");
-      setShowInstructionsModal(false);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const clearPendingBanner = () => {
-    if (bannerLocalUrl?.startsWith("blob:")) URL.revokeObjectURL(bannerLocalUrl);
-    setBannerLocalUrl(null);
-    setBannerFile(null);
+  const handleRemovePreSurveyQuestion = (idx: number) => {
+    setPreSurveyRows((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
   };
 
   const handleSaveChanges = async () => {
     if (!assessment?.id) return;
+    setSaveSuccess(false);
+    const name = assessmentName.trim();
+    if (!name) {
+      showToast("Please enter a name for this assessment.");
+      scrollToId("edit-basics");
+      return;
+    }
+    if (!description.trim()) {
+      showToast("Add a short description (it appears on cards and the list).");
+      scrollToId("edit-basics");
+      return;
+    }
+    const instructionLines = instructions.map((i) => i.trim()).filter(Boolean);
+    if (instructionLines.length === 0) {
+      showToast("Add at least one line of instructions for people taking the survey.");
+      scrollToId("edit-instructions");
+      return;
+    }
+    const invalidSection = wizardSections.some(
+      (s) =>
+        s.layers.length !== WIZARD_LAYER_COUNT ||
+        s.layers.some((l) => !l.choices.some((c) => c.trim())),
+    );
+    if (invalidSection) {
+      showToast(
+        `Each section needs ${WIZARD_LAYER_COUNT} steps (layers) and at least one filled-in answer choice on every step. Scroll to “Survey content” to fix it.`,
+      );
+      scrollToId("edit-content");
+      return;
+    }
+    const preSurveyPayload = buildPreSurveyPayloadForDirectorCreate(preSurveyRows);
+    if (hasPreSurvey && preSurveyPayload.length === 0) {
+      showToast("Pre-survey is on — add at least one question with some text, or turn pre-survey off.");
+      scrollToId("edit-pre");
+      return;
+    }
+
+    const modelSections = wizardSections.map(directorEditWizardToSection);
     setSaving(true);
     try {
       if (bannerFile) {
@@ -433,18 +369,32 @@ export default function ViewEditAssessmentPage() {
         }
         if (!newUrl && typeof body?.bannerImage === "string") newUrl = body.bannerImage;
         if (typeof newUrl === "string" && newUrl.trim()) {
-          setAssessment((a: { bannerImage?: string } | null) =>
-            a ? { ...a, bannerImage: newUrl } : a,
-          );
+          setAssessment((a) => (a ? { ...a, bannerImage: newUrl } : a));
         }
-        clearPendingBanner();
+        if (bannerPreview?.startsWith("blob:")) URL.revokeObjectURL(bannerPreview);
+        setBannerFile(null);
+        setBannerPreview(newUrl ? resolveApiMediaUrl(newUrl) || newUrl : null);
       }
 
-      await apiUpdateSections(assessment.id, buildSectionsPayload(sections));
+      const typeForApi: "CMA" | "PMP" = hasPreSurvey ? "CMA" : "PMP";
+      const patchBody = {
+        name: name,
+        description: description.trim(),
+        type: typeForApi,
+        ...(hasPreSurvey && preSurveyPayload.length > 0 ? { preSurvey: preSurveyPayload } : {}),
+      };
+      try {
+        await apiPatchAssessment(assessment.id, patchBody);
+      } catch (e) {
+        console.warn("PATCH /assessment (metadata) not applied:", e);
+      }
 
-      showToast("Survey Edited Successfully");
+      await apiUpdateSections(assessment.id, buildSectionsPayload(modelSections));
+      await apiUpdateInstructions(assessment.id, instructionLines);
+
       router.refresh();
-      router.push("/director/assessments");
+      setSaveSuccess(true);
+      showToast("Saved. You can keep editing or go back to the list.");
     } catch (e) {
       console.error(e);
       showToast(formatAssessmentApiErrorMessage(e));
@@ -453,47 +403,54 @@ export default function ViewEditAssessmentPage() {
     }
   };
 
-  const selectedSectionData = sections.find((s) => s.id === selectedSection);
-  const currentLayer = selectedSectionData?.layers.find(
-    (l) => l.id === currentLayerId
-  );
-  const currentLayerIndex =
-    currentLayer && selectedSectionData
-      ? selectedSectionData.layers.findIndex((l) => l.id === currentLayer.id)
-      : 0;
+  const displayBanner = bannerFile
+    ? bannerPreview
+    : bannerPreview || (assessment ? resolveApiMediaUrl(assessment.bannerImage) || "" : "") || null;
 
-  const resolvedBannerForDisplay = assessment
-    ? bannerLocalUrl || resolveApiMediaUrl(assessment.bannerImage) || ""
-    : "";
+  if (!assessment && !loadError) {
+    return (
+      <div className={directorPageRoot}>
+        <div className={`${directorPageContainer} px-4 sm:px-6 lg:px-10`}>
+          <DirectorHero
+            title="Edit assessment"
+            subtitle="Loading this assessment. One moment…"
+            image={AssessmentBg}
+            breadcrumbItems={[
+              { label: "Home", href: "/director/home" },
+              { label: "Assessments", href: "/director/assessments" },
+              { label: "…" },
+            ]}
+          />
+        </div>
+        <section className="flex flex-1 items-center justify-center py-20">
+          <div className={directorSpinner} />
+        </section>
+      </div>
+    );
+  }
 
-  if (!assessment) {
+  if (loadError || !assessment) {
     return (
       <div className={directorPageRoot}>
         <DirectorHero
           title="Assessment"
-          subtitle={loadError ? "Could not load this assessment." : "Loading survey builder…"}
+          subtitle="Could not load this assessment."
           image={AssessmentBg}
           breadcrumbItems={[
             { label: "Home", href: "/director/home" },
             { label: "Assessments", href: "/director/assessments" },
-            { label: loadError ? "Error" : "…" },
+            { label: "Error" },
           ]}
         />
-        <section className="flex flex-1 flex-col items-center justify-center gap-6 px-4 pb-16 pt-4">
-          {loadError ? (
-            <>
-              <p className="text-center text-white/80">Check the link or try again from the list.</p>
-              <button
-                type="button"
-                onClick={() => router.push("/director/assessments")}
-                className="rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
-              >
-                Back to assessments
-              </button>
-            </>
-          ) : (
-            <div className={directorSpinner} />
-          )}
+        <section className="flex flex-1 flex-col items-center justify-center gap-6 px-4 pb-16">
+          <p className="text-center text-white/80">Check the link or try again from the list.</p>
+          <button
+            type="button"
+            onClick={() => router.push("/director/assessments")}
+            className="rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-3 text-sm font-semibold text-white"
+          >
+            Back to assessments
+          </button>
         </section>
       </div>
     );
@@ -501,92 +458,439 @@ export default function ViewEditAssessmentPage() {
 
   return (
     <div className={directorPageRoot}>
-      <DirectorHero
-        title={assessment.name || "Edit assessment"}
-        subtitle="Sections, layers, choices, and instructions — save when done."
-        image={AssessmentBg}
-        breadcrumbItems={[
-          { label: "Home", href: "/director/home" },
-          { label: "Assessments", href: "/director/assessments" },
-          { label: assessment.name || "Edit" },
-        ]}
-      />
+      <div className={`${directorPageContainer} px-4 pt-3 sm:px-6 lg:px-10 sm:pt-5`}>
+        <DirectorHero
+          title="Edit assessment"
+          subtitle="Update the title, questions, and plans in one place. Your work is not saved until you use Save at the bottom."
+          image={AssessmentBg}
+          breadcrumbItems={[
+            { label: "Home", href: "/director/home" },
+            { label: "Assessments", href: "/director/assessments" },
+            { label: assessmentName || "Edit" },
+          ]}
+        />
+      </div>
 
-      <section className="relative flex-1 px-0 pb-10 pt-2 sm:px-2">
-        <div className="mx-auto flex h-full max-w-[1600px] flex-col gap-6 lg:flex-row lg:gap-8">
-          {/* Left Sidebar - Sections */}
-          <div className={`w-full flex-shrink-0 space-y-3 lg:w-80 ${directorGlassCard} p-4`}>
-            <div className="mb-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={openAddSectionModal}
-                className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+      <section className="relative flex-1 pb-28 pt-2 sm:pb-32">
+        <div className={`${directorPageContainer} px-4 sm:px-6 lg:px-10`}>
+          <div className={`${directorGlassCard} mx-auto max-w-3xl p-5 sm:p-8`}>
+            {saveSuccess ? (
+              <div
+                className="mb-6 flex flex-col gap-3 rounded-2xl border border-emerald-500/40 bg-emerald-500/15 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+                role="status"
               >
-                <i className="fa-solid fa-plus"></i>
-                Section
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowInstructionsModal(true)}
-                className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+                <p className="text-sm font-medium text-emerald-100">
+                  <i className="fa-solid fa-circle-check mr-2" aria-hidden />
+                  All changes were saved. You can keep making edits, or return to the list.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSaveSuccess(false);
+                    }}
+                    className="rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm font-semibold text-white hover:bg-white/15"
+                  >
+                    Dismiss
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void router.push("/director/assessments");
+                    }}
+                    className="rounded-lg border border-emerald-400/50 bg-emerald-500/25 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500/35"
+                  >
+                    Back to assessments
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="mb-6 flex flex-col gap-2 rounded-2xl border border-white/10 bg-white/[0.04] p-4 sm:p-5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/50">On this page</p>
+              <p className="text-sm text-white/75">
+                <strong>Basics</strong> — what people see in the list. <strong>Instructions</strong> — what they
+                read before they start. <strong>Content</strong> — each section has 4 quick steps and 4
+                follow-up plan levels. <strong>Banner</strong> is optional.
+              </p>
+              <nav
+                className="flex flex-wrap gap-2 pt-1 text-sm"
+                aria-label="Section shortcuts"
               >
-                <i className="fa-solid fa-pen-to-square"></i>
-                Instructions
+                {(
+                  [
+                    ["edit-basics", "Basics"] as [string, string],
+                    ["edit-instructions", "Instructions"],
+                    ...(hasPreSurvey ? (["edit-pre", "Pre-survey"] as [string, string][]) : []),
+                    ["edit-content", "Survey content"],
+                    ["edit-banner", "Banner"],
+                  ] as [string, string][]
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => scrollToId(id)}
+                    className="rounded-full border border-white/20 bg-white/5 px-3 py-1.5 font-medium text-white/90 transition hover:border-[#8ec5eb]/40 hover:bg-white/10"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            <div className="mb-8 scroll-mt-20 space-y-5" id="edit-basics">
+              <h2 className="text-lg font-bold text-white">Basics</h2>
+              <p className="text-sm text-white/60">
+                Name and short description are shown on assessment cards. Survey type sets whether
+                a short pre-question list appears first.
+              </p>
+              <div>
+                <label className={directorLabelClass} htmlFor="field-assessment-name">
+                  Assessment name (required)
+                </label>
+                <input
+                  id="field-assessment-name"
+                  type="text"
+                  value={assessmentName}
+                  onChange={(e) => setAssessmentName(e.target.value)}
+                  className={directorInputClass}
+                  placeholder="e.g. Church readiness self-assessment"
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <label className={directorLabelClass} htmlFor="field-assessment-desc">
+                  Short description (required)
+                </label>
+                <textarea
+                  id="field-assessment-desc"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  className={`${directorInputClass} min-h-[100px] resize-y`}
+                  placeholder="A single sentence is enough. This appears on thumbnails and the assessment list."
+                />
+              </div>
+              <div>
+                <span className={directorLabelClass}>Survey type</span>
+                <p className="mb-3 text-sm text-white/60">
+                  Choose whether people answer a few warm-up questions before the main survey.
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setHasPreSurvey(false)}
+                    aria-pressed={!hasPreSurvey}
+                    className={`rounded-2xl border-2 p-4 text-left transition ${
+                      !hasPreSurvey
+                        ? "border-[#8ec5eb] bg-[#8ec5eb]/10 ring-2 ring-[#8ec5eb]/30"
+                        : "border-white/15 bg-white/[0.03] hover:border-white/30"
+                    }`}
+                  >
+                    <span className="block text-sm font-bold text-white">Main survey only (PMP)</span>
+                    <span className="mt-1 block text-xs text-white/65">No pre-survey step. Simpler path.</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setHasPreSurvey(true)}
+                    aria-pressed={hasPreSurvey}
+                    className={`rounded-2xl border-2 p-4 text-left transition ${
+                      hasPreSurvey
+                        ? "border-[#8ec5eb] bg-[#8ec5eb]/10 ring-2 ring-[#8ec5eb]/30"
+                        : "border-white/15 bg-white/[0.03] hover:border-white/30"
+                    }`}
+                  >
+                    <span className="block text-sm font-bold text-white">Pre-survey + main (CMA)</span>
+                    <span className="mt-1 block text-xs text-white/65">Add a few text or number questions first, then the main flow.</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-8 scroll-mt-20" id="edit-instructions">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-lg font-bold text-white">Instructions for participants</h2>
+                  <p className="mt-1 text-sm text-white/60">At least one line. These are shown with the survey.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddInstruction}
+                  className={directorBtnSecondary + " !py-2 !text-sm"}
+                >
+                  <i className="fa-solid fa-plus" />
+                  Add line
+                </button>
+              </div>
+              <div className="space-y-3">
+                {instructions.map((instruction, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={instruction}
+                      onChange={(e) => handleUpdateInstruction(idx, e.target.value)}
+                      className={directorInputClass + " min-w-0 flex-1"}
+                      placeholder={
+                        idx === 0
+                          ? "e.g. Take your time and answer based on your real experience."
+                          : "Another instruction line (optional)"
+                      }
+                    />
+                    {instructions.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveInstruction(idx)}
+                        className="shrink-0 rounded-lg border border-red-400/30 bg-red-500/15 px-3 py-2 text-sm font-semibold text-red-200"
+                        aria-label={`Remove instruction ${idx + 1}`}
+                      >
+                        <i className="fa-solid fa-trash" />
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {hasPreSurvey ? (
+              <div className="mb-8 scroll-mt-20" id="edit-pre">
+                <h2 className="mb-1 text-lg font-bold text-white">Pre-survey questions</h2>
+                <p className="mb-4 text-sm text-white/70">
+                  Short fields people complete before the main flow. They are not multiple choice.
+                </p>
+                <div className="space-y-5">
+                  {preSurveyRows.map((row, qIdx) => (
+                    <div
+                      key={row.id}
+                      className="space-y-3 rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6"
+                    >
+                      <div className="flex flex-wrap items-end gap-3">
+                        <div className="min-w-[200px] flex-1">
+                          <label className={directorLabelClass}>Question {qIdx + 1}</label>
+                          <input
+                            type="text"
+                            value={row.text}
+                            onChange={(e) => handleUpdatePreSurvey(qIdx, "text", e.target.value)}
+                            className={directorInputClass}
+                          />
+                        </div>
+                        <div className="w-full sm:w-40">
+                          <label className={directorLabelClass}>Type</label>
+                          <select
+                            value={row.type}
+                            onChange={(e) => handleUpdatePreSurvey(qIdx, "type", e.target.value)}
+                            className={`${directorInputClass} cursor-pointer`}
+                          >
+                            <option value="number">Number</option>
+                            <option value="text">Text</option>
+                          </select>
+                        </div>
+                        <div className="min-w-[160px] flex-1">
+                          <label className={directorLabelClass}>Placeholder</label>
+                          <input
+                            type="text"
+                            value={row.placeholder}
+                            onChange={(e) => handleUpdatePreSurvey(qIdx, "placeholder", e.target.value)}
+                            className={directorInputClass}
+                          />
+                        </div>
+                        {preSurveyRows.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePreSurveyQuestion(qIdx)}
+                            className="rounded-lg border border-white/20 px-3 py-2 text-sm text-white/80"
+                          >
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={handleAddPreSurveyQuestion}
+                    className={directorBtnSecondary + " !py-2 !text-sm"}
+                  >
+                    <i className="fa-solid fa-plus" />
+                    Add pre-survey question
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="mb-4 scroll-mt-20" id="edit-content">
+              <h2 className="text-lg font-bold text-white">Survey content</h2>
+              <p className="mb-2 text-sm text-white/65">
+                Add one or more <strong>sections</strong>. Each has four <strong>steps</strong> (what people
+                choose from) and four <strong>plan levels</strong> (suggested follow-up). Every step needs at
+                least one non-empty choice.
+              </p>
+            </div>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-sm text-white/50">
+                {wizardSections.length} section{wizardSections.length === 1 ? "" : "s"}
+              </p>
+              <button type="button" onClick={handleAddSection} className={directorBtnSecondary + " !py-2 !text-sm"}>
+                <i className="fa-solid fa-plus" />
+                Add section
               </button>
             </div>
 
-            {sections.map((section, index) => (
-              <div
-                key={section.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => setSelectedSection(section.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setSelectedSection(section.id);
-                  }
-                }}
-                className={`cursor-pointer rounded-xl border-2 p-4 transition-all ${
-                  selectedSection === section.id
-                    ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/15 text-white"
-                    : "border-white/10 bg-white/5 text-white/90 hover:border-white/25 hover:bg-white/10"
-                }`}
-              >
-                <div className="mb-2">
-                  <span className="rounded bg-[#8ec5eb]/25 px-2 py-1 text-xs font-bold text-[#cde2f2]">
-                    Section {index + 1}
-                  </span>
-                </div>
-                <h3 className="text-sm font-semibold leading-tight">{section.name}</h3>
-                {section.description ? (
-                  <p className="mt-1 text-xs text-white/60">{section.description}</p>
-                ) : null}
-              </div>
-            ))}
-          </div>
+            <div className="space-y-5">
+              {wizardSections.map((section, sectionIdx) => (
+                <div
+                  key={section.id}
+                  className="space-y-4 rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-base font-semibold text-[#8ec5eb]">Section {sectionIdx + 1}</h3>
+                    {wizardSections.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSection(sectionIdx)}
+                        className="rounded-lg border border-red-400/30 bg-red-500/15 px-3 py-1.5 text-sm font-semibold text-red-200"
+                      >
+                        <i className="fa-solid fa-trash mr-1" />
+                        Remove section
+                      </button>
+                    ) : null}
+                  </div>
+                  <div>
+                    <label className={directorLabelClass}>Section name</label>
+                    <input
+                      type="text"
+                      value={section.name}
+                      onChange={(e) => handleUpdateSection(sectionIdx, "name", e.target.value)}
+                      className={directorInputClass}
+                      placeholder="e.g. How you work with others"
+                    />
+                  </div>
+                  <div>
+                    <label className={directorLabelClass}>Guidelines (shown to participants)</label>
+                    <textarea
+                      value={section.guidelines}
+                      onChange={(e) => handleUpdateSection(sectionIdx, "guidelines", e.target.value)}
+                      className={`${directorInputClass} min-h-[72px] resize-y text-sm`}
+                      rows={2}
+                      placeholder="What this part of the survey is about"
+                    />
+                  </div>
+                  <p className="text-sm text-white/70">
+                    Below: <strong>Steps 1–{WIZARD_LAYER_COUNT}</strong> are the answer choices. Then add
+                    <strong> plan lines</strong> for each of the four levels.
+                  </p>
 
-          {/* Main Content Area */}
-          <div className={`min-w-0 flex-1 ${directorGlassCard} p-5 sm:p-6`}>
-            <div className="mb-6 rounded-xl border border-white/15 bg-white/[0.04] p-4 sm:p-5">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  {section.layers.map((layer, layerIdx) => (
+                    <div key={layer.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-white/90">Step {layerIdx + 1} — choices</span>
+                        <button
+                          type="button"
+                          onClick={() => handleAddLayerChoice(sectionIdx, layerIdx)}
+                          className="text-xs font-semibold text-[#8ec5eb] hover:underline"
+                        >
+                          + Choice
+                        </button>
+                      </div>
+                      {layer.choices.map((choice, choiceIdx) => (
+                        <div key={choiceIdx} className="mb-2 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={choice}
+                            onChange={(e) =>
+                              handleUpdateLayerChoice(sectionIdx, layerIdx, choiceIdx, e.target.value)
+                            }
+                            className={directorInputClass + " min-w-0 flex-1"}
+                            placeholder={`Option ${choiceIdx + 1}`}
+                          />
+                          {layer.choices.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveLayerChoice(sectionIdx, layerIdx, choiceIdx)}
+                              className="shrink-0 rounded-lg border border-red-400/30 bg-red-500/15 px-2.5 py-2 text-sm text-red-200"
+                            >
+                              <i className="fa-solid fa-trash" />
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                      <div className="mt-3">
+                        <label className="mb-1 block text-xs font-medium text-white/60">
+                          Optional: extra notes (one per line) linked to this step
+                        </label>
+                        <textarea
+                          value={layer.notes}
+                          onChange={(e) => handleUpdateLayerNotes(sectionIdx, layerIdx, e.target.value)}
+                          rows={2}
+                          className={`${directorInputClass} min-h-[56px] resize-y text-sm`}
+                        />
+                      </div>
+                    </div>
+                  ))}
+
+                  {section.plans.map((plan, planIdx) => (
+                    <div key={plan.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold text-white/85" title="Development plan for this level">
+                          {plan.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleAddPlanItem(sectionIdx, planIdx)}
+                          className="text-xs font-semibold text-[#8ec5eb] hover:underline"
+                        >
+                          + Item
+                        </button>
+                      </div>
+                      {plan.items.map((item, itemIdx) => (
+                        <div key={itemIdx} className="mb-2 flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={item}
+                            onChange={(e) =>
+                              handleUpdatePlanItem(sectionIdx, planIdx, itemIdx, e.target.value)
+                            }
+                            className={directorInputClass + " min-w-0 flex-1"}
+                            placeholder={`Plan line ${itemIdx + 1}`}
+                          />
+                          {plan.items.length > 1 ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRemovePlanItem(sectionIdx, planIdx, itemIdx)}
+                              className="shrink-0 rounded-lg border border-red-400/30 bg-red-500/15 px-2.5 py-2 text-sm text-red-200"
+                            >
+                              <i className="fa-solid fa-trash" />
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 scroll-mt-20" id="edit-banner">
+              <h2 className="mb-1 text-lg font-bold text-white">Banner</h2>
+              <p className="mb-3 text-sm text-white/60">Optional. Appears on cards and the top of the survey.</p>
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                 <span className={`${directorLabelClass} mb-0 flex items-center gap-2`}>
                   <i className="fa-solid fa-image text-[#8ec5eb]" />
-                  Banner image
+                  Image file
                 </span>
-                {bannerFile || bannerLocalUrl ? (
+                {bannerFile ? (
                   <button
                     type="button"
-                    onClick={clearPendingBanner}
+                    onClick={() => {
+                      if (bannerPreview?.startsWith("blob:")) URL.revokeObjectURL(bannerPreview);
+                      setBannerFile(null);
+                      setBannerPreview(assessment?.bannerImage ? resolveApiMediaUrl(assessment.bannerImage) : null);
+                    }}
                     className="text-sm font-semibold text-red-300/90 hover:underline"
                   >
                     Discard new image
                   </button>
                 ) : null}
               </div>
-              <p className="mb-3 text-xs text-white/55">
-                Shown on assessment cards. Choose a file, then use Save changes to upload.
-              </p>
               <input
                 ref={bannerInputRef}
                 type="file"
@@ -596,47 +900,45 @@ export default function ViewEditAssessmentPage() {
                 onChange={(e) => {
                   const f = e.target.files?.[0] || null;
                   e.target.value = "";
-                  if (bannerLocalUrl?.startsWith("blob:")) URL.revokeObjectURL(bannerLocalUrl);
+                  if (bannerPreview?.startsWith("blob:")) URL.revokeObjectURL(bannerPreview);
                   setBannerFile(f);
-                  setBannerLocalUrl(f ? URL.createObjectURL(f) : null);
+                  setBannerPreview(f ? URL.createObjectURL(f) : resolveApiMediaUrl(assessment.bannerImage) || null);
                 }}
               />
-              <div className="space-y-3 rounded-2xl border-2 border-dashed border-white/25 bg-white/[0.04] px-4 py-4">
+              <div className="mt-2 space-y-3 rounded-2xl border-2 border-dashed border-white/25 bg-white/[0.04] px-4 py-6">
                 <div className="flex flex-wrap justify-center gap-2">
                   <button
                     type="button"
                     onClick={() => bannerInputRef.current?.click()}
-                    className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                    className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white"
                   >
-                    {resolvedBannerForDisplay ? "Change banner" : "Upload banner"}
+                    {displayBanner ? "Replace banner" : "Upload banner"}
                   </button>
                 </div>
-                {resolvedBannerForDisplay ? (
+                {displayBanner ? (
                   <div
-                    className="relative mx-auto h-36 w-full max-w-md cursor-pointer overflow-hidden rounded-xl"
+                    className="relative mx-auto h-40 w-full max-w-md cursor-pointer overflow-hidden rounded-xl"
                     onClick={() => bannerInputRef.current?.click()}
+                    role="button"
+                    tabIndex={0}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         bannerInputRef.current?.click();
                       }
                     }}
-                    role="button"
-                    tabIndex={0}
-                    aria-label="Change banner image"
                   >
-                    {resolvedBannerForDisplay.startsWith("blob:") ||
-                    resolvedBannerForDisplay.startsWith("data:") ? (
+                    {displayBanner.startsWith("blob:") || displayBanner.startsWith("data:") ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={resolvedBannerForDisplay} alt="" className="h-36 w-full object-cover" />
+                      <img src={displayBanner} alt="" className="h-40 w-full object-cover" />
                     ) : (
                       <Image
-                        src={resolvedBannerForDisplay}
+                        src={displayBanner}
                         alt=""
                         width={800}
-                        height={288}
-                        className="h-36 w-full object-cover"
-                        unoptimized={isRemoteImageSrc(resolvedBannerForDisplay)}
+                        height={320}
+                        className="h-40 w-full object-cover"
+                        unoptimized={isRemoteImageSrc(displayBanner)}
                       />
                     )}
                     <p className="absolute bottom-2 left-1/2 w-[90%] -translate-x-1/2 rounded bg-black/55 px-2 py-1 text-center text-xs text-white/90">
@@ -647,649 +949,63 @@ export default function ViewEditAssessmentPage() {
                   <button
                     type="button"
                     onClick={() => bannerInputRef.current?.click()}
-                    className="flex w-full flex-col items-center gap-2 py-6"
+                    className="flex w-full flex-col items-center justify-center gap-2 py-6"
                   >
                     <i className="fa-solid fa-cloud-arrow-up text-2xl text-[#8ec5eb]" />
-                    <span className="text-sm font-semibold text-white">Choose an image (PNG or JPG)</span>
+                    <span className="text-sm font-semibold text-white">Or click to choose a file</span>
                   </button>
                 )}
               </div>
             </div>
 
-            {selectedSectionData ? (
-              <>
-                {/* Help Text */}
-                <div className="mb-6 rounded-lg border border-white/15 bg-white/5 p-4">
-                  <p className="text-sm text-white/85">
-                    Choose the option that best matches how you feel and who you
-                    are, as this self-assessment helps you understand yourself
-                    better. Your accuracy allows us to provide the best support
-                    and guidance.
-                  </p>
-                </div>
-
-                {/* Divider and Action Buttons */}
-                <div className="mb-6 border-t border-white/15" />
-
-                <div className="mb-6 flex justify-end gap-2">
-                  {!isSelectionMode ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setIsSelectionMode(true)}
-                        className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
-                      >
-                        <i className="fa-solid fa-check-square"></i>
-                        Select
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddLayerModal(true)}
-                        className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
-                      >
-                        <i className="fa-solid fa-layer-group"></i>
-                        Layer
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="flex items-center font-semibold text-white">
-                        {selectedChoices.length} Selected
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleDeleteSelected}
-                        disabled={selectedChoices.length === 0}
-                        className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold ${
-                          selectedChoices.length > 0
-                            ? "border border-red-400/40 bg-red-500/20 text-red-100 hover:bg-red-500/30"
-                            : "cursor-not-allowed border border-white/10 bg-white/5 text-white/40"
-                        }`}
-                      >
-                        <i className="fa-solid fa-trash"></i>
-                        Delete
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setIsSelectionMode(false);
-                          setSelectedChoices([]);
-                        }}
-                        className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {/* Layers - Each in its own bordered container */}
-                <div className="space-y-6">
-                  {selectedSectionData.layers.map((layer, layerIdx) => (
-                    <div
-                      key={layer.id}
-                      className="rounded-xl border border-white/15 bg-white/5 p-5"
-                    >
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-semibold text-white">Layer {layerIdx + 1}</h3>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCurrentLayerId(layer.id);
-                            setShowRecommendationsModal(true);
-                          }}
-                          className="flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
-                        >
-                          <i className="fa-solid fa-pen-to-square"></i>
-                          Edit Recommendations
-                        </button>
-                      </div>
-
-                      <div className="mb-4 space-y-2">
-                        {layer.choices.map((choice, choiceIdx) => (
-                          <div
-                            key={choice.id}
-                            className={`flex items-center gap-3 rounded-lg border p-3 text-white transition-all ${
-                              selectedChoices.includes(choice.id)
-                                ? "border-[#8ec5eb] ring-2 ring-[#8ec5eb]/40"
-                                : "border-white/15 bg-white/5"
-                            } ${isSelectionMode ? "cursor-pointer hover:border-[#8ec5eb]/50" : ""}`}
-                            onClick={() =>
-                              isSelectionMode && handleSelectChoice(choice.id)
-                            }
-                            role="group"
-                          >
-                            {isSelectionMode && (
-                              <input
-                                type="checkbox"
-                                checked={selectedChoices.includes(choice.id)}
-                                onChange={() => handleSelectChoice(choice.id)}
-                                className="h-5 w-5 rounded text-[#2E3B8E] focus:ring-[#2E3B8E]"
-                              />
-                            )}
-                            <span className="w-7 shrink-0 text-sm font-semibold">
-                              {choiceIdx + 1}.
-                            </span>
-                            {isSelectionMode ? (
-                              <span className="flex-1 text-sm">{choice.text}</span>
-                            ) : (
-                              <input
-                                type="text"
-                                value={choice.text}
-                                onChange={(e) =>
-                                  handleUpdateChoiceText(
-                                    selectedSectionData.id,
-                                    layer.id,
-                                    choice.id,
-                                    e.target.value,
-                                  )
-                                }
-                                onClick={(e) => e.stopPropagation()}
-                                placeholder="Choice text"
-                                className="min-w-0 flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 outline-none focus:border-[#8ec5eb]/50 focus:ring-1 focus:ring-[#8ec5eb]/30"
-                              />
-                            )}
-                            {!isSelectionMode && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteSingleChoice(
-                                    selectedSectionData.id,
-                                    layer.id,
-                                    choice.id,
-                                  );
-                                }}
-                                className="shrink-0 rounded-lg border border-red-400/30 bg-red-500/20 px-2.5 py-1.5 text-sm text-red-100 hover:bg-red-500/30"
-                                title="Remove choice"
-                                aria-label="Remove choice"
-                              >
-                                <i className="fa-solid fa-trash" />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (selectedSectionData) {
-                              handleAppendChoice(selectedSectionData.id, layer.id);
-                            }
-                          }}
-                          className="flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
-                        >
-                          <i className="fa-solid fa-plus"></i>
-                          Choice
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="flex h-full min-h-[200px] items-center justify-center">
-                <div className="text-center text-white/80">
-                  <i className="fa-solid fa-list-check mb-4 text-5xl opacity-40"></i>
-                  <p className="text-lg font-semibold">Select a section to view</p>
-                </div>
-              </div>
-            )}
+            <p className="mt-6 text-center text-sm text-white/40">
+              Use the bar at the bottom of the screen to save or go back.
+            </p>
           </div>
-        </div>
-
-        {/* Bottom Action Buttons */}
-        <div className="mx-auto mt-8 flex max-w-[1600px] flex-wrap justify-end gap-4 px-0">
-          <button
-            type="button"
-            onClick={() => router.push("/director/assessments")}
-            className="rounded-xl border border-white/25 bg-white/10 px-8 py-3 text-sm font-semibold text-white transition hover:bg-white/15"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleSaveChanges()}
-            disabled={saving}
-            className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-8 py-3 text-sm font-semibold text-white shadow-[0_0_0_1px_rgba(142,197,235,0.15)] transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? "Saving…" : "Save changes"}
-          </button>
         </div>
       </section>
 
-      {/* Add Section Modal (Offcanvas from right) */}
-      {showAddSectionModal && (
-        <div className="fixed inset-0 bg-black/60 flex justify-end z-50">
-          <div className="bg-white w-full max-w-lg h-full overflow-y-auto shadow-2xl animate-slide-left">
-            <div className="sticky top-0 bg-white border-b p-6 flex justify-between items-center z-10">
-              <h3 className="text-2xl font-bold text-gray-900">Add Section</h3>
-              <button
-                type="button"
-                onClick={closeAddSectionModal}
-                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg"
-              >
-                <i className="fa-solid fa-xmark text-gray-600"></i>
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              <h4 className="text-xl font-bold text-gray-900">
-                Section {sections.length + 1}
-              </h4>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Name of Section
-                </label>
-                <input
-                  type="text"
-                  value={newSectionName}
-                  onChange={(e) => setNewSectionName(e.target.value)}
-                  placeholder="Enter Name of Section"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900 placeholder-gray-400"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Guidelines
-                </label>
-                <input
-                  type="text"
-                  value={newSectionGuidelines}
-                  onChange={(e) => setNewSectionGuidelines(e.target.value)}
-                  placeholder="Enter Guidelines"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900 placeholder-gray-400"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700" htmlFor="add-section-layer-count">
-                  Number of levels (layers)
-                </label>
-                <select
-                  id="add-section-layer-count"
-                  value={newSectionLayers}
-                  onChange={(e) => setNewSectionLayers(Number(e.target.value))}
-                  className="w-full rounded-lg border-2 border-gray-300 bg-white px-4 py-3 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] [&>option]:bg-white [&>option]:text-gray-900"
-                  style={{ colorScheme: "light" }}
-                >
-                  {[1, 2, 3, 4, 5, 6].map((num) => (
-                    <option key={num} value={num} className="bg-white text-gray-900">
-                      {num} {num === 1 ? "level" : "levels"}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-xs text-gray-500">
-                  Create flow uses four levels; pick how many you need for this section.
-                </p>
-              </div>
-
-              {Array.from({ length: newSectionLayers }).map((_, i) => (
-                <div key={`layer-block-${i}`} className="border-t border-gray-200 pt-4">
-                  <div className="mb-3 flex items-center justify-between">
-                    <label className="text-base font-bold text-gray-900">Level {i + 1}</label>
-                    <button
-                      type="button"
-                      onClick={() => appendModalChoice(i)}
-                      className="flex items-center gap-1 rounded-lg border-2 border-[#2E3B8E] bg-white px-3 py-1 text-sm font-semibold text-[#2E3B8E] hover:bg-blue-50"
-                    >
-                      <i className="fa-solid fa-plus"></i>
-                      Choice
-                    </button>
-                  </div>
-                  <div className="space-y-2">
-                    {(newSectionLayerChoices[i] ?? [""]).map((text, j) => (
-                      <div key={`${i}-${j}`} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={text}
-                          onChange={(e) => updateModalChoice(i, j, e.target.value)}
-                          placeholder={`Choice ${j + 1}`}
-                          className="min-w-0 flex-1 rounded-lg border border-gray-300 px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#2E3B8E]"
-                        />
-                        {(newSectionLayerChoices[i] ?? [""]).length > 1 ? (
-                          <button
-                            type="button"
-                            onClick={() => removeModalChoice(i, j)}
-                            className="shrink-0 rounded-lg border border-red-200 px-2.5 py-2 text-sm text-red-600 hover:bg-red-50"
-                            aria-label={`Remove choice ${j + 1}`}
-                            title="Remove"
-                          >
-                            <i className="fa-solid fa-trash" />
-                          </button>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="sticky bottom-0 bg-white border-t p-6 flex justify-between gap-4">
-              <button
-                type="button"
-                onClick={closeAddSectionModal}
-                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleAddSection()}
-                disabled={!newSectionName.trim() || savingSection}
-                className={`flex-1 px-6 py-3 rounded-lg font-semibold ${newSectionName.trim() && !savingSection
-                  ? "bg-[#2E3B8E] text-white hover:bg-[#1F2A6E]"
-                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  }`}
-              >
-                {savingSection ? "Saving…" : "Create Section"}
-              </button>
-            </div>
+      <div
+        className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#041f35]/95 px-4 py-3 shadow-[0_-8px_32px_rgba(0,0,0,0.35)] backdrop-blur-md sm:px-6"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
+        <div
+          className={`${directorPageContainer} flex w-full max-w-3xl flex-col items-stretch gap-3 sm:mx-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end`}
+        >
+          <p className="order-2 text-center text-xs text-white/50 sm:order-1 sm:mr-auto sm:text-left sm:text-sm">
+            Nothing is stored until you press Save
+          </p>
+          <div className="order-1 flex w-full flex-wrap justify-end gap-2 sm:order-2 sm:w-auto">
+            <button
+              type="button"
+              onClick={() => {
+                if (saving) return;
+                void router.push("/director/assessments");
+              }}
+              className={directorBtnSecondary}
+              disabled={saving}
+            >
+              Back without saving
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleSaveChanges()}
+              disabled={saving}
+              className={directorBtnPrimary}
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Add Layer Modal */}
-      {showAddLayerModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-8 max-w-lg w-full shadow-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold text-gray-900">Add Layer</h3>
-              <button
-                onClick={() => setShowAddLayerModal(false)}
-                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg"
-              >
-                <i className="fa-solid fa-xmark text-gray-600"></i>
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-base font-bold text-gray-900">
-                    Layer {selectedSectionData?.layers.length! + 1}
-                  </label>
-                  <button className="px-3 py-1 bg-white border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg text-sm font-semibold hover:bg-blue-50 flex items-center gap-1">
-                    <i className="fa-solid fa-plus"></i>
-                    Choice
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Choice 1"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900 placeholder-gray-400"
-                />
-              </div>
-
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-base font-bold text-gray-900">
-                    Layer {selectedSectionData?.layers.length! + 1} -
-                    Recommendations
-                  </label>
-                  <button className="px-3 py-1 bg-white border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg text-sm font-semibold hover:bg-blue-50 flex items-center gap-1">
-                    <i className="fa-solid fa-plus"></i>
-                    Suggestion
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Suggestion 1"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900 placeholder-gray-400"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-4 mt-8">
-              <button
-                onClick={() => setShowAddLayerModal(false)}
-                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddLayer}
-                className="flex-1 px-6 py-3 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E]"
-              >
-                Create Layer
-              </button>
-            </div>
+      {toast ? (
+        <div className="fixed bottom-24 left-1/2 z-[100] max-w-md -translate-x-1/2 px-4 sm:bottom-28">
+          <div className="rounded-xl border border-white/15 bg-[#041f35]/95 px-5 py-3 text-center text-sm font-semibold text-white shadow-xl backdrop-blur-md">
+            {toast}
           </div>
         </div>
-      )}
-
-      {/* Recommendations Modal */}
-      {showRecommendationsModal && currentLayer && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#2E3B8E] rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="p-6 border-b border-white/20 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-white">
-                Level {currentLayerIndex + 1} — recommendations
-              </h3>
-              <button
-                onClick={() => {
-                  setShowRecommendationsModal(false);
-                  setRecSelectionMode(false);
-                  setSelectedRecs([]);
-                }}
-                className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-lg text-white"
-              >
-                <i className="fa-solid fa-xmark"></i>
-              </button>
-            </div>
-
-            <div className="p-6">
-              <div className="flex gap-2 mb-4">
-                {!recSelectionMode ? (
-                  <>
-                    <button
-                      onClick={() => setRecSelectionMode(true)}
-                      className="px-4 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 text-sm flex items-center gap-2"
-                    >
-                      <i className="fa-solid fa-check"></i>
-                      Select
-                    </button>
-                    <button className="px-4 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 text-sm flex items-center gap-2">
-                      <i className="fa-solid fa-lightbulb"></i>
-                      Suggestion
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-white font-semibold">
-                      {selectedRecs.length} Selected
-                    </span>
-                    <button
-                      onClick={handleDeleteRecs}
-                      disabled={selectedRecs.length === 0}
-                      className={`px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 ${selectedRecs.length > 0
-                        ? "bg-white text-red-600 hover:bg-red-50"
-                        : "bg-white/20 text-white/50 cursor-not-allowed"
-                        }`}
-                    >
-                      <i className="fa-solid fa-trash"></i>
-                      Delete
-                    </button>
-                  </>
-                )}
-              </div>
-
-              <div className="space-y-2 mb-6 max-h-96 overflow-y-auto">
-                {currentLayer.recommendations.map((rec) => (
-                  <div
-                    key={rec.id}
-                    className={`bg-[#4A6FA5] border rounded-lg p-3 text-white flex items-center gap-3 transition-all ${selectedRecs.includes(rec.id)
-                      ? "border-white ring-2 ring-white"
-                      : "border-white/30"
-                      } ${recSelectionMode
-                        ? "cursor-pointer hover:border-white"
-                        : ""
-                      }`}
-                    onClick={() => recSelectionMode && handleSelectRec(rec.id)}
-                  >
-                    {recSelectionMode ? (
-                      <input
-                        type="checkbox"
-                        checked={selectedRecs.includes(rec.id)}
-                        onChange={() => handleSelectRec(rec.id)}
-                        className="w-5 h-5 text-[#2E3B8E] rounded"
-                      />
-                    ) : (
-                      <i className="fa-solid fa-star text-yellow-400"></i>
-                    )}
-                    <span className="text-sm flex-1">{rec.text}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-white/20 flex justify-between gap-4">
-              <button
-                onClick={() => {
-                  setShowRecommendationsModal(false);
-                  setRecSelectionMode(false);
-                  setSelectedRecs([]);
-                }}
-                className="flex-1 px-6 py-3 bg-white text-gray-700 rounded-lg font-semibold hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveRecommendations}
-                className="flex-1 px-6 py-3 bg-[#1F2A6E] text-white rounded-lg font-semibold hover:bg-[#0F1A5E]"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Instructions Modal */}
-      {showInstructionsModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl">
-            <div className="p-6 border-b flex justify-between items-center">
-              <h3 className="text-2xl font-bold text-gray-900">
-                Comprehensive Self Assessment Survey
-              </h3>
-              <button
-                onClick={() => setShowInstructionsModal(false)}
-                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg"
-              >
-                <i className="fa-solid fa-xmark text-gray-600"></i>
-              </button>
-            </div>
-
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-lg font-bold text-gray-900">
-                  Survey Guidelines
-                </h4>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowInstructionsModal(false)}
-                    className="px-4 py-2 bg-white border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg font-semibold hover:bg-blue-50 text-sm flex items-center gap-2"
-                  >
-                    <i className="fa-solid fa-pen-to-square"></i>
-                    Edit Next Section
-                  </button>
-                  <button
-                    onClick={handleDeleteInstructions}
-                    className="px-4 py-2 bg-white border-2 border-red-600 text-red-600 rounded-lg font-semibold hover:bg-red-50 text-sm flex items-center gap-2"
-                  >
-                    <i className="fa-solid fa-trash"></i>
-                    Delete
-                  </button>
-                  <button className="px-4 py-2 bg-white border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg font-semibold hover:bg-blue-50 text-sm flex items-center gap-2">
-                    <i className="fa-solid fa-file-lines"></i>
-                    Instruction
-                  </button>
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="text-sm font-medium text-gray-700 mb-2 block">
-                  {instructions.filter((i) => i.checked).length} Selected
-                </label>
-              </div>
-
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {instructions.map((instruction) => (
-                  <div
-                    key={instruction.id}
-                    className="flex items-start gap-2 rounded-lg border border-gray-200 p-3 hover:bg-gray-50"
-                  >
-                    <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={instruction.checked}
-                        onChange={() => {
-                          setInstructions(
-                            instructions.map((inst) =>
-                              inst.id === instruction.id
-                                ? { ...inst, checked: !inst.checked }
-                                : inst,
-                            ),
-                          );
-                        }}
-                        className="mt-0.5 h-5 w-5 rounded text-[#2E3B8E]"
-                      />
-                      <span className="text-sm text-gray-700">{instruction.text}</span>
-                    </label>
-                    {instructions.length > 1 ? (
-                      <button
-                        type="button"
-                        title="Remove this instruction from the list"
-                        aria-label="Remove instruction"
-                        onClick={() =>
-                          setInstructions((prev) => prev.filter((i) => i.id !== instruction.id))
-                        }
-                        className="shrink-0 rounded-lg border border-red-200 px-2 py-1.5 text-red-600 hover:bg-red-50"
-                      >
-                        <i className="fa-solid fa-trash text-sm" />
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="p-6 border-t flex justify-between gap-4">
-              <button
-                onClick={() => setShowInstructionsModal(false)}
-                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveInstructions}
-                className="flex-1 px-6 py-3 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E]"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[70] animate-fade-in">
-          <div className="bg-white rounded-xl px-6 py-4 shadow-2xl flex items-center gap-3 border-2 border-green-500">
-            <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-              <i className="fa-solid fa-check text-white text-xs"></i>
-            </div>
-            <span className="text-[#2E3B8E] font-semibold">{toast}</span>
-          </div>
-        </div>
-      )}
-
+      ) : null}
     </div>
   );
 }
