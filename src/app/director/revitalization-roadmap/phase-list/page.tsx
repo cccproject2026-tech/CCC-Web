@@ -25,6 +25,7 @@ import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 type NestedItem = {
   _id?: string;
   name?: string;
+  title?: string;
   roadMapDetails?: string;
   description?: string;
   duration?: string;
@@ -53,6 +54,16 @@ function unwrapRoadmap(res: unknown): RoadmapDoc | null {
     return data as RoadmapDoc;
   }
   return r as RoadmapDoc;
+}
+
+function nestedRoadmapRows(rm: RoadmapDoc | null): NestedItem[] {
+  if (!rm?.roadmaps) return [];
+  const raw = rm.roadmaps as unknown;
+  if (Array.isArray(raw)) return raw as NestedItem[];
+  if (raw && typeof raw === "object" && Array.isArray((raw as { items?: NestedItem[] }).items)) {
+    return (raw as { items: NestedItem[] }).items;
+  }
+  return [];
 }
 
 function formatAxiosError(e: unknown): string {
@@ -113,9 +124,9 @@ export default function DirectorPhaseListPage() {
   }, [roadmapId]);
 
   const items = useMemo(() => {
-    const list = (roadmap?.roadmaps || []).map((x) => ({
+    const list = nestedRoadmapRows(roadmap).map((x) => ({
       id: String(x._id || ""),
-      title: String(x.name || "Untitled phase"),
+      title: String(x.name || x.title || "Untitled phase"),
       desc: String(x.roadMapDetails || x.description || ""),
       duration: String(x.duration || ""),
       phase: String(x.phase || ""),
@@ -124,7 +135,7 @@ export default function DirectorPhaseListPage() {
     const query = q.trim().toLowerCase();
     if (!query) return list;
     return list.filter((it) => it.title.toLowerCase().includes(query) || it.desc.toLowerCase().includes(query));
-  }, [roadmap?.roadmaps, q]);
+  }, [roadmap, q]);
 
   const goToCreatePhaseTask = () => {
     const qp = new URLSearchParams();
@@ -140,7 +151,7 @@ export default function DirectorPhaseListPage() {
     setDeleting(true);
     try {
       /** Backend aligns with roadmap-form: nested phases are removed by PATCH parent `roadmaps` (no DELETE /nested). */
-      const before = roadmap.roadmaps || [];
+      const before = nestedRoadmapRows(roadmap);
       const remaining = before.filter((r) => String(r?._id ?? "") !== String(confirmDelete.id));
       if (remaining.length === before.length) {
         setDeleteError("Could not find this task. Try refreshing the page.");
@@ -164,16 +175,19 @@ export default function DirectorPhaseListPage() {
   };
 
   const openPhaseTaskPage = (nestedRoadmapId: string, opts?: { viewOnly?: boolean }) => {
-    const phase = roadmap?.roadmaps?.find((r) => String(r._id) === nestedRoadmapId);
+    const phase = nestedRoadmapRows(roadmap).find((r) => String(r._id) === nestedRoadmapId);
     if (!phase) return;
+    const sub = String(phase.roadMapDetails || phase.description || "");
+    const longDesc = String(phase.description || phase.roadMapDetails || "");
     const qp = new URLSearchParams();
     qp.set("roadmapId", roadmapId);
     qp.set("nestedRoadmapId", nestedRoadmapId);
     qp.set("type", "phase");
     qp.set("isEditMode", "true");
     if (opts?.viewOnly) qp.set("viewOnly", "true");
-    qp.set("name", String(phase.name || ""));
-    qp.set("subheading", String(phase.roadMapDetails || phase.description || ""));
+    qp.set("name", String(phase.name || phase.title || ""));
+    qp.set("subheading", sub);
+    qp.set("longDescription", longDesc);
     qp.set("completionTime", String(phase.duration || ""));
     qp.set("selectedDivision", String(phase.phase || "All"));
     qp.set("bannerImage", String(phase.imageUrl || ""));
@@ -187,7 +201,7 @@ export default function DirectorPhaseListPage() {
     const t = String(roadmap.type ?? "").toLowerCase();
     const isPhase = t === "phase" || t.includes("phase");
     const kind = isPhase ? "Phase roadmap" : "Single roadmap";
-    const n = roadmap.roadmaps?.length ?? 0;
+    const n = nestedRoadmapRows(roadmap).length;
     const duration =
       (typeof roadmap.duration === "string" && roadmap.duration.trim()) ||
       (n > 0 ? items[0]?.duration?.trim() : "") ||
@@ -264,7 +278,7 @@ export default function DirectorPhaseListPage() {
         ) : (
           <div className="space-y-4">
             {items.map((it) => {
-                const imgSrc = resolveApiMediaUrl(it.imageUrl) || JumpStartBg.src;
+              const imgSrc = resolveApiMediaUrl(it.imageUrl) || JumpStartBg.src;
               const imgUnopt = isRemoteImageSrc(imgSrc) || imgSrc.startsWith("blob:");
               return (
                 <div
@@ -272,7 +286,7 @@ export default function DirectorPhaseListPage() {
                   className={`flex overflow-hidden rounded-2xl ${directorGlassCard} ${directorGlassCardHover} p-0`}
                 >
                   <div className="relative w-[38%] min-w-[140px] shrink-0 sm:w-[42%]">
-                    <div className="relative min-h-[200px] h-full sm:min-h-[220px]">
+                    <div className="relative h-full min-h-[200px] sm:min-h-[220px]">
                       <Image
                         src={imgSrc}
                         alt=""
@@ -284,9 +298,13 @@ export default function DirectorPhaseListPage() {
                     </div>
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5">
-                    <h3 className="text-[17px] font-semibold leading-tight text-white sm:text-[18px]">{it.title}</h3>
+                    <h3 className="text-[17px] font-semibold leading-tight text-white sm:text-[18px]">
+                      {it.title}
+                    </h3>
                     {it.desc ? (
-                      <p className="mt-2 line-clamp-3 text-[13px] leading-relaxed text-white/70 sm:text-[14px]">{it.desc}</p>
+                      <p className="mt-2 line-clamp-3 text-[13px] leading-relaxed text-white/70 sm:text-[14px]">
+                        {it.desc}
+                      </p>
                     ) : null}
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span className="text-[13px] font-semibold text-white/80">Status</span>
@@ -315,7 +333,11 @@ export default function DirectorPhaseListPage() {
                         <i className="fa-regular fa-eye text-sm" aria-hidden />
                         View
                       </button>
-                      <button type="button" onClick={() => openPhaseTaskPage(it.id)} className={cardActionPrimary}>
+                      <button
+                        type="button"
+                        onClick={() => openPhaseTaskPage(it.id)}
+                        className={cardActionPrimary}
+                      >
                         <i className="fa-solid fa-list-check text-sm" />
                         Edit tasks
                       </button>

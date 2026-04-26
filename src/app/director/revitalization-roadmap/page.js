@@ -29,6 +29,56 @@ import {
 import { DirectorFilterSection } from "../ui";
 import SearchBar from "@/app/Components/SearchBar";
 
+/** Unwrap `roadmaps` as array or `{ items: [] }` (list API). */
+function roadmapChildrenList(rm) {
+  const raw = rm?.roadmaps;
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === "object" && Array.isArray(raw.items)) return raw.items;
+  return [];
+}
+
+function roadmapDetailText(raw) {
+  if (raw == null) return "";
+  if (typeof raw === "string") return raw.trim();
+  if (typeof raw === "object" && raw !== null) {
+    if (typeof raw.en === "string" && raw.en.trim()) return raw.en.trim();
+    if (typeof raw.text === "string" && raw.text.trim()) return raw.text.trim();
+  }
+  const s = String(raw).trim();
+  return s && s !== "[object Object]" ? s : "";
+}
+
+function firstNonEmpty(...parts) {
+  for (const p of parts) {
+    const t = roadmapDetailText(p);
+    if (t) return t;
+  }
+  return "";
+}
+
+/** Best-effort display description for a library card (parent + first nested, then scan). */
+function pickRoadmapDescription(item, nested0) {
+  return (
+    firstNonEmpty(
+      nested0?.roadMapDetails,
+      nested0?.description,
+      nested0?.road_map_details,
+    ) ||
+    firstNonEmpty(item?.roadMapDetails, item?.description, item?.road_map_details) ||
+    (() => {
+      for (const n of roadmapChildrenList(item)) {
+        const t = firstNonEmpty(n?.roadMapDetails, n?.description, n?.road_map_details);
+        if (t) return t;
+      }
+      return "";
+    })()
+  );
+}
+
+function pickRoadmapTitle(item, nested0) {
+  return firstNonEmpty(item?.name, item?.title, nested0?.name, nested0?.title) || "Untitled roadmap";
+}
+
 /** Dark glass dropdown panels (matches director shell). */
 const glassPopover =
   "absolute z-[60] mt-2 min-w-[240px] rounded-xl border border-white/15 bg-[#041f35]/95 p-4 shadow-2xl backdrop-blur-xl";
@@ -110,18 +160,14 @@ export default function RevitalizationRoadmapPage() {
       const res = await apiGetRoadmaps();
       const list = unwrapRoadmapsList(res);
       const mapped = list.map((item) => {
-        /** Card copy: prefer first nested row when present (single + phase). Routing uses `type` only — see openRoadmapView / openRoadmapEdit. */
-        const nested0 =
-          Array.isArray(item.roadmaps) && item.roadmaps.length > 0 ? item.roadmaps[0] : null;
+        const kids = roadmapChildrenList(item);
+        const nested0 = kids.length > 0 ? kids[0] : null;
 
-        const title = item.name || "Untitled roadmap";
-        const description =
-          (nested0 && String(nested0.roadMapDetails || nested0.description || "").trim()) ||
-          item.description ||
-          item.roadMapDetails ||
-          "No description";
+        const title = pickRoadmapTitle(item, nested0);
+        const desc = pickRoadmapDescription(item, nested0);
+        const description = desc || "No description yet";
         const completionTime =
-          (nested0 && String(nested0.duration || "").trim()) || item.duration || "N/A";
+          (nested0 && String(nested0.duration || "").trim()) || String(item.duration || "").trim() || "N/A";
         const img = (nested0 && nested0.imageUrl) || item.imageUrl || Card1;
 
         return {
@@ -216,8 +262,7 @@ export default function RevitalizationRoadmapPage() {
       return;
     }
 
-    const firstNested =
-      Array.isArray(rm.roadmaps) && rm.roadmaps.length > 0 ? rm.roadmaps[0] : null;
+    const firstNested = roadmapChildrenList(rm)[0] || null;
     const nestedId = firstNested?._id != null ? String(firstNested._id) : "";
 
     const qp = new URLSearchParams();
@@ -226,10 +271,8 @@ export default function RevitalizationRoadmapPage() {
     qp.set("isEditMode", "true");
     qp.set("viewOnly", "true");
     if (nestedId) qp.set("nestedRoadmapId", nestedId);
-    qp.set("name", String(rm.name || row?.title || ""));
-    const subView = firstNested
-      ? String(firstNested.roadMapDetails || firstNested.description || "").trim()
-      : String(rm.roadMapDetails || rm.description || row?.description || "");
+    qp.set("name", String(pickRoadmapTitle(rm, firstNested) || row?.title || ""));
+    const subView = pickRoadmapDescription(rm, firstNested);
     if (subView) qp.set("subheading", subView);
     qp.set(
       "completionTime",
@@ -252,7 +295,7 @@ export default function RevitalizationRoadmapPage() {
     if (!roadmapId) return;
 
     if (isPhaseLibrary) {
-      const first = Array.isArray(rm.roadmaps) && rm.roadmaps.length > 0 ? rm.roadmaps[0] : null;
+      const first = roadmapChildrenList(rm)[0] || null;
       const nestedId = first?._id != null ? String(first._id) : "";
       const qp = new URLSearchParams();
       qp.set("roadmapId", roadmapId);
@@ -260,9 +303,10 @@ export default function RevitalizationRoadmapPage() {
       qp.set("isEditMode", "true");
       if (nestedId) qp.set("nestedRoadmapId", nestedId);
       if (first) {
-        if (first.name) qp.set("name", String(first.name));
-        const sub = first.roadMapDetails || first.description || "";
-        if (sub) qp.set("subheading", String(sub));
+        const nameForPhase = firstNonEmpty(first.name, first.title, rm.name, rm.title);
+        if (nameForPhase) qp.set("name", nameForPhase);
+        const sub = pickRoadmapDescription(rm, first);
+        if (sub) qp.set("subheading", sub);
         if (first.duration) qp.set("completionTime", String(first.duration));
         qp.set("selectedDivision", String(first.phase || "All"));
         if (first.imageUrl) qp.set("bannerImage", String(first.imageUrl));
@@ -272,17 +316,15 @@ export default function RevitalizationRoadmapPage() {
     }
 
     /** Single (e.g. Jump-Start): same as phase — edit library card on roadmap-creation, then tasks on roadmap-form. */
-    const firstSingle = Array.isArray(rm.roadmaps) && rm.roadmaps.length > 0 ? rm.roadmaps[0] : null;
+    const firstSingle = roadmapChildrenList(rm)[0] || null;
     const nestedIdSingle = firstSingle?._id != null ? String(firstSingle._id) : "";
     const qpSingle = new URLSearchParams();
     qpSingle.set("roadmapId", roadmapId);
     qpSingle.set("type", "single");
     qpSingle.set("isEditMode", "true");
     if (nestedIdSingle) qpSingle.set("nestedRoadmapId", nestedIdSingle);
-    qpSingle.set("name", String(rm.name || row?.title || ""));
-    const subSingle = firstSingle
-      ? String(firstSingle.roadMapDetails || firstSingle.description || "").trim()
-      : String(rm.roadMapDetails || rm.description || row?.description || "");
+    qpSingle.set("name", String(pickRoadmapTitle(rm, firstSingle) || row?.title || ""));
+    const subSingle = pickRoadmapDescription(rm, firstSingle);
     if (subSingle) qpSingle.set("subheading", subSingle);
     qpSingle.set(
       "completionTime",
@@ -386,9 +428,14 @@ export default function RevitalizationRoadmapPage() {
               ) : (
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
                   {roadmapLibrary
-                    .filter((r) =>
-                      r.title.toLowerCase().includes((searchQuery || "").trim().toLowerCase())
-                    )
+                    .filter((r) => {
+                      const q = (searchQuery || "").trim().toLowerCase();
+                      if (!q) return true;
+                      return (
+                        r.title.toLowerCase().includes(q) ||
+                        r.description.toLowerCase().includes(q)
+                      );
+                    })
                     .map((roadmap) => (
                       <RoadmapCard
                         key={roadmap.id}
@@ -403,9 +450,14 @@ export default function RevitalizationRoadmapPage() {
                         onDelete={() => handleDeleteRoadmap(roadmap.id)}
                       />
                     ))}
-                  {roadmapLibrary.filter((r) =>
-                    r.title.toLowerCase().includes((searchQuery || "").trim().toLowerCase())
-                  ).length === 0 && (
+                  {roadmapLibrary.filter((r) => {
+                    const q = (searchQuery || "").trim().toLowerCase();
+                    if (!q) return true;
+                    return (
+                      r.title.toLowerCase().includes(q) ||
+                      r.description.toLowerCase().includes(q)
+                    );
+                  }).length === 0 && (
                     <p className="col-span-2 py-8 text-center text-[15px] text-white/70">
                       {roadmapLibrary.length === 0
                         ? "No roadmaps yet. Create one with New roadmap."

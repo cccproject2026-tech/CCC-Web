@@ -6,7 +6,14 @@ import { setCookie, getCookie } from "@/app/utils/cookies";
 import Image from "next/image";
 import { isRemoteImageSrc } from "@/app/utils/image";
 import MentorCard from "@/app/Components/Card/MentorCard";
-import { directorPageRoot } from "../directorUi";
+import {
+  directorGlassCard,
+  directorGlassCardHover,
+  directorInputClass,
+  directorPageContainer,
+  directorPageRoot,
+  directorSpinner,
+} from "../directorUi";
 import HeroBg from "../../Assets/hero-bg.png";
 import Book from "../../Assets/book.png";
 import MapImg from "../../Assets/map-placeholder.png";
@@ -40,11 +47,6 @@ import { Navigation, Pagination } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
-
-const glassCard =
-  "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.1)_0%,rgba(255,255,255,0.04)_100%)] backdrop-blur-xl shadow-[0_8px_40px_rgba(3,24,43,0.4)]";
-const glassCardHover =
-  "transition-all duration-300 hover:border-white/25 hover:bg-[linear-gradient(180deg,rgba(255,255,255,0.14)_0%,rgba(255,255,255,0.06)_100%)] hover:shadow-[0_12px_48px_rgba(3,24,43,0.45)]";
 
 function parseUserCookie(): {
   firstName?: string;
@@ -460,7 +462,7 @@ export default function DirectorHome() {
   return (
     <div className={directorPageRoot}>
       {/* Hero — mentor / pastor glass + image */}
-      <section className={`relative overflow-hidden rounded-3xl border border-white/10 ${glassCard}`}>
+      <section className={`relative overflow-hidden rounded-3xl border border-white/10 ${directorGlassCard}`}>
         <div className="relative h-[240px] sm:h-[300px] lg:h-[340px]">
           <Image
             src={HeroBg}
@@ -533,7 +535,7 @@ export default function DirectorHome() {
           >
             {mediaList.map((item) => (
               <SwiperSlide key={item._id}>
-                <div className={`overflow-hidden rounded-xl text-left ${glassCard} ${glassCardHover}`}>
+                <div className={`overflow-hidden rounded-xl text-left ${directorGlassCard} ${directorGlassCardHover}`}>
                   <div className="relative">
                     <Image
                       src={getMediaThumbnail(item)}
@@ -591,7 +593,7 @@ export default function DirectorHome() {
         {appointmentsLoading ? (
           <p className="text-sm text-white/55">Loading appointments…</p>
         ) : appointments.length === 0 ? (
-          <div className={`p-8 text-center text-sm text-white/55 ${glassCard}`}>
+          <div className={`p-8 text-center text-sm text-white/55 ${directorGlassCard}`}>
             No appointments scheduled for today.
           </div>
         ) : (
@@ -603,7 +605,7 @@ export default function DirectorHome() {
               return (
                 <div
                   key={appointment.id}
-                  className={`flex flex-col gap-4 p-5 sm:flex-row sm:items-center ${glassCard}`}
+                  className={`flex flex-col gap-4 p-5 sm:flex-row sm:items-center ${directorGlassCard}`}
                 >
                   <div className="flex shrink-0 justify-center sm:justify-start">
                     <div className="flex h-[100px] w-[100px] items-center justify-center rounded-2xl border border-white/15 bg-white/10 sm:h-[120px] sm:w-[120px]">
@@ -701,12 +703,12 @@ export default function DirectorHome() {
             {interestsLoading ? (
               <div className="py-8 text-center text-white/55">Loading interests…</div>
             ) : interests.length === 0 ? (
-              <div className={`py-8 text-center text-sm text-white/55 ${glassCard}`}>No new interests</div>
+              <div className={`py-8 text-center text-sm text-white/55 ${directorGlassCard}`}>No new interests</div>
             ) : (
               interests.slice(0, 4).map((interest) => (
                 <div
                   key={interest._id}
-                  className={`flex flex-col items-start justify-between gap-4 rounded-xl p-4 sm:flex-row sm:items-center sm:p-5 ${glassCard}`}
+                  className={`flex flex-col items-start justify-between gap-4 rounded-xl p-4 sm:flex-row sm:items-center sm:p-5 ${directorGlassCard}`}
                 >
                   <div className="flex items-center gap-4">
                     <div className="flex h-[50px] w-[50px] items-center justify-center rounded-full border border-white/15 bg-[#8ec5eb]/20">
@@ -899,7 +901,7 @@ export default function DirectorHome() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") router.push(item.route);
               }}
-              className={`flex min-h-[200px] cursor-pointer flex-col justify-between rounded-xl p-6 text-white transition hover:scale-[1.02] ${glassCard} ${glassCardHover}`}
+              className={`flex min-h-[200px] cursor-pointer flex-col justify-between rounded-xl p-6 text-white transition hover:scale-[1.02] ${directorGlassCard} ${directorGlassCardHover}`}
             >
               <i className={`${item.icon} mb-4 text-2xl text-[#8ec5eb]`} />
               <div>
@@ -917,157 +919,206 @@ export default function DirectorHome() {
         </div>
       </section>
 
-      {/* Over View */}
-      <section className="py-16">
-        <h2 className="mb-8 text-[22px] font-semibold text-white">Over View</h2>
+      {/* Overview + roadmap & assessment progress (matches director / track-progress language) */}
+      <section className="py-12 sm:py-16">
+        <div className={directorPageContainer}>
+          <h2 className="text-lg font-semibold text-white sm:text-xl">Overview</h2>
+          <p className="mt-1 text-sm text-white/55">Network headcount and completions at a glance.</p>
 
-        <div className="mb-8 grid grid-cols-1 gap-4 sm:mb-12 sm:grid-cols-3 sm:gap-6">
-          {overviewLoading ? (
-            <div className="col-span-3 py-8 text-center text-white/55">Loading overview…</div>
-          ) : directorOverview ? (
-            <>
-              <div className={`rounded-xl p-8 ${glassCard}`}>
-                <p className="mb-2 text-sm text-white/60">Total Mentors</p>
-                <h3 className="text-4xl font-bold text-[#8ec5eb]">
-                  {directorOverview.totalMentors}
-                </h3>
+          <div className="mb-10 mt-6 grid grid-cols-1 gap-4 sm:mb-12 sm:grid-cols-3 sm:gap-6">
+            {overviewLoading ? (
+              <div className="col-span-3 flex justify-center py-12">
+                <div className={directorSpinner} role="status" aria-label="Loading" />
               </div>
-              <div className={`rounded-xl p-8 ${glassCard}`}>
-                <p className="mb-2 text-sm text-white/60">Total Pastors</p>
-                <h3 className="text-4xl font-bold text-[#8ec5eb]">
-                  {directorOverview.totalPastors}
-                </h3>
-              </div>
-              <div className={`rounded-xl p-8 ${glassCard}`}>
-                <p className="mb-2 text-sm text-white/60">Pastors Completed</p>
-                <h3 className="text-4xl font-bold text-[#8ec5eb]">
-                  {directorOverview.completedPastors}
-                </h3>
-              </div>
-            </>
-          ) : (
-            <div className="col-span-3 py-8 text-center text-white/55">No data available</div>
-          )}
-        </div>
-
-        {/* Overall Progress */}
-        <h2 className="mb-8 text-[22px] font-semibold text-white">Overall Progress</h2>
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
-          {/* Donut Chart */}
-          <div className={`rounded-xl p-8 ${glassCard}`}>
-            <div className="mb-6 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-white">
-                Roadmap & Assessments
-              </h3>
-              <div className="flex gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-[#8ec5eb]" />
-                  <span className="text-white/65">Completed</span>
+            ) : directorOverview ? (
+              <>
+                <div
+                  className={`${directorGlassCard} p-6 sm:p-7`}
+                >
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-[#8ec5eb]/30 bg-[#8ec5eb]/10">
+                    <i className="fa-solid fa-user-tie text-[#8ec5eb]" aria-hidden />
+                  </div>
+                  <p className="text-sm text-white/60">Total mentors</p>
+                  <h3 className="mt-1 text-3xl font-bold tabular-nums text-[#8ec5eb] sm:text-4xl">
+                    {directorOverview.totalMentors}
+                  </h3>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-[#F9C74F]" />
-                  <span className="text-white/65">Remaining</span>
+                <div
+                  className={`${directorGlassCard} p-6 sm:p-7`}
+                >
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-[#8ec5eb]/30 bg-[#8ec5eb]/10">
+                    <i className="fa-solid fa-users text-[#8ec5eb]" aria-hidden />
+                  </div>
+                  <p className="text-sm text-white/60">Total pastors</p>
+                  <h3 className="mt-1 text-3xl font-bold tabular-nums text-[#8ec5eb] sm:text-4xl">
+                    {directorOverview.totalPastors}
+                  </h3>
                 </div>
+                <div
+                  className={`${directorGlassCard} p-6 sm:p-7`}
+                >
+                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-400/30 bg-emerald-500/10">
+                    <i className="fa-solid fa-circle-check text-emerald-300" aria-hidden />
+                  </div>
+                  <p className="text-sm text-white/60">Pastors completed</p>
+                  <h3 className="mt-1 text-3xl font-bold tabular-nums text-[#8ec5eb] sm:text-4xl">
+                    {directorOverview.completedPastors}
+                  </h3>
+                </div>
+              </>
+            ) : (
+              <div className="col-span-3 rounded-2xl border border-white/10 bg-white/[0.03] py-10 text-center text-sm text-white/55">
+                No overview data available
               </div>
-            </div>
-
-            <div className="flex h-[280px] items-center justify-center">
-              {overviewLoading ? (
-                <div className="text-white/55">Loading…</div>
-              ) : donutChartData ? (
-                <div className="relative">
-                  <div className="relative h-[240px] w-[240px] rounded-full">
-                    <div
-                      className="absolute inset-0 rounded-full"
-                      style={{
-                        background: `conic-gradient(
-                          #8ec5eb 0deg ${donutChartData.completedDegrees}deg,
-                          #F9C74F ${donutChartData.completedDegrees}deg 360deg
-                        )`,
-                      }}
-                    />
-                    <div className="absolute left-1/2 top-1/2 h-[160px] w-[160px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#062946]" />
-                  </div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-[#8ec5eb]">
-                        {donutChartData.completed.toFixed(1)}%
-                      </div>
-                      <div className="mt-1 text-xs text-white/55">Completed</div>
-                    </div>
-                  </div>
-                  <div className="absolute -left-12 top-1/2 -translate-y-1/2 transform rounded-md bg-[#8ec5eb]/30 px-2 py-2 text-sm font-semibold text-white sm:-left-20 sm:px-4">
-                    {donutChartData.completed.toFixed(1)}%
-                  </div>
-                  <div className="absolute -right-12 top-1/2 -translate-y-1/2 transform rounded-md bg-[#F9C74F] px-2 py-2 text-sm font-semibold text-[#062946] sm:-right-20 sm:px-4">
-                    {donutChartData.remaining.toFixed(1)}%
-                  </div>
-                </div>
-              ) : (
-                <div className="text-white/55">No data available</div>
-              )}
-            </div>
+            )}
           </div>
 
-          {/* Bar Chart */}
-          <div className={`rounded-xl p-4 sm:p-8 ${glassCard}`}>
-            <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
-              <h3 className="text-lg font-semibold text-white">
-                Roadmap & Assessments
-              </h3>
-              <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="h-3 w-3 rounded-full bg-[#8ec5eb]" />
-                  <span className="text-white/65">Pastor</span>
+          <div className="mb-4 flex flex-col gap-2 sm:mb-6 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-white sm:text-xl">Overall progress</h2>
+              <p className="mt-1 max-w-xl text-sm text-white/55">
+                Roadmap and assessment completion (combined). Open Track Progress for per-person detail.
+              </p>
+            </div>
+            <Link
+              href="/director/track-progress"
+              className="shrink-0 text-sm font-semibold text-[#8ec5eb] transition hover:text-[#b8ddf5]"
+            >
+              View track progress
+              <i className="fa-solid fa-arrow-up-right-from-square ml-1.5 text-xs opacity-80" />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
+            <div className={`${directorGlassCard} p-5 sm:p-8`}>
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-white sm:text-lg">Roadmap &amp; assessments</h3>
+                  <p className="mt-1 text-xs text-white/50">Network-wide combined completion</p>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="h-3 w-3 rounded-full bg-[#5ee0d0]" />
-                  <span className="text-white/65">Mentor</span>
+                <div className="flex flex-wrap gap-3 text-xs sm:text-sm">
+                  <span className="inline-flex items-center gap-2 text-white/70">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#8ec5eb]" />
+                    Done
+                  </span>
+                  <span className="inline-flex items-center gap-2 text-white/70">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#f9c74f]" />
+                    Remaining
+                  </span>
                 </div>
-                <select className="rounded-md border border-white/20 bg-white/10 px-3 py-1 text-sm text-white outline-none">
-                  <option className="text-black">Past 6 Months</option>
-                </select>
+              </div>
+
+              <div className="flex min-h-[240px] flex-col items-center justify-center gap-6 py-2 sm:min-h-[280px]">
+                {overviewLoading ? (
+                  <div className={directorSpinner} role="status" aria-label="Loading" />
+                ) : donutChartData ? (
+                  <>
+                    <div className="relative h-[200px] w-[200px] sm:h-[220px] sm:w-[220px]">
+                      <div
+                        className="absolute inset-0 rounded-full"
+                        style={{
+                          background: `conic-gradient(
+                            #8ec5eb 0deg ${donutChartData.completedDegrees}deg,
+                            #f9c74f ${donutChartData.completedDegrees}deg 360deg
+                          )`,
+                        }}
+                      />
+                      <div className="absolute left-1/2 top-1/2 h-[60%] w-[60%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#041f35] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]" />
+                      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                        <span className="text-3xl font-bold tabular-nums text-[#8ec5eb] sm:text-4xl">
+                          {donutChartData.completed.toFixed(1)}%
+                        </span>
+                        <span className="mt-0.5 text-xs text-white/50">complete</span>
+                      </div>
+                    </div>
+                    <div className="flex w-full max-w-sm justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm">
+                      <div>
+                        <p className="text-white/50">Completed</p>
+                        <p className="mt-0.5 font-semibold tabular-nums text-[#8ec5eb]">
+                          {donutChartData.completed.toFixed(1)}%
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-white/50">Remaining</p>
+                        <p className="mt-0.5 font-semibold tabular-nums text-[#f9c74f]">
+                          {donutChartData.remaining.toFixed(1)}%
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-white/50">No progress data available</p>
+                )}
               </div>
             </div>
 
-            <div className="flex h-[200px] items-end justify-between gap-2 sm:h-[280px] sm:gap-4">
-              {overviewLoading ? (
-                <div className="flex h-full w-full items-center justify-center text-white/55">
-                  Loading chart data…
+            <div className={`${directorGlassCard} p-5 sm:p-8`}>
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 className="text-base font-semibold text-white sm:text-lg">Monthly completions</h3>
+                  <p className="mt-1 text-xs text-white/50">Pastors and mentors (last six months in view)</p>
                 </div>
-              ) : chartData.length > 0 ? (
-                chartData.map((data, i) => {
-                  const maxValue = Math.max(
-                    ...chartData.map(d => Math.max(d.pastor, d.mentor))
-                  );
-                  const pastorHeight = maxValue > 0 ? (data.pastor / maxValue) * 100 : 0;
-                  const mentorHeight = maxValue > 0 ? (data.mentor / maxValue) * 100 : 0;
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#8ec5eb]" />
+                    <span className="text-white/70">Pastor</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs sm:text-sm">
+                    <span className="h-2.5 w-2.5 rounded-full bg-[#5ee0d0]" />
+                    <span className="text-white/70">Mentor</span>
+                  </div>
+                  <select
+                    disabled
+                    className={`${directorInputClass} !py-2 !text-sm opacity-80`}
+                    aria-label="Time range (fixed to past six months in chart)"
+                    title="Chart shows the last 6 months from your overview"
+                  >
+                    <option className="bg-[#0a3558]">Past 6 months</option>
+                  </select>
+                </div>
+              </div>
 
-                  return (
-                    <div
-                      key={i}
-                      className="flex flex-1 flex-col items-center gap-2"
-                    >
-                      <div className="flex h-[160px] w-full items-end gap-1 sm:h-[220px]">
-                        <div
-                          className="flex-1 rounded-t-md bg-[#8ec5eb]/80"
-                          style={{ height: `${pastorHeight}%` }}
-                        />
-                        <div
-                          className="flex-1 rounded-t-md bg-[#5ee0d0]/80"
-                          style={{ height: `${mentorHeight}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-white/60">{data.monthName}</span>
+              <div className="rounded-xl border border-white/10 bg-[#041f35]/50 p-3 sm:p-4">
+                <div className="flex h-[200px] items-end justify-between gap-1.5 sm:h-[240px] sm:gap-3">
+                  {overviewLoading ? (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <div className={directorSpinner} role="status" aria-label="Loading chart" />
                     </div>
-                  );
-                })
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-white/55">
-                  No chart data available
+                  ) : chartData.length > 0 ? (
+                    chartData.map((data, i) => {
+                      const maxValue = Math.max(
+                        ...chartData.map((d) => Math.max(d.pastor, d.mentor)),
+                        1,
+                      );
+                      const pastorHeight = maxValue > 0 ? (data.pastor / maxValue) * 100 : 0;
+                      const mentorHeight = maxValue > 0 ? (data.mentor / maxValue) * 100 : 0;
+                      return (
+                        <div key={i} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                          <div className="flex h-[160px] w-full max-w-[48px] items-end justify-center gap-0.5 self-center sm:h-[200px] sm:max-w-none sm:gap-1">
+                            <div
+                              className="w-[46%] max-w-[22px] rounded-t-md bg-gradient-to-t from-[#6eb6e0] to-[#8ec5eb] shadow-sm sm:max-w-[28px]"
+                              style={{ height: `${Math.max(pastorHeight, 2)}%` }}
+                              title={`Pastors: ${data.pastor}`}
+                            />
+                            <div
+                              className="w-[46%] max-w-[22px] rounded-t-md bg-gradient-to-t from-[#3ec9b8] to-[#5ee0d0] shadow-sm sm:max-w-[28px]"
+                              style={{ height: `${Math.max(mentorHeight, 2)}%` }}
+                              title={`Mentors: ${data.mentor}`}
+                            />
+                          </div>
+                          <span className="max-w-full truncate text-center text-[10px] text-white/55 sm:text-xs">
+                            {data.monthName}
+                          </span>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-sm text-white/50">
+                      No chart data for this period
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
@@ -1079,7 +1130,7 @@ export default function DirectorHome() {
           <button
             type="button"
             onClick={() => router.push("/director/course-completed")}
-            className={`flex w-full flex-col items-start justify-between gap-4 rounded-xl p-6 text-left text-white sm:flex-row sm:items-center sm:p-8 ${glassCard} ${glassCardHover}`}
+            className={`flex w-full flex-col items-start justify-between gap-4 rounded-xl p-6 text-left text-white sm:flex-row sm:items-center sm:p-8 ${directorGlassCard} ${directorGlassCardHover}`}
           >
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/10">
@@ -1100,7 +1151,7 @@ export default function DirectorHome() {
           <button
             type="button"
             onClick={() => router.push("/director/invite-field-mentor")}
-            className={`flex w-full flex-col items-start justify-between gap-4 rounded-xl p-6 text-left text-white sm:flex-row sm:items-center sm:p-8 ${glassCard} ${glassCardHover}`}
+            className={`flex w-full flex-col items-start justify-between gap-4 rounded-xl p-6 text-left text-white sm:flex-row sm:items-center sm:p-8 ${directorGlassCard} ${directorGlassCardHover}`}
           >
             <div className="flex items-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/10">
@@ -1126,7 +1177,7 @@ export default function DirectorHome() {
           />
         </div>
 
-        <div className={`relative overflow-hidden rounded-2xl border border-white/15 ${glassCard}`}>
+        <div className={`relative overflow-hidden rounded-2xl border border-white/15 ${directorGlassCard}`}>
           <Image
             src={MapImg}
             alt="Map"

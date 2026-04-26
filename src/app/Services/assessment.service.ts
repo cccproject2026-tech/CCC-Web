@@ -3,9 +3,10 @@ import axiosInstance from "./config/axios-instance";
 import type {
   AssessmentResponse,
   CreateAssessmentPayload,
-  SubmitSectionAnswersPayload,
-  SubmitPreSurveyPayload,
   SendSectionRecommendationsPayload,
+  SubmitPreSurveyPayload,
+  SubmitSectionAnswersPayload,
+  UpdateAssessmentPayload,
 } from "./types/assessment.types";
 
 /**
@@ -234,6 +235,13 @@ export const apiGetAssessmentById = (id: string) => {
 export const apiDeleteAssessments = (ids: string[]) =>
   axiosInstance.delete<{ success: boolean; message: string }>("/assessment", { data: { ids } });
 
+// PATCH /assessment/:id — optional: name, description, type, preSurvey (if backend supports)
+export const apiPatchAssessment = (assessmentId: string, body: UpdateAssessmentPayload) =>
+  axiosInstance.patch<{ success: boolean; data: AssessmentResponse }>(
+    `/assessment/${assessmentId}`,
+    body,
+  );
+
 // PATCH /assessment/:id/instructions  body: { instructions }
 export const apiUpdateInstructions = (assessmentId: string, instructions: string[]) =>
   axiosInstance.patch<{ success: boolean; data: AssessmentResponse }>(
@@ -250,6 +258,8 @@ export type AssessmentSectionsPatch = {
     choices: { text: string }[];
     recommendations: string[];
   }[];
+  /** CDP / action-plan levels 1–4, distinct from per-layer `layers[].recommendations`. */
+  recommendations?: { level: 1 | 2 | 3 | 4; items: string[] }[];
 }[];
 
 // PATCH /assessment/:id/sections  body: { sections }

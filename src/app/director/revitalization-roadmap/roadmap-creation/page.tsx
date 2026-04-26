@@ -17,6 +17,7 @@ import {
   apiGetNestedRoadmapItem,
   apiGetRoadmapById,
   apiUpdateNestedRoadmapItem,
+  apiUpdateRoadmap,
 } from "@/app/Services/api";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 
@@ -94,6 +95,27 @@ function unwrapNestedRoadmapItem(res: unknown): any | null {
 function safeString(s: unknown): string {
   if (s == null) return "";
   return String(s).trim();
+}
+
+/**
+ * Some APIs return `roadMapDetails` as a string, others as `{ en: "..." }` or similar.
+ * Used for form prefill so description/subheading show reliably.
+ */
+function roadmapDetailText(raw: unknown): string {
+  if (raw == null) return "";
+  if (typeof raw === "string") return raw.trim();
+  if (typeof raw === "object" && raw !== null) {
+    const o = raw as Record<string, unknown>;
+    if (typeof o.en === "string" && o.en.trim()) return o.en.trim();
+    if (typeof o.text === "string" && o.text.trim()) return o.text.trim();
+    if (typeof o.value === "string" && o.value.trim()) return o.value.trim();
+  }
+  try {
+    const s = String(raw).trim();
+    return s && s !== "[object Object]" ? s : "";
+  } catch {
+    return "";
+  }
 }
 
 function safeDecodeURIComponent(s: string): string {
@@ -194,14 +216,15 @@ function buildNestedPatchPayload(
   const includeMeetingsExtras = opts?.includeMeetingsExtras === true;
   const omitPhaseWhenAll = opts?.omitPhaseWhenAll !== false;
   const duration = fields.duration.trim() || safeString(nested.duration) || "1";
+  const copy = safeString(fields.roadMapDetails);
   const body: Record<string, unknown> = {
     name: fields.name,
-    roadMapDetails: fields.roadMapDetails,
+    roadMapDetails: copy,
     duration,
     status: normalizeNestedStatus(nested.status),
   };
-  const desc = safeString(nested.description);
-  if (desc) body.description = desc;
+  /* Many deployments mirror marketing copy in `description`; keep it aligned with the editor. */
+  if (copy) body.description = copy;
 
   const phaseVal = (fields.phase || "").trim();
   if (!omitPhaseWhenAll || (phaseVal && phaseVal.toLowerCase() !== "all")) {
@@ -241,7 +264,11 @@ export default function DirectorRoadmapCreationPage() {
     name: boolean;
     subheading: boolean;
     completionTime: boolean;
-  }>({ name: false, subheading: false, completionTime: false });
+    parentName: boolean;
+  }>({ name: false, subheading: false, completionTime: false, parentName: false });
+  /** Parent (library) card when editing a phase under a parent roadmap — not the same as the nested phase title. */
+  const [parentLibraryName, setParentLibraryName] = useState("");
+  const [parentLibraryDescription, setParentLibraryDescription] = useState("");
   /** Centered dialog when required fields are missing (with red outlines on fields). */
   const [requiredFieldsOpen, setRequiredFieldsOpen] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
@@ -287,6 +314,23 @@ export default function DirectorRoadmapCreationPage() {
       cancelled = true;
     };
   }, [roadmapId]);
+
+  useEffect(() => {
+    setParentLibraryName("");
+    setParentLibraryDescription("");
+  }, [roadmapId]);
+
+  useEffect(() => {
+    if (!parent || !isEditMode || roadmapType !== "phase") return;
+    if (String((parent as { _id?: string })._id || "") !== String(roadmapId)) return;
+    const t = safeString(parent.name) || safeString((parent as { title?: string }).title);
+    const d =
+      roadmapDetailText(parent.description) ||
+      roadmapDetailText(parent.roadMapDetails) ||
+      "";
+    setParentLibraryName(t);
+    setParentLibraryDescription(d);
+  }, [parent, isEditMode, roadmapType, roadmapId]);
 
   useEffect(() => {
     if (!roadmapId || !nestedRoadmapIdParam || (roadmapType !== "phase" && roadmapType !== "single")) {
@@ -398,9 +442,11 @@ export default function DirectorRoadmapCreationPage() {
     const fromApi = nested
       ? {
           name: safeString(nested.name || (nested as { title?: string }).title),
-          subheading: safeString(
-            nested.roadMapDetails || nested.description || (nested as any).road_map_details || "",
-          ),
+          subheading: roadmapDetailText(
+            (nested as { roadMapDetails?: unknown }).roadMapDetails,
+          ) ||
+            roadmapDetailText((nested as { description?: unknown }).description) ||
+            roadmapDetailText((nested as { road_map_details?: unknown }).road_map_details),
           completionTime: safeString(nested.duration),
           selectedDivision: safeString(nested.phase) || "All",
           bannerImage: resolveApiMediaUrl(nested.imageUrl) || "",
@@ -409,7 +455,10 @@ export default function DirectorRoadmapCreationPage() {
 
     /** Phase roadmap parent (library card) — preferred for description, duration, banner when present. */
     const fromParent = {
-      subheading: safeString(parent.description || parent.roadMapDetails || ""),
+      subheading:
+        roadmapDetailText(parent.description) ||
+        roadmapDetailText(parent.roadMapDetails) ||
+        "",
       completionTime: safeString(parent.duration || ""),
       bannerImage: resolveApiMediaUrl(parent.imageUrl) || "",
     };
@@ -442,7 +491,7 @@ export default function DirectorRoadmapCreationPage() {
       if (img) setBannerPreview(img);
       else setBannerPreview(null);
     }
-  }, [parent, roadmapType, nestedForPhase, urlSeedKey, isEditMode]);
+  }, [parent, roadmapType, nestedForPhase, nestedDetailDoc, urlSeedKey, isEditMode]);
 
   // Prefill single roadmap edit (e.g. Jump-Start): parent title + nested template row for copy/duration/banner.
   useEffect(() => {
@@ -470,9 +519,12 @@ export default function DirectorRoadmapCreationPage() {
 
     const fromNested = nested
       ? {
-          subheading: safeString(
-            nested.roadMapDetails || nested.description || (nested as any).road_map_details || "",
-          ),
+          subheading:
+            roadmapDetailText(
+              (nested as { roadMapDetails?: unknown }).roadMapDetails,
+            ) ||
+            roadmapDetailText((nested as { description?: unknown }).description) ||
+            roadmapDetailText((nested as { road_map_details?: unknown }).road_map_details),
           completionTime: safeString(nested.duration),
           selectedDivision: safeString(nested.phase) || "All",
           bannerImage: resolveApiMediaUrl(nested.imageUrl) || "",
@@ -480,7 +532,10 @@ export default function DirectorRoadmapCreationPage() {
       : null;
 
     const fromParent = {
-      subheading: safeString(parent.description || parent.roadMapDetails || ""),
+      subheading:
+        roadmapDetailText(parent.description) ||
+        roadmapDetailText(parent.roadMapDetails) ||
+        "",
       completionTime: safeString(parent.duration || ""),
       bannerImage: resolveApiMediaUrl(parent.imageUrl) || "",
     };
@@ -508,7 +563,7 @@ export default function DirectorRoadmapCreationPage() {
       if (img) setBannerPreview(img);
       else setBannerPreview(null);
     }
-  }, [parent, roadmapType, nestedForSingle, urlSeedKey, isEditMode]);
+  }, [parent, roadmapType, nestedForSingle, nestedDetailDoc, urlSeedKey, isEditMode]);
 
   useEffect(() => {
     if (!saveFeedback) return;
@@ -576,13 +631,19 @@ export default function DirectorRoadmapCreationPage() {
     const nameOk = Boolean(nameForFlow);
     const subOk = Boolean(subheading.trim());
     const timeOk = Boolean(completionTime.trim());
-    if (!nameOk || !subOk || !timeOk) {
-      setFieldErrors({ name: !nameOk, subheading: !subOk, completionTime: !timeOk });
+    const parentNameOk = !(isEditMode && roadmapType === "phase") || Boolean(parentLibraryName.trim());
+    if (!nameOk || !subOk || !timeOk || !parentNameOk) {
+      setFieldErrors({
+        name: !nameOk,
+        subheading: !subOk,
+        completionTime: !timeOk,
+        parentName: !parentNameOk,
+      });
       setError(null);
       setRequiredFieldsOpen(true);
       return;
     }
-    setFieldErrors({ name: false, subheading: false, completionTime: false });
+    setFieldErrors({ name: false, subheading: false, completionTime: false, parentName: false });
     const qp = new URLSearchParams();
     qp.set("roadmapId", roadmapId);
     qp.set("type", roadmapType);
@@ -605,6 +666,7 @@ export default function DirectorRoadmapCreationPage() {
     roadmapId,
     effectiveNestedId,
     router,
+    parentLibraryName,
   ]);
 
   const handleSave = async () => {
@@ -614,12 +676,18 @@ export default function DirectorRoadmapCreationPage() {
     const nameOk = Boolean(nameToPersist);
     const subOk = Boolean(subheading.trim());
     const timeOk = Boolean(completionTime.trim());
-    if (!nameOk || !subOk || !timeOk) {
-      setFieldErrors({ name: !nameOk, subheading: !subOk, completionTime: !timeOk });
+    const parentNameOk = !(isEditMode && roadmapType === "phase") || Boolean(parentLibraryName.trim());
+    if (!nameOk || !subOk || !timeOk || !parentNameOk) {
+      setFieldErrors({
+        name: !nameOk,
+        subheading: !subOk,
+        completionTime: !timeOk,
+        parentName: !parentNameOk,
+      });
       setRequiredFieldsOpen(true);
       return;
     }
-    setFieldErrors({ name: false, subheading: false, completionTime: false });
+    setFieldErrors({ name: false, subheading: false, completionTime: false, parentName: false });
     if (!roadmapId || !parent) return;
     if (!(roadmapType === "phase" || roadmapType === "single") || !effectiveNestedId) {
       setError("Save applies when editing a roadmap with a valid nested template id.");
@@ -640,6 +708,22 @@ export default function DirectorRoadmapCreationPage() {
 
     setSaving(true);
     try {
+      if (isEditMode && roadmapType === "phase") {
+        const libName = parentLibraryName.trim();
+        const libDesc = parentLibraryDescription.trim();
+        const parentType = safeString((parent as { type?: string }).type);
+        await apiUpdateRoadmap(
+          roadmapId,
+          {
+            name: libName,
+            description: libDesc,
+            roadMapDetails: libDesc,
+            ...(parentType ? { type: parentType } : {}),
+            ...(Array.isArray(parent.divisions) ? { divisions: parent.divisions } : {}),
+          } as any,
+        );
+      }
+
       const patchBody = buildNestedPatchPayload(
         nested as Record<string, unknown>,
         {
@@ -668,13 +752,13 @@ export default function DirectorRoadmapCreationPage() {
 
       setSaveFeedback(
         roadmapType === "phase"
-          ? "Roadmap library and phase list will show this phase’s updated info."
+          ? "The main roadmap (library) title and this phase are saved."
           : "Roadmap library will show this roadmap’s updated info.",
       );
       bannerFileRef.current = null;
       setBannerFile(null);
       const res = await apiGetRoadmapById(roadmapId);
-      const doc = unwrapRoadmap(res.data);
+      const doc = normalizeParentRoadmapDoc(unwrapRoadmap(res.data));
       if (doc) setParent(doc);
       if (effectiveNestedId) {
         try {
@@ -708,7 +792,9 @@ export default function DirectorRoadmapCreationPage() {
   }, [router, roadmapId]);
   const cardTitle = isEditMode ? "Edit Roadmap" : "Create Roadmap";
   const heroTitle = showReferenceHero
-    ? safeString(parent?.name) || "Roadmap"
+    ? isEditMode && roadmapType === "phase" && parentLibraryName.trim()
+      ? parentLibraryName.trim()
+      : safeString(parent?.name) || "Roadmap"
     : isEditMode
       ? "Edit roadmap"
       : "Create roadmap";
@@ -934,6 +1020,46 @@ export default function DirectorRoadmapCreationPage() {
                   </>
                 ) : (
                   <>
+                    {isEditMode && roadmapType === "phase" ? (
+                      <div className="rounded-xl border border-[#8ec5eb]/20 bg-white/[0.04] p-4 sm:p-5">
+                        <p className="text-sm font-semibold text-white/95">Roadmap (main list)</p>
+                        <p className="mt-1 text-xs leading-relaxed text-white/50">
+                          Name and text on the revitalization library card — the container for all phases, not
+                          the individual phase below.
+                        </p>
+                        <div className="mt-4 space-y-4">
+                          <div>
+                            <label className={directorLabelClass}>
+                              Roadmap name <span className="text-red-300">*</span>
+                            </label>
+                            <input
+                              value={parentLibraryName}
+                              onChange={(e) => {
+                                setParentLibraryName(e.target.value);
+                                setFieldErrors((f) => ({ ...f, parentName: false }));
+                              }}
+                              className={`${directorInputClass} ${
+                                fieldErrors.parentName ? directorInputErrorClass : ""
+                              }`}
+                              placeholder="e.g. Self Revitalization"
+                              aria-invalid={fieldErrors.parentName}
+                            />
+                          </div>
+                          <div>
+                            <label className={directorLabelClass}>Short description (library card)</label>
+                            <p className="mb-1.5 text-xs text-white/45">Optional; shown with the name on the main list.</p>
+                            <textarea
+                              value={parentLibraryDescription}
+                              onChange={(e) => setParentLibraryDescription(e.target.value)}
+                              rows={3}
+                              className={`${directorInputClass} min-h-[88px] resize-y`}
+                              placeholder="Summary for the roadmap card"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
                     <div>
                       <label className={directorLabelClass}>Type</label>
                       <select
@@ -946,46 +1072,50 @@ export default function DirectorRoadmapCreationPage() {
                       </select>
                     </div>
 
-                    <div>
-                      <label className={directorLabelClass}>
-                        {isEditMode && roadmapType === "phase" ? "Phase name" : "Name"}{" "}
-                        <span className="text-red-300">*</span>
-                      </label>
-                      {isEditMode && roadmapType === "phase" ? (
-                        <p className="mb-2 text-xs text-white/50">
-                          Title for this phase (phase list and library card).
-                        </p>
-                      ) : null}
-                      <input
-                        value={name}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setName(v);
-                          if (roadmapType === "phase") nestedPhaseNameForApiRef.current = v;
-                          setFieldErrors((f) => ({ ...f, name: false }));
-                        }}
-                        className={`${directorInputClass} ${fieldErrors.name ? directorInputErrorClass : ""}`}
-                        placeholder="Enter name"
-                        aria-invalid={fieldErrors.name}
-                      />
-                    </div>
+                    {!(isEditMode && roadmapType === "phase") ? (
+                      <>
+                        <div>
+                          <label className={directorLabelClass}>
+                            Name <span className="text-red-300">*</span>
+                          </label>
+                          <input
+                            value={name}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setName(v);
+                              if (roadmapType === "phase") nestedPhaseNameForApiRef.current = v;
+                              setFieldErrors((f) => ({ ...f, name: false }));
+                            }}
+                            className={`${directorInputClass} ${fieldErrors.name ? directorInputErrorClass : ""}`}
+                            placeholder="Enter name"
+                            aria-invalid={fieldErrors.name}
+                          />
+                        </div>
 
-                    <div>
-                      <label className={directorLabelClass}>
-                        Description <span className="text-red-300">*</span>
-                      </label>
-                      <textarea
-                        value={subheading}
-                        onChange={(e) => {
-                          setSubheading(e.target.value);
-                          setFieldErrors((f) => ({ ...f, subheading: false }));
-                        }}
-                        rows={4}
-                        className={`${directorInputClass} min-h-[100px] resize-y ${fieldErrors.subheading ? directorInputErrorClass : ""}`}
-                        placeholder="Enter description"
-                        aria-invalid={fieldErrors.subheading}
-                      />
-                    </div>
+                        <div>
+                          <label className={directorLabelClass}>
+                            Description <span className="text-red-300">*</span>
+                          </label>
+                          <textarea
+                            value={subheading}
+                            onChange={(e) => {
+                              setSubheading(e.target.value);
+                              setFieldErrors((f) => ({ ...f, subheading: false }));
+                            }}
+                            rows={4}
+                            className={`${directorInputClass} min-h-[100px] resize-y ${fieldErrors.subheading ? directorInputErrorClass : ""}`}
+                            placeholder="Enter description"
+                            aria-invalid={fieldErrors.subheading}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <p className="text-sm leading-relaxed text-white/60">
+                        Edit this phase&rsquo;s <span className="text-white/85">name and description</span> in{" "}
+                        <span className="font-semibold text-white/90">Edit tasks</span> (task editor) — not on this
+                        page.
+                      </p>
+                    )}
 
                     <div>
                       <label className={directorLabelClass}>
