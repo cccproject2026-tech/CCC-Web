@@ -66,7 +66,11 @@ export const apiGetInterestsByStatus = (status: string) =>
   );
 
 // PATCH /interests/request/:userId  — update status (accepted | rejected)
-export const apiUpdateInterestStatus = (id: string, status: "accepted" | "rejected") =>
+// export const apiUpdateInterestStatus = (id: string, status: "accepted" | "rejected") =>
+export const apiUpdateInterestStatus = (
+  id: string,
+  status: "accepted" | "rejected" | "pending"
+) =>
   axiosInstance.patch<{ success: boolean; data: InterestResponse }>(
     `/interests/request/${id}`,
     { status },
