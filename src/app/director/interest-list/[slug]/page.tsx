@@ -8,6 +8,7 @@ import DirectorHero from "../../DirectorHero";
 import MentorBg from "../../../Assets/mentor-bg.png";
 import Mentor1 from "../../../Assets/mentor1.png";
 import { apiGetInterestById, apiUpdateInterestStatus } from "@/app/Services/interests.service";
+import { apiAssignUsers, apiGetAllUsers } from "@/app/Services/users.service";
 import type { ChurchDetails } from "@/app/Services/types/interests.types";
 import type { Interest } from "@/app/Services/types";
 import { directorGlassCard, directorPageRoot } from "../../directorUi";
@@ -45,6 +46,12 @@ export default function InterestDetailPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
+const [assignUsers, setAssignUsers] = useState<any[]>([]);
+const [assignLoading, setAssignLoading] = useState(false);
+const [selectedAssignUserId, setSelectedAssignUserId] = useState<string>("");
+const [assignError, setAssignError] = useState<string | null>(null);
+
+
   const [interestData, setInterestData] = useState<Interest | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -76,20 +83,101 @@ export default function InterestDetailPage() {
     fetchInterest();
   }, [slug]);
 
+    const isMentorInterest = String(interestData?.title ?? "")
+    .toLowerCase()
+    .includes("mentor");
+
+  useEffect(() => {
+    if (!showAssignModal) return;
+
+    const loadAssignUsers = async () => {
+      try {
+        setAssignLoading(true);
+        setAssignError(null);
+        setSelectedAssignUserId("");
+
+        const roleToFetch = isMentorInterest ? "pastor" : "mentor";
+
+        const res = await apiGetAllUsers({
+          role: roleToFetch,
+          roleMatch: "mixed",
+          page: 1,
+          limit: 50,
+          t: Date.now(),
+        });
+
+        const data: any = res.data?.data;
+
+        const users = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.users)
+            ? data.users
+            : Array.isArray(data?.data)
+              ? data.data
+              : [];
+
+        setAssignUsers(users);
+      } catch (error) {
+        console.error("Failed to load assign users", error);
+        setAssignUsers([]);
+        setAssignError(
+          isMentorInterest ? "Could not load pastors." : "Could not load mentors."
+        );
+      } finally {
+        setAssignLoading(false);
+      }
+    };
+
+    loadAssignUsers();
+  }, [showAssignModal, isMentorInterest]);
+
   // const handleAssign = () => {
   //   setShowAssignModal(false);
   //   // setToast("Interest assigned to mentor successfully");
   //   setToast(assignSuccessMessage);
   //   setTimeout(() => setToast(null), 3000);
   // };
-  const handleAssign = () => {
-  setShowAssignModal(false);
-  setToast(assignSuccessMessage);
+//   const handleAssign = () => {
+//   setShowAssignModal(false);
+//   setToast(assignSuccessMessage);
 
-  setTimeout(() => {
-    router.push("/director/interest-list");
-  }, 1200);
+//   setTimeout(() => {
+//     router.push("/director/interest-list");
+//   }, 1200);
+// };
+const handleAssign = async () => {
+  if (!interestData?.userId) {
+    setToast("Missing user id — cannot assign.");
+    setTimeout(() => setToast(null), 3000);
+    return;
+  }
+
+  if (!selectedAssignUserId) {
+    setToast(
+      isMentorInterest
+        ? "Please select a pastor to assign."
+        : "Please select a mentor to assign."
+    );
+    setTimeout(() => setToast(null), 3000);
+    return;
+  }
+
+  try {
+    await apiAssignUsers(interestData.userId, [selectedAssignUserId]);
+
+    setShowAssignModal(false);
+    setToast(assignSuccessMessage);
+
+    setTimeout(() => {
+      router.push("/director/interest-list");
+    }, 1200);
+  } catch (error) {
+    console.error("Failed to assign user", error);
+    setToast("Failed to assign. Please try again.");
+    setTimeout(() => setToast(null), 3000);
+  }
 };
+
 
   const handleReject = async () => {
     if (!interestData?.userId) {
@@ -186,11 +274,13 @@ export default function InterestDetailPage() {
   }
 
   const church = interestData.churchDetails?.[0];
+
+  
   const interestsList = interestData.interests ?? [];
   const fullName = `${interestData.firstName} ${interestData.lastName}`.trim();
-  const isMentorInterest = String(interestData.title ?? "")
-  .toLowerCase()
-  .includes("mentor");
+  // const isMentorInterest = String(interestData.title ?? "")
+  // .toLowerCase()
+  // .includes("mentor");
 
 const assignButtonLabel = isMentorInterest ? "Assign to Mentee" : "Assign to Mentor";
 const assignSuccessMessage = isMentorInterest
@@ -612,28 +702,55 @@ const assignModalDescription = isMentorInterest
   {assignModalDescription}
 </p>
 
-              <div className="mt-5 space-y-2">
-                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-3 py-3 transition hover:bg-white/10">
-                  <input type="radio" name="mentor" className="accent-[#8ec5eb]" />
-                  <div>
-                    <p className="font-medium text-white">John Doe</p>
-                    {/* <p className="text-xs text-[#cde2f2]/70">Mentor</p> */}
-                    <p className="text-xs text-[#cde2f2]/70">
-  {isMentorInterest ? "Mentee" : "Mentor"}
-</p>
-                  </div>
-                </label>
-                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-3 py-3 transition hover:bg-white/10">
-                  <input type="radio" name="mentor" className="accent-[#8ec5eb]" />
-                  <div>
-                    <p className="font-medium text-white">Jacob Jones</p>
-                    {/* <p className="text-xs text-[#cde2f2]/70">Field mentor</p> */}
-                    <p className="text-xs text-[#cde2f2]/70">
-  {isMentorInterest ? "Mentee" : "Field mentor"}
-</p>
-                  </div>
-                </label>
-              </div>
+<div className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1">
+  {assignLoading ? (
+    <p className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm text-[#cde2f2]/80">
+      {isMentorInterest ? "Loading pastors…" : "Loading mentors…"}
+    </p>
+  ) : assignError ? (
+    <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-3 text-sm text-red-100">
+      {assignError}
+    </p>
+  ) : assignUsers.length > 0 ? (
+    assignUsers.map((user) => {
+      const userId = String(user._id ?? user.id ?? "");
+      const fullName =
+        `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() ||
+        user.name ||
+        user.email ||
+        "Unnamed user";
+
+      return (
+        <label
+          key={userId}
+          className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-3 py-3 transition hover:bg-white/10"
+        >
+          <input
+            type="radio"
+            name="assignUser"
+            value={userId}
+            checked={selectedAssignUserId === userId}
+            onChange={() => setSelectedAssignUserId(userId)}
+            className="accent-[#8ec5eb]"
+          />
+          <div className="min-w-0">
+            <p className="truncate font-medium text-white">{fullName}</p>
+            <p className="truncate text-xs text-[#cde2f2]/70">
+              {user.email ?? (isMentorInterest ? "Pastor" : "Mentor")}
+            </p>
+          </div>
+        </label>
+      );
+    })
+  ) : (
+    <p className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm text-[#cde2f2]/80">
+      {isMentorInterest ? "No pastors found." : "No mentors found."}
+    </p>
+  )}
+</div>
+
+
+
               <div className="mt-6 flex gap-3">
                 <button
                   type="button"
@@ -642,13 +759,21 @@ const assignModalDescription = isMentorInterest
                 >
                   Cancel
                 </button>
-                <button
+                {/* <button
                   type="button"
                   onClick={handleAssign}
                   className="flex-1 rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
                 >
                   Assign
-                </button>
+                </button> */}
+                <button
+  type="button"
+  onClick={handleAssign}
+  disabled={assignLoading || !selectedAssignUserId}
+  className="flex-1 rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
+>
+  Assign
+</button>
               </div>
             </div>
           </div>
