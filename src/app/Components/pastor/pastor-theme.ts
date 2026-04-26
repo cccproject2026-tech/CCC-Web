@@ -83,7 +83,7 @@ export const pastorFieldLabel = "mb-1.5 block text-xs font-medium text-[#d9ebf8]
 
 /** Dark select / native input on glass pages. */
 export const pastorDarkSelect =
-  "w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none focus:border-[#8ec5eb]/50";
+  "w-full rounded-xl border border-white/20 bg-[#062946] px-3 py-2 text-sm text-white outline-none focus:border-[#8ec5eb]/50 [&>option]:bg-[#062946] [&>option]:text-white";
 
 export const pastorDarkDateInput =
   "w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-[#0f4a76] outline-none focus:ring-2 focus:ring-[#8ec5eb]";
