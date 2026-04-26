@@ -21,6 +21,9 @@ import {
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import DuoIcon from "../../Assets/duo.png";
 import MeetIcon from "../../Assets/meet.png";
+import ZoomIcon from "../../Assets/zoom.png";
+import TeamsIcon from "../../Assets/teams.png";
+import PhoneIcon from "../../Assets/phone.png";
 import UserProfile from "../../Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import axiosInstance from "@/app/Services/config/axios-instance";
@@ -215,14 +218,36 @@ export default function PastorAppointmentsPage() {
 
 
 
-  const getModeIcon = (mode) => {
-    if (!mode) return DuoIcon;
-    const m = mode.toLowerCase();
-    if (m === "duo") return DuoIcon;
-    if (m === "google meet" || m === "meet") return MeetIcon;
-    if (m === "zoom") return MeetIcon;
-    return DuoIcon;
-  };
+  // const getModeIcon = (mode) => {
+  //   if (!mode) return DuoIcon;
+  //   const m = mode.toLowerCase();
+  //   if (m === "duo") return DuoIcon;
+  //   if (m === "google meet" || m === "meet") return MeetIcon;
+  //   if (m === "zoom") return MeetIcon;
+  //   return DuoIcon;
+  // };
+  const getModeIcon = (mode?: string) => {
+  const m = String(mode || "").toLowerCase().trim();
+
+  if (m.includes("zoom")) return ZoomIcon;
+
+  if (
+    m.includes("google meet") ||
+    m.includes("gmeet") ||
+    m.includes("google") ||
+    m.includes("meet")
+  ) {
+    return MeetIcon;
+  }
+
+  if (m.includes("team")) return TeamsIcon;
+
+  if (m.includes("phone") || m.includes("call")) return PhoneIcon;
+
+  if (m.includes("duo")) return DuoIcon;
+
+  return ZoomIcon;
+};
 
   const formatDate = (dateString) => {
     const d = new Date(dateString);

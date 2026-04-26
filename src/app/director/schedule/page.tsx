@@ -20,6 +20,9 @@ import { DirectorFilterSection } from "../ui";
 import ProgressBg from "../../Assets/progress-bg.jpg";
 import DuoIcon from "../../Assets/duo.png";
 import MeetIcon from "../../Assets/meet.png";
+import ZoomIcon from "../../Assets/zoom.png";
+import TeamsIcon from "../../Assets/teams.png";
+import PhoneIcon from "../../Assets/phone.png";
 import UserProfile from "../../Assets/user-profile.png";
 import {
   apiCancelAppointment,
@@ -110,6 +113,28 @@ function toLocalDateTimeInput(iso: string): string {
   const hh = String(d.getHours()).padStart(2, "0");
   const min = String(d.getMinutes()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
+function getPlatformIcon(platform?: string) {
+  const value = String(platform || "").toLowerCase().trim();
+
+  if (value.includes("zoom")) return ZoomIcon;
+
+  if (
+    value.includes("meet") ||
+    value.includes("gmeet") ||
+    value.includes("google")
+  ) {
+    return MeetIcon;
+  }
+
+  if (value.includes("team")) return TeamsIcon;
+
+  if (value.includes("phone") || value.includes("call")) return PhoneIcon;
+
+  if (value.includes("duo")) return DuoIcon;
+
+  return ZoomIcon;
 }
 
 // ─── Inner content (needs useSearchParams — wrapped in Suspense) ──────────────
@@ -857,11 +882,16 @@ function DirectorScheduleContent() {
                       >
                         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-6">
                           <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
-                            <Image
+                            {/* <Image
                               src={appt.platform === "gmeet" || appt.platform === "google-meet" ? MeetIcon : DuoIcon}
                               alt={appt.platform}
                               className="h-10 w-10"
-                            />
+                            /> */}
+                            <Image
+  src={getPlatformIcon(appt.platform)}
+  alt={appt.platform || "Meeting platform"}
+  className="h-10 w-10"
+/>
                           </div>
                         </div>
                         <div className="relative min-w-0 flex-1 px-4 py-4 sm:px-5">
@@ -1041,11 +1071,16 @@ function DirectorScheduleContent() {
                       >
                         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-6">
                           <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
-                            <Image
+                            {/* <Image
                               src={appt.platform === "gmeet" || appt.platform === "google-meet" ? MeetIcon : DuoIcon}
                               alt={appt.platform}
                               className="h-10 w-10"
-                            />
+                            /> */}
+                            <Image
+  src={getPlatformIcon(appt.platform)}
+  alt={appt.platform || "Meeting platform"}
+  className="h-10 w-10"
+/>
                           </div>
                         </div>
                         <div className="relative min-w-0 flex-1 px-4 py-4 sm:px-5">

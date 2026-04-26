@@ -5,6 +5,9 @@ import Image from "next/image";
 import HeroBg from "../../Assets/appointment-bg.png";
 import DuoIcon from "../../Assets/duo.png";
 import MeetIcon from "../../Assets/meet.png";
+import ZoomIcon from "../../Assets/zoom.png";
+import TeamsIcon from "../../Assets/teams.png";
+import PhoneIcon from "../../Assets/phone.png";
 import UserProfile from "../../Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
@@ -77,6 +80,44 @@ function convertTo24Hour(time12: string, period: string): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
+// function getPlatformIcon(platform?: string) {
+//   const value = String(platform || "").toLowerCase().trim();
+
+//   if (value.includes("zoom")) return ZoomIcon;
+
+//   if (
+//     value.includes("meet") ||
+//     value.includes("gmeet") ||
+//     value.includes("google")
+//   ) {
+//     return MeetIcon;
+//   }
+
+//   if (value.includes("duo")) return DuoIcon;
+
+//   return ZoomIcon;
+// }
+function getPlatformIcon(platform?: string) {
+  const value = String(platform || "").toLowerCase().trim();
+
+  if (value.includes("zoom")) return ZoomIcon;
+
+  if (
+    value.includes("meet") ||
+    value.includes("gmeet") ||
+    value.includes("google")
+  ) {
+    return MeetIcon;
+  }
+
+  if (value.includes("team")) return TeamsIcon;
+
+  if (value.includes("phone") || value.includes("call")) return PhoneIcon;
+
+  if (value.includes("duo")) return DuoIcon;
+
+  return ZoomIcon;
+}
 function MentorScheduleContent() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<
@@ -1133,7 +1174,8 @@ function MentorScheduleContent() {
                         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-0">
                           <div className="flex h-[100px] w-[100px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
                             <Image
-                              src={appt.platform === "zoom" ? MeetIcon : DuoIcon}
+                              // src={appt.platform === "zoom" ? MeetIcon : DuoIcon}
+                              src={getPlatformIcon(appt.platform)}
                               alt={appt.platform}
                               className="h-[52px] w-[52px]"
                             />
@@ -1273,7 +1315,8 @@ function MentorScheduleContent() {
                         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-0">
                           <div className="flex h-[100px] w-[100px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
                             <Image
-                              src={appt.platform === "zoom" ? MeetIcon : DuoIcon}
+                              // src={appt.platform === "zoom" ? MeetIcon : DuoIcon}
+                              src={getPlatformIcon(appt.platform)}
                               alt={appt.platform}
                               className="h-[52px] w-[52px]"
                             />

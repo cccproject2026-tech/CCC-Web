@@ -42,24 +42,63 @@ export default function PastorProfile() {
   // -------------------------
   // FETCH USER
   // -------------------------
-  useEffect(() => {
-    const storedUser = JSON.parse(getCookie("user") || "{}");
-    const userId = storedUser?.id;
-    if (!userId) return;
+  // useEffect(() => {
+  //   const storedUser = JSON.parse(getCookie("user") || "{}");
+  //   const userId = storedUser?.id;
+  //   if (!userId) return;
 
-    async function fetchUser() {
-      try {
-        const res = await getSingleUser(userId);
-        const data = res.data?.data;
-        setProfile(data);
-        initForm(data);
-      } catch (err) {
-        console.error("Error fetching profile:", err);
+  //   async function fetchUser() {
+  //     try {
+  //       const res = await getSingleUser(userId);
+  //       const data = res.data?.data;
+  //       setProfile(data);
+  //       initForm(data);
+  //     } catch (err) {
+  //       console.error("Error fetching profile:", err);
+  //     }
+  //   }
+
+  //   fetchUser();
+  // }, []);
+
+  useEffect(() => {
+  const storedUser = JSON.parse(getCookie("user") || "{}");
+  const userId = storedUser?.id || storedUser?._id;
+
+  if (!userId) return;
+
+  async function fetchUser() {
+    try {
+      const res = await getSingleUser(userId);
+      const apiUser = res.data?.data;
+
+      const mergedUser = {
+        ...apiUser,
+        // profilePicture:
+        //   apiUser?.profilePicture ||
+        //   storedUser?.profilePicture ||
+        //   "",
+        profilePicture:
+  storedUser?.profilePicture ||
+  apiUser?.profilePicture ||
+  "",
+      };
+
+      setProfile(mergedUser);
+      initForm(mergedUser);
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+
+      // fallback: use cookie data if API fails
+      if (storedUser?.profilePicture) {
+        setProfile(storedUser);
+        initForm(storedUser);
       }
     }
+  }
 
-    fetchUser();
-  }, []);
+  fetchUser();
+}, []);
 
   const initForm = (data: any) => {
     setForm({
@@ -267,13 +306,22 @@ export default function PastorProfile() {
 
           {/* LEFT PROFILE CARD */}
           <div className="w-full flex-shrink-0 rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-6 text-center shadow-[0_18px_40px_rgba(2,20,38,0.35)] md:w-[320px]">
-            <Image
+            {/* <Image
               src={profile.profilePicture || ProfilePic}
               alt="Profile"
               width={104}
               height={104}
               className="mx-auto mb-4 rounded-full border-2 border-[#8ec5eb]/55 object-cover shadow-[0_10px_24px_rgba(2,20,38,0.35)]"
-            />
+            /> */}
+
+            <Image
+  src={profile?.profilePicture || form?.profilePicture || ProfilePic}
+  alt="Profile"
+  width={104}
+  height={104}
+  unoptimized
+  className="mx-auto mb-4 h-[104px] w-[104px] rounded-full border-2 border-[#8ec5eb]/55 object-cover shadow-[0_10px_24px_rgba(2,20,38,0.35)]"
+/>
             <p className="mb-1 text-sm text-[#cde2f2]">Good Morning</p>
             <h3 className="text-[33px] font-semibold leading-tight text-white">
               {profile.firstName} {profile.lastName}

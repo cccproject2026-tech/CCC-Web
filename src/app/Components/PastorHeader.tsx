@@ -66,21 +66,59 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
     setIsClient(true);
   }, []);
 
+  // useEffect(() => {
+  //   const userId = getPastorUserId();
+  //   if (!userId) return;
+
+  //   async function fetchProfile() {
+  //     try {
+  //       const res = await getSingleUser(userId);
+  //       setProfile(res.data?.data);
+  //     } catch (error) {
+  //       console.error("Error fetching user:", error);
+  //     }
+  //   }
+
+  //   fetchProfile();
+  // }, []);
+
   useEffect(() => {
-    const userId = getPastorUserId();
-    if (!userId) return;
+  const userId = getPastorUserId();
 
-    async function fetchProfile() {
-      try {
-        const res = await getSingleUser(userId);
-        setProfile(res.data?.data);
-      } catch (error) {
-        console.error("Error fetching user:", error);
-      }
+  let storedUser: any = {};
+  try {
+    storedUser = JSON.parse(getCookie("user") || "{}");
+  } catch {
+    storedUser = {};
+  }
+
+  if (storedUser?.id || storedUser?._id || storedUser?.profilePicture) {
+    setProfile(storedUser);
+  }
+
+  if (!userId) return;
+
+  async function fetchProfile() {
+    try {
+      const res = await getSingleUser(userId);
+      const apiUser = res.data?.data;
+
+      const mergedUser = {
+        ...apiUser,
+        profilePicture:
+          storedUser?.profilePicture ||
+          apiUser?.profilePicture ||
+          "",
+      };
+
+      setProfile(mergedUser);
+    } catch (error) {
+      console.error("Error fetching user:", error);
     }
+  }
 
-    fetchProfile();
-  }, []);
+  fetchProfile();
+}, []);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
@@ -452,13 +490,22 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
                   </p>
 
                 </div>
-                <Image
+                {/* <Image
                   src={profile?.profilePicture || UserProfile}
                   alt="User"
                   width={30}
                   height={30}
                   className="rounded-full border border-white/40"
-                />
+                /> */}
+
+                <Image
+  src={profile?.profilePicture || UserProfile}
+  alt="User"
+  width={30}
+  height={30}
+  unoptimized
+  className="h-[30px] w-[30px] rounded-full border border-white/40 object-cover"
+/>
               </button>
 
               {/* Profile Menu Dropdown */}
