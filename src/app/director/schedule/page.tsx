@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useLayoutEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { getCookie } from "@/app/utils/cookies";
@@ -25,6 +25,7 @@ import {
   apiCancelAppointment,
   apiCreateAppointment,
   apiCreateAvailability,
+  apiDeleteAvailabilitySlot,
   apiGetAppointments,
   apiRescheduleAppointment,
   apiGetWeeklyAvailability,
@@ -122,6 +123,7 @@ function DirectorScheduleContent() {
 
   // director identity
   const [directorId, setDirectorId] = useState<string | null>(null);
+  const router = useRouter();
 
   // shared state
   const [appointments, setAppointments] = useState<AppointmentResponse[]>([]);
@@ -154,6 +156,7 @@ function DirectorScheduleContent() {
   const [isAddSlotModalOpen, setIsAddSlotModalOpen] = useState(false);
   const [newSlot, setNewSlot] = useState<any>(null);
   const [slotError, setSlotError] = useState<string | null>(null);
+  const [maxBookingsPerDay, setMaxBookingsPerDay] = useState(5);
 
   // schedule drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -273,6 +276,7 @@ function DirectorScheduleContent() {
             slots:
               Array.isArray(d.slots) && d.slots.length > 0
                 ? d.slots.map((s: any) => ({
+                    _id: s._id,
                     startTime: s.startTime || "09:00",
                     startPeriod: s.startPeriod || "AM",
                     endTime: s.endTime || "05:00",
@@ -761,7 +765,7 @@ function DirectorScheduleContent() {
 
   // ── Glass select style (director tokens) ─────────────────────────────────────
   const directorSelectDark =
-    "w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white outline-none focus:border-[#8ec5eb]/50 focus:ring-1 focus:ring-[#8ec5eb]/30 [&>option]:bg-[#062946]";
+    "w-full rounded-lg border border-white/15 bg-[#062946] px-3 py-2 text-sm text-white outline-none focus:border-[#8ec5eb]/50 focus:ring-1 focus:ring-[#8ec5eb]/30 [&>option]:bg-[#062946] [&>option]:text-white";
 
   const directorDateInput =
     "w-full rounded-lg border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white outline-none focus:border-[#8ec5eb]/50 focus:ring-1 focus:ring-[#8ec5eb]/30 [color-scheme:dark]";
@@ -903,6 +907,15 @@ function DirectorScheduleContent() {
                             <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] capitalize text-[#d9ebf8]">
                               {appt.platform}
                             </span>
+                          </div>
+                          <div className="mt-3 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/director/schedule/${encodeURIComponent(apptKey)}`)}
+                              className={`${directorBtnPrimary} px-4 py-1.5 text-xs`}
+                            >
+                              Details
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1100,8 +1113,12 @@ function DirectorScheduleContent() {
                           </p>
                           <div className="mb-2 flex flex-wrap gap-2">
                             <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
+                              <i className="fa-regular fa-calendar text-[#8ec5eb]" />
+                              {md.toLocaleDateString()}
+                            </span>
+                            <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
                               <i className="fa-regular fa-clock text-[#8ec5eb]" />
-                              {md.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              {md.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
                             </span>
                             <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] capitalize text-[#d9ebf8]">
                               {appt.platform}
@@ -1170,11 +1187,18 @@ function DirectorScheduleContent() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="mb-1 block text-xs text-[#cde2f2]">Meeting Duration</label>
-                    <select className={directorSelectDark}><option>60 Minutes</option><option>30 Minutes</option></select>
+                    <select className={directorSelectDark}><option>60 Minutes</option><option>90 Minutes</option><option>30 Minutes</option></select>
                   </div>
                   <div>
                     <label className="mb-1 block text-xs text-[#cde2f2]">Max. Bookings/Day</label>
-                    <select className={directorSelectDark}><option>5</option><option>10</option></select>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={maxBookingsPerDay}
+                      onChange={(e) => setMaxBookingsPerDay(Math.max(1, Number(e.target.value)))}
+                      className={directorSelectDark}
+                    />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs text-[#cde2f2]">Min. Notice</label>
@@ -1182,7 +1206,9 @@ function DirectorScheduleContent() {
                   </div>
                   <div>
                     <label className="mb-1 block text-xs text-[#cde2f2]">Preferred Mode</label>
-                    <select className={directorSelectDark}><option>Zoom</option><option>Google Meet</option></select>
+                    <select className={directorSelectDark}><option>Zoom</option>
+                    {/* <option>Google Meet</option> */}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -1210,14 +1236,20 @@ function DirectorScheduleContent() {
                             <button
                               type="button"
                               aria-label={`Delete slot ${i + 1}`}
-                              onClick={() => {
-                                const newAvail = availability.map((d) =>
-                                  d.day === selectedAvailabilityDay
-                                    ? { ...d, slots: d.slots.filter((_: any, idx: number) => idx !== i), enabled: d.slots.length > 1 ? d.enabled : false }
-                                    : d,
-                                );
-                                setAvailability(newAvail);
-                                void handleSaveAvailability(newAvail);
+                              onClick={async () => {
+                                if (!directorId) return;
+                                const dateStr = resolveAvailabilityRowDate(selectedDayData);
+                                try {
+                                  await apiDeleteAvailabilitySlot(directorId, {
+                                    slotId: slot._id,
+                                    date: dateStr,
+                                  });
+                                  setAvailabilityRefreshKey((k) => k + 1);
+                                  showToast("Slot deleted successfully");
+                                } catch (err: any) {
+                                  const msg = err?.response?.data?.message || "Failed to delete slot";
+                                  showToast(msg);
+                                }
                               }}
                               className="rounded p-0.5 text-red-400 transition hover:bg-red-400/15 hover:text-red-300"
                             >
@@ -1271,7 +1303,7 @@ function DirectorScheduleContent() {
                         type="button"
                         className={`${directorBtnSecondary} px-3 py-1.5 text-xs`}
                         onClick={() => {
-                          setNewSlot({ startTime: "09:00", startPeriod: "AM", endTime: "10:00", endPeriod: "AM" });
+                          setNewSlot({ startTime: "9:00", startPeriod: "AM", endTime: "10:00", endPeriod: "AM" });
                           setSlotError(null);
                           setIsAddSlotModalOpen(true);
                         }}
@@ -1465,9 +1497,14 @@ function DirectorScheduleContent() {
                             unoptimized={person.profilePicture ? isRemoteImageSrc(person.profilePicture) : false}
                             className="shrink-0 rounded-full border border-white/20"
                           />
-                          <span className="truncate text-sm font-medium text-white">
-                            {person.firstName} {person.lastName}
-                          </span>
+                          <div className="flex min-w-0 flex-col">
+                              <span className="truncate text-sm font-medium text-white">
+                                {person.firstName} {person.lastName}
+                              </span>
+                              <span className="text-[11px] capitalize text-[#8ec5eb]/80">
+                                {person.role || scheduleRecipientType}
+                              </span>
+                            </div>
                         </div>
                         <input type="radio" checked={isSelected} readOnly className="accent-[#8ec5eb]" aria-hidden />
                       </button>
@@ -1638,9 +1675,9 @@ function DirectorScheduleContent() {
                     className={directorSelectDark}
                   >
                     <option value="zoom">Zoom</option>
-                    <option value="google meet">Google Meet</option>
+                    {/* <option value="google meet">Google Meet</option>
                     <option value="teams">Microsoft Teams</option>
-                    <option value="phone">Phone</option>
+                    <option value="phone">Phone</option> */}
                   </select>
                 </div>
                 </div>
@@ -1792,10 +1829,10 @@ function DirectorScheduleContent() {
                   className={directorSelectDark}
                 >
                   <option value="zoom">Zoom</option>
-                  <option value="google-meet">Google Meet</option>
+                  {/* <option value="google-meet">Google Meet</option>
                   <option value="teams">Microsoft Teams</option>
                   <option value="phone">Phone</option>
-                  <option value="in-person">In person</option>
+                  <option value="in-person">In person</option> */}
                 </select>
               </div>
             </div>

@@ -87,6 +87,20 @@ export const apiGetWeeklyAvailability = (mentorId: string, date: string) =>
 export const apiGetMonthlyAvailability = (mentorId: string, date: string) =>
   axiosInstance.get(`/appointments/availability/${mentorId}/month`, { params: { date } });
 
+type DeleteAvailabilitySlotPayload = {
+  slotId: string;
+  date: string;
+};
+
+// DELETE /appointments/availability/:mentorId/slot
+export const apiDeleteAvailabilitySlot = (
+  mentorId: string,
+  payload: DeleteAvailabilitySlotPayload,
+) =>
+  axiosInstance.delete(`/appointments/availability/${mentorId}/slot`, {
+    data: payload,
+  });
+
 // ─── Transcript Summary ─────────────────────────────────────────────────────────
 
 // GET /appointments/pastor/:appointmentId/transcript-summary

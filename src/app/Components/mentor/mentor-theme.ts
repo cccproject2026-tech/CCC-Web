@@ -77,7 +77,7 @@ export const mentorFilterPanel =
 export const mentorFieldLabel = "mb-1.5 block text-xs font-medium text-[#d9ebf8]";
 
 export const mentorSelectDark =
-  "w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-white outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30";
+  "w-full rounded-xl border border-white/20 bg-[#062946] px-3 py-2.5 text-sm text-white outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30 [&>option]:bg-[#062946] [&>option]:text-white";
 
 export const mentorDateInputDark =
   "w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-white outline-none [color-scheme:dark] focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30";

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorSearchBar from "@/app/Components/pastor/PastorSearchBar";
@@ -84,6 +85,7 @@ export default function PastorAppointmentsPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [appointmentsTab, setAppointmentsTab] = useState<"next" | "history">("next");
   const [monthlyAvailabilitySlots, setMonthlyAvailabilitySlots] = useState<any[]>([]);
+  const router = useRouter();
 
 
 
@@ -234,8 +236,9 @@ export default function PastorAppointmentsPage() {
   const formatTime = (dateString) => {
     const d = new Date(dateString);
     return d.toLocaleTimeString("en-US", {
-      hour: "2-digit",
+      hour: "numeric",
       minute: "2-digit",
+      hour12: true,
     });
   };
 
@@ -394,10 +397,19 @@ export default function PastorAppointmentsPage() {
       return;
     }
 
-    setIsScheduling(true);
-
     const yyyyMmDd = new Date(currentYear, currentMonth, selectedDate).toLocaleDateString("en-CA");
     const meetingDateISO = parseSlotStartToIso(yyyyMmDd, selectedTime);
+    const proposedMs = new Date(meetingDateISO).getTime();
+    const hasOverlap = (appointments as any[]).some((a: any) => {
+      const t = new Date(String(a.meetingDate ?? "")).getTime();
+      return !Number.isNaN(t) && Math.abs(t - proposedMs) < 60 * 60 * 1000;
+    });
+    if (hasOverlap) {
+      setToastMessage("This time slot overlaps with an existing appointment.");
+      return;
+    }
+
+    setIsScheduling(true);
 
     const payload = {
       userId,
@@ -756,7 +768,7 @@ export default function PastorAppointmentsPage() {
                   return (
                     <div
                       key={appointmentEntityId(appt)}
-                      className={`relative flex flex-col items-start gap-5 p-4 md:flex-row md:items-center md:p-5 ${pastorGlassCard}`}
+                      className={`relative flex flex-col items-start gap-5 p-4 md:flex-row md:items-center md:p-5 ${pastorGlassCard} ${menuOpenId === appointmentEntityId(appt) ? "z-[60]" : ""}`}
                     >
                       {/* Icon */}
                       <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl bg-white/90 md:h-[100px] md:w-[100px]">
@@ -779,7 +791,7 @@ export default function PastorAppointmentsPage() {
                             <h4 className="text-sm font-semibold text-white">
                               {mentor?.firstName} {mentor?.lastName}
                             </h4>
-                            <p className="text-[11px] text-[#cde2f2]">Mentor</p>
+                            <p className="text-[11px] capitalize text-[#8ec5eb]">{String((mentor as any)?.role ?? "Mentor")}</p>
                           </div>
                         </div>
 
@@ -811,13 +823,13 @@ export default function PastorAppointmentsPage() {
                             <i className="fa-brands fa-whatsapp cursor-pointer"></i>
                           </div>
 
-                          <button type="button" className={pastorPrimaryCta}>
+                          <button type="button" onClick={() => router.push(`/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt))}`)} className={pastorPrimaryCta}>
                             Details
                           </button>
                         </div>
                       </div>
 
-                      {/* 3 DOT MENU */}
+                      {/* 3 DOT MENU */
                       <div className="absolute top-3 right-3">
                         <button
                           onClick={() =>
@@ -922,7 +934,7 @@ export default function PastorAppointmentsPage() {
                   return (
                     <div
                       key={appointmentEntityId(appt)}
-                      className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard}`}
+                      className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard} ${menuOpenId === appointmentEntityId(appt) ? "z-[60]" : ""}`}
                     >
                       <div className="absolute right-3 top-3 z-20">
                         <button
@@ -998,7 +1010,7 @@ export default function PastorAppointmentsPage() {
                             <h4 className="text-sm font-semibold">
                               {mentor?.firstName} {mentor?.lastName}
                             </h4>
-                            <p className="text-xs text-[#cde2f2]">Mentor</p>
+                            <p className="text-xs capitalize text-[#8ec5eb]">{String((mentor as any)?.role ?? "Mentor")}</p>
                           </div>
                         </div>
 
@@ -1030,7 +1042,7 @@ export default function PastorAppointmentsPage() {
                             </div>
                           </div>
 
-                          <button type="button" className={pastorPrimaryCta}>
+                          <button type="button" onClick={() => router.push(`/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt))}`)} className={pastorPrimaryCta}>
                             Details
                           </button>
                         </div>
@@ -1076,7 +1088,7 @@ export default function PastorAppointmentsPage() {
                             <h4 className="text-sm font-semibold">
                               {mentor?.firstName} {mentor?.lastName}
                             </h4>
-                            <p className="text-xs text-[#cde2f2]">Mentor</p>
+                            <p className="text-xs capitalize text-[#8ec5eb]">{String((mentor as any)?.role ?? "Mentor")}</p>
                           </div>
                         </div>
 
@@ -1407,9 +1419,9 @@ export default function PastorAppointmentsPage() {
                           key={t}
                           type="button"
                           onClick={() => setSelectedTime(t)}
-                          className={`rounded-xl border px-3 py-2.5 text-sm transition ${selectedTime === t
-                            ? "border-[#8ec5eb] bg-[#8ec5eb]/20 font-medium text-white shadow-[0_0_0_1px_rgba(142,197,235,0.35)]"
-                            : "border-white/20 bg-white/[0.06] text-[#d9ebf8] hover:border-white/35 hover:bg-white/10"
+                          className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${selectedTime === t
+                            ? "border-[#8ec5eb] bg-[#8ec5eb]/25 text-white shadow-[0_0_0_1px_rgba(142,197,235,0.35)]"
+                            : "border-[#8ec5eb]/30 bg-[#8ec5eb]/10 text-white hover:border-[#8ec5eb]/55 hover:bg-[#8ec5eb]/20"
                             }`}
                         >
                           {t}
@@ -1620,6 +1632,8 @@ export default function PastorAppointmentsPage() {
           </div>
         </div>
       ) : null}
+
+
 
 
     </div>
