@@ -364,7 +364,7 @@ function JumpStartContent() {
     }
     return `url(${HeroBg.src})`;
   }, [roadmap?.imageUrl]);
-
+// Prevent roadmap completion when a required signature field is still empty.
   const hasRequiredSignature = useMemo(() => {
   const checkExtras = (
     items: ExtraComponent[] | undefined,
@@ -393,7 +393,7 @@ function JumpStartContent() {
 
   return checkExtras(roadmap?.extras as ExtraComponent[] | undefined, "extra");
 }, [roadmap?.extras, formData]);
-
+// Prevent roadmap completion when a required upload field has no uploaded or saved file.
 const hasRequiredUploads = useMemo(() => {
   const checkExtras = (
     items: ExtraComponent[] | undefined,
@@ -427,7 +427,8 @@ const hasRequiredUploads = useMemo(() => {
   return checkExtras(roadmap?.extras as ExtraComponent[] | undefined, "extra");
 }, [roadmap?.extras, uploadedFiles, formData]);
 
-
+// Prevent roadmap completion until required task submissions such as text fields,
+// text areas, and checkboxes are completed.
 const hasRequiredSubmissions = useMemo(() => {
   const checkExtras = (
     items: ExtraComponent[] | undefined,
@@ -728,7 +729,7 @@ const hasRequiredSubmissions = useMemo(() => {
       setSaving(false);
     }
   };
-
+// Block completion unless all required roadmap inputs are satisfied.
   const handleMarkComplete = async () => {
     if (!userId || !nestedItemId) {
       setCompleteFeedback("Sign in again or open this task from your roadmap.");

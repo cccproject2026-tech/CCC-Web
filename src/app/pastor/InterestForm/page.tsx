@@ -67,12 +67,13 @@ function InterestFormContent() {
   const searchParams = useSearchParams();
   const role = searchParams.get("role") || "pastor";
 
-  const [showInterests, setShowInterests] = useState(false);
+  // const [showInterests, setShowInterests] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [personalCountry, setPersonalCountry] = useState("");
 
   const [form, setForm] = useState({
     firstName: "",
@@ -89,18 +90,18 @@ function InterestFormContent() {
 
   const [churches, setChurches] = useState<ChurchRow[]>([emptyChurch()]);
 
-  const interests = [
-    "I would like to find out more about the Center for Community Change",
-    "I am interested in receiving mentoring in community engagement",
-    "I would like to talk to one of the mentors",
-    "I am a conference administrator and would like to find out more about partnering with the center",
-  ];
+  // const interests = [
+  //   "I would like to find out more about the Center for Community Change",
+  //   "I am interested in receiving mentoring in community engagement",
+  //   "I would like to talk to one of the mentors",
+  //   "I am a conference administrator and would like to find out more about partnering with the center",
+  // ];
 
   const setField = (k: keyof typeof form, v: string) => {
     setForm((prev) => ({ ...prev, [k]: v }));
     setErrors((prev) => { const e = { ...prev }; delete e[k]; return e; });
   };
-
+// Restrict name-like fields to letters, spaces, apostrophes, and hyphens.
 const sanitizeName = (value: string) => value.replace(/[^A-Za-z\s'-]/g, "");
 
 
@@ -111,14 +112,26 @@ const sanitizeName = (value: string) => value.replace(/[^A-Za-z\s'-]/g, "");
   //   setErrors((prev) => { const e = { ...prev }; delete e[errKey]; return e; });
   // };
 
+// Reset state whenever country changes so state/province always matches the selected country.
   const setChurchField = (idx: number, k: keyof ChurchRow, v: string) => {
   setChurches((prev) =>
     prev.map((c, i) => {
       if (i !== idx) return c;
 
+      // if (k === "country") {
+      //   return { ...c, country: v, state: "" };
+      // }
+
       if (k === "country") {
-        return { ...c, country: v, state: "" };
-      }
+  const phoneCode = getPhoneCodeByCountryName(v);
+
+  return {
+    ...c,
+    country: v,
+    state: "",
+    churchPhone: phoneCode ? `${phoneCode} ` : "",
+  };
+}
 
       return { ...c, [k]: v };
     })
@@ -178,13 +191,46 @@ const sanitizeName = (value: string) => value.replace(/[^A-Za-z\s'-]/g, "");
   //   setErrors(errs);
   //   return Object.keys(errs).length === 0;
   // };
-
+/// Country/state data is powered by country-state-city so the dropdown supports more than US/Canada.
   const countryOptions = Country.getAllCountries();
 
 const getStateOptions = (countryName: string) => {
   const selectedCountry = countryOptions.find((c) => c.name === countryName);
   if (!selectedCountry) return [];
   return State.getStatesOfCountry(selectedCountry.isoCode);
+};
+
+const getPhoneCodeByCountryName = (countryName: string) => {
+  const selectedCountry = countryOptions.find((c) => c.name === countryName);
+  return selectedCountry?.phonecode ? `+${selectedCountry.phonecode}` : "";
+};
+
+const formatPersonalPhone = (value: string) => {
+  const digitsOnly = value.replace(/[^\d]/g, "");
+  const selectedCode = getPhoneCodeByCountryName(personalCountry);
+
+  if (!selectedCode) return digitsOnly;
+
+  const codeDigits = selectedCode.replace("+", "");
+  const numberWithoutCode = digitsOnly.startsWith(codeDigits)
+    ? digitsOnly.slice(codeDigits.length)
+    : digitsOnly;
+
+  return `${selectedCode} ${numberWithoutCode}`.trim();
+};
+
+const formatChurchPhone = (value: string, countryName: string) => {
+  const digitsOnly = value.replace(/[^\d]/g, "");
+  const selectedCode = getPhoneCodeByCountryName(countryName);
+
+  if (!selectedCode) return digitsOnly;
+
+  const codeDigits = selectedCode.replace("+", "");
+  const numberWithoutCode = digitsOnly.startsWith(codeDigits)
+    ? digitsOnly.slice(codeDigits.length)
+    : digitsOnly;
+
+  return `${selectedCode} ${numberWithoutCode}`.trimEnd();
 };
 
 const validate = (): boolean => {
@@ -202,6 +248,9 @@ const validate = (): boolean => {
   } else if (!nameRegex.test(form.lastName.trim())) {
     errs.lastName = "Last Name should contain only letters.";
   }
+  if (!personalCountry) {
+  errs.personalCountry = "Country is required.";
+}
 
   if (!form.phoneNumber.trim()) {
     errs.phoneNumber = "Phone Number is required.";
@@ -222,6 +271,7 @@ const validate = (): boolean => {
     if (!c.churchPhone.trim()) errs[`churchPhone${p}`] = "Church Phone is required.";
     // churchWebsite is optional
     // churchWebsite is optional, but if entered it must be valid
+
 if (c.churchWebsite.trim()) {
   const websiteValue = c.churchWebsite.trim();
   const websiteRegex = /^(https?:\/\/)?([\w-]+\.)+[\w-]{2,}(\/.*)?$/i;
@@ -295,11 +345,16 @@ if (c.churchWebsite.trim()) {
         setErrors({ _form: json.message || "Failed to submit interest form." });
         return;
       }
+      // setSuccessMsg(json.message || "Interest form submitted successfully.");
+      // setToastMessage("Interest submitted successfully.");
+      // setTimeout(() => setToastMessage(null), 2000);
+      // setShowInterests(true);
+      // setCookie("interestEmail", form.email.trim());
       setSuccessMsg(json.message || "Interest form submitted successfully.");
-      setToastMessage("Interest submitted successfully.");
-      setTimeout(() => setToastMessage(null), 2000);
-      setShowInterests(true);
-      setCookie("interestEmail", form.email.trim());
+setToastMessage("Interest submitted successfully.");
+setTimeout(() => setToastMessage(null), 2000);
+setCookie("interestEmail", form.email.trim());
+setShowPopup(true);
     } catch (error) {
       console.error("Interest submit error:", error);
       setErrors({ _form: axiosErrorMessage(error) });
@@ -308,9 +363,9 @@ if (c.churchWebsite.trim()) {
     }
   };
 
-  const handleFirstCheckbox = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) setShowPopup(true);
-  };
+  // const handleFirstCheckbox = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   if (e.target.checked) setShowPopup(true);
+  // };
 
   /** Inline red error under a field */
   const Err = ({ k }: { k: string }) =>
@@ -393,19 +448,63 @@ if (c.churchWebsite.trim()) {
                     />
                     <Err k="lastName" />
                   </div>
-                  <div>
+                  {/* <div>
                     <input
                       type="tel"
                       placeholder="Phone Number *"
                       value={form.phoneNumber}
+                      // onChange={(e) => {
+                      //   const v = e.target.value.replace(/[^\d\s+\-()\u00d7]/g, "");
+                      //   setField("phoneNumber", v);
+                      // }}
+
                       onChange={(e) => {
-                        const v = e.target.value.replace(/[^\d\s+\-()\u00d7]/g, "");
-                        setField("phoneNumber", v);
-                      }}
+  setField("phoneNumber", formatPersonalPhone(e.target.value));
+}}
                       className={inputCls("phoneNumber")}
                     />
                     <Err k="phoneNumber" />
-                  </div>
+                  </div> */}
+
+                  <div>
+  <select
+    value={personalCountry}
+    onChange={(e) => {
+      setPersonalCountry(e.target.value);
+      setField("phoneNumber", "");
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.personalCountry;
+        delete next.phoneNumber;
+        return next;
+      });
+    }}
+    className={inputCls("personalCountry")}
+  >
+    <option value="" disabled>
+      Select Country *
+    </option>
+    {countryOptions.map((country) => (
+      <option key={country.isoCode} value={country.name}>
+        {country.name}
+      </option>
+    ))}
+  </select>
+  <Err k="personalCountry" />
+</div>
+
+<div>
+  <input
+    type="tel"
+    placeholder="Phone Number *"
+    value={form.phoneNumber}
+    onChange={(e) => {
+      setField("phoneNumber", formatPersonalPhone(e.target.value));
+    }}
+    className={inputCls("phoneNumber")}
+  />
+  <Err k="phoneNumber" />
+</div>
                   <div>
                     <input
                       type="email"
@@ -459,7 +558,7 @@ if (c.churchWebsite.trim()) {
                         <Err k={`churchName${p}`} />
                       </div>
                       <div>
-                        <input
+                        {/* <input
                           type="tel"
                           placeholder="Church Phone *"
                           value={church.churchPhone}
@@ -468,7 +567,16 @@ if (c.churchWebsite.trim()) {
                             setChurchField(idx, "churchPhone", v);
                           }}
                           className={inputCls(`churchPhone${p}`)}
-                        />
+                        /> */}
+                        <input
+  type="tel"
+  placeholder="Church Phone *"
+  value={church.churchPhone}
+  onChange={(e) => {
+    setChurchField(idx, "churchPhone", formatChurchPhone(e.target.value, church.country));
+  }}
+  className={inputCls(`churchPhone${p}`)}
+/>
                         <Err k={`churchPhone${p}`} />
                       </div>
                       {/* <div>
@@ -748,7 +856,7 @@ if (c.churchWebsite.trim()) {
             </form>
 
             {/* CHECKBOXES APPEAR BELOW FORM AFTER SUCCESSFUL SUBMIT */}
-            {showInterests && (
+            {/* {showInterests && (
               <div className="mt-8 rounded-lg border border-white/20 bg-[#0a3558] text-white p-6 shadow-md">
                 <h3 className="text-sm font-semibold mb-4">Interests</h3>
                 <div className="flex flex-col gap-3">
@@ -764,7 +872,7 @@ if (c.churchWebsite.trim()) {
                   ))}
                 </div>
               </div>
-            )}
+            )} */}
           </div>
         </div>
       </section>
