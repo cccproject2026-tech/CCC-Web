@@ -15,6 +15,7 @@ import {
 } from "@/app/director/directorUi";
 import ConfirmModal from "@/app/Components/ConfirmModal";
 import AssignMenteesModal from "@/app/Components/AssignMenteesModal";
+import ListMenteesModal from "@/app/Components/ListMenteesModal";
 import MentorBg from "@/app/Assets/mentor-bg.png";
 import Mentor1 from "@/app/Assets/mentor1.png";
 import ProfileForm from "@/app/Components/ProfileForm";
@@ -59,6 +60,7 @@ export default function MentorProfilePage() {
   const { id } = useParams<{ id: string }>();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showListMenteesModal, setShowListMenteesModal] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
     variant: "success" | "error";
@@ -136,7 +138,7 @@ export default function MentorProfilePage() {
         profilePicture: user.profilePicture ?? null,
         totalMentees: ids.length,
         otherInfo: {
-          title: interest?.title ?? "",
+          title: user?.title ?? interest?.title ?? "",
           yearsInMinistry: interest?.yearsInMinistry ?? "",
           conference: interest?.conference ?? "",
           bio: interest?.comments ?? "",
@@ -256,12 +258,19 @@ export default function MentorProfilePage() {
   }
 
   const fullName = `${mentorData.firstName} ${mentorData.lastName}`.trim();
+  const mentorTitle = mentorData.otherInfo.title?.trim() || "";
 
   return (
     <div className={directorPageRoot}>
       <DirectorHero
         title={fullName || "Mentor Profile"}
-        subtitle={mentorData.role ? `${mentorData.role}` : "Mentor details and assigned mentees"}
+        subtitle={
+          mentorTitle
+            ? `${mentorTitle}${mentorData.role ? ` • ${mentorData.role}` : ""}`
+            : mentorData.role
+              ? `${mentorData.role}`
+              : "Mentor details and assigned mentees"
+        }
         image={MentorBg}
         breadcrumbItems={[
           { label: "Home", href: "/director/home" },
@@ -293,7 +302,7 @@ export default function MentorProfilePage() {
                   <p className="mt-1 text-[13px] capitalize text-white/65">{mentorData.role}</p>
                   <div className="mt-2 flex items-center gap-1.5 text-[12px] text-[#8ec5eb]/90">
                     <i className="fa-solid fa-award" />
-                    <span className="capitalize">{mentorData.role}</span>
+                    <span className="capitalize">{mentorTitle || mentorData.role}</span>
                   </div>
                 </div>
 
@@ -442,12 +451,13 @@ export default function MentorProfilePage() {
                   <h2 className="text-lg font-semibold text-white sm:text-xl">
                     Assigned mentees ({assignedMentees.length})
                   </h2>
-                  <Link
-                    href="/director/mentees"
+                  <button
+                    type="button"
+                    onClick={() => setShowListMenteesModal(true)}
                     className="text-sm font-semibold text-[#8ec5eb] transition hover:text-[#cde2f2]"
                   >
                     View all mentees
-                  </Link>
+                  </button>
                 </div>
 
                 {assignedLoading ? (
@@ -511,6 +521,13 @@ export default function MentorProfilePage() {
           await refreshAfterAssign();
         }}
         onError={(message) => setToast({ message, variant: "error" })}
+      />
+
+      <ListMenteesModal
+        isOpen={showListMenteesModal}
+        onClose={() => setShowListMenteesModal(false)}
+        mentorId={id ?? null}
+        mentorName={fullName || null}
       />
 
       {toast && (

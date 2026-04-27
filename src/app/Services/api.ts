@@ -126,6 +126,12 @@ export {
 export {
   apiGetDirectorOverview,
   apiGetOverallProgress,
+  unwrapDirectorOverview,
+  aggregateDirectorOverviewFromUsers,
+  mergeDirectorOverviewWithUserAggregate,
+  buildMonthlyCompletionsFromUserProgressRows,
+  extractUserIdFromOverallProgressRow,
+  unwrapOverallProgressList,
   apiGetUserProgress,
   apiAssignRoadmap,
   apiAssignAssessment,

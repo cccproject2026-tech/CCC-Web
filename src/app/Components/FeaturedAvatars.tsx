@@ -1,11 +1,14 @@
 "use client";
 import Image from "next/image";
+import Link from "next/link";
 import { isRemoteImageSrc } from "@/app/utils/image";
 
 export interface FeaturedAvatarItem {
   id: number | string;
   name: string;
   img: any;
+  /** When set, avatar + label navigate (e.g. mentor profile). Takes precedence over `onItemClick`. */
+  href?: string;
 }
 
 interface FeaturedAvatarsProps {
@@ -40,6 +43,9 @@ export default function FeaturedAvatars({
             ? "shadow-[0_0_0_2px_#0a1f2e,0_0_0_4px_#8ec5eb] sm:shadow-[0_0_0_2px_#0a1f2e,0_0_0_4px_#8ec5eb]"
             : "";
 
+          const interactiveClass =
+            "group flex flex-col items-center rounded-xl px-1 py-0.5 text-center transition hover:opacity-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8ec5eb]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#041f35]";
+
           const avatar = (
             <div
               className="relative mb-2"
@@ -54,7 +60,11 @@ export default function FeaturedAvatars({
                     alt=""
                     className="object-cover"
                     fill
-                    unoptimized={isRemoteImageSrc(item.img)}
+                    unoptimized={
+                      isRemoteImageSrc(item.img) ||
+                      (typeof item.img === "string" &&
+                        (item.img.startsWith("blob:") || item.img.startsWith("data:")))
+                    }
                     sizes={`${sizePx}px`}
                   />
                 </div>
@@ -62,22 +72,41 @@ export default function FeaturedAvatars({
             </div>
           );
 
+          const label = (
+            <span
+              className={`${nameClass} max-w-[min(140px,22vw)] truncate group-hover:underline group-hover:underline-offset-2`}
+            >
+              {item.name}
+            </span>
+          );
+
+          if (item.href) {
+            return (
+              <div key={item.id} className="flex-shrink-0 text-center">
+                <Link
+                  href={item.href}
+                  className={`${interactiveClass} cursor-pointer`}
+                  aria-label={`View ${item.name} profile`}
+                >
+                  {avatar}
+                  {label}
+                </Link>
+              </div>
+            );
+          }
+
           if (onItemClick) {
             return (
               <div key={item.id} className="flex-shrink-0 text-center">
                 <button
                   type="button"
                   onClick={() => onItemClick(item)}
-                  className="group flex cursor-pointer flex-col items-center rounded-xl px-1 py-0.5 text-center transition hover:opacity-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8ec5eb]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#041f35]"
+                  className={`${interactiveClass} cursor-pointer`}
                   aria-pressed={isSelected}
                   aria-label={`Select ${item.name}`}
                 >
                   {avatar}
-                  <span
-                    className={`${nameClass} max-w-[min(140px,22vw)] truncate group-hover:underline group-hover:underline-offset-2`}
-                  >
-                    {item.name}
-                  </span>
+                  {label}
                 </button>
               </div>
             );

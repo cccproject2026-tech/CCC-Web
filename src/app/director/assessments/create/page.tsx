@@ -22,12 +22,16 @@ import {
 import {
   buildCreateAssessmentSectionsFromWizard,
   buildPreSurveyPayloadForDirectorCreate,
+  defaultWizardPlanName,
 } from "@/app/Services/utils/assessment-mapper";
 import type { CreateAssessmentPayload } from "@/app/Services/types/assessment.types";
 import { isRemoteImageSrc } from "@/app/utils/image";
 
-/** Every section is created with exactly four layers (levels). */
-const SECTION_LAYER_COUNT = 4;
+/** Initial count of **choice layers** (survey); add/remove is independent of CDP levels. */
+const DEFAULT_STARTING_LAYERS = 4;
+const MIN_LAYERS = 1;
+/** CDP is always **four levels** (1–4), separate from choice layers. */
+const CDP_LEVEL_COUNT = 4;
 
 type WizardSection = {
   id: number;
@@ -52,20 +56,23 @@ const defaultPreSurveyRow = (): PreSurveyRow => ({
   placeholder: "Enter number",
 });
 
-const defaultSection = (): WizardSection => ({
-  id: Date.now(),
-  name: "",
-  guidelines: "",
-  layers: Array.from({ length: SECTION_LAYER_COUNT }, (_, i) => ({
-    id: i + 1,
-    choices: [""],
-  })),
-  plans: Array.from({ length: SECTION_LAYER_COUNT }, (_, i) => ({
-    id: i + 1,
-    name: `Level ${i + 1} - Customized Development Plans`,
-    items: [""],
-  })),
-});
+const defaultSection = (): WizardSection => {
+  const base = Date.now();
+  return {
+    id: base,
+    name: "",
+    guidelines: "",
+    layers: Array.from({ length: DEFAULT_STARTING_LAYERS }, (_, i) => ({
+      id: base + i,
+      choices: [""],
+    })),
+    plans: Array.from({ length: CDP_LEVEL_COUNT }, (_, i) => ({
+      id: base + i + 100,
+      name: defaultWizardPlanName(i),
+      items: [""],
+    })),
+  };
+};
 
 export default function CreateAssessmentPage() {
   const router = useRouter();
@@ -131,6 +138,28 @@ export default function CreateAssessmentPage() {
     const updated = [...sections];
     updated[sectionIdx].layers[layerIdx].choices.push("");
     setSections(updated);
+  };
+
+  const handleAddLayer = (sectionIdx: number) => {
+    setSections((prev) => {
+      const next = [...prev];
+      const copy = { ...next[sectionIdx] };
+      const idBase = Date.now();
+      copy.layers = [...copy.layers, { id: idBase, choices: [""] }];
+      next[sectionIdx] = copy;
+      return next;
+    });
+  };
+
+  const handleRemoveLayer = (sectionIdx: number, layerIdx: number) => {
+    setSections((prev) => {
+      if (prev[sectionIdx]?.layers.length <= MIN_LAYERS) return prev;
+      const next = [...prev];
+      const copy = { ...next[sectionIdx] };
+      copy.layers = copy.layers.filter((_, j) => j !== layerIdx);
+      next[sectionIdx] = copy;
+      return next;
+    });
   };
 
   const handleRemoveLayerChoice = (sectionIdx: number, layerIdx: number, choiceIdx: number) => {
@@ -223,12 +252,13 @@ export default function CreateAssessmentPage() {
 
     const invalidSection = sections.some(
       (s) =>
-        s.layers.length !== SECTION_LAYER_COUNT ||
+        s.layers.length < MIN_LAYERS ||
+        s.plans.length !== CDP_LEVEL_COUNT ||
         s.layers.some((l) => !l.choices.some((c) => c.trim())),
     );
     if (invalidSection) {
       showToast(
-        `Each section must have ${SECTION_LAYER_COUNT} layers, and each layer needs at least one choice with text.`,
+        `Each section needs at least one choice layer with text, and exactly ${CDP_LEVEL_COUNT} CDP level blocks (levels 1–4).`,
       );
       return;
     }
@@ -297,7 +327,7 @@ export default function CreateAssessmentPage() {
       <div className={`${directorPageContainer} px-4 pt-3 sm:px-6 lg:px-10 sm:pt-5`}>
         <DirectorHero
           title="Create assessment"
-          subtitle="Aligned with Director mobile: CMA includes a pre-survey; PMP does not. Four layers per section and optional CDP lines per level."
+          subtitle="CMA includes a pre-survey; PMP does not. Layers are multiple-choice steps (you can add or remove). Levels 1–4 are four CDP plan blocks per section and stay fixed."
           image={AssessmentBg}
           breadcrumbItems={[
             { label: "Home", href: "/director/home" },
@@ -520,21 +550,45 @@ export default function CreateAssessmentPage() {
                     />
                   </div>
 
-                  <p className="text-sm text-white/70">
-                    This section has {SECTION_LAYER_COUNT} layers. Add at least one choice per layer.
-                  </p>
+                  <h4 className="text-sm font-semibold text-white/90">Choice layers (survey)</h4>
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <p className="text-sm text-white/70">
+                      {section.layers.length} layer{section.layers.length === 1 ? "" : "s"} — not the same
+                      as CDP levels 1–4 below. At least one filled option per layer.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleAddLayer(sectionIdx)}
+                      className={directorBtnSecondary + " !py-2 !text-sm"}
+                    >
+                      <i className="fa-solid fa-plus" />
+                      Add layer
+                    </button>
+                  </div>
 
                   {section.layers.map((layer, layerIdx) => (
                     <div key={layer.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                      <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <span className="text-sm font-semibold text-white/90">Layer {layerIdx + 1}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleAddLayerChoice(sectionIdx, layerIdx)}
-                          className="text-xs font-semibold text-[#8ec5eb] hover:underline"
-                        >
-                          + Choice
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleAddLayerChoice(sectionIdx, layerIdx)}
+                            className="text-xs font-semibold text-[#8ec5eb] hover:underline"
+                          >
+                            + Choice
+                          </button>
+                          {section.layers.length > MIN_LAYERS ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveLayer(sectionIdx, layerIdx)}
+                              className="rounded-lg border border-red-400/30 bg-red-500/15 px-2.5 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/25"
+                            >
+                              <i className="fa-solid fa-trash mr-1" />
+                              Remove layer
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                       {layer.choices.map((choice, choiceIdx) => (
                         <div key={choiceIdx} className="mb-2 flex items-center gap-2">
@@ -569,6 +623,11 @@ export default function CreateAssessmentPage() {
                     </div>
                   ))}
 
+                  <h4 className="pt-2 text-sm font-semibold text-white/90">Levels 1–4 (CDP)</h4>
+                  <p className="text-xs text-white/55">
+                    Exactly four development-plan levels per section, independent of how many choice
+                    layers you added above.
+                  </p>
                   {section.plans.map((plan, planIdx) => (
                     <div key={plan.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
                       <div className="mb-2 flex items-center justify-between gap-2">

@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import DirectorHero from "../DirectorHero";
 import { directorGlassCard, directorPageRoot } from "../directorUi";
@@ -16,7 +16,7 @@ import MentorBg from "../../Assets/mentor-bg.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
-import { apiGetAllUsers } from "@/app/Services/users.service";
+import { apiGetAllUsers, apiGetAssignedUsers } from "@/app/Services/users.service";
 import { apiCreateAppointment } from "@/app/Services/api";
 import {
   extractApiErrorMessage,
@@ -24,6 +24,7 @@ import {
   uiMeetingModeToPlatform,
 } from "@/app/Services/appointment-utils";
 import { getDirectorUserId } from "@/app/utils/director-auth";
+import { resolveApiMediaUrl } from "@/app/utils/image";
 
 interface Mentor {
   id: string;
@@ -36,25 +37,228 @@ interface Mentor {
   lastContact?: string;
   status: string;
   assignedIds: string[];
+  email?: string;
+  phoneNumber?: string;
+}
+
+/** List APIs sometimes nest `email` under `user` or `contact` (see director home). */
+function getUserListEmail(
+  person: Record<string, unknown> | { email?: string; contact?: unknown; user?: unknown }
+): string | undefined {
+  const tryStr = (v: unknown): string | undefined => {
+    if (typeof v !== "string") return undefined;
+    const t = v.trim().replace(/[\u200B-\u200D\uFEFF]/g, "");
+    return t.includes("@") && t.length > 3 ? t : undefined;
+  };
+  const direct = tryStr((person as { email?: string }).email);
+  if (direct) return direct;
+  const contact = (person as { contact?: unknown }).contact;
+  if (contact && typeof contact === "object" && !Array.isArray(contact)) {
+    const c = tryStr((contact as Record<string, unknown>).email);
+    if (c) return c;
+  }
+  const user = (person as { user?: unknown }).user;
+  if (user && typeof user === "object" && !Array.isArray(user)) {
+    const u = tryStr((user as Record<string, unknown>).email);
+    if (u) return u;
+  }
+  return undefined;
+}
+
+function getUserListPhone(user: any): string | undefined {
+  const direct = user?.phoneNumber ?? user?.phone;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+  const c = user?.contact;
+  if (c && typeof c === "object" && !Array.isArray(c)) {
+    const p = (c as Record<string, unknown>).phone;
+    if (typeof p === "string" && p.trim()) return p.trim();
+  }
+  const u = user?.user;
+  if (u && typeof u === "object" && !Array.isArray(u)) {
+    const p = (u as Record<string, unknown>).phoneNumber ?? (u as Record<string, unknown>).phone;
+    if (typeof p === "string" && p.trim()) return p.trim();
+  }
+  return undefined;
+}
+
+/** Initial count from list payload only (deduped). Do not use `menteeCount` on the user DTO — it is often stale or a different metric. */
+function readListAssignedCount(user: any): number {
+  const raw = user?.assignedId ?? user?.assignedIds;
+  if (!Array.isArray(raw) || raw.length === 0) return 0;
+  return new Set(
+    raw.map((x) => String(x).trim()).filter(Boolean),
+  ).size;
+}
+
+function applyMenteeCountToMentor(m: Mentor, count: number): Mentor {
+  const w = count === 1 ? "mentee" : "mentees";
+  return {
+    ...m,
+    menteeCount: count,
+    description: `${m.role} with ${count} assigned ${w}`,
+  };
+}
+
+function assignedIdsForMentor(user: any): string[] {
+  const raw = user?.assignedId ?? user?.assignedIds;
+  if (!Array.isArray(raw)) return [];
+  return [
+    ...new Set(
+      raw.map((x) => String(x).trim()).filter(Boolean),
+    ),
+  ];
 }
 
 // Helper function to convert User to Mentor (index = stable fallback avatar)
 const convertUserToMentor = (user: any, index: number): Mentor => {
   const defaultImages = [Mentor1, Mentor2, Mentor3];
+  const rawPic = user?.profilePicture;
+  const img =
+    typeof rawPic === "string" && rawPic.trim()
+      ? (resolveApiMediaUrl(rawPic) ?? rawPic)
+      : defaultImages[index % defaultImages.length];
+  const nAssigned = readListAssignedCount(user);
+  const menteeWord = nAssigned === 1 ? "mentee" : "mentees";
 
   return {
     id: user.id || user._id,
     name: `${user.firstName} ${user.lastName}`,
     role: user.role,
-    description: `${user.role} with ${user.assignedId?.length || 0} assigned mentees`,
-    img: user.profilePicture || defaultImages[index % defaultImages.length],
-    menteeCount: user.assignedId?.length || 0,
+    description: `${user.role} with ${nAssigned} assigned ${menteeWord}`,
+    img,
+    menteeCount: nAssigned,
     isFeatured: false,
     lastContact: undefined,
     status: user.status,
-    assignedIds: user.assignedId || [],
+    assignedIds: assignedIdsForMentor(user),
+    email: getUserListEmail(user) ?? undefined,
+    phoneNumber: getUserListPhone(user),
   };
 };
+
+const PAGE_SIZE = 20;
+const FEATURED_THUMB_LIMIT = 6;
+/** Max rows pulled from `role=mentor&roleMatch=mixed` when we filter by role on the client. */
+const MENTOR_LIST_CLIENT_FILTER_LIMIT = 2000;
+
+type MentorListQuery = { search?: string; page: number; limit: number };
+
+function normalizeRoleKey(role: string | undefined): string {
+  return String(role ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, "");
+}
+
+/** Some APIs return display strings like "Field Mentor"; /users?role=field-mentor may return nothing. */
+function isFieldMentorUser(user: { role?: string } | null | undefined): boolean {
+  const r = String(user?.role ?? "").trim();
+  if (!r) return false;
+  const n = normalizeRoleKey(r);
+  if (n === "fieldmentor") return true;
+  if (n.includes("field") && n.includes("mentor") && n !== "mentor") return true;
+  return false;
+}
+
+/** Core mentor (not field mentor) — `role` is exactly the base `mentor` value. */
+function isStandardMentorOnly(user: { role?: string } | null | undefined): boolean {
+  if (!user) return false;
+  if (isFieldMentorUser(user)) return false;
+  return normalizeRoleKey(user.role) === "mentor";
+}
+
+/**
+ * Tries `GET /users?role=field-mentor&roleMatch=mixed` first. If the list is empty, loads
+ * `role=mentor&roleMatch=mixed` and keeps users whose `role` is a field mentor (fallback).
+ */
+async function fetchFieldMentorPage(base: {
+  search?: string;
+  page: number;
+  limit: number;
+}): Promise<{ users: any[]; total: number; totalPages: number }> {
+  const direct = await apiGetAllUsers({
+    search: base.search,
+    page: base.page,
+    limit: base.limit,
+    role: "field-mentor",
+    roleMatch: "mixed",
+  });
+  const d = direct.data.data;
+  const dUsers = d.users ?? [];
+  const dTotal = d.total ?? 0;
+  if (dUsers.length > 0 || dTotal > 0) {
+    const onlyField = dUsers.filter((u) => isFieldMentorUser(u));
+    return {
+      users: onlyField,
+      total: dTotal,
+      totalPages:
+        d.totalPages ??
+        Math.max(1, Math.ceil((dTotal || 0) / base.limit) || 1),
+    };
+  }
+
+  const broad = await apiGetAllUsers({
+    search: base.search,
+    page: 1,
+    limit: MENTOR_LIST_CLIENT_FILTER_LIMIT,
+    role: "mentor",
+    roleMatch: "mixed",
+    t: Date.now(),
+  });
+  const all = (broad.data.data.users ?? []) as any[];
+  const fieldOnes = all.filter((u) => isFieldMentorUser(u));
+  const total = fieldOnes.length;
+  const start = (base.page - 1) * base.limit;
+  return {
+    users: fieldOnes.slice(start, start + base.limit),
+    total,
+    totalPages: Math.max(1, Math.ceil(total / base.limit) || 1),
+  };
+}
+
+/** Core `mentor` role only (excludes field mentor), from mixed list + client filter + slice. */
+async function fetchMentorOnlyPage(base: {
+  search?: string;
+  page: number;
+  limit: number;
+}): Promise<{ users: any[]; total: number; totalPages: number }> {
+  const broad = await apiGetAllUsers({
+    search: base.search,
+    page: 1,
+    limit: MENTOR_LIST_CLIENT_FILTER_LIMIT,
+    role: "mentor",
+    roleMatch: "mixed",
+    t: Date.now(),
+  });
+  const all = (broad.data.data.users ?? []) as any[];
+  const standard = all.filter((u) => isStandardMentorOnly(u));
+  const total = standard.length;
+  const start = (base.page - 1) * base.limit;
+  return {
+    users: standard.slice(start, start + base.limit),
+    total,
+    totalPages: Math.max(1, Math.ceil(total / base.limit) || 1),
+  };
+}
+
+function buildMentorListRequest(
+  activeFilter: string,
+  base: MentorListQuery
+) {
+  if (activeFilter === "All") {
+    return apiGetAllUsers({
+      ...base,
+      role: "mentor",
+      roleMatch: "mixed",
+    });
+  }
+  // "Mentors" → fetchMentorOnlyPage(); "Field Mentor" → fetchFieldMentorPage()
+  return apiGetAllUsers({
+    ...base,
+    role: "mentor",
+    roleMatch: "mixed",
+  });
+}
 
 export default function MyMentorsPage() {
   const router = useRouter();
@@ -70,12 +274,14 @@ export default function MyMentorsPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const [allMentors, setAllMentors] = useState<Mentor[]>([]);
+  const [featuredMentors, setFeaturedMentors] = useState<Mentor[]>([]);
   const [loading, setLoading] = useState(true);
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const PAGE_SIZE = 20;
+  /** When mentor ids are unchanged but assignments change (e.g. assign modal), re-run assigned GETs. */
+  const [mentorMenteeHydrateNonce, setMentorMenteeHydrateNonce] = useState(0);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -97,38 +303,41 @@ export default function MyMentorsPage() {
         const search =
           debouncedQuery.length > 0 ? debouncedQuery : undefined;
 
-        const base = { search, page: currentPage, limit: PAGE_SIZE };
-
-        const response =
-          activeFilter === "All"
-            ? await apiGetAllUsers({
-                ...base,
-                role: "mentor",
-                roleMatch: "mixed",
-              })
-            : activeFilter === "Mentors"
-              ? await apiGetAllUsers({
-                  ...base,
-                  role: "mentor",
-                  roleMatch: "exact",
-                })
-              : activeFilter === "Field Mentor"
-                ? await apiGetAllUsers({
-                    ...base,
-                    role: "field-mentor",
-                  })
-                : await apiGetAllUsers({
-                    ...base,
-                    role: "mentor",
-                    roleMatch: "mixed",
-                  });
-
-        const { users, total, totalPages: tp } = response.data.data;
-        setAllMentors(
-          users.map((u: any, i: number) => convertUserToMentor(u, i))
-        );
-        setTotalCount(total);
-        setTotalPages(tp);
+        if (activeFilter === "Field Mentor") {
+          const { users, total, totalPages: tp } = await fetchFieldMentorPage({
+            search,
+            page: currentPage,
+            limit: PAGE_SIZE,
+          });
+          setAllMentors(
+            users.map((u: any, i: number) => convertUserToMentor(u, i))
+          );
+          setTotalCount(total);
+          setTotalPages(tp);
+        } else if (activeFilter === "Mentors") {
+          const { users, total, totalPages: tp } = await fetchMentorOnlyPage({
+            search,
+            page: currentPage,
+            limit: PAGE_SIZE,
+          });
+          setAllMentors(
+            users.map((u: any, i: number) => convertUserToMentor(u, i))
+          );
+          setTotalCount(total);
+          setTotalPages(tp);
+        } else {
+          const response = await buildMentorListRequest(activeFilter, {
+            search,
+            page: currentPage,
+            limit: PAGE_SIZE,
+          });
+          const { users, total, totalPages: tp } = response.data.data;
+          setAllMentors(
+            users.map((u: any, i: number) => convertUserToMentor(u, i))
+          );
+          setTotalCount(total);
+          setTotalPages(tp);
+        }
       } catch (error) {
         console.error("Error fetching mentors:", error);
         setAllMentors([]);
@@ -140,16 +349,128 @@ export default function MyMentorsPage() {
     fetchMentors();
   }, [activeFilter, debouncedQuery, currentPage]);
 
-  const featuredMentors = useMemo(() => allMentors.slice(0, 6), [allMentors]);
+  // First 6 profile thumbnails always match the current search/filter (page 1),
+  // not the paged list — so they stay in sync when searching and when you're on page 2+.
+  useEffect(() => {
+    let cancelled = false;
+    const loadFeatured = async () => {
+      try {
+        const search =
+          debouncedQuery.length > 0 ? debouncedQuery : undefined;
+        if (activeFilter === "Field Mentor") {
+          const { users } = await fetchFieldMentorPage({
+            search,
+            page: 1,
+            limit: FEATURED_THUMB_LIMIT,
+          });
+          if (cancelled) return;
+          setFeaturedMentors(
+            users.map((u: any, i: number) => convertUserToMentor(u, i))
+          );
+        } else if (activeFilter === "Mentors") {
+          const { users } = await fetchMentorOnlyPage({
+            search,
+            page: 1,
+            limit: FEATURED_THUMB_LIMIT,
+          });
+          if (cancelled) return;
+          setFeaturedMentors(
+            users.map((u: any, i: number) => convertUserToMentor(u, i))
+          );
+        } else {
+          const response = await buildMentorListRequest(activeFilter, {
+            search,
+            page: 1,
+            limit: FEATURED_THUMB_LIMIT,
+          });
+          const { users } = response.data.data;
+          if (cancelled) return;
+          setFeaturedMentors(
+            users.map((u: any, i: number) => convertUserToMentor(u, i))
+          );
+        }
+      } catch (error) {
+        console.error("Error fetching featured mentors:", error);
+        if (!cancelled) setFeaturedMentors([]);
+      }
+    };
+    loadFeatured();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeFilter, debouncedQuery]);
   const featuredItems: FeaturedAvatarItem[] = useMemo(
     () =>
       featuredMentors.map((m) => ({
         id: m.id,
         name: m.name,
         img: m.img,
+        href: `/director/mentors/profile/${m.id}`,
       })),
     [featuredMentors]
   );
+
+  /** Authoritative count from `GET /users/:id/assigned` (avoids list DTO `menteeCount` drift). */
+  const mentorAssignedFetchKey = useMemo(
+    () =>
+      `${mentorMenteeHydrateNonce}|${[...new Set([...allMentors, ...featuredMentors].map((m) => m.id))]
+        .filter(Boolean)
+        .sort()
+        .join(",")}`,
+    [allMentors, featuredMentors, mentorMenteeHydrateNonce],
+  );
+
+  const assignMenteeCountGen = useRef(0);
+
+  useEffect(() => {
+    const ids = mentorAssignedFetchKey.split(",").filter(Boolean);
+    if (ids.length === 0) return;
+
+    const myGen = ++assignMenteeCountGen.current;
+    let cancelled = false;
+
+    (async () => {
+      const pairs: [string, number | null][] = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const res = await apiGetAssignedUsers(id);
+            const list = res.data?.data;
+            const n = Array.isArray(list) ? list.length : 0;
+            return [id, n] as [string, number | null];
+          } catch {
+            return [id, null] as [string, number | null];
+          }
+        }),
+      );
+      if (cancelled) return;
+      if (myGen !== assignMenteeCountGen.current) return;
+
+      const map = new Map<string, number>();
+      for (const [id, n] of pairs) {
+        if (n !== null) map.set(id, n);
+      }
+
+      setAllMentors((prev) =>
+        prev.map((m) =>
+          map.has(m.id) ? applyMenteeCountToMentor(m, map.get(m.id)!) : m,
+        ),
+      );
+      setFeaturedMentors((prev) =>
+        prev.map((m) =>
+          map.has(m.id) ? applyMenteeCountToMentor(m, map.get(m.id)!) : m,
+        ),
+      );
+      setSelectedMentor((prev) => {
+        if (!prev) return null;
+        const n = map.get(prev.id);
+        return n === undefined ? prev : applyMenteeCountToMentor(prev, n);
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mentorAssignedFetchKey]);
 
   const filteredMentors = useMemo(() => {
     const filtered = [...allMentors];
@@ -270,17 +591,10 @@ export default function MyMentorsPage() {
 
           {!loading && featuredItems.length > 0 && (
             <FeaturedAvatars
+              key={`featured-${activeFilter}-${debouncedQuery}`}
               items={featuredItems}
               showDivider
               className="mb-2"
-              selectedId={selectedMentor?.id ?? null}
-              onItemClick={(item) => {
-                const m = allMentors.find(
-                  (x) => String(x.id) === String(item.id)
-                );
-                if (!m) return;
-                setSelectedMentor((prev) => (prev?.id === m.id ? null : m));
-              }}
             />
           )}
         </div>
@@ -384,6 +698,8 @@ export default function MyMentorsPage() {
                   profileLink={`/director/mentors/profile/${mentor.id}`}
                   menteeCount={mentor.menteeCount}
                   optionsMenu={getMentorOptions(mentor)}
+                  email={mentor.email}
+                  phoneNumber={mentor.phoneNumber}
                 />
               ))}
             </div>
@@ -500,45 +816,78 @@ export default function MyMentorsPage() {
         onSuccess={(message) => {
           setToast({ message, type: 'success' });
           setTimeout(() => setToast(null), 3000);
-          // Refresh the mentors list to show updated assigned counts
+          // Refresh list + featured thumbnails (mentee counts)
           const fetchMentors = async () => {
             try {
               const search =
                 debouncedQuery.length > 0 ? debouncedQuery : undefined;
-              const base = {
-                search,
-                page: currentPage,
-                limit: PAGE_SIZE,
-              };
-              const response =
-                activeFilter === "All"
-                  ? await apiGetAllUsers({
-                      ...base,
-                      role: "mentor",
-                      roleMatch: "mixed",
-                    })
-                  : activeFilter === "Mentors"
-                    ? await apiGetAllUsers({
-                        ...base,
-                        role: "mentor",
-                        roleMatch: "exact",
-                      })
-                    : activeFilter === "Field Mentor"
-                      ? await apiGetAllUsers({
-                          ...base,
-                          role: "field-mentor",
-                        })
-                      : await apiGetAllUsers({
-                          ...base,
-                          role: "mentor",
-                          roleMatch: "mixed",
-                        });
-              const { users, total, totalPages: tp } = response.data.data;
-              setAllMentors(
-                users.map((u: any, i: number) => convertUserToMentor(u, i))
-              );
-              setTotalCount(total);
-              setTotalPages(tp);
+              if (activeFilter === "Field Mentor") {
+                const [list, feat] = await Promise.all([
+                  fetchFieldMentorPage({
+                    search,
+                    page: currentPage,
+                    limit: PAGE_SIZE,
+                  }),
+                  fetchFieldMentorPage({
+                    search,
+                    page: 1,
+                    limit: FEATURED_THUMB_LIMIT,
+                  }),
+                ]);
+                setAllMentors(
+                  list.users.map((u: any, i: number) => convertUserToMentor(u, i))
+                );
+                setTotalCount(list.total);
+                setTotalPages(list.totalPages);
+                setFeaturedMentors(
+                  feat.users.map((u: any, i: number) => convertUserToMentor(u, i))
+                );
+              } else if (activeFilter === "Mentors") {
+                const [list, feat] = await Promise.all([
+                  fetchMentorOnlyPage({
+                    search,
+                    page: currentPage,
+                    limit: PAGE_SIZE,
+                  }),
+                  fetchMentorOnlyPage({
+                    search,
+                    page: 1,
+                    limit: FEATURED_THUMB_LIMIT,
+                  }),
+                ]);
+                setAllMentors(
+                  list.users.map((u: any, i: number) => convertUserToMentor(u, i))
+                );
+                setTotalCount(list.total);
+                setTotalPages(list.totalPages);
+                setFeaturedMentors(
+                  feat.users.map((u: any, i: number) => convertUserToMentor(u, i))
+                );
+              } else {
+                const [listRes, featRes] = await Promise.all([
+                  buildMentorListRequest(activeFilter, {
+                    search,
+                    page: currentPage,
+                    limit: PAGE_SIZE,
+                  }),
+                  buildMentorListRequest(activeFilter, {
+                    search,
+                    page: 1,
+                    limit: FEATURED_THUMB_LIMIT,
+                  }),
+                ]);
+                const { users, total, totalPages: tp } = listRes.data.data;
+                setAllMentors(
+                  users.map((u: any, i: number) => convertUserToMentor(u, i))
+                );
+                setTotalCount(total);
+                setTotalPages(tp);
+                const featUsers = featRes.data.data.users;
+                setFeaturedMentors(
+                  featUsers.map((u: any, i: number) => convertUserToMentor(u, i))
+                );
+              }
+              setMentorMenteeHydrateNonce((n) => n + 1);
             } catch (error) {
               console.error("Error refreshing mentors:", error);
             }

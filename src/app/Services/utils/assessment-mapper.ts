@@ -43,11 +43,16 @@ export function buildCreateAssessmentSectionsFromWizard(
         choices: texts.map((text) => ({ text })),
       };
     });
-    const recommendations =
-      section.plans?.map((plan, idx) => ({
-        level: (idx + 1) as 1 | 2 | 3 | 4,
-        items: plan.items.map((t) => t.trim()).filter(Boolean),
-      })) ?? [];
+    /** CDP: always levels 1–4; `plans[0]..[3]` — independent of how many choice layers exist. */
+    const recPlans = section.plans ?? [];
+    const recommendations: Array<{ level: 1 | 2 | 3 | 4; items: string[] }> = [0, 1, 2, 3].map(
+      (i) => ({
+        level: (i + 1) as 1 | 2 | 3 | 4,
+        items: (recPlans[i]?.items ?? [])
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0),
+      }),
+    );
     return {
       title: section.name.trim() || `Section ${sIdx + 1}`,
       description,

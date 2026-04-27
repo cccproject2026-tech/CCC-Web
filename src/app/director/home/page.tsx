@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { setCookie, getCookie } from "@/app/utils/cookies";
@@ -16,7 +16,6 @@ import {
 } from "../directorUi";
 import HeroBg from "../../Assets/hero-bg.png";
 import Book from "../../Assets/book.png";
-import MapImg from "../../Assets/map-placeholder.png";
 import DuoIcon from "../../Assets/duo.png";
 import MeetIcon from "../../Assets/meet.png";
 import UserProfile from "../../Assets/user-profile.png";
@@ -34,14 +33,25 @@ import {
   apiCreateUser,
   apiGetUserById,
   apiGetAllUsers,
+  apiGetOverallProgress,
+  unwrapDirectorOverview,
+  unwrapOverallProgressList,
+  aggregateDirectorOverviewFromUsers,
+  mergeDirectorOverviewWithUserAggregate,
+  extractUserIdFromOverallProgressRow,
   Appointment,
   Interest,
   MentorPastor,
   User,
 } from "@/app/Services/api";
+import { unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
 import type { UserRole } from "@/app/Services/types/users.types";
+import type { UserOverallProgress } from "@/app/Services/types/progress.types";
 import { getPastorMedia } from "@/app/Services/pastor.service";
 import { getGreeting } from "@/app/Services/utils/helpers";
+import MapCard, { type MapMarker } from "@/app/Components/MapCard";
+import { parseMentorUsersListResponse } from "@/app/director/mentors/parseMentorUsersResponse";
+import { resolveApiMediaUrl } from "@/app/utils/image";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination } from "swiper/modules";
 import "swiper/css";
@@ -77,6 +87,28 @@ function readArrayFromApiBody(res: { data: unknown } | null | undefined): unknow
   return [];
 }
 
+/** List APIs sometimes nest `email` under `user` or `contact`. */
+function getUserListEmail(person: Record<string, unknown> | MentorPastor): string | undefined {
+  const tryStr = (v: unknown): string | undefined => {
+    if (typeof v !== "string") return undefined;
+    const t = v.trim().replace(/[\u200B-\u200D\uFEFF]/g, "");
+    return t.includes("@") && t.length > 3 ? t : undefined;
+  };
+  const direct = tryStr(person.email);
+  if (direct) return direct;
+  const contact = person.contact;
+  if (contact && typeof contact === "object" && !Array.isArray(contact)) {
+    const c = tryStr((contact as Record<string, unknown>).email);
+    if (c) return c;
+  }
+  const user = person.user;
+  if (user && typeof user === "object" && !Array.isArray(user)) {
+    const u = tryStr((user as Record<string, unknown>).email);
+    if (u) return u;
+  }
+  return undefined;
+}
+
 function readUsersPage(res: { data: unknown } | null | undefined): { users: MentorPastor[]; total?: number } {
   if (!res?.data) return { users: [] };
   const body = res.data as Record<string, unknown> | null;
@@ -94,28 +126,6 @@ function readUsersPage(res: { data: unknown } | null | undefined): { users: Ment
     }
   }
   return { users: [] };
-}
-
-function readDirectorOverviewPayload(
-  res: { data: unknown } | null | undefined,
-): DirectorOverviewDto | null {
-  if (!res?.data) return null;
-  const body = res.data as Record<string, unknown> | null;
-  if (!body || typeof body !== "object") return null;
-  if ("totalMentors" in body && "monthlyData" in body) {
-    return body as unknown as DirectorOverviewDto;
-  }
-  const d = body.data;
-  if (d && typeof d === "object" && "totalMentors" in d) {
-    return d as DirectorOverviewDto;
-  }
-  if (d && typeof d === "object" && (d as { data?: unknown }).data) {
-    const dd = (d as { data: unknown }).data;
-    if (dd && typeof dd === "object" && "totalMentors" in (dd as object)) {
-      return dd as DirectorOverviewDto;
-    }
-  }
-  return null;
 }
 
 function readUserPayload(res: { data: unknown } | null | undefined): User | null {
@@ -140,6 +150,63 @@ const getMediaThumbnail = (item: { mediaFiles?: { thumbnail?: string }[]; headin
   if (url && url.trim() !== "") return url;
   return Book;
 };
+
+type ChartRangeId = "p3" | "p6" | "p12" | "n3" | "n6";
+
+function chartMonthCountFromRange(id: ChartRangeId): 3 | 6 | 12 {
+  if (id === "p3" || id === "n3") return 3;
+  if (id === "p12") return 12;
+  return 6;
+}
+
+/** Forward-looking month labels (current month first); completions are typically zero until work lands. */
+function buildUpcomingMonthsPlaceholderChart(
+  count: 3 | 6,
+  ref: Date,
+): { pastor: number; mentor: number; monthName: string; year: number; month: number }[] {
+  const out: {
+    pastor: number;
+    mentor: number;
+    monthName: string;
+    year: number;
+    month: number;
+  }[] = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(ref.getFullYear(), ref.getMonth() + i, 1);
+    out.push({
+      pastor: 0,
+      mentor: 0,
+      monthName: d.toLocaleString("en-US", { month: "short" }),
+      year: d.getFullYear(),
+      month: d.getMonth() + 1,
+    });
+  }
+  return out;
+}
+
+/** Google embed: SF Bay area (same base as /director/mentors/location). */
+const BAY_AREA_MAP_EMBED =
+  "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d31568.68148787118!2d-122.356!3d37.7799!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x808f7fd1d5f8d9f1%3A0x3e1f9a5c95f9a!2sSan%20Francisco%20Bay%20Area!5e0!3m2!1sen!2sus!4v1710000000000&zoom=10";
+
+/** Percent positions on the static embed until API provides lat/lng per user. */
+const NETWORK_MAP_OVERLAY_SLOTS: { top: string; left: string }[] = [
+  { top: "20%", left: "26%" },
+  { top: "18%", left: "46%" },
+  { top: "20%", left: "66%" },
+  { top: "36%", left: "20%" },
+  { top: "34%", left: "40%" },
+  { top: "36%", left: "58%" },
+  { top: "34%", left: "78%" },
+  { top: "50%", left: "28%" },
+  { top: "50%", left: "50%" },
+  { top: "50%", left: "72%" },
+  { top: "66%", left: "36%" },
+  { top: "64%", left: "54%" },
+  { top: "68%", left: "74%" },
+  { top: "44%", left: "12%" },
+  { top: "58%", left: "88%" },
+];
+const MAX_NETWORK_MAP_MARKERS = 15;
 
 const directorExploreCards = [
   {
@@ -192,6 +259,13 @@ export default function DirectorHome() {
   const [pastorsLoading, setPastorsLoading] = useState(true);
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [completedPastorsCount, setCompletedPastorsCount] = useState<number | null>(null);
+  const [networkMapPeople, setNetworkMapPeople] = useState<
+    { id: string; name: string; img: string | typeof Mentor1; kind: "mentor" | "pastor" }[]
+  >([]);
+  const [networkMapLoading, setNetworkMapLoading] = useState(true);
+  const [networkMapRefreshing, setNetworkMapRefreshing] = useState(false);
+  const [mapSearch, setMapSearch] = useState("");
+  const [debouncedMapSearch, setDebouncedMapSearch] = useState("");
   const [addUserLoading, setAddUserLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [mediaList, setMediaList] = useState<
@@ -205,6 +279,7 @@ export default function DirectorHome() {
     }[]
   >([]);
   const [cookieUser, setCookieUser] = useState<{ firstName?: string; lastName?: string } | null>(null);
+  const [chartRangeId, setChartRangeId] = useState<ChartRangeId>("p6");
 
   useEffect(() => {
     const idFromCookie = getCookie("userId")?.trim() ?? "";
@@ -225,6 +300,112 @@ export default function DirectorHome() {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedMapSearch(mapSearch.trim().toLowerCase()), 300);
+    return () => clearTimeout(t);
+  }, [mapSearch]);
+
+  const networkMapRequestId = useRef(0);
+  const networkMapFirstLoadDone = useRef(false);
+
+  const loadNetworkMap = useCallback(async (silent: boolean) => {
+    const req = ++networkMapRequestId.current;
+    if (!silent) {
+      setNetworkMapLoading(true);
+    } else {
+      setNetworkMapRefreshing(true);
+    }
+    const pool = [Mentor1, Mentor2, Mentor3];
+    const mapUserToPin = (
+      u: Record<string, unknown>,
+      kind: "mentor" | "pastor",
+      i: number,
+    ): { id: string; name: string; img: string | typeof Mentor1; kind: "mentor" | "pastor" } => {
+      const id = String(u._id ?? u.id ?? `${kind}-${i}`);
+      const fn = String(u.firstName ?? "");
+      const ln = String(u.lastName ?? "");
+      const name = `${fn} ${ln}`.trim() || (kind === "mentor" ? "Mentor" : "Pastor");
+      const raw = u.profilePicture;
+      if (typeof raw === "string" && raw.trim()) {
+        return { id, name, img: (resolveApiMediaUrl(raw) ?? raw) as string, kind };
+      }
+      return { id, name, img: pool[i % pool.length], kind };
+    };
+    try {
+      const ts = Date.now();
+      const [mRes, pRes] = await Promise.all([
+        apiGetAllUsers({
+          role: "mentor",
+          roleMatch: "mixed",
+          page: 1,
+          limit: 40,
+          t: ts,
+        }),
+        apiGetAllUsers({
+          role: "pastor",
+          roleMatch: "mixed",
+          page: 1,
+          limit: 40,
+          t: ts,
+        }),
+      ]);
+      if (req !== networkMapRequestId.current) return;
+      const { users: mu } = parseMentorUsersListResponse(mRes);
+      const { users: pu } = parseMentorUsersListResponse(pRes);
+      const mentors = mu.map((u, i) => mapUserToPin(u, "mentor", i));
+      const pastors = pu.map((u, i) => mapUserToPin(u, "pastor", i));
+      const interleaved: typeof mentors = [];
+      const maxL = Math.max(mentors.length, pastors.length);
+      for (let i = 0; i < maxL; i++) {
+        if (i < mentors.length) interleaved.push(mentors[i]);
+        if (i < pastors.length) interleaved.push(pastors[i]);
+      }
+      setNetworkMapPeople(interleaved);
+    } catch (e) {
+      console.error(e);
+      if (req === networkMapRequestId.current) setNetworkMapPeople([]);
+    } finally {
+      // Always clear *both* flags when the latest in-flight request finishes. If we only
+      // clear `refreshing` for silent follow-up calls, a superseded first load can leave
+      // `networkMapLoading` stuck true (race: two requests, higher req wins, first never clears).
+      if (req === networkMapRequestId.current) {
+        setNetworkMapLoading(false);
+        setNetworkMapRefreshing(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const silent = networkMapFirstLoadDone.current;
+    networkMapFirstLoadDone.current = true;
+    void loadNetworkMap(silent);
+  }, [resolvedUserId, loadNetworkMap]);
+
+  useEffect(() => {
+    let onVisible: () => void;
+    // Defer so the first paint does not fire `visibilitychange` at the same time as the
+    // initial fetch (avoids two in-flight requests that used to leave the loader stuck).
+    const arm = window.setTimeout(() => {
+      onVisible = () => {
+        if (document.visibilityState === "visible") {
+          void loadNetworkMap(true);
+        }
+      };
+      document.addEventListener("visibilitychange", onVisible);
+    }, 800);
+    return () => {
+      clearTimeout(arm);
+      if (onVisible) document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [loadNetworkMap]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void loadNetworkMap(true);
+    }, 5 * 60 * 1000);
+    return () => window.clearInterval(id);
+  }, [loadNetworkMap]);
 
   useEffect(() => {
     async function fetchMedia() {
@@ -295,66 +476,102 @@ export default function DirectorHome() {
         apiGetMentors({ limit: 4, roleMatch: "mixed" }),
         apiGetPastors({ limit: 4, roleMatch: "mixed" }),
         apiGetDirectorOverview({
-          period: 'yearly',
+          period: "yearly",
           year: new Date().getFullYear(),
-          includeUsers: false,
+          includeUsers: true,
         }),
         uid ? apiGetUserById(uid) : Promise.resolve(null),
         apiGetAllUsers({ role: "pastor", hasCompleted: true, limit: 1 }),
+        apiGetOverallProgress(["mentor", "pastor"]),
       ]);
 
-      // Handle appointments
-      if (results[0].status === 'fulfilled') {
-        setAppointments(results[0].value.data.data || []);
+      // Handle appointments (envelope shapes vary — same as schedule / mentor pages)
+      if (results[0].status === "fulfilled") {
+        setAppointments((unwrapAppointmentsAxiosData(results[0].value) || []) as Appointment[]);
       } else {
-        console.error('Error fetching appointments:', results[0].reason);
+        console.error("Error fetching appointments:", results[0].reason);
         setAppointments([]);
       }
       setAppointmentsLoading(false);
 
       // Handle interests
-      if (results[1].status === 'fulfilled') {
-        setInterests(results[1].value.data.data || []);
+      if (results[1].status === "fulfilled") {
+        const intRes = results[1].value;
+        const raw = intRes?.data as Record<string, unknown> | undefined;
+        const list = Array.isArray(raw?.data)
+          ? raw.data
+          : Array.isArray(raw)
+            ? raw
+            : [];
+        setInterests((list || []) as Interest[]);
       } else {
-        console.error('Error fetching interests:', results[1].reason);
+        console.error("Error fetching interests:", results[1].reason);
         setInterests([]);
       }
       setInterestsLoading(false);
 
-      // Handle mentors
-      if (results[2].status === 'fulfilled') {
-        setMentors(results[2].value.data.data.users || []);
+      // Handle mentors / pastors — use same unwrap as fetchMentors / fetchPastors (users list or array)
+      if (results[2].status === "fulfilled") {
+        setMentors(readUsersPage(results[2].value).users);
       } else {
-        console.error('Error fetching mentors:', results[2].reason);
+        console.error("Error fetching mentors:", results[2].reason);
         setMentors([]);
       }
       setMentorsLoading(false);
 
-      // Handle pastors
-      if (results[3].status === 'fulfilled') {
-        setPastors(results[3].value.data.data.users || []);
+      if (results[3].status === "fulfilled") {
+        setPastors(readUsersPage(results[3].value).users);
       } else {
-        console.error('Error fetching pastors:', results[3].reason);
+        console.error("Error fetching pastors:", results[3].reason);
         setPastors([]);
       }
       setPastorsLoading(false);
 
-      // Handle director overview
-      if (results[4].status === 'fulfilled') {
-        setDirectorOverview(results[4].value.data.data);
+      // Director overview + merge with per-user `/progress/overview/all` when API returns zeros
+      let overviewFromApi: DirectorOverviewDto | null = null;
+      if (results[4].status === "fulfilled") {
+        overviewFromApi = unwrapDirectorOverview(results[4].value);
       } else {
-        console.error('Error fetching director overview:', results[4].reason);
+        console.error("Error fetching director overview:", results[4].reason);
       }
+
+      let progressRows: UserOverallProgress[] = [];
+      if (results[7].status === "fulfilled") {
+        progressRows = unwrapOverallProgressList(results[7].value);
+      } else {
+        console.warn("Error fetching overall progress (mentor/pastor):", results[7].reason);
+      }
+
+      // Director overview may include a `users` list not present on `/overview/all`
+      const fromOverviewUsers = overviewFromApi?.users;
+      if (Array.isArray(fromOverviewUsers) && fromOverviewUsers.length > 0) {
+        const seen = new Set(
+          progressRows
+            .map((r) => extractUserIdFromOverallProgressRow(r))
+            .filter((id): id is string => Boolean(id)),
+        );
+        for (const u of fromOverviewUsers) {
+          const id = extractUserIdFromOverallProgressRow(u);
+          if (id && !seen.has(id)) {
+            progressRows.push(u);
+            seen.add(id);
+          }
+        }
+      }
+
+      const synthetic =
+        progressRows.length > 0 ? aggregateDirectorOverviewFromUsers(progressRows) : null;
+      setDirectorOverview(mergeDirectorOverviewWithUserAggregate(overviewFromApi, synthetic));
       setOverviewLoading(false);
 
       // Handle user details
-      if (results[5].status === 'fulfilled' && results[5].value) {
-        setUser(results[5].value.data.data || null);
+      if (results[5].status === "fulfilled" && results[5].value) {
+        setUser(readUserPayload(results[5].value));
         if (uid) {
           setCookie("userId", uid);
         }
-      } else if (results[5].status === 'rejected') {
-        console.error('Error fetching user details:', results[5].reason);
+      } else if (results[5].status === "rejected") {
+        console.error("Error fetching user details:", results[5].reason);
         setUser(null);
       }
 
@@ -378,17 +595,58 @@ export default function DirectorHome() {
   }, [resolvedUserId]);
 
   const chartData = useMemo(() => {
-    return directorOverview?.monthlyData.slice(-6).map(month => ({
+    if (chartRangeId === "n3" || chartRangeId === "n6") {
+      const n = chartRangeId === "n3" ? 3 : 6;
+      return buildUpcomingMonthsPlaceholderChart(n, currentTime);
+    }
+    const n = chartMonthCountFromRange(chartRangeId);
+    const months = (directorOverview?.monthlyData ?? []).slice(-n);
+    return months.map((month) => ({
       pastor: month.pastorsCompleted,
       mentor: month.mentorsCompleted,
-      monthName: month.monthName,
-    })) || [];
-  }, [directorOverview?.monthlyData]);
+      year: month.year,
+      month: month.month,
+      monthName:
+        month.monthName?.trim() ||
+        (month.month && month.year
+          ? new Date(month.year, month.month - 1, 1).toLocaleString("en-US", { month: "short" })
+          : ""),
+    }));
+  }, [directorOverview?.monthlyData, chartRangeId, currentTime]);
+
+  const filteredNetworkMapPeople = useMemo(() => {
+    if (!debouncedMapSearch) return networkMapPeople;
+    return networkMapPeople.filter(
+      (p) =>
+        p.name.toLowerCase().includes(debouncedMapSearch) ||
+        p.id.toLowerCase().includes(debouncedMapSearch),
+    );
+  }, [networkMapPeople, debouncedMapSearch]);
+
+  const networkMapMarkers: MapMarker[] = useMemo(() => {
+    const list = filteredNetworkMapPeople.slice(0, MAX_NETWORK_MAP_MARKERS);
+    return list.map((p, i) => {
+      const slot = NETWORK_MAP_OVERLAY_SLOTS[i % NETWORK_MAP_OVERLAY_SLOTS.length] ?? {
+        top: "50%",
+        left: "50%",
+      };
+      return {
+        id: p.id,
+        name: p.name,
+        img: p.img,
+        top: slot.top,
+        left: slot.left,
+        kind: p.kind,
+      };
+    });
+  }, [filteredNetworkMapPeople]);
 
   const donutChartData = useMemo(() => {
     if (!directorOverview) return null;
 
-    const completed = directorOverview.overallCombinedProgress;
+    let completed = Number(directorOverview.overallCombinedProgress);
+    if (!Number.isFinite(completed)) completed = 0;
+    completed = Math.min(100, Math.max(0, completed));
     const remaining = 100 - completed;
     const completedDegrees = (completed / 100) * 360;
 
@@ -874,6 +1132,8 @@ export default function DirectorHome() {
                     name={`${person.firstName} ${person.lastName}`}
                     role={person.role}
                     menteeCount={menteeCount}
+                    email={getUserListEmail(person as Record<string, unknown>) ?? person.email}
+                    phoneNumber={person.phoneNumber}
                     onViewDetails={() =>
                       isMentor
                         ? router.push(`/director/mentors/profile/${personId}`)
@@ -1056,7 +1316,11 @@ export default function DirectorHome() {
               <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h3 className="text-base font-semibold text-white sm:text-lg">Monthly completions</h3>
-                  <p className="mt-1 text-xs text-white/50">Pastors and mentors (last six months in view)</p>
+                  <p className="mt-1 text-xs text-white/50">
+                    {chartRangeId.startsWith("n")
+                      ? "Upcoming months on the calendar; bars fill as completions are recorded through the program."
+                      : `Pastors and mentors — last ${chartMonthCountFromRange(chartRangeId)} months, rolling with today’s date.`}
+                  </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                   <div className="flex items-center gap-2 text-xs sm:text-sm">
@@ -1068,12 +1332,27 @@ export default function DirectorHome() {
                     <span className="text-white/70">Mentor</span>
                   </div>
                   <select
-                    disabled
-                    className={`${directorInputClass} !py-2 !text-sm opacity-80`}
-                    aria-label="Time range (fixed to past six months in chart)"
-                    title="Chart shows the last 6 months from your overview"
+                    value={chartRangeId}
+                    onChange={(e) => setChartRangeId(e.target.value as ChartRangeId)}
+                    className={`${directorInputClass} !py-2 !text-sm cursor-pointer`}
+                    aria-label="Time range for monthly completions chart"
+                    title="Last months show historical data; next months are the forward calendar view."
                   >
-                    <option className="bg-[#0a3558]">Past 6 months</option>
+                    <option className="bg-[#0a3558]" value="p3">
+                      Last 3 months
+                    </option>
+                    <option className="bg-[#0a3558]" value="p6">
+                      Last 6 months
+                    </option>
+                    <option className="bg-[#0a3558]" value="p12">
+                      Last 12 months
+                    </option>
+                    <option className="bg-[#0a3558]" value="n3">
+                      Next 3 months
+                    </option>
+                    <option className="bg-[#0a3558]" value="n6">
+                      Next 6 months
+                    </option>
                   </select>
                 </div>
               </div>
@@ -1085,24 +1364,31 @@ export default function DirectorHome() {
                       <div className={directorSpinner} role="status" aria-label="Loading chart" />
                     </div>
                   ) : chartData.length > 0 ? (
-                    chartData.map((data, i) => {
+                    chartData.map((data) => {
                       const maxValue = Math.max(
                         ...chartData.map((d) => Math.max(d.pastor, d.mentor)),
                         1,
                       );
                       const pastorHeight = maxValue > 0 ? (data.pastor / maxValue) * 100 : 0;
                       const mentorHeight = maxValue > 0 ? (data.mentor / maxValue) * 100 : 0;
+                      const pastorH =
+                        data.pastor > 0 ? `${Math.max(pastorHeight, 1)}%` : "0%";
+                      const mentorH =
+                        data.mentor > 0 ? `${Math.max(mentorHeight, 1)}%` : "0%";
                       return (
-                        <div key={i} className="flex min-w-0 flex-1 flex-col items-center gap-2">
+                        <div
+                          key={`${data.year}-${data.month}`}
+                          className="flex min-w-0 flex-1 flex-col items-center gap-2"
+                        >
                           <div className="flex h-[160px] w-full max-w-[48px] items-end justify-center gap-0.5 self-center sm:h-[200px] sm:max-w-none sm:gap-1">
                             <div
                               className="w-[46%] max-w-[22px] rounded-t-md bg-gradient-to-t from-[#6eb6e0] to-[#8ec5eb] shadow-sm sm:max-w-[28px]"
-                              style={{ height: `${Math.max(pastorHeight, 2)}%` }}
+                              style={{ height: pastorH, minHeight: data.pastor > 0 ? undefined : 0 }}
                               title={`Pastors: ${data.pastor}`}
                             />
                             <div
                               className="w-[46%] max-w-[22px] rounded-t-md bg-gradient-to-t from-[#3ec9b8] to-[#5ee0d0] shadow-sm sm:max-w-[28px]"
-                              style={{ height: `${Math.max(mentorHeight, 2)}%` }}
+                              style={{ height: mentorH, minHeight: data.mentor > 0 ? undefined : 0 }}
                               title={`Mentors: ${data.mentor}`}
                             />
                           </div>
@@ -1168,24 +1454,79 @@ export default function DirectorHome() {
 
       {/* Map */}
       <section className="py-16">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <h2 className="text-[22px] font-semibold text-white">Network map</h2>
-          <input
-            type="text"
-            placeholder="Search..."
-            className="w-full max-w-xs rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm text-white placeholder:text-white/50 outline-none focus:ring-2 focus:ring-[#8ec5eb]/40 sm:w-auto"
-          />
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <h2 className="text-[22px] font-semibold text-white">Network map</h2>
+            <button
+              type="button"
+              onClick={() => void loadNetworkMap(true)}
+              disabled={networkMapLoading || networkMapRefreshing}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-[#8ec5eb] transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+              title="Refresh mentor and pastor data from the server"
+              aria-label="Refresh network map data"
+            >
+              <i
+                className={`fa-solid fa-rotate ${networkMapRefreshing ? "animate-spin" : ""}`}
+                aria-hidden
+              />
+            </button>
+          </div>
+          <div className="flex w-full max-w-sm flex-col gap-2 sm:max-w-xs">
+            <input
+              type="search"
+              value={mapSearch}
+              onChange={(e) => setMapSearch(e.target.value)}
+              placeholder="Filter by name…"
+              className="w-full rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm text-white placeholder:text-white/50 outline-none focus:ring-2 focus:ring-[#8ec5eb]/40"
+              aria-label="Filter people on the network map"
+            />
+            <p className="text-[11px] text-white/45">
+              <span className="font-medium text-[#8ec5eb]">Blue</span> = mentor ·{" "}
+              <span className="font-medium text-[#5ee0d0]">teal</span> = pastor. Avatar pins are
+              placed on the Bay Area overview until your API provides GPS per profile.
+            </p>
+          </div>
         </div>
 
-        <div className={`relative overflow-hidden rounded-2xl border border-white/15 ${directorGlassCard}`}>
-          <Image
-            src={MapImg}
-            alt="Map"
-            className="h-[420px] w-full object-cover"
-          />
-          <div className="absolute bottom-6 left-6 rounded-lg border border-white/20 bg-[#062946]/70 px-5 py-3 backdrop-blur-md">
-            <p className="text-sm font-medium text-white/95">Mentor and mentee locations across the region</p>
+        {networkMapLoading ? (
+          <div
+            className="flex h-[420px] w-full items-center justify-center rounded-2xl border border-white/10 bg-[#041f35]/50 md:h-[480px]"
+            role="status"
+            aria-live="polite"
+          >
+            <div className={directorSpinner} aria-label="Loading map" />
           </div>
+        ) : (
+          <div className="relative">
+            {networkMapRefreshing ? (
+              <div
+                className="pointer-events-none absolute right-3 top-3 z-20 flex items-center gap-2 rounded-lg border border-white/15 bg-[#062946]/85 px-2.5 py-1.5 text-xs text-white/90 shadow-lg backdrop-blur-sm"
+                role="status"
+                aria-live="polite"
+              >
+                <div className={`${directorSpinner} !h-4 !w-4`} aria-hidden />
+                Updating…
+              </div>
+            ) : null}
+            <MapCard
+              iframeSrc={BAY_AREA_MAP_EMBED}
+              height="h-[420px] md:h-[480px]"
+              markers={networkMapMarkers}
+            />
+          </div>
+        )}
+        <p className="mt-3 text-center text-xs text-white/50">
+          Live data: refetches when you return to this tab, every 5 minutes, and when you press refresh.
+          Showing up to {MAX_NETWORK_MAP_MARKERS} people. For GPS-accurate pins, add coordinates in your
+          API.
+        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-4 text-xs text-white/55">
+          <span>
+            <span className="inline-block h-2.5 w-2.5 rounded-full ring-2 ring-[#8ec5eb]/90" /> Mentor
+          </span>
+          <span>
+            <span className="inline-block h-2.5 w-2.5 rounded-full ring-2 ring-[#5ee0d0]/90" /> Pastor
+          </span>
         </div>
       </section>
     </div>

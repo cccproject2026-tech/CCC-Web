@@ -102,7 +102,7 @@ export interface AssessmentSectionCreateBody {
     title: string;
     choices: Array<{ text: string }>;
   }>;
-  /** Per-section CDP levels — matches CCC-Director-Mobile create payload. */
+  /** Per-section CDP levels 1–4 (distinct from choice `layers`). */
   recommendations?: Array<{ level: 1 | 2 | 3 | 4; items: string[] }>;
 }
 

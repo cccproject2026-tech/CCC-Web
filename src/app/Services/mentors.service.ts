@@ -13,9 +13,9 @@ export const apiGetMentors = (params?: GetUsersParams) =>
 export const apiGetPastors = (params?: GetUsersParams) =>
   apiGetAllUsers({ ...params, role: 'pastor' });
 
-// GET /users?role=field-mentor&...
+// GET /users?role=field-mentor&roleMatch=mixed&...
 export const apiGetFieldMentors = (params?: GetUsersParams) =>
-  apiGetAllUsers({ ...params, role: 'field-mentor' });
+  apiGetAllUsers({ ...params, role: "field-mentor", roleMatch: "mixed" });
 
 // ─── /home endpoints ──────────────────────────────────────────────────────────
 

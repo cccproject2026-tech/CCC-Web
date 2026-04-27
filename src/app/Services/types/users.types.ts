@@ -122,6 +122,10 @@ export type User = UserResponse;
 /** @deprecated use CreateUserPayload */
 export type CreateUserDto = CreateUserPayload;
 /** Mentor or Pastor user shape — same as UserResponse */
-export type MentorPastor = Pick<UserResponse, '_id' | 'firstName' | 'lastName' | 'email' | 'role' | 'profilePicture' | 'assignedId'> & {
+export type MentorPastor = Pick<
+  UserResponse,
+  "_id" | "firstName" | "lastName" | "email" | "role" | "profilePicture" | "assignedId" | "phoneNumber"
+> & {
   menteeCount?: number;
+  id?: string;
 };
