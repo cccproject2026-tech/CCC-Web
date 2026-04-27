@@ -68,32 +68,99 @@ export const apiGetRoadmapById = (id: string) =>
     headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
   });
 
-// POST /roadmaps  (multipart/form-data when image provided)
-export const apiCreateRoadmap = (payload: CreateRoadMapPayload, image?: File) => {
-  if (image) {
-    const formData = new FormData();
-    formData.append('image', image);
-    Object.entries(payload).forEach(([key, val]) => {
-      if (val !== undefined) {
-        formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
+/**
+ * Nest/Multer: arrays must be sent as `divisions[0]`, `extras[0][type]`, etc.
+ * Stringifying `[]` to `"[]"` breaks ValidationPipe (400).
+ * Matches `CreateRoadmapModal` + mobile multipart shape.
+ */
+function appendRoadmapWritePayloadToFormData(
+  formData: FormData,
+  payload: CreateRoadMapPayload | UpdateRoadMapPayload,
+) {
+  const p = payload as CreateRoadMapPayload;
+  if (p.type != null) formData.append("type", String(p.type));
+  if (p.name != null) formData.append("name", String(p.name));
+  if (p.duration != null) formData.append("duration", String(p.duration));
+  if (p.roadMapDetails != null && String(p.roadMapDetails).trim() !== "") {
+    formData.append("roadMapDetails", String(p.roadMapDetails).trim());
+  }
+  if (p.description != null && String(p.description).trim() !== "") {
+    formData.append("description", String(p.description).trim());
+  }
+  if (p.status != null) formData.append("status", String(p.status));
+  if (p.phase != null) formData.append("phase", String(p.phase));
+  if (p.assesmentId != null) formData.append("assesmentId", String(p.assesmentId));
+  if (p.totalSteps != null) formData.append("totalSteps", String(p.totalSteps));
+  if (p.imageUrl != null) formData.append("imageUrl", String(p.imageUrl));
+  if (p.startDate != null) formData.append("startDate", String(p.startDate));
+  if (p.endDate != null) formData.append("endDate", String(p.endDate));
+  if (p.completedOn != null) formData.append("completedOn", String(p.completedOn));
+  if (Array.isArray(p.meetings) && p.meetings.length) {
+    p.meetings.forEach((m, i) => {
+      formData.append(`meetings[${i}]`, m);
+    });
+  }
+  if (Array.isArray(p.divisions) && p.divisions.length) {
+    p.divisions.forEach((d, i) => {
+      formData.append(`divisions[${i}]`, d);
+    });
+  }
+  if (Array.isArray(p.extras) && p.extras.length) {
+    p.extras.forEach((extra, i) => {
+      const b = `extras[${i}]`;
+      formData.append(`${b}[type]`, String(extra.type));
+      formData.append(`${b}[name]`, String(extra.name));
+      const e = extra as Record<string, unknown>;
+      if (e.placeHolder) formData.append(`${b}[placeHolder]`, String(e.placeHolder));
+      if (e.buttonName) formData.append(`${b}[buttonName]`, String(e.buttonName));
+      if (e.haveButton !== undefined) formData.append(`${b}[haveButton]`, String(e.haveButton));
+      if (String(extra.type) === "ASSESSMENT" && e.assessmentId) {
+        formData.append(`${b}[assessmentId]`, String(e.assessmentId));
       }
     });
-    // Let axios set Content-Type with boundary; a bare multipart/form-data breaks parsing on the server.
-    return axiosInstance.post('/roadmaps', formData);
   }
-  return axiosInstance.post('/roadmaps', payload);
+  if (Array.isArray(p.roadmaps) && p.roadmaps.length) {
+    p.roadmaps.forEach((item, i) => {
+      const b = `roadmaps[${i}]`;
+      formData.append(`${b}[name]`, String(item.name ?? ""));
+      formData.append(`${b}[duration]`, String(item.duration ?? ""));
+      if (item.description?.trim()) {
+        formData.append(`${b}[description]`, item.description.trim());
+      }
+      if (item.roadMapDetails?.trim()) {
+        formData.append(`${b}[roadMapDetails]`, item.roadMapDetails.trim());
+      }
+      const nestedExtras = item.extras ?? [];
+      nestedExtras.forEach((extra, j) => {
+        const e = `roadmaps[${i}][extras][${j}]`;
+        formData.append(`${e}[type]`, String(extra.type));
+        formData.append(`${e}[name]`, String(extra.name));
+        const ex = extra as Record<string, unknown>;
+        if (ex.placeHolder) formData.append(`${e}[placeHolder]`, String(ex.placeHolder));
+        if (ex.buttonName) formData.append(`${e}[buttonName]`, String(ex.buttonName));
+        if (ex.haveButton !== undefined) formData.append(`${e}[haveButton]`, String(ex.haveButton));
+        if (String(extra.type) === "ASSESSMENT" && ex.assessmentId) {
+          formData.append(`${e}[assessmentId]`, String(ex.assessmentId));
+        }
+      });
+    });
+  }
+}
+
+// POST /roadmaps — always multipart (parity with CreateRoadmapModal; server expects indexed fields, not JSON-stringified arrays)
+export const apiCreateRoadmap = (payload: CreateRoadMapPayload, image?: File) => {
+  const formData = new FormData();
+  if (image) formData.append("image", image);
+  appendRoadmapWritePayloadToFormData(formData, payload);
+  return axiosInstance.post("/roadmaps", formData);
 };
 
 // PATCH /roadmaps/:id  (multipart/form-data when image provided)
 export const apiUpdateRoadmap = (id: string, payload: UpdateRoadMapPayload, image?: File) => {
   if (image) {
     const formData = new FormData();
-    formData.append('image', image);
-    Object.entries(payload).forEach(([key, val]) => {
-      if (val !== undefined) {
-        formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
-      }
-    });
+    formData.append("image", image);
+    appendRoadmapWritePayloadToFormData(formData, payload);
     return axiosInstance.patch(`/roadmaps/${id}`, formData);
   }
   return axiosInstance.patch(`/roadmaps/${id}`, payload);

@@ -3,6 +3,14 @@ import { useState, useRef, useEffect } from "react";
 import AssignRoadmapModal from "./AssignRoadmapModal";
 import { directorGlassCard } from "@/app/director/directorUi";
 
+function roadmapIdToString(v: unknown): string {
+  if (v == null) return "";
+  if (typeof v === "object" && v !== null && "$oid" in v) {
+    return String((v as { $oid: string }).$oid);
+  }
+  return String(v).trim();
+}
+
 interface RoadmapCardProps {
   id?: string;
   img: any;
@@ -66,6 +74,9 @@ export default function RoadmapCard({
   const openRoadmap = () => {
     onView?.();
   };
+
+  const assignRid = roadmapIdToString(id);
+  const assignRoadmapIds = assignRid ? [assignRid] : [];
 
   return (
     <>
@@ -208,7 +219,7 @@ export default function RoadmapCard({
       <AssignRoadmapModal
         isOpen={showAssignModal}
         onClose={() => setShowAssignModal(false)}
-        roadmapIds={id ? [id] : []}
+        roadmapIds={assignRoadmapIds}
         roadmapName={title}
         onSuccess={() => setShowAssignModal(false)}
       />
