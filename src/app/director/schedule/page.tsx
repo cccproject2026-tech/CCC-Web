@@ -304,7 +304,7 @@ function DirectorScheduleContent() {
       // For pastors: derive available slots from the director's own monthly availability
       const normalize = (t: string) => t.replace(/\s+/g, "").toLowerCase();
       const bookedSlots = appointments
-        .filter((a) => a.meetingDate.startsWith(meetingDate))
+        .filter((a) => a.meetingDate.startsWith(meetingDate) && !["cancelled", "canceled"].includes((a.status || "").toLowerCase()))
         .map((a) => {
           const d = new Date(a.meetingDate);
           return normalize(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
@@ -349,7 +349,7 @@ function DirectorScheduleContent() {
           }
           const normalize = (t: string) => t.replace(/\s+/g, "").toLowerCase();
           const bookedSlots = appointments
-            .filter((a) => a.meetingDate.startsWith(meetingDate))
+            .filter((a) => a.meetingDate.startsWith(meetingDate) && !["cancelled", "canceled"].includes((a.status || "").toLowerCase()))
             .map((a) => {
               const d = new Date(a.meetingDate);
               return normalize(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
@@ -659,13 +659,26 @@ function DirectorScheduleContent() {
   const handleCancelAppointment = async (appt: AppointmentResponse) => {
     const id = appointmentEntityId(appt);
     if (!id) return;
+
     try {
       await apiCancelAppointment(id);
-      setAppointments((prev) => prev.filter((a) => appointmentEntityId(a) !== id));
-      setShowMenu(null);
-      showToast("Appointment cancelled");
     } catch (e) {
-      showToast(extractApiErrorMessage(e) || "Failed to cancel appointment");
+      console.error(e);
+    }
+
+    try {
+      const res = await apiGetAppointments({ futureOnly: false });
+      const freshList = unwrapAppointmentsAxiosData(res);
+      setAppointments(freshList);
+      setShowMenu(null);
+      const stillActive = freshList.find(
+        (a: AppointmentResponse) =>
+          appointmentEntityId(a) === id &&
+          !["cancelled", "canceled"].includes((a.status || "").toLowerCase()),
+      );
+      showToast(stillActive ? "Failed to cancel appointment" : "Appointment cancelled");
+    } catch (_) {
+      showToast("Failed to cancel appointment");
     }
   };
 
@@ -1163,6 +1176,7 @@ function DirectorScheduleContent() {
                       const day = date.toLocaleDateString("default", { weekday: "short" });
                       const isSelected = selectedAvailabilityDay === dayIndex;
                       const isPast = isPastDate(date.toISOString().split("T")[0]);
+                      const isToday = date.toDateString() === new Date().toDateString();
                       return (
                         <div
                           key={date.toISOString()}
@@ -1179,6 +1193,7 @@ function DirectorScheduleContent() {
                         >
                           <div>{day}</div>
                           <div className="text-xs text-white/80">{date.getDate()}</div>
+                          {isToday && <div className="mx-auto mt-0.5 h-1 w-1 rounded-full bg-[#8ec5eb]" />}
                         </div>
                       );
                     })}
@@ -1375,6 +1390,24 @@ function DirectorScheduleContent() {
                       if (overlaps) {
                         setSlotError("This time range overlaps with an existing slot.");
                         return;
+                      }
+                      // Check against scheduled appointments on this date
+                      const selectedDayAvail = availability.find((d) => d.day === selectedAvailabilityDay);
+                      const slotDateStr = selectedDayAvail ? resolveAvailabilityRowDate(selectedDayAvail) : null;
+                      if (slotDateStr) {
+                        const conflictingAppt = appointments.find((a) => {
+                          if (!a.meetingDate.startsWith(slotDateStr)) return false;
+                          if (["cancelled", "canceled"].includes((a.status || "").toLowerCase())) return false;
+                          const d = new Date(a.meetingDate);
+                          const apptStart = d.getHours() * 60 + d.getMinutes();
+                          const apptEnd = apptStart + 60; // meetings are 60 min
+                          return newStart < apptEnd && newEnd > apptStart;
+                        });
+                        if (conflictingAppt) {
+                          const apptTime = new Date(conflictingAppt.meetingDate).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
+                          setSlotError(`This time conflicts with an existing appointment at ${apptTime}.`);
+                          return;
+                        }
                       }
                       setAvailability((prev) =>
                         prev.map((d) =>

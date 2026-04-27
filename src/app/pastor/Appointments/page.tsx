@@ -63,7 +63,6 @@ export default function PastorAppointmentsPage() {
   const [filteredMentors, setFilteredMentors] = useState([]);
   const [selectedMentor, setSelectedMentor] = useState(null);
   const [search, setSearch] = useState("");
-  const [appointmentSearch, setAppointmentSearch] = useState("");
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -87,6 +86,11 @@ export default function PastorAppointmentsPage() {
   const [monthlyAvailabilitySlots, setMonthlyAvailabilitySlots] = useState<any[]>([]);
   const router = useRouter();
 
+  const showToast = (msg: string, duration = 3000) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), duration);
+  };
+
 
 
 
@@ -100,6 +104,8 @@ export default function PastorAppointmentsPage() {
 
   const [rescheduleSuccess, setRescheduleSuccess] = useState(false);
   const [rescheduleAvailableTimes, setRescheduleAvailableTimes] = useState<any[]>([]);
+  const [rescheduleMonthlySlots, setRescheduleMonthlySlots] = useState<any[]>([]);
+  const [rescheduleAvailabilityLoading, setRescheduleAvailabilityLoading] = useState(false);
 
 
 
@@ -131,6 +137,24 @@ export default function PastorAppointmentsPage() {
     }
   };
 
+  const handleReschedulePrevMonth = () => {
+    if (rescheduleMonth === 0) {
+      setRescheduleMonth(11);
+      setRescheduleYear(rescheduleYear - 1);
+    } else {
+      setRescheduleMonth(rescheduleMonth - 1);
+    }
+  };
+
+  const handleRescheduleNextMonth = () => {
+    if (rescheduleMonth === 11) {
+      setRescheduleMonth(0);
+      setRescheduleYear(rescheduleYear + 1);
+    } else {
+      setRescheduleMonth(rescheduleMonth + 1);
+    }
+  };
+
 
 
   function getPastorUserId(): string | null {
@@ -159,9 +183,9 @@ export default function PastorAppointmentsPage() {
     return null;
   }
 
-  const refreshAppointmentLists = async () => {
+  const refreshAppointmentLists = async (): Promise<any[]> => {
     const userId = getPastorUserId();
-    if (!userId) return;
+    if (!userId) return [];
     try {
       const [scheduleResult, upcomingResult] = await Promise.allSettled([
         apiGetUserSchedule(userId),
@@ -196,9 +220,12 @@ export default function PastorAppointmentsPage() {
       } else {
         setUpcomingAppointments([] as any);
       }
+
+      return scheduleData;
     } catch (err) {
       console.error("Error fetching appointments:", err);
     }
+    return [];
   };
 
   useEffect(() => {
@@ -359,6 +386,27 @@ export default function PastorAppointmentsPage() {
           }
         }
 
+        // Remove slots that are already booked (by any non-cancelled appointment on this day with this mentor)
+        const mentorIdStr = String(selectedMentor.id ?? selectedMentor._id ?? "");
+        const bookedMs = (appointments as any[])
+          .filter((a: any) => {
+            const apptMentorId = String(a.mentor?._id ?? a.mentor?.id ?? a.mentorId ?? "");
+            const status = String(a.status ?? "").toLowerCase();
+            return (
+              apptMentorId === mentorIdStr &&
+              !status.includes("cancel") &&
+              typeof a.meetingDate === "string" &&
+              a.meetingDate.startsWith(selectedYmd)
+            );
+          })
+          .map((a: any) => new Date(a.meetingDate).getTime())
+          .filter((ms: number) => !Number.isNaN(ms));
+
+        times = times.filter((label: string) => {
+          const slotMs = new Date(parseSlotStartToIso(selectedYmd, label)).getTime();
+          return !bookedMs.some((bMs: number) => Math.abs(bMs - slotMs) < 30 * 60 * 1000);
+        });
+
         if (!cancelled) {
           setAvailableTimesForBooking(times);
           setAvailabilityLoading(false);
@@ -376,24 +424,24 @@ export default function PastorAppointmentsPage() {
     return () => {
       cancelled = true;
     };
-  }, [drawerStep, selectedMentor, currentYear, currentMonth, selectedDate, availabilityRefreshKey]);
+  }, [drawerStep, selectedMentor, currentYear, currentMonth, selectedDate, availabilityRefreshKey, appointments]);
 
   const handleSchedule = async () => {
     if (isScheduling) return;
     const mid = selectedMentor?.id || selectedMentor?._id;
     if (!mid) {
-      setToastMessage("Please select a mentor");
+      showToast("Please select a mentor");
       return;
     }
 
     if (!selectedTime) {
-      setToastMessage("Please select a time");
+      showToast("Please select a time");
       return;
     }
 
     const userId = getPastorUserId();
     if (!userId) {
-      setToastMessage("Please sign in again.");
+      showToast("Please sign in again.");
       return;
     }
 
@@ -405,7 +453,7 @@ export default function PastorAppointmentsPage() {
       return !Number.isNaN(t) && Math.abs(t - proposedMs) < 60 * 60 * 1000;
     });
     if (hasOverlap) {
-      setToastMessage("This time slot overlaps with an existing appointment.");
+      showToast("This time slot overlaps with an existing appointment.");
       return;
     }
 
@@ -429,7 +477,7 @@ export default function PastorAppointmentsPage() {
       await refreshAppointmentLists();
     } catch (error) {
       console.error("Error scheduling appointment:", error);
-      setToastMessage("Failed to schedule appointment.");
+      showToast("Failed to schedule appointment.");
     } finally {
       setIsScheduling(false);
     }
@@ -439,7 +487,7 @@ export default function PastorAppointmentsPage() {
     const id = appointmentEntityId(appointmentToEdit);
     if (!id) return;
     if (!rescheduleTime) {
-      setToastMessage("Please select a time");
+      showToast("Please select a time");
       return;
     }
 
@@ -459,47 +507,55 @@ export default function PastorAppointmentsPage() {
       await refreshAppointmentLists();
     } catch (err) {
       console.error("Reschedule API error:", err);
-      setToastMessage("Failed to reschedule appointment");
+      showToast("Failed to reschedule appointment");
     }
   };
 
   useEffect(() => {
     if (!showReschedule || !appointmentToEdit) {
       setRescheduleAvailableTimes([]);
+      setRescheduleMonthlySlots([]);
       return;
     }
 
     const mentorId = appointmentToEdit.mentor?.id || appointmentToEdit.mentor?._id;
     if (!mentorId) {
       setRescheduleAvailableTimes([]);
+      setRescheduleMonthlySlots([]);
       return;
     }
 
     let cancelled = false;
     (async () => {
       try {
-        // Fetch availability using new API format
+        setRescheduleAvailabilityLoading(true);
         const res = await axiosInstance.get(`/appointments/availability/${mentorId}/month`, {
           params: { year: rescheduleYear, month: rescheduleMonth + 1 },
         });
 
         if (!cancelled) {
           const slots = res.data?.data || [];
-          
-          // Find slots for the selected date
-          const selectedDate = `${rescheduleYear}-${String(rescheduleMonth + 1).padStart(2, "0")}-${String(rescheduleDay).padStart(2, "0")}`;
-          const daySlots = slots.find((slot: any) => slot.date === selectedDate);
-          
-          if (daySlots && Array.isArray(daySlots.times)) {
-            setRescheduleAvailableTimes(daySlots.times);
-          } else {
-            setRescheduleAvailableTimes([]);
+          setRescheduleMonthlySlots(slots);
+
+          const selectedYmd = `${rescheduleYear}-${String(rescheduleMonth + 1).padStart(2, "0")}-${String(rescheduleDay).padStart(2, "0")}`;
+          const daySlots = slots.find((slot: any) => slot.date === selectedYmd);
+
+          let times: string[] = [];
+          if (daySlots?.slots?.length) {
+            times = (daySlots.slots as any[])
+              .map((raw: any) => formatAvailabilitySlotLabel(raw))
+              .filter((s: string) => s.length > 0);
+            times = filterSlotsAfter2Hours(times, selectedYmd);
           }
+          setRescheduleAvailableTimes(times);
+          setRescheduleAvailabilityLoading(false);
         }
       } catch (err) {
         if (!cancelled) {
           console.error("Failed to fetch reschedule availability:", err);
           setRescheduleAvailableTimes([]);
+          setRescheduleMonthlySlots([]);
+          setRescheduleAvailabilityLoading(false);
         }
       }
     })();
@@ -535,53 +591,36 @@ export default function PastorAppointmentsPage() {
       await refreshAppointmentLists();
     } catch (err) {
       console.error("Change meeting mode error:", err);
-      setToastMessage("Failed to update meeting mode");
+      showToast("Failed to update meeting mode");
     }
   };
 
-  const filteredAppointmentsToday = useMemo(() => {
-    const q = appointmentSearch.trim().toLowerCase();
-    return (appointmentsToday as Record<string, unknown>[]).filter((a) => {
-      if (!q) return true;
-      const mentor = a.mentor as { firstName?: string; lastName?: string } | undefined;
-      const name = `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.toLowerCase();
-      const plat = String(a.platform ?? "").toLowerCase();
-      return name.includes(q) || plat.includes(q);
-    });
-  }, [appointmentsToday, appointmentSearch]);
+  const filteredAppointmentsToday = appointmentsToday as Record<string, unknown>[];
 
-  const filteredUpcoming = useMemo(() => {
-    const q = appointmentSearch.trim().toLowerCase();
-    return (upcomingAppointments as Record<string, unknown>[]).filter((a) => {
-      if (!q) return true;
-      const mentor = a.mentor as { firstName?: string; lastName?: string } | undefined;
-      const name = `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.toLowerCase();
-      const plat = String(a.platform ?? "").toLowerCase();
-      return name.includes(q) || plat.includes(q);
-    });
-  }, [upcomingAppointments, appointmentSearch]);
+  const selectedCalendarYmd = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}`;
+  const todayYmd = new Date().toLocaleDateString("en-CA");
+  const filteredAppointmentsForSelectedDate = (appointments as Record<string, unknown>[]).filter((a) => {
+    if (!a?.meetingDate) return false;
+    return meetingDateLocalYmd(String(a.meetingDate)) === selectedCalendarYmd;
+  });
+
+  const filteredUpcoming = upcomingAppointments as Record<string, unknown>[];
 
   const filteredHistory = useMemo(() => {
-    const q = appointmentSearch.trim().toLowerCase();
     const nowMs = Date.now();
     return (appointments as Record<string, unknown>[])
       .filter((a) => {
         const raw = String(a.meetingDate ?? "");
         if (!raw) return false;
         const t = new Date(raw).getTime();
-        if (Number.isNaN(t) || t >= nowMs) return false;
-        if (!q) return true;
-        const mentor = a.mentor as { firstName?: string; lastName?: string } | undefined;
-        const name = `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.toLowerCase();
-        const plat = String(a.platform ?? "").toLowerCase();
-        return name.includes(q) || plat.includes(q);
+        return !Number.isNaN(t) && t < nowMs;
       })
       .sort(
         (a, b) =>
           new Date(String(b.meetingDate ?? "")).getTime() -
           new Date(String(a.meetingDate ?? "")).getTime(),
       );
-  }, [appointments, appointmentSearch]);
+  }, [appointments]);
 
   const handleCancelAppointment = async () => {
     if (!appointmentToCancel) return;
@@ -590,14 +629,22 @@ export default function PastorAppointmentsPage() {
 
     try {
       await apiCancelAppointment(id);
-
-      setShowCancelConfirm(false);
-      setShowCancelSuccess(true);
-      await refreshAppointmentLists();
-      setTimeout(() => setShowCancelSuccess(false), 2000);
     } catch (error) {
       console.error("Cancel API error:", error);
-      setToastMessage("Failed to cancel appointment");
+    }
+
+    setShowCancelConfirm(false);
+    const freshList = await refreshAppointmentLists();
+    const stillActive = freshList?.find(
+      (a: any) =>
+        appointmentEntityId(a) === id &&
+        !["cancelled", "canceled"].includes((a.status || "").toLowerCase()),
+    );
+    if (!stillActive) {
+      setShowCancelSuccess(true);
+      setTimeout(() => setShowCancelSuccess(false), 2000);
+    } else {
+      showToast("Failed to cancel appointment");
     }
   };
 
@@ -633,23 +680,18 @@ export default function PastorAppointmentsPage() {
       <main className={pastorMainGradient}>
         <div className={pastorContainer}>
           <div className={pastorControlsRow}>
-            <PastorSearchBar
-              value={appointmentSearch}
-              onChange={setAppointmentSearch}
-              placeholder="Search"
-              aria-label="Search appointments"
-            />
-
-            <button
-              type="button"
-              onClick={() => {
-                setDrawerOpen(true);
-                setDrawerStep("mentor");
-              }}
-              className={`flex shrink-0 items-center justify-center gap-2 ${pastorPrimaryCta}`}
-            >
-              <i className="fa-solid fa-plus text-xs" /> New Meeting
-            </button>
+            <div className="ml-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setDrawerOpen(true);
+                  setDrawerStep("mentor");
+                }}
+                className={`flex shrink-0 items-center justify-center gap-2 ${pastorPrimaryCta}`}
+              >
+                <i className="fa-solid fa-plus text-xs" /> New Meeting
+              </button>
+            </div>
           </div>
 
           {/* CALENDAR + TODAY'S APPOINTMENTS */}
@@ -712,12 +754,10 @@ export default function PastorAppointmentsPage() {
                     return (
                       <div
                         key={i}
-                        onClick={() => {
-                          if (!isPast) setSelectedDate(day);
-                        }}
-                        className={`py-1 rounded-md transition ${isPast
-                          ? "opacity-40 cursor-not-allowed pointer-events-none"
-                          : "cursor-pointer"
+                        onClick={() => setSelectedDate(day)}
+                        className={`py-1 rounded-md transition cursor-pointer ${isPast
+                          ? "opacity-50"
+                          : ""
                           } ${isSelected
                             ? "bg-[#00B3FF] text-white font-bold"
                             : "text-white/80 hover:bg-[#00B3FF]/40"
@@ -732,24 +772,22 @@ export default function PastorAppointmentsPage() {
               </div>
             </div>
 
-            {/* RIGHT — TODAY'S APPOINTMENTS */}
+            {/* RIGHT — SELECTED DATE APPOINTMENTS */}
             <div>
               <h3 className="mb-4 text-sm font-semibold text-white md:text-[15px]">
-                You have {filteredAppointmentsToday.length} appointment
-                {filteredAppointmentsToday.length === 1 ? "" : "s"} today
+                {selectedCalendarYmd === todayYmd
+                  ? `You have ${filteredAppointmentsForSelectedDate.length} appointment${filteredAppointmentsForSelectedDate.length === 1 ? "" : "s"} today`
+                  : `${new Date(`${selectedCalendarYmd}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} — ${filteredAppointmentsForSelectedDate.length} appointment${filteredAppointmentsForSelectedDate.length === 1 ? "" : "s"}`
+                }
               </h3>
 
               <div className="flex flex-col gap-4 md:gap-6">
 
-                {filteredAppointmentsToday.length === 0 && (
-                  <p className="text-sm text-[#cde2f2]/90">
-                    {appointmentSearch.trim()
-                      ? "No appointments match your search for today."
-                      : "No appointments today."}
-                  </p>
+                {filteredAppointmentsForSelectedDate.length === 0 && (
+                  <p className="text-sm text-[#cde2f2]/90">No appointments on this date.</p>
                 )}
 
-                {filteredAppointmentsToday.map((appt) => {
+                {filteredAppointmentsForSelectedDate.map((appt) => {
                   const mentor = appt.mentor as { profilePicture?: string; firstName?: string; lastName?: string } | undefined;
                   const icon = getModeIcon(appt.platform);
 
@@ -769,6 +807,7 @@ export default function PastorAppointmentsPage() {
                     <div
                       key={appointmentEntityId(appt)}
                       className={`relative flex flex-col items-start gap-5 p-4 md:flex-row md:items-center md:p-5 ${pastorGlassCard} ${menuOpenId === appointmentEntityId(appt) ? "z-[60]" : ""}`}
+                      style={menuOpenId === appointmentEntityId(appt) ? { overflow: "visible" } : undefined}
                     >
                       {/* Icon */}
                       <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl bg-white/90 md:h-[100px] md:w-[100px]">
@@ -818,9 +857,9 @@ export default function PastorAppointmentsPage() {
                         <div className="flex justify-between items-center">
 
                           <div className="flex gap-4 text-sm text-[#8ec5eb]">
-                            <i className="fa-solid fa-phone cursor-pointer"></i>
-                            <i className="fa-regular fa-comment cursor-pointer"></i>
-                            <i className="fa-brands fa-whatsapp cursor-pointer"></i>
+                            <a href={(appt.mentor as any)?.phoneNumber ? `tel:${(appt.mentor as any).phoneNumber}` : undefined} aria-label="Call mentor" className="hover:text-white transition"><i className="fa-solid fa-phone" /></a>
+                            <a href={(appt.mentor as any)?.phoneNumber ? `sms:${(appt.mentor as any).phoneNumber}` : undefined} aria-label="Text mentor" className="hover:text-white transition"><i className="fa-regular fa-comment" /></a>
+                            <a href={(appt.mentor as any)?.phoneNumber ? `https://wa.me/${String((appt.mentor as any).phoneNumber).replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-label="WhatsApp mentor" className="hover:text-white transition"><i className="fa-brands fa-whatsapp" /></a>
                           </div>
 
                           <button type="button" onClick={() => router.push(`/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt))}`)} className={pastorPrimaryCta}>
@@ -841,33 +880,36 @@ export default function PastorAppointmentsPage() {
                         </button>
 
                         {menuOpenId === appointmentEntityId(appt) && (
-                          <div className="absolute right-0 mt-2 w-48 bg-white shadow-lg rounded-lg text-sm z-50">
+                          <div className="absolute right-0 top-9 z-[50] w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
 
                             <button
-                              className="w-full px-4 py-2 flex gap-2 hover:bg-gray-100"
+                              type="button"
+                              className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
                               onClick={() => {
                                 setAppointmentToEdit(appt);
                                 setShowReschedule(true);
                                 setMenuOpenId(null);
                               }}
                             >
-                              <i className="fa-regular fa-calendar"></i> Reschedule Meeting
+                              <i className="fa-regular fa-calendar mr-2 text-[#8ec5eb]" /> Reschedule Meeting
                             </button>
 
                             <button
-                              className="w-full px-4 py-2 flex items-center gap-2 hover:bg-gray-100"
+                              type="button"
+                              className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
                               onClick={() => {
                                 setAppointmentToCancel(appt);
                                 setShowCancelConfirm(true);
                                 setMenuOpenId(null);
                               }}
                             >
-                              <i className="fa-regular fa-calendar-xmark"></i>
+                              <i className="fa-regular fa-calendar-xmark mr-2 text-red-300" />
                               Cancel Meeting
                             </button>
 
                             <button
-                              className="w-full px-4 py-2 flex gap-2 hover:bg-gray-100"
+                              type="button"
+                              className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
                               onClick={() => {
                                 setAppointmentToEdit(appt);  // <-- VERY IMPORTANT
                                 setSelectedMode(appt.platform || "zoom");
@@ -875,7 +917,7 @@ export default function PastorAppointmentsPage() {
                                 setMenuOpenId(null);
                               }}
                             >
-                              <i className="fa-regular fa-pen-to-square"></i>
+                              <i className="fa-regular fa-pen-to-square mr-2 text-[#8ec5eb]" />
                               Change Meeting Mode
                             </button>
 
@@ -895,22 +937,20 @@ export default function PastorAppointmentsPage() {
               <button
                 type="button"
                 onClick={() => setAppointmentsTab("next")}
-                className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
-                  appointmentsTab === "next"
+                className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${appointmentsTab === "next"
                     ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
                     : "border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
-                }`}
+                  }`}
               >
                 Next appointments
               </button>
               <button
                 type="button"
                 onClick={() => setAppointmentsTab("history")}
-                className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
-                  appointmentsTab === "history"
+                className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${appointmentsTab === "history"
                     ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
                     : "border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
-                }`}
+                  }`}
               >
                 Appointment history
               </button>
@@ -919,11 +959,7 @@ export default function PastorAppointmentsPage() {
             {appointmentsTab === "next" ? (
               <div className="grid grid-cols-1 gap-6 md:gap-10 lg:grid-cols-2">
                 {filteredUpcoming.length === 0 && (
-                  <p className="text-sm text-[#cde2f2]/90">
-                    {appointmentSearch.trim()
-                      ? "No upcoming appointments match your search."
-                      : "No upcoming appointments."}
-                  </p>
+                  <p className="text-sm text-[#cde2f2]/90">No upcoming appointments.</p>
                 )}
 
                 {filteredUpcoming.map((appt) => {
@@ -935,6 +971,7 @@ export default function PastorAppointmentsPage() {
                     <div
                       key={appointmentEntityId(appt)}
                       className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard} ${menuOpenId === appointmentEntityId(appt) ? "z-[60]" : ""}`}
+                      style={menuOpenId === appointmentEntityId(appt) ? { overflow: "visible" } : undefined}
                     >
                       <div className="absolute right-3 top-3 z-20">
                         <button
@@ -950,35 +987,35 @@ export default function PastorAppointmentsPage() {
                         </button>
 
                         {menuOpenId === appointmentEntityId(appt) && (
-                          <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg bg-white text-sm shadow-lg">
+                          <div className="absolute right-0 top-9 z-[50] w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
                             <button
                               type="button"
-                              className="flex w-full gap-2 px-4 py-2 hover:bg-gray-100 text-black"
+                              className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
                               onClick={() => {
                                 setAppointmentToEdit(appt);
                                 setShowReschedule(true);
                                 setMenuOpenId(null);
                               }}
                             >
-                              <i className="fa-regular fa-calendar" /> Reschedule Meeting
+                              <i className="fa-regular fa-calendar mr-2 text-[#8ec5eb]" /> Reschedule Meeting
                             </button>
 
                             <button
                               type="button"
-                              className="flex w-full items-center gap-2 px-4 py-2 hover:bg-gray-100"
+                              className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
                               onClick={() => {
                                 setAppointmentToCancel(appt);
                                 setShowCancelConfirm(true);
                                 setMenuOpenId(null);
                               }}
                             >
-                              <i className="fa-regular fa-calendar-xmark" />
+                              <i className="fa-regular fa-calendar-xmark mr-2 text-red-300" />
                               Cancel Meeting
                             </button>
 
                             <button
                               type="button"
-                              className="flex w-full gap-2 px-4 py-2 hover:bg-gray-100"
+                              className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
                               onClick={() => {
                                 setAppointmentToEdit(appt);
                                 setSelectedMode(appt.platform || "zoom");
@@ -986,7 +1023,7 @@ export default function PastorAppointmentsPage() {
                                 setMenuOpenId(null);
                               }}
                             >
-                              <i className="fa-regular fa-pen-to-square" />
+                              <i className="fa-regular fa-pen-to-square mr-2 text-[#8ec5eb]" />
                               Change Meeting Mode
                             </button>
                           </div>
@@ -1036,9 +1073,9 @@ export default function PastorAppointmentsPage() {
                             </p>
 
                             <div className="flex gap-4 text-sm text-[#cde2f2]">
-                              <i className="fa-solid fa-phone cursor-pointer opacity-80 hover:opacity-100" />
-                              <i className="fa-regular fa-comment cursor-pointer opacity-80 hover:opacity-100" />
-                              <i className="fa-brands fa-whatsapp cursor-pointer opacity-80 hover:opacity-100" />
+                              <a href={(appt.mentor as any)?.phoneNumber ? `tel:${(appt.mentor as any).phoneNumber}` : undefined} aria-label="Call mentor" className="opacity-80 hover:opacity-100 transition"><i className="fa-solid fa-phone" /></a>
+                              <a href={(appt.mentor as any)?.phoneNumber ? `sms:${(appt.mentor as any).phoneNumber}` : undefined} aria-label="Text mentor" className="opacity-80 hover:opacity-100 transition"><i className="fa-regular fa-comment" /></a>
+                              <a href={(appt.mentor as any)?.phoneNumber ? `https://wa.me/${String((appt.mentor as any).phoneNumber).replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-label="WhatsApp mentor" className="opacity-80 hover:opacity-100 transition"><i className="fa-brands fa-whatsapp" /></a>
                             </div>
                           </div>
 
@@ -1054,11 +1091,7 @@ export default function PastorAppointmentsPage() {
             ) : (
               <div className="grid grid-cols-1 gap-6 md:gap-10 lg:grid-cols-2">
                 {filteredHistory.length === 0 && (
-                  <p className="text-sm text-[#cde2f2]/90">
-                    {appointmentSearch.trim()
-                      ? "No appointment history matches your search."
-                      : "No appointment history yet."}
-                  </p>
+                  <p className="text-sm text-[#cde2f2]/90">No appointment history yet.</p>
                 )}
 
                 {filteredHistory.map((appt) => {
@@ -1122,90 +1155,39 @@ export default function PastorAppointmentsPage() {
 
       {/* RESCHEDULE POPUP */}
       {showReschedule && (
-        <div className="fixed inset-0 bg-black/40 z-50">
+        <div className="fixed inset-0 bg-[#041f35]/70 backdrop-blur-sm z-50">
           {/* Right Drawer */}
-          <div className="absolute top-0 right-0 w-[440px] h-full bg-white shadow-2xl animate-slide-left flex flex-col">
+          <div className="absolute top-0 right-0 w-[440px] h-full bg-[linear-gradient(180deg,rgba(10,52,88,0.97)_0%,rgba(4,28,48,0.99)_100%)] border-l border-[#8ec5eb]/30 shadow-[-20px_0_48px_rgba(2,12,28,0.65)] animate-slide-left flex flex-col text-white">
 
             {/* Header */}
-            <div className="flex justify-between items-center px-6 py-5 border-b">
-              <h2 className="text-[18px] font-semibold flex items-center gap-2">
-                <i className="fa-regular fa-calendar text-[#103C8C]"></i>
+            <div className="flex justify-between items-center px-6 py-5 border-b border-white/15">
+              <h2 className="text-[18px] font-semibold flex items-center gap-2 text-white">
+                <i className="fa-regular fa-calendar text-[#8ec5eb]"></i>
                 Reschedule Meeting
               </h2>
-              <button onClick={() => setShowReschedule(false)}>
-                <i className="fa-solid fa-xmark text-lg"></i>
+              <button onClick={() => setShowReschedule(false)} className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[#d9ebf8] hover:bg-white/20 transition">
+                <i className="fa-solid fa-xmark text-sm"></i>
               </button>
             </div>
+
             <div className="flex-1 overflow-y-auto px-6 py-6">
               {/* DATE PICKER */}
-              <p className="text-sm mb-2 font-medium">Select Available Date</p>
+              <p className="text-sm mb-2 font-medium text-[#d9ebf8]">Mentor Availability</p>
 
-              <div className="bg-[#103C8C] rounded-xl p-4 text-center text-white">
-
-                {/* HEADER */}
-                <div className="flex justify-between items-center mb-3">
-                  <button
-                    onClick={() =>
-                      setRescheduleMonth(rescheduleMonth === 0 ? 11 : rescheduleMonth - 1)
-                    }
-                    className="hover:text-white text-white/70"
-                  >
-                    <i className="fa-solid fa-chevron-left"></i>
-                  </button>
-
-                  <p className="font-semibold">
-                    {new Date(rescheduleYear, rescheduleMonth).toLocaleString("en-US", {
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </p>
-
-                  <button
-                    onClick={() =>
-                      setRescheduleMonth(rescheduleMonth === 11 ? 0 : rescheduleMonth + 1)
-                    }
-                    className="hover:text-white text-white/70"
-                  >
-                    <i className="fa-solid fa-chevron-right"></i>
-                  </button>
-                </div>
-
-                {/* Week days */}
-                <div className="grid grid-cols-7 gap-1 text-xs mb-1">
-                  {["S", "M", "T", "W", "T", "F", "S"].map((d) => (
-                    <div className="font-medium text-white/70">{d}</div>
-                  ))}
-                </div>
-
-                {/* DATES */}
-                <div className="grid grid-cols-7 gap-1 text-xs">
-                  {Array(new Date(rescheduleYear, rescheduleMonth, 1).getDay())
-                    .fill(null)
-                    .map((_, i) => <div key={i}></div>)}
-
-                  {Array.from({
-                    length: new Date(rescheduleYear, rescheduleMonth + 1, 0).getDate(),
-                  }).map((_, i) => {
-                    const day = i + 1;
-
-                    return (
-                      <div
-                        key={i}
-                        onClick={() => setRescheduleDay(day)}
-                        className={`py-1 rounded-md cursor-pointer ${rescheduleDay === day
-                          ? "bg-[#00B3FF] text-white font-bold"
-                          : "hover:bg-[#00B3FF]/40 text-white/80"
-                          }`}
-                      >
-                        {day}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              <AvailabilityCalendar
+                mentorId={String(appointmentToEdit?.mentor?.id || appointmentToEdit?.mentor?._id || "")}
+                currentMonth={rescheduleMonth}
+                currentYear={rescheduleYear}
+                selectedDate={rescheduleDay}
+                onDateSelect={setRescheduleDay}
+                onPrevMonth={handleReschedulePrevMonth}
+                onNextMonth={handleRescheduleNextMonth}
+                availabilitySlots={rescheduleMonthlySlots}
+                isLoading={rescheduleAvailabilityLoading}
+              />
 
               {/* TIME PICKER */}
-              <p className="text-sm mt-4 mb-2 font-medium">Select a Time</p>
+              <p className="text-sm mt-5 mb-2 font-medium text-[#d9ebf8]">Select a Time</p>
 
               {rescheduleAvailableTimes.length > 0 ? (
                 <div className="grid grid-cols-2 gap-3">
@@ -1213,9 +1195,9 @@ export default function PastorAppointmentsPage() {
                     <button
                       key={slot}
                       onClick={() => setRescheduleTime(slot)}
-                      className={`px-3 py-2 rounded-md border text-sm transition ${rescheduleTime === slot
-                        ? "bg-[#103C8C] text-white border-[#103C8C]"
-                        : "border-gray-300 hover:bg-gray-100"
+                      className={`px-3 py-2 rounded-xl border text-sm transition ${rescheduleTime === slot
+                          ? "bg-blue-600 text-white font-semibold border-blue-500"
+                          : "border-white/20 bg-white/10 text-white hover:bg-white/20"
                         }`}
                     >
                       {slot}
@@ -1223,38 +1205,38 @@ export default function PastorAppointmentsPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-gray-500 mb-4">No available time slots for the selected date. Please choose a different day.</p>
+                <p className="text-xs text-[#cde2f2]/70 mb-4">No available time slots for the selected date. Please choose a different day.</p>
               )}
 
               {/* MODE PICKER */}
+              <p className="text-sm mt-5 mb-2 font-medium text-[#d9ebf8]">Meeting Option</p>
               <select
-                className="w-full mt-4 px-3 py-2 border rounded-md text-sm"
+                className="w-full rounded-xl border border-white/20 bg-[#062946] px-3 py-2.5 text-sm text-white outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30 [&>option]:bg-[#062946] [&>option]:text-white"
                 value={rescheduleMode}
                 onChange={(e) => setRescheduleMode(e.target.value)}
               >
                 <option value="">Preferred meeting option</option>
-                <option value="Duo">Duo</option>
-                <option value="Google Meet">Google Meet</option>
+                {/* <option value="Duo">Duo</option>
+                <option value="Google Meet">Google Meet</option> */}
                 <option value="Zoom">Zoom</option>
               </select>
             </div>
 
             {/* FOOTER */}
-            <div className="border-t px-6 py-4 flex justify-between">
+            <div className="border-t border-white/15 px-6 py-4 flex justify-between gap-3">
               <button
-                className="px-5 py-2 rounded-md border"
+                className="px-5 py-2 rounded-lg border border-white/25 bg-white/10 text-sm font-semibold text-white transition hover:bg-white/15"
                 onClick={() => setShowReschedule(false)}
               >
                 Cancel
               </button>
 
               <button
-                className="px-6 py-2 bg-[#103C8C] text-white rounded-md"
+                className="px-6 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold transition hover:bg-blue-700"
                 onClick={handleReschedule}
               >
                 Reschedule
               </button>
-
             </div>
           </div>
         </div>
@@ -1394,7 +1376,7 @@ export default function PastorAppointmentsPage() {
                     availabilitySlots={monthlyAvailabilitySlots}
                     isLoading={availabilityLoading}
                   />
-                  
+
                   <label className={pastorFieldLabel} htmlFor="time-slot" style={{ marginTop: "1.5rem" }}>
                     Select a time
                     <span className="ml-1 font-normal text-[#cde2f2]">
@@ -1442,7 +1424,7 @@ export default function PastorAppointmentsPage() {
                     <option value="Zoom" className="bg-[#062946] text-white">
                       Zoom
                     </option>
-                    <option value="Google Meet" className="bg-[#062946] text-white">
+                    {/* <option value="Google Meet" className="bg-[#062946] text-white">
                       Google Meet
                     </option>
                     <option value="Microsoft Teams" className="bg-[#062946] text-white">
@@ -1450,7 +1432,7 @@ export default function PastorAppointmentsPage() {
                     </option>
                     <option value="Phone call" className="bg-[#062946] text-white">
                       Phone call
-                    </option>
+                    </option> */}
                   </select>
                 </>
               )}
@@ -1550,35 +1532,44 @@ export default function PastorAppointmentsPage() {
       )}
 
       {showChangeMode && (
-        <div className="fixed inset-0 z-[90] bg-black/30 flex items-center justify-center">
+        <div className="fixed inset-0 z-[90] bg-[#041f35]/70 backdrop-blur-sm flex items-center justify-center">
 
-          <div className="bg-white w-[420px] rounded-xl shadow-lg p-6 animate-fade-in">
+          <div className="w-[420px] rounded-2xl border border-[#8ec5eb]/25 bg-[linear-gradient(180deg,rgba(10,52,88,0.97)_0%,rgba(4,28,48,0.99)_100%)] shadow-2xl p-6 animate-fade-in text-white">
 
             {/* Header */}
-            <h2 className="text-[16px] font-semibold text-[#0B1C58] mb-4">
-              Choose your meeting option
-            </h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-[16px] font-semibold text-white flex items-center gap-2">
+                <i className="fa-regular fa-pen-to-square text-[#8ec5eb]"></i>
+                Choose your meeting option
+              </h2>
+              <button
+                onClick={() => setShowChangeMode(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[#d9ebf8] hover:bg-white/20 transition"
+              >
+                <i className="fa-solid fa-xmark text-sm"></i>
+              </button>
+            </div>
 
             {/* Divider */}
-            <hr className="mb-4" />
+            <hr className="mb-4 border-white/15" />
 
             {/* OPTIONS */}
-            <div className="space-y-3 text-[14px] text-[#0B1C58]">
+            <div className="space-y-3 text-[14px] text-[#d9ebf8]">
 
               {[
                 "Zoom",
-                "Google Meet",
-                "Teams",
-                "Whatsapp",
-                "Phone call",
+                // "Google Meet",
+                // "Teams",
+                // "Whatsapp",
+                // "Phone call",
               ].map((mode) => (
-                <label key={mode} className="flex items-center gap-3 cursor-pointer">
+                <label key={mode} className="flex items-center gap-3 cursor-pointer hover:text-white transition">
                   <input
                     type="radio"
                     name="meetingMode"
                     checked={selectedMode === mode}
                     onChange={() => setSelectedMode(mode)}
-                    className="w-4 h-4 text-[#103C8C] accent-[#103C8C]"
+                    className="w-4 h-4 accent-[#8ec5eb]"
                   />
                   <span>{mode}</span>
                 </label>
@@ -1591,18 +1582,17 @@ export default function PastorAppointmentsPage() {
 
               <button
                 onClick={() => setShowChangeMode(false)}
-                className="px-5 py-2 rounded-md border border-gray-300 text-sm"
+                className="px-5 py-2 rounded-lg border border-white/25 bg-white/10 text-sm font-semibold text-white transition hover:bg-white/15"
               >
                 Cancel
               </button>
 
               <button
                 onClick={handleChangeMode}
-                className="px-6 py-2 bg-[#103C8C] text-white rounded-md text-sm"
+                className="px-6 py-2 rounded-lg bg-[#8ec5eb] text-[#041f35] text-sm font-semibold transition hover:bg-[#a8d4f0]"
               >
                 Save
               </button>
-
 
             </div>
           </div>

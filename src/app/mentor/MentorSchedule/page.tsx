@@ -271,7 +271,7 @@ function MentorScheduleContent() {
           t.replace(/\s+/g, "").toLowerCase();
 
         const bookedSlots = appointments
-          .filter(a => a.meetingDate.startsWith(meetingDate))
+          .filter(a => a.meetingDate.startsWith(meetingDate) && !["cancelled", "canceled"].includes((a.status || "").toLowerCase()))
           .map(a => {
             const d = new Date(a.meetingDate);
             return normalize(
@@ -518,6 +518,9 @@ function MentorScheduleContent() {
 
     setSelectedAvailabilityDay((prev) => {
       if (prev !== null && availability.some((d) => d.day === prev)) return prev;
+      // Prefer today's day of the week
+      const todayDayOfWeek = new Date().getDay();
+      if (availability.some((d) => d.day === todayDayOfWeek)) return todayDayOfWeek;
       const firstEnabledDay = availability.find((d) => d.enabled)?.day;
       return typeof firstEnabledDay === "number" ? firstEnabledDay : availability[0]?.day ?? 0;
     });
@@ -866,14 +869,25 @@ function MentorScheduleContent() {
   const handleCancelMentorAppointment = async (appt: Appointment) => {
     const id = appointmentEntityId(appt);
     if (!id || !mentorId) return;
+
     try {
       await apiCancelAppointment(id);
-      const refresh = await apiGetMentorAppointments(mentorId);
-      setAppointments(unwrapAppointmentsAxiosData(refresh));
-      setShowMenu(null);
-      setToastMessage("Appointment cancelled");
     } catch (e) {
       console.error(e);
+    }
+
+    try {
+      const refresh = await apiGetMentorAppointments(mentorId);
+      const freshList = unwrapAppointmentsAxiosData(refresh);
+      setAppointments(freshList);
+      setShowMenu(null);
+      const stillActive = freshList.find(
+        (a: Appointment) =>
+          appointmentEntityId(a) === id &&
+          !["cancelled", "canceled"].includes((a.status || "").toLowerCase()),
+      );
+      setToastMessage(stillActive ? "Failed to cancel appointment" : "Appointment cancelled");
+    } catch (_) {
       setToastMessage("Failed to cancel appointment");
     }
     setTimeout(() => setToastMessage(null), 3000);
@@ -990,11 +1004,6 @@ function MentorScheduleContent() {
         <div className="mx-auto max-w-7xl">
           <div className={`${mentorFilterPanel} mb-8`}>
             <div className="flex flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-center">
-              <input
-                type="text"
-                placeholder="Jump to date (dd-mm-yyyy)"
-                className={`w-full max-w-none rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30 lg:max-w-sm`}
-              />
               <MentorFilterTabGroup
                 tabs={["Appointments", "Availability", "Schedule", "Appointment History"] as const}
                 active={activeTab}
@@ -1181,9 +1190,9 @@ function MentorScheduleContent() {
 
                           <div className="flex items-center justify-between">
                             <div className="flex gap-3 text-[15px] text-[#8ec5eb]">
-                              <i className="fa-solid fa-phone cursor-pointer transition hover:text-white" />
-                              <i className="fa-regular fa-comment cursor-pointer transition hover:text-white" />
-                              <i className="fa-brands fa-whatsapp cursor-pointer transition hover:text-white" />
+                              <a href={(appt.user as any)?.phoneNumber ? `tel:${(appt.user as any).phoneNumber}` : undefined} aria-label="Call" className="transition hover:text-white"><i className="fa-solid fa-phone" /></a>
+                              <a href={(appt.user as any)?.phoneNumber ? `sms:${(appt.user as any).phoneNumber}` : undefined} aria-label="Text" className="transition hover:text-white"><i className="fa-regular fa-comment" /></a>
+                              <a href={(appt.user as any)?.phoneNumber ? `https://wa.me/${String((appt.user as any).phoneNumber).replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-label="WhatsApp" className="transition hover:text-white"><i className="fa-brands fa-whatsapp" /></a>
                             </div>
 
                             <div className="relative" data-mentor-appointment-menu>
@@ -1368,6 +1377,7 @@ function MentorScheduleContent() {
                       const day = date.toLocaleDateString("default", { weekday: "short" });
                       const isSelected = selectedAvailabilityDay === dayIndex;
                       const isPast = isPastDate(date.toISOString().split("T")[0]);
+                      const isToday = date.toDateString() === new Date().toDateString();
                       return (
                         <div
                           key={date.toISOString()}
@@ -1382,6 +1392,7 @@ function MentorScheduleContent() {
                         >
                           <div>{day}</div>
                           <div className="text-xs text-white/80">{date.getDate()}</div>
+                          {isToday && <div className="mx-auto mt-0.5 h-1 w-1 rounded-full bg-[#8ec5eb]" />}
                         </div>
                       );
                     })}
