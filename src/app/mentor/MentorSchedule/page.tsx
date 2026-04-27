@@ -960,12 +960,22 @@ function MentorScheduleContent() {
     setIsRescheduling(true);
 
     try {
-      const meetingDate = rescheduleRecipientType === "director"
+      const newDate = rescheduleRecipientType === "director"
         ? rescheduleSelectedSlot
         : rescheduleDateTime;
 
+      // Extract startTime/startPeriod from the resolved ISO
+      const _d = new Date(newDate);
+      const _h24 = _d.getHours();
+      const _min = _d.getMinutes();
+      const startPeriod = _h24 < 12 ? "AM" : "PM";
+      const _h12 = _h24 % 12 === 0 ? 12 : _h24 % 12;
+      const startTime = `${_h12}:${String(_min).padStart(2, "0")}`;
+
       await apiRescheduleAppointment(id, {
-        meetingDate,
+        newDate,
+        startTime,
+        startPeriod,
         platform: reschedulePlatform as any,
       });
       const refresh = await apiGetMentorAppointments(mentorId);
@@ -1702,6 +1712,24 @@ function MentorScheduleContent() {
                       if (overlaps) {
                         setSlotValidationError("This slot overlaps with an existing slot on this day.");
                         return;
+                      }
+
+                      // Check against scheduled appointments on this date
+                      const slotDateStr = selectedDayData ? resolveAvailabilityRowDate(selectedDayData) : null;
+                      if (slotDateStr) {
+                        const conflictingAppt = appointments.find((a) => {
+                          if (!String(a.meetingDate).startsWith(slotDateStr)) return false;
+                          if (["cancelled", "canceled"].includes((a.status || "").toLowerCase())) return false;
+                          const d = new Date(a.meetingDate);
+                          const apptStart = d.getHours() * 60 + d.getMinutes();
+                          const apptEnd = apptStart + 60; // meetings are 60 min
+                          return startMins < apptEnd && endMins > apptStart;
+                        });
+                        if (conflictingAppt) {
+                          const apptTime = new Date(conflictingAppt.meetingDate).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
+                          setSlotValidationError(`This time conflicts with an existing appointment at ${apptTime}.`);
+                          return;
+                        }
                       }
 
                       setAvailability((prev) =>

@@ -494,10 +494,18 @@ export default function PastorAppointmentsPage() {
     try {
       const dateObj = new Date(rescheduleYear, rescheduleMonth, rescheduleDay);
       const yyyyMMdd = dateObj.toLocaleDateString("en-CA");
-      const meetingDate = parseSlotStartToIso(yyyyMMdd, rescheduleTime);
+      const newDate = parseSlotStartToIso(yyyyMMdd, rescheduleTime);
+
+      // Extract startTime/startPeriod from slot label e.g. "3:00 PM - 4:00 PM"
+      const firstPart = rescheduleTime.replace(/\u2013/g, "-").split("-")[0]?.trim() ?? "";
+      const tMatch = firstPart.match(/^(\d{1,2}):(\d{2})\s*(am|pm)/i);
+      const startTime = tMatch ? `${tMatch[1]}:${tMatch[2]}` : "12:00";
+      const startPeriod = tMatch ? tMatch[3].toUpperCase() : "PM";
 
       await apiRescheduleAppointment(id, {
-        meetingDate,
+        newDate,
+        startTime,
+        startPeriod,
         ...(rescheduleMode ? { platform: uiMeetingModeToPlatform(rescheduleMode) as any } : {}),
       });
 

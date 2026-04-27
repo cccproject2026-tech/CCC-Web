@@ -741,12 +741,22 @@ function DirectorScheduleContent() {
     setIsRescheduling(true);
 
     try {
-      const meetingDate = isMentorRecipient
+      const newDate = isMentorRecipient
         ? rescheduleSelectedSlot
         : new Date(rescheduleDateTime).toISOString();
 
+      // Extract startTime/startPeriod from the resolved ISO
+      const _d = new Date(newDate);
+      const _h24 = _d.getHours();
+      const _min = _d.getMinutes();
+      const startPeriod = _h24 < 12 ? "AM" : "PM";
+      const _h12 = _h24 % 12 === 0 ? 12 : _h24 % 12;
+      const startTime = `${_h12}:${String(_min).padStart(2, "0")}`;
+
       await apiRescheduleAppointment(id, {
-        meetingDate,
+        newDate,
+        startTime,
+        startPeriod,
         platform: reschedulePlatform as any,
       });
       const refresh = await apiGetAppointments({ futureOnly: false, status: "scheduled" });
