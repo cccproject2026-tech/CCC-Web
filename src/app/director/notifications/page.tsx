@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { directorGlassCard, directorPageRoot } from "../directorUi";
 import { getNotification } from "@/app/Services/api";
 import type { NotificationItem } from "@/app/Services/types/home.types";
@@ -11,6 +12,7 @@ import {
 } from "@/app/Services/notificationUi";
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,10 +77,29 @@ export default function NotificationsPage() {
               {items.map((n) => {
                 const p = mapNotificationItemToPopup(n);
                 return (
+                  // <div
+                  //   key={n._id}
+                  //   className={`relative px-6 py-5 transition hover:border-white/25 ${directorGlassCard}`}
+                  // >
                   <div
-                    key={n._id}
-                    className={`relative px-6 py-5 transition hover:border-white/25 ${directorGlassCard}`}
-                  >
+  key={n._id}
+  role={p.link ? "button" : undefined}
+  tabIndex={p.link ? 0 : undefined}
+  onClick={() => {
+    if (p.link) router.push(p.link);
+  }}
+  onKeyDown={(e) => {
+    if (!p.link) return;
+
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      router.push(p.link);
+    }
+  }}
+  className={`relative px-6 py-5 transition hover:border-white/25 ${directorGlassCard} ${
+    p.link ? "cursor-pointer hover:bg-white/[0.03]" : ""
+  }`}
+>
                     <div className="flex items-start gap-4">
                       <div className="flex-shrink-0">
                         <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/15 bg-white/10">

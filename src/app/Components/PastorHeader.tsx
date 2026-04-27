@@ -427,13 +427,39 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
                         No notifications yet.
                       </p>
                     ) : (
+                      // notificationList.slice(0, 4).map((note) => {
+                      //   const p = mapNotificationItemToPopup(note);
+                      //   return (
+                      //     <div
+                      //       key={note._id}
+                      //       className="flex items-start justify-between rounded-xl bg-[#F5F7FA] p-3"
+                      //     >
                       notificationList.slice(0, 4).map((note) => {
-                        const p = mapNotificationItemToPopup(note);
-                        return (
-                          <div
-                            key={note._id}
-                            className="flex items-start justify-between rounded-xl bg-[#F5F7FA] p-3"
-                          >
+  const p = mapNotificationItemToPopup(note);
+  return (
+    <div
+      key={note._id}
+      role={p.link ? "button" : undefined}
+      tabIndex={p.link ? 0 : undefined}
+      onClick={() => {
+        if (p.link) {
+          setShowNotifications(false);
+          router.push(p.link);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (!p.link) return;
+
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setShowNotifications(false);
+          router.push(p.link);
+        }
+      }}
+      className={`flex items-start justify-between rounded-xl bg-[#F5F7FA] p-3 transition hover:bg-[#eef2f6] ${
+        p.link ? "cursor-pointer" : ""
+      }`}
+    >
                             <div className="flex w-full items-start gap-3">
                               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/80 bg-white">
                                 <i className={`${p.icon} text-base ${p.iconColor}`} aria-hidden />
