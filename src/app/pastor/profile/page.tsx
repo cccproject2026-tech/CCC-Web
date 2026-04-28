@@ -2,13 +2,15 @@
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { getCookie, setCookie } from "@/app/utils/cookies";
-import { apiUploadProfilePicture } from "@/app/Services/users.service";
+import {
+  apiUploadProfilePicture,
+  apiUpdateUserById,
+} from "@/app/Services/users.service";
 import PastorHeader from "@/app/Components/PastorHeader";
 import ProfilePic from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import {
   getSingleUser,
-  updateUser,
   updateInterestByEmail,
   uploadDocument,
   getUserDocuments,
@@ -211,76 +213,190 @@ if (uploadedUrl) {
   // -------------------------
   // SAVE
   // -------------------------
+  // const handleSave = async () => {
+  //   try {
+  //     const userId = profile?.id || profile?._id;
+  //     const email = profile?.email;
+
+  //     const userPayload: any = {};
+  //     if (form.firstName !== (profile.firstName || "")) userPayload.firstName = form.firstName;
+  //     if (form.lastName !== (profile.lastName || "")) userPayload.lastName = form.lastName;
+  //     if (form.profilePicture !== (profile.profilePicture || "")) userPayload.profilePicture = form.profilePicture;
+
+  //     const prevChurch = profile.interest?.churchDetails?.[0] || {};
+  //     const interestPayload: any = {};
+  //     if (form.profileInfo !== (profile.interest?.profileInfo || "")) interestPayload.profileInfo = form.profileInfo;
+  //     if (form.phoneNumber !== (profile.interest?.phoneNumber || "")) interestPayload.phoneNumber = form.phoneNumber;
+  //     if (form.title !== (profile.interest?.title || "")) interestPayload.title = form.title;
+  //     if (form.yearsInMinistry !== (profile.interest?.yearsInMinistry || "")) interestPayload.yearsInMinistry = form.yearsInMinistry;
+  //     if (form.conference !== (profile.interest?.conference || "")) interestPayload.conference = form.conference;
+  //     if (form.currentCommunityProjects !== (profile.interest?.currentCommunityProjects || "")) interestPayload.currentCommunityProjects = form.currentCommunityProjects;
+  //     if (form.comments !== (profile.interest?.comments || "")) interestPayload.comments = form.comments;
+  //     if (form.interests !== (profile.interest?.interests?.join(", ") || "")) {
+  //       interestPayload.interests = form.interests
+  //         ? form.interests.split(",").map((s: string) => s.trim()).filter(Boolean)
+  //         : [];
+  //     }
+
+  //     const churchChanged =
+  //       form.churchName !== (prevChurch.churchName || "") ||
+  //       form.churchPhone !== (prevChurch.churchPhone || "") ||
+  //       form.churchWebsite !== (prevChurch.churchWebsite || "") ||
+  //       form.churchAddress !== (prevChurch.churchAddress || "") ||
+  //       form.city !== (prevChurch.city || "") ||
+  //       form.state !== (prevChurch.state || "") ||
+  //       form.zipCode !== (prevChurch.zipCode || "") ||
+  //       form.country !== (prevChurch.country || "");
+
+  //     if (churchChanged) {
+  //       interestPayload.churchDetails = [{
+  //         churchName: form.churchName,
+  //         churchPhone: form.churchPhone,
+  //         churchWebsite: form.churchWebsite,
+  //         churchAddress: form.churchAddress,
+  //         city: form.city,
+  //         state: form.state,
+  //         zipCode: form.zipCode,
+  //         country: form.country,
+  //       }];
+  //     }
+
+  //     const hasUserChanges = Object.keys(userPayload).length > 0;
+  //     const hasInterestChanges = Object.keys(interestPayload).length > 0;
+
+  //     await Promise.all([
+  //       hasUserChanges ? updateUser(userId, userPayload) : null,
+  //       hasInterestChanges ? updateInterestByEmail(email, interestPayload) : null,
+  //     ].filter(Boolean));
+
+  //     setProfile((prev: any) => ({
+  //       ...prev,
+  //       ...(hasUserChanges ? userPayload : {}),
+  //       interest: {
+  //         ...prev.interest,
+  //         ...(hasInterestChanges ? interestPayload : {}),
+  //       },
+  //     }));
+
+  //     setIsEditing(false);
+  //   } catch (err) {
+  //     console.error("Error saving profile:", err);
+  //   }
+  // };
   const handleSave = async () => {
-    try {
-      const userId = profile?.id || profile?._id;
-      const email = profile?.email;
+  try {
+    const userId = String(profile?.id || profile?._id || "");
+    const email = String(profile?.email || form.email || "");
 
-      const userPayload: any = {};
-      if (form.firstName !== (profile.firstName || "")) userPayload.firstName = form.firstName;
-      if (form.lastName !== (profile.lastName || "")) userPayload.lastName = form.lastName;
-      if (form.profilePicture !== (profile.profilePicture || "")) userPayload.profilePicture = form.profilePicture;
-
-      const prevChurch = profile.interest?.churchDetails?.[0] || {};
-      const interestPayload: any = {};
-      if (form.profileInfo !== (profile.interest?.profileInfo || "")) interestPayload.profileInfo = form.profileInfo;
-      if (form.phoneNumber !== (profile.interest?.phoneNumber || "")) interestPayload.phoneNumber = form.phoneNumber;
-      if (form.title !== (profile.interest?.title || "")) interestPayload.title = form.title;
-      if (form.yearsInMinistry !== (profile.interest?.yearsInMinistry || "")) interestPayload.yearsInMinistry = form.yearsInMinistry;
-      if (form.conference !== (profile.interest?.conference || "")) interestPayload.conference = form.conference;
-      if (form.currentCommunityProjects !== (profile.interest?.currentCommunityProjects || "")) interestPayload.currentCommunityProjects = form.currentCommunityProjects;
-      if (form.comments !== (profile.interest?.comments || "")) interestPayload.comments = form.comments;
-      if (form.interests !== (profile.interest?.interests?.join(", ") || "")) {
-        interestPayload.interests = form.interests
-          ? form.interests.split(",").map((s: string) => s.trim()).filter(Boolean)
-          : [];
-      }
-
-      const churchChanged =
-        form.churchName !== (prevChurch.churchName || "") ||
-        form.churchPhone !== (prevChurch.churchPhone || "") ||
-        form.churchWebsite !== (prevChurch.churchWebsite || "") ||
-        form.churchAddress !== (prevChurch.churchAddress || "") ||
-        form.city !== (prevChurch.city || "") ||
-        form.state !== (prevChurch.state || "") ||
-        form.zipCode !== (prevChurch.zipCode || "") ||
-        form.country !== (prevChurch.country || "");
-
-      if (churchChanged) {
-        interestPayload.churchDetails = [{
-          churchName: form.churchName,
-          churchPhone: form.churchPhone,
-          churchWebsite: form.churchWebsite,
-          churchAddress: form.churchAddress,
-          city: form.city,
-          state: form.state,
-          zipCode: form.zipCode,
-          country: form.country,
-        }];
-      }
-
-      const hasUserChanges = Object.keys(userPayload).length > 0;
-      const hasInterestChanges = Object.keys(interestPayload).length > 0;
-
-      await Promise.all([
-        hasUserChanges ? updateUser(userId, userPayload) : null,
-        hasInterestChanges ? updateInterestByEmail(email, interestPayload) : null,
-      ].filter(Boolean));
-
-      setProfile((prev: any) => ({
-        ...prev,
-        ...(hasUserChanges ? userPayload : {}),
-        interest: {
-          ...prev.interest,
-          ...(hasInterestChanges ? interestPayload : {}),
-        },
-      }));
-
-      setIsEditing(false);
-    } catch (err) {
-      console.error("Error saving profile:", err);
+    if (!userId) {
+      console.error("Missing pastor user id — cannot save profile.");
+      return;
     }
-  };
+
+    if (!email) {
+      console.error("Missing pastor email — cannot update interest details.");
+      return;
+    }
+
+    const userPayload = {
+      firstName: form.firstName,
+      lastName: form.lastName,
+      profilePicture: form.profilePicture,
+    };
+
+    const churchDetailsPayload = [
+      {
+        churchName: form.churchName,
+        churchPhone: form.churchPhone,
+        churchWebsite: form.churchWebsite,
+        churchAddress: form.churchAddress,
+        city: form.city,
+        state: form.state,
+        zipCode: form.zipCode,
+        country: form.country,
+      },
+    ];
+
+    const interestPayload = {
+      profileInfo: form.profileInfo,
+      phoneNumber: form.phoneNumber,
+      title: form.title,
+      yearsInMinistry: form.yearsInMinistry,
+      conference: form.conference,
+      currentCommunityProjects: form.currentCommunityProjects,
+      comments: form.comments,
+      interests: form.interests
+        ? form.interests
+            .split(",")
+            .map((s: string) => s.trim())
+            .filter(Boolean)
+        : [],
+      churchDetails: churchDetailsPayload,
+    };
+
+    // await Promise.all([
+    //   updateUser(userId, userPayload),
+    //   updateInterestByEmail(email, interestPayload),
+    // ]);
+console.log("PASTOR USER ID:", userId);
+console.log("PASTOR USER PAYLOAD:", userPayload);
+console.log("PASTOR INTEREST PAYLOAD:", interestPayload);
+
+// const [userRes, interestRes] = await Promise.all([
+//   apiUpdateUserById(userId, userPayload),
+//   updateInterestByEmail(email, interestPayload),
+// ]);
+
+// console.log("USER UPDATED LAST NAME:", userRes.data?.data?.lastName);
+// const freshRes = await getSingleUser(userId);
+// console.log("FRESH USER AFTER SAVE:", freshRes.data?.data?.lastName);
+// console.log("INTEREST UPDATE RESPONSE:", interestRes.data);
+const interestRes = await updateInterestByEmail(email, {
+  ...interestPayload,
+  firstName: form.firstName,
+  lastName: form.lastName,
+});
+
+const userRes = await apiUpdateUserById(userId, userPayload);
+
+console.log("INTEREST UPDATE RESPONSE:", interestRes.data);
+console.log("USER UPDATED LAST NAME:", userRes.data?.data?.lastName);
+
+const freshRes = await getSingleUser(userId);
+console.log("FRESH USER AFTER SAVE:", freshRes.data?.data?.lastName);
+
+    setProfile((prev: any) => ({
+      ...prev,
+      ...userPayload,
+      interest: {
+        ...(prev?.interest || {}),
+        ...interestPayload,
+      },
+    }));
+
+    setForm((prev: any) => ({
+      ...prev,
+      ...userPayload,
+      ...interestPayload,
+      interests: Array.isArray(interestPayload.interests)
+        ? interestPayload.interests.join(", ")
+        : prev.interests,
+      churchName: churchDetailsPayload[0].churchName,
+      churchPhone: churchDetailsPayload[0].churchPhone,
+      churchWebsite: churchDetailsPayload[0].churchWebsite,
+      churchAddress: churchDetailsPayload[0].churchAddress,
+      city: churchDetailsPayload[0].city,
+      state: churchDetailsPayload[0].state,
+      zipCode: churchDetailsPayload[0].zipCode,
+      country: churchDetailsPayload[0].country,
+    }));
+
+    setIsEditing(false);
+  } catch (err: any) {
+    console.error("Error saving profile:", err?.response?.data || err);
+    alert(err?.response?.data?.message || "Error saving profile.");
+  }
+};
 
   const handleCancel = () => {
     initForm(profile);

@@ -9,10 +9,14 @@ export const getUserAppointments = (userId: string) => {
   return api.get(`/appointments/user/${userId}`);
 };
 
+// export const getSingleUser = (userId: string) => {
+//   return api.get(`/users/${userId}`);
+// };
 export const getSingleUser = (userId: string) => {
-  return api.get(`/users/${userId}`);
+  return api.get(`/users/${userId}`, {
+    params: { t: Date.now() },
+  });
 };
-
 export const getUpcomingAppointments = (userId: string) => {
   return api.get(`/appointments/upcoming`, {
     params: { userId }

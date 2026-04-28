@@ -8,6 +8,7 @@ import { isAxiosError } from "axios";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { useRouter, useSearchParams } from "next/navigation";
 import { apiCreateInterest } from "@/app/Services/api";
+
 import type {
   ChurchDetails,
   CreateInterestPayload,
@@ -337,25 +338,43 @@ if (c.churchWebsite.trim()) {
     if (form.yearsInMinistry.trim()) createPayload.yearsInMinistry = form.yearsInMinistry.trim();
     if (form.currentProjects.trim()) createPayload.currentCommunityProjects = form.currentProjects.trim();
 
-    try {
-      setIsSubmitting(true);
-      const response = await apiCreateInterest(createPayload);
-      const json = response.data;
-      if (!json.success) {
-        setErrors({ _form: json.message || "Failed to submit interest form." });
-        return;
-      }
-      // setSuccessMsg(json.message || "Interest form submitted successfully.");
-      // setToastMessage("Interest submitted successfully.");
-      // setTimeout(() => setToastMessage(null), 2000);
-      // setShowInterests(true);
-      // setCookie("interestEmail", form.email.trim());
-      setSuccessMsg(json.message || "Interest form submitted successfully.");
-setToastMessage("Interest submitted successfully.");
-setTimeout(() => setToastMessage(null), 2000);
-setCookie("interestEmail", form.email.trim());
-setShowPopup(true);
-    } catch (error) {
+//     try {
+//       setIsSubmitting(true);
+//       const response = await apiCreateInterest(createPayload);
+//       const json = response.data;
+//       if (!json.success) {
+//         setErrors({ _form: json.message || "Failed to submit interest form." });
+//         return;
+//       }
+//       // setSuccessMsg(json.message || "Interest form submitted successfully.");
+//       // setToastMessage("Interest submitted successfully.");
+//       // setTimeout(() => setToastMessage(null), 2000);
+//       // setShowInterests(true);
+//       // setCookie("interestEmail", form.email.trim());
+//       setSuccessMsg(json.message || "Interest form submitted successfully.");
+// setToastMessage("Interest submitted successfully.");
+// setTimeout(() => setToastMessage(null), 2000);
+// setCookie("interestEmail", form.email.trim());
+// setShowPopup(true);
+//     } catch (error) {
+try {
+  setIsSubmitting(true);
+
+  const response = await apiCreateInterest(createPayload);
+  const json = response.data;
+
+  if (!json.success) {
+    setErrors({ _form: json.message || "Failed to submit interest form." });
+    return;
+  }
+
+ 
+  setSuccessMsg(json.message || "Interest form submitted successfully.");
+  setToastMessage("Interest submitted successfully.");
+  setTimeout(() => setToastMessage(null), 2000);
+  setCookie("interestEmail", form.email.trim());
+  setShowPopup(true);
+} catch (error) {
       console.error("Interest submit error:", error);
       setErrors({ _form: axiosErrorMessage(error) });
     } finally {

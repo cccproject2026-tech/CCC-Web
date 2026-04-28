@@ -16,12 +16,18 @@ import CCCDropdown from "../CCCDropdown";
 import DocumentsModal from "../DocumentsModal";
 import { getNotification, apiGetRoadmaps, apiGetAssessments, apiGetAllUsers } from "@/app/Services/api";
 import { parseAssessmentsListPayload } from "@/app/Services/assessment.service";
+// import {
+//   mapNotificationItemToPopup,
+//   resolveSessionUserId,
+//   unwrapNotificationsList,
+//   type NotificationPopupItem,
+// } from "@/app/Services/notificationUi";
 import {
   mapNotificationItemToPopup,
   resolveSessionUserId,
   unwrapNotificationsList,
-  type NotificationPopupItem,
 } from "@/app/Services/notificationUi";
+import type { NotificationPopupItem } from "@/app/Components/NotificationPopup";
 import type { NotificationItem } from "@/app/Services/types/home.types";
 
 export default function AppHeader({ showFullHeader = false }) {
@@ -61,13 +67,24 @@ export default function AppHeader({ showFullHeader = false }) {
     const load = async () => {
       setNotificationsLoading(true);
       try {
-        const res = await getNotification(uid);
-        const list: NotificationItem[] = unwrapNotificationsList(res);
-        if (cancelled) return;
-        const unread = list.filter((n) => n.isRead === false).length;
-        const badge = unread > 0 ? unread : list.length;
-        setNotificationBadge(Math.min(badge, 99));
-        setNotificationItems(list.slice(0, 6).map(mapNotificationItemToPopup));
+        // const res = await getNotification(uid);
+        // const list: NotificationItem[] = unwrapNotificationsList(res);
+        // if (cancelled) return;
+        // const unread = list.filter((n) => n.isRead === false).length;
+        // const badge = unread > 0 ? unread : list.length;
+        // setNotificationBadge(Math.min(badge, 99));
+        // setNotificationItems(list.slice(0, 6).map(mapNotificationItemToPopup));
+        const res = await getNotification({ role: "director" });
+const list: NotificationItem[] = unwrapNotificationsList(res);
+const newestFirst = [...list].reverse();
+
+if (cancelled) return;
+
+const unread = newestFirst.filter((n) => n.isRead === false).length;
+const badge = unread > 0 ? unread : newestFirst.length;
+
+setNotificationBadge(Math.min(badge, 99));
+setNotificationItems(newestFirst.slice(0, 6).map(mapNotificationItemToPopup));
       } catch (e) {
         console.error("Director notifications:", e);
         if (!cancelled) {

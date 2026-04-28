@@ -20,8 +20,12 @@ export default function NotificationsPage() {
         if (!userId) return;
 
         const res = await getNotifications(userId);
+        // const list = unwrapNotificationsList(res);
+        // setNotifications(list);
         const list = unwrapNotificationsList(res);
-        setNotifications(list);
+const newestFirst = [...list].reverse();
+
+setNotifications(newestFirst);
       } catch (err) {
         console.error("Error loading notifications:", err);
       } finally {

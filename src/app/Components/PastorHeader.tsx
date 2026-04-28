@@ -189,26 +189,50 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
     },
   ];
 
+  // useEffect(() => {
+  //   const userId = getPastorUserId();
+  //   if (!userId) return;
+
+  //   async function fetchNotifications() {
+  //     try {
+  //       const res = await getNotifications(userId);
+  //       const list = unwrapNotificationsList(res);
+  //       setNotificationList(list);
+  //       const unread = list.filter((n) => !n.isRead).length;
+  //       setNotificationCount(unread > 0 ? Math.min(unread, 99) : 0);
+  //     } catch (err) {
+  //       console.error("Error fetching notifications:", err);
+  //       setNotificationList([]);
+  //       setNotificationCount(0);
+  //     }
+  //   }
+
+  //   fetchNotifications();
+  // }, []);
   useEffect(() => {
-    const userId = getPastorUserId();
-    if (!userId) return;
+  const pastorUserId = getPastorUserId();
 
-    async function fetchNotifications() {
-      try {
-        const res = await getNotifications(userId);
-        const list = unwrapNotificationsList(res);
-        setNotificationList(list);
-        const unread = list.filter((n) => !n.isRead).length;
-        setNotificationCount(unread > 0 ? Math.min(unread, 99) : 0);
-      } catch (err) {
-        console.error("Error fetching notifications:", err);
-        setNotificationList([]);
-        setNotificationCount(0);
-      }
+  if (!pastorUserId) return;
+
+  async function fetchNotifications(userId: string) {
+    try {
+      const res = await getNotifications(userId);
+      const list = unwrapNotificationsList(res);
+      const newestFirst = [...list].reverse();
+
+      setNotificationList(newestFirst);
+
+      const unread = newestFirst.filter((n) => !n.isRead).length;
+      setNotificationCount(unread > 0 ? Math.min(unread, 99) : 0);
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+      setNotificationList([]);
+      setNotificationCount(0);
     }
+  }
 
-    fetchNotifications();
-  }, []);
+  void fetchNotifications(pastorUserId);
+}, []);
 
   useEffect(() => {
     const query = searchQuery.trim();
