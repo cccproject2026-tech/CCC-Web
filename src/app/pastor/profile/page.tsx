@@ -1,7 +1,8 @@
 "use client";
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
-import { getCookie } from "@/app/utils/cookies";
+import { getCookie, setCookie } from "@/app/utils/cookies";
+import { apiUploadProfilePicture } from "@/app/Services/users.service";
 import PastorHeader from "@/app/Components/PastorHeader";
 import ProfilePic from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -38,6 +39,8 @@ export default function PastorProfile() {
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const profileImageInputRef = useRef<HTMLInputElement | null>(null);
+const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
 
   // -------------------------
   // FETCH USER
@@ -82,6 +85,7 @@ export default function PastorProfile() {
   storedUser?.profilePicture ||
   apiUser?.profilePicture ||
   "",
+ 
       };
 
       setProfile(mergedUser);
@@ -128,6 +132,81 @@ export default function PastorProfile() {
   const handleChange = (field: string, value: string) => {
     setForm((prev: any) => ({ ...prev, [field]: value }));
   };
+
+  const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  e.target.value = "";
+
+  if (!file) return;
+
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+  if (!allowedTypes.includes(file.type)) {
+    alert("Only JPEG, PNG, and WebP images are allowed.");
+    return;
+  }
+
+  const userId = profile?.id || profile?._id;
+  if (!userId) return;
+
+  try {
+    setUploadingProfileImage(true);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await apiUploadProfilePicture(userId, formData);
+    const uploadedUrl = res.data?.data?.profilePicture;
+    // if (uploadedUrl) {
+//   const storedUser = JSON.parse(getCookie("user") || "{}");
+
+//   setCookie(
+//     "user",
+//     JSON.stringify({
+//       ...storedUser,
+//       profilePicture: uploadedUrl,
+//     }),
+//   );
+// }
+if (uploadedUrl) {
+  const storedUser = JSON.parse(getCookie("user") || "{}");
+
+  setCookie(
+    "user",
+    JSON.stringify({
+      ...storedUser,
+      profilePicture: uploadedUrl,
+    }),
+    30
+  );
+
+  setProfile((prev: any) => ({
+    ...prev,
+    profilePicture: uploadedUrl,
+  }));
+
+  setForm((prev: any) => ({
+    ...prev,
+    profilePicture: uploadedUrl,
+  }));
+}
+
+    setProfile((prev: any) => ({
+      ...prev,
+      profilePicture: uploadedUrl || prev?.profilePicture,
+    }));
+
+    setForm((prev: any) => ({
+      ...prev,
+      profilePicture: uploadedUrl || prev?.profilePicture,
+    }));
+  } catch (err: any) {
+    console.error("Profile image upload failed", err?.response?.data || err);
+    alert(err?.response?.data?.message || "Profile image upload failed");
+  } finally {
+    setUploadingProfileImage(false);
+  }
+};
 
   // -------------------------
   // SAVE
@@ -314,14 +393,41 @@ export default function PastorProfile() {
               className="mx-auto mb-4 rounded-full border-2 border-[#8ec5eb]/55 object-cover shadow-[0_10px_24px_rgba(2,20,38,0.35)]"
             /> */}
 
-            <Image
+            {/* <Image
   src={profile?.profilePicture || form?.profilePicture || ProfilePic}
   alt="Profile"
   width={104}
   height={104}
   unoptimized
   className="mx-auto mb-4 h-[104px] w-[104px] rounded-full border-2 border-[#8ec5eb]/55 object-cover shadow-[0_10px_24px_rgba(2,20,38,0.35)]"
-/>
+/> */}
+<div className="relative mx-auto mb-4 h-[104px] w-[104px] overflow-hidden rounded-full border-2 border-[#8ec5eb]/55 bg-white/10 shadow-[0_10px_24px_rgba(2,20,38,0.35)]">
+  <Image
+    src={profile?.profilePicture || form?.profilePicture || ProfilePic}
+    alt="Pastor profile"
+    width={104}
+    height={104}
+    unoptimized
+    className="h-full w-full rounded-full object-cover"
+  />
+
+  <button
+    type="button"
+    onClick={() => profileImageInputRef.current?.click()}
+    disabled={uploadingProfileImage}
+    className="absolute inset-x-0 bottom-0 bg-black/55 px-2 py-1 text-[10px] font-semibold text-white transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-60"
+  >
+    {uploadingProfileImage ? "Uploading..." : "Change"}
+  </button>
+
+  <input
+    ref={profileImageInputRef}
+    type="file"
+    accept="image/jpeg,image/png,image/webp"
+    className="hidden"
+    onChange={handleProfileImageChange}
+  />
+</div>
             <p className="mb-1 text-sm text-[#cde2f2]">Good Morning</p>
             <h3 className="text-[33px] font-semibold leading-tight text-white">
               {profile.firstName} {profile.lastName}
@@ -351,7 +457,7 @@ export default function PastorProfile() {
               className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#8ec5eb]/45 bg-[#062946]/55 px-4 py-3 text-base font-semibold text-[#d9ebf8] transition hover:border-[#8ec5eb]/70 hover:bg-[#0d426d]"
             >
               <i className="fa-solid fa-paperclip text-[#8ec5eb] text-lg"></i>
-              Upload documents
+              documents
             </button>
           </div>
 

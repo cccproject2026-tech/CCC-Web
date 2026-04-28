@@ -167,7 +167,7 @@ setNotificationList(list);
     { icon: <User size={18} />, label: "Profile", path: "/mentor/profile" },
     { icon: <Award size={18} />, label: "Certificates", path: "/mentor/certificates" },
     { icon: <Clipboard size={18} />, label: "Mentorship Sessions", path: "/mentor/mentoring-session" },
-    { icon: <File size={18} />, label: "Assignments", path: "/mentor/assignments" },
+    // { icon: <File size={18} />, label: "Assignments", path: "/mentor/assignments" },
     { icon: <Trophy size={18} />, label: "Micro Grand", path: "/mentor/micro-grant" },
     { icon: <FolderOpen size={18} />, label: "Documents", path: "/mentor/documents" },
     {
@@ -391,13 +391,23 @@ setNotificationList(list);
                     {user ? `${user.firstName} ${user.lastName}` : "Loading..."}
                   </p>
                 </div>
-                <Image
+                {/* <Image
                   src={user?.profilePicture || UserProfile}
                   alt={user ? `${user.firstName} profile` : "User profile"}
                   width={30}
                   height={30}
                   className="rounded-full border border-white/40"
-                />
+                /> */}
+                <div className="h-[30px] w-[30px] overflow-hidden rounded-full border border-white/40 bg-white/10">
+  <Image
+    src={user?.profilePicture || UserProfile}
+    alt={user ? `${user.firstName} profile` : "User profile"}
+    width={30}
+    height={30}
+    className="h-full w-full rounded-full object-cover"
+    unoptimized={typeof user?.profilePicture === "string" && user.profilePicture.startsWith("http")}
+  />
+</div>
               </button>
 
               {/* Profile Menu Dropdown */}
