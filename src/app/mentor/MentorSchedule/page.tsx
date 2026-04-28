@@ -271,7 +271,7 @@ function MentorScheduleContent() {
           t.replace(/\s+/g, "").toLowerCase();
 
         const bookedSlots = appointments
-          .filter(a => a.meetingDate.startsWith(meetingDate))
+          .filter(a => a.meetingDate.startsWith(meetingDate) && !["cancelled", "canceled"].includes((a.status || "").toLowerCase()))
           .map(a => {
             const d = new Date(a.meetingDate);
             return normalize(
@@ -518,6 +518,9 @@ function MentorScheduleContent() {
 
     setSelectedAvailabilityDay((prev) => {
       if (prev !== null && availability.some((d) => d.day === prev)) return prev;
+      // Prefer today's day of the week
+      const todayDayOfWeek = new Date().getDay();
+      if (availability.some((d) => d.day === todayDayOfWeek)) return todayDayOfWeek;
       const firstEnabledDay = availability.find((d) => d.enabled)?.day;
       return typeof firstEnabledDay === "number" ? firstEnabledDay : availability[0]?.day ?? 0;
     });
@@ -866,14 +869,25 @@ function MentorScheduleContent() {
   const handleCancelMentorAppointment = async (appt: Appointment) => {
     const id = appointmentEntityId(appt);
     if (!id || !mentorId) return;
+
     try {
       await apiCancelAppointment(id);
-      const refresh = await apiGetMentorAppointments(mentorId);
-      setAppointments(unwrapAppointmentsAxiosData(refresh));
-      setShowMenu(null);
-      setToastMessage("Appointment cancelled");
     } catch (e) {
       console.error(e);
+    }
+
+    try {
+      const refresh = await apiGetMentorAppointments(mentorId);
+      const freshList = unwrapAppointmentsAxiosData(refresh);
+      setAppointments(freshList);
+      setShowMenu(null);
+      const stillActive = freshList.find(
+        (a: Appointment) =>
+          appointmentEntityId(a) === id &&
+          !["cancelled", "canceled"].includes((a.status || "").toLowerCase()),
+      );
+      setToastMessage(stillActive ? "Failed to cancel appointment" : "Appointment cancelled");
+    } catch (_) {
       setToastMessage("Failed to cancel appointment");
     }
     setTimeout(() => setToastMessage(null), 3000);
@@ -946,12 +960,22 @@ function MentorScheduleContent() {
     setIsRescheduling(true);
 
     try {
-      const meetingDate = rescheduleRecipientType === "director"
+      const newDate = rescheduleRecipientType === "director"
         ? rescheduleSelectedSlot
         : rescheduleDateTime;
 
+      // Extract startTime/startPeriod from the resolved ISO
+      const _d = new Date(newDate);
+      const _h24 = _d.getHours();
+      const _min = _d.getMinutes();
+      const startPeriod = _h24 < 12 ? "AM" : "PM";
+      const _h12 = _h24 % 12 === 0 ? 12 : _h24 % 12;
+      const startTime = `${_h12}:${String(_min).padStart(2, "0")}`;
+
       await apiRescheduleAppointment(id, {
-        meetingDate,
+        newDate,
+        startTime,
+        startPeriod,
         platform: reschedulePlatform as any,
       });
       const refresh = await apiGetMentorAppointments(mentorId);
@@ -990,11 +1014,6 @@ function MentorScheduleContent() {
         <div className="mx-auto max-w-7xl">
           <div className={`${mentorFilterPanel} mb-8`}>
             <div className="flex flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-center">
-              <input
-                type="text"
-                placeholder="Jump to date (dd-mm-yyyy)"
-                className={`w-full max-w-none rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30 lg:max-w-sm`}
-              />
               <MentorFilterTabGroup
                 tabs={["Appointments", "Availability", "Schedule", "Appointment History"] as const}
                 active={activeTab}
@@ -1168,8 +1187,9 @@ function MentorScheduleContent() {
                             <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-medium text-[#d9ebf8]">
                               <i className="fa-regular fa-clock text-[#8ec5eb]" />
                               {meetingDate.toLocaleTimeString([], {
-                                hour: "2-digit",
+                                hour: "numeric",
                                 minute: "2-digit",
+                                hour12: true,
                               })}
                             </div>
                           </div>
@@ -1181,9 +1201,9 @@ function MentorScheduleContent() {
 
                           <div className="flex items-center justify-between">
                             <div className="flex gap-3 text-[15px] text-[#8ec5eb]">
-                              <i className="fa-solid fa-phone cursor-pointer transition hover:text-white" />
-                              <i className="fa-regular fa-comment cursor-pointer transition hover:text-white" />
-                              <i className="fa-brands fa-whatsapp cursor-pointer transition hover:text-white" />
+                              <a href={(appt.user as any)?.phoneNumber ? `tel:${(appt.user as any).phoneNumber}` : undefined} aria-label="Call" className="transition hover:text-white"><i className="fa-solid fa-phone" /></a>
+                              <a href={(appt.user as any)?.phoneNumber ? `sms:${(appt.user as any).phoneNumber}` : undefined} aria-label="Text" className="transition hover:text-white"><i className="fa-regular fa-comment" /></a>
+                              <a href={(appt.user as any)?.phoneNumber ? `https://wa.me/${String((appt.user as any).phoneNumber).replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-label="WhatsApp" className="transition hover:text-white"><i className="fa-brands fa-whatsapp" /></a>
                             </div>
 
                             <div className="relative" data-mentor-appointment-menu>
@@ -1300,7 +1320,7 @@ function MentorScheduleContent() {
                             </div>
                             <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-medium text-[#d9ebf8]">
                               <i className="fa-regular fa-clock text-[#8ec5eb]" />
-                              {meetingDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              {meetingDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
                             </div>
                           </div>
                           <p className="mb-2 text-[12px] text-[#cde2f2]">Mode: <span className="font-semibold text-[#8ec5eb]">{appt.platform}</span></p>
@@ -1368,6 +1388,7 @@ function MentorScheduleContent() {
                       const day = date.toLocaleDateString("default", { weekday: "short" });
                       const isSelected = selectedAvailabilityDay === dayIndex;
                       const isPast = isPastDate(date.toISOString().split("T")[0]);
+                      const isToday = date.toDateString() === new Date().toDateString();
                       return (
                         <div
                           key={date.toISOString()}
@@ -1382,6 +1403,7 @@ function MentorScheduleContent() {
                         >
                           <div>{day}</div>
                           <div className="text-xs text-white/80">{date.getDate()}</div>
+                          {isToday && <div className="mx-auto mt-0.5 h-1 w-1 rounded-full bg-[#8ec5eb]" />}
                         </div>
                       );
                     })}
@@ -1693,6 +1715,24 @@ function MentorScheduleContent() {
                         return;
                       }
 
+                      // Check against scheduled appointments on this date
+                      const slotDateStr = selectedDayData ? resolveAvailabilityRowDate(selectedDayData) : null;
+                      if (slotDateStr) {
+                        const conflictingAppt = appointments.find((a) => {
+                          if (!String(a.meetingDate).startsWith(slotDateStr)) return false;
+                          if (["cancelled", "canceled"].includes((a.status || "").toLowerCase())) return false;
+                          const d = new Date(a.meetingDate);
+                          const apptStart = d.getHours() * 60 + d.getMinutes();
+                          const apptEnd = apptStart + 60; // meetings are 60 min
+                          return startMins < apptEnd && endMins > apptStart;
+                        });
+                        if (conflictingAppt) {
+                          const apptTime = new Date(conflictingAppt.meetingDate).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
+                          setSlotValidationError(`This time conflicts with an existing appointment at ${apptTime}.`);
+                          return;
+                        }
+                      }
+
                       setAvailability((prev) =>
                         prev.map((d) =>
                           d.day === selectedAvailabilityDay
@@ -1961,10 +2001,17 @@ function MentorScheduleContent() {
             {rescheduleRecipientType === "director" ? (
               <div className="flex h-full flex-col p-6">
                 <div className="mb-6 flex items-center justify-between shrink-0">
-                  <h2 className="flex items-center gap-2 text-lg font-semibold">
-                    <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
-                    Reschedule meeting
-                  </h2>
+                  <div>
+                    <h2 className="flex items-center gap-2 text-lg font-semibold">
+                      <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
+                      Reschedule meeting
+                    </h2>
+                    {((rescheduleTarget.user as any)?.firstName || (rescheduleTarget.user as any)?.lastName) && (
+                      <p className="mt-1 text-sm text-[#8ec5eb] font-medium pl-7">
+                        {[(rescheduleTarget.user as any)?.firstName, (rescheduleTarget.user as any)?.lastName].filter(Boolean).join(" ")}
+                      </p>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => setIsRescheduleModalOpen(false)}
@@ -2087,10 +2134,17 @@ function MentorScheduleContent() {
               /* ── Pastor: Show simple datetime input ── */
               <div className="flex h-full flex-col p-6">
                 <div className="mb-6 flex items-center justify-between shrink-0">
-                  <h2 className="flex items-center gap-2 text-lg font-semibold">
-                    <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
-                    Reschedule meeting
-                  </h2>
+                  <div>
+                    <h2 className="flex items-center gap-2 text-lg font-semibold">
+                      <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
+                      Reschedule meeting
+                    </h2>
+                    {((rescheduleTarget.user as any)?.firstName || (rescheduleTarget.user as any)?.lastName) && (
+                      <p className="mt-1 text-sm text-[#8ec5eb] font-medium pl-7">
+                        {[(rescheduleTarget.user as any)?.firstName, (rescheduleTarget.user as any)?.lastName].filter(Boolean).join(" ")}
+                      </p>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => setIsRescheduleModalOpen(false)}

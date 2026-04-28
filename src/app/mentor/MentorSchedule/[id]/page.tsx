@@ -86,6 +86,7 @@ export default function MentorAppointmentDetailPage() {
 
   const [tsLoading, setTsLoading] = useState(false);
   const [tsData, setTsData] = useState<TranscriptSummary | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   // ── Fetch appointment ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -252,7 +253,7 @@ export default function MentorAppointmentDetailPage() {
               <div>
                 <p className="text-[11px] text-white/50">Time</p>
                 <p className="text-white">
-                  {meetingDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                  {meetingDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
                 </p>
               </div>
             </div>
@@ -270,7 +271,9 @@ export default function MentorAppointmentDetailPage() {
                 <i className="fa-regular fa-hourglass text-[#8ec5eb] w-4 text-center" />
                 <div>
                   <p className="text-[11px] text-white/50">End Time</p>
-                  <p className="text-white">{appt.endTime}</p>
+                  <p className="text-white">
+                    {(() => { const d = new Date(appt.endTime as string); return isNaN(d.getTime()) ? String(appt.endTime) : d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true }); })()}
+                  </p>
                 </div>
               </div>
             ) : null}
@@ -278,15 +281,33 @@ export default function MentorAppointmentDetailPage() {
 
           {/* Meeting link */}
           {meetLink ? (
-            <a
-              href={meetLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 flex items-center gap-2 truncate rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/10 px-4 py-2.5 text-sm font-medium text-[#8ec5eb] hover:bg-[#8ec5eb]/20"
-            >
-              <i className="fa-solid fa-link shrink-0" />
-              <span className="truncate">{meetLink}</span>
-            </a>
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/10 px-4 py-2.5">
+              <i className="fa-solid fa-link shrink-0 text-[#8ec5eb]" />
+              <a
+                href={meetLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-w-0 flex-1 truncate text-sm font-medium text-[#8ec5eb] hover:underline"
+              >
+                {meetLink}
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(meetLink).then(() => {
+                    setLinkCopied(true);
+                    setTimeout(() => setLinkCopied(false), 2000);
+                  });
+                }}
+                className="ml-1 shrink-0 rounded-lg border border-white/20 bg-white/10 px-2.5 py-1 text-xs font-medium text-white transition hover:bg-white/20"
+              >
+                {linkCopied ? (
+                  <span className="flex items-center gap-1 text-green-300"><i className="fa-solid fa-check" /> Copied</span>
+                ) : (
+                  <span className="flex items-center gap-1"><i className="fa-regular fa-copy" /> Copy</span>
+                )}
+              </button>
+            </div>
           ) : (
             <p className="mt-4 text-[12px] text-white/40">No meeting link available.</p>
           )}

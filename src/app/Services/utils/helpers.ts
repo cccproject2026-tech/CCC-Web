@@ -15,20 +15,11 @@ export const generateTimeOptions = () => {
     const options: { time: string; period: string; label: string }[] = [];
 
     for (let h = 0; h < 24; h++) {
-        for (const m of [0, 30]) {
-            const hour12 = h % 12 === 0 ? 12 : h % 12;
-            const period = h < 12 ? "AM" : "PM";
-            const minStr = m === 0 ? "00" : "30";
-
-            const time = `${hour12}:${minStr}`;
-            const label = `${hour12}:${minStr} ${period}`;
-
-            options.push({
-                time,
-                period,
-                label,
-            });
-        }
+        const hour12 = h % 12 === 0 ? 12 : h % 12;
+        const period = h < 12 ? "AM" : "PM";
+        const time = `${hour12}:00`;
+        const label = `${hour12}:00 ${period}`;
+        options.push({ time, period, label });
     }
 
     return options;
