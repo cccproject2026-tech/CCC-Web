@@ -27,8 +27,6 @@ import {
 import type { CreateAssessmentPayload } from "@/app/Services/types/assessment.types";
 import { isRemoteImageSrc } from "@/app/utils/image";
 
-/** Initial count of **choice layers** (survey); add/remove is independent of CDP levels. */
-const DEFAULT_STARTING_LAYERS = 4;
 const MIN_LAYERS = 1;
 /** CDP is always **four levels** (1–4), separate from choice layers. */
 const CDP_LEVEL_COUNT = 4;
@@ -62,7 +60,7 @@ const defaultSection = (): WizardSection => {
     id: base,
     name: "",
     guidelines: "",
-    layers: Array.from({ length: DEFAULT_STARTING_LAYERS }, (_, i) => ({
+    layers: Array.from({ length: 2 }, (_, i) => ({
       id: base + i,
       choices: [""],
     })),
@@ -109,7 +107,21 @@ export default function CreateAssessmentPage() {
   };
 
   const handleAddSection = () => {
-    setSections([...sections, defaultSection()]);
+    const base = Date.now();
+    setSections([
+      ...sections,
+      {
+        id: base,
+        name: "",
+        guidelines: "",
+        layers: [{ id: base + 1, choices: [""] }],
+        plans: Array.from({ length: CDP_LEVEL_COUNT }, (_, i) => ({
+          id: base + 100 + i,
+          name: defaultWizardPlanName(i),
+          items: [""],
+        })),
+      },
+    ]);
   };
 
   const handleRemoveSection = (sectionIdx: number) => {
@@ -556,14 +568,25 @@ export default function CreateAssessmentPage() {
                       {section.layers.length} layer{section.layers.length === 1 ? "" : "s"} — not the same
                       as CDP levels 1–4 below. At least one filled option per layer.
                     </p>
-                    <button
-                      type="button"
-                      onClick={() => handleAddLayer(sectionIdx)}
-                      className={directorBtnSecondary + " !py-2 !text-sm"}
-                    >
-                      <i className="fa-solid fa-plus" />
-                      Add layer
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveLayer(sectionIdx, section.layers.length - 1)}
+                        disabled={section.layers.length <= MIN_LAYERS}
+                        className="rounded-lg border border-red-400/30 bg-red-500/15 px-2.5 py-1.5 text-xs font-semibold text-red-200 transition enabled:hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <i className="fa-solid fa-minus mr-1" />
+                        Layer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddLayer(sectionIdx)}
+                        className="rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/15 px-2.5 py-1.5 text-xs font-semibold text-[#d6edff] transition hover:bg-[#8ec5eb]/25"
+                      >
+                        <i className="fa-solid fa-plus mr-1" />
+                        Layer
+                      </button>
+                    </div>
                   </div>
 
                   {section.layers.map((layer, layerIdx) => (

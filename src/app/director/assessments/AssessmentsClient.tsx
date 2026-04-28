@@ -13,7 +13,7 @@ import {
   directorSpinner,
   directorToastClass,
 } from "../directorUi";
-import { DirectorFilterSection, DirectorSlideOver } from "../ui";
+import { DirectorFilterSection } from "../ui";
 import SearchBar from "@/app/Components/SearchBar";
 import ConfirmModal from "@/app/Components/ConfirmModal";
 import AssessmentBg from "../../Assets/assessment-bg.png";
@@ -557,67 +557,101 @@ function AssessmentsPageContent() {
         </div>
       </section>
 
-      <DirectorSlideOver
-        open={showAssignModal}
-        onClose={() => setShowAssignModal(false)}
-        title="Assign to"
-        footer={
-          <div>
-            <p className="mb-3 text-center text-sm text-gray-600">
-              {selectedUsers.length === 0
-                ? "Select one or more pastors."
-                : `${selectedUsers.length} pastor${selectedUsers.length === 1 ? "" : "s"} selected`}
-            </p>
-            <button
-              type="button"
-              onClick={handleAssign}
-              disabled={selectedUsers.length === 0 || loading}
-              className="w-full rounded-lg bg-[#2E3B8E] px-6 py-3 font-semibold text-white transition hover:bg-[#1F2A6E] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {loading ? "Assigning…" : "Assign"}
-            </button>
-          </div>
-        }
-      >
-        <div className="border-b border-gray-100 px-6 py-4">
-          <SearchBar
-            value={userSearch}
-            onChange={setUserSearch}
-            placeholder="Search pastors…"
-            variant="light"
-            className="w-full"
-          />
-        </div>
-        <div className="px-6 py-4">
-          <div className="space-y-2">
-            {users.map((user) => (
-              <label
-                key={user.id}
-                className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-100 p-3 transition hover:bg-gray-50"
+      {showAssignModal ? (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setShowAssignModal(false)}
+          role="presentation"
+        >
+          <div
+            className="flex w-full max-w-md max-h-[90vh] flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="assign-assessment-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <div>
+                <h2 id="assign-assessment-title" className="text-lg font-bold text-gray-900">
+                  Assign to pastors
+                </h2>
+                <p className="mt-0.5 text-sm text-gray-600">
+                  Choose pastors and assign selected assessments.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAssignModal(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
+                aria-label="Close assign popup"
               >
-                <input
-                  type="checkbox"
-                  checked={selectedUsers.includes(user.id)}
-                  onChange={() => handleUserToggle(user.id)}
-                  className="h-5 w-5 rounded text-[#2E3B8E] focus:ring-2 focus:ring-[#2E3B8E]"
-                />
-                <Image
-                  src={user.avatar}
-                  alt=""
-                  width={40}
-                  height={40}
-                  className="rounded-full object-cover"
-                  unoptimized={typeof user.avatar === "string" && isRemoteImageSrc(user.avatar)}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-gray-900">{user.name}</div>
-                  <div className="truncate text-sm text-gray-600">{user.role}</div>
-                </div>
-              </label>
-            ))}
+                <i className="fa-solid fa-xmark text-xl" />
+              </button>
+            </header>
+
+            <div className="border-b border-gray-100 px-6 py-4">
+              <SearchBar
+                value={userSearch}
+                onChange={setUserSearch}
+                placeholder="Search pastors…"
+                variant="light"
+                className="w-full"
+              />
+            </div>
+
+            <div className="flex-1 overflow-auto px-6 py-4">
+              <div className="space-y-2">
+                {users.map((user) => (
+                  <label
+                    key={user.id}
+                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-100 p-3 transition hover:bg-gray-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedUsers.includes(user.id)}
+                      onChange={() => handleUserToggle(user.id)}
+                      className="h-5 w-5 rounded text-[#2E3B8E] focus:ring-2 focus:ring-[#2E3B8E]"
+                    />
+                    <Image
+                      src={user.avatar}
+                      alt=""
+                      width={40}
+                      height={40}
+                      className="rounded-full object-cover"
+                      unoptimized={typeof user.avatar === "string" && isRemoteImageSrc(user.avatar)}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-gray-900">{user.name}</div>
+                      <div className="truncate text-sm text-gray-600">{user.role}</div>
+                    </div>
+                  </label>
+                ))}
+                {users.length === 0 ? (
+                  <p className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+                    No pastors found.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <footer className="border-t border-gray-200 px-6 py-4">
+              <p className="mb-3 text-center text-sm text-gray-600">
+                {selectedUsers.length === 0
+                  ? "Select one or more pastors."
+                  : `${selectedUsers.length} pastor${selectedUsers.length === 1 ? "" : "s"} selected`}
+              </p>
+              <button
+                type="button"
+                onClick={handleAssign}
+                disabled={selectedUsers.length === 0 || loading}
+                className="w-full rounded-lg bg-[#2E3B8E] px-6 py-3 font-semibold text-white transition hover:bg-[#1F2A6E] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loading ? "Assigning…" : "Assign"}
+              </button>
+            </footer>
           </div>
         </div>
-      </DirectorSlideOver>
+      ) : null}
 
       <ConfirmModal
         isOpen={showDeleteModal}

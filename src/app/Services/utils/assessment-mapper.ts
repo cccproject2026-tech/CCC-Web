@@ -320,23 +320,20 @@ export function newDirectorEditSection(): DirectorEditSection {
  * Extra API layers after the 4th are not shown; missing layers are padded.
  */
 export function sectionToDirectorEditWizard(s: Section): DirectorEditSection {
-  const layers: DirectorWizardLayer[] = [];
-  for (let i = 0; i < WIZARD_LAYER_COUNT; i++) {
-    const L = s.layers[i];
-    if (L) {
-      const choiceTexts = L.choices.length
-        ? L.choices.map((c) => c.text)
-        : [""];
-      const notes = L.recommendations
-        .map((r) => r.text)
-        .map((t) => t.trim())
-        .filter(Boolean)
-        .join("\n");
-      layers.push({ id: i + 1, choices: choiceTexts, notes });
-    } else {
-      layers.push({ id: i + 1, choices: [""], notes: "" });
-    }
-  }
+  const sourceLayers = Array.isArray(s.layers) && s.layers.length > 0
+    ? s.layers
+    : [{ id: "fallback-layer", name: "Layer 1", choices: [{ id: "c1", text: "" }], recommendations: [] }];
+  const layers: DirectorWizardLayer[] = sourceLayers.map((L, i) => {
+    const choiceTexts = L.choices.length
+      ? L.choices.map((c) => c.text)
+      : [""];
+    const notes = L.recommendations
+      .map((r) => r.text)
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .join("\n");
+    return { id: i + 1, choices: choiceTexts, notes };
+  });
 
   const plans: DirectorWizardPlan[] = [];
   for (let i = 0; i < WIZARD_LAYER_COUNT; i++) {
