@@ -2001,10 +2001,17 @@ function MentorScheduleContent() {
             {rescheduleRecipientType === "director" ? (
               <div className="flex h-full flex-col p-6">
                 <div className="mb-6 flex items-center justify-between shrink-0">
-                  <h2 className="flex items-center gap-2 text-lg font-semibold">
-                    <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
-                    Reschedule meeting
-                  </h2>
+                  <div>
+                    <h2 className="flex items-center gap-2 text-lg font-semibold">
+                      <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
+                      Reschedule meeting
+                    </h2>
+                    {((rescheduleTarget.user as any)?.firstName || (rescheduleTarget.user as any)?.lastName) && (
+                      <p className="mt-1 text-sm text-[#8ec5eb] font-medium pl-7">
+                        {[(rescheduleTarget.user as any)?.firstName, (rescheduleTarget.user as any)?.lastName].filter(Boolean).join(" ")}
+                      </p>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => setIsRescheduleModalOpen(false)}
@@ -2127,10 +2134,17 @@ function MentorScheduleContent() {
               /* ── Pastor: Show simple datetime input ── */
               <div className="flex h-full flex-col p-6">
                 <div className="mb-6 flex items-center justify-between shrink-0">
-                  <h2 className="flex items-center gap-2 text-lg font-semibold">
-                    <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
-                    Reschedule meeting
-                  </h2>
+                  <div>
+                    <h2 className="flex items-center gap-2 text-lg font-semibold">
+                      <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
+                      Reschedule meeting
+                    </h2>
+                    {((rescheduleTarget.user as any)?.firstName || (rescheduleTarget.user as any)?.lastName) && (
+                      <p className="mt-1 text-sm text-[#8ec5eb] font-medium pl-7">
+                        {[(rescheduleTarget.user as any)?.firstName, (rescheduleTarget.user as any)?.lastName].filter(Boolean).join(" ")}
+                      </p>
+                    )}
+                  </div>
                   <button
                     type="button"
                     onClick={() => setIsRescheduleModalOpen(false)}

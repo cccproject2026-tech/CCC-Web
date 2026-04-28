@@ -1196,10 +1196,17 @@ export default function PastorAppointmentsPage() {
 
             {/* Header */}
             <div className="flex justify-between items-center px-6 py-5 border-b border-white/15">
-              <h2 className="text-[18px] font-semibold flex items-center gap-2 text-white">
-                <i className="fa-regular fa-calendar text-[#8ec5eb]"></i>
-                Reschedule Meeting
-              </h2>
+              <div>
+                <h2 className="text-[18px] font-semibold flex items-center gap-2 text-white">
+                  <i className="fa-regular fa-calendar text-[#8ec5eb]"></i>
+                  Reschedule Meeting
+                </h2>
+                {(appointmentToEdit?.mentor?.firstName || appointmentToEdit?.mentor?.lastName) && (
+                  <p className="mt-1 text-sm text-[#8ec5eb] font-medium pl-6">
+                    {[appointmentToEdit?.mentor?.firstName, appointmentToEdit?.mentor?.lastName].filter(Boolean).join(" ")}
+                  </p>
+                )}
+              </div>
               <button onClick={() => setShowReschedule(false)} className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[#d9ebf8] hover:bg-white/20 transition">
                 <i className="fa-solid fa-xmark text-sm"></i>
               </button>
