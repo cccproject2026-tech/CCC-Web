@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
-
+import { useRouter } from "next/navigation";
 export type NotificationPopupItem = {
   id: string;
   icon: string;
@@ -35,6 +35,7 @@ export default function NotificationPopup({
   emptyMessage,
   viewAllHref = "/director/notifications",
 }: NotificationPopupProps) {
+  const router = useRouter();
   const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -146,10 +147,57 @@ export default function NotificationPopup({
         )}
         {!loading &&
           displayNotifications.map((notification) => (
-          <div
-            key={notification.id}
-            className="border-b border-gray-100 px-6 py-4 hover:bg-gray-50 transition relative"
-          >
+          // <div
+          //   key={notification.id}
+          //   className="border-b border-gray-100 px-6 py-4 hover:bg-gray-50 transition relative"
+          // >
+//           <div
+//   key={notification.id}
+//   role={notification.link ? "button" : undefined}
+//   tabIndex={notification.link ? 0 : undefined}
+//   onClick={() => {
+//     if (notification.link) {
+//       window.location.href = notification.link;
+//     }
+//   }}
+//   onKeyDown={(e) => {
+//     if (!notification.link) return;
+//     if (e.key === "Enter" || e.key === " ") {
+//       e.preventDefault();
+//       window.location.href = notification.link;
+//     }
+//   }}
+//   className={`border-b border-gray-100 px-6 py-4 hover:bg-gray-50 transition relative ${
+//     notification.link ? "cursor-pointer" : ""
+//   }`}
+// >
+
+<div
+  key={notification.id}
+  role={notification.link ? "button" : undefined}
+  tabIndex={notification.link ? 0 : undefined}
+  onClick={() => {
+    console.log("POPUP NOTIFICATION CLICKED:", notification.link);
+
+    if (notification.link) {
+      onClose();
+      router.push(notification.link);
+    }
+  }}
+  onKeyDown={(e) => {
+    if (!notification.link) return;
+
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onClose();
+      router.push(notification.link);
+    }
+  }}
+  className={`border-b border-gray-100 px-6 py-4 hover:bg-gray-50 transition relative ${
+    notification.link ? "cursor-pointer" : "cursor-default"
+  }`}
+>
+
             <div className="flex gap-4">
               {/* Icon */}
               <div className="flex-shrink-0 mt-1">
@@ -186,10 +234,28 @@ export default function NotificationPopup({
                 )}
 
                 {notification.link && (
-                  <a
-                    href="#"
-                    className="text-[12px] text-[#2E3B8E] hover:underline"
-                  >
+                  // <a
+                  //   href="#"
+                  //   className="text-[12px] text-[#2E3B8E] hover:underline"
+                  // >
+//                   <a
+//   href={notification.link}
+//   onClick={(e) => e.stopPropagation()}
+//   className="text-[12px] text-[#2E3B8E] hover:underline"
+// >
+<a
+  href={notification.link}
+  onClick={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (notification.link) {
+      onClose();
+      router.push(notification.link);
+    }
+  }}
+  className="text-[12px] text-[#2E3B8E] hover:underline"
+>
                     {'linkText' in notification && notification.linkText ? notification.linkText : notification.link}
                   </a>
                 )}

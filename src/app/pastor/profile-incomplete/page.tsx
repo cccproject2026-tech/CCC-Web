@@ -36,6 +36,9 @@ export default function ProfileIncomplete() {
     ProfileLogo
   );
 
+  const [selectedProfileFile, setSelectedProfileFile] = useState<File | null>(null);
+const [hasProfileChanged, setHasProfileChanged] = useState(false);
+
   // 🔹 Profile picture upload state
   const [isProfileUploading, setIsProfileUploading] = useState(false);
   const [profileErrorMsg, setProfileErrorMsg] = useState<string | null>(null);
@@ -72,58 +75,138 @@ export default function ProfileIncomplete() {
   };
 
   // 🔹 Handle profile picture upload
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0];
+  //   if (!file) return;
 
-    const uid = getPastorUserId() || user?.id || user?._id;
-    if (!uid) {
-      setProfileErrorMsg("Missing user id. Please login again.");
+  //   const uid = getPastorUserId() || user?.id || user?._id;
+  //   if (!uid) {
+  //     setProfileErrorMsg("Missing user id. Please login again.");
+  //     return;
+  //   }
+
+  //   const formData = new FormData();
+  //   formData.append("file", file);
+
+  //   try {
+  //     setIsProfileUploading(true);
+  //     setProfileErrorMsg(null);
+
+  //     const response = await apiUploadProfilePicture(String(uid), formData);
+  //     const json = response.data;
+
+  //     if (!json.success) {
+  //       setProfileErrorMsg(
+  //         json.message || "Failed to upload profile picture."
+  //       );
+  //       return;
+  //     }
+
+  //     const newUrl: string | undefined = json.data?.profilePicture;
+  //     if (newUrl) {
+  //       setProfileImage(newUrl);
+
+  //       // update local user + localStorage
+  //       const updatedUser: User = {
+  //         ...user,
+  //         profilePicture: newUrl,
+  //       };
+  //       const merged = normalizeUserCookieForClient(
+  //         updatedUser as Record<string, unknown>,
+  //       ) as User;
+  //       setUser(merged);
+  //       if (typeof window !== "undefined") {
+  //         setCookie("user", JSON.stringify(merged));
+  //       }
+  //     }
+  //   } catch (err) {
+  //     console.error("Upload error:", err);
+  //     setProfileErrorMsg("Something went wrong. Please try again.");
+  //   } finally {
+  //     setIsProfileUploading(false);
+  //     e.target.value = "";
+  //   }
+  // };
+
+const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    setProfileErrorMsg("Please select a valid image file.");
+    return;
+  }
+
+  const previewUrl = URL.createObjectURL(file);
+
+  setSelectedProfileFile(file);
+  setProfileImage(previewUrl);
+  setHasProfileChanged(true);
+  setProfileErrorMsg(null);
+};
+
+const handleSaveProfile = async () => {
+  const uid = getPastorUserId() || user?.id || user?._id;
+
+  if (!uid) {
+    setProfileErrorMsg("Missing user id. Please login again.");
+    return;
+  }
+
+  if (!selectedProfileFile) {
+    setProfileErrorMsg("Please choose a profile picture first.");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", selectedProfileFile);
+
+  try {
+    setIsProfileUploading(true);
+    setProfileErrorMsg(null);
+
+    const response = await apiUploadProfilePicture(String(uid), formData);
+    const json = response.data;
+
+    if (!json.success) {
+      setProfileErrorMsg(json.message || "Failed to upload profile picture.");
       return;
     }
 
-    const formData = new FormData();
-    formData.append("file", file);
+    // const newUrl: string | undefined = json.data?.profilePicture;
+    const uploadedUrl: string | undefined = json.data?.profilePicture;
+const newUrl = uploadedUrl ? `${uploadedUrl}?t=${Date.now()}` : undefined;
 
-    try {
-      setIsProfileUploading(true);
-      setProfileErrorMsg(null);
+    if (newUrl) {
+      setProfileImage(newUrl);
 
-      const response = await apiUploadProfilePicture(String(uid), formData);
-      const json = response.data;
+      const updatedUser: User = {
+        ...user,
+        id: user?.id || String(uid),
+        _id: user?._id,
+        profilePicture: newUrl,
+      };
 
-      if (!json.success) {
-        setProfileErrorMsg(
-          json.message || "Failed to upload profile picture."
-        );
-        return;
+      const merged = normalizeUserCookieForClient(
+        updatedUser as Record<string, unknown>
+      ) as User;
+
+      setUser(merged);
+
+      if (typeof window !== "undefined") {
+        setCookie("user", JSON.stringify(merged));
       }
-
-      const newUrl: string | undefined = json.data?.profilePicture;
-      if (newUrl) {
-        setProfileImage(newUrl);
-
-        // update local user + localStorage
-        const updatedUser: User = {
-          ...user,
-          profilePicture: newUrl,
-        };
-        const merged = normalizeUserCookieForClient(
-          updatedUser as Record<string, unknown>,
-        ) as User;
-        setUser(merged);
-        if (typeof window !== "undefined") {
-          setCookie("user", JSON.stringify(merged));
-        }
-      }
-    } catch (err) {
-      console.error("Upload error:", err);
-      setProfileErrorMsg("Something went wrong. Please try again.");
-    } finally {
-      setIsProfileUploading(false);
-      e.target.value = "";
     }
-  };
+
+    // router.push("/pastor/home");
+    window.location.href = "/pastor/home";
+  } catch (err) {
+    console.error("Upload error:", err);
+    setProfileErrorMsg("Something went wrong. Please try again.");
+  } finally {
+    setIsProfileUploading(false);
+  }
+};
 
   // 🔹 Open document file picker
   const handleUploadDocsClick = () => {
@@ -264,6 +347,19 @@ export default function ProfileIncomplete() {
             <i className="fa-solid fa-paperclip text-xs"></i>
             Upload documents
           </button>
+
+          <button
+  type="button"
+  onClick={handleSaveProfile}
+  disabled={!hasProfileChanged || isProfileUploading}
+  className={`mt-4 flex items-center justify-center gap-2 mx-auto text-sm font-semibold px-8 py-2 rounded-lg transition ${
+    hasProfileChanged && !isProfileUploading
+      ? "bg-[#f5cc76] text-[#062946] hover:bg-[#ffd98a]"
+      : "bg-white/20 text-white/50 cursor-not-allowed"
+  }`}
+>
+  {isProfileUploading ? "Saving..." : "Save"}
+</button>
 
           {/* hidden file input for documents */}
           <input

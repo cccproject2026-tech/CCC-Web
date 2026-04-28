@@ -31,6 +31,9 @@ export default function ProfileIncomplete() {
     ProfileLogo
   );
 
+  const [selectedProfileFile, setSelectedProfileFile] = useState<File | null>(null);
+const [hasProfileChanged, setHasProfileChanged] = useState(false);
+
   // 🔹 Profile picture upload state
   const [isProfileUploading, setIsProfileUploading] = useState(false);
   const [profileErrorMsg, setProfileErrorMsg] = useState<string | null>(null);
@@ -72,51 +75,121 @@ export default function ProfileIncomplete() {
   };
 
   // 🔹 Handle profile picture upload
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const file = e.target.files?.[0];
+  //   if (!file) return;
 
-    if (!user?.id) {
-      setProfileErrorMsg("Missing user id. Please login again.");
+  //   if (!user?.id) {
+  //     setProfileErrorMsg("Missing user id. Please login again.");
+  //     return;
+  //   }
+
+  //   const formData = new FormData();
+  //   formData.append("file", file);
+
+  //   try {
+  //     setIsProfileUploading(true);
+  //     setProfileErrorMsg(null);
+
+  //     const response = await apiUploadProfilePicture(user.id, formData);
+  //     const json = response.data;
+
+  //     if (!json.success) {
+  //       setProfileErrorMsg(
+  //         json.message || "Failed to upload profile picture."
+  //       );
+  //       return;
+  //     }
+
+  //     const newUrl: string | undefined = json.data?.profilePicture;
+  //     if (newUrl) {
+  //       setProfileImage(newUrl);
+
+  //       // update local user + localStorage
+  //       const updatedUser: User = { ...user, profilePicture: newUrl };
+  //       setUser(updatedUser);
+  //       if (typeof window !== "undefined") {
+  //         setCookie("mentor", JSON.stringify(updatedUser));
+  //       }
+  //     }
+  //   } catch (err) {
+  //     console.error("Upload error:", err);
+  //     setProfileErrorMsg("Something went wrong. Please try again.");
+  //   } finally {
+  //     setIsProfileUploading(false);
+  //     e.target.value = "";
+  //   }
+  // };
+const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  if (!file.type.startsWith("image/")) {
+    setProfileErrorMsg("Please select a valid image file.");
+    return;
+  }
+
+  const previewUrl = URL.createObjectURL(file);
+
+  setSelectedProfileFile(file);
+  setProfileImage(previewUrl);
+  setHasProfileChanged(true);
+  setProfileErrorMsg(null);
+};
+
+const handleSaveProfile = async () => {
+  if (!user?.id) {
+    setProfileErrorMsg("Missing user id. Please login again.");
+    return;
+  }
+
+  if (!selectedProfileFile) {
+    setProfileErrorMsg("Please choose a profile picture first.");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", selectedProfileFile);
+
+  try {
+    setIsProfileUploading(true);
+    setProfileErrorMsg(null);
+
+    const response = await apiUploadProfilePicture(user.id, formData);
+    const json = response.data;
+
+    if (!json.success) {
+      setProfileErrorMsg(json.message || "Failed to upload profile picture.");
       return;
     }
 
-    const formData = new FormData();
-    formData.append("file", file);
+    const newUrl: string | undefined = json.data?.profilePicture;
 
-    try {
-      setIsProfileUploading(true);
-      setProfileErrorMsg(null);
+    if (newUrl) {
+      setProfileImage(newUrl);
 
-      const response = await apiUploadProfilePicture(user.id, formData);
-      const json = response.data;
+      const updatedUser: User = {
+        ...user,
+        profilePicture: newUrl,
+      };
 
-      if (!json.success) {
-        setProfileErrorMsg(
-          json.message || "Failed to upload profile picture."
-        );
-        return;
+      setUser(updatedUser);
+
+      if (typeof window !== "undefined") {
+        setCookie("mentor", JSON.stringify(updatedUser));
       }
-
-      const newUrl: string | undefined = json.data?.profilePicture;
-      if (newUrl) {
-        setProfileImage(newUrl);
-
-        // update local user + localStorage
-        const updatedUser: User = { ...user, profilePicture: newUrl };
-        setUser(updatedUser);
-        if (typeof window !== "undefined") {
-          setCookie("mentor", JSON.stringify(updatedUser));
-        }
-      }
-    } catch (err) {
-      console.error("Upload error:", err);
-      setProfileErrorMsg("Something went wrong. Please try again.");
-    } finally {
-      setIsProfileUploading(false);
-      e.target.value = "";
     }
-  };
+
+    router.push("/mentor/home");
+  } catch (err) {
+    console.error("Upload error:", err);
+    setProfileErrorMsg("Something went wrong. Please try again.");
+  } finally {
+    setIsProfileUploading(false);
+  }
+};
+
+
 
   // 🔹 Open document file picker
   const handleUploadDocsClick = () => {
@@ -190,12 +263,20 @@ export default function ProfileIncomplete() {
           </div>
 
           {/* Skip button */}
-          <button
+          {/* <button
             className="absolute top-4 right-4 text-xs text-[#cde2f2] bg-white/10 px-3 py-[2px] rounded-full border border-white/15 hover:bg-white/20 transition"
             onClick={() => router.push(`/mentor/home`)}
           >
             Skip <span className="ml-1">{">"}</span>
-          </button>
+          </button> */}
+          {/* Top action button */}
+<button
+  type="button"
+  className="absolute top-4 right-4 text-xs text-[#cde2f2] bg-white/10 px-3 py-[2px] rounded-full border border-white/15 hover:bg-white/20 transition"
+  onClick={() => router.push(`/mentor/home`)}
+>
+  Skip <span className="ml-1">{">"}</span>
+</button>
 
           {/* Avatar + edit button */}
           <div className="flex justify-center mt-8 mb-4 relative">
@@ -256,6 +337,18 @@ export default function ProfileIncomplete() {
             <i className="fa-solid fa-paperclip text-xs"></i>
             Upload documents
           </button>
+          <button
+  type="button"
+  onClick={handleSaveProfile}
+  disabled={!hasProfileChanged || isProfileUploading}
+  className={`mt-4 flex items-center justify-center gap-2 mx-auto text-sm font-semibold px-8 py-2 rounded-lg transition ${
+    hasProfileChanged && !isProfileUploading
+      ? "bg-[#f5cc76] text-[#062946] hover:bg-[#ffd98a]"
+      : "bg-white/20 text-white/50 cursor-not-allowed"
+  }`}
+>
+  {isProfileUploading ? "Saving..." : "Save"}
+</button>
 
           {/* hidden file input for documents */}
           <input

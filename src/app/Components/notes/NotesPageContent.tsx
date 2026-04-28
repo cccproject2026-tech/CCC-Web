@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { isAxiosError } from "axios";
@@ -58,6 +58,7 @@ export default function NotesPageContent({ variant }: { variant: NotesVariant })
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveOk, setSaveOk] = useState<string | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const { userId, displayName } = useNotesSession(variant);
   const notesStorageKey = `notes:${variant}:${userId ?? "guest"}`;
@@ -334,6 +335,192 @@ useEffect(() => {
 //   }
 // };
 
+// type NoteFormat =
+//   | "heading"
+//   | "quote"
+//   | "divider"
+//   | "bullet"
+//   | "number"
+//   | "left"
+//   | "center"
+//   | "right";
+
+// const applyNoteFormat = (format: NoteFormat) => {
+//   const textarea = textareaRef.current;
+//   if (!textarea) return;
+
+//   const start = textarea.selectionStart;
+//   const end = textarea.selectionEnd;
+//   const selectedText = draft.slice(start, end);
+//   const fallbackText = selectedText || "Your text";
+//   let formattedText = fallbackText;
+
+//   switch (format) {
+//     case "heading":
+//       formattedText = `# ${fallbackText}`;
+//       break;
+
+//     case "quote":
+//       formattedText = fallbackText
+//         .split("\n")
+//         .map((line) => `> ${line}`)
+//         .join("\n");
+//       break;
+
+//     case "divider":
+//       formattedText = `${fallbackText}\n\n---\n`;
+//       break;
+
+//     case "bullet":
+//       formattedText = fallbackText
+//         .split("\n")
+//         .map((line) => `• ${line}`)
+//         .join("\n");
+//       break;
+
+//     case "number":
+//       formattedText = fallbackText
+//         .split("\n")
+//         .map((line, index) => `${index + 1}. ${line}`)
+//         .join("\n");
+//       break;
+
+//     case "left":
+//       formattedText = fallbackText
+//         .split("\n")
+//         .map((line) => `<p style="text-align:left">${line}</p>`)
+//         .join("\n");
+//       break;
+
+//     case "center":
+//       formattedText = fallbackText
+//         .split("\n")
+//         .map((line) => `<p style="text-align:center">${line}</p>`)
+//         .join("\n");
+//       break;
+
+//     case "right":
+//       formattedText = fallbackText
+//         .split("\n")
+//         .map((line) => `<p style="text-align:right">${line}</p>`)
+//         .join("\n");
+//       break;
+
+//     default:
+//       break;
+//   }
+
+//   const nextDraft =
+//     draft.slice(0, start) + formattedText + draft.slice(end);
+
+//   setDraft(nextDraft);
+
+//   window.setTimeout(() => {
+//     textarea.focus();
+//     textarea.setSelectionRange(start, start + formattedText.length);
+//   }, 0);
+// };
+
+type NoteFormat =
+  | "heading"
+  | "quote"
+  | "divider"
+  | "bullet"
+  | "number"
+  | "left"
+  | "center"
+  | "right";
+
+const applyNoteFormat = (format: NoteFormat) => {
+  const textarea = textareaRef.current;
+  if (!textarea) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+
+  const selectedText = draft.slice(start, end);
+  const hasSelection = selectedText.length > 0;
+  const targetText = hasSelection ? selectedText : "Your text";
+
+  let formattedText = targetText;
+
+  switch (format) {
+    case "heading":
+      formattedText = targetText
+        .split("\n")
+        .map((line) => (line.trim() ? `# ${line.replace(/^#\s*/, "")}` : line))
+        .join("\n");
+      break;
+
+    case "quote":
+      formattedText = targetText
+        .split("\n")
+        .map((line) => (line.trim() ? `> ${line.replace(/^>\s*/, "")}` : line))
+        .join("\n");
+      break;
+
+    case "divider":
+      formattedText = hasSelection
+        ? `${targetText}\n\n---\n`
+        : `\n---\n`;
+      break;
+
+    case "bullet":
+      formattedText = targetText
+        .split("\n")
+        .map((line) => {
+          const clean = line.replace(/^(\s*[-•]\s*)/, "");
+          return clean.trim() ? `• ${clean}` : clean;
+        })
+        .join("\n");
+      break;
+
+    case "number":
+      formattedText = targetText
+        .split("\n")
+        .map((line, index) => {
+          const clean = line.replace(/^\s*\d+\.\s*/, "");
+          return clean.trim() ? `${index + 1}. ${clean}` : clean;
+        })
+        .join("\n");
+      break;
+
+    case "left":
+      formattedText = targetText
+        .split("\n")
+        .map((line) => line.trimStart())
+        .join("\n");
+      break;
+
+    case "center":
+      formattedText = targetText
+        .split("\n")
+        .map((line) => (line.trim() ? `          ${line.trim()}` : line))
+        .join("\n");
+      break;
+
+    case "right":
+      formattedText = targetText
+        .split("\n")
+        .map((line) => (line.trim() ? `                    ${line.trim()}` : line))
+        .join("\n");
+      break;
+
+    default:
+      break;
+  }
+
+  const nextDraft =
+    draft.slice(0, start) + formattedText + draft.slice(end);
+
+  setDraft(nextDraft);
+
+  window.setTimeout(() => {
+    textarea.focus();
+    textarea.setSelectionRange(start, start + formattedText.length);
+  }, 0);
+};
+
 const handleSave = async () => {
   if (!userId) {
     setSaveError("Session expired. Please sign in again.");
@@ -491,7 +678,7 @@ const handleSave = async () => {
                   </p>
                   {/* Decorative toolbar (visual parity with mobile reference) */}
                   <div className="mb-3 flex flex-wrap gap-2 rounded-xl border border-white/10 bg-white/[0.06] p-2">
-                    {["fa-font", "fa-table-columns", "fa-minus", "fa-list-ul", "fa-list-ol", "fa-align-left", "fa-align-center", "fa-align-right"].map(
+                    {/* {["fa-font", "fa-table-columns", "fa-minus", "fa-list-ul", "fa-list-ol", "fa-align-left", "fa-align-center", "fa-align-right"].map(
                       (icon) => (
                         <button
                           key={icon}
@@ -503,12 +690,33 @@ const handleSave = async () => {
                           <i className={`fa-solid ${icon} text-xs`} />
                         </button>
                       ),
-                    )}
+                    )} */}
+                    {[
+  { icon: "fa-font", label: "Heading", format: "heading" },
+  { icon: "fa-table-columns", label: "Quote block", format: "quote" },
+  { icon: "fa-minus", label: "Divider", format: "divider" },
+  { icon: "fa-list-ul", label: "Bullet list", format: "bullet" },
+  { icon: "fa-list-ol", label: "Numbered list", format: "number" },
+  { icon: "fa-align-left", label: "Align left", format: "left" },
+  { icon: "fa-align-center", label: "Align center", format: "center" },
+  { icon: "fa-align-right", label: "Align right", format: "right" },
+].map((tool) => (
+  <button
+    key={tool.icon}
+    type="button"
+    onClick={() => applyNoteFormat(tool.format as NoteFormat)}
+    className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-[#cde2f2] transition hover:bg-white/10"
+    title={tool.label}
+  >
+    <i className={`fa-solid ${tool.icon} text-xs`} />
+  </button>
+))}
                   </div>
                   <label className="sr-only" htmlFor="note-draft">
                     Note content
                   </label>
                   <textarea
+                   ref={textareaRef}
                     id="note-draft"
                     value={draft}
                     onChange={(e) => setDraft(e.target.value)}

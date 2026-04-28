@@ -17,7 +17,33 @@ export function resolveSessionUserId(): string | null {
     return null;
   }
 }
+export function resolveSessionRole(): string {
+  if (typeof document === "undefined") return "mentor";
 
+  const raw = getCookie("user");
+  if (!raw) return "mentor";
+
+  try {
+    const u = JSON.parse(raw) as { role?: string };
+    return String(u.role || "mentor").toLowerCase();
+  } catch {
+    return "mentor";
+  }
+}
+
+
+// const MODULE_ALIASES: Record<string, NotificationModule> = {
+//   appointment: "appointments",
+//   appointments: "appointments",
+//   roadmap: "roadmaps",
+//   roadmaps: "roadmaps",
+//   assessment: "assessments",
+//   assessments: "assessments",
+//   microgrant: "microgrant",
+//   interest: "interests",
+//   interests: "interests",
+//   general: "general",
+// };
 const MODULE_ALIASES: Record<string, NotificationModule> = {
   appointment: "appointments",
   appointments: "appointments",
@@ -28,6 +54,11 @@ const MODULE_ALIASES: Record<string, NotificationModule> = {
   microgrant: "microgrant",
   interest: "interests",
   interests: "interests",
+
+  assignment: "general",
+  assignments: "general",
+  assigned: "general",
+
   general: "general",
 };
 
@@ -36,23 +67,177 @@ function normalizeModule(raw: unknown): NotificationModule {
   return MODULE_ALIASES[key] ?? "general";
 }
 
+function formatNotificationTitle(value: string): string {
+  return value
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatDateTime(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return value;
+
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function formatIsoDatesInMessage(value: string): string {
+  return value.replace(
+    /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z/g,
+    (iso) => {
+      const date = new Date(iso);
+
+      if (Number.isNaN(date.getTime())) return iso;
+
+      return date.toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+    }
+  );
+}
+// function formatAssignmentNotification(title: string, details: string) {
+//   const text = `${title} ${details}`.toLowerCase();
+
+//   if (
+//     text.includes("assigned") ||
+//     text.includes("mentee") ||
+//     text.includes("mentor")
+//   ) {
+//     const match = details.match(/assigned to\s+(.+?)\.?$/i);
+//     const assignedName = match?.[1]?.trim();
+
+//     return {
+//       title: "New Mentee Assigned",
+//       details: assignedName
+//         ? `${assignedName} has been assigned to you as a mentee.`
+//         : details,
+//     };
+//   }
+
+//   return {
+//     title,
+//     details,
+//   };
+// }
+function formatAssignmentNotification(title: string, details: string) {
+  const lowerTitle = title.toLowerCase();
+  const lowerDetails = details.toLowerCase();
+
+  // Mentor received a new assigned mentee
+  if (lowerDetails.includes("you have been assigned to")) {
+    const match = details.match(/you have been assigned to\s+(.+?)\.?$/i);
+    const assignedName = match?.[1]?.trim();
+
+    return {
+      title: "New Mentee Assigned",
+      details: assignedName
+        ? `${assignedName} has been assigned to you as a mentee.`
+        : details,
+    };
+  }
+
+  // Pastor/director assignment-completed style notifications
+  if (
+    lowerTitle.includes("assignment completed") ||
+    lowerDetails.includes("you assigned:")
+  ) {
+    return {
+      title: "Assignment Completed",
+      details,
+    };
+  }
+
+  return {
+    title,
+    details,
+  };
+}
+
+// function normalizeNotificationItem(raw: unknown, index: number): NotificationItem {
+//   const n = raw as Record<string, unknown>;
+//   const id = String(n._id ?? n.id ?? `notification-${index}`);
+//   const explicitUnread =
+//     n.isRead === false ||
+//     n.read === false ||
+//     String(n.status ?? "").toLowerCase() === "unread";
+//   const explicitRead = n.isRead === true || n.read === true;
+//   /** When API omits `isRead`, treat as read so the badge is not inflated. */
+//   const isRead = explicitUnread ? false : explicitRead ? true : true;
+//   return {
+//     _id: id,
+//     name: String(n.name ?? n.title ?? "Notification"),
+//     details: String(n.details ?? n.message ?? n.body ?? ""),
+//     module: normalizeModule(n.module ?? n.type ?? n.category),
+//     isRead,
+//     createdAt: String(n.createdAt ?? n.created_at ?? n.updatedAt ?? new Date().toISOString()),
+//   };
+// }
 function normalizeNotificationItem(raw: unknown, index: number): NotificationItem {
   const n = raw as Record<string, unknown>;
   const id = String(n._id ?? n.id ?? `notification-${index}`);
+
   const explicitUnread =
     n.isRead === false ||
     n.read === false ||
     String(n.status ?? "").toLowerCase() === "unread";
+
   const explicitRead = n.isRead === true || n.read === true;
+
   /** When API omits `isRead`, treat as read so the badge is not inflated. */
   const isRead = explicitUnread ? false : explicitRead ? true : true;
-  return {
-    _id: id,
-    name: String(n.name ?? n.title ?? "Notification"),
-    details: String(n.details ?? n.message ?? n.body ?? ""),
+
+  const rawTitle = String(n.name ?? n.title ?? "Notification");
+  const rawDetails = String(n.details ?? n.message ?? n.body ?? "");
+
+  // const cleanTitle = formatNotificationTitle(rawTitle);
+  // const cleanDetails = formatIsoDatesInMessage(rawDetails);
+
+  // return {
+  //   _id: id,
+  //   name: cleanTitle,
+  //   details: cleanDetails,
+  const cleanTitle = formatNotificationTitle(rawTitle);
+const cleanDetails = formatIsoDatesInMessage(rawDetails);
+const assignmentText = formatAssignmentNotification(cleanTitle, cleanDetails);
+
+return {
+  _id: id,
+  name: assignmentText.title,
+  details: assignmentText.details,
     module: normalizeModule(n.module ?? n.type ?? n.category),
     isRead,
-    createdAt: String(n.createdAt ?? n.created_at ?? n.updatedAt ?? new Date().toISOString()),
+    // createdAt: String(
+    //   n.createdAt ?? n.created_at ?? n.updatedAt ?? new Date().toISOString()
+    // ),
+//     createdAt: String(
+//   n.createdAt ??
+//   n.created_at ??
+//   n.notificationCreatedAt ??
+//   n.sentAt ??
+//   n.updatedAt ??
+//   new Date().toISOString()
+// ),
+createdAt: String(
+  n.createdAt ??
+  n.created_at ??
+  n.notificationCreatedAt ??
+  n.sentAt ??
+  n.updatedAt ??
+  ""
+),
   };
 }
 
@@ -108,21 +293,134 @@ const MODULE_STYLE: Record<
   general: { icon: "fa-solid fa-bell", iconColor: "text-[#cde2f2]" },
 };
 
+// export function getNotificationHref(n: NotificationItem): string {
+//   const module = String(n.module || "general").toLowerCase();
+//   const title = String(n.name || "").toLowerCase();
+//   const details = String(n.details || "").toLowerCase();
+//   const text = `${module} ${title} ${details}`;
+
+//   if (text.includes("appointment") || module === "appointments") {
+//     return "/mentor/MentorSchedule";
+//   }
+
+//   if (text.includes("roadmap") || module === "roadmaps") {
+//     return "/mentor/revitalization-roadmap";
+//   }
+
+//   if (text.includes("assessment") || module === "assessments") {
+//     return "/mentor/Assessments";
+//   }
+
+//   if (text.includes("microgrant") || module === "microgrant") {
+//     return "/pastor/MicroGrantApplication";
+//   }
+
+//   if (
+//     text.includes("mentee") ||
+//     text.includes("mentor assigned") ||
+//     text.includes("assigned")
+//   ) {
+//     return "/mentor/Mymentees";
+//   }
+
+//   if (module === "interests") {
+//     return "/director/interests";
+//   }
+
+//   return "/mentor/notifications";
+// }
+
+export function getNotificationHref(n: NotificationItem): string {
+  const role = resolveSessionRole();
+
+  const module = String(n.module || "general").toLowerCase();
+  const title = String(n.name || "").toLowerCase();
+  const details = String(n.details || "").toLowerCase();
+  const text = `${module} ${title} ${details}`;
+
+  if (text.includes("appointment") || module === "appointments") {
+    if (role === "pastor") return "/pastor/appointments";
+    if (role === "director") return "/director/schedule";
+    return "/mentor/MentorSchedule";
+  }
+
+  if (text.includes("roadmap") || module === "roadmaps") {
+    if (role === "pastor") return "/pastor/revitalization-roadmap";
+    if (role === "director") return "/director/revitalization-roadmap";
+    return "/mentor/revitalization-roadmap";
+  }
+
+  if (text.includes("assessment") || module === "assessments") {
+    if (role === "pastor") return "/pastor/assessments";
+    if (role === "director") return "/director/assessments";
+    return "/mentor/Assessments";
+  }
+
+  if (text.includes("microgrant") || module === "microgrant") {
+    if (role === "director") return "/director/micro-grant";
+    return "/pastor/MicroGrantApplication";
+  }
+
+  // if (
+  //   text.includes("mentee") ||
+  //   text.includes("mentor assigned") ||
+  //   text.includes("assigned")
+  // ) {
+  //   if (role === "pastor") return "/pastor/my-mentors";
+  //   if (role === "director") return "/director/pastor-assignments";
+  //   return "/mentor/Mymentees";
+  // }
+  if (
+  text.includes("mentee") ||
+  text.includes("mentor assigned") ||
+  text.includes("assigned")
+) {
+  if (role === "pastor") return "/pastor/Mymentors";
+  if (role === "director") return "/director/pastor-assignments";
+  return "/mentor/MenteesDetailed";
+}
+
+  if (module === "interests") {
+    return "/director/interests";
+  }
+
+  if (role === "pastor") return "/pastor/notifications";
+  if (role === "director") return "/director/notifications";
+  return "/mentor/notifications";
+}
 export function mapNotificationItemToPopup(n: NotificationItem): NotificationPopupItem {
   const st = MODULE_STYLE[n.module] ?? MODULE_STYLE.general;
+  // let time = "";
+  // try {
+  //   time = n.createdAt ? new Date(n.createdAt).toLocaleString() : "";
+  // } catch {
+  //   time = "";
+  // }
   let time = "";
-  try {
-    time = n.createdAt ? new Date(n.createdAt).toLocaleString() : "";
-  } catch {
-    time = "";
-  }
+try {
+  time = n.createdAt ? formatDateTime(n.createdAt) : "";
+} catch {
+  time = "";
+}
+  // return {
+  //   id: n._id,
+  //   icon: st.icon,
+  //   iconColor: st.iconColor,
+  //   title: n.name,
+  //   subtitle: n.details,
+  //   time,
+  //   isStarred: !n.isRead,
+  // };
   return {
-    id: n._id,
-    icon: st.icon,
-    iconColor: st.iconColor,
-    title: n.name,
-    subtitle: n.details,
-    time,
-    isStarred: !n.isRead,
-  };
+  id: n._id,
+  icon: st.icon,
+  iconColor: st.iconColor,
+  title: n.name,
+  subtitle: n.details,
+  time,
+  isStarred: !n.isRead,
+  // href: getNotificationHref(n),
+  link: getNotificationHref(n),
+linkText: "Open",
+};
 }
