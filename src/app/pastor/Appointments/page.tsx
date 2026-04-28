@@ -862,17 +862,12 @@ export default function PastorAppointmentsPage() {
                         </p>
 
                         {/* Actions row */}
-                        <div className="flex justify-between items-center">
-
+                        <div className="flex items-center">
                           <div className="flex gap-4 text-sm text-[#8ec5eb]">
                             <a href={(appt.mentor as any)?.phoneNumber ? `tel:${(appt.mentor as any).phoneNumber}` : undefined} aria-label="Call mentor" className="hover:text-white transition"><i className="fa-solid fa-phone" /></a>
                             <a href={(appt.mentor as any)?.phoneNumber ? `sms:${(appt.mentor as any).phoneNumber}` : undefined} aria-label="Text mentor" className="hover:text-white transition"><i className="fa-regular fa-comment" /></a>
                             <a href={(appt.mentor as any)?.phoneNumber ? `https://wa.me/${String((appt.mentor as any).phoneNumber).replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-label="WhatsApp mentor" className="hover:text-white transition"><i className="fa-brands fa-whatsapp" /></a>
                           </div>
-
-                          <button type="button" onClick={() => router.push(`/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt))}`)} className={pastorPrimaryCta}>
-                            Details
-                          </button>
                         </div>
                       </div>
 
@@ -889,6 +884,14 @@ export default function PastorAppointmentsPage() {
 
                         {menuOpenId === appointmentEntityId(appt) && (
                           <div className="absolute right-0 top-9 z-[50] w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+
+                            <button
+                              type="button"
+                              className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                              onClick={() => { router.push(`/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt))}`); setMenuOpenId(null); }}
+                            >
+                              <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" /> View Details
+                            </button>
 
                             <button
                               type="button"
@@ -999,6 +1002,13 @@ export default function PastorAppointmentsPage() {
                             <button
                               type="button"
                               className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                              onClick={() => { router.push(`/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt))}`); setMenuOpenId(null); }}
+                            >
+                              <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" /> View Details
+                            </button>
+                            <button
+                              type="button"
+                              className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
                               onClick={() => {
                                 setAppointmentToEdit(appt);
                                 setShowReschedule(true);
@@ -1086,10 +1096,6 @@ export default function PastorAppointmentsPage() {
                               <a href={(appt.mentor as any)?.phoneNumber ? `https://wa.me/${String((appt.mentor as any).phoneNumber).replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-label="WhatsApp mentor" className="opacity-80 hover:opacity-100 transition"><i className="fa-brands fa-whatsapp" /></a>
                             </div>
                           </div>
-
-                          <button type="button" onClick={() => router.push(`/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt))}`)} className={pastorPrimaryCta}>
-                            Details
-                          </button>
                         </div>
                       </div>
                     </div>
@@ -1110,8 +1116,29 @@ export default function PastorAppointmentsPage() {
                   return (
                     <div
                       key={`history-${appointmentEntityId(appt as any)}`}
-                      className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard}`}
+                      className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard} ${menuOpenId === appointmentEntityId(appt as any) ? "z-[60]" : ""}`}
+                      style={menuOpenId === appointmentEntityId(appt as any) ? { overflow: "visible" } : undefined}
                     >
+                      <div className="absolute right-3 top-3 z-20">
+                        <button
+                          type="button"
+                          onClick={() => setMenuOpenId(menuOpenId === appointmentEntityId(appt as any) ? null : appointmentEntityId(appt as any))}
+                          className="text-[#d9ebf8] hover:text-white"
+                        >
+                          <i className="fa-solid fa-ellipsis-vertical text-lg" />
+                        </button>
+                        {menuOpenId === appointmentEntityId(appt as any) && (
+                          <div className="absolute right-0 top-9 z-[50] w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                            <button
+                              type="button"
+                              className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                              onClick={() => { router.push(`/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt as any))}`); setMenuOpenId(null); }}
+                            >
+                              <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" /> View Details
+                            </button>
+                          </div>
+                        )}
+                      </div>
                       <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-white/95 md:h-[140px] md:w-[140px]">
                         <Image src={icon} alt={String(mode)} className="h-[50px] w-[50px] md:h-[60px] md:w-[60px]" />
                       </div>

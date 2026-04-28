@@ -130,6 +130,7 @@ function DirectorScheduleContent() {
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState<number | null>(null);
+  const [showHistoryMenu, setShowHistoryMenu] = useState<string | null>(null);
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [rescheduleTarget, setRescheduleTarget] = useState<AppointmentResponse | null>(null);
   const [rescheduleDateTime, setRescheduleDateTime] = useState("");
@@ -876,7 +877,8 @@ function DirectorScheduleContent() {
                     return (
                       <div
                         key={apptKey}
-                        className={`${directorGlassCard} relative flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center`}
+                        className={`${directorGlassCard} relative flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showHistoryMenu === apptKey ? "z-[60]" : ""}`}
+                        style={showHistoryMenu === apptKey ? { overflow: "visible" } : undefined}
                       >
                         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-6">
                           <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
@@ -888,6 +890,30 @@ function DirectorScheduleContent() {
                           </div>
                         </div>
                         <div className="relative min-w-0 flex-1 px-4 py-4 sm:px-5">
+                          <div className="absolute right-4 top-4 z-10 sm:right-5">
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowHistoryMenu(showHistoryMenu === apptKey ? null : apptKey)}
+                                className="rounded-lg px-3 py-1 text-[#8ec5eb] transition hover:bg-white/10 hover:text-white"
+                                aria-label="Appointment actions"
+                              >
+                                <i className="fa-solid fa-ellipsis-vertical" />
+                              </button>
+                              {showHistoryMenu === apptKey && (
+                                <div className="absolute right-0 top-9 z-[100] w-[200px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                                  <button
+                                    type="button"
+                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                                    onClick={() => { router.push(`/director/schedule/${encodeURIComponent(apptKey)}`); setShowHistoryMenu(null); }}
+                                  >
+                                    <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" />
+                                    View Details
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                           <div className="mb-2 flex items-center gap-3">
                             <Image
                               src={mentor?.profilePicture || UserProfile}
@@ -898,7 +924,7 @@ function DirectorScheduleContent() {
                               className="rounded-full border border-white/20"
                             />
                             <div>
-                              <h4 className="text-sm font-semibold text-white">
+                              <h4 className="pr-10 text-sm font-semibold text-white">
                                 {mentorId ? (
                                   <Link href={`/director/mentors/profile/${encodeURIComponent(mentorId)}`} className="hover:text-[#8ec5eb]">
                                     {mentorName}
@@ -925,20 +951,11 @@ function DirectorScheduleContent() {
                             </span>
                             <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
                               <i className="fa-regular fa-clock text-[#8ec5eb]" />
-                              {md.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              {md.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
                             </span>
                             <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] capitalize text-[#d9ebf8]">
                               {appt.platform}
                             </span>
-                          </div>
-                          <div className="mt-3 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => router.push(`/director/schedule/${encodeURIComponent(apptKey)}`)}
-                              className={`${directorBtnPrimary} px-4 py-1.5 text-xs`}
-                            >
-                              Details
-                            </button>
                           </div>
                         </div>
                       </div>
@@ -1060,7 +1077,8 @@ function DirectorScheduleContent() {
                     return (
                       <div
                         key={apptKey}
-                        className={`${directorGlassCard} relative flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center`}
+                        className={`${directorGlassCard} relative flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showMenu === index ? "z-[60]" : ""}`}
+                        style={showMenu === index ? { overflow: "visible" } : undefined}
                       >
                         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-6">
                           <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
@@ -1083,7 +1101,15 @@ function DirectorScheduleContent() {
                                 <i className="fa-solid fa-ellipsis-vertical" />
                               </button>
                               {showMenu === index && (
-                                <div className="absolute right-0 top-9 z-10 w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                                <div className="absolute right-0 top-9 z-[100] w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                                  <button
+                                    type="button"
+                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                                    onClick={() => { router.push(`/director/schedule/${encodeURIComponent(apptKey)}`); setShowMenu(null); }}
+                                  >
+                                    <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" />
+                                    View Details
+                                  </button>
                                   <button
                                     type="button"
                                     className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"

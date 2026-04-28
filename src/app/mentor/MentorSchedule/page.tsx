@@ -1187,8 +1187,9 @@ function MentorScheduleContent() {
                             <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-medium text-[#d9ebf8]">
                               <i className="fa-regular fa-clock text-[#8ec5eb]" />
                               {meetingDate.toLocaleTimeString([], {
-                                hour: "2-digit",
+                                hour: "numeric",
                                 minute: "2-digit",
+                                hour12: true,
                               })}
                             </div>
                           </div>
@@ -1319,7 +1320,7 @@ function MentorScheduleContent() {
                             </div>
                             <div className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] font-medium text-[#d9ebf8]">
                               <i className="fa-regular fa-clock text-[#8ec5eb]" />
-                              {meetingDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              {meetingDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
                             </div>
                           </div>
                           <p className="mb-2 text-[12px] text-[#cde2f2]">Mode: <span className="font-semibold text-[#8ec5eb]">{appt.platform}</span></p>
