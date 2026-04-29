@@ -1,144 +1,47 @@
 "use client";
-import { useState, useEffect } from "react";
-import Cookies from "js-cookie";
+import { useEffect, useMemo, useState } from "react";
 import MentorHeader from "@/app/Components/MentorHeader";
 import HeroBg from "../../Assets/progress-bg.png";
-import {
-    apiGetMentorshipSessionsNormalized,
-} from "@/app/Services/roadmaps.service";
-import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import Image from "next/image";
 import SessionProgressHeader from "@/app/Components/mentorship-sessions/SessionProgressHeader";
 import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStatusBadge";
 import { formatSessionTime, getNextSessionId } from "./utils/sessionFlow";
-import { useRouter } from "next/navigation";
-
-type MentoringSession = {
-    id: string;
-    sessionNumber: number;
-    title: string;
-    status: "COMPLETED" | "CANCELLED" | "MISSED" | "SCHEDULED";
-    scheduledDate: string;
-    mentorNote: string;
-    pastorNote: string;
-    appointmentId: string;
-    pastorId: string;
-};
-
-type PastorSessions = {
-    pastorId: string;
-    pastorName: string;
-    pastorEmail: string;
-    sessions: MentoringSession[];
-};
+import { useRouter, useSearchParams } from "next/navigation";
+import { useMentorGroupedSessionsQuery, type MentorSession } from "./hooks/useMentorshipQueries";
 
 export default function MentorMentoringSessionPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const pastorIdFromQuery = searchParams.get("pastorId") || "";
     const [filterStatus, setFilterStatus] = useState("All");
     const [search, setSearch] = useState("");
-    const [groupedSessions, setGroupedSessions] = useState<PastorSessions[]>([]);
     const [selectedPastorId, setSelectedPastorId] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [refetchTick, setRefetchTick] = useState(0);
+    const { data: groupedSessions = [], isLoading: loading, error } = useMentorGroupedSessionsQuery();
+
+    const groupedError = error instanceof Error ? error.message : null;
 
     useEffect(() => {
-        let mounted = true;
-        const fetchSessions = async () => {
-            try {
-                setLoading(true);
-                setError(null);
+        if (!groupedSessions.length) return;
 
-                // Get mentor data from cookie
-                const mentorCookie = Cookies.get("mentor");
-                if (!mentorCookie) {
-                    setError("Mentor information not found");
-                    setLoading(false);
-                    return;
-                }
+        // Mobile-like: if we navigated back after an action, preserve pastor context via query param.
+        if (pastorIdFromQuery && groupedSessions.some((g) => g.pastorId === pastorIdFromQuery)) {
+            setSelectedPastorId(pastorIdFromQuery);
+            return;
+        }
 
-                const mentorData = JSON.parse(decodeURIComponent(mentorCookie));
-                const mentorId = mentorData?.id;
+        // If nothing selected (first load), auto-select the first pastor with sessions.
+        setSelectedPastorId((prev) => (prev && groupedSessions.some((g) => g.pastorId === prev) ? prev : groupedSessions[0].pastorId));
+    }, [groupedSessions, pastorIdFromQuery]);
 
-                if (!mentorId) {
-                    setError("Mentor ID not found");
-                    setLoading(false);
-                    return;
-                }
-
-                // Fetch assigned users (pastors) details
-                const assignedUsersResponse = await apiGetAssignedUsers(mentorId);
-                const assignedPastors = assignedUsersResponse.data?.data || [];
-                if (!assignedPastors || assignedPastors.length === 0) {
-                    setGroupedSessions([]);
-                    setLoading(false);
-                    return;
-                }
-
-                // Fetch sessions for each assigned pastor and group by pastor
-                const groupedData: PastorSessions[] = [];
-                for (const pastor of assignedPastors) {
-                    if (pastor._id) {
-                        try {
-                            const pastorSessions = (await apiGetMentorshipSessionsNormalized(pastor._id)).map((s) => ({
-                                ...s,
-                                pastorId: pastor._id,
-                            })) as any as MentoringSession[];
-                            if (pastorSessions.length > 0) {
-                                groupedData.push({
-                                    pastorId: pastor._id,
-                                    pastorName: `${pastor.firstName} ${pastor.lastName}`,
-                                    pastorEmail: pastor.email,
-                                    sessions: pastorSessions
-                                });
-                            }
-                        } catch (err) {
-                            console.error(`Error fetching sessions for pastor ${pastor._id}:`, err);
-                        }
-                    }
-                }
-                if (mounted) setGroupedSessions(groupedData);
-            } catch (err: unknown) {
-                const errorMessage = err instanceof Error ? err.message : "Failed to fetch mentoring sessions";
-                if (mounted) setError(errorMessage);
-                console.error("Error fetching mentoring sessions:", err);
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        };
-
-        fetchSessions();
-        const onFocus = () => setRefetchTick((x) => x + 1);
-        window.addEventListener("focus", onFocus);
-        return () => {
-            mounted = false;
-            window.removeEventListener("focus", onFocus);
-        };
-    }, [refetchTick]);
-
-    const filteredGroupedSessions = groupedSessions.map(group => ({
-        ...group,
-        sessions: group.sessions.filter((session) => {
-            const statusMatch = filterStatus === "All" ||
-                (filterStatus === "Completed" && session.status === "COMPLETED") ||
-                (filterStatus === "Missed" && session.status === "MISSED") ||
-                (filterStatus === "Cancelled" && session.status === "CANCELLED");
-
-            const searchMatch = session.title.toLowerCase().includes(search.toLowerCase());
-            return statusMatch && searchMatch;
-        })
-    })).filter(group => group.sessions.length > 0);
-
-    const handleViewDetails = (session: MentoringSession) => {
+    const handleViewDetails = (session: MentorSession) => {
         router.push(`/mentor/mentoring-session/${encodeURIComponent(session.id)}?pastorId=${encodeURIComponent(session.pastorId)}`);
     };
 
     const selectedGroup = selectedPastorId ? groupedSessions.find(g => g.pastorId === selectedPastorId) : undefined;
     const sessionsForPastor = selectedGroup?.sessions ?? [];
-    const sortedSessions = [...sessionsForPastor].sort((a, b) => a.sessionNumber - b.sessionNumber);
+    const sortedSessions = useMemo(() => [...sessionsForPastor].sort((a, b) => a.sessionNumber - b.sessionNumber), [sessionsForPastor]);
     const nextSessionId = getNextSessionId(
-        sortedSessions.map((s) => ({ id: s.appointmentId ?? `${s.sessionNumber}`, status: s.status, scheduledDate: s.scheduledDate })),
+        sortedSessions.map((s) => ({ id: s.id, status: s.status, scheduledDate: s.scheduledDate })),
     );
 
     return (
@@ -182,10 +85,10 @@ export default function MentorMentoringSessionPage() {
                             <p className="text-white/70">Loading mentoring sessions...</p>
                         </div>
                     </div>
-                ) : error ? (
+                ) : groupedError ? (
                     <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center">
                         <i className="fas fa-exclamation-circle mb-3 block text-2xl text-red-400" />
-                        <p className="text-red-300">{error}</p>
+                        <p className="text-red-300">{groupedError}</p>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -223,7 +126,7 @@ export default function MentorMentoringSessionPage() {
                                         ))
                                     ) : (
                                         <p className="text-sm text-white/50 text-center py-6">
-                                            No assigned pastors
+                                            No mentoring sessions yet
                                         </p>
                                     )}
                                 </div>
@@ -262,7 +165,7 @@ export default function MentorMentoringSessionPage() {
                                             </div>
 
                                             {/* PROGRESS HEADER (Mobile parity) */}
-                                            <SessionProgressHeader sessions={sortedSessions.map((s) => ({ ...s, id: s.appointmentId ?? `${s.sessionNumber}` })) as any} />
+                                            <SessionProgressHeader sessions={sortedSessions as any} />
 
                                             {/* SEARCH BAR */}
                                             <div className="mb-6">

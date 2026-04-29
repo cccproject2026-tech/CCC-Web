@@ -2,20 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import Cookies from "js-cookie";
 import MentorHeader from "@/app/Components/MentorHeader";
 import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStatusBadge";
 import ConfirmModal from "@/app/Components/ui/ConfirmModal";
 import { useToast } from "@/app/Components/ui/Toast";
-import { extractApiErrorMessage, appointmentEntityId, unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
-import {
-  apiCompleteMentorshipSession,
-  apiRedoMentorshipSession,
-  apiGetMentorshipSessionsNormalized,
-  type MentorshipSession,
-} from "@/app/Services/roadmaps.service";
-import { apiGetAssignedUsers } from "@/app/Services/users.service";
-import { apiGetMentorSchedule, apiGetUserSchedule, apiGenerateTranscriptSummary } from "@/app/Services/appointments.service";
+import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
+import { apiGenerateTranscriptSummary, apiGetTranscriptSummary } from "@/app/Services/appointments.service";
 import type { AppointmentResponse, TranscriptSummaryResponseDto } from "@/app/Services/types/appointments.types";
 import {
   appointmentPlatformLabel,
@@ -27,6 +19,8 @@ import {
   zoomUrlHasPasscodeQuery,
 } from "@/app/utils/meetingLinkDetails";
 import { formatSessionTime, getNextSessionId } from "../utils/sessionFlow";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMentorSessionActions, useMentorSessionDetailQuery } from "../hooks/useMentorshipQueries";
 
 type TranscriptSummary = {
   appointmentId: string;
@@ -52,98 +46,29 @@ export default function MentorMentoringSessionDetailPage() {
   const pastorIdFromQuery = search.get("pastorId") || "";
 
   const sessionId = decodeURIComponent(params.id);
-
-  const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState<(MentorshipSession & { pastorId?: string; pastorName?: string }) | null>(null);
-  const [sessionsForPastor, setSessionsForPastor] = useState<MentorshipSession[]>([]);
-  const [appointment, setAppointment] = useState<AppointmentResponse | null>(null);
+  const queryClient = useQueryClient();
 
   const [confirm, setConfirm] = useState<{ kind: "complete" | "redo" } | null>(null);
-  const [actionLoading, setActionLoading] = useState<"complete" | "redo" | null>(null);
-
-  const [tsLoading, setTsLoading] = useState(false);
   const [tsData, setTsData] = useState<TranscriptSummary | null>(null);
+  const [tsTab, setTsTab] = useState<"transcript" | "summary">("transcript");
+  const detailQuery = useMentorSessionDetailQuery(sessionId, pastorIdFromQuery);
+  const { completeMutation, redoMutation, actionLoading } = useMentorSessionActions(sessionId);
+  const loading = detailQuery.isLoading;
+  const session = detailQuery.data?.session ?? null;
+  const sessionsForPastor = detailQuery.data?.sessionsForPastor ?? [];
+  const appointment = (detailQuery.data?.appointment ?? null) as AppointmentResponse | null;
+  const pastorId = detailQuery.data?.pastorId ?? "";
+
+  useEffect(() => {
+    if (!detailQuery.error) return;
+    toast.show({ kind: "error", title: "Failed to load session", subtitle: extractApiErrorMessage(detailQuery.error) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailQuery.error]);
 
   const nextSessionId = useMemo(() => {
     const sorted = [...sessionsForPastor].sort((a, b) => a.sessionNumber - b.sessionNumber);
     return getNextSessionId(sorted.map((s) => ({ id: s.id, status: s.status as any, scheduledDate: s.scheduledDate })));
   }, [sessionsForPastor]);
-
-  useEffect(() => {
-    const run = async () => {
-      try {
-        setLoading(true);
-
-        // mentorId from cookie
-        const mentorCookie = Cookies.get("mentor");
-        if (!mentorCookie) throw new Error("Mentor information not found");
-        const mentorData = JSON.parse(decodeURIComponent(mentorCookie));
-        const mentorId = String(mentorData?.id ?? "").trim();
-        if (!mentorId) throw new Error("Mentor ID not found");
-
-        // Find pastorId: prefer query param, else search all assigned pastors.
-        let pastorId = pastorIdFromQuery;
-        let sessions: MentorshipSession[] = [];
-
-        if (pastorId) {
-          sessions = await apiGetMentorshipSessionsNormalized(pastorId);
-        } else {
-          const assignedUsersResponse = await apiGetAssignedUsers(mentorId);
-          const assignedPastors = assignedUsersResponse.data?.data || [];
-          for (const p of assignedPastors) {
-            const pid = String(p?._id ?? "").trim();
-            if (!pid) continue;
-            const list = await apiGetMentorshipSessionsNormalized(pid);
-            const found = list.find((s) => s.id === sessionId);
-            if (found) {
-              pastorId = pid;
-              sessions = list;
-              break;
-            }
-          }
-        }
-
-        setSessionsForPastor(sessions);
-        const found = sessions.find((s) => s.id === sessionId) ?? null;
-        if (!found) {
-          setSession(null);
-          return;
-        }
-        setSession({ ...found, pastorId });
-
-        // Appointment enrichment (mobile-like): fetch both mentor + pastor schedules and find appointmentId.
-        const apptId = found.appointmentId ? String(found.appointmentId) : "";
-        if (!apptId) {
-          setAppointment(null);
-          return;
-        }
-
-        const [mentorSched, pastorSched] = await Promise.all([
-          apiGetMentorSchedule(mentorId),
-          pastorId ? apiGetUserSchedule(pastorId) : Promise.resolve({ data: [] } as any),
-        ]);
-
-        const merged = [
-          ...unwrapAppointmentsAxiosData(mentorSched),
-          ...unwrapAppointmentsAxiosData(pastorSched),
-        ] as AppointmentResponse[];
-
-        const match =
-          merged.find((a) => appointmentEntityId(a) === apptId) ??
-          merged.find((a) => String((a as any)?._id ?? (a as any)?.id) === apptId) ??
-          null;
-
-        setAppointment(match);
-      } catch (e) {
-        toast.show({ kind: "error", title: "Failed to load session", subtitle: extractApiErrorMessage(e) });
-        setSession(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, pastorIdFromQuery]);
 
   const meetingLink = useMemo(() => getAppointmentJoinUrl(appointment), [appointment]);
   const platformRaw = String(appointment?.platform ?? "zoom");
@@ -152,15 +77,85 @@ export default function MentorMentoringSessionDetailPage() {
   const meetCode = meetingLink ? parseGoogleMeetCodeFromUrl(meetingLink) : undefined;
   const hasZoomPasscode = meetingLink ? zoomUrlHasPasscodeQuery(meetingLink) : false;
 
-  const fetchTranscript = async (refresh: boolean) => {
-    if (!session?.appointmentId) {
-      toast.show({ kind: "error", title: "Missing appointment ID" });
+  const chatMessages = useMemo(() => {
+    const raw = String(tsData?.transcript ?? "").trim();
+    if (!raw) return [] as { speaker: string; text: string; side: "left" | "right" }[];
+
+    const lines = raw
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    const parsed = lines.map((line, idx) => {
+      const m = line.match(/^([^:]{1,40}):\s*(.+)$/);
+      if (m) return { speaker: m[1].trim(), text: m[2].trim(), idx };
+      return { speaker: "", text: line, idx };
+    });
+
+    const speakers = Array.from(new Set(parsed.map((p) => p.speaker).filter(Boolean))).slice(0, 2);
+    const left = speakers[0] || "";
+    const right = speakers[1] || "";
+
+    return parsed.map((p) => {
+      const side: "left" | "right" =
+        p.speaker && right && p.speaker === right ? "right" : "left";
+      return { speaker: p.speaker || "Transcript", text: p.text, side };
+    });
+  }, [tsData?.transcript]);
+
+  const transcriptQuery = useQuery({
+    queryKey: ["transcript-summary", String(session?.appointmentId ?? "")],
+    enabled: !!session?.appointmentId,
+    staleTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error) => {
+      const err = error as { response?: { status?: number } };
+      if (err?.response?.status === 404) return false;
+      if (err?.response?.status === 429) return false;
+      return failureCount < 1;
+    },
+    queryFn: async () => {
+      const appointmentId = String(session?.appointmentId ?? "").trim();
+      if (!appointmentId) throw new Error("Missing appointment ID");
+      const res = await apiGetTranscriptSummary(appointmentId);
+      return (res.data?.data ?? res.data) as TranscriptSummaryResponseDto;
+    },
+  });
+
+  useEffect(() => {
+    if (!transcriptQuery.data) return;
+    setTsData({
+      appointmentId: transcriptQuery.data.appointmentId,
+      transcript: transcriptQuery.data.transcript,
+      transcriptSavedAt: transcriptQuery.data.transcriptSavedAt,
+      summary: transcriptQuery.data.summary,
+      generatedAt: transcriptQuery.data.generatedAt,
+      model: transcriptQuery.data.model,
+      cached: transcriptQuery.data.cached,
+    });
+    setTsTab((prev) => (prev === "transcript" || prev === "summary" ? prev : "transcript"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transcriptQuery.data]);
+
+  useEffect(() => {
+    if (!tsData) return;
+    if (tsData.summary && !tsData.transcript?.trim()) {
+      setTsTab("summary");
       return;
     }
-    setTsLoading(true);
-    try {
+    if (tsData.transcript?.trim() && !tsData.summary) {
+      setTsTab("transcript");
+      return;
+    }
+  }, [tsData]);
+
+  const transcriptMutation = useMutation({
+    mutationFn: async (refresh: boolean) => {
+      if (!session?.appointmentId) throw new Error("Missing appointment ID");
       const res = await apiGenerateTranscriptSummary(String(session.appointmentId), refresh);
-      const data = (res.data?.data ?? res.data) as TranscriptSummaryResponseDto;
+      return (res.data?.data ?? res.data) as TranscriptSummaryResponseDto;
+    },
+    onSuccess: (data) => {
       setTsData({
         appointmentId: data.appointmentId,
         transcript: data.transcript,
@@ -170,45 +165,51 @@ export default function MentorMentoringSessionDetailPage() {
         model: data.model,
         cached: data.cached,
       });
+      void queryClient.setQueryData(["transcript-summary", String(session?.appointmentId ?? "")], data);
       toast.show({
         kind: "success",
         title: data.cached ? "Summary loaded from cache" : "Summary generated successfully",
         subtitle: `Model: ${data.model}`,
       });
-    } catch (e) {
-      // Mobile behavior: summary failures shouldn't block transcript.
+    },
+    onError: (e) => {
       toast.show({ kind: "error", title: "Failed to generate summary", subtitle: extractApiErrorMessage(e) });
       setTsData(null);
-    } finally {
-      setTsLoading(false);
+    },
+  });
+
+  const fetchTranscript = async (refresh: boolean) => {
+    if (!session?.appointmentId) {
+      toast.show({ kind: "error", title: "Missing appointment ID" });
+      return;
     }
+    if (transcriptMutation.isPending) return;
+    await transcriptMutation.mutateAsync(refresh);
   };
 
   const runAction = async (kind: "complete" | "redo") => {
-    if (!session?.appointmentId || !session.pastorId) {
+    if (!session?.appointmentId) {
       toast.show({ kind: "error", title: "Missing appointment/pastor info" });
       return;
     }
-    setActionLoading(kind);
+    if (!pastorId) {
+      toast.show({ kind: "error", title: "Mentor-only action blocked", subtitle: "Pastor context is required." });
+      return;
+    }
     try {
       if (kind === "complete") {
-        await apiCompleteMentorshipSession(String(session.appointmentId));
+        await completeMutation.mutateAsync({ appointmentId: String(session.appointmentId) });
         toast.show({ kind: "success", title: "Session completed" });
-        setSession((prev) => (prev ? { ...prev, status: "COMPLETED" as any } : prev));
       } else {
-        await apiRedoMentorshipSession(String(session.appointmentId));
+        await redoMutation.mutateAsync({ appointmentId: String(session.appointmentId) });
         toast.show({ kind: "success", title: "Redo scheduled" });
-        // mobile: navigate away because session list may change after redo
-        router.push(`/mentor/mentoring-session?pastorId=${encodeURIComponent(session.pastorId)}`);
+        router.push(`/mentor/mentoring-session?pastorId=${encodeURIComponent(pastorId)}`);
         return;
       }
-      // Refresh this pastor’s sessions without page reload.
-      const updated = await apiGetMentorshipSessionsNormalized(session.pastorId);
-      setSessionsForPastor(updated);
+      await queryClient.invalidateQueries({ queryKey: ["mentorship-sessions"] });
+      await queryClient.invalidateQueries({ queryKey: ["mentorship-session", sessionId] });
     } catch (e) {
       toast.show({ kind: "error", title: kind === "complete" ? "Cannot complete session" : "Cannot redo session", subtitle: extractApiErrorMessage(e) });
-    } finally {
-      setActionLoading(null);
     }
   };
 
@@ -265,7 +266,7 @@ export default function MentorMentoringSessionDetailPage() {
         busy={actionLoading != null}
       />
 
-      <div className="mx-auto max-w-5xl px-4 md:px-8 py-10 space-y-6">
+      <div className="mx-auto max-w-6xl px-4 md:px-8 py-10 space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -365,97 +366,240 @@ export default function MentorMentoringSessionDetailPage() {
         </div>
 
         {/* Transcript & AI Summary */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold text-[#8ec5eb]">Transcript & AI Summary</div>
-              <div className="mt-1 text-xs text-white/60">Generates or refreshes summary using the transcript-summary API.</div>
+        <div className="rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06)_0%,rgba(255,255,255,0.03)_100%)] p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="text-sm font-semibold text-[#8ec5eb]">Transcript & AI Summary</div>
+                
+              </div>
+              
             </div>
-            <div className="flex gap-2">
+
+            <div className="flex flex-wrap gap-2 sm:justify-end">
               <button
                 type="button"
                 onClick={() => void fetchTranscript(false)}
-                disabled={tsLoading}
-                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-60"
+                disabled={transcriptMutation.isPending}
+                className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-[#062946] hover:bg-white/90 disabled:opacity-60"
               >
-                {tsLoading ? "Loading…" : "Generate"}
+                {transcriptMutation.isPending ? "Working…" : "Generate"}
               </button>
               <button
                 type="button"
                 onClick={() => void fetchTranscript(true)}
-                disabled={tsLoading}
-                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-60"
+                disabled={transcriptMutation.isPending}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 hover:bg-white/10 disabled:opacity-60"
               >
                 Refresh
               </button>
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="text-sm font-semibold mb-2">Transcript</div>
-              <pre className="whitespace-pre-wrap text-xs text-white/70 max-h-[360px] overflow-auto">
-                {tsData?.transcript?.trim() ? tsData.transcript : "No transcript available yet."}
-              </pre>
+          <div className="mt-5">
+            <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-[#041f35]/40 p-2">
+              <button
+                type="button"
+                onClick={() => setTsTab("transcript")}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  tsTab === "transcript"
+                    ? "bg-white text-[#062946]"
+                    : "bg-white/5 text-white/80 hover:bg-white/10"
+                }`}
+              >
+                Transcript
+              </button>
+              <button
+                type="button"
+                onClick={() => setTsTab("summary")}
+                className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  tsTab === "summary"
+                    ? "bg-white text-[#062946]"
+                    : "bg-white/5 text-white/80 hover:bg-white/10"
+                }`}
+              >
+                AI Summary
+              </button>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="text-sm font-semibold mb-2">AI Summary</div>
-              {tsData?.summary ? (
-                <div className="space-y-4 text-sm text-white/70">
-                  {tsData.summary.sessionOverview ? (
-                    <div>
-                      <div className="font-semibold text-white/80">Session Overview</div>
-                      <div>{tsData.summary.sessionOverview}</div>
-                    </div>
-                  ) : null}
-                  {tsData.summary.keyDiscussionPoints?.length ? (
-                    <div>
-                      <div className="font-semibold text-white/80">Key Discussion Points</div>
-                      <ul className="list-disc list-inside">
-                        {tsData.summary.keyDiscussionPoints.map((x) => (
-                          <li key={x}>{x}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  {tsData.summary.mentorGuidance?.length ? (
-                    <div>
-                      <div className="font-semibold text-white/80">Mentor Guidance</div>
-                      <ul className="list-disc list-inside">
-                        {tsData.summary.mentorGuidance.map((x) => (
-                          <li key={x}>{x}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  {tsData.summary.actionItems?.length ? (
-                    <div>
-                      <div className="font-semibold text-white/80">Action Items</div>
-                      <ul className="list-disc list-inside">
-                        {tsData.summary.actionItems.map((x) => (
-                          <li key={x}>{x}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  {tsData.summary.followUp ? (
-                    <div>
-                      <div className="font-semibold text-white/80">Follow-up</div>
-                      <div>{tsData.summary.followUp}</div>
-                    </div>
-                  ) : null}
-                  {!tsData.summary.sessionOverview &&
-                  !tsData.summary.keyDiscussionPoints?.length &&
-                  !tsData.summary.mentorGuidance?.length &&
-                  !tsData.summary.actionItems?.length &&
-                  !tsData.summary.followUp ? (
-                    <div>Summary is being generated or temporarily unavailable.</div>
-                  ) : null}
+
+            {tsTab === "transcript" ? (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-[#041f35]/40 p-5">
+                <div className="mb-4 flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold text-white/90">Transcript</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = String(tsData?.transcript ?? "").trim();
+                      if (!text) {
+                        toast.show({ kind: "info", title: "Nothing to copy" });
+                        return;
+                      }
+                      void navigator.clipboard.writeText(text);
+                      toast.show({ kind: "success", title: "Transcript copied" });
+                    }}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10"
+                  >
+                    Copy
+                  </button>
                 </div>
-              ) : (
-                <div className="text-sm text-white/60">No summary yet.</div>
-              )}
-            </div>
+
+                <div className="max-h-[520px] overflow-auto rounded-2xl border border-white/10 bg-white/5 p-4">
+                  {transcriptQuery.isLoading ? (
+                    <div className="space-y-2">
+                      <div className="h-3 w-11/12 animate-pulse rounded bg-white/10" />
+                      <div className="h-3 w-10/12 animate-pulse rounded bg-white/10" />
+                      <div className="h-3 w-9/12 animate-pulse rounded bg-white/10" />
+                      <div className="h-3 w-8/12 animate-pulse rounded bg-white/10" />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {chatMessages.length ? (
+                        chatMessages.map((m, i) => (
+                          <div
+                            key={`${m.speaker}-${i}`}
+                            className={`flex ${m.side === "right" ? "justify-end" : "justify-start"}`}
+                          >
+                            <div
+                              className={`max-w-[92%] rounded-2xl px-3 py-2 text-[12px] leading-relaxed shadow-sm border ${
+                                m.side === "right"
+                                  ? "bg-emerald-500/15 border-emerald-400/20 text-emerald-50"
+                                  : "bg-white/8 border-white/10 text-white/85"
+                              }`}
+                            >
+                              {m.speaker ? (
+                                <div
+                                  className={`mb-1 text-[10px] font-semibold uppercase tracking-wide ${
+                                    m.side === "right" ? "text-emerald-200/80" : "text-white/55"
+                                  }`}
+                                >
+                                  {m.speaker}
+                                </div>
+                              ) : null}
+                              <div className="whitespace-pre-wrap">{m.text}</div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-sm text-white/60">
+                          No transcript available yet. If the session is completed, try Generate.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-2xl border border-white/10 bg-[#041f35]/40 p-5">
+                <div className="mb-4 flex items-center justify-between gap-2">
+                  <div className="text-sm font-semibold text-white/90">AI Summary</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const s = tsData?.summary;
+                      if (!s) {
+                        toast.show({ kind: "info", title: "Nothing to copy" });
+                        return;
+                      }
+                      const lines = [
+                        s.sessionOverview ? `Session Overview:\n${s.sessionOverview}` : "",
+                        s.keyDiscussionPoints?.length ? `\nKey Discussion Points:\n- ${s.keyDiscussionPoints.join("\n- ")}` : "",
+                        s.mentorGuidance?.length ? `\nMentor Guidance:\n- ${s.mentorGuidance.join("\n- ")}` : "",
+                        s.actionItems?.length ? `\nAction Items:\n- ${s.actionItems.join("\n- ")}` : "",
+                        s.followUp ? `\nFollow-up:\n${s.followUp}` : "",
+                      ]
+                        .filter(Boolean)
+                        .join("\n");
+                      void navigator.clipboard.writeText(lines.trim());
+                      toast.show({ kind: "success", title: "Summary copied" });
+                    }}
+                    className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10"
+                  >
+                    Copy
+                  </button>
+                </div>
+
+                <div className="max-h-[520px] overflow-auto rounded-2xl border border-white/10 bg-white/5 p-4">
+                  {transcriptQuery.isLoading ? (
+                    <div className="space-y-3">
+                      <div className="h-4 w-7/12 animate-pulse rounded bg-white/10" />
+                      <div className="h-3 w-11/12 animate-pulse rounded bg-white/10" />
+                      <div className="h-3 w-10/12 animate-pulse rounded bg-white/10" />
+                      <div className="h-4 w-6/12 animate-pulse rounded bg-white/10" />
+                      <div className="h-3 w-9/12 animate-pulse rounded bg-white/10" />
+                      <div className="h-3 w-8/12 animate-pulse rounded bg-white/10" />
+                    </div>
+                  ) : tsData?.summary ? (
+                    <div className="space-y-4 text-sm leading-relaxed text-white/80">
+                      {tsData.summary.sessionOverview ? (
+                        <div className="rounded-2xl border border-sky-400/15 bg-sky-500/10 p-4">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-sky-200/80">Session overview</div>
+                          <div className="mt-2 text-white/85">{tsData.summary.sessionOverview}</div>
+                        </div>
+                      ) : null}
+
+                      {tsData.summary.keyDiscussionPoints?.length ? (
+                        <div className="rounded-2xl border border-indigo-400/15 bg-indigo-500/10 p-4">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-indigo-200/80">Key discussion points</div>
+                          <ul className="mt-2 space-y-2">
+                            {tsData.summary.keyDiscussionPoints.map((x) => (
+                              <li key={x} className="flex gap-2">
+                                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-indigo-200/80" />
+                                <span className="text-white/85">{x}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+
+                      {tsData.summary.mentorGuidance?.length ? (
+                        <div className="rounded-2xl border border-emerald-400/15 bg-emerald-500/10 p-4">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-emerald-200/80">Mentor guidance</div>
+                          <ul className="mt-2 space-y-2">
+                            {tsData.summary.mentorGuidance.map((x) => (
+                              <li key={x} className="flex gap-2">
+                                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300/80" />
+                                <span className="text-white/85">{x}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+
+                      {tsData.summary.actionItems?.length ? (
+                        <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-amber-200/80">Action items</div>
+                          <ul className="mt-2 space-y-2">
+                            {tsData.summary.actionItems.map((x) => (
+                              <li key={x} className="flex gap-2">
+                                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-300/80" />
+                                <span className="text-white/85">{x}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : null}
+
+                      {tsData.summary.followUp ? (
+                        <div className="rounded-2xl border border-fuchsia-400/15 bg-fuchsia-500/10 p-4">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-fuchsia-200/80">Follow-up</div>
+                          <div className="mt-2 text-white/85">{tsData.summary.followUp}</div>
+                        </div>
+                      ) : null}
+
+                      {!tsData.summary.sessionOverview &&
+                      !tsData.summary.keyDiscussionPoints?.length &&
+                      !tsData.summary.mentorGuidance?.length &&
+                      !tsData.summary.actionItems?.length &&
+                      !tsData.summary.followUp ? (
+                        <div className="text-sm text-white/60">Summary is being generated or temporarily unavailable. Try Refresh.</div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-white/60">No summary yet. If the session is completed, click Generate.</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
