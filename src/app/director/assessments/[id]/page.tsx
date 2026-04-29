@@ -126,7 +126,9 @@ export default function ViewEditAssessmentPage() {
           (mapped.type as string) === "CMA" || preSurveyFromApiDetail(raw).some((r) => r.text.trim().length > 0),
         );
         setInstructions(
-          mapped.instructions.length > 0 ? mapped.instructions.map((i) => i.text) : [""],
+          mapped.instructions.length > 0
+            ? mapped.instructions.map((i: { text: string }) => i.text)
+            : [""],
         );
         setWizardSections(
           mapped.sections.length > 0
@@ -520,7 +522,7 @@ export default function ViewEditAssessmentPage() {
                   [
                     ["edit-basics", "Basics"] as [string, string],
                     ["edit-instructions", "Instructions"],
-                    ...(hasPreSurvey ? (["edit-pre", "Pre-survey"] as [string, string][]) : []),
+                    ...(hasPreSurvey ? ([["edit-pre", "Pre-survey"]] as [string, string][]) : []),
                     ["edit-content", "Survey content"],
                     ["edit-banner", "Banner"],
                   ] as [string, string][]
@@ -571,37 +573,31 @@ export default function ViewEditAssessmentPage() {
                 />
               </div>
               <div>
-                <span className={directorLabelClass}>Survey type</span>
+                <span className={directorLabelClass}>Include Pre-Survey Questions?</span>
                 <p className="mb-3 text-sm text-white/60">
-                  Choose whether people answer a few warm-up questions before the main survey.
+                  Select Yes to add pre-survey questions before the main assessment.
                 </p>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => setHasPreSurvey(false)}
-                    aria-pressed={!hasPreSurvey}
-                    className={`rounded-2xl border-2 p-4 text-left transition ${
-                      !hasPreSurvey
-                        ? "border-[#8ec5eb] bg-[#8ec5eb]/10 ring-2 ring-[#8ec5eb]/30"
-                        : "border-white/15 bg-white/[0.03] hover:border-white/30"
-                    }`}
-                  >
-                    <span className="block text-sm font-bold text-white">Main survey only (PMP)</span>
-                    <span className="mt-1 block text-xs text-white/65">No pre-survey step. Simpler path.</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setHasPreSurvey(true)}
-                    aria-pressed={hasPreSurvey}
-                    className={`rounded-2xl border-2 p-4 text-left transition ${
-                      hasPreSurvey
-                        ? "border-[#8ec5eb] bg-[#8ec5eb]/10 ring-2 ring-[#8ec5eb]/30"
-                        : "border-white/15 bg-white/[0.03] hover:border-white/30"
-                    }`}
-                  >
-                    <span className="block text-sm font-bold text-white">Pre-survey + main (CMA)</span>
-                    <span className="mt-1 block text-xs text-white/65">Add a few text or number questions first, then the main flow.</span>
-                  </button>
+                <div className="flex flex-wrap gap-6">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
+                    <input
+                      type="radio"
+                      name="hasPreSurvey"
+                      checked={!hasPreSurvey}
+                      onChange={() => setHasPreSurvey(false)}
+                      className="h-4 w-4"
+                    />
+                    No
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
+                    <input
+                      type="radio"
+                      name="hasPreSurvey"
+                      checked={hasPreSurvey}
+                      onChange={() => setHasPreSurvey(true)}
+                      className="h-4 w-4"
+                    />
+                    Yes
+                  </label>
                 </div>
               </div>
             </div>
@@ -651,44 +647,25 @@ export default function ViewEditAssessmentPage() {
             </div>
 
             {hasPreSurvey ? (
-              <div className="mb-8 scroll-mt-20" id="edit-pre">
-                <h2 className="mb-1 text-lg font-bold text-white">Pre-survey questions</h2>
+              <div className="mb-8 scroll-mt-20 rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6" id="edit-pre">
+                <h2 className="mb-1 text-lg font-bold text-white">Pre-Survey Question</h2>
                 <p className="mb-4 text-sm text-white/70">
-                  Short fields people complete before the main flow. They are not multiple choice.
+                  These questions will be shown before the main assessment.
                 </p>
                 <div className="space-y-5">
                   {preSurveyRows.map((row, qIdx) => (
                     <div
                       key={row.id}
-                      className="space-y-3 rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6"
+                      className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-4"
                     >
                       <div className="flex flex-wrap items-end gap-3">
-                        <div className="min-w-[200px] flex-1">
+                        <div className="min-w-[220px] flex-1">
                           <label className={directorLabelClass}>Question {qIdx + 1}</label>
                           <input
                             type="text"
                             value={row.text}
                             onChange={(e) => handleUpdatePreSurvey(qIdx, "text", e.target.value)}
-                            className={directorInputClass}
-                          />
-                        </div>
-                        <div className="w-full sm:w-40">
-                          <label className={directorLabelClass}>Type</label>
-                          <select
-                            value={row.type}
-                            onChange={(e) => handleUpdatePreSurvey(qIdx, "type", e.target.value)}
-                            className={`${directorInputClass} cursor-pointer`}
-                          >
-                            <option value="number">Number</option>
-                            <option value="text">Text</option>
-                          </select>
-                        </div>
-                        <div className="min-w-[160px] flex-1">
-                          <label className={directorLabelClass}>Placeholder</label>
-                          <input
-                            type="text"
-                            value={row.placeholder}
-                            onChange={(e) => handleUpdatePreSurvey(qIdx, "placeholder", e.target.value)}
+                            placeholder="e.g. What is your current church?"
                             className={directorInputClass}
                           />
                         </div>

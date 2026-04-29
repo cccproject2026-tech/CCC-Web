@@ -1205,7 +1205,7 @@ export default function CreateAssessmentPage() {
 
   return (
     <div className={directorPageRoot}>
-       <MentorHeader showFullHeader={true} />
+      <MentorHeader showFullHeader={true} />
       <div className={`${directorPageContainer} px-4 pt-3 sm:px-6 lg:px-10 sm:pt-5`}>
         <DirectorHero
           title="Create assessment"
@@ -1217,10 +1217,10 @@ export default function CreateAssessmentPage() {
           //   { label: "Create" },
           // ]}
           breadcrumbItems={[
-  { label: "Home", href: "/mentor/home" },
-  { label: "Assessments", href: "/mentor/MentorAssessments" },
-  { label: "Create" },
-]}
+            { label: "Home", href: "/mentor/home" },
+            { label: "Assessments", href: "/mentor/MentorAssessments" },
+            { label: "Create" },
+          ]}
         />
       </div>
 
@@ -1251,9 +1251,9 @@ export default function CreateAssessmentPage() {
               </div>
 
               <div>
-                <span className={directorLabelClass}>Include pre-survey questions?</span>
+                <span className={directorLabelClass}>Include Pre-Survey Questions?</span>
                 <p className="mb-3 text-sm text-white/60">
-                  Yes → CMA (pre-survey before main survey). No → PMP.
+                  Select Yes to add pre-survey questions before the main assessment.
                 </p>
                 <div className="flex flex-wrap gap-6">
                   <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
@@ -1264,7 +1264,7 @@ export default function CreateAssessmentPage() {
                       onChange={() => setHasPreSurvey(false)}
                       className="h-4 w-4"
                     />
-                    No (PMP)
+                    No
                   </label>
                   <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
                     <input
@@ -1274,7 +1274,7 @@ export default function CreateAssessmentPage() {
                       onChange={() => setHasPreSurvey(true)}
                       className="h-4 w-4"
                     />
-                    Yes (CMA)
+                    Yes
                   </label>
                 </div>
               </div>
@@ -1318,50 +1318,25 @@ export default function CreateAssessmentPage() {
             </div>
 
             {hasPreSurvey ? (
-              <div className="mb-8">
-                <h2 className="mb-1 text-lg font-bold text-white">Pre-survey questions</h2>
+              <div className="mb-8 rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6">
+                <h2 className="mb-1 text-lg font-bold text-white">Pre-Survey Question</h2>
                 <p className="mb-4 text-sm text-white/70">
-                  Shown before the main survey (mobile: text or number fields — not multiple-choice lists).
+                  These questions will be shown before the main assessment.
                 </p>
                 <div className="space-y-5">
                   {preSurveyRows.map((row, qIdx) => (
                     <div
                       key={row.id}
-                      className="space-y-3 rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6"
+                      className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-4"
                     >
                       <div className="flex flex-wrap items-end gap-3">
-                        <div className="min-w-[200px] flex-1">
+                        <div className="min-w-[220px] flex-1">
                           <label className={directorLabelClass}>Question {qIdx + 1}</label>
                           <input
                             type="text"
                             value={row.text}
                             onChange={(e) => handleUpdatePreSurvey(qIdx, "text", e.target.value)}
-                            placeholder="e.g. What is your current church membership?"
-                            className={directorInputClass}
-                          />
-                        </div>
-                        <div className="w-full sm:w-40">
-                          <label className={directorLabelClass}>Type</label>
-                          <select
-                            value={row.type}
-                            onChange={(e) =>
-                              handleUpdatePreSurvey(qIdx, "type", e.target.value)
-                            }
-                            className={`${directorInputClass} cursor-pointer`}
-                          >
-                            <option value="number">Number</option>
-                            <option value="text">Text</option>
-                          </select>
-                        </div>
-                        <div className="min-w-[160px] flex-1">
-                          <label className={directorLabelClass}>Placeholder</label>
-                          <input
-                            type="text"
-                            value={row.placeholder}
-                            onChange={(e) =>
-                              handleUpdatePreSurvey(qIdx, "placeholder", e.target.value)
-                            }
-                            placeholder="Enter number"
+                            placeholder="e.g. What is your current church?"
                             className={directorInputClass}
                           />
                         </div>

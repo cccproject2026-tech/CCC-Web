@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import DirectorHero from "../DirectorHero";
+import FeaturedAvatars, { type FeaturedAvatarItem } from "@/app/Components/FeaturedAvatars";
 import {
   directorBtnPrimary,
   directorBtnSecondary,
@@ -13,15 +14,18 @@ import {
   directorSpinner,
   directorToastClass,
 } from "../directorUi";
-import { DirectorFilterSection } from "../ui";
+import { DirectorFilterSection, DirectorSlideOver } from "../ui";
+import { mentorFilterPanel } from "@/app/Components/mentor/mentor-theme";
 import SearchBar from "@/app/Components/SearchBar";
 import ConfirmModal from "@/app/Components/ConfirmModal";
 import AssessmentBg from "../../Assets/assessment-bg.png";
 import Thumb1 from "../../Assets/thumb1.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import {
+  apiGetAssessmentById,
   apiDeleteAssessments,
   apiGetAssessments,
+  parseAssessmentDetailPayload,
   parseAssessmentsListPayload,
 } from "@/app/Services/assessment.service";
 import { apiGetAllUsers } from "@/app/Services/users.service";
@@ -48,6 +52,34 @@ type AssignUserRow = {
   avatar: string | typeof Mentor1;
 };
 
+type AssessmentCardRow = {
+  id: string;
+  title: string;
+  description: string;
+  image: string | typeof Thumb1;
+  type?: unknown;
+  progressStatus?: "not_started" | "submitted" | "completed";
+};
+
+function normalizeAssessmentStatus(raw: unknown): "not_started" | "submitted" | "completed" {
+  const s = String(raw || "").toLowerCase().replace(/\s+/g, "_");
+  if (s === "submitted") return "submitted";
+  if (s === "completed" || s === "reviewed") return "completed";
+  return "not_started";
+}
+
+function assessmentStatusLabel(status: AssessmentCardRow["progressStatus"]): string {
+  if (status === "completed") return "Completed";
+  if (status === "submitted") return "Submitted";
+  return "Not Started";
+}
+
+function assessmentStatusChipClass(status: AssessmentCardRow["progressStatus"]): string {
+  if (status === "completed") return "border-emerald-300/35 bg-emerald-500/20 text-emerald-100";
+  if (status === "submitted") return "border-amber-300/35 bg-amber-500/20 text-amber-100";
+  return "border-white/20 bg-white/10 text-[#cde2f2]";
+}
+
 const mapUserToAssignUser = (user: any): AssignUserRow => ({
   id: String(user.id ?? user._id ?? ""),
   name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "User",
@@ -69,13 +101,16 @@ function AssessmentsPageContent() {
   const [showOptionsMenu, setShowOptionsMenu] = useState<string | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
-  const [assessments, setAssessments] = useState<any[]>([]);
+  const [assessments, setAssessments] = useState<AssessmentCardRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<AssignUserRow[]>([]);
   const [userSearch, setUserSearch] = useState("");
   const [loadingAssessments, setLoadingAssessments] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [listRefetchKey, setListRefetchKey] = useState(0);
+  const [featuredItems, setFeaturedItems] = useState<FeaturedAvatarItem[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(false);
+  const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(assignUserFromQuery);
   const lastAssignBootstrap = useRef<string | null>(null);
 
   useEffect(() => {
@@ -98,9 +133,17 @@ function AssessmentsPageContent() {
 
         const body = res?.data;
         const list = parseAssessmentsListPayload(body);
-        const mapped: any[] = [];
+        const mapped: AssessmentCardRow[] = [];
         for (const item of list) {
-          const rawItem = item as Record<string, unknown>;
+          const rawItem = item as {
+            _id?: unknown;
+            id?: unknown;
+            bannerImage?: unknown;
+            name?: unknown;
+            title?: unknown;
+            description?: unknown;
+            type?: unknown;
+          };
           const rawId = rawItem._id ?? rawItem.id;
           const id = rawId != null && String(rawId).trim() !== "" ? String(rawId) : "";
           if (!id) continue;
@@ -120,22 +163,66 @@ function AssessmentsPageContent() {
           });
         }
 
-        if (assignUserFromQuery) {
+        if (selectedMenteeId) {
           try {
-            const progRes = await apiGetUserProgress(assignUserFromQuery);
+            const progRes = await apiGetUserProgress(selectedMenteeId);
             const pr = unwrapProgressData(progRes);
             const rows = pr?.assessments ?? [];
-            const allowed = new Set<string>();
+            const byAssessmentId = new Map<string, "not_started" | "submitted" | "completed">();
             for (const row of rows) {
-              const aid = (row as { assessmentId?: string }).assessmentId;
+              const typedRow = row as { assessmentId?: string; status?: string };
+              const aid = typedRow.assessmentId;
               if (aid != null && String(aid).trim() !== "") {
-                allowed.add(String(aid).trim());
+                byAssessmentId.set(String(aid).trim(), normalizeAssessmentStatus(typedRow.status));
               }
             }
-            if (allowed.size === 0) {
+            if (byAssessmentId.size === 0) {
               setAssessments([]);
             } else {
-              setAssessments(mapped.filter((a) => allowed.has(String(a.id))));
+              const detailRows = await Promise.allSettled(
+                Array.from(byAssessmentId.keys()).map(async (assessmentId) => {
+                  const detailRes = await apiGetAssessmentById(assessmentId);
+                  const detail = parseAssessmentDetailPayload(detailRes.data);
+                  if (!detail) return null;
+                  const detailObj = detail as unknown as {
+                    _id?: string;
+                    id?: string;
+                    bannerImage?: string;
+                    name?: string;
+                    description?: string;
+                    type?: unknown;
+                  };
+
+                  const raw = detailObj.bannerImage;
+                  const image =
+                    (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
+
+                  return {
+                    id: String(detailObj._id ?? detailObj.id ?? assessmentId),
+                    title: String(detailObj.name || "Untitled"),
+                    description: String(detailObj.description || ""),
+                    image,
+                    type: detailObj.type,
+                    progressStatus: byAssessmentId.get(assessmentId) || "not_started",
+                  } satisfies AssessmentCardRow;
+                }),
+              );
+
+              const assigned: AssessmentCardRow[] = [];
+              detailRows.forEach((r) => {
+                if (r.status === "fulfilled" && r.value) assigned.push(r.value);
+              });
+
+              if (!debouncedSearch) {
+                setAssessments(assigned);
+              } else {
+                const q = debouncedSearch.toLowerCase();
+                setAssessments(
+                  assigned.filter((a) =>
+                    `${a.title} ${a.description}`.toLowerCase().includes(q),
+                  ),
+                );
+              }
             }
           } catch (e) {
             console.error("Failed to load pastor assessment assignments", e);
@@ -154,7 +241,51 @@ function AssessmentsPageContent() {
     };
 
     fetchAssessments();
-  }, [pathname, debouncedSearch, assignUserFromQuery, listRefetchKey]);
+  }, [pathname, debouncedSearch, selectedMenteeId, listRefetchKey]);
+
+  useEffect(() => {
+    if (pathname !== "/director/assessments") return;
+
+    const fetchFeaturedPastors = async () => {
+      try {
+        setFeaturedLoading(true);
+        const res = await apiGetAllUsers({
+          role: "pastor",
+          roleMatch: "mixed",
+          page: 1,
+          limit: 20,
+        });
+
+        const inner = res?.data?.data;
+        let listUsers: unknown[] = [];
+        if (inner && typeof inner === "object") {
+          const payload = inner as { users?: unknown[]; rows?: unknown[] };
+          if (Array.isArray(payload.users)) listUsers = payload.users;
+          else if (Array.isArray(payload.rows)) listUsers = payload.rows;
+        }
+
+        setFeaturedItems(
+          listUsers
+            .map((user) => {
+              const row = mapUserToAssignUser(user as Record<string, unknown>);
+              return {
+                id: row.id,
+                name: row.name,
+                img: resolveApiMediaUrl(typeof row.avatar === "string" ? row.avatar : "") || row.avatar,
+              } satisfies FeaturedAvatarItem;
+            })
+            .filter((item) => String(item.id).trim() !== ""),
+        );
+      } catch (error) {
+        console.error("Failed to fetch featured pastors", error);
+        setFeaturedItems([]);
+      } finally {
+        setFeaturedLoading(false);
+      }
+    };
+
+    void fetchFeaturedPastors();
+  }, [pathname]);
 
   useEffect(() => {
     if (pathname !== "/director/assessments") return;
@@ -169,6 +300,7 @@ function AssessmentsPageContent() {
     if (!assignUserFromQuery) return;
     if (lastAssignBootstrap.current === assignUserFromQuery) return;
     lastAssignBootstrap.current = assignUserFromQuery;
+    setSelectedMenteeId(assignUserFromQuery);
     setSelectedUsers([assignUserFromQuery]);
     setIsSelectionMode(true);
     setToast("Select assessments, then tap Assigned to.");
@@ -192,7 +324,7 @@ function AssessmentsPageContent() {
         const inner = res?.data?.data;
         let listUsers: unknown[] = [];
         if (inner && typeof inner === "object") {
-          const o = inner as Record<string, unknown>;
+          const o = inner as { users?: unknown[]; rows?: unknown[] };
           if (Array.isArray(o.users)) listUsers = o.users;
           else if (Array.isArray(o.rows)) listUsers = o.rows;
         }
@@ -324,8 +456,8 @@ function AssessmentsPageContent() {
       <DirectorHero
         title="Assessments"
         subtitle={
-          assignUserFromQuery
-            ? "Assessments assigned to this pastor."
+          selectedMenteeId
+            ? "Assessments assigned to the selected pastor."
             : "Create, edit, and assign assessments to pastors."
         }
         image={AssessmentBg}
@@ -389,6 +521,34 @@ function AssessmentsPageContent() {
             </div>
           </DirectorFilterSection>
 
+          {!featuredLoading && featuredItems.length > 0 && (
+            <div className={`mb-6 ${mentorFilterPanel}`}>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-[#cde2f2]">
+                  {selectedMenteeId
+                    ? "Showing assigned assessments for selected pastor"
+                    : "Showing all assessments"}
+                </p>
+                {selectedMenteeId && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMenteeId(null)}
+                    className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/15"
+                  >
+                    Clear filter
+                  </button>
+                )}
+              </div>
+              <FeaturedAvatars
+                items={featuredItems}
+                showDivider={false}
+                className="mb-0"
+                selectedId={selectedMenteeId}
+                onItemClick={(item) => setSelectedMenteeId(String(item.id))}
+              />
+            </div>
+          )}
+
           {isSelectionMode && (
             <div className={`mb-6 flex flex-wrap items-center justify-between gap-4 p-5 ${directorGlassCard}`}>
               <div className="flex flex-wrap items-center gap-4">
@@ -450,7 +610,7 @@ function AssessmentsPageContent() {
                     </div>
                   )}
 
-                  {!isSelectionMode && (
+                  {!isSelectionMode && !selectedMenteeId && (
                     <div className="options-menu-container absolute right-4 top-4 z-[60]">
                       <button
                         type="button"
@@ -525,13 +685,67 @@ function AssessmentsPageContent() {
                         <p className="text-sm text-white/65">{assessment.description}</p>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/director/assessments/${assessment.id}`)}
-                        className="mt-4 self-end rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
-                      >
-                        View / edit
-                      </button>
+                      {selectedMenteeId ? (
+                        <div className="mt-4 space-y-3">
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="font-semibold text-white/80">Status</span>
+                            <span
+                              className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${assessmentStatusChipClass(
+                                assessment.progressStatus,
+                              )}`}
+                            >
+                              {assessmentStatusLabel(assessment.progressStatus)}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {(assessment.progressStatus === "submitted" ||
+                              assessment.progressStatus === "completed") && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  router.push(
+                                    `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}`,
+                                  )
+                                }
+                                className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                              >
+                                View Result
+                              </button>
+                            )}
+                            {(assessment.progressStatus === "submitted" ||
+                              assessment.progressStatus === "completed") && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  router.push(
+                                    `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}&editRecommendation=1`,
+                                  )
+                                }
+                                className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+                              >
+                                Edit Recommendation
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                router.push(`/director/assessments/${assessment.id}?viewUser=${selectedMenteeId}`)
+                              }
+                              className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+                            >
+                              View
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/director/assessments/${assessment.id}`)}
+                          className="mt-4 self-end rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+                        >
+                          View / edit
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -543,12 +757,12 @@ function AssessmentsPageContent() {
                 <i className="fa-regular fa-folder-open text-2xl text-[#8ec5eb]" />
               </div>
               <p className="text-lg font-semibold text-white">
-                {assignUserFromQuery
+                {selectedMenteeId
                   ? "No assessments assigned to this pastor."
                   : "No assessments found"}
               </p>
               <p className="mt-2 text-sm text-white/60">
-                {assignUserFromQuery
+                {selectedMenteeId
                   ? "Assign assessments from the full list when needed."
                   : "Try another search or create an assessment with Add."}
               </p>

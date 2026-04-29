@@ -30,11 +30,11 @@ import {
 } from "@/app/Components/mentor/mentor-theme";
 import { Appointment } from "@/app/Services/types";
 import {
+  apiGetAppointments,
   apiCancelAppointment,
   apiCreateAppointment,
   apiCreateAvailability,
   apiDeleteAvailabilitySlot,
-  apiGetMentorAppointments,
   apiGetWeeklyAvailability,
   apiRescheduleAppointment,
 } from "@/app/Services/appointments.service";
@@ -238,7 +238,7 @@ function MentorScheduleContent() {
 
     const fetchAppointments = async () => {
       try {
-        const res = await apiGetMentorAppointments(mentorId);
+        const res = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: true });
         if (!cancelled) setAppointments(unwrapAppointmentsAxiosData(res));
       } catch (err) {
         console.error("Failed to fetch appointments", err);
@@ -299,6 +299,12 @@ function MentorScheduleContent() {
       try {
         const res = await apiGetWeeklyAvailability(targetId, meetingDate);
         const data = res.data?.data || [];
+        const busyRes = await apiGetAppointments({
+          mentorId: String(targetId),
+          futureOnly: true,
+          status: "scheduled",
+        });
+        const busyAppointments = unwrapAppointmentsAxiosData(busyRes);
 
         const dayData = data.find((d: any) =>
           d.date?.startsWith(meetingDate)
@@ -311,7 +317,7 @@ function MentorScheduleContent() {
         const normalize = (t: string) =>
           t.replace(/\s+/g, "").toLowerCase();
 
-        const bookedSlots = appointments
+        const bookedSlots = busyAppointments
           .filter(a => a.meetingDate.startsWith(meetingDate) && !["cancelled", "canceled"].includes((a.status || "").toLowerCase()))
           .map(a => {
             const d = new Date(a.meetingDate);
@@ -337,7 +343,7 @@ function MentorScheduleContent() {
     };
 
     fetchSlots();
-  }, [mentorId, meetingDate, availabilityRefreshKey, appointments, scheduleRecipientType, selectedRecipient]);
+  }, [mentorId, meetingDate, availabilityRefreshKey, scheduleRecipientType, selectedRecipient]);
 
   // ── Schedule drawer calendar navigation handlers ──────────────────────────────
   const handleSchedulePrevMonth = () => {
@@ -574,7 +580,7 @@ function MentorScheduleContent() {
     const fetchAvailability = async () => {
       if (rescheduleRecipientType === "director") {
         // Fetch director's availability
-        const directorId = (rescheduleTarget.user as any)?._id || (rescheduleTarget.user as any)?.id;
+        const directorId = (rescheduleTarget.mentor as any)?._id || (rescheduleTarget.mentor as any)?.id;
         if (!directorId) {
           console.warn("No director ID available for reschedule");
           return;
@@ -862,10 +868,21 @@ function MentorScheduleContent() {
 
     if (isScheduling) return;
 
-    // Overlap check: block if proposed slot is within 1 hour of an existing appointment
+    const targetMentorId =
+      scheduleRecipientType === "director"
+        ? String(selectedRecipient._id || selectedRecipient.id)
+        : String(mentorId);
+
+    // Overlap check against target availability owner
     const proposedIso = toIsoFromDateAndSlot(meetingDate, selectedSlot);
     const proposedMs = new Date(proposedIso).getTime();
-    const hasOverlap = appointments.some((a) => {
+    const busyRes = await apiGetAppointments({
+      mentorId: targetMentorId,
+      futureOnly: true,
+      status: "scheduled",
+    });
+    const busyAppointments = unwrapAppointmentsAxiosData(busyRes);
+    const hasOverlap = busyAppointments.some((a) => {
       const t = new Date(String(a.meetingDate ?? "")).getTime();
       return !Number.isNaN(t) && Math.abs(t - proposedMs) < 60 * 60 * 1000;
     });
@@ -879,8 +896,11 @@ function MentorScheduleContent() {
 
     try {
       await apiCreateAppointment({
-        userId: selectedRecipient._id || selectedRecipient.id,
-        mentorId,
+        userId:
+          scheduleRecipientType === "director"
+            ? mentorId
+            : String(selectedRecipient._id || selectedRecipient.id),
+        mentorId: targetMentorId,
         meetingDate: toIsoFromDateAndSlot(meetingDate, selectedSlot),
         platform: uiMeetingModeToPlatform(selectedPlatform),
         notes: "Scheduled by mentor",
@@ -888,7 +908,7 @@ function MentorScheduleContent() {
 
       setAvailableSlots(prev => prev.filter(s => s !== selectedSlot));
       setAvailabilityRefreshKey(prev => prev + 1);
-      const refresh = await apiGetMentorAppointments(mentorId);
+      const refresh = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: true });
       setAppointments(unwrapAppointmentsAxiosData(refresh));
       setIsDrawerOpen(false);
       setDrawerStep(1);
@@ -918,7 +938,7 @@ function MentorScheduleContent() {
     }
 
     try {
-      const refresh = await apiGetMentorAppointments(mentorId);
+      const refresh = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: true });
       const freshList = unwrapAppointmentsAxiosData(refresh);
       setAppointments(freshList);
       setShowMenu(null);
@@ -941,7 +961,7 @@ function MentorScheduleContent() {
     setShowMenu(null);
 
     // Determine recipient type (director or pastor)
-    const recipientRole = (appt.user as any)?.role || "pastor";
+    const recipientRole = (appt.mentor as any)?.role || (appt.user as any)?.role || "pastor";
     const isDirector = recipientRole?.toLowerCase().includes("director");
     setRescheduleRecipientType(isDirector ? "director" : "pastor");
 
@@ -1019,7 +1039,7 @@ function MentorScheduleContent() {
         startPeriod,
         platform: reschedulePlatform as any,
       });
-      const refresh = await apiGetMentorAppointments(mentorId);
+      const refresh = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: true });
       setAppointments(unwrapAppointmentsAxiosData(refresh));
       setIsRescheduleModalOpen(false);
       setRescheduleTarget(null);
@@ -2086,7 +2106,7 @@ function MentorScheduleContent() {
                       </div>
                     ) : (
                       <AvailabilityCalendar
-                        mentorId={(rescheduleTarget.user as any)?._id || (rescheduleTarget.user as any)?.id || ""}
+                        mentorId={(rescheduleTarget.mentor as any)?._id || (rescheduleTarget.mentor as any)?.id || ""}
                         currentMonth={rescheduleMonth}
                         currentYear={rescheduleYear}
                         selectedDate={rescheduleSelectedDate}
@@ -2107,19 +2127,19 @@ function MentorScheduleContent() {
                     <div className="grid grid-cols-2 gap-3">
                       {(() => {
                         const selectedDateSlots = rescheduleMonthlyAvailabilitySlots.find(
-                          (slot) => new Date(slot.date).getDate() === rescheduleSelectedDate
+                          (slot: any) => new Date(slot.date).getDate() === rescheduleSelectedDate
                         );
 
                         // Filter to only hourly slots (ending with :00)
                         const timeSlots = (selectedDateSlots?.slots || []).filter(
-                          (slot) => slot.startTime.endsWith(":00")
+                          (slot: any) => slot.startTime.endsWith(":00")
                         );
 
                         if (timeSlots.length === 0) {
                           return <p className="text-sm text-[#cde2f2]">No slots available on this date</p>;
                         }
 
-                        return timeSlots.map((slot, idx) => {
+                        return timeSlots.map((slot: any, idx: number) => {
                           const timeLabel = `${slot.startTime} ${slot.startPeriod}`;
                           const isoString = new Date(`${selectedDateSlots.date}T${convertTo24Hour(slot.startTime, slot.startPeriod)}`).toISOString();
 
@@ -2228,19 +2248,19 @@ function MentorScheduleContent() {
                     <div className="grid grid-cols-2 gap-3">
                       {(() => {
                         const selectedDateSlots = scheduleMonthlyAvailabilitySlots.find(
-                          (slot) => new Date(slot.date).getDate() === rescheduleSelectedDate
+                          (slot: any) => new Date(slot.date).getDate() === rescheduleSelectedDate
                         );
 
                         // Filter to only hourly slots (ending with :00)
                         const timeSlots = (selectedDateSlots?.slots || []).filter(
-                          (slot) => slot.startTime.endsWith(":00")
+                          (slot: any) => slot.startTime.endsWith(":00")
                         );
 
                         if (timeSlots.length === 0) {
                           return <p className="text-sm text-[#cde2f2]">No slots available on this date</p>;
                         }
 
-                        return timeSlots.map((slot, idx) => {
+                        return timeSlots.map((slot: any, idx: number) => {
                           const timeLabel = `${slot.startTime} ${slot.startPeriod}`;
                           const isoString = new Date(`${selectedDateSlots.date}T${convertTo24Hour(slot.startTime, slot.startPeriod)}`).toISOString();
 
