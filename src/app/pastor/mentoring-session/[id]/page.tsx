@@ -6,7 +6,7 @@ import PastorHeader from "@/app/Components/PastorHeader";
 import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStatusBadge";
 import { useToast } from "@/app/Components/ui/Toast";
 import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
-import { apiGenerateTranscriptSummary } from "@/app/Services/appointments.service";
+import { apiGenerateTranscriptSummary, apiGetTranscriptSummary } from "@/app/Services/appointments.service";
 import type { AppointmentResponse, TranscriptSummaryResponseDto } from "@/app/Services/types/appointments.types";
 import {
   appointmentPlatformLabel,
@@ -18,7 +18,7 @@ import {
   zoomUrlHasPasscodeQuery,
 } from "@/app/utils/meetingLinkDetails";
 import { formatSessionTime, getNextSessionId } from "../utils/sessionFlow";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { usePastorSessionDetailQuery } from "@/app/mentor/mentoring-session/hooks/useMentorshipQueries";
 
 type TranscriptSummary = {
@@ -66,6 +66,39 @@ export default function PastorMentoringSessionDetailPage() {
   const zoomId = meetingLink ? parseZoomMeetingIdFromUrl(meetingLink) : undefined;
   const meetCode = meetingLink ? parseGoogleMeetCodeFromUrl(meetingLink) : undefined;
   const hasZoomPasscode = meetingLink ? zoomUrlHasPasscodeQuery(meetingLink) : false;
+
+  const transcriptQuery = useQuery({
+    queryKey: ["transcript-summary", String(session?.appointmentId ?? "")],
+    enabled: !!session?.appointmentId,
+    staleTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: (failureCount, error) => {
+      const err = error as { response?: { status?: number } };
+      if (err?.response?.status === 404) return false;
+      if (err?.response?.status === 429) return false;
+      return failureCount < 1;
+    },
+    queryFn: async () => {
+      const appointmentId = String(session?.appointmentId ?? "").trim();
+      if (!appointmentId) throw new Error("Missing appointment ID");
+      const res = await apiGetTranscriptSummary(appointmentId);
+      return (res.data?.data ?? res.data) as TranscriptSummaryResponseDto;
+    },
+  });
+
+  useEffect(() => {
+    if (!transcriptQuery.data) return;
+    setTsData({
+      appointmentId: transcriptQuery.data.appointmentId,
+      transcript: transcriptQuery.data.transcript,
+      transcriptSavedAt: transcriptQuery.data.transcriptSavedAt,
+      summary: transcriptQuery.data.summary,
+      generatedAt: transcriptQuery.data.generatedAt,
+      model: transcriptQuery.data.model,
+      cached: transcriptQuery.data.cached,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transcriptQuery.data]);
 
   const transcriptMutation = useMutation({
     mutationFn: async (refresh: boolean) => {
@@ -201,96 +234,204 @@ export default function PastorMentoringSessionDetailPage() {
         </div>
 
         {/* Transcript & AI Summary */}
-        <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold text-[#8ec5eb]">Transcript & AI Summary</div>
-              <div className="mt-1 text-xs text-white/60">Generates or refreshes summary using the transcript-summary API.</div>
+        <div className="rounded-2xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06)_0%,rgba(255,255,255,0.03)_100%)] p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="text-sm font-semibold text-[#8ec5eb]">Transcript & AI Summary</div>
+                {tsData?.model ? (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-white/70">
+                    Model: {tsData.model}
+                  </span>
+                ) : null}
+                {tsData?.cached ? (
+                  <span className="rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-200">
+                    Cached
+                  </span>
+                ) : null}
+                {tsData?.generatedAt ? (
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-semibold text-white/60">
+                    Updated {new Date(tsData.generatedAt).toLocaleString()}
+                  </span>
+                ) : null}
+              </div>
+              <div className="mt-1 text-xs text-white/60">
+                We automatically load any existing transcript/summary. Use Generate/Refresh if you need to create or update it.
+              </div>
             </div>
-            <div className="flex gap-2">
+
+            <div className="flex flex-wrap gap-2 sm:justify-end">
               <button
                 type="button"
                 onClick={() => void fetchTranscript(false)}
                 disabled={transcriptMutation.isPending}
-                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-60"
+                className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-[#062946] hover:bg-white/90 disabled:opacity-60"
               >
-                {transcriptMutation.isPending ? "Loading…" : "Generate"}
+                {transcriptMutation.isPending ? "Working…" : "Generate"}
               </button>
               <button
                 type="button"
                 onClick={() => void fetchTranscript(true)}
                 disabled={transcriptMutation.isPending}
-                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-60"
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 hover:bg-white/10 disabled:opacity-60"
               >
                 Refresh
               </button>
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="text-sm font-semibold mb-2">Transcript</div>
-              <pre className="whitespace-pre-wrap text-xs text-white/70 max-h-[360px] overflow-auto">
-                {tsData?.transcript?.trim() ? tsData.transcript : "No transcript available yet."}
-              </pre>
+          <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2">
+            <div className="rounded-2xl border border-white/10 bg-[#041f35]/40 p-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="text-sm font-semibold text-white/90">Transcript</div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const text = String(tsData?.transcript ?? "").trim();
+                    if (!text) {
+                      toast.show({ kind: "info", title: "Nothing to copy" });
+                      return;
+                    }
+                    void navigator.clipboard.writeText(text);
+                    toast.show({ kind: "success", title: "Transcript copied" });
+                  }}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10"
+                >
+                  Copy
+                </button>
+              </div>
+
+              <div className="max-h-[420px] overflow-auto rounded-xl border border-white/10 bg-white/5 p-3">
+                {transcriptQuery.isLoading ? (
+                  <div className="space-y-2">
+                    <div className="h-3 w-11/12 animate-pulse rounded bg-white/10" />
+                    <div className="h-3 w-10/12 animate-pulse rounded bg-white/10" />
+                    <div className="h-3 w-9/12 animate-pulse rounded bg-white/10" />
+                    <div className="h-3 w-8/12 animate-pulse rounded bg-white/10" />
+                  </div>
+                ) : (
+                  <pre className="whitespace-pre-wrap text-[12px] leading-relaxed text-white/75">
+                    {tsData?.transcript?.trim()
+                      ? tsData.transcript
+                      : "No transcript available yet. If the session is completed, try Generate."}
+                  </pre>
+                )}
+              </div>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="text-sm font-semibold mb-2">AI Summary</div>
-              {tsData?.summary ? (
-                <div className="space-y-4 text-sm text-white/70">
-                  {tsData.summary.sessionOverview ? (
-                    <div>
-                      <div className="font-semibold text-white/80">Session Overview</div>
-                      <div>{tsData.summary.sessionOverview}</div>
-                    </div>
-                  ) : null}
-                  {tsData.summary.keyDiscussionPoints?.length ? (
-                    <div>
-                      <div className="font-semibold text-white/80">Key Discussion Points</div>
-                      <ul className="list-disc list-inside">
-                        {tsData.summary.keyDiscussionPoints.map((x) => (
-                          <li key={x}>{x}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  {tsData.summary.mentorGuidance?.length ? (
-                    <div>
-                      <div className="font-semibold text-white/80">Mentor Guidance</div>
-                      <ul className="list-disc list-inside">
-                        {tsData.summary.mentorGuidance.map((x) => (
-                          <li key={x}>{x}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  {tsData.summary.actionItems?.length ? (
-                    <div>
-                      <div className="font-semibold text-white/80">Action Items</div>
-                      <ul className="list-disc list-inside">
-                        {tsData.summary.actionItems.map((x) => (
-                          <li key={x}>{x}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                  {tsData.summary.followUp ? (
-                    <div>
-                      <div className="font-semibold text-white/80">Follow-up</div>
-                      <div>{tsData.summary.followUp}</div>
-                    </div>
-                  ) : null}
-                  {!tsData.summary.sessionOverview &&
-                  !tsData.summary.keyDiscussionPoints?.length &&
-                  !tsData.summary.mentorGuidance?.length &&
-                  !tsData.summary.actionItems?.length &&
-                  !tsData.summary.followUp ? (
-                    <div>Summary is being generated or temporarily unavailable.</div>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="text-sm text-white/60">No summary yet.</div>
-              )}
+
+            <div className="rounded-2xl border border-white/10 bg-[#041f35]/40 p-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="text-sm font-semibold text-white/90">AI Summary</div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const s = tsData?.summary;
+                    if (!s) {
+                      toast.show({ kind: "info", title: "Nothing to copy" });
+                      return;
+                    }
+                    const lines = [
+                      s.sessionOverview ? `Session Overview:\n${s.sessionOverview}` : "",
+                      s.keyDiscussionPoints?.length ? `\nKey Discussion Points:\n- ${s.keyDiscussionPoints.join("\n- ")}` : "",
+                      s.mentorGuidance?.length ? `\nMentor Guidance:\n- ${s.mentorGuidance.join("\n- ")}` : "",
+                      s.actionItems?.length ? `\nAction Items:\n- ${s.actionItems.join("\n- ")}` : "",
+                      s.followUp ? `\nFollow-up:\n${s.followUp}` : "",
+                    ]
+                      .filter(Boolean)
+                      .join("\n");
+                    void navigator.clipboard.writeText(lines.trim());
+                    toast.show({ kind: "success", title: "Summary copied" });
+                  }}
+                  className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10"
+                >
+                  Copy
+                </button>
+              </div>
+
+              <div className="max-h-[420px] overflow-auto rounded-xl border border-white/10 bg-white/5 p-4">
+                {transcriptQuery.isLoading ? (
+                  <div className="space-y-3">
+                    <div className="h-4 w-7/12 animate-pulse rounded bg-white/10" />
+                    <div className="h-3 w-11/12 animate-pulse rounded bg-white/10" />
+                    <div className="h-3 w-10/12 animate-pulse rounded bg-white/10" />
+                    <div className="h-4 w-6/12 animate-pulse rounded bg-white/10" />
+                    <div className="h-3 w-9/12 animate-pulse rounded bg-white/10" />
+                    <div className="h-3 w-8/12 animate-pulse rounded bg-white/10" />
+                  </div>
+                ) : tsData?.summary ? (
+                  <div className="space-y-5 text-sm leading-relaxed text-white/75">
+                    {tsData.summary.sessionOverview ? (
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Session overview</div>
+                        <div className="mt-1">{tsData.summary.sessionOverview}</div>
+                      </div>
+                    ) : null}
+
+                    {tsData.summary.keyDiscussionPoints?.length ? (
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Key discussion points</div>
+                        <ul className="mt-2 space-y-1.5">
+                          {tsData.summary.keyDiscussionPoints.map((x) => (
+                            <li key={x} className="flex gap-2">
+                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#8ec5eb]" />
+                              <span>{x}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    {tsData.summary.mentorGuidance?.length ? (
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Mentor guidance</div>
+                        <ul className="mt-2 space-y-1.5">
+                          {tsData.summary.mentorGuidance.map((x) => (
+                            <li key={x} className="flex gap-2">
+                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-300/80" />
+                              <span>{x}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    {tsData.summary.actionItems?.length ? (
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Action items</div>
+                        <ul className="mt-2 space-y-1.5">
+                          {tsData.summary.actionItems.map((x) => (
+                            <li key={x} className="flex gap-2">
+                              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-300/80" />
+                              <span>{x}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+
+                    {tsData.summary.followUp ? (
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Follow-up</div>
+                        <div className="mt-1">{tsData.summary.followUp}</div>
+                      </div>
+                    ) : null}
+
+                    {!tsData.summary.sessionOverview &&
+                    !tsData.summary.keyDiscussionPoints?.length &&
+                    !tsData.summary.mentorGuidance?.length &&
+                    !tsData.summary.actionItems?.length &&
+                    !tsData.summary.followUp ? (
+                      <div className="text-sm text-white/60">
+                        Summary is being generated or temporarily unavailable. Try Refresh.
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="text-sm text-white/60">
+                    No summary yet. If the session is completed, click Generate.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
