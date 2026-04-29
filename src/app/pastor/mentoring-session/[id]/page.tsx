@@ -2,13 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Cookies from "js-cookie";
 import PastorHeader from "@/app/Components/PastorHeader";
 import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStatusBadge";
 import { useToast } from "@/app/Components/ui/Toast";
-import { extractApiErrorMessage, appointmentEntityId, unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
-import { apiGetMentorshipSessionsNormalized, type MentorshipSession } from "@/app/Services/roadmaps.service";
-import { apiGetUserSchedule, apiGenerateTranscriptSummary } from "@/app/Services/appointments.service";
+import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
+import { apiGenerateTranscriptSummary } from "@/app/Services/appointments.service";
 import type { AppointmentResponse, TranscriptSummaryResponseDto } from "@/app/Services/types/appointments.types";
 import {
   appointmentPlatformLabel,
@@ -20,6 +18,8 @@ import {
   zoomUrlHasPasscodeQuery,
 } from "@/app/utils/meetingLinkDetails";
 import { formatSessionTime, getNextSessionId } from "../utils/sessionFlow";
+import { useMutation } from "@tanstack/react-query";
+import { usePastorSessionDetailQuery } from "@/app/mentor/mentoring-session/hooks/useMentorshipQueries";
 
 type TranscriptSummary = {
   appointmentId: string;
@@ -42,53 +42,23 @@ export default function PastorMentoringSessionDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const sessionId = decodeURIComponent(params.id);
-
-  const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState<MentorshipSession | null>(null);
-  const [sessions, setSessions] = useState<MentorshipSession[]>([]);
-  const [appointment, setAppointment] = useState<AppointmentResponse | null>(null);
-
-  const [tsLoading, setTsLoading] = useState(false);
   const [tsData, setTsData] = useState<TranscriptSummary | null>(null);
+  const detailQuery = usePastorSessionDetailQuery(sessionId);
+  const loading = detailQuery.isLoading;
+  const session = detailQuery.data?.session ?? null;
+  const sessions = detailQuery.data?.sessions ?? [];
+  const appointment = (detailQuery.data?.appointment ?? null) as AppointmentResponse | null;
+
+  useEffect(() => {
+    if (!detailQuery.error) return;
+    toast.show({ kind: "error", title: "Failed to load session", subtitle: extractApiErrorMessage(detailQuery.error) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailQuery.error]);
 
   const nextSessionId = useMemo(() => {
     const sorted = [...sessions].sort((a, b) => a.sessionNumber - b.sessionNumber);
     return getNextSessionId(sorted.map((s) => ({ id: s.id, status: s.status as any, scheduledDate: s.scheduledDate })));
   }, [sessions]);
-
-  useEffect(() => {
-    const run = async () => {
-      try {
-        setLoading(true);
-        const pastorCookie = Cookies.get("user");
-        if (!pastorCookie) throw new Error("Pastor information not found");
-        const pastorData = JSON.parse(decodeURIComponent(pastorCookie));
-        const pastorId = String(pastorData?.id ?? "").trim();
-        if (!pastorId) throw new Error("Pastor ID not found");
-
-        const list = await apiGetMentorshipSessionsNormalized(pastorId);
-        setSessions(list);
-        const found = list.find((s) => s.id === sessionId) ?? null;
-        setSession(found);
-
-        if (!found?.appointmentId) {
-          setAppointment(null);
-          return;
-        }
-
-        const sched = await apiGetUserSchedule(pastorId);
-        const all = unwrapAppointmentsAxiosData(sched) as AppointmentResponse[];
-        const match = all.find((a) => appointmentEntityId(a) === String(found.appointmentId)) ?? null;
-        setAppointment(match);
-      } catch (e) {
-        toast.show({ kind: "error", title: "Failed to load session", subtitle: extractApiErrorMessage(e) });
-        setSession(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    run();
-  }, [sessionId, toast]);
 
   const meetingLink = useMemo(() => getAppointmentJoinUrl(appointment), [appointment]);
   const platformRaw = String(appointment?.platform ?? "zoom");
@@ -97,15 +67,13 @@ export default function PastorMentoringSessionDetailPage() {
   const meetCode = meetingLink ? parseGoogleMeetCodeFromUrl(meetingLink) : undefined;
   const hasZoomPasscode = meetingLink ? zoomUrlHasPasscodeQuery(meetingLink) : false;
 
-  const fetchTranscript = async (refresh: boolean) => {
-    if (!session?.appointmentId) {
-      toast.show({ kind: "error", title: "Missing appointment ID" });
-      return;
-    }
-    setTsLoading(true);
-    try {
+  const transcriptMutation = useMutation({
+    mutationFn: async (refresh: boolean) => {
+      if (!session?.appointmentId) throw new Error("Missing appointment ID");
       const res = await apiGenerateTranscriptSummary(String(session.appointmentId), refresh);
-      const data = (res.data?.data ?? res.data) as TranscriptSummaryResponseDto;
+      return (res.data?.data ?? res.data) as TranscriptSummaryResponseDto;
+    },
+    onSuccess: (data) => {
       setTsData({
         appointmentId: data.appointmentId,
         transcript: data.transcript,
@@ -120,12 +88,20 @@ export default function PastorMentoringSessionDetailPage() {
         title: data.cached ? "Summary loaded from cache" : "Summary generated successfully",
         subtitle: `Model: ${data.model}`,
       });
-    } catch (e) {
+    },
+    onError: (e) => {
       toast.show({ kind: "error", title: "Failed to generate summary", subtitle: extractApiErrorMessage(e) });
       setTsData(null);
-    } finally {
-      setTsLoading(false);
+    },
+  });
+
+  const fetchTranscript = async (refresh: boolean) => {
+    if (!session?.appointmentId) {
+      toast.show({ kind: "error", title: "Missing appointment ID" });
+      return;
     }
+    if (transcriptMutation.isPending) return;
+    await transcriptMutation.mutateAsync(refresh);
   };
 
   if (loading) {
@@ -235,15 +211,15 @@ export default function PastorMentoringSessionDetailPage() {
               <button
                 type="button"
                 onClick={() => void fetchTranscript(false)}
-                disabled={tsLoading}
+                disabled={transcriptMutation.isPending}
                 className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-60"
               >
-                {tsLoading ? "Loading…" : "Generate"}
+                {transcriptMutation.isPending ? "Loading…" : "Generate"}
               </button>
               <button
                 type="button"
                 onClick={() => void fetchTranscript(true)}
-                disabled={tsLoading}
+                disabled={transcriptMutation.isPending}
                 className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-60"
               >
                 Refresh

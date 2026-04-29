@@ -2,20 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import Cookies from "js-cookie";
 import MentorHeader from "@/app/Components/MentorHeader";
 import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStatusBadge";
 import ConfirmModal from "@/app/Components/ui/ConfirmModal";
 import { useToast } from "@/app/Components/ui/Toast";
-import { extractApiErrorMessage, appointmentEntityId, unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
-import {
-  apiCompleteMentorshipSession,
-  apiRedoMentorshipSession,
-  apiGetMentorshipSessionsNormalized,
-  type MentorshipSession,
-} from "@/app/Services/roadmaps.service";
-import { apiGetAssignedUsers } from "@/app/Services/users.service";
-import { apiGetMentorSchedule, apiGetUserSchedule, apiGenerateTranscriptSummary } from "@/app/Services/appointments.service";
+import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
+import { apiGenerateTranscriptSummary } from "@/app/Services/appointments.service";
 import type { AppointmentResponse, TranscriptSummaryResponseDto } from "@/app/Services/types/appointments.types";
 import {
   appointmentPlatformLabel,
@@ -27,6 +19,8 @@ import {
   zoomUrlHasPasscodeQuery,
 } from "@/app/utils/meetingLinkDetails";
 import { formatSessionTime, getNextSessionId } from "../utils/sessionFlow";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMentorSessionActions, useMentorSessionDetailQuery } from "../hooks/useMentorshipQueries";
 
 type TranscriptSummary = {
   appointmentId: string;
@@ -52,98 +46,28 @@ export default function MentorMentoringSessionDetailPage() {
   const pastorIdFromQuery = search.get("pastorId") || "";
 
   const sessionId = decodeURIComponent(params.id);
-
-  const [loading, setLoading] = useState(true);
-  const [session, setSession] = useState<(MentorshipSession & { pastorId?: string; pastorName?: string }) | null>(null);
-  const [sessionsForPastor, setSessionsForPastor] = useState<MentorshipSession[]>([]);
-  const [appointment, setAppointment] = useState<AppointmentResponse | null>(null);
+  const queryClient = useQueryClient();
 
   const [confirm, setConfirm] = useState<{ kind: "complete" | "redo" } | null>(null);
-  const [actionLoading, setActionLoading] = useState<"complete" | "redo" | null>(null);
-
-  const [tsLoading, setTsLoading] = useState(false);
   const [tsData, setTsData] = useState<TranscriptSummary | null>(null);
+  const detailQuery = useMentorSessionDetailQuery(sessionId, pastorIdFromQuery);
+  const { completeMutation, redoMutation, actionLoading } = useMentorSessionActions(sessionId);
+  const loading = detailQuery.isLoading;
+  const session = detailQuery.data?.session ?? null;
+  const sessionsForPastor = detailQuery.data?.sessionsForPastor ?? [];
+  const appointment = (detailQuery.data?.appointment ?? null) as AppointmentResponse | null;
+  const pastorId = detailQuery.data?.pastorId ?? "";
+
+  useEffect(() => {
+    if (!detailQuery.error) return;
+    toast.show({ kind: "error", title: "Failed to load session", subtitle: extractApiErrorMessage(detailQuery.error) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailQuery.error]);
 
   const nextSessionId = useMemo(() => {
     const sorted = [...sessionsForPastor].sort((a, b) => a.sessionNumber - b.sessionNumber);
     return getNextSessionId(sorted.map((s) => ({ id: s.id, status: s.status as any, scheduledDate: s.scheduledDate })));
   }, [sessionsForPastor]);
-
-  useEffect(() => {
-    const run = async () => {
-      try {
-        setLoading(true);
-
-        // mentorId from cookie
-        const mentorCookie = Cookies.get("mentor");
-        if (!mentorCookie) throw new Error("Mentor information not found");
-        const mentorData = JSON.parse(decodeURIComponent(mentorCookie));
-        const mentorId = String(mentorData?.id ?? "").trim();
-        if (!mentorId) throw new Error("Mentor ID not found");
-
-        // Find pastorId: prefer query param, else search all assigned pastors.
-        let pastorId = pastorIdFromQuery;
-        let sessions: MentorshipSession[] = [];
-
-        if (pastorId) {
-          sessions = await apiGetMentorshipSessionsNormalized(pastorId);
-        } else {
-          const assignedUsersResponse = await apiGetAssignedUsers(mentorId);
-          const assignedPastors = assignedUsersResponse.data?.data || [];
-          for (const p of assignedPastors) {
-            const pid = String(p?._id ?? "").trim();
-            if (!pid) continue;
-            const list = await apiGetMentorshipSessionsNormalized(pid);
-            const found = list.find((s) => s.id === sessionId);
-            if (found) {
-              pastorId = pid;
-              sessions = list;
-              break;
-            }
-          }
-        }
-
-        setSessionsForPastor(sessions);
-        const found = sessions.find((s) => s.id === sessionId) ?? null;
-        if (!found) {
-          setSession(null);
-          return;
-        }
-        setSession({ ...found, pastorId });
-
-        // Appointment enrichment (mobile-like): fetch both mentor + pastor schedules and find appointmentId.
-        const apptId = found.appointmentId ? String(found.appointmentId) : "";
-        if (!apptId) {
-          setAppointment(null);
-          return;
-        }
-
-        const [mentorSched, pastorSched] = await Promise.all([
-          apiGetMentorSchedule(mentorId),
-          pastorId ? apiGetUserSchedule(pastorId) : Promise.resolve({ data: [] } as any),
-        ]);
-
-        const merged = [
-          ...unwrapAppointmentsAxiosData(mentorSched),
-          ...unwrapAppointmentsAxiosData(pastorSched),
-        ] as AppointmentResponse[];
-
-        const match =
-          merged.find((a) => appointmentEntityId(a) === apptId) ??
-          merged.find((a) => String((a as any)?._id ?? (a as any)?.id) === apptId) ??
-          null;
-
-        setAppointment(match);
-      } catch (e) {
-        toast.show({ kind: "error", title: "Failed to load session", subtitle: extractApiErrorMessage(e) });
-        setSession(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-    run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId, pastorIdFromQuery]);
 
   const meetingLink = useMemo(() => getAppointmentJoinUrl(appointment), [appointment]);
   const platformRaw = String(appointment?.platform ?? "zoom");
@@ -152,15 +76,13 @@ export default function MentorMentoringSessionDetailPage() {
   const meetCode = meetingLink ? parseGoogleMeetCodeFromUrl(meetingLink) : undefined;
   const hasZoomPasscode = meetingLink ? zoomUrlHasPasscodeQuery(meetingLink) : false;
 
-  const fetchTranscript = async (refresh: boolean) => {
-    if (!session?.appointmentId) {
-      toast.show({ kind: "error", title: "Missing appointment ID" });
-      return;
-    }
-    setTsLoading(true);
-    try {
+  const transcriptMutation = useMutation({
+    mutationFn: async (refresh: boolean) => {
+      if (!session?.appointmentId) throw new Error("Missing appointment ID");
       const res = await apiGenerateTranscriptSummary(String(session.appointmentId), refresh);
-      const data = (res.data?.data ?? res.data) as TranscriptSummaryResponseDto;
+      return (res.data?.data ?? res.data) as TranscriptSummaryResponseDto;
+    },
+    onSuccess: (data) => {
       setTsData({
         appointmentId: data.appointmentId,
         transcript: data.transcript,
@@ -175,40 +97,45 @@ export default function MentorMentoringSessionDetailPage() {
         title: data.cached ? "Summary loaded from cache" : "Summary generated successfully",
         subtitle: `Model: ${data.model}`,
       });
-    } catch (e) {
-      // Mobile behavior: summary failures shouldn't block transcript.
+    },
+    onError: (e) => {
       toast.show({ kind: "error", title: "Failed to generate summary", subtitle: extractApiErrorMessage(e) });
       setTsData(null);
-    } finally {
-      setTsLoading(false);
+    },
+  });
+
+  const fetchTranscript = async (refresh: boolean) => {
+    if (!session?.appointmentId) {
+      toast.show({ kind: "error", title: "Missing appointment ID" });
+      return;
     }
+    if (transcriptMutation.isPending) return;
+    await transcriptMutation.mutateAsync(refresh);
   };
 
   const runAction = async (kind: "complete" | "redo") => {
-    if (!session?.appointmentId || !session.pastorId) {
+    if (!session?.appointmentId) {
       toast.show({ kind: "error", title: "Missing appointment/pastor info" });
       return;
     }
-    setActionLoading(kind);
+    if (!pastorId) {
+      toast.show({ kind: "error", title: "Mentor-only action blocked", subtitle: "Pastor context is required." });
+      return;
+    }
     try {
       if (kind === "complete") {
-        await apiCompleteMentorshipSession(String(session.appointmentId));
+        await completeMutation.mutateAsync({ appointmentId: String(session.appointmentId) });
         toast.show({ kind: "success", title: "Session completed" });
-        setSession((prev) => (prev ? { ...prev, status: "COMPLETED" as any } : prev));
       } else {
-        await apiRedoMentorshipSession(String(session.appointmentId));
+        await redoMutation.mutateAsync({ appointmentId: String(session.appointmentId) });
         toast.show({ kind: "success", title: "Redo scheduled" });
-        // mobile: navigate away because session list may change after redo
-        router.push(`/mentor/mentoring-session?pastorId=${encodeURIComponent(session.pastorId)}`);
+        router.push(`/mentor/mentoring-session?pastorId=${encodeURIComponent(pastorId)}`);
         return;
       }
-      // Refresh this pastor’s sessions without page reload.
-      const updated = await apiGetMentorshipSessionsNormalized(session.pastorId);
-      setSessionsForPastor(updated);
+      await queryClient.invalidateQueries({ queryKey: ["mentorship-sessions"] });
+      await queryClient.invalidateQueries({ queryKey: ["mentorship-session", sessionId] });
     } catch (e) {
       toast.show({ kind: "error", title: kind === "complete" ? "Cannot complete session" : "Cannot redo session", subtitle: extractApiErrorMessage(e) });
-    } finally {
-      setActionLoading(null);
     }
   };
 
@@ -375,15 +302,15 @@ export default function MentorMentoringSessionDetailPage() {
               <button
                 type="button"
                 onClick={() => void fetchTranscript(false)}
-                disabled={tsLoading}
+                disabled={transcriptMutation.isPending}
                 className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-60"
               >
-                {tsLoading ? "Loading…" : "Generate"}
+                {transcriptMutation.isPending ? "Loading…" : "Generate"}
               </button>
               <button
                 type="button"
                 onClick={() => void fetchTranscript(true)}
-                disabled={tsLoading}
+                disabled={transcriptMutation.isPending}
                 className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10 disabled:opacity-60"
               >
                 Refresh
