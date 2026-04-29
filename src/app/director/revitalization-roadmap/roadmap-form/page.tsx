@@ -600,14 +600,22 @@ export default function DirectorRoadmapFormPage() {
         if (cancelled) return;
         setParent(doc);
 
-        /** New task / template: start with empty fields; ignore URL and nested row copy. */
+        /** Mobile parity: new flow should carry values from create step into form page. */
         if (!isEditMode) {
-          setNestedItemTitle("");
-          setChurchVerbiage("");
-          setDescriptionVerbiage("");
+          const fromUrlTitle = safeDecodeURIComponent(roadmapData.name.trim());
+          const fromUrlSubheading = safeDecodeURIComponent(roadmapData.subheading.trim());
+          const fromUrlLong = safeDecodeURIComponent(roadmapData.longDescription.trim());
+          setNestedItemTitle(fromUrlTitle);
+          setChurchVerbiage(fromUrlSubheading);
+          setDescriptionVerbiage(fromUrlLong || fromUrlSubheading);
           setCustomFields([]);
-          setBannerPreview(null);
-          setBannerFile(null);
+          if (roadmapData.bannerImage?.trim()) {
+            setBannerPreview(roadmapData.bannerImage.trim());
+            setBannerFile(null);
+          } else {
+            setBannerPreview(null);
+            setBannerFile(null);
+          }
           return;
         }
 

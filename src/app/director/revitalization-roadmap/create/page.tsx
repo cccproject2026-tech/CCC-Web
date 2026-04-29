@@ -359,12 +359,19 @@ function CreateRoadmapStepOnePage() {
       setError("Roadmap subheading is required.");
       return;
     }
+    if (type === "Phase" && divisions.length === 0) {
+      setError("Please add at least one division (e.g. church or pastor).");
+      return;
+    }
 
     try {
       setSubmitting(true);
 
       if (isEditMode && roadmapIdParam) {
         const sub = roadmapSubheading.trim();
+        const normalizedDivisions = divisions
+          .map((d) => d.trim().toLowerCase())
+          .filter(Boolean);
         await apiUpdateRoadmap(
           roadmapIdParam,
           {
@@ -372,7 +379,8 @@ function CreateRoadmapStepOnePage() {
             description: sub,
             roadMapDetails: sub,
             duration: duration.trim(),
-            type: type === "Phase" ? "Phase" : "Single Roadmap",
+            type: type === "Phase" ? "phase" : "single",
+            ...(normalizedDivisions.length ? { divisions: normalizedDivisions } : {}),
           },
           bannerFile ?? undefined
         );
@@ -383,16 +391,16 @@ function CreateRoadmapStepOnePage() {
 
       // Mobile / CreateRoadmapModal parity: type + multipart fields the API validates (not JSON-stringified arrays).
       const sub = roadmapSubheading.trim();
+      const normalizedDivisions = divisions
+        .map((d) => d.trim().toLowerCase())
+        .filter(Boolean);
       const payload = {
-        type: type === "Phase" ? "Phase" : "Single Roadmap",
+        type: type === "Phase" ? "phase" : "single",
         name: name.trim(),
         roadMapDetails: sub,
         description: sub,
         duration: duration.trim(),
-        divisions:
-          type === "Phase"
-            ? (divisions.length ? divisions : ["All"])
-            : (divisions.length ? divisions : ["All"]),
+        divisions: normalizedDivisions.length ? normalizedDivisions : ["church"],
       };
 
       const res = await apiCreateRoadmap(payload, bannerFile ?? undefined);

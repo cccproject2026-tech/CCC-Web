@@ -32,7 +32,6 @@ import {
   mapAssessmentFromApi,
   newDirectorEditSection,
   sectionToDirectorEditWizard,
-  WIZARD_LAYER_COUNT,
 } from "@/app/Services/utils/assessment-mapper";
 
 type PreSurveyRow = {
@@ -335,12 +334,12 @@ export default function ViewEditAssessmentPage() {
     }
     const invalidSection = wizardSections.some(
       (s) =>
-        s.layers.length !== WIZARD_LAYER_COUNT ||
+        s.layers.length < 1 ||
         s.layers.some((l) => !l.choices.some((c) => c.trim())),
     );
     if (invalidSection) {
       showToast(
-        `Each section needs ${WIZARD_LAYER_COUNT} steps (layers) and at least one filled-in answer choice on every step. Scroll to “Survey content” to fix it.`,
+        "Each section needs at least one step (layer), and every step needs at least one filled-in answer choice. Scroll to Survey content to fix it.",
       );
       scrollToId("edit-content");
       return;
@@ -510,7 +509,7 @@ export default function ViewEditAssessmentPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-white/50">On this page</p>
               <p className="text-sm text-white/75">
                 <strong>Basics</strong> — what people see in the list. <strong>Instructions</strong> — what they
-                read before they start. <strong>Content</strong> — each section has 4 quick steps and 4
+                read before they start. <strong>Content</strong> — each section has flexible steps (layers) and 4
                 follow-up plan levels. <strong>Banner</strong> is optional.
               </p>
               <nav
@@ -720,9 +719,9 @@ export default function ViewEditAssessmentPage() {
             <div className="mb-4 scroll-mt-20" id="edit-content">
               <h2 className="text-lg font-bold text-white">Survey content</h2>
               <p className="mb-2 text-sm text-white/65">
-                Add one or more <strong>sections</strong>. Each has four <strong>steps</strong> (what people
-                choose from) and four <strong>plan levels</strong> (suggested follow-up). Every step needs at
-                least one non-empty choice.
+                Add one or more <strong>sections</strong>. Each has one or more <strong>steps</strong> (what
+                people choose from) and four <strong>plan levels</strong> (suggested follow-up). Every step needs
+                at least one non-empty choice.
               </p>
             </div>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -775,7 +774,7 @@ export default function ViewEditAssessmentPage() {
                     />
                   </div>
                   <p className="text-sm text-white/70">
-                    Below: <strong>Steps 1–{WIZARD_LAYER_COUNT}</strong> are the answer choices. Then add
+                    Below: <strong>Steps 1–{section.layers.length}</strong> are the answer choices. Then add
                     <strong> plan lines</strong> for each of the four levels.
                   </p>
 
