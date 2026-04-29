@@ -2,8 +2,10 @@
 
 import { useState, Suspense } from "react";
 
-import { Country, State } from "country-state-city";
 
+import { Country, State } from "country-state-city";
+import { PhoneInput } from "react-international-phone";
+import "react-international-phone/style.css";
 import { isAxiosError } from "axios";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -75,6 +77,8 @@ function InterestFormContent() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [personalCountry, setPersonalCountry] = useState("");
+  const [personalDialCode, setPersonalDialCode] = useState("");
+  
 
   const [form, setForm] = useState({
     firstName: "",
@@ -123,17 +127,13 @@ const sanitizeName = (value: string) => value.replace(/[^A-Za-z\s'-]/g, "");
       //   return { ...c, country: v, state: "" };
       // }
 
-      if (k === "country") {
-  const phoneCode = getPhoneCodeByCountryName(v);
-
+    if (k === "country") {
   return {
     ...c,
     country: v,
     state: "",
-    churchPhone: phoneCode ? `${phoneCode} ` : "",
   };
 }
-
       return { ...c, [k]: v };
     })
   );
@@ -201,24 +201,38 @@ const getStateOptions = (countryName: string) => {
   return State.getStatesOfCountry(selectedCountry.isoCode);
 };
 
+// const getPhoneCodeByCountryName = (countryName: string) => {
+//   const selectedCountry = countryOptions.find((c) => c.name === countryName);
+//   return selectedCountry?.phonecode ? `+${selectedCountry.phonecode}` : "";
+// };
 const getPhoneCodeByCountryName = (countryName: string) => {
   const selectedCountry = countryOptions.find((c) => c.name === countryName);
-  return selectedCountry?.phonecode ? `+${selectedCountry.phonecode}` : "";
+  return cleanDialCode(selectedCountry?.phonecode);
 };
-
-const formatPersonalPhone = (value: string) => {
-  const digitsOnly = value.replace(/[^\d]/g, "");
-  const selectedCode = getPhoneCodeByCountryName(personalCountry);
-
-  if (!selectedCode) return digitsOnly;
-
-  const codeDigits = selectedCode.replace("+", "");
-  const numberWithoutCode = digitsOnly.startsWith(codeDigits)
-    ? digitsOnly.slice(codeDigits.length)
-    : digitsOnly;
-
-  return `${selectedCode} ${numberWithoutCode}`.trim();
+const cleanDialCode = (phonecode?: string) => {
+  if (!phonecode) return "";
+  return `+${phonecode.replace(/^\+/, "")}`;
 };
+const getFlagEmoji = (isoCode: string) =>
+  isoCode
+    .toUpperCase()
+    .replace(/./g, (char) =>
+      String.fromCodePoint(127397 + char.charCodeAt(0))
+    );
+
+// const formatPersonalPhone = (value: string) => {
+//   const digitsOnly = value.replace(/[^\d]/g, "");
+//   const selectedCode = getPhoneCodeByCountryName(personalCountry);
+
+//   if (!selectedCode) return digitsOnly;
+
+//   const codeDigits = selectedCode.replace("+", "");
+//   const numberWithoutCode = digitsOnly.startsWith(codeDigits)
+//     ? digitsOnly.slice(codeDigits.length)
+//     : digitsOnly;
+
+//   return `${selectedCode} ${numberWithoutCode}`.trim();
+// };
 
 const formatChurchPhone = (value: string, countryName: string) => {
   const digitsOnly = value.replace(/[^\d]/g, "");
@@ -249,15 +263,21 @@ const validate = (): boolean => {
   } else if (!nameRegex.test(form.lastName.trim())) {
     errs.lastName = "Last Name should contain only letters.";
   }
-  if (!personalCountry) {
-  errs.personalCountry = "Country is required.";
+//   if (!personalCountry) {
+//   errs.personalCountry = "Country is required.";
+// }
+
+//   if (!form.phoneNumber.trim()) {
+//     errs.phoneNumber = "Phone Number is required.";
+//   } else if (!/^\+?[\d\s\-()\u00d7]{7,20}$/.test(form.phoneNumber.trim())) {
+//     errs.phoneNumber = "Enter a valid phone number.";
+//   }
+if (!form.phoneNumber.trim()) {
+  errs.phoneNumber = "Phone Number is required.";
+} else if (form.phoneNumber.replace(/[^\d]/g, "").length < 7) {
+  errs.phoneNumber = "Enter a valid phone number.";
 }
 
-  if (!form.phoneNumber.trim()) {
-    errs.phoneNumber = "Phone Number is required.";
-  } else if (!/^\+?[\d\s\-()\u00d7]{7,20}$/.test(form.phoneNumber.trim())) {
-    errs.phoneNumber = "Enter a valid phone number.";
-  }
 
   if (!form.email.trim()) {
     errs.email = "Email is required.";
@@ -328,6 +348,7 @@ if (c.churchWebsite.trim()) {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
       email: form.email.trim(),
+      // phoneNumber: form.phoneNumber.trim(),
       phoneNumber: form.phoneNumber.trim(),
       churchDetails: churchDetailsPayload,
       title: titleForApi,
@@ -484,44 +505,60 @@ try {
                     />
                     <Err k="phoneNumber" />
                   </div> */}
-
-                  <div>
-  <select
-    value={personalCountry}
-    onChange={(e) => {
-      setPersonalCountry(e.target.value);
-      setField("phoneNumber", "");
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next.personalCountry;
-        delete next.phoneNumber;
-        return next;
-      });
-    }}
-    className={inputCls("personalCountry")}
-  >
-    <option value="" disabled>
-      Select Country *
-    </option>
-    {countryOptions.map((country) => (
-      <option key={country.isoCode} value={country.name}>
-        {country.name}
-      </option>
-    ))}
-  </select>
-  <Err k="personalCountry" />
-</div>
-
 <div>
-  <input
-    type="tel"
-    placeholder="Phone Number *"
-    value={form.phoneNumber}
-    onChange={(e) => {
-      setField("phoneNumber", formatPersonalPhone(e.target.value));
-    }}
-    className={inputCls("phoneNumber")}
-  />
+  <div
+    className={`${inputCls(
+      "phoneNumber"
+    )} relative z-50 flex !h-[42px] !min-h-[42px] !max-h-[42px] w-full items-center overflow-visible !p-0`}
+  >
+    <PhoneInput
+      defaultCountry="in"
+      value={form.phoneNumber}
+      onChange={(phone) => {
+        setField("phoneNumber", phone || "");
+      }}
+      placeholder="Phone Number"
+      className="flex h-full w-full items-center bg-transparent"
+      style={{
+        height: "42px",
+        minHeight: "42px",
+        maxHeight: "42px",
+        backgroundColor: "transparent",
+      }}
+      inputClassName="h-full min-w-0 flex-1 border-0 bg-transparent px-4 text-[18px] text-white placeholder-gray-300 outline-none"
+      inputStyle={{
+        height: "42px",
+        minHeight: "42px",
+        maxHeight: "42px",
+        backgroundColor: "transparent",
+        color: "white",
+        border: "none",
+        outline: "none",
+        fontSize: "18px",
+        lineHeight: "42px",
+      }}
+      countrySelectorStyleProps={{
+        buttonClassName:
+          "h-full w-[72px] border-0 border-r border-[#47A3FF]/25 bg-transparent px-3 text-white outline-none",
+        buttonStyle: {
+          height: "42px",
+          minHeight: "42px",
+          maxHeight: "42px",
+          width: "72px",
+          backgroundColor: "transparent",
+          border: "none",
+          borderRight: "1px solid rgba(71, 163, 255, 0.25)",
+        },
+        dropdownStyleProps: {
+          className:
+            "z-[9999] max-h-[240px] overflow-y-auto rounded-md border border-[#47A3FF]/40 bg-[#063f5a] text-white shadow-lg",
+          listItemClassName:
+            "bg-[#063f5a] px-3 py-2 text-white hover:bg-[#0a4d6d]",
+        },
+      }}
+    />
+  </div>
+
   <Err k="phoneNumber" />
 </div>
                   <div>
@@ -557,57 +594,96 @@ try {
                       )}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        {/* <input
-                          type="text"
-                          placeholder="Church Name *"
-                          value={church.churchName}
-                          // onChange={(e) => setChurchField(idx, "churchName", e.target.value)}
-                          onChange={(e) => setChurchField(idx, "city", sanitizeName(e.target.value))}
-                          className={inputCls(`churchName${p}`)}
-                        /> */}
+                     {/* Row 1: Church Name | Church Phone */}
+<div>
+  <input
+    type="text"
+    placeholder="Church Name *"
+    value={church.churchName}
+    onChange={(e) => setChurchField(idx, "churchName", e.target.value)}
+    className={inputCls(`churchName${p}`)}
+  />
+  <Err k={`churchName${p}`} />
+</div>
 
-                        <input
-  type="text"
-  placeholder="Church Name *"
-  value={church.churchName}
-  onChange={(e) => setChurchField(idx, "churchName", e.target.value)}
-  className={inputCls(`churchName${p}`)}
-/>
-                        <Err k={`churchName${p}`} />
-                      </div>
-                      <div>
-                        {/* <input
-                          type="tel"
-                          placeholder="Church Phone *"
-                          value={church.churchPhone}
-                          onChange={(e) => {
-                            const v = e.target.value.replace(/[^\d\s+\-()\u00d7]/g, "");
-                            setChurchField(idx, "churchPhone", v);
-                          }}
-                          className={inputCls(`churchPhone${p}`)}
-                        /> */}
-                        <input
-  type="tel"
-  placeholder="Church Phone *"
-  value={church.churchPhone}
-  onChange={(e) => {
-    setChurchField(idx, "churchPhone", formatChurchPhone(e.target.value, church.country));
-  }}
-  className={inputCls(`churchPhone${p}`)}
-/>
-                        <Err k={`churchPhone${p}`} />
-                      </div>
-                      {/* <div>
-                        <input
-                          type="text"
-                          placeholder="Church Website"
-                          value={church.churchWebsite}
-                          onChange={(e) => setChurchField(idx, "churchWebsite", e.target.value)}
-                          className="form-input"
-                        />
-                      </div> */}
-                      <div>
+{/* <div>
+  <input
+    type="tel"
+    placeholder={church.country ? "Church Phone *" : "Select Country First"}
+    value={church.churchPhone}
+    disabled={!church.country}
+    onChange={(e) => {
+      setChurchField(
+        idx,
+        "churchPhone",
+        formatChurchPhone(e.target.value, church.country)
+      );
+    }}
+    className={`${inputCls(`churchPhone${p}`)} ${
+      !church.country ? "cursor-not-allowed opacity-60" : ""
+    }`}
+  />
+  <Err k={`churchPhone${p}`} />
+</div> */}
+<div>
+  <div
+    className={`${inputCls(
+      `churchPhone${p}`
+    )} relative z-50 flex !h-[42px] !min-h-[42px] !max-h-[42px] w-full items-center overflow-visible !p-0`}
+  >
+    <PhoneInput
+      defaultCountry="in"
+      value={church.churchPhone}
+      onChange={(phone) => {
+        setChurchField(idx, "churchPhone", phone || "");
+      }}
+      placeholder="Church Phone"
+      className="flex h-full w-full items-center bg-transparent"
+      style={{
+        height: "42px",
+        minHeight: "42px",
+        maxHeight: "42px",
+        backgroundColor: "transparent",
+      }}
+      inputClassName="h-full min-w-0 flex-1 border-0 bg-transparent px-4 text-[18px] text-white placeholder-gray-300 outline-none"
+      inputStyle={{
+        height: "42px",
+        minHeight: "42px",
+        maxHeight: "42px",
+        backgroundColor: "transparent",
+        color: "white",
+        border: "none",
+        outline: "none",
+        fontSize: "18px",
+        lineHeight: "42px",
+      }}
+      countrySelectorStyleProps={{
+        buttonClassName:
+          "h-full w-[72px] border-0 border-r border-[#47A3FF]/25 bg-transparent px-3 text-white outline-none",
+        buttonStyle: {
+          height: "42px",
+          minHeight: "42px",
+          maxHeight: "42px",
+          width: "72px",
+          backgroundColor: "transparent",
+          border: "none",
+          borderRight: "1px solid rgba(71, 163, 255, 0.25)",
+        },
+        dropdownStyleProps: {
+          className:
+            "z-[9999] max-h-[240px] overflow-y-auto rounded-md border border-[#47A3FF]/40 bg-[#063f5a] text-white shadow-lg",
+          listItemClassName:
+            "bg-[#063f5a] px-3 py-2 text-white hover:bg-[#0a4d6d]",
+        },
+      }}
+    />
+  </div>
+
+  <Err k={`churchPhone${p}`} />
+</div>
+
+{/* Row 2: Website | Address */}
+<div>
   <input
     type="text"
     placeholder="Church Website"
@@ -617,107 +693,49 @@ try {
   />
   <Err k={`churchWebsite${p}`} />
 </div>
-                      <div>
-                        <input
-                          type="text"
-                          placeholder="Church Address *"
-                          value={church.churchAddress}
-                          onChange={(e) => setChurchField(idx, "churchAddress", e.target.value)}
-                          className={inputCls(`churchAddress${p}`)}
-                        />
-                        <Err k={`churchAddress${p}`} />
-                      </div>
-                      <div>
-                      <input
-  type="text"
-  placeholder="City *"
-  value={church.city}
-  onChange={(e) => setChurchField(idx, "city", sanitizeName(e.target.value))}
-  className={inputCls(`city${p}`)}
-/>
-                        <Err k={`city${p}`} />
-                      </div>
-                      {/* <div>
-                        <select
-                          value={church.state}
-                          onChange={(e) => setChurchField(idx, "state", e.target.value)}
-                          className={inputCls(`state${p}`)}
-                        >
-                          <option value="" disabled>State *</option>
-                          <option value="Alabama">Alabama</option>
-                          <option value="Alaska">Alaska</option>
-                          <option value="Arizona">Arizona</option>
-                          <option value="Arkansas">Arkansas</option>
-                          <option value="California">California</option>
-                          <option value="Colorado">Colorado</option>
-                          <option value="Connecticut">Connecticut</option>
-                          <option value="Delaware">Delaware</option>
-                          <option value="Florida">Florida</option>
-                          <option value="Georgia">Georgia</option>
-                          <option value="Hawaii">Hawaii</option>
-                          <option value="Idaho">Idaho</option>
-                          <option value="Illinois">Illinois</option>
-                          <option value="Indiana">Indiana</option>
-                          <option value="Iowa">Iowa</option>
-                          <option value="Kansas">Kansas</option>
-                          <option value="Kentucky">Kentucky</option>
-                          <option value="Louisiana">Louisiana</option>
-                          <option value="Maine">Maine</option>
-                          <option value="Maryland">Maryland</option>
-                          <option value="Massachusetts">Massachusetts</option>
-                          <option value="Michigan">Michigan</option>
-                          <option value="Minnesota">Minnesota</option>
-                          <option value="Mississippi">Mississippi</option>
-                          <option value="Missouri">Missouri</option>
-                          <option value="Montana">Montana</option>
-                          <option value="Nebraska">Nebraska</option>
-                          <option value="Nevada">Nevada</option>
-                          <option value="New Hampshire">New Hampshire</option>
-                          <option value="New Jersey">New Jersey</option>
-                          <option value="New Mexico">New Mexico</option>
-                          <option value="New York">New York</option>
-                          <option value="North Carolina">North Carolina</option>
-                          <option value="North Dakota">North Dakota</option>
-                          <option value="Ohio">Ohio</option>
-                          <option value="Oklahoma">Oklahoma</option>
-                          <option value="Oregon">Oregon</option>
-                          <option value="Pennsylvania">Pennsylvania</option>
-                          <option value="Rhode Island">Rhode Island</option>
-                          <option value="South Carolina">South Carolina</option>
-                          <option value="South Dakota">South Dakota</option>
-                          <option value="Tennessee">Tennessee</option>
-                          <option value="Texas">Texas</option>
-                          <option value="Utah">Utah</option>
-                          <option value="Vermont">Vermont</option>
-                          <option value="Virginia">Virginia</option>
-                          <option value="Washington">Washington</option>
-                          <option value="West Virginia">West Virginia</option>
-                          <option value="Wisconsin">Wisconsin</option>
-                          <option value="Wyoming">Wyoming</option>
-                          <option value="Ontario">Ontario</option>
-                          <option value="Quebec">Quebec</option>
-                          <option value="British Columbia">British Columbia</option>
-                          <option value="Alberta">Alberta</option>
-                          <option value="Manitoba">Manitoba</option>
-                          <option value="Saskatchewan">Saskatchewan</option>
-                          <option value="Nova Scotia">Nova Scotia</option>
-                          <option value="New Brunswick">New Brunswick</option>
-                          <option value="Prince Edward Island">Prince Edward Island</option>
-                          <option value="Newfoundland and Labrador">Newfoundland and Labrador</option>
-                        </select>
-                        <Err k={`state${p}`} />
-                      </div> */}
+
+<div>
+  <input
+    type="text"
+    placeholder="Church Address *"
+    value={church.churchAddress}
+    onChange={(e) => setChurchField(idx, "churchAddress", e.target.value)}
+    className={inputCls(`churchAddress${p}`)}
+  />
+  <Err k={`churchAddress${p}`} />
+</div>
+
+{/* Row 3: Country | State */}
+<div>
+  <select
+    value={church.country}
+    onChange={(e) => setChurchField(idx, "country", e.target.value)}
+    className={inputCls(`country${p}`)}
+  >
+    <option value="" disabled>
+      Country *
+    </option>
+    {countryOptions.map((country) => (
+      <option key={country.isoCode} value={country.name}>
+        {country.name} {country.phonecode ? `(+${country.phonecode})` : ""}
+      </option>
+    ))}
+  </select>
+  <Err k={`country${p}`} />
+</div>
 
 <div>
   <select
     value={church.state}
     onChange={(e) => setChurchField(idx, "state", e.target.value)}
-    className={inputCls(`state${p}`)}
+    className={`${inputCls(`state${p}`)} ${
+      !church.country ? "cursor-not-allowed opacity-60" : ""
+    }`}
     disabled={!church.country}
   >
-    <option value="" disabled>
-      {church.country ? "State / Province *" : "Select Country First"}
-    </option>
+   <option value="" disabled>
+  State / Province *
+</option>
     {getStateOptions(church.country).map((state) => (
       <option key={state.isoCode} value={state.name}>
         {state.name}
@@ -727,45 +745,33 @@ try {
   <Err k={`state${p}`} />
 </div>
 
+{/* Row 4: City | Zip Code */}
+<div>
+  <input
+    type="text"
+    placeholder="City *"
+    value={church.city}
+    disabled={!church.country}
+    onChange={(e) => setChurchField(idx, "city", sanitizeName(e.target.value))}
+    className={`${inputCls(`city${p}`)} ${
+      !church.country ? "cursor-not-allowed opacity-60" : ""
+    }`}
+  />
+  <Err k={`city${p}`} />
+</div>
 
-
-                      <div>
-                        <input
-                          type="text"
-                          placeholder="Zip Code *"
-                          value={church.zipCode}
-                          onChange={(e) => setChurchField(idx, "zipCode", e.target.value)}
-                          className={inputCls(`zipCode${p}`)}
-                        />
-                        <Err k={`zipCode${p}`} />
-                      </div>
-                      {/* <div>
-                        <select
-                          value={church.country}
-                          onChange={(e) => setChurchField(idx, "country", e.target.value)}
-                          className={inputCls(`country${p}`)}
-                        >
-                          <option value="" disabled>Country *</option>
-                          <option value="United States">United States</option>
-                          <option value="Canada">Canada</option>
-                        </select>
-                        <Err k={`country${p}`} />
-                      </div> */}
-
-                      <div>
-  <select
-    value={church.country}
-    onChange={(e) => setChurchField(idx, "country", e.target.value)}
-    className={inputCls(`country${p}`)}
-  >
-    <option value="" disabled>Country *</option>
-    {countryOptions.map((country) => (
-      <option key={country.isoCode} value={country.name}>
-        {country.name}
-      </option>
-    ))}
-  </select>
-  <Err k={`country${p}`} />
+<div>
+  <input
+    type="text"
+    placeholder="Zip Code *"
+    value={church.zipCode}
+    disabled={!church.country}
+    onChange={(e) => setChurchField(idx, "zipCode", e.target.value)}
+    className={`${inputCls(`zipCode${p}`)} ${
+      !church.country ? "cursor-not-allowed opacity-60" : ""
+    }`}
+  />
+  <Err k={`zipCode${p}`} />
 </div>
                     </div>
                   </div>
