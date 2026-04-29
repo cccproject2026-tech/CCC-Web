@@ -1,25 +1,13 @@
 "use client";
-import { useState, useEffect } from "react";
-import Cookies from "js-cookie";
+import { useMemo, useState } from "react";
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/progress-bg.png";
-import { apiGetMentorshipSessionsNormalized } from "@/app/Services/roadmaps.service";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import SessionProgressHeader from "@/app/Components/mentorship-sessions/SessionProgressHeader";
 import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStatusBadge";
 import { formatSessionTime, getNextSessionId } from "./utils/sessionFlow";
 import { useRouter } from "next/navigation";
-
-type MentoringSession = {
-    id: string;
-    sessionNumber: number;
-    title: string;
-    status: "COMPLETED" | "CANCELLED" | "SCHEDULED";
-    scheduledDate: string;
-    mentorNote: string;
-    pastorNote: string;
-    appointmentId: string;
-};
+import { usePastorSessionsQuery } from "@/app/mentor/mentoring-session/hooks/useMentorshipQueries";
 
 const SESSION_FLOW = [
     {
@@ -40,55 +28,8 @@ export default function PastorMentoringSessionPage() {
     const router = useRouter();
     const [filterStatus, setFilterStatus] = useState("All");
     const [search, setSearch] = useState("");
-    const [sessions, setSessions] = useState<MentoringSession[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [refetchTick, setRefetchTick] = useState(0);
-
-    useEffect(() => {
-        let mounted = true;
-        const fetchSessions = async () => {
-            try {
-                setLoading(true);
-                setError(null);
-
-                // Get pastor data from cookie
-                const pastorCookie = Cookies.get("user");
-                if (!pastorCookie) {
-                    setError("Pastor information not found");
-                    setLoading(false);
-                    return;
-                }
-
-                const pastorData = JSON.parse(decodeURIComponent(pastorCookie));
-                const pastorId = pastorData?.id;
-
-                if (!pastorId) {
-                    setError("Pastor is not found");
-                    setLoading(false);
-                    return;
-                }
-
-                // Fetch sessions for this pastor
-                const pastorSessions = await apiGetMentorshipSessionsNormalized(pastorId);
-                if (mounted) setSessions(pastorSessions as any as MentoringSession[]);
-            } catch (err: unknown) {
-                const errorMessage = err instanceof Error ? err.message : "Failed to fetch mentoring sessions";
-                if (mounted) setError(errorMessage);
-                console.error("Error fetching mentoring sessions:", err);
-            } finally {
-                if (mounted) setLoading(false);
-            }
-        };
-
-        fetchSessions();
-        const onFocus = () => setRefetchTick((x) => x + 1);
-        window.addEventListener("focus", onFocus);
-        return () => {
-            mounted = false;
-            window.removeEventListener("focus", onFocus);
-        };
-    }, [refetchTick]);
+    const { data: sessions = [], isLoading: loading, error } = usePastorSessionsQuery();
+    const sessionsError = error instanceof Error ? error.message : null;
 
     const filteredSessions = sessions.filter((session) => {
         if (filterStatus === "Completed") return session.status === "COMPLETED";
@@ -98,7 +39,7 @@ export default function PastorMentoringSessionPage() {
     });
 
     const visible = filteredSessions.filter((s) =>
-        s.mentorNote.toLowerCase().includes(search.toLowerCase())
+        String(s.mentorNote ?? s.title ?? "").toLowerCase().includes(search.toLowerCase())
     );
 
     const getPhaseInfo = (sessionNumber: number) => {
@@ -112,7 +53,7 @@ export default function PastorMentoringSessionPage() {
         return "Unknown Phase";
     };
 
-    const sortedSessions = [...sessions].sort((a, b) => a.sessionNumber - b.sessionNumber);
+    const sortedSessions = useMemo(() => [...sessions].sort((a, b) => a.sessionNumber - b.sessionNumber), [sessions]);
     const nextSessionId = getNextSessionId(
         sortedSessions.map((s) => ({ id: s.id, status: s.status as any, scheduledDate: s.scheduledDate })),
     );
@@ -178,10 +119,10 @@ export default function PastorMentoringSessionPage() {
                             <p className="text-white/70">Loading mentoring sessions...</p>
                         </div>
                     </div>
-                ) : error ? (
+                ) : sessionsError ? (
                     <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-center">
                         <i className="fas fa-exclamation-circle mb-3 block text-2xl text-red-400" />
-                        <p className="text-red-300">{error}</p>
+                        <p className="text-red-300">{sessionsError}</p>
                     </div>
                 ) : visible.length > 0 ? (
                     <div className="space-y-4">

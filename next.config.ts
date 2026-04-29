@@ -46,7 +46,6 @@ const nextConfig: NextConfig = {
       },
       /** Case-only aliases — avoids 404 when nav/bookmarks use lowercase (routes use PascalCase folders). */
       { source: "/pastor/appointments", destination: "/pastor/Appointments" },
-      { source: "/pastor/appointments/:path*", destination: "/pastor/Appointments/:path*" },
       { source: "/pastor/assessments", destination: "/pastor/Assessments" },
       { source: "/pastor/assessments/:path*", destination: "/pastor/Assessments/:path*" },
     ];
