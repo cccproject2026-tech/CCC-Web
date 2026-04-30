@@ -22,9 +22,12 @@ import AssessmentBg from "../../Assets/assessment-bg.png";
 import Thumb1 from "../../Assets/thumb1.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import {
+  apiGetAssignedAssessments,
   apiGetAssessmentById,
   apiDeleteAssessments,
+  flattenAssignedAssessmentRow,
   apiGetAssessments,
+  parseAssignedAssessmentsListBody,
   parseAssessmentDetailPayload,
   parseAssessmentsListPayload,
 } from "@/app/Services/assessment.service";
@@ -59,7 +62,29 @@ type AssessmentCardRow = {
   image: string | typeof Thumb1;
   type?: unknown;
   progressStatus?: "not_started" | "submitted" | "completed";
+  dueDate?: string;
 };
+
+function toDateInputValue(value?: string): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDueDate(value?: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 function normalizeAssessmentStatus(raw: unknown): "not_started" | "submitted" | "completed" {
   const s = String(raw || "").toLowerCase().replace(/\s+/g, "_");
@@ -111,6 +136,7 @@ function AssessmentsPageContent() {
   const [featuredItems, setFeaturedItems] = useState<FeaturedAvatarItem[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(false);
   const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(assignUserFromQuery);
+  const [assignDueDate, setAssignDueDate] = useState("");
   const lastAssignBootstrap = useRef<string | null>(null);
 
   useEffect(() => {
@@ -165,7 +191,11 @@ function AssessmentsPageContent() {
 
         if (selectedMenteeId) {
           try {
-            const progRes = await apiGetUserProgress(selectedMenteeId);
+            const [assignedRes, progRes] = await Promise.all([
+              apiGetAssignedAssessments(selectedMenteeId),
+              apiGetUserProgress(selectedMenteeId),
+            ]);
+            const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
             const pr = unwrapProgressData(progRes);
             const rows = pr?.assessments ?? [];
             const byAssessmentId = new Map<string, "not_started" | "submitted" | "completed">();
@@ -176,43 +206,40 @@ function AssessmentsPageContent() {
                 byAssessmentId.set(String(aid).trim(), normalizeAssessmentStatus(typedRow.status));
               }
             }
-            if (byAssessmentId.size === 0) {
+            const assigned = assignedRows
+              .map((item) => {
+                const flat = flattenAssignedAssessmentRow(item);
+                if (!flat) return null;
+
+                const detailObj = flat.assessment as {
+                  _id?: string;
+                  id?: string;
+                  bannerImage?: string;
+                  name?: string;
+                  description?: string;
+                  type?: unknown;
+                };
+
+                const raw = detailObj.bannerImage;
+                const image =
+                  (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
+                const assessmentId = String(detailObj._id ?? detailObj.id ?? flat.assessmentId);
+
+                return {
+                  id: assessmentId,
+                  title: String(detailObj.name || "Untitled"),
+                  description: String(detailObj.description || ""),
+                  image,
+                  type: detailObj.type,
+                  progressStatus: byAssessmentId.get(assessmentId) || "not_started",
+                  dueDate: flat.dueDate,
+                } satisfies AssessmentCardRow;
+              })
+              .filter((item): item is NonNullable<typeof item> => item != null);
+
+            if (assigned.length === 0) {
               setAssessments([]);
             } else {
-              const detailRows = await Promise.allSettled(
-                Array.from(byAssessmentId.keys()).map(async (assessmentId) => {
-                  const detailRes = await apiGetAssessmentById(assessmentId);
-                  const detail = parseAssessmentDetailPayload(detailRes.data);
-                  if (!detail) return null;
-                  const detailObj = detail as unknown as {
-                    _id?: string;
-                    id?: string;
-                    bannerImage?: string;
-                    name?: string;
-                    description?: string;
-                    type?: unknown;
-                  };
-
-                  const raw = detailObj.bannerImage;
-                  const image =
-                    (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
-
-                  return {
-                    id: String(detailObj._id ?? detailObj.id ?? assessmentId),
-                    title: String(detailObj.name || "Untitled"),
-                    description: String(detailObj.description || ""),
-                    image,
-                    type: detailObj.type,
-                    progressStatus: byAssessmentId.get(assessmentId) || "not_started",
-                  } satisfies AssessmentCardRow;
-                }),
-              );
-
-              const assigned: AssessmentCardRow[] = [];
-              detailRows.forEach((r) => {
-                if (r.status === "fulfilled" && r.value) assigned.push(r.value);
-              });
-
               if (!debouncedSearch) {
                 setAssessments(assigned);
               } else {
@@ -338,6 +365,12 @@ function AssessmentsPageContent() {
     fetchPastors();
   }, [showAssignModal, userSearch]);
 
+  useEffect(() => {
+    if (!showAssignModal) {
+      setAssignDueDate("");
+    }
+  }, [showAssignModal]);
+
   const handleSelectAssessment = (id: string) => {
     setSelectedAssessments((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
@@ -377,6 +410,7 @@ function AssessmentsPageContent() {
         await apiAssignAssessment({
           userIds,
           assessmentIds: [assessmentId],
+          dueDate: assignDueDate ? new Date(`${assignDueDate}T23:59:59`).toISOString() : undefined,
         });
       }
 
@@ -384,6 +418,7 @@ function AssessmentsPageContent() {
 
       setShowAssignModal(false);
       setIsSelectionMode(false);
+      setAssignDueDate("");
       setSelectedUsers([]);
       setSelectedAssessments([]);
 
@@ -697,6 +732,12 @@ function AssessmentsPageContent() {
                               {assessmentStatusLabel(assessment.progressStatus)}
                             </span>
                           </div>
+                          {formatDueDate(assessment.dueDate) ? (
+                            <div className="text-sm text-[#cde2f2]">
+                              <span className="font-semibold text-white/80">Due</span>{" "}
+                              {formatDueDate(assessment.dueDate)}
+                            </div>
+                          ) : null}
                           <div className="flex flex-wrap items-center gap-2">
                             {(assessment.progressStatus === "submitted" ||
                               assessment.progressStatus === "completed") && (
@@ -811,6 +852,15 @@ function AssessmentsPageContent() {
                 variant="light"
                 className="w-full"
               />
+              <label className="mt-4 block">
+                <span className="mb-1 block text-sm font-medium text-gray-700">Due date</span>
+                <input
+                  type="date"
+                  value={toDateInputValue(assignDueDate) || assignDueDate}
+                  onChange={(e) => setAssignDueDate(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-[#2E3B8E] focus:ring-2 focus:ring-[#2E3B8E]/20"
+                />
+              </label>
             </div>
 
             <div className="flex-1 overflow-auto px-6 py-4">

@@ -25,9 +25,21 @@ type Assessment = {
   /** API banner URL only when valid http(s) */
   thumbUrl: string | null;
   status: Status;
+  dueOn?: string;
   submittedOn?: string;
   completedOn?: string;
 };
+
+function formatDueDate(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 type PastorRow = {
   id: string;
@@ -114,6 +126,7 @@ export default function PastorAssessments() {
             desc: (assessment?.description as string) || "",
             thumbUrl,
             status: st,
+            dueOn: formatDueDate(dueDate),
           };
           if (st === "Submitted") {
             row.submittedOn = new Date(dateSrc || Date.now()).toLocaleDateString();
@@ -337,6 +350,12 @@ export default function PastorAssessments() {
                         <span className="inline-block ml-1 px-3 py-[6px] rounded border border-[#E6E9F3] bg-[#F4F6FB] text-[#4B587E]">
                           {a.submittedOn}
                         </span>
+                      </div>
+                    )}
+
+                    {a.dueOn && (
+                      <div className="mt-3 text-[12px] text-[#6B789A]">
+                        Due on <span className="ml-1 font-medium text-[#0B1C58]">{a.dueOn}</span>
                       </div>
                     )}
 

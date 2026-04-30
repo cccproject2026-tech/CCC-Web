@@ -303,12 +303,12 @@ function DirectorScheduleContent() {
             slots:
               Array.isArray(d.slots) && d.slots.length > 0
                 ? d.slots.map((s: any) => ({
-                    _id: s._id,
-                    startTime: s.startTime || "09:00",
-                    startPeriod: s.startPeriod || "AM",
-                    endTime: s.endTime || "05:00",
-                    endPeriod: s.endPeriod || "PM",
-                  }))
+                  _id: s._id,
+                  startTime: s.startTime || "09:00",
+                  startPeriod: s.startPeriod || "AM",
+                  endTime: s.endTime || "05:00",
+                  endPeriod: s.endPeriod || "PM",
+                }))
                 : [],
           })),
         );
@@ -858,11 +858,10 @@ function DirectorScheduleContent() {
                     if (tab === "Schedule") { setIsDrawerOpen(true); setDrawerStep(1); }
                     else setIsDrawerOpen(false);
                   }}
-                  className={`relative h-8 rounded-md px-5 text-sm font-semibold transition-all ${
-                    activeTab === tab
+                  className={`relative h-8 rounded-md px-5 text-sm font-semibold transition-all ${activeTab === tab
                       ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/35"
                       : "bg-transparent text-white/70 hover:text-white"
-                  }`}
+                    }`}
                 >
                   {tab}
                 </button>
@@ -897,8 +896,10 @@ function DirectorScheduleContent() {
                     const apptKey = appointmentEntityId(appt) || `history-${historyPage}-${index}`;
                     const mentor = appt.mentor ?? (typeof appt.mentorId === "object" ? appt.mentorId : undefined);
                     const mentee = appt.user ?? (typeof appt.userId === "object" ? appt.userId : undefined);
-                    const mentorName = labelPerson(mentor, "Mentor");
-                    const menteeName = labelPerson(mentee, "Mentee");
+                    const mentorName = labelPerson(mentor, "Unknown");
+                    const menteeName = labelPerson(mentee, "Unknown");
+                    const mentorRole = mentor?.role ? (mentor.role.charAt(0).toUpperCase() + mentor.role.slice(1).toLowerCase()) : "Mentor";
+                    const menteeRole = mentee?.role ? (mentee.role.charAt(0).toUpperCase() + mentee.role.slice(1).toLowerCase()) : "Pastor";
                     const mentorId =
                       typeof appt.mentorId === "string" ? appt.mentorId : appt.mentorId?._id ?? appt.mentor?._id;
                     const menteeId =
@@ -907,8 +908,6 @@ function DirectorScheduleContent() {
                     return (
                       <div
                         key={apptKey}
-                        className={`${directorGlassCard} relative flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showHistoryMenu === apptKey ? "z-[60]" : ""}`}
-                        style={showHistoryMenu === apptKey ? { overflow: "visible" } : undefined}
                       >
                         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-6">
                           <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
@@ -918,10 +917,10 @@ function DirectorScheduleContent() {
                               className="h-10 w-10"
                             /> */}
                             <Image
-  src={getPlatformIcon(appt.platform)}
-  alt={appt.platform || "Meeting platform"}
-  className="h-10 w-10"
-/>
+                              src={getPlatformIcon(appt.platform)}
+                              alt={appt.platform || "Meeting platform"}
+                              className="h-10 w-10"
+                            />
                           </div>
                         </div>
                         <div className="relative min-w-0 flex-1 px-4 py-4 sm:px-5">
@@ -966,19 +965,29 @@ function DirectorScheduleContent() {
                                   </Link>
                                 ) : mentorName}
                               </h4>
-                              <p className="text-[12px] text-[#cde2f2]/90">Mentor</p>
+                              <p className="text-[12px] text-[#cde2f2]/90">{mentorRole}</p>
                             </div>
                           </div>
-                          <p className="mb-2 text-[12px] text-[#cde2f2]">
-                            with{" "}
-                            <span className="font-medium text-white">
-                              {menteeId ? (
-                                <Link href={`/director/mentees/profile/${encodeURIComponent(menteeId)}`} className="hover:text-[#8ec5eb]">
-                                  {menteeName}
-                                </Link>
-                              ) : menteeName}
-                            </span>
-                          </p>
+                          <div className="mb-2 flex items-center gap-3">
+                            <Image
+                              src={mentee?.profilePicture || UserProfile}
+                              alt={menteeName}
+                              width={36}
+                              height={36}
+                              unoptimized={mentee?.profilePicture ? isRemoteImageSrc(mentee.profilePicture) : false}
+                              className="rounded-full border border-white/20"
+                            />
+                            <div>
+                              <h4 className="text-sm font-semibold text-white">
+                                {menteeId ? (
+                                  <Link href={`/director/mentees/profile/${encodeURIComponent(menteeId)}`} className="hover:text-[#8ec5eb]">
+                                    {menteeName}
+                                  </Link>
+                                ) : menteeName}
+                              </h4>
+                              <p className="text-[12px] text-[#cde2f2]/90">{menteeRole}</p>
+                            </div>
+                          </div>
                           <div className="mb-2 flex flex-wrap gap-2">
                             <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
                               <i className="fa-regular fa-calendar text-[#8ec5eb]" />
@@ -1073,11 +1082,10 @@ function DirectorScheduleContent() {
                         <div
                           key={index}
                           onClick={() => !isPast && setSelectedAppointmentDate(dateStr)}
-                          className={`rounded-md py-1 transition ${isPast ? "opacity-40 cursor-not-allowed pointer-events-none" : "cursor-pointer"} ${
-                            isSelected || isT
+                          className={`rounded-md py-1 transition ${isPast ? "opacity-40 cursor-not-allowed pointer-events-none" : "cursor-pointer"} ${isSelected || isT
                               ? "bg-[#8ec5eb]/35 font-semibold text-white ring-1 ring-[#8ec5eb]/50"
                               : "text-[#d9ebf8] hover:bg-white/10"
-                          } ${hasAppointment && !isPast ? "ring-1 ring-amber-300/60" : ""}`}
+                            } ${hasAppointment && !isPast ? "ring-1 ring-amber-300/60" : ""}`}
                         >
                           {day}
                         </div>
@@ -1103,8 +1111,10 @@ function DirectorScheduleContent() {
                     const apptKey = appointmentEntityId(appt) || String(index);
                     const mentor = appt.mentor ?? (typeof appt.mentorId === "object" ? appt.mentorId : undefined);
                     const mentee = appt.user ?? (typeof appt.userId === "object" ? appt.userId : undefined);
-                    const mentorName = labelPerson(mentor, "Mentor");
-                    const menteeName = labelPerson(mentee, "Mentee");
+                    const mentorName = labelPerson(mentor, "Unknown");
+                    const menteeName = labelPerson(mentee, "Unknown");
+                    const mentorRole = mentor?.role ? (mentor.role.charAt(0).toUpperCase() + mentor.role.slice(1).toLowerCase()) : "Mentor";
+                    const menteeRole = mentee?.role ? (mentee.role.charAt(0).toUpperCase() + mentee.role.slice(1).toLowerCase()) : "Pastor";
                     const mentorId =
                       typeof appt.mentorId === "string" ? appt.mentorId : appt.mentorId?._id ?? appt.mentor?._id;
                     const menteeId =
@@ -1123,10 +1133,10 @@ function DirectorScheduleContent() {
                               className="h-10 w-10"
                             /> */}
                             <Image
-  src={getPlatformIcon(appt.platform)}
-  alt={appt.platform || "Meeting platform"}
-  className="h-10 w-10"
-/>
+                              src={getPlatformIcon(appt.platform)}
+                              alt={appt.platform || "Meeting platform"}
+                              className="h-10 w-10"
+                            />
                           </div>
                         </div>
                         <div className="relative min-w-0 flex-1 px-4 py-4 sm:px-5">
@@ -1187,19 +1197,29 @@ function DirectorScheduleContent() {
                                   </Link>
                                 ) : mentorName}
                               </h4>
-                              <p className="text-[12px] text-[#cde2f2]/90">Mentor</p>
+                              <p className="text-[12px] text-[#cde2f2]/90">{mentorRole}</p>
                             </div>
                           </div>
-                          <p className="mb-2 text-[12px] text-[#cde2f2]">
-                            with{" "}
-                            <span className="font-medium text-white">
-                              {menteeId ? (
-                                <Link href={`/director/mentees/profile/${encodeURIComponent(menteeId)}`} className="hover:text-[#8ec5eb]">
-                                  {menteeName}
-                                </Link>
-                              ) : menteeName}
-                            </span>
-                          </p>
+                          <div className="mb-2 flex items-center gap-3">
+                            <Image
+                              src={mentee?.profilePicture || UserProfile}
+                              alt={menteeName}
+                              width={36}
+                              height={36}
+                              unoptimized={mentee?.profilePicture ? isRemoteImageSrc(mentee.profilePicture) : false}
+                              className="rounded-full border border-white/20"
+                            />
+                            <div>
+                              <h4 className="text-sm font-semibold text-white">
+                                {menteeId ? (
+                                  <Link href={`/director/mentees/profile/${encodeURIComponent(menteeId)}`} className="hover:text-[#8ec5eb]">
+                                    {menteeName}
+                                  </Link>
+                                ) : menteeName}
+                              </h4>
+                              <p className="text-[12px] text-[#cde2f2]/90">{menteeRole}</p>
+                            </div>
+                          </div>
                           <div className="mb-2 flex flex-wrap gap-2">
                             <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
                               <i className="fa-regular fa-calendar text-[#8ec5eb]" />
@@ -1257,15 +1277,13 @@ function DirectorScheduleContent() {
                         <div
                           key={date.toISOString()}
                           onClick={() => !isPast && setSelectedAvailabilityDay(dayIndex)}
-                          className={`rounded-md py-2 text-center transition ${
-                            isPast
+                          className={`rounded-md py-2 text-center transition ${isPast
                               ? "opacity-40 cursor-not-allowed pointer-events-none"
                               : "cursor-pointer"
-                          } ${
-                            isSelected
+                            } ${isSelected
                               ? "bg-[#8ec5eb]/30 font-semibold text-white ring-1 ring-[#8ec5eb]/55"
                               : "text-[#d9ebf8] hover:bg-white/10"
-                          } ${hasSlots && !isPast ? "ring-1 ring-amber-300/55" : ""}`}
+                            } ${hasSlots && !isPast ? "ring-1 ring-amber-300/55" : ""}`}
                         >
                           <div>{day}</div>
                           <div className="text-xs text-white/80">{date.getDate()}</div>
@@ -1298,7 +1316,7 @@ function DirectorScheduleContent() {
                   <div>
                     <label className="mb-1 block text-xs text-[#cde2f2]">Preferred Mode</label>
                     <select className={directorSelectDark}><option>Zoom</option>
-                    {/* <option>Google Meet</option> */}
+                      {/* <option>Google Meet</option> */}
                     </select>
                   </div>
                 </div>
@@ -1452,7 +1470,7 @@ function DirectorScheduleContent() {
                     className={directorBtnPrimary}
                     onClick={() => {
                       const newStart = slotToMins(newSlot.startTime, newSlot.startPeriod);
-                      const newEnd   = slotToMins(newSlot.endTime,   newSlot.endPeriod);
+                      const newEnd = slotToMins(newSlot.endTime, newSlot.endPeriod);
                       if (newEnd <= newStart) {
                         setSlotError("End time must be after start time.");
                         return;
@@ -1460,7 +1478,7 @@ function DirectorScheduleContent() {
                       const daySlots = (availability.find((d) => d.day === selectedAvailabilityDay)?.slots || []) as any[];
                       const overlaps = daySlots.some((s: any) => {
                         const sStart = slotToMins(s.startTime, s.startPeriod);
-                        const sEnd   = slotToMins(s.endTime,   s.endPeriod);
+                        const sEnd = slotToMins(s.endTime, s.endPeriod);
                         return newStart < sEnd && newEnd > sStart;
                       });
                       if (overlaps) {
@@ -1560,11 +1578,10 @@ function DirectorScheduleContent() {
                       key={type}
                       type="button"
                       onClick={() => { setScheduleRecipientType(type); setSelectedRecipient(null); }}
-                      className={`rounded-lg px-4 py-2 text-sm font-medium capitalize transition ${
-                        scheduleRecipientType === type
+                      className={`rounded-lg px-4 py-2 text-sm font-medium capitalize transition ${scheduleRecipientType === type
                           ? "bg-white/15 text-white ring-1 ring-[#8ec5eb]/40"
                           : "border border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
-                      }`}
+                        }`}
                     >
                       {type}
                     </button>
@@ -1591,11 +1608,10 @@ function DirectorScheduleContent() {
                         type="button"
                         key={personId}
                         onClick={() => setSelectedRecipient(person)}
-                        className={`flex w-full items-center justify-between gap-4 rounded-xl border px-4 py-3 text-left transition ${
-                          isSelected
+                        className={`flex w-full items-center justify-between gap-4 rounded-xl border px-4 py-3 text-left transition ${isSelected
                             ? "border-[#8ec5eb]/45 bg-[#8ec5eb]/15"
                             : "border-white/15 bg-white/5 hover:border-white/25 hover:bg-white/10"
-                        }`}
+                          }`}
                       >
                         <div className="flex min-w-0 items-center gap-3">
                           <Image
@@ -1607,13 +1623,13 @@ function DirectorScheduleContent() {
                             className="shrink-0 rounded-full border border-white/20"
                           />
                           <div className="flex min-w-0 flex-col">
-                              <span className="truncate text-sm font-medium text-white">
-                                {person.firstName} {person.lastName}
-                              </span>
-                              <span className="text-[11px] capitalize text-[#8ec5eb]/80">
-                                {person.role || scheduleRecipientType}
-                              </span>
-                            </div>
+                            <span className="truncate text-sm font-medium text-white">
+                              {person.firstName} {person.lastName}
+                            </span>
+                            <span className="text-[11px] capitalize text-[#8ec5eb]/80">
+                              {person.role || scheduleRecipientType}
+                            </span>
+                          </div>
                         </div>
                         <input type="radio" checked={isSelected} readOnly className="accent-[#8ec5eb]" aria-hidden />
                       </button>
@@ -1762,11 +1778,10 @@ function DirectorScheduleContent() {
                               key={label}
                               type="button"
                               onClick={() => setSelectedSlot(label)}
-                              className={`rounded-lg border px-3 py-2 text-sm transition ${
-                                selectedSlot === label
+                              className={`rounded-lg border px-3 py-2 text-sm transition ${selectedSlot === label
                                   ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20 text-white"
                                   : "border-white/15 bg-white/5 text-[#d9ebf8] hover:bg-white/10"
-                              }`}
+                                }`}
                             >
                               {label}
                             </button>
@@ -1781,14 +1796,14 @@ function DirectorScheduleContent() {
                     <select
                       value={selectedPlatform}
                       onChange={(e) => setSelectedPlatform(e.target.value)}
-                    className={directorSelectDark}
-                  >
-                    <option value="zoom">Zoom</option>
-                    {/* <option value="google meet">Google Meet</option>
+                      className={directorSelectDark}
+                    >
+                      <option value="zoom">Zoom</option>
+                      {/* <option value="google meet">Google Meet</option>
                     <option value="teams">Microsoft Teams</option>
                     <option value="phone">Phone</option> */}
-                  </select>
-                </div>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-3 border-t border-white/10 pt-6 shrink-0">
@@ -1902,11 +1917,10 @@ function DirectorScheduleContent() {
                           <button
                             key={idx}
                             onClick={() => setRescheduleSelectedSlot(item.iso)}
-                            className={`px-3 py-2 rounded-xl border text-sm transition ${
-                              rescheduleSelectedSlot === item.iso
+                            className={`px-3 py-2 rounded-xl border text-sm transition ${rescheduleSelectedSlot === item.iso
                                 ? "bg-blue-600 text-white font-semibold border-blue-500"
                                 : "border-white/20 bg-white/10 text-white hover:bg-white/20"
-                            }`}
+                              }`}
                           >
                             {item.label}
                           </button>

@@ -54,13 +54,14 @@ function collectSentSectionIds(payload: unknown): Set<string> {
 }
 
 function readCurrentPastorId(): string {
+  const fallbackId = String(getCookie("userId") || "").trim();
   const raw = getCookie("user");
-  if (!raw) return "";
+  if (!raw) return fallbackId;
   try {
     const parsed = JSON.parse(raw) as { id?: string; _id?: string };
-    return String(parsed.id || parsed._id || "").trim();
+    return String(parsed.id || parsed._id || fallbackId || "").trim();
   } catch {
-    return "";
+    return fallbackId;
   }
 }
 

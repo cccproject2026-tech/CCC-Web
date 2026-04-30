@@ -117,7 +117,7 @@ export default function PastorAssessmentDetailPage() {
               onClick={toSurveyResults}
               className="bg-white text-[#103C8C] text-sm font-semibold px-6 py-2.5 rounded-md shadow-sm hover:bg-[#F3F5FF] transition max-sm:w-full"
             >
-              View Your Survey Results
+              View Your Survey Submission
             </button>
 
             <button
@@ -131,7 +131,7 @@ export default function PastorAssessmentDetailPage() {
           {hasMentorRecommendations && assessmentId ? (
             <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-white/20 bg-white/5 p-4">
               <p className="text-sm text-[#d9ebf8]">
-                Mentor recommendations (CDP) are available for this assessment.
+                Customized Development Plans (CDP) are available for this assessment.
               </p>
               <button
                 type="button"
@@ -140,7 +140,7 @@ export default function PastorAssessmentDetailPage() {
                 }
                 className="rounded-lg border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
               >
-                Open Recommendation
+                Customized Development Plans (CDP)
               </button>
             </div>
           ) : null}

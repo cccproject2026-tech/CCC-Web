@@ -118,6 +118,36 @@ function getPlatformIcon(platform?: string) {
 
   return ZoomIcon;
 }
+/**
+ * Given a mentor's own ID and an appointment, returns the OTHER party (pastor/director).
+ * The API is queried with mentorId so `appt.mentor` could be populated with the logged-in
+ * mentor. We compare IDs to find which populated object is NOT the current user.
+ */
+function resolveOtherPerson(
+  appt: Appointment,
+  currentMentorId: string | null,
+): import("@/app/Services/types/appointments.types").PersonInfo | undefined {
+  const mid = currentMentorId ?? "";
+  const userObj: import("@/app/Services/types/appointments.types").PersonInfo | undefined =
+    appt.user ??
+    (appt.userId && typeof appt.userId === "object"
+      ? (appt.userId as import("@/app/Services/types/appointments.types").PersonInfo)
+      : undefined);
+  const mentorObj: import("@/app/Services/types/appointments.types").PersonInfo | undefined =
+    appt.mentor ??
+    (appt.mentorId && typeof appt.mentorId === "object"
+      ? (appt.mentorId as import("@/app/Services/types/appointments.types").PersonInfo)
+      : undefined);
+
+  // If userObj is the logged-in mentor, the other person is mentorObj (and vice-versa)
+  if (userObj && (userObj._id === mid || (userObj as any).id === mid)) return mentorObj;
+  // userObj is the other party
+  if (userObj) return userObj;
+  // Only mentorObj available — if it's us, no other info; otherwise return it
+  if (mentorObj && mentorObj._id !== mid && (mentorObj as any).id !== mid) return mentorObj;
+  return undefined;
+}
+
 function MentorScheduleContent() {
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<
@@ -1204,6 +1234,12 @@ function MentorScheduleContent() {
                   {selectedDayAppointments.map((appt, index) => {
                     const meetingDate = new Date(appt.meetingDate);
                     const apptKey = appointmentEntityId(appt) || String(index);
+                    const otherPerson = resolveOtherPerson(appt, mentorId);
+                    const displayName = otherPerson
+                      ? `${otherPerson.firstName ?? ""} ${otherPerson.lastName ?? ""}`.trim() || "Unknown"
+                      : "Unknown";
+                    const rawRole = otherPerson?.role ?? "pastor";
+                    const displayRole = rawRole.charAt(0).toUpperCase() + rawRole.slice(1).toLowerCase();
 
                     return (
                       <div
@@ -1224,7 +1260,7 @@ function MentorScheduleContent() {
                         <div className="min-w-0 flex-1 px-0 pt-4 sm:px-5 sm:pt-0">
                           <div className="mb-2 flex items-center gap-3">
                             <Image
-                              src={appt.user?.profilePicture || UserProfile}
+                              src={otherPerson?.profilePicture || UserProfile}
                               alt="User"
                               width={36}
                               height={36}
@@ -1233,10 +1269,10 @@ function MentorScheduleContent() {
 
                             <div>
                               <h4 className="text-sm font-semibold text-white">
-                                {appt.user?.firstName} {appt.user?.lastName}
+                                {displayName}
                               </h4>
 
-                              <p className="text-[12px] text-[#cde2f2]/90">Pastor</p>
+                              <p className="text-[12px] text-[#cde2f2]/90">{displayRole}</p>
                             </div>
                           </div>
 
@@ -1263,9 +1299,9 @@ function MentorScheduleContent() {
 
                           <div className="flex items-center justify-between">
                             <div className="flex gap-3 text-[15px] text-[#8ec5eb]">
-                              <a href={(appt.user as any)?.phoneNumber ? `tel:${(appt.user as any).phoneNumber}` : undefined} aria-label="Call" className="transition hover:text-white"><i className="fa-solid fa-phone" /></a>
-                              <a href={(appt.user as any)?.phoneNumber ? `sms:${(appt.user as any).phoneNumber}` : undefined} aria-label="Text" className="transition hover:text-white"><i className="fa-regular fa-comment" /></a>
-                              <a href={(appt.user as any)?.phoneNumber ? `https://wa.me/${String((appt.user as any).phoneNumber).replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-label="WhatsApp" className="transition hover:text-white"><i className="fa-brands fa-whatsapp" /></a>
+                              <a href={(otherPerson as any)?.phoneNumber ? `tel:${(otherPerson as any).phoneNumber}` : undefined} aria-label="Call" className="transition hover:text-white"><i className="fa-solid fa-phone" /></a>
+                              <a href={(otherPerson as any)?.phoneNumber ? `sms:${(otherPerson as any).phoneNumber}` : undefined} aria-label="Text" className="transition hover:text-white"><i className="fa-regular fa-comment" /></a>
+                              <a href={(otherPerson as any)?.phoneNumber ? `https://wa.me/${String((otherPerson as any).phoneNumber).replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-label="WhatsApp" className="transition hover:text-white"><i className="fa-brands fa-whatsapp" /></a>
                             </div>
 
                             <div className="relative" data-mentor-appointment-menu>
@@ -1350,6 +1386,12 @@ function MentorScheduleContent() {
                   {pagedAppointmentHistory.map((appt, index) => {
                     const meetingDate = new Date(appt.meetingDate);
                     const apptKey = appointmentEntityId(appt) || `history-${historyPage}-${index}`;
+                    const otherPerson = resolveOtherPerson(appt, mentorId);
+                    const displayName = otherPerson
+                      ? `${otherPerson.firstName ?? ""} ${otherPerson.lastName ?? ""}`.trim() || "Unknown"
+                      : "Unknown";
+                    const rawRole = otherPerson?.role ?? "pastor";
+                    const displayRole = rawRole.charAt(0).toUpperCase() + rawRole.slice(1).toLowerCase();
                     return (
                       <div key={apptKey} className={`${mentorGlassCardRoadmap} relative items-stretch gap-0 p-4 sm:items-center sm:p-5`}>
                         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-0">
@@ -1365,15 +1407,15 @@ function MentorScheduleContent() {
                         <div className="min-w-0 flex-1 px-0 pt-4 sm:px-5 sm:pt-0">
                           <div className="mb-2 flex items-center gap-3">
                             <Image
-                              src={appt.user?.profilePicture || UserProfile}
+                              src={otherPerson?.profilePicture || UserProfile}
                               alt="User"
                               width={36}
                               height={36}
                               className="rounded-full border border-white/20"
                             />
                             <div>
-                              <h4 className="text-sm font-semibold text-white">{appt.user?.firstName} {appt.user?.lastName}</h4>
-                              <p className="text-[12px] text-[#cde2f2]/90">Pastor</p>
+                              <h4 className="text-sm font-semibold text-white">{displayName}</h4>
+                              <p className="text-[12px] text-[#cde2f2]/90">{displayRole}</p>
                             </div>
                           </div>
                           <div className="mb-2 flex flex-wrap gap-2">
