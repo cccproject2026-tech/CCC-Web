@@ -115,9 +115,14 @@ export default function MentorHeader({ showFullHeader = false }) {
         // const res = await getNotification(mentorId);
         // const list = res.data?.data?.notifications || [];
         // setNotificationList(list);
-        const res = await getNotification(mentorId);
+//         const res = await getNotification(mentorId);
+// const list = unwrapNotificationsList(res);
+// setNotificationList(list);
+const res = await getNotification(mentorId);
 const list = unwrapNotificationsList(res);
-setNotificationList(list);
+const newestFirst = [...list].reverse();
+
+setNotificationList(newestFirst);
       } catch (error) {
         console.error("Failed to fetch mentor notifications:", error);
         setNotificationList([]);

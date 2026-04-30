@@ -381,7 +381,8 @@ export function getNotificationHref(n: NotificationItem): string {
 }
 
   if (module === "interests") {
-    return "/director/interests";
+    // return "/director/interests";
+     return "/director/interest-list";
   }
 
   if (role === "pastor") return "/pastor/notifications";

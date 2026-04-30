@@ -30,9 +30,14 @@ export default function NotificationsPage() {
       setLoading(true);
       setError(null);
       try {
-        const res = await getNotification(uid);
+        // const res = await getNotification(uid);
+        const res = await getNotification({ role: "director" });
+        // const list = unwrapNotificationsList(res);
+        // if (!cancelled) setItems(list);
         const list = unwrapNotificationsList(res);
-        if (!cancelled) setItems(list);
+const newestFirst = [...list].reverse();
+
+if (!cancelled) setItems(newestFirst);
       } catch (e) {
         console.error(e);
         if (!cancelled) setError("Could not load notifications.");
