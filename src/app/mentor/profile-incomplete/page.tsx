@@ -27,6 +27,7 @@ export default function ProfileIncomplete() {
   const router = useRouter();
 
   const [user, setUser] = useState<User | null>(null);
+  const [checkingProfile, setCheckingProfile] = useState(true);
   const [profileImage, setProfileImage] = useState<string | StaticImageData>(
     ProfileLogo
   );
@@ -47,28 +48,65 @@ const [hasProfileChanged, setHasProfileChanged] = useState(false);
   const docFileInputRef = useRef<HTMLInputElement | null>(null); // documents
 
   // 🔹 Load user from localStorage on mount
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = getCookie("mentor");
-      if (stored) {
-        try {
-          const parsedAny = JSON.parse(stored) as any;
-          // Normalize `_id` -> `id` since some backend responses store only `_id`.
-          const normalized: User = {
-            ...(parsedAny as User),
-            id: parsedAny?.id || parsedAny?._id,
-          };
+//   useEffect(() => {
+//     if (typeof window !== "undefined") {
+//       const stored = getCookie("mentor");
+//       if (stored) {
+//         try {
+//           const parsedAny = JSON.parse(stored) as any;
+//           // Normalize `_id` -> `id` since some backend responses store only `_id`.
+//           const normalized: User = {
+//             ...(parsedAny as User),
+//             id: parsedAny?.id || parsedAny?._id,
+//           };
 
-          setUser(normalized);
-          if (normalized.profilePicture) {
-            setProfileImage(normalized.profilePicture);
-          }
-        } catch (e) {
-          console.error("Failed to parse user from localStorage", e);
-        }
-      }
+//           setUser(normalized);
+//           // if (normalized.profilePicture) {
+//           //   setProfileImage(normalized.profilePicture);
+//           // }
+//           setUser(normalized);
+
+// if (normalized.profilePicture) {
+//   router.replace("/mentor/home");
+//   return;
+// }
+
+// setProfileImage(ProfileLogo);
+//         } catch (e) {
+//           console.error("Failed to parse user from localStorage", e);
+//         }
+//       }
+//     }
+//   }, []);
+useEffect(() => {
+  const stored = getCookie("mentor");
+
+  if (!stored) {
+    setCheckingProfile(false);
+    return;
+  }
+
+  try {
+    const parsedAny = JSON.parse(stored) as any;
+
+    const normalized: User = {
+      ...(parsedAny as User),
+      id: parsedAny?.id || parsedAny?._id,
+    };
+
+    if (normalized.profilePicture) {
+      router.replace("/mentor/home");
+      return;
     }
-  }, []);
+
+    setUser(normalized);
+    setProfileImage(ProfileLogo);
+  } catch (e) {
+    console.error("Failed to parse user from cookie", e);
+  } finally {
+    setCheckingProfile(false);
+  }
+}, [router]);
 
   const handleEditClick = () => {
     fileInputRef.current?.click();
@@ -249,6 +287,10 @@ const handleSaveProfile = async () => {
     user?.firstName || user?.lastName
       ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim()
       : "";
+
+      if (checkingProfile) {
+  return null;
+}
 
   return (
     <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">

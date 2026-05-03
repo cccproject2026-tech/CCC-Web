@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/hero-bg.png";
 import { apiGetInterestByEmail } from "@/app/Services/interests.service";
 import { getCookie } from "@/app/utils/cookies";
 import { Interest } from "@/app/Services/types";
+import SetPasswordInlinePanel from "@/app/Components/SetPasswordInlinePanel";
 
 function normStatus(s: string | undefined | null): string {
   return String(s ?? "")
@@ -21,20 +22,32 @@ function normStatus(s: string | undefined | null): string {
  */
 export default function ProcessingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+const emailFromUrl = searchParams.get("email") ?? "";
   const [interest, setInterest] = useState<Interest | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [statusError, setStatusError] = useState<string | null>(null);
   const navigatedRef = useRef(false);
 
-  const fetchStatus = useCallback(async (): Promise<Interest | null> => {
-    const email = getCookie("interestEmail");
-    if (!email?.trim()) {
-      setStatusError("No saved email. Open the interest link from your confirmation email or resubmit the form.");
-      setInterest(null);
-      return null;
-    }
+  // const fetchStatus = useCallback(async (): Promise<Interest | null> => {
+  //   const email = getCookie("interestEmail");
+  //   if (!email?.trim()) {
+  //     setStatusError("No saved email. Open the interest link from your confirmation email or resubmit the form.");
+  //     setInterest(null);
+  //     return null;
+  //   }
 
-    const res = await apiGetInterestByEmail(email);
+  //   const res = await apiGetInterestByEmail(email);
+  const fetchStatus = useCallback(async (): Promise<Interest | null> => {
+  const email = emailFromUrl || getCookie("interestEmail");
+
+  if (!email?.trim()) {
+    setStatusError("No saved email. Open the interest link from your confirmation email or resubmit the form.");
+    setInterest(null);
+    return null;
+  }
+
+  const res = await apiGetInterestByEmail(email);
     const body = res.data;
     if (body && body.success === false) {
       throw new Error(body.message || "Unable to load status");
@@ -43,8 +56,7 @@ export default function ProcessingPage() {
     setInterest(data);
     setStatusError(null);
     return data;
-  }, []);
-
+ }, [emailFromUrl]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -54,10 +66,10 @@ export default function ProcessingPage() {
         if (!cancelled) {
           const statusNorm = normStatus(data?.status);
           // Check if already accepted on load
-          if (statusNorm === "accepted" && !navigatedRef.current) {
-            navigatedRef.current = true;
-            setTimeout(() => router.push("/pastor/setpassword"), 1500);
-          }
+          // if (statusNorm === "accepted" && !navigatedRef.current) {
+          //   navigatedRef.current = true;
+          //   setTimeout(() => router.push("/pastor/setpassword"), 1500);
+          // }
         }
       } catch (err) {
         if (!cancelled) {
@@ -73,8 +85,10 @@ export default function ProcessingPage() {
   }, [fetchStatus, router]);
 
   useEffect(() => {
-    const email = getCookie("interestEmail");
-    if (!email?.trim()) return;
+    // const email = getCookie("interestEmail");
+    // if (!email?.trim()) return;
+    const email = emailFromUrl || getCookie("interestEmail");
+if (!email?.trim()) return;
 
     let intervalId: ReturnType<typeof setInterval> | undefined;
 
@@ -82,12 +96,16 @@ export default function ProcessingPage() {
       try {
         const data = await fetchStatus();
         const next = normStatus(data?.status);
-        if (next === "accepted" && !navigatedRef.current) {
-          navigatedRef.current = true;
-          if (intervalId != null) window.clearInterval(intervalId);
-          setTimeout(() => router.push("/pastor/setpassword"), 1500);
-          return;
-        }
+        // if (next === "accepted" && !navigatedRef.current) {
+        //   navigatedRef.current = true;
+        //   if (intervalId != null) window.clearInterval(intervalId);
+        //   setTimeout(() => router.push("/pastor/setpassword"), 1500);
+        //   return;
+        // }
+        if (next === "accepted" && intervalId != null) {
+  window.clearInterval(intervalId);
+  return;
+}
         if (next === "rejected" && intervalId != null) {
           window.clearInterval(intervalId);
         }
@@ -110,17 +128,19 @@ export default function ProcessingPage() {
   const isPending = !isAccepted && !isRejected && !statusError;
 
   const handleCheckStatus = async () => {
-    const email = getCookie("interestEmail");
-    if (!email) return;
+    // const email = getCookie("interestEmail");
+    // if (!email) return;
+    const email = emailFromUrl || getCookie("interestEmail");
+if (!email) return;
     setStatusLoading(true);
     setStatusError(null);
     try {
       const data = await fetchStatus();
       const st = normStatus(data?.status);
-      if (st === "accepted" && !navigatedRef.current) {
-        navigatedRef.current = true;
-        setTimeout(() => router.push("/pastor/setpassword"), 1500);
-      }
+      // if (st === "accepted" && !navigatedRef.current) {
+      //   navigatedRef.current = true;
+      //   setTimeout(() => router.push("/pastor/setpassword"), 1500);
+      // }
     } catch (err) {
       setStatusError("Unable to load your status. Please try again later.");
     } finally {
@@ -221,12 +241,54 @@ export default function ProcessingPage() {
                 <div className="mt-6 max-w-2xl space-y-4 text-base leading-relaxed text-[#cde2f2] md:text-lg">
                   {statusError ? (
                     <p>{statusError}</p>
-                  ) : isAccepted ? (
-                    <>
-                      <p>You’re approved to continue. You’ll be redirected to set your password shortly.</p>
-                      <p>If nothing happens, go to Set Password from your email or open the button below.</p>
-                    </>
-                  ) : isRejected ? (
+                  // ) : isAccepted ? (
+                  //   <>
+                  //     {/* <p>You’re approved to continue. You’ll be redirected to set your password shortly.</p> */}
+                  //     <p>You’re approved to continue. Click the button below to set your password.</p>
+                  //     <p>If nothing happens, go to Set Password from your email or open the button below.</p>
+                  //   </>
+//                   ) : isAccepted ? (
+//   <>
+//     <p>You’re approved to continue. Complete your account setup by creating your password.</p>
+
+//     <div
+//       role="button"
+//       tabIndex={0}
+//       onClick={() => router.push("/pastor/setpassword")}
+//       onKeyDown={(e) => {
+//         if (e.key === "Enter" || e.key === " ") {
+//           router.push("/pastor/setpassword");
+//         }
+//       }}
+//       className="mt-6 cursor-pointer rounded-2xl border border-emerald-300/30 bg-emerald-400/10 p-5 transition hover:border-emerald-300/50 hover:bg-emerald-400/15"
+//     >
+//       <div className="flex items-start gap-4">
+//         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-400/20 text-emerald-200">
+//           <i className="fa-solid fa-lock text-base" />
+//         </div>
+
+//         <div className="min-w-0 flex-1">
+//           <p className="text-base font-semibold text-white">Set your password</p>
+//           <p className="mt-1 text-sm leading-6 text-[#cde2f2]">
+//             Create your password to activate your account and sign in.
+//           </p>
+//         </div>
+
+//         <i className="fa-solid fa-arrow-right mt-1 text-sm text-emerald-200" />
+//       </div>
+//     </div>
+//   </>
+// )
+) : isAccepted ? (
+  <>
+    <p>You’re approved to continue. Complete your account setup by creating your password.</p>
+
+    <div className="mt-6">
+      <SetPasswordInlinePanel />
+    </div>
+  </>
+)
+                   : isRejected ? (
                     <p>
                       If you have questions, please contact us using the information on this page. We’re grateful for
                       your interest in Community Change.
@@ -257,7 +319,7 @@ export default function ProcessingPage() {
                   >
                     {statusLoading ? "Checking…" : "Check Status"}
                   </button>
-                  {isAccepted && (
+                  {/* {isAccepted && (
                     <button
                       type="button"
                       onClick={() => router.push("/pastor/setpassword")}
@@ -265,7 +327,7 @@ export default function ProcessingPage() {
                     >
                       Go to Set Password
                     </button>
-                  )}
+                  )} */}
                   <Link
                     href="/pastor/Thankyou"
                     className="text-center text-sm font-medium text-[#8ec5eb] underline-offset-4 hover:underline sm:text-left"
