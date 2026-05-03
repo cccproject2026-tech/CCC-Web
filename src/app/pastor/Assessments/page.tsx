@@ -57,6 +57,7 @@ type Row = {
   desc: string;
   status: "Due" | "Not Started" | "Completed" | "Submitted";
   date: string;
+  submittedAt?: string;
   imgUrl: string | null;
   button: string;
   meeting?: string;
@@ -112,12 +113,11 @@ export default function PastorAssessments() {
 
         const progressData = unwrapProgressData(progressRes);
         const assessmentProgress = progressData?.assessments || [];
-
         const mapped = list
           .map((item) => {
             const flat = flattenAssignedAssessmentRow(item);
             if (!flat) return null;
-            const { assessment, assessmentId: aid, assignmentId, dueDate, meetingDate } = flat;
+            const { assessment, assessmentId: aid, assignmentId, dueDate, meetingDate, updatedAt } = flat;
             const progress = assessmentProgress.find(
               (p: { assessmentId?: string; assignmentId?: string }) =>
                 String(p.assessmentId) === aid ||
@@ -126,7 +126,9 @@ export default function PastorAssessments() {
 
             const ps = String(progress?.status || "").toLowerCase().replace(/\s+/g, "_");
             let status: Row["status"] = "Not Started";
-            if (ps === "completed" || ps === "reviewed") status = "Completed";
+            if (ps === "completed" || ps === "reviewed") {
+              status = meetingDate && new Date(meetingDate).getTime() < Date.now() ? "Completed" : "Submitted";
+            }
             else if (ps === "submitted") status = "Submitted";
             else if (
               ps === "in_progress" ||
@@ -150,6 +152,7 @@ export default function PastorAssessments() {
               desc: (assessment?.description as string) || "",
               status,
               date: dueDate ? new Date(dueDate).toLocaleDateString() : "",
+              submittedAt: updatedAt ? new Date(updatedAt).toLocaleDateString() : undefined,
               imgUrl,
               button:
                 status === "Completed"
@@ -296,10 +299,10 @@ export default function PastorAssessments() {
                     ) : (
                       <ApiImagePlaceholder className="h-full w-full rounded-lg" />
                     )}
-                    {item.date ? (
+                    {(item.status === "Due" || item.status === "Not Started") && item.date ? (
                       <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-md bg-[#fff6d8] px-2 py-[3px] text-xs font-semibold text-[#d38a00]">
                         <i className="fa-regular fa-calendar text-xs" />
-                        {item.date}
+                        Due: {item.date}
                       </div>
                     ) : null}
                   </div>
@@ -322,7 +325,7 @@ export default function PastorAssessments() {
 
                       {item.status === "Submitted" && (
                         <>
-                          <p className="mb-2 text-xs text-[#d9ebf8]">Submitted on : {item.date}</p>
+                          <p className="mb-2 text-xs text-[#d9ebf8]">Submitted on : {item.submittedAt ?? item.date}</p>
                           {item.meeting ? (
                             <p className="inline-block rounded-md bg-white/15 px-3 py-2 text-xs font-medium text-[#d9ebf8]">
                               Meeting: {item.meeting}
@@ -332,7 +335,7 @@ export default function PastorAssessments() {
                       )}
 
                       {item.status === "Completed" && (
-                        <p className="mt-2 text-xs text-[#d9ebf8]">Completed on : {item.date}</p>
+                        <p className="mt-2 text-xs text-[#d9ebf8]">Completed on : {item.meeting ?? item.date}</p>
                       )}
                     </div>
 

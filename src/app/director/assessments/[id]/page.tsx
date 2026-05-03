@@ -32,7 +32,6 @@ import {
   mapAssessmentFromApi,
   newDirectorEditSection,
   sectionToDirectorEditWizard,
-  WIZARD_LAYER_COUNT,
 } from "@/app/Services/utils/assessment-mapper";
 
 type PreSurveyRow = {
@@ -41,6 +40,9 @@ type PreSurveyRow = {
   type: "text" | "number";
   placeholder: string;
 };
+
+const MAX_BANNER_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_BANNER_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp"]);
 
 const defaultPreSurveyRow = (): PreSurveyRow => ({
   id: Date.now(),
@@ -99,6 +101,14 @@ export default function ViewEditAssessmentPage() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  const focusField = useCallback((id: string) => {
+    if (typeof document === "undefined") return;
+    const el = document.getElementById(id) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.focus();
+  }, []);
+
   useEffect(() => {
     if (!params?.id) return;
 
@@ -127,7 +137,9 @@ export default function ViewEditAssessmentPage() {
           (mapped.type as string) === "CMA" || preSurveyFromApiDetail(raw).some((r) => r.text.trim().length > 0),
         );
         setInstructions(
-          mapped.instructions.length > 0 ? mapped.instructions.map((i) => i.text) : [""],
+          mapped.instructions.length > 0
+            ? mapped.instructions.map((i: { text: string }) => i.text)
+            : [""],
         );
         setWizardSections(
           mapped.sections.length > 0
@@ -314,41 +326,68 @@ export default function ViewEditAssessmentPage() {
   };
 
   const handleSaveChanges = async () => {
-    if (!assessment?.id) return;
+    if (!assessment?.id) {
+      showToast("Could not save: assessment id is missing.");
+      return;
+    }
     setSaveSuccess(false);
     const name = assessmentName.trim();
     if (!name) {
       showToast("Please enter a name for this assessment.");
-      scrollToId("edit-basics");
+      focusField("field-assessment-name");
       return;
     }
     if (!description.trim()) {
       showToast("Add a short description (it appears on cards and the list).");
-      scrollToId("edit-basics");
+      focusField("field-assessment-desc");
       return;
     }
     const instructionLines = instructions.map((i) => i.trim()).filter(Boolean);
     if (instructionLines.length === 0) {
       showToast("Add at least one line of instructions for people taking the survey.");
-      scrollToId("edit-instructions");
+      focusField("director-instruction-0");
       return;
     }
-    const invalidSection = wizardSections.some(
-      (s) =>
-        s.layers.length !== WIZARD_LAYER_COUNT ||
-        s.layers.some((l) => !l.choices.some((c) => c.trim())),
-    );
-    if (invalidSection) {
+    const invalidSectionNameIdx = wizardSections.findIndex((s) => !s.name.trim());
+    if (invalidSectionNameIdx !== -1) {
       showToast(
-        `Each section needs ${WIZARD_LAYER_COUNT} steps (layers) and at least one filled-in answer choice on every step. Scroll to “Survey content” to fix it.`,
+        "Each section needs a name, and every choice field in each step must be filled. Scroll to Survey content to fix it.",
       );
-      scrollToId("edit-content");
+      focusField(`director-section-name-${invalidSectionNameIdx}`);
+      return;
+    }
+
+    const invalidChoice = wizardSections
+      .flatMap((section, sectionIdx) =>
+        section.layers.flatMap((layer, layerIdx) =>
+          layer.choices.map((choice, choiceIdx) => ({
+            sectionIdx,
+            layerIdx,
+            choiceIdx,
+            text: choice.trim(),
+          })),
+        ),
+      )
+      .find((item) => item.text.length === 0);
+    if (invalidChoice) {
+      showToast(
+        "Each section needs a name, and every choice field in each step must be filled. Scroll to Survey content to fix it.",
+      );
+      focusField(`director-choice-${invalidChoice.sectionIdx}-${invalidChoice.layerIdx}-${invalidChoice.choiceIdx}`);
       return;
     }
     const preSurveyPayload = buildPreSurveyPayloadForDirectorCreate(preSurveyRows);
     if (hasPreSurvey && preSurveyPayload.length === 0) {
       showToast("Pre-survey is on — add at least one question with some text, or turn pre-survey off.");
-      scrollToId("edit-pre");
+      focusField("director-presurvey-question-0");
+      return;
+    }
+    const firstEmptyPreSurveyIdx = hasPreSurvey
+      ? preSurveyRows.findIndex((row) => row.text.trim().length === 0)
+      : -1;
+    if (firstEmptyPreSurveyIdx !== -1) {
+      showToast("Fill all pre-survey question fields or remove empty rows.");
+      focusField(`director-presurvey-question-${firstEmptyPreSurveyIdx}`);
       return;
     }
 
@@ -510,7 +549,7 @@ export default function ViewEditAssessmentPage() {
               <p className="text-xs font-semibold uppercase tracking-wide text-white/50">On this page</p>
               <p className="text-sm text-white/75">
                 <strong>Basics</strong> — what people see in the list. <strong>Instructions</strong> — what they
-                read before they start. <strong>Content</strong> — each section has 4 quick steps and 4
+                read before they start. <strong>Content</strong> — each section has flexible steps (layers) and 4
                 follow-up plan levels. <strong>Banner</strong> is optional.
               </p>
               <nav
@@ -521,7 +560,7 @@ export default function ViewEditAssessmentPage() {
                   [
                     ["edit-basics", "Basics"] as [string, string],
                     ["edit-instructions", "Instructions"],
-                    ...(hasPreSurvey ? (["edit-pre", "Pre-survey"] as [string, string][]) : []),
+                    ...(hasPreSurvey ? ([["edit-pre", "Pre-survey"]] as [string, string][]) : []),
                     ["edit-content", "Survey content"],
                     ["edit-banner", "Banner"],
                   ] as [string, string][]
@@ -572,37 +611,31 @@ export default function ViewEditAssessmentPage() {
                 />
               </div>
               <div>
-                <span className={directorLabelClass}>Survey type</span>
+                <span className={directorLabelClass}>Include Pre-Survey Questions?</span>
                 <p className="mb-3 text-sm text-white/60">
-                  Choose whether people answer a few warm-up questions before the main survey.
+                  Select Yes to add pre-survey questions before the main assessment.
                 </p>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => setHasPreSurvey(false)}
-                    aria-pressed={!hasPreSurvey}
-                    className={`rounded-2xl border-2 p-4 text-left transition ${
-                      !hasPreSurvey
-                        ? "border-[#8ec5eb] bg-[#8ec5eb]/10 ring-2 ring-[#8ec5eb]/30"
-                        : "border-white/15 bg-white/[0.03] hover:border-white/30"
-                    }`}
-                  >
-                    <span className="block text-sm font-bold text-white">Main survey only (PMP)</span>
-                    <span className="mt-1 block text-xs text-white/65">No pre-survey step. Simpler path.</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setHasPreSurvey(true)}
-                    aria-pressed={hasPreSurvey}
-                    className={`rounded-2xl border-2 p-4 text-left transition ${
-                      hasPreSurvey
-                        ? "border-[#8ec5eb] bg-[#8ec5eb]/10 ring-2 ring-[#8ec5eb]/30"
-                        : "border-white/15 bg-white/[0.03] hover:border-white/30"
-                    }`}
-                  >
-                    <span className="block text-sm font-bold text-white">Pre-survey + main (CMA)</span>
-                    <span className="mt-1 block text-xs text-white/65">Add a few text or number questions first, then the main flow.</span>
-                  </button>
+                <div className="flex flex-wrap gap-6">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
+                    <input
+                      type="radio"
+                      name="hasPreSurvey"
+                      checked={!hasPreSurvey}
+                      onChange={() => setHasPreSurvey(false)}
+                      className="h-4 w-4"
+                    />
+                    No
+                  </label>
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
+                    <input
+                      type="radio"
+                      name="hasPreSurvey"
+                      checked={hasPreSurvey}
+                      onChange={() => setHasPreSurvey(true)}
+                      className="h-4 w-4"
+                    />
+                    Yes
+                  </label>
                 </div>
               </div>
             </div>
@@ -626,6 +659,7 @@ export default function ViewEditAssessmentPage() {
                 {instructions.map((instruction, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     <input
+                      id={`director-instruction-${idx}`}
                       type="text"
                       value={instruction}
                       onChange={(e) => handleUpdateInstruction(idx, e.target.value)}
@@ -652,44 +686,26 @@ export default function ViewEditAssessmentPage() {
             </div>
 
             {hasPreSurvey ? (
-              <div className="mb-8 scroll-mt-20" id="edit-pre">
-                <h2 className="mb-1 text-lg font-bold text-white">Pre-survey questions</h2>
+              <div className="mb-8 scroll-mt-20 rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6" id="edit-pre">
+                <h2 className="mb-1 text-lg font-bold text-white">Pre-Survey Question</h2>
                 <p className="mb-4 text-sm text-white/70">
-                  Short fields people complete before the main flow. They are not multiple choice.
+                  These questions will be shown before the main assessment.
                 </p>
                 <div className="space-y-5">
                   {preSurveyRows.map((row, qIdx) => (
                     <div
                       key={row.id}
-                      className="space-y-3 rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6"
+                      className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-4"
                     >
                       <div className="flex flex-wrap items-end gap-3">
-                        <div className="min-w-[200px] flex-1">
+                        <div className="min-w-[220px] flex-1">
                           <label className={directorLabelClass}>Question {qIdx + 1}</label>
                           <input
+                            id={`director-presurvey-question-${qIdx}`}
                             type="text"
                             value={row.text}
                             onChange={(e) => handleUpdatePreSurvey(qIdx, "text", e.target.value)}
-                            className={directorInputClass}
-                          />
-                        </div>
-                        <div className="w-full sm:w-40">
-                          <label className={directorLabelClass}>Type</label>
-                          <select
-                            value={row.type}
-                            onChange={(e) => handleUpdatePreSurvey(qIdx, "type", e.target.value)}
-                            className={`${directorInputClass} cursor-pointer`}
-                          >
-                            <option value="number">Number</option>
-                            <option value="text">Text</option>
-                          </select>
-                        </div>
-                        <div className="min-w-[160px] flex-1">
-                          <label className={directorLabelClass}>Placeholder</label>
-                          <input
-                            type="text"
-                            value={row.placeholder}
-                            onChange={(e) => handleUpdatePreSurvey(qIdx, "placeholder", e.target.value)}
+                            placeholder="e.g. What is your current church?"
                             className={directorInputClass}
                           />
                         </div>
@@ -720,9 +736,9 @@ export default function ViewEditAssessmentPage() {
             <div className="mb-4 scroll-mt-20" id="edit-content">
               <h2 className="text-lg font-bold text-white">Survey content</h2>
               <p className="mb-2 text-sm text-white/65">
-                Add one or more <strong>sections</strong>. Each has four <strong>steps</strong> (what people
-                choose from) and four <strong>plan levels</strong> (suggested follow-up). Every step needs at
-                least one non-empty choice.
+                Add one or more <strong>sections</strong>. Each has one or more <strong>steps</strong> (what
+                people choose from) and four <strong>plan levels</strong> (suggested follow-up). Every step needs
+                at least one non-empty choice.
               </p>
             </div>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -757,6 +773,7 @@ export default function ViewEditAssessmentPage() {
                   <div>
                     <label className={directorLabelClass}>Section name</label>
                     <input
+                      id={`director-section-name-${sectionIdx}`}
                       type="text"
                       value={section.name}
                       onChange={(e) => handleUpdateSection(sectionIdx, "name", e.target.value)}
@@ -775,7 +792,7 @@ export default function ViewEditAssessmentPage() {
                     />
                   </div>
                   <p className="text-sm text-white/70">
-                    Below: <strong>Steps 1–{WIZARD_LAYER_COUNT}</strong> are the answer choices. Then add
+                    Below: <strong>Steps 1–{section.layers.length}</strong> are the answer choices. Then add
                     <strong> plan lines</strong> for each of the four levels.
                   </p>
 
@@ -794,6 +811,7 @@ export default function ViewEditAssessmentPage() {
                       {layer.choices.map((choice, choiceIdx) => (
                         <div key={choiceIdx} className="mb-2 flex items-center gap-2">
                           <input
+                            id={`director-choice-${sectionIdx}-${layerIdx}-${choiceIdx}`}
                             type="text"
                             value={choice}
                             onChange={(e) =>
@@ -900,6 +918,17 @@ export default function ViewEditAssessmentPage() {
                 onChange={(e) => {
                   const f = e.target.files?.[0] || null;
                   e.target.value = "";
+
+                  if (f && !ALLOWED_BANNER_TYPES.has(f.type)) {
+                    showToast("Use a PNG, JPG, or WEBP image.");
+                    return;
+                  }
+
+                  if (f && f.size > MAX_BANNER_SIZE_BYTES) {
+                    showToast("File size must be less than 10 MB.");
+                    return;
+                  }
+
                   if (bannerPreview?.startsWith("blob:")) URL.revokeObjectURL(bannerPreview);
                   setBannerFile(f);
                   setBannerPreview(f ? URL.createObjectURL(f) : resolveApiMediaUrl(assessment.bannerImage) || null);

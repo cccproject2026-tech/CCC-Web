@@ -8,6 +8,7 @@ import DirectorHero from "../../DirectorHero";
 import MentorBg from "../../../Assets/mentor-bg.png";
 import Mentor1 from "../../../Assets/mentor1.png";
 import { apiGetInterestById, apiUpdateInterestStatus } from "@/app/Services/interests.service";
+import { apiAssignUsers, apiGetAllUsers } from "@/app/Services/users.service";
 import type { ChurchDetails } from "@/app/Services/types/interests.types";
 import type { Interest } from "@/app/Services/types";
 import { directorGlassCard, directorPageRoot } from "../../directorUi";
@@ -43,7 +44,14 @@ export default function InterestDetailPage() {
   const [activeTab, setActiveTab] = useState<"details" | "interests" | "history">("details");
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showAcceptedModal, setShowAcceptedModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
+const [assignUsers, setAssignUsers] = useState<any[]>([]);
+const [assignLoading, setAssignLoading] = useState(false);
+const [selectedAssignUserId, setSelectedAssignUserId] = useState<string>("");
+const [assignError, setAssignError] = useState<string | null>(null);
+
 
   const [interestData, setInterestData] = useState<Interest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,20 +84,101 @@ export default function InterestDetailPage() {
     fetchInterest();
   }, [slug]);
 
+    const isMentorInterest = String(interestData?.title ?? "")
+    .toLowerCase()
+    .includes("mentor");
+
+  useEffect(() => {
+    if (!showAssignModal) return;
+
+    const loadAssignUsers = async () => {
+      try {
+        setAssignLoading(true);
+        setAssignError(null);
+        setSelectedAssignUserId("");
+
+        const roleToFetch = isMentorInterest ? "pastor" : "mentor";
+
+        const res = await apiGetAllUsers({
+          role: roleToFetch,
+          roleMatch: "mixed",
+          page: 1,
+          limit: 50,
+          t: Date.now(),
+        });
+
+        const data: any = res.data?.data;
+
+        const users = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.users)
+            ? data.users
+            : Array.isArray(data?.data)
+              ? data.data
+              : [];
+
+        setAssignUsers(users);
+      } catch (error) {
+        console.error("Failed to load assign users", error);
+        setAssignUsers([]);
+        setAssignError(
+          isMentorInterest ? "Could not load pastors." : "Could not load mentors."
+        );
+      } finally {
+        setAssignLoading(false);
+      }
+    };
+
+    loadAssignUsers();
+  }, [showAssignModal, isMentorInterest]);
+
   // const handleAssign = () => {
   //   setShowAssignModal(false);
   //   // setToast("Interest assigned to mentor successfully");
   //   setToast(assignSuccessMessage);
   //   setTimeout(() => setToast(null), 3000);
   // };
-  const handleAssign = () => {
-  setShowAssignModal(false);
-  setToast(assignSuccessMessage);
+//   const handleAssign = () => {
+//   setShowAssignModal(false);
+//   setToast(assignSuccessMessage);
 
-  setTimeout(() => {
-    router.push("/director/interest-list");
-  }, 1200);
+//   setTimeout(() => {
+//     router.push("/director/interest-list");
+//   }, 1200);
+// };
+const handleAssign = async () => {
+  if (!interestData?.userId) {
+    setToast("Missing user id — cannot assign.");
+    setTimeout(() => setToast(null), 3000);
+    return;
+  }
+
+  if (!selectedAssignUserId) {
+    setToast(
+      isMentorInterest
+        ? "Please select a pastor to assign."
+        : "Please select a mentor to assign."
+    );
+    setTimeout(() => setToast(null), 3000);
+    return;
+  }
+
+  try {
+    await apiAssignUsers(interestData.userId, [selectedAssignUserId]);
+
+    setShowAssignModal(false);
+    setToast(assignSuccessMessage);
+
+    setTimeout(() => {
+      router.push("/director/interest-list");
+    }, 1200);
+  } catch (error) {
+    console.error("Failed to assign user", error);
+    setToast("Failed to assign. Please try again.");
+    setTimeout(() => setToast(null), 3000);
+  }
 };
+
 
   const handleReject = async () => {
     if (!interestData?.userId) {
@@ -111,6 +200,26 @@ export default function InterestDetailPage() {
       setTimeout(() => setToast(null), 3000);
     }
   };
+
+  const handlePending = async () => {
+  if (!interestData?.userId) {
+    setToast("Missing user id — cannot move to pending.");
+    setTimeout(() => setToast(null), 3000);
+    return;
+  }
+
+  try {
+    await apiUpdateInterestStatus(interestData.userId, "pending");
+    // setInterestData({ ...interestData, status: "pending" });
+    setInterestData({ ...interestData, status: "pending" as const });
+    setToast("Interest moved to pending successfully");
+    setTimeout(() => setToast(null), 3000);
+  } catch (error) {
+    console.error("Failed to move interest to pending", error);
+    setToast("Failed to move interest to pending");
+    setTimeout(() => setToast(null), 3000);
+  }
+};
 
   const handleAccept = async () => {
     if (!interestData?.userId) {
@@ -140,7 +249,8 @@ export default function InterestDetailPage() {
 
   setInterestData(updatedInterest);
   setToast("Interest accepted successfully. Please continue with assignment.");
-  setShowAssignModal(true);
+  // setShowAssignModal(true);
+  setShowAcceptedModal(true);
   setTimeout(() => setToast(null), 3000);
 } catch (error) {
   console.error("Failed to accept interest", error);
@@ -186,11 +296,13 @@ export default function InterestDetailPage() {
   }
 
   const church = interestData.churchDetails?.[0];
+
+  
   const interestsList = interestData.interests ?? [];
   const fullName = `${interestData.firstName} ${interestData.lastName}`.trim();
-  const isMentorInterest = String(interestData.title ?? "")
-  .toLowerCase()
-  .includes("mentor");
+  // const isMentorInterest = String(interestData.title ?? "")
+  // .toLowerCase()
+  // .includes("mentor");
 
 const assignButtonLabel = isMentorInterest ? "Assign to Mentee" : "Assign to Mentor";
 const assignSuccessMessage = isMentorInterest
@@ -352,17 +464,7 @@ const assignModalDescription = isMentorInterest
                   </dl>
 
                   <div className="mt-6 space-y-2 border-t border-white/10 pt-6">
-                  {interestData.status === "accepted" && (
-
-                    <button
-                      type="button"
-                      onClick={() => setShowAssignModal(true)}
-                      className="w-full rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 py-3 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
-                    >
-                      {/* Assign to mentor */}
-                      {assignButtonLabel}
-                    </button>
-                    )}
+                 
                     <button
                       type="button"
                       onClick={handleAccept}
@@ -379,6 +481,14 @@ const assignModalDescription = isMentorInterest
                     >
                       Reject interest
                     </button>
+                    <button
+  type="button"
+  onClick={handlePending}
+  disabled={interestData.status === "pending"}
+  className="w-full rounded-xl border border-amber-400/40 bg-amber-500/20 py-3 text-sm font-semibold text-amber-100 transition hover:bg-amber-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+>
+  Add to pending
+</button>
                   </div>
                 </div>
               </div>
@@ -590,6 +700,51 @@ const assignModalDescription = isMentorInterest
         </div>
       ) : null}
 
+      {showAcceptedModal ? (
+  <div
+    className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+    role="dialog"
+    aria-modal="true"
+  >
+    <div className={`${directorGlassCard} w-full max-w-md overflow-hidden`}>
+      <div className="p-6 text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white">
+          <i className="fa-solid fa-check text-2xl" />
+        </div>
+
+        <h3 className="text-lg font-semibold text-white">
+          Interest Form Accepted!
+        </h3>
+
+        <p className="mt-2 text-sm text-[#cde2f2]/90">
+          Log-in credentials have been sent to respective email ID
+        </p>
+
+        <div className="mt-6 flex gap-3">
+          <button
+            type="button"
+            onClick={() => setShowAcceptedModal(false)}
+            className="flex-1 rounded-xl border border-white/20 py-2.5 text-sm font-semibold text-white/90 transition hover:bg-white/10"
+          >
+            Later
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowAcceptedModal(false);
+              setShowAssignModal(true);
+            }}
+            className="flex-1 rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+          >
+            {assignButtonLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+) : null}
+
       {showAssignModal ? (
         <div
           className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
@@ -612,28 +767,55 @@ const assignModalDescription = isMentorInterest
   {assignModalDescription}
 </p>
 
-              <div className="mt-5 space-y-2">
-                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-3 py-3 transition hover:bg-white/10">
-                  <input type="radio" name="mentor" className="accent-[#8ec5eb]" />
-                  <div>
-                    <p className="font-medium text-white">John Doe</p>
-                    {/* <p className="text-xs text-[#cde2f2]/70">Mentor</p> */}
-                    <p className="text-xs text-[#cde2f2]/70">
-  {isMentorInterest ? "Mentee" : "Mentor"}
-</p>
-                  </div>
-                </label>
-                <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-3 py-3 transition hover:bg-white/10">
-                  <input type="radio" name="mentor" className="accent-[#8ec5eb]" />
-                  <div>
-                    <p className="font-medium text-white">Jacob Jones</p>
-                    {/* <p className="text-xs text-[#cde2f2]/70">Field mentor</p> */}
-                    <p className="text-xs text-[#cde2f2]/70">
-  {isMentorInterest ? "Mentee" : "Field mentor"}
-</p>
-                  </div>
-                </label>
-              </div>
+<div className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1">
+  {assignLoading ? (
+    <p className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm text-[#cde2f2]/80">
+      {isMentorInterest ? "Loading pastors…" : "Loading mentors…"}
+    </p>
+  ) : assignError ? (
+    <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-3 text-sm text-red-100">
+      {assignError}
+    </p>
+  ) : assignUsers.length > 0 ? (
+    assignUsers.map((user) => {
+      const userId = String(user._id ?? user.id ?? "");
+      const fullName =
+        `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() ||
+        user.name ||
+        user.email ||
+        "Unnamed user";
+
+      return (
+        <label
+          key={userId}
+          className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-3 py-3 transition hover:bg-white/10"
+        >
+          <input
+            type="radio"
+            name="assignUser"
+            value={userId}
+            checked={selectedAssignUserId === userId}
+            onChange={() => setSelectedAssignUserId(userId)}
+            className="accent-[#8ec5eb]"
+          />
+          <div className="min-w-0">
+            <p className="truncate font-medium text-white">{fullName}</p>
+            <p className="truncate text-xs text-[#cde2f2]/70">
+              {user.email ?? (isMentorInterest ? "Pastor" : "Mentor")}
+            </p>
+          </div>
+        </label>
+      );
+    })
+  ) : (
+    <p className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm text-[#cde2f2]/80">
+      {isMentorInterest ? "No pastors found." : "No mentors found."}
+    </p>
+  )}
+</div>
+
+
+
               <div className="mt-6 flex gap-3">
                 <button
                   type="button"
@@ -642,13 +824,21 @@ const assignModalDescription = isMentorInterest
                 >
                   Cancel
                 </button>
-                <button
+                {/* <button
                   type="button"
                   onClick={handleAssign}
                   className="flex-1 rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
                 >
                   Assign
-                </button>
+                </button> */}
+                <button
+  type="button"
+  onClick={handleAssign}
+  disabled={assignLoading || !selectedAssignUserId}
+  className="flex-1 rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
+>
+  Assign
+</button>
               </div>
             </div>
           </div>

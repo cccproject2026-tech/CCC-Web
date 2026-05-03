@@ -30,6 +30,8 @@ import {
 import { apiGetUserById } from "../Services/users.service";
 import { getGreeting } from "../Services/utils/helpers";
 import { getNotification, apiGetRoadmaps, apiGetAssessments, apiGetAllUsers } from "../Services/api";
+import type { NotificationItem } from "../Services/types/home.types";
+import { mapNotificationItemToPopup, unwrapNotificationsList } from "../Services/notificationUi";
 import { parseAssessmentsListPayload } from "../Services/assessment.service";
 
 export default function MentorHeader({ showFullHeader = false }) {
@@ -44,7 +46,8 @@ export default function MentorHeader({ showFullHeader = false }) {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
-  const [notificationList, setNotificationList] = useState<any[]>([]);
+  // const [notificationList, setNotificationList] = useState<any[]>([]);
+  const [notificationList, setNotificationList] = useState<NotificationItem[]>([]);
   const [searchResults, setSearchResults] = useState<{
     roadmaps: any[];
     assessments: any[];
@@ -109,9 +112,17 @@ export default function MentorHeader({ showFullHeader = false }) {
       }
 
       try {
-        const res = await getNotification(mentorId);
-        const list = res.data?.data?.notifications || [];
-        setNotificationList(list);
+        // const res = await getNotification(mentorId);
+        // const list = res.data?.data?.notifications || [];
+        // setNotificationList(list);
+//         const res = await getNotification(mentorId);
+// const list = unwrapNotificationsList(res);
+// setNotificationList(list);
+const res = await getNotification(mentorId);
+const list = unwrapNotificationsList(res);
+const newestFirst = [...list].reverse();
+
+setNotificationList(newestFirst);
       } catch (error) {
         console.error("Failed to fetch mentor notifications:", error);
         setNotificationList([]);
@@ -161,7 +172,7 @@ export default function MentorHeader({ showFullHeader = false }) {
     { icon: <User size={18} />, label: "Profile", path: "/mentor/profile" },
     { icon: <Award size={18} />, label: "Certificates", path: "/mentor/certificates" },
     { icon: <Clipboard size={18} />, label: "Mentorship Sessions", path: "/mentor/mentoring-session" },
-    { icon: <File size={18} />, label: "Assignments", path: "/mentor/assignments" },
+    // { icon: <File size={18} />, label: "Assignments", path: "/mentor/assignments" },
     { icon: <Trophy size={18} />, label: "Micro Grand", path: "/mentor/micro-grant" },
     { icon: <FolderOpen size={18} />, label: "Documents", path: "/mentor/documents" },
     {
@@ -313,30 +324,52 @@ export default function MentorHeader({ showFullHeader = false }) {
 
                   {/* Notifications List */}
                   <div className="p-2 space-y-2">
-                    {notificationList.slice(0, 4).map((note, i) => (
+                    {/* {notificationList.slice(0, 4).map((note, i) => (
                       <div
                         key={i}
                         className="flex items-start justify-between bg-[#F5F7FA] rounded-xl p-3"
-                      >
+                      > */}
+                      {notificationList.slice(0, 4).map((note) => {
+  const p = mapNotificationItemToPopup(note);
+
+  return (
+    <div
+      key={note._id}
+      role={p.link ? "button" : undefined}
+      tabIndex={p.link ? 0 : undefined}
+      onClick={() => {
+        if (p.link) {
+          setShowNotifications(false);
+          router.push(p.link);
+        }
+      }}
+      className={`flex items-start justify-between bg-[#F5F7FA] rounded-xl p-3 transition hover:bg-[#eef2f6] ${
+        p.link ? "cursor-pointer" : ""
+      }`}
+    >
                         <div className="flex items-start gap-3 w-full">
                           <Clipboard size={20} className="text-[#2679FF]" />
                           <div className="flex flex-col w-full">
                             <div className="flex justify-between">
                               <h3 className="font-semibold text-[14px] text-[#000000]">
-                                {note.name || "Notification"}
+                                {/* {note.name || "Notification"} */}
+                                {p.title}
                               </h3>
                               <div className="w-[8px] h-[8px] rounded-full bg-[#FFD700] mt-[2px]"></div>
                             </div>
                             <p className="text-[#7A7A7A] text-[13px] leading-snug">
-                              {note.details || note.description || ""}
+                              {/* {note.details || note.description || ""} */}
+                              {p.subtitle || ""}
                             </p>
                             <p className="text-[#9A9A9A] text-[12px] text-right mt-1">
-                              {note?.createdAt ? new Date(note.createdAt).toLocaleString() : ""}
+                              {/* {note?.createdAt ? new Date(note.createdAt).toLocaleString() : ""} */}
+                              {p.time}
                             </p>
                           </div>
                         </div>
                       </div>
-                    ))}
+                       );
+})}
                   </div>
                 </div>
               )}
@@ -363,13 +396,23 @@ export default function MentorHeader({ showFullHeader = false }) {
                     {user ? `${user.firstName} ${user.lastName}` : "Loading..."}
                   </p>
                 </div>
-                <Image
+                {/* <Image
                   src={user?.profilePicture || UserProfile}
                   alt={user ? `${user.firstName} profile` : "User profile"}
                   width={30}
                   height={30}
                   className="rounded-full border border-white/40"
-                />
+                /> */}
+                <div className="h-[30px] w-[30px] overflow-hidden rounded-full border border-white/40 bg-white/10">
+  <Image
+    src={user?.profilePicture || UserProfile}
+    alt={user ? `${user.firstName} profile` : "User profile"}
+    width={30}
+    height={30}
+    className="h-full w-full rounded-full object-cover"
+    unoptimized={typeof user?.profilePicture === "string" && user.profilePicture.startsWith("http")}
+  />
+</div>
               </button>
 
               {/* Profile Menu Dropdown */}

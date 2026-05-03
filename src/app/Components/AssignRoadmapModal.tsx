@@ -6,7 +6,24 @@ import Mentor2 from "../Assets/mentor2.png";
 import Mentor3 from "../Assets/mentor3.png";
 import { apiGetAllUsers } from "@/app/Services/users.service";
 import { apiAssignRoadmap } from "@/app/Services/api";
+import { parseMentorUsersListResponse } from "@/app/director/mentors/parseMentorUsersResponse";
 import { emitPastorAssignmentsChanged } from "@/app/utils/progress-sync";
+
+/** Match filter tabs to API roles ("lay leader" vs "lay-leader", case, etc.). */
+function normalizeRoleKey(role: string): string {
+  return String(role || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-");
+}
+
+function extractUserId(u: { id?: unknown; _id?: unknown }): string {
+  const rawId = u.id ?? u._id;
+  if (rawId != null && typeof rawId === "object" && rawId !== null && "$oid" in rawId) {
+    return String((rawId as { $oid: string }).$oid);
+  }
+  return rawId != null ? String(rawId) : "";
+}
 
 function formatAssignRoadmapError(err: unknown): string {
   const e = err as {
@@ -97,29 +114,56 @@ export default function AssignRoadmapModal({
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
+    // Do not send `status: "active"` — backend uses values like "accepted" for enrolled pastors
+    // (see director mentees + AssignMenteesModal, which omit status).
+    const base = {
+      roleMatch: "mixed" as const,
+      limit: 9999,
+      t: Date.now(),
+    };
+    const roleQueries = [
+      apiGetAllUsers({ ...base, role: "pastor" }),
+      apiGetAllUsers({ ...base, role: "lay leader" }),
+      apiGetAllUsers({ ...base, role: "seminarian" }),
+    ];
     try {
-      const res = await apiGetAllUsers({
-        role: "pastor",
-        roleMatch: "mixed",
-        limit: 9999,
-        status: "active",
-      });
-      const raw = res.data?.data?.users || [];
-      const allUsers = raw.filter((u: any) => {
+      const settled = await Promise.allSettled(roleQueries);
+      const combined: any[] = [];
+      for (const s of settled) {
+        if (s.status === "fulfilled")
+          combined.push(...parseMentorUsersListResponse(s.value).users);
+      }
+      if (settled.every((s) => s.status === "rejected")) {
+        setError("Failed to load users. Please try again.");
+        setPeople([]);
+        return;
+      }
+      if (settled.some((s) => s.status === "rejected")) {
+        // Partial failure: still show whoever loaded; no blocking banner
+        console.warn("Some user list requests failed", settled);
+      }
+
+      const byId = new Map<string, any>();
+      for (const u of combined) {
+        const id = extractUserId(u);
+        if (id) byId.set(id, u);
+      }
+
+      const allUsers = [...byId.values()].filter((u: any) => {
         if (u?.isDeleted === true || u?.deletedAt) return false;
-        const s = String(u?.status || "").toLowerCase();
-        if (s === "inactive" || s === "deleted") return false;
+        const st = String(u?.status || "").toLowerCase();
+        if (st === "inactive" || st === "deleted") return false;
         return true;
       });
 
       setPeople(
         allUsers.map((u: any, i: number) => ({
-          id: u.id || u._id,
-          name: `${u.firstName} ${u.lastName}`,
-          email: u.email,
+          id: extractUserId(u),
+          name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email || "User",
+          email: u.email ?? "",
           role: u.role,
           img: u.profilePicture || DEFAULT_IMAGES[i % DEFAULT_IMAGES.length],
-        }))
+        })).filter((p: Person) => p.id.length > 0)
       );
     } catch {
       setError("Failed to load users. Please try again.");
@@ -129,7 +173,10 @@ export default function AssignRoadmapModal({
   };
 
   const filteredPeople = people.filter((p) => {
-    const matchesRole = roleFilter === "all" || p.role === roleFilter;
+    const matchesRole =
+      roleFilter === "all" ||
+      p.role === roleFilter ||
+      normalizeRoleKey(p.role) === roleFilter;
     const matchesQuery =
       p.name.toLowerCase().includes(query.toLowerCase()) ||
       p.email.toLowerCase().includes(query.toLowerCase());
@@ -142,12 +189,28 @@ export default function AssignRoadmapModal({
     );
   };
 
+  const roadMapIdsSafe = roadmapIds
+    .map((x) => {
+      if (x == null) return "";
+      if (typeof x === "object" && x !== null && "$oid" in (x as object)) {
+        return String((x as { $oid: string }).$oid);
+      }
+      return String(x).trim();
+    })
+    .filter(Boolean);
+
   const handleAssign = async () => {
-    if (!roadmapIds.length || selected.length === 0) return;
+    if (selected.length === 0) return;
+    if (roadMapIdsSafe.length === 0) {
+      setError(
+        "Missing roadmap id. Close this dialog and use Assign from the roadmap card menu again.",
+      );
+      return;
+    }
     setAssigning(true);
     setError(null);
     try {
-      await apiAssignRoadmap({ userIds: selected, roadMapIds: roadmapIds });
+      await apiAssignRoadmap({ userIds: selected, roadMapIds: roadMapIdsSafe });
       emitPastorAssignmentsChanged(selected);
       onSuccess?.();
       setAssignSuccess("Roadmap assigned successfully.");
@@ -291,7 +354,12 @@ export default function AssignRoadmapModal({
           </p>
           <button
             onClick={handleAssign}
-            disabled={selected.length === 0 || assigning || Boolean(assignSuccess)}
+            disabled={
+              selected.length === 0 ||
+              assigning ||
+              Boolean(assignSuccess) ||
+              roadMapIdsSafe.length === 0
+            }
             className="px-6 py-2.5 bg-[#2E3B8E] text-white rounded-lg text-sm font-semibold hover:bg-[#1F2A6E] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
             {assigning && <i className="fa-solid fa-spinner animate-spin text-xs"></i>}

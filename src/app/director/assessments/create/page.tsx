@@ -22,12 +22,14 @@ import {
 import {
   buildCreateAssessmentSectionsFromWizard,
   buildPreSurveyPayloadForDirectorCreate,
+  defaultWizardPlanName,
 } from "@/app/Services/utils/assessment-mapper";
 import type { CreateAssessmentPayload } from "@/app/Services/types/assessment.types";
 import { isRemoteImageSrc } from "@/app/utils/image";
 
-/** Every section is created with exactly four layers (levels). */
-const SECTION_LAYER_COUNT = 4;
+const MIN_LAYERS = 1;
+/** CDP is always **four levels** (1–4), separate from choice layers. */
+const CDP_LEVEL_COUNT = 4;
 
 type WizardSection = {
   id: number;
@@ -52,20 +54,23 @@ const defaultPreSurveyRow = (): PreSurveyRow => ({
   placeholder: "Enter number",
 });
 
-const defaultSection = (): WizardSection => ({
-  id: Date.now(),
-  name: "",
-  guidelines: "",
-  layers: Array.from({ length: SECTION_LAYER_COUNT }, (_, i) => ({
-    id: i + 1,
-    choices: [""],
-  })),
-  plans: Array.from({ length: SECTION_LAYER_COUNT }, (_, i) => ({
-    id: i + 1,
-    name: `Level ${i + 1} - Customized Development Plans`,
-    items: [""],
-  })),
-});
+const defaultSection = (): WizardSection => {
+  const base = Date.now();
+  return {
+    id: base,
+    name: "",
+    guidelines: "",
+    layers: Array.from({ length: 2 }, (_, i) => ({
+      id: base + i,
+      choices: [""],
+    })),
+    plans: Array.from({ length: CDP_LEVEL_COUNT }, (_, i) => ({
+      id: base + i + 100,
+      name: defaultWizardPlanName(i),
+      items: [""],
+    })),
+  };
+};
 
 export default function CreateAssessmentPage() {
   const router = useRouter();
@@ -102,7 +107,21 @@ export default function CreateAssessmentPage() {
   };
 
   const handleAddSection = () => {
-    setSections([...sections, defaultSection()]);
+    const base = Date.now();
+    setSections([
+      ...sections,
+      {
+        id: base,
+        name: "",
+        guidelines: "",
+        layers: [{ id: base + 1, choices: [""] }],
+        plans: Array.from({ length: CDP_LEVEL_COUNT }, (_, i) => ({
+          id: base + 100 + i,
+          name: defaultWizardPlanName(i),
+          items: [""],
+        })),
+      },
+    ]);
   };
 
   const handleRemoveSection = (sectionIdx: number) => {
@@ -131,6 +150,28 @@ export default function CreateAssessmentPage() {
     const updated = [...sections];
     updated[sectionIdx].layers[layerIdx].choices.push("");
     setSections(updated);
+  };
+
+  const handleAddLayer = (sectionIdx: number) => {
+    setSections((prev) => {
+      const next = [...prev];
+      const copy = { ...next[sectionIdx] };
+      const idBase = Date.now();
+      copy.layers = [...copy.layers, { id: idBase, choices: [""] }];
+      next[sectionIdx] = copy;
+      return next;
+    });
+  };
+
+  const handleRemoveLayer = (sectionIdx: number, layerIdx: number) => {
+    setSections((prev) => {
+      if (prev[sectionIdx]?.layers.length <= MIN_LAYERS) return prev;
+      const next = [...prev];
+      const copy = { ...next[sectionIdx] };
+      copy.layers = copy.layers.filter((_, j) => j !== layerIdx);
+      next[sectionIdx] = copy;
+      return next;
+    });
   };
 
   const handleRemoveLayerChoice = (sectionIdx: number, layerIdx: number, choiceIdx: number) => {
@@ -223,12 +264,13 @@ export default function CreateAssessmentPage() {
 
     const invalidSection = sections.some(
       (s) =>
-        s.layers.length !== SECTION_LAYER_COUNT ||
+        s.layers.length < MIN_LAYERS ||
+        s.plans.length !== CDP_LEVEL_COUNT ||
         s.layers.some((l) => !l.choices.some((c) => c.trim())),
     );
     if (invalidSection) {
       showToast(
-        `Each section must have ${SECTION_LAYER_COUNT} layers, and each layer needs at least one choice with text.`,
+        `Each section needs at least one choice layer with text, and exactly ${CDP_LEVEL_COUNT} CDP level blocks (levels 1–4).`,
       );
       return;
     }
@@ -297,7 +339,7 @@ export default function CreateAssessmentPage() {
       <div className={`${directorPageContainer} px-4 pt-3 sm:px-6 lg:px-10 sm:pt-5`}>
         <DirectorHero
           title="Create assessment"
-          subtitle="Aligned with Director mobile: CMA includes a pre-survey; PMP does not. Four layers per section and optional CDP lines per level."
+          subtitle="CMA includes a pre-survey; PMP does not. Layers are multiple-choice steps (you can add or remove). Levels 1–4 are four CDP plan blocks per section and stay fixed."
           image={AssessmentBg}
           breadcrumbItems={[
             { label: "Home", href: "/director/home" },
@@ -334,9 +376,9 @@ export default function CreateAssessmentPage() {
               </div>
 
               <div>
-                <span className={directorLabelClass}>Include pre-survey questions?</span>
+                <span className={directorLabelClass}>Include Pre-Survey Questions?</span>
                 <p className="mb-3 text-sm text-white/60">
-                  Yes → CMA (pre-survey before main survey). No → PMP.
+                  Select Yes to add pre-survey questions before the main assessment.
                 </p>
                 <div className="flex flex-wrap gap-6">
                   <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
@@ -347,7 +389,7 @@ export default function CreateAssessmentPage() {
                       onChange={() => setHasPreSurvey(false)}
                       className="h-4 w-4"
                     />
-                    No (PMP)
+                    No
                   </label>
                   <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
                     <input
@@ -357,7 +399,7 @@ export default function CreateAssessmentPage() {
                       onChange={() => setHasPreSurvey(true)}
                       className="h-4 w-4"
                     />
-                    Yes (CMA)
+                    Yes
                   </label>
                 </div>
               </div>
@@ -401,50 +443,25 @@ export default function CreateAssessmentPage() {
             </div>
 
             {hasPreSurvey ? (
-              <div className="mb-8">
-                <h2 className="mb-1 text-lg font-bold text-white">Pre-survey questions</h2>
+              <div className="mb-8 rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6">
+                <h2 className="mb-1 text-lg font-bold text-white">Pre-Survey Question</h2>
                 <p className="mb-4 text-sm text-white/70">
-                  Shown before the main survey (mobile: text or number fields — not multiple-choice lists).
+                  These questions will be shown before the main assessment.
                 </p>
                 <div className="space-y-5">
                   {preSurveyRows.map((row, qIdx) => (
                     <div
                       key={row.id}
-                      className="space-y-3 rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6"
+                      className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-4"
                     >
                       <div className="flex flex-wrap items-end gap-3">
-                        <div className="min-w-[200px] flex-1">
+                        <div className="min-w-[220px] flex-1">
                           <label className={directorLabelClass}>Question {qIdx + 1}</label>
                           <input
                             type="text"
                             value={row.text}
                             onChange={(e) => handleUpdatePreSurvey(qIdx, "text", e.target.value)}
-                            placeholder="e.g. What is your current church membership?"
-                            className={directorInputClass}
-                          />
-                        </div>
-                        <div className="w-full sm:w-40">
-                          <label className={directorLabelClass}>Type</label>
-                          <select
-                            value={row.type}
-                            onChange={(e) =>
-                              handleUpdatePreSurvey(qIdx, "type", e.target.value)
-                            }
-                            className={`${directorInputClass} cursor-pointer`}
-                          >
-                            <option value="number">Number</option>
-                            <option value="text">Text</option>
-                          </select>
-                        </div>
-                        <div className="min-w-[160px] flex-1">
-                          <label className={directorLabelClass}>Placeholder</label>
-                          <input
-                            type="text"
-                            value={row.placeholder}
-                            onChange={(e) =>
-                              handleUpdatePreSurvey(qIdx, "placeholder", e.target.value)
-                            }
-                            placeholder="Enter number"
+                            placeholder="e.g. What is your current church?"
                             className={directorInputClass}
                           />
                         </div>
@@ -520,21 +537,56 @@ export default function CreateAssessmentPage() {
                     />
                   </div>
 
-                  <p className="text-sm text-white/70">
-                    This section has {SECTION_LAYER_COUNT} layers. Add at least one choice per layer.
-                  </p>
+                  <h4 className="text-sm font-semibold text-white/90">Choice layers (survey)</h4>
+                  <div className="flex flex-wrap items-end justify-between gap-3">
+                    <p className="text-sm text-white/70">
+                      {section.layers.length} layer{section.layers.length === 1 ? "" : "s"} — not the same
+                      as CDP levels 1–4 below. At least one filled option per layer.
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveLayer(sectionIdx, section.layers.length - 1)}
+                        disabled={section.layers.length <= MIN_LAYERS}
+                        className="rounded-lg border border-red-400/30 bg-red-500/15 px-2.5 py-1.5 text-xs font-semibold text-red-200 transition enabled:hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <i className="fa-solid fa-minus mr-1" />
+                        Layer
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddLayer(sectionIdx)}
+                        className="rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/15 px-2.5 py-1.5 text-xs font-semibold text-[#d6edff] transition hover:bg-[#8ec5eb]/25"
+                      >
+                        <i className="fa-solid fa-plus mr-1" />
+                        Layer
+                      </button>
+                    </div>
+                  </div>
 
                   {section.layers.map((layer, layerIdx) => (
                     <div key={layer.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                      <div className="mb-2 flex items-center justify-between gap-2">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                         <span className="text-sm font-semibold text-white/90">Layer {layerIdx + 1}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleAddLayerChoice(sectionIdx, layerIdx)}
-                          className="text-xs font-semibold text-[#8ec5eb] hover:underline"
-                        >
-                          + Choice
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleAddLayerChoice(sectionIdx, layerIdx)}
+                            className="text-xs font-semibold text-[#8ec5eb] hover:underline"
+                          >
+                            + Choice
+                          </button>
+                          {section.layers.length > MIN_LAYERS ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveLayer(sectionIdx, layerIdx)}
+                              className="rounded-lg border border-red-400/30 bg-red-500/15 px-2.5 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/25"
+                            >
+                              <i className="fa-solid fa-trash mr-1" />
+                              Remove layer
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                       {layer.choices.map((choice, choiceIdx) => (
                         <div key={choiceIdx} className="mb-2 flex items-center gap-2">
@@ -569,6 +621,11 @@ export default function CreateAssessmentPage() {
                     </div>
                   ))}
 
+                  <h4 className="pt-2 text-sm font-semibold text-white/90">Levels 1–4 (CDP)</h4>
+                  <p className="text-xs text-white/55">
+                    Exactly four development-plan levels per section, independent of how many choice
+                    layers you added above.
+                  </p>
                   {section.plans.map((plan, planIdx) => (
                     <div key={plan.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
                       <div className="mb-2 flex items-center justify-between gap-2">

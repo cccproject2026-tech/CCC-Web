@@ -432,6 +432,7 @@ export default function DirectorAssessmentResultPage() {
   const searchParams = useSearchParams();
   const assessmentId = (searchParams.get("assessmentId") || "").trim();
   const userId = (searchParams.get("userId") || "").trim();
+  const editRecommendation = (searchParams.get("editRecommendation") || "").trim() === "1";
 
   const [loading, setLoading] = useState(true);
   const [assessmentTitle, setAssessmentTitle] = useState("Assessment Result");
@@ -444,6 +445,7 @@ export default function DirectorAssessmentResultPage() {
   const [recommendationSubmitting, setRecommendationSubmitting] = useState(false);
   const [recommendationRows, setRecommendationRows] = useState<RecommendationRow[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [didAutoOpenRecommendation, setDidAutoOpenRecommendation] = useState(false);
 
   useEffect(() => {
     if (!assessmentId || !userId) {
@@ -568,6 +570,13 @@ export default function DirectorAssessmentResultPage() {
       setRecommendationLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!editRecommendation || didAutoOpenRecommendation) return;
+    if (!assessmentId || !userId || loading) return;
+    setDidAutoOpenRecommendation(true);
+    void openRecommendationEditor();
+  }, [editRecommendation, didAutoOpenRecommendation, assessmentId, userId, loading]);
 
   const handleSendRecommendations = async () => {
     if (!assessmentId || !userId) return;

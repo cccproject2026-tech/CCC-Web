@@ -1,13 +1,18 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { updateInterestByEmail } from "@/app/Services/pastor.service";
 import HeroBg from "@/app/Assets/hero-bg.png";
 import ProfilePic from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import DocumentsModal from "@/app/Components/DocumentsModal";
-import { apiGetUserById, apiUpdateUserById } from "@/app/Services/users.service";
+import {
+  apiGetUserById,
+  apiUpdateUserById,
+  apiUploadProfilePicture,
+} from "@/app/Services/users.service";
 import type { ChurchDetails } from "@/app/Services/types/users.types";
 import { getGreeting, getMentorFromCookie } from "@/app/Services/utils/helpers";
 import {
@@ -33,6 +38,8 @@ export default function MentorProfile() {
   const [loading, setLoading] = useState(true);
   const [greeting, setGreeting] = useState("");
   const [form, setForm] = useState<Record<string, unknown> | null>(null);
+  const profileImageInputRef = useRef<HTMLInputElement | null>(null);
+const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
 
   useEffect(() => {
     setGreeting(getGreeting());
@@ -49,7 +56,8 @@ export default function MentorProfile() {
       }
 
       const res = await apiGetUserById(String(mid));
-      const data = res.data?.data as Record<string, unknown> | undefined;
+      // const data = res.data?.data as Record<string, unknown> | undefined;
+      const data = res.data?.data as unknown as Record<string, unknown> | undefined;
       if (data) {
         setProfile(data);
         setForm(data);
@@ -64,6 +72,39 @@ export default function MentorProfile() {
   useEffect(() => {
     void fetchProfile();
   }, [fetchProfile]);
+
+
+  const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  e.target.value = "";
+
+  if (!file) return;
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+if (!allowedTypes.includes(file.type)) {
+  alert("Only JPEG, PNG, and WebP images are allowed.");
+  return;
+}
+
+  const pid = (profile?.id ?? profile?._id) as string | undefined;
+  if (!pid) return;
+
+  try {
+    setUploadingProfileImage(true);
+
+    const formData = new FormData();
+    // formData.append("image", file);
+    formData.append("file", file);
+    
+
+    await apiUploadProfilePicture(pid, formData);
+    await fetchProfile();
+  } catch (err) {
+    console.error("Profile image upload failed", err);
+  } finally {
+    setUploadingProfileImage(false);
+  }
+};
 
   const handleAddChurch = () => {
     setForm((prev) => {
@@ -101,21 +142,119 @@ export default function MentorProfile() {
       if (!pid || !form) return;
 
       const interest = (form.interest as Record<string, unknown>) || {};
+      const email = form.email as string | undefined;
 
-      const payload = {
-        firstName: form.firstName as string | undefined,
-        lastName: form.lastName as string | undefined,
-        phoneNumber: interest.phoneNumber as string | undefined,
-        title: interest.title as string | undefined,
-        yearsInMinistry: interest.yearsInMinistry as string | undefined,
-        conference: interest.conference as string | undefined,
-        bio: interest.profileInfo as string | undefined,
-        churchDetails: (Array.isArray(interest.churchDetails) ? interest.churchDetails : []) as ChurchDetails[],
-      };
+      // const payload = {
+      //   firstName: form.firstName as string | undefined,
+      //   lastName: form.lastName as string | undefined,
+      //   phoneNumber: interest.phoneNumber as string | undefined,
+      //   title: interest.title as string | undefined,
+      //   yearsInMinistry: interest.yearsInMinistry as string | undefined,
+      //   conference: interest.conference as string | undefined,
+      //   profileInfo: interest.profileInfo as string | undefined,
+      //   bio: interest.profileInfo as string | undefined,
+      //   churchDetails: (Array.isArray(interest.churchDetails) ? interest.churchDetails : []) as ChurchDetails[],
+      // };
+//       const profileInfoValue = String(interest.profileInfo ?? form.bio ?? "");
 
-      await apiUpdateUserById(pid, payload);
-      await fetchProfile();
-      setIsEditing(false);
+// const payload = {
+//   firstName: form.firstName as string | undefined,
+//   lastName: form.lastName as string | undefined,
+//   phoneNumber: interest.phoneNumber as string | undefined,
+//   title: interest.title as string | undefined,
+//   yearsInMinistry: interest.yearsInMinistry as string | undefined,
+//   conference: interest.conference as string | undefined,
+//   currentCommunityProjects: interest.currentCommunityProjects as string | undefined,
+//   bio: profileInfoValue,
+//   churchDetails: (Array.isArray(interest.churchDetails)
+//     ? interest.churchDetails
+//     : []) as ChurchDetails[],
+// };
+
+const profileInfoValue = String(interest.profileInfo ?? form.bio ?? "");
+
+const churchDetailsPayload = (Array.isArray(interest.churchDetails)
+  ? interest.churchDetails
+  : []) as ChurchDetails[];
+
+// const payload = {
+//   firstName: form.firstName as string | undefined,
+//   lastName: form.lastName as string | undefined,
+//   phoneNumber: interest.phoneNumber as string | undefined,
+//   title: interest.title as string | undefined,
+//   yearsInMinistry: interest.yearsInMinistry as string | undefined,
+//   conference: interest.conference as string | undefined,
+//   currentCommunityProjects: interest.currentCommunityProjects as string | undefined,
+//   bio: profileInfoValue,
+
+//   churchDetails: churchDetailsPayload,
+
+//   interest: {
+//     churchDetails: churchDetailsPayload,
+//   },
+// } as any;
+
+const userPayload = {
+  firstName: form.firstName as string | undefined,
+  lastName: form.lastName as string | undefined,
+};
+ const interestPayload = {
+      phoneNumber: interest.phoneNumber as string | undefined,
+      title: interest.title as string | undefined,
+      yearsInMinistry: interest.yearsInMinistry as string | undefined,
+      conference: interest.conference as string | undefined,
+      currentCommunityProjects: interest.currentCommunityProjects as string | undefined,
+      profileInfo: profileInfoValue,
+      churchDetails: churchDetailsPayload,
+    };
+      // await apiUpdateUserById(pid, payload);
+      // await fetchProfile();
+      // setIsEditing(false);
+      // await apiUpdateUserById(pid, payload);
+      await Promise.all([
+  apiUpdateUserById(pid, userPayload),
+  email ? updateInterestByEmail(email, interestPayload) : Promise.resolve(),
+]);
+
+setForm((prev) => {
+  if (!prev) return prev;
+  const oldInterest = (prev.interest as Record<string, unknown>) || {};
+
+  return {
+    ...prev,
+    bio: profileInfoValue,
+    // interest: {
+    //   ...oldInterest,
+    //   profileInfo: profileInfoValue,
+    // },
+    interest: {
+  ...oldInterest,
+  profileInfo: profileInfoValue,
+  churchDetails: churchDetailsPayload,
+},
+  };
+});
+
+setProfile((prev) => {
+  if (!prev) return prev;
+  const oldInterest = (prev.interest as Record<string, unknown>) || {};
+
+  return {
+    ...prev,
+    bio: profileInfoValue,
+    // interest: {
+    //   ...oldInterest,
+    //   profileInfo: profileInfoValue,
+    // },
+    interest: {
+  ...oldInterest,
+  profileInfo: profileInfoValue,
+  churchDetails: churchDetailsPayload,
+},
+  };
+});
+
+setIsEditing(false);
     } catch (err) {
       console.error("Update failed", err);
     }
@@ -205,16 +344,45 @@ export default function MentorProfile() {
           <div
             className={`${mentorGlassCardFrost} flex h-auto w-full flex-shrink-0 flex-col p-6 text-center md:sticky md:top-24 md:w-[300px] md:self-start`}
           >
-            <div className="relative mx-auto mb-3 h-[100px] w-[100px]">
-              <Image
-                src={(profile.profilePicture as string) || ProfilePic}
-                alt=""
-                width={100}
-                height={100}
-                className="rounded-full border border-white/20 object-cover"
-                unoptimized={typeof profile.profilePicture === "string" && profile.profilePicture.startsWith("http")}
-              />
-            </div>
+       
+            {/* <div className="relative mx-auto mb-3 h-[100px] w-[100px] overflow-hidden rounded-full border border-white/20 bg-white/10">
+  <Image
+    src={(profile.profilePicture as string) || ProfilePic}
+    alt="Mentor profile"
+    width={100}
+    height={100}
+    className="h-full w-full rounded-full object-cover"
+    unoptimized={typeof profile.profilePicture === "string" && profile.profilePicture.startsWith("http")}
+  />
+</div> */}
+
+<div className="relative mx-auto mb-3 h-[100px] w-[100px] overflow-hidden rounded-full border border-white/20 bg-white/10">
+  <Image
+    src={(profile.profilePicture as string) || ProfilePic}
+    alt="Mentor profile"
+    width={100}
+    height={100}
+    className="h-full w-full rounded-full object-cover"
+    unoptimized={typeof profile.profilePicture === "string" && profile.profilePicture.startsWith("http")}
+  />
+
+  <button
+    type="button"
+    onClick={() => profileImageInputRef.current?.click()}
+    disabled={uploadingProfileImage}
+    className="absolute inset-x-0 bottom-0 bg-black/55 px-2 py-1 text-[10px] font-semibold text-white transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-60"
+  >
+    {uploadingProfileImage ? "Uploading..." : "Change"}
+  </button>
+
+  <input
+    ref={profileImageInputRef}
+    type="file"
+    accept="image/*"
+    className="hidden"
+    onChange={handleProfileImageChange}
+  />
+</div>
             <p className="mb-1 text-xs text-[#cde2f2]/80">{greeting}</p>
             <h3 className="text-base font-semibold text-white">
               {String(profile.firstName ?? "")} {String(profile.lastName ?? "")}
@@ -224,18 +392,25 @@ export default function MentorProfile() {
             <div className="my-3 border-t border-white/10" />
 
             <p className="mb-1 text-left text-xs font-medium text-[#cde2f2]/80">Profile information</p>
-            <textarea
-              readOnly
-              value={String(interest.profileInfo ?? "") || "No profile information added yet."}
-              className={`${inputClass} mb-4 min-h-[72px] resize-none`}
-              rows={3}
-            />
+        
+<textarea
+  readOnly={!isEditing}
+  // value={String(interest.profileInfo ?? profile.bio ?? "")}
+  value={String(interest.profileInfo || form.bio || profile.bio || "")}
+  onChange={(e) => {
+    updateInterest("profileInfo", e.target.value);
+    setForm((prev) => (prev ? { ...prev, bio: e.target.value } : prev));
+  }}
+  placeholder="No profile information added yet."
+  className={`${inputClass} mb-4 min-h-[72px] resize-none`}
+  rows={3}
+/>
             <button
               type="button"
               onClick={() => setShowDocuments(true)}
               className={`${mentorSecondaryCta} flex w-full items-center justify-center gap-2 text-xs`}
             >
-              <i className="fa-solid fa-paperclip text-[#8ec5eb]" /> Upload documents
+              <i className="fa-solid fa-paperclip text-[#8ec5eb]" /> Documents
             </button>
 
           </div>

@@ -66,21 +66,59 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
     setIsClient(true);
   }, []);
 
+  // useEffect(() => {
+  //   const userId = getPastorUserId();
+  //   if (!userId) return;
+
+  //   async function fetchProfile() {
+  //     try {
+  //       const res = await getSingleUser(userId);
+  //       setProfile(res.data?.data);
+  //     } catch (error) {
+  //       console.error("Error fetching user:", error);
+  //     }
+  //   }
+
+  //   fetchProfile();
+  // }, []);
+
   useEffect(() => {
-    const userId = getPastorUserId();
-    if (!userId) return;
+  const userId = getPastorUserId();
 
-    async function fetchProfile() {
-      try {
-        const res = await getSingleUser(userId);
-        setProfile(res.data?.data);
-      } catch (error) {
-        console.error("Error fetching user:", error);
-      }
+  let storedUser: any = {};
+  try {
+    storedUser = JSON.parse(getCookie("user") || "{}");
+  } catch {
+    storedUser = {};
+  }
+
+  if (storedUser?.id || storedUser?._id || storedUser?.profilePicture) {
+    setProfile(storedUser);
+  }
+
+  if (!userId) return;
+
+  async function fetchProfile() {
+    try {
+      const res = await getSingleUser(userId);
+      const apiUser = res.data?.data;
+
+      const mergedUser = {
+        ...apiUser,
+        profilePicture:
+          storedUser?.profilePicture ||
+          apiUser?.profilePicture ||
+          "",
+      };
+
+      setProfile(mergedUser);
+    } catch (error) {
+      console.error("Error fetching user:", error);
     }
+  }
 
-    fetchProfile();
-  }, []);
+  fetchProfile();
+}, []);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
@@ -151,26 +189,50 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
     },
   ];
 
+  // useEffect(() => {
+  //   const userId = getPastorUserId();
+  //   if (!userId) return;
+
+  //   async function fetchNotifications() {
+  //     try {
+  //       const res = await getNotifications(userId);
+  //       const list = unwrapNotificationsList(res);
+  //       setNotificationList(list);
+  //       const unread = list.filter((n) => !n.isRead).length;
+  //       setNotificationCount(unread > 0 ? Math.min(unread, 99) : 0);
+  //     } catch (err) {
+  //       console.error("Error fetching notifications:", err);
+  //       setNotificationList([]);
+  //       setNotificationCount(0);
+  //     }
+  //   }
+
+  //   fetchNotifications();
+  // }, []);
   useEffect(() => {
-    const userId = getPastorUserId();
-    if (!userId) return;
+  const pastorUserId = getPastorUserId();
 
-    async function fetchNotifications() {
-      try {
-        const res = await getNotifications(userId);
-        const list = unwrapNotificationsList(res);
-        setNotificationList(list);
-        const unread = list.filter((n) => !n.isRead).length;
-        setNotificationCount(unread > 0 ? Math.min(unread, 99) : 0);
-      } catch (err) {
-        console.error("Error fetching notifications:", err);
-        setNotificationList([]);
-        setNotificationCount(0);
-      }
+  if (!pastorUserId) return;
+
+  async function fetchNotifications(userId: string) {
+    try {
+      const res = await getNotifications(userId);
+      const list = unwrapNotificationsList(res);
+      const newestFirst = [...list].reverse();
+
+      setNotificationList(newestFirst);
+
+      const unread = newestFirst.filter((n) => !n.isRead).length;
+      setNotificationCount(unread > 0 ? Math.min(unread, 99) : 0);
+    } catch (err) {
+      console.error("Error fetching notifications:", err);
+      setNotificationList([]);
+      setNotificationCount(0);
     }
+  }
 
-    fetchNotifications();
-  }, []);
+  void fetchNotifications(pastorUserId);
+}, []);
 
   useEffect(() => {
     const query = searchQuery.trim();
@@ -389,13 +451,39 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
                         No notifications yet.
                       </p>
                     ) : (
+                      // notificationList.slice(0, 4).map((note) => {
+                      //   const p = mapNotificationItemToPopup(note);
+                      //   return (
+                      //     <div
+                      //       key={note._id}
+                      //       className="flex items-start justify-between rounded-xl bg-[#F5F7FA] p-3"
+                      //     >
                       notificationList.slice(0, 4).map((note) => {
-                        const p = mapNotificationItemToPopup(note);
-                        return (
-                          <div
-                            key={note._id}
-                            className="flex items-start justify-between rounded-xl bg-[#F5F7FA] p-3"
-                          >
+  const p = mapNotificationItemToPopup(note);
+  return (
+    <div
+      key={note._id}
+      role={p.link ? "button" : undefined}
+      tabIndex={p.link ? 0 : undefined}
+      onClick={() => {
+        if (p.link) {
+          setShowNotifications(false);
+          router.push(p.link);
+        }
+      }}
+      onKeyDown={(e) => {
+        if (!p.link) return;
+
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setShowNotifications(false);
+          router.push(p.link);
+        }
+      }}
+      className={`flex items-start justify-between rounded-xl bg-[#F5F7FA] p-3 transition hover:bg-[#eef2f6] ${
+        p.link ? "cursor-pointer" : ""
+      }`}
+    >
                             <div className="flex w-full items-start gap-3">
                               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/80 bg-white">
                                 <i className={`${p.icon} text-base ${p.iconColor}`} aria-hidden />
@@ -452,13 +540,22 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
                   </p>
 
                 </div>
-                <Image
+                {/* <Image
                   src={profile?.profilePicture || UserProfile}
                   alt="User"
                   width={30}
                   height={30}
                   className="rounded-full border border-white/40"
-                />
+                /> */}
+
+                <Image
+  src={profile?.profilePicture || UserProfile}
+  alt="User"
+  width={30}
+  height={30}
+  unoptimized
+  className="h-[30px] w-[30px] rounded-full border border-white/40 object-cover"
+/>
               </button>
 
               {/* Profile Menu Dropdown */}

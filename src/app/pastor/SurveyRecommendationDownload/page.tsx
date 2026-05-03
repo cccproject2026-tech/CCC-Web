@@ -24,8 +24,9 @@ type DownloadSection = {
 
 function readCurrentPastor() {
   const raw = getCookie("user");
+  const fallbackId = String(getCookie("userId") || "").trim();
   if (!raw) {
-    return { id: "", name: "Pastor" };
+    return { id: fallbackId, name: "Pastor" };
   }
   try {
     const parsed = JSON.parse(raw) as {
@@ -37,11 +38,11 @@ function readCurrentPastor() {
     };
     const name = parsed.name || `${parsed.firstName || ""} ${parsed.lastName || ""}`.trim() || "Pastor";
     return {
-      id: String(parsed.id || parsed._id || "").trim(),
+      id: String(parsed.id || parsed._id || fallbackId || "").trim(),
       name,
     };
   } catch {
-    return { id: "", name: "Pastor" };
+    return { id: fallbackId, name: "Pastor" };
   }
 }
 
@@ -55,6 +56,50 @@ export default function SurveyRecommendationDownload() {
   const [assessmentName, setAssessmentName] = useState("Assessment");
   const [sections, setSections] = useState<DownloadSection[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const handleDownload = () => {
+    if (sections.length === 0) return;
+
+    const exportedOn = new Date();
+    const lines: string[] = [
+      "Customized Development Plans (CDP)",
+      `Pastor: ${pastor.name}`,
+      `Assessment: ${assessmentName}`,
+      `Exported On: ${exportedOn.toLocaleString()}`,
+      "",
+    ];
+
+    sections.forEach((section, index) => {
+      lines.push(`Section ${index + 1}: ${section.sectionTitle}`);
+      lines.push(section.message || "-");
+      if (section.sentAt) {
+        lines.push(`Sent on: ${new Date(section.sentAt).toLocaleString()}`);
+      }
+      lines.push("");
+    });
+
+    try {
+      const blob = new Blob([lines.join("\n")], {
+        type: "text/plain;charset=utf-8",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const safeName = assessmentName
+        .trim()
+        .replace(/[^a-z0-9\-\s_]/gi, "")
+        .replace(/\s+/g, "-")
+        .toLowerCase();
+
+      link.href = url;
+      link.download = `${safeName || "assessment"}-cdp.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      window.print();
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -131,7 +176,8 @@ export default function SurveyRecommendationDownload() {
         </button>
         <button
           type="button"
-          onClick={() => window.print()}
+          onClick={handleDownload}
+          disabled={loading || sections.length === 0}
           className="rounded-xl bg-[#8ec5eb] px-5 py-2 text-sm font-semibold text-[#062946] shadow-[0_12px_30px_rgba(2,20,38,0.35)] transition hover:bg-[#a9d5f2]"
         >
           <i className="fa-solid fa-download mr-2" /> Download

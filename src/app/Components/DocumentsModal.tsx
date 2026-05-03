@@ -132,7 +132,7 @@ export default function DocumentsModal({ isOpen, onClose, userId }: DocumentsMod
                 <i className="fa-solid fa-plus"></i>
                 Add Files
               </button>
-              {pendingFiles.length > 0 && (
+              {/* {pendingFiles.length > 0 && (
                 <button
                   onClick={handleUpload}
                   disabled={isUploading || !hasPending}
@@ -141,7 +141,7 @@ export default function DocumentsModal({ isOpen, onClose, userId }: DocumentsMod
                   <i className="fa-solid fa-upload"></i>
                   {isUploading ? "Uploading…" : "Upload"}
                 </button>
-              )}
+              )} */}
             </div>
             <input
               ref={fileInputRef}
@@ -212,6 +212,19 @@ export default function DocumentsModal({ isOpen, onClose, userId }: DocumentsMod
               </div>
             )}
           </div>
+          {/* Footer */}
+<div className="flex justify-end gap-2 border-t bg-gray-50 px-6 py-4">
+  {pendingFiles.length > 0 && (
+    <button
+      onClick={handleUpload}
+      disabled={isUploading || !hasPending}
+      className="flex items-center gap-2 rounded-lg bg-[#2E3B8E] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#1F2A6E] disabled:opacity-60"
+    >
+      <i className="fa-solid fa-upload"></i>
+      {isUploading ? "Uploading…" : "Upload"}
+    </button>
+  )}
+</div>
         </div>
       </div>
 

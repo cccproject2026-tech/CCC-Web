@@ -68,7 +68,8 @@ export default function DashboardFocusModal({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5 sm:py-4">
+        {/* <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5 sm:py-4"> */}
+       <div className="max-h-[420px] min-h-0 flex-1 overflow-y-auto px-4 py-3 pr-2 sm:px-5 sm:py-4 sm:pr-3">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-[#cde2f2]">
               <div className="h-9 w-9 animate-spin rounded-full border-2 border-[#8ec5eb]/30 border-t-[#8ec5eb]" />

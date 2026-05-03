@@ -48,6 +48,8 @@ export interface Mentee {
   assignedLoaded: boolean;
   createdAt?: string;
   country?: string;
+  email?: string;
+  phoneNumber?: string;
 }
 
 type MenteeSortKey =
@@ -107,12 +109,80 @@ function labelForSortKey(k: MenteeSortKey): string {
 
 const IMAGE_POOL = [Mentor1, Mentor2, Mentor3];
 
+const PAGE_SIZE = 10;
+const FEATURED_THUMB_LIMIT = 6;
+
+function getUserListEmail(person: {
+  email?: string;
+  contact?: unknown;
+  user?: unknown;
+}): string | undefined {
+  const tryStr = (v: unknown): string | undefined => {
+    if (typeof v !== "string") return undefined;
+    const t = v.trim().replace(/[\u200B-\u200D\uFEFF]/g, "");
+    return t.includes("@") && t.length > 3 ? t : undefined;
+  };
+  const direct = tryStr(person.email);
+  if (direct) return direct;
+  const contact = person.contact;
+  if (contact && typeof contact === "object" && !Array.isArray(contact)) {
+    const c = tryStr((contact as Record<string, unknown>).email);
+    if (c) return c;
+  }
+  const user = person.user;
+  if (user && typeof user === "object" && !Array.isArray(user)) {
+    const u = tryStr((user as Record<string, unknown>).email);
+    if (u) return u;
+  }
+  return undefined;
+}
+
+function getUserListPhone(user: any): string | undefined {
+  const direct = user?.phoneNumber ?? user?.phone;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+  const c = user?.contact;
+  if (c && typeof c === "object" && !Array.isArray(c)) {
+    const p = (c as Record<string, unknown>).phone;
+    if (typeof p === "string" && p.trim()) return p.trim();
+  }
+  const u = user?.user;
+  if (u && typeof u === "object" && !Array.isArray(u)) {
+    const p =
+      (u as Record<string, unknown>).phoneNumber ??
+      (u as Record<string, unknown>).phone;
+    if (typeof p === "string" && p.trim()) return p.trim();
+  }
+  return undefined;
+}
+
 function profileImageForUser(user: any, index: number) {
   const raw = user.profilePicture;
   if (typeof raw === "string" && raw.trim()) {
     return resolveApiMediaUrl(raw) ?? raw;
   }
   return IMAGE_POOL[index % IMAGE_POOL.length];
+}
+
+function buildMenteeListParams(
+  activeTab: "all" | "active" | "completed",
+  search: string | undefined,
+  page: number,
+  limit: number,
+) {
+  const params: Record<string, unknown> = {
+    role: "pastor",
+    roleMatch: "mixed",
+    search,
+    page,
+    limit,
+  };
+  if (activeTab === "active") {
+    params.hasCompleted = false;
+    params.status = "accepted";
+  } else if (activeTab === "completed") {
+    params.hasCompleted = true;
+  }
+  return params;
 }
 
 const mapUserToMentee = (user: any, index: number): Mentee => ({
@@ -135,16 +205,18 @@ const mapUserToMentee = (user: any, index: number): Mentee => ({
     user.interest?.churchDetails?.[0]?.country?.trim() ||
     user.interest?.country?.trim() ||
     "",
+  email: getUserListEmail(user) ?? undefined,
+  phoneNumber: getUserListPhone(user),
 });
 
 export default function MenteesPage() {
   const router = useRouter();
 
   const [mentees, setMentees] = useState<Mentee[]>([]);
+  const [featuredMentees, setFeaturedMentees] = useState<Mentee[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const PAGE_SIZE = 10;
   const [activeTab, setActiveTab] = useState<"all" | "active" | "completed">(
     "active"
   );
@@ -200,22 +272,9 @@ export default function MenteesPage() {
       try {
         const search =
           debouncedQuery.length > 0 ? debouncedQuery : undefined;
-        const params: Record<string, unknown> = {
-          role: "pastor",
-          roleMatch: "mixed",
-          search,
-          page: currentPage,
-          limit: PAGE_SIZE,
-        };
-
-        if (activeTab === "active") {
-          params.hasCompleted = false;
-          params.status = "accepted";
-        } else if (activeTab === "completed") {
-          params.hasCompleted = true;
-        }
-
-        const res = await apiGetAllUsers(params as any);
+        const res = await apiGetAllUsers(
+          buildMenteeListParams(activeTab, search, currentPage, PAGE_SIZE) as any,
+        );
         const { users, total, totalPages: tp } = res.data.data;
         setMentees(users.map((u: any, i: number) => mapUserToMentee(u, i)));
         setTotalCount(total);
@@ -230,6 +289,32 @@ export default function MenteesPage() {
 
     fetchMentees();
   }, [debouncedQuery, currentPage, activeTab]);
+
+  // First 6 profile thumbnails: page 1 for current search + tab (not paged / client sort)
+  useEffect(() => {
+    let cancelled = false;
+    const loadFeatured = async () => {
+      try {
+        const search =
+          debouncedQuery.length > 0 ? debouncedQuery : undefined;
+        const res = await apiGetAllUsers(
+          buildMenteeListParams(activeTab, search, 1, FEATURED_THUMB_LIMIT) as any,
+        );
+        const { users } = res.data.data;
+        if (cancelled) return;
+        setFeaturedMentees(
+          users.map((u: any, i: number) => mapUserToMentee(u, i)),
+        );
+      } catch (e) {
+        console.error("Failed to load featured mentees", e);
+        if (!cancelled) setFeaturedMentees([]);
+      }
+    };
+    void loadFeatured();
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedQuery, activeTab]);
 
   /* ---------------- PROGRESS ---------------- */
 
@@ -318,7 +403,7 @@ export default function MenteesPage() {
     try {
       const res = await apiGetAllUsers({
         role: "mentor",
-        roleMatch: "exact",
+        roleMatch: "mixed",
         page: 1,
         limit: 500,
       });
@@ -484,12 +569,13 @@ export default function MenteesPage() {
 
   const featuredItems: FeaturedAvatarItem[] = useMemo(
     () =>
-      mentees.slice(0, 6).map((m) => ({
+      featuredMentees.map((m) => ({
         id: m.id,
         name: m.name,
         img: m.img,
+        href: `/director/mentees/profile/${m.id}`,
       })),
-    [mentees]
+    [featuredMentees],
   );
 
   const getMenteeOptions = (menteeId: string) => [
@@ -510,12 +596,6 @@ export default function MenteesPage() {
         router.push(
           `/director/assessments?assignUser=${encodeURIComponent(menteeId)}`
         ),
-    },
-    {
-      icon: "fa-regular fa-note-sticky",
-      label: "Mentor Notes",
-      color: "text-[#8ec5eb]",
-      onClick: () => setToast("Opening Notes..."),
     },
     // {
     //   icon: "fa-solid fa-chart-line",
@@ -617,15 +697,10 @@ export default function MenteesPage() {
 
           {!loading && featuredItems.length > 0 && (
             <FeaturedAvatars
+              key={`featured-${activeTab}-${debouncedQuery}`}
               items={featuredItems}
               showDivider
               className="mb-2"
-              selectedId={selectedMentee}
-              onItemClick={(item) => {
-                setSelectedMentee((prev) =>
-                  prev === String(item.id) ? null : String(item.id)
-                );
-              }}
             />
           )}
         </div>
@@ -956,6 +1031,8 @@ export default function MenteesPage() {
               variant="glass"
               listLayout={viewMode === "list"}
               profileLink={`/director/mentees/profile/${m.id}`}
+              email={m.email}
+              phoneNumber={m.phoneNumber}
               progress={
                 m.progress !== undefined
                   ? { phase: m.phase, value: m.progress }

@@ -345,6 +345,26 @@ function buildMeetingDateIso(dateYmd: string, timeRange: string): string | null 
   return new Date(Date.UTC(year, month - 1, day, parsed.hour24, parsed.minute, 0, 0)).toISOString();
 }
 
+function resolveCookieUserId(): string | null {
+  const rawUser = getCookie("user");
+  if (rawUser) {
+    try {
+      const user = JSON.parse(rawUser) as { id?: string; _id?: string };
+      const uid = String(user.id || user._id || "").trim();
+      if (uid) return uid;
+    } catch {
+      // Ignore malformed `user` cookie and try `userId`.
+    }
+  }
+
+  const rawUserId = getCookie("userId");
+  if (rawUserId && String(rawUserId).trim()) {
+    return String(rawUserId).trim();
+  }
+
+  return null;
+}
+
 /** CCC-Mobile: trigger jumpstart POST before assessment submit (non-blocking). */
 async function ensureJumpstartTriggeredForAssessment(userId: string): Promise<void> {
   try {
@@ -404,6 +424,7 @@ function PastorSurveyCMAContent() {
   /** Mentor Customized Development Plan (CDP) text per layer — from answers doc + GET recommendations. */
   const [mentorLayerCdp, setMentorLayerCdp] = useState<Record<string, string>>({});
   const hasSentRecommendations = Object.keys(mentorLayerCdp).length > 0;
+  const canShowPastorCdp = selfReadOnlyMode && hasSentRecommendations;
 
   useEffect(() => {
     if (!assessmentId) {
@@ -432,14 +453,10 @@ function PastorSurveyCMAContent() {
         if (mentorReviewMode) {
           answersUserId = reviewUserId;
         } else {
-          const userCookie = getCookie("user");
-          if (userCookie) {
-            const user = JSON.parse(userCookie) as { id?: string; _id?: string };
-            answersUserId = String(user.id || user._id || "");
-            if (answersUserId) {
-              const mentorsRes = await apiGetAssignedUsers(answersUserId);
-              setMentors(mentorsRes.data?.data || []);
-            }
+          answersUserId = resolveCookieUserId() ?? "";
+          if (answersUserId) {
+            const mentorsRes = await apiGetAssignedUsers(answersUserId);
+            setMentors(mentorsRes.data?.data || []);
           }
         }
 
@@ -620,11 +637,9 @@ function PastorSurveyCMAContent() {
 
   const submitAllSectionAnswers = async () => {
     if (uiReadOnly) return;
-    const userCookie = getCookie("user");
-    if (!userCookie || !assessmentId) return;
+    if (!assessmentId) return;
 
-    const user = JSON.parse(userCookie) as { id?: string; _id?: string };
-    const uid = String(user.id || user._id || "");
+    const uid = resolveCookieUserId() ?? "";
     if (!uid) return;
 
     const formattedAnswers = sections.map((section, sectionIndex) => {
@@ -670,10 +685,12 @@ function PastorSurveyCMAContent() {
       return;
     }
 
-    const userCookie = getCookie("user");
-    if (!userCookie) return;
-
-    const user = JSON.parse(userCookie) as { id?: string; _id?: string };
+    const uid = resolveCookieUserId();
+    if (!uid) {
+      setToast("Unable to identify your account. Please sign in again.");
+      setTimeout(() => setToast(null), 5000);
+      return;
+    }
 
     try {
       const meetingDateIso = buildMeetingDateIso(selectedDate, selectedTime);
@@ -682,9 +699,6 @@ function PastorSurveyCMAContent() {
         setTimeout(() => setToast(null), 3000);
         return;
       }
-
-      const uid = String(user.id || user._id || "");
-      if (!uid) return;
 
       const payload = {
         userId: uid,
@@ -709,8 +723,9 @@ function PastorSurveyCMAContent() {
       }, 2500);
     } catch (err) {
       console.error("Failed to schedule appointment", err);
-      setToast("Failed to schedule appointment");
-      setTimeout(() => setToast(null), 3000);
+      const msg = isAxiosError(err) ? (err.response?.data?.message ?? "Failed to schedule appointment") : "Failed to schedule appointment";
+      setToast(msg);
+      setTimeout(() => setToast(null), 5000);
     }
   };
 
@@ -1028,7 +1043,7 @@ function PastorSurveyCMAContent() {
             </p>
           </div>
 
-          {selfReadOnlyMode && assessmentId ? (
+          {canShowPastorCdp && assessmentId ? (
             <div className="shrink-0 flex flex-col gap-2 sm:flex-row">
               <button
                 type="button"
@@ -1150,14 +1165,13 @@ function PastorSurveyCMAContent() {
                         );
                       })}
                       {(() => {
-                        const selectedAns = answers[layerId];
-                        const fromApi =
+                        if (!canShowPastorCdp) return null;
+                        const cdp = (
                           mentorLayerCdp[layerId] ||
                           (layer.layerId != null && mentorLayerCdp[String(layer.layerId)]) ||
                           (layer._id != null && mentorLayerCdp[String(layer._id)]) ||
-                          "";
-                        const fromTemplate = pickCdpFromLayerTemplate(layer, selectedAns);
-                        const cdp = (fromApi || fromTemplate).trim();
+                          ""
+                        ).trim();
                         if (!cdp) return null;
                         return (
                           <div className="mt-4 rounded-xl border border-[#8ec5eb]/35 bg-[#041f35]/80 p-3 text-sm sm:p-4">
@@ -1250,17 +1264,32 @@ function PastorSurveyCMAContent() {
 
       {showSchedulePrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-[480px] rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#062946_100%)] px-8 py-8 text-center text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)] sm:px-10">
+          <div className="relative mx-4 w-full max-w-[480px] rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#062946_100%)] px-8 py-8 text-center text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)] sm:px-10">
+            <button
+              onClick={() => { setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
+              className="absolute right-4 top-4 text-white/60 transition hover:text-white"
+              aria-label="Close"
+            >
+              <i className="fa-solid fa-xmark text-lg" />
+            </button>
             <p className="font-semibold text-lg mb-4">
               On completion of the PMP and CMA assessment tools please schedule
               a meeting with your mentor.
             </p>
-            <button
-              onClick={handleScheduleMeeting}
-              className="rounded-xl bg-[#8ec5eb] px-8 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
-            >
-              Schedule Meeting
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                onClick={() => { setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
+                className="rounded-xl border border-white/30 px-6 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+              >
+                Skip
+              </button>
+              <button
+                onClick={handleScheduleMeeting}
+                className="rounded-xl bg-[#8ec5eb] px-8 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
+              >
+                Schedule Meeting
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1270,9 +1299,16 @@ function PastorSurveyCMAContent() {
           <div className="h-full w-full max-w-[480px] overflow-y-auto border-l border-white/15 bg-[linear-gradient(180deg,#062946_0%,#041f35_100%)] p-6 text-white shadow-[-20px_0_50px_rgba(2,20,38,0.55)] sm:p-8">
             {mentorStep === 1 ? (
               <>
-                <h2 className="text-xl font-semibold mb-6">
-                  Choose Mentor for the Meeting
-                </h2>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold">Choose Mentor for the Meeting</h2>
+                  <button
+                    onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
+                    className="text-white/60 transition hover:text-white"
+                    aria-label="Close"
+                  >
+                    <i className="fa-solid fa-xmark text-lg" />
+                  </button>
+                </div>
                 {mentors.length === 0 ? (
                   <p className="text-[#cbe6f9]">No mentors assigned.</p>
                 ) : (
@@ -1313,9 +1349,16 @@ function PastorSurveyCMAContent() {
               </>
             ) : (
               <>
-                <h2 className="text-xl font-semibold mb-6">
-                  Schedule a Meeting
-                </h2>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold">Schedule a Meeting</h2>
+                  <button
+                    onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
+                    className="text-white/60 transition hover:text-white"
+                    aria-label="Close"
+                  >
+                    <i className="fa-solid fa-xmark text-lg" />
+                  </button>
+                </div>
                 {selectedMentor && (
                   <p className="mb-6 text-sm text-[#cbe6f9]">
                     Scheduling meeting with {mentors.find(m => (m._id || m.id) === selectedMentor)?.name || mentors.find(m => (m._id || m.id) === selectedMentor)?.firstName + " " + mentors.find(m => (m._id || m.id) === selectedMentor)?.lastName || "Selected Mentor"}

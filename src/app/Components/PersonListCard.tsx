@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import { isRemoteImageSrc } from "@/app/utils/image";
@@ -43,6 +43,9 @@ interface PersonListCardProps {
   variant?: "light" | "glass";
   /** Compact horizontal row (mentees list view). */
   listLayout?: boolean;
+  /** When set, contact row opens mail / SMS / WhatsApp / call like MentorCard. */
+  email?: string;
+  phoneNumber?: string;
 }
 
 function formatProgressPercent(value: number): string {
@@ -50,6 +53,75 @@ function formatProgressPercent(value: number): string {
   const rounded = Math.round(v * 100) / 100;
   if (Number.isInteger(rounded)) return `${rounded}%`;
   return `${rounded.toFixed(1)}%`;
+}
+
+function mailtoHref(email: string) {
+  const addr = email.trim().replace(/[\u200B-\u200D\uFEFF]/g, "");
+  if (!addr.includes("@")) return "";
+  return `mailto:${addr}`;
+}
+
+function telHref(phone: string) {
+  return `tel:${phone.replace(/\s/g, "")}`;
+}
+
+function smsHref(phone: string) {
+  return `sms:${phone.replace(/\s/g, "")}`;
+}
+
+function whatsappHref(phone: string): string | null {
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 10) return null;
+  return `https://wa.me/${digits}`;
+}
+
+function IconLink({
+  href,
+  ariaLabel,
+  className,
+  children,
+  title,
+}: {
+  href?: string;
+  ariaLabel: string;
+  className: string;
+  children: ReactNode;
+  title?: string;
+}) {
+  if (href) {
+    return (
+      <a
+        href={href}
+        target={href.startsWith("http") ? "_blank" : undefined}
+        rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+        className={className}
+        aria-label={ariaLabel}
+        title={title ?? ariaLabel}
+      >
+        {children}
+      </a>
+    );
+  }
+  return (
+    <span
+      className={`${className} cursor-not-allowed opacity-40`}
+      aria-label={ariaLabel}
+      title={title ?? "Not available"}
+    >
+      {children}
+    </span>
+  );
+}
+
+function imageUnoptimized(
+  image: string | StaticImageData
+): boolean {
+  if (typeof image !== "string") return false;
+  return (
+    isRemoteImageSrc(image) ||
+    image.startsWith("blob:") ||
+    image.startsWith("data:")
+  );
 }
 
 export default function PersonListCard({
@@ -68,9 +140,18 @@ export default function PersonListCard({
   optionsMenu,
   variant = "light",
   listLayout = false,
+  email,
+  phoneNumber,
 }: PersonListCardProps) {
   const [showOptions, setShowOptions] = useState(false);
   const isGlass = variant === "glass";
+
+  const emailTrim = email?.trim().replace(/[\u200B-\u200D\uFEFF]/g, "") ?? "";
+  const hasEmail = emailTrim.length > 0 && emailTrim.includes("@");
+  const mailto = hasEmail ? mailtoHref(emailTrim) : "";
+  const phoneTrim = phoneNumber?.trim() ?? "";
+  const hasPhone = phoneTrim.length > 0;
+  const wa = hasPhone ? whatsappHref(phoneTrim) : null;
 
   const shellClass = isGlass
     ? listLayout
@@ -97,8 +178,14 @@ export default function PersonListCard({
     : "text-[13px] text-gray-500 mb-3 leading-relaxed";
 
   const iconRowClass = isGlass
-    ? "flex items-center gap-3 text-[#8ec5eb] text-[17px] sm:gap-4"
-    : "flex items-center gap-4 text-[#2E3B8E] text-[17px]";
+    ? "flex flex-wrap items-center gap-0.5 text-[#8ec5eb] sm:gap-1"
+    : "flex flex-wrap items-center gap-0.5 text-[#2E3B8E] sm:gap-1";
+
+  const iconWrapperBase = isGlass
+    ? "inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#8ec5eb] transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#8ec5eb]/60 sm:h-10 sm:w-10"
+    : "inline-flex h-9 w-9 items-center justify-center rounded-lg text-[#2E3B8E] transition hover:bg-[#2E3B8E]/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#2E3B8E]/50 sm:h-10 sm:w-10";
+  const iconLg = isGlass ? "text-lg sm:text-xl" : "text-[22px] leading-none";
+  const iconPhone = isGlass ? "text-base sm:text-lg" : "text-[20px] leading-none";
 
   return (
     <div
@@ -112,7 +199,7 @@ export default function PersonListCard({
           alt={name}
           fill
           className="object-cover"
-          unoptimized={isRemoteImageSrc(image)}
+          unoptimized={imageUnoptimized(image)}
         />
         {isNew && (
           <span
@@ -223,7 +310,7 @@ export default function PersonListCard({
                   : "bg-yellow-100 text-yellow-800"
               }`}
             >
-              {menteeCount} Mentees
+              {menteeCount} {menteeCount === 1 ? "Mentee" : "Mentees"}
             </div>
           )}
 
@@ -298,18 +385,60 @@ export default function PersonListCard({
         </div>
 
         <div className={iconRowClass}>
-          <button type="button" className="transition hover:opacity-80" aria-label="Email">
-            <i className="fa-regular fa-envelope" />
-          </button>
-          <button type="button" className="transition hover:opacity-80" aria-label="Message">
-            <i className="fa-regular fa-comment" />
-          </button>
-          <button type="button" className="transition hover:opacity-80" aria-label="WhatsApp">
-            <i className="fa-brands fa-whatsapp" />
-          </button>
-          <button type="button" className="transition hover:opacity-80" aria-label="Call">
-            <i className="fa-solid fa-phone" />
-          </button>
+          {mailto ? (
+            <a
+              href={mailto}
+              className={iconWrapperBase}
+              aria-label={`Send email to ${name} at ${emailTrim}`}
+              title={`Open your email app to message ${emailTrim}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                window.location.assign(mailto);
+              }}
+            >
+              <i className={`fa-regular fa-envelope ${iconLg}`} />
+            </a>
+          ) : (
+            <span
+              className={`${iconWrapperBase} cursor-not-allowed opacity-40`}
+              aria-label="Email not available for this person"
+              title="No email on file"
+            >
+              <i className={`fa-regular fa-envelope ${iconLg}`} />
+            </span>
+          )}
+          <IconLink
+            href={hasPhone ? smsHref(phoneTrim) : hasEmail ? mailto : undefined}
+            ariaLabel={
+              hasPhone
+                ? `Text ${name}`
+                : hasEmail
+                  ? `Message ${name} via email`
+                  : "SMS not available"
+            }
+            className={iconWrapperBase}
+          >
+            <i className={`fa-regular fa-comment-dots ${iconLg}`} />
+          </IconLink>
+          <IconLink
+            href={wa ?? undefined}
+            ariaLabel={
+              wa
+                ? `WhatsApp ${name}`
+                : "WhatsApp not available (add a phone number with country code)"
+            }
+            className={iconWrapperBase}
+          >
+            <i className={`fa-brands fa-whatsapp ${iconLg}`} />
+          </IconLink>
+          <IconLink
+            href={hasPhone ? telHref(phoneTrim) : undefined}
+            ariaLabel={hasPhone ? `Call ${name}` : "Phone number not available"}
+            className={iconWrapperBase}
+          >
+            <i className={`fa-solid fa-phone ${iconPhone}`} />
+          </IconLink>
         </div>
       </div>
 

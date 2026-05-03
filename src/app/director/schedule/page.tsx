@@ -20,6 +20,9 @@ import { DirectorFilterSection } from "../ui";
 import ProgressBg from "../../Assets/progress-bg.jpg";
 import DuoIcon from "../../Assets/duo.png";
 import MeetIcon from "../../Assets/meet.png";
+import ZoomIcon from "../../Assets/zoom.png";
+import TeamsIcon from "../../Assets/teams.png";
+import PhoneIcon from "../../Assets/phone.png";
 import UserProfile from "../../Assets/user-profile.png";
 import {
   apiCancelAppointment,
@@ -33,6 +36,7 @@ import {
 import {
   appointmentEntityId,
   extractApiErrorMessage,
+  formatAvailabilitySlotLabel,
   parseSlotStartToIso,
   slotDateToYmd,
   slotToHHmm,
@@ -112,6 +116,28 @@ function toLocalDateTimeInput(iso: string): string {
   return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
 }
 
+function getPlatformIcon(platform?: string) {
+  const value = String(platform || "").toLowerCase().trim();
+
+  if (value.includes("zoom")) return ZoomIcon;
+
+  if (
+    value.includes("meet") ||
+    value.includes("gmeet") ||
+    value.includes("google")
+  ) {
+    return MeetIcon;
+  }
+
+  if (value.includes("team")) return TeamsIcon;
+
+  if (value.includes("phone") || value.includes("call")) return PhoneIcon;
+
+  if (value.includes("duo")) return DuoIcon;
+
+  return ZoomIcon;
+}
+
 // ─── Inner content (needs useSearchParams — wrapped in Suspense) ──────────────
 
 function DirectorScheduleContent() {
@@ -130,6 +156,7 @@ function DirectorScheduleContent() {
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState<number | null>(null);
+  const [showHistoryMenu, setShowHistoryMenu] = useState<string | null>(null);
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [rescheduleTarget, setRescheduleTarget] = useState<AppointmentResponse | null>(null);
   const [rescheduleDateTime, setRescheduleDateTime] = useState("");
@@ -276,12 +303,12 @@ function DirectorScheduleContent() {
             slots:
               Array.isArray(d.slots) && d.slots.length > 0
                 ? d.slots.map((s: any) => ({
-                    _id: s._id,
-                    startTime: s.startTime || "09:00",
-                    startPeriod: s.startPeriod || "AM",
-                    endTime: s.endTime || "05:00",
-                    endPeriod: s.endPeriod || "PM",
-                  }))
+                  _id: s._id,
+                  startTime: s.startTime || "09:00",
+                  startPeriod: s.startPeriod || "AM",
+                  endTime: s.endTime || "05:00",
+                  endPeriod: s.endPeriod || "PM",
+                }))
                 : [],
           })),
         );
@@ -304,7 +331,7 @@ function DirectorScheduleContent() {
       // For pastors: derive available slots from the director's own monthly availability
       const normalize = (t: string) => t.replace(/\s+/g, "").toLowerCase();
       const bookedSlots = appointments
-        .filter((a) => a.meetingDate.startsWith(meetingDate))
+        .filter((a) => a.meetingDate.startsWith(meetingDate) && !["cancelled", "canceled"].includes((a.status || "").toLowerCase()))
         .map((a) => {
           const d = new Date(a.meetingDate);
           return normalize(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
@@ -349,7 +376,7 @@ function DirectorScheduleContent() {
           }
           const normalize = (t: string) => t.replace(/\s+/g, "").toLowerCase();
           const bookedSlots = appointments
-            .filter((a) => a.meetingDate.startsWith(meetingDate))
+            .filter((a) => a.meetingDate.startsWith(meetingDate) && !["cancelled", "canceled"].includes((a.status || "").toLowerCase()))
             .map((a) => {
               const d = new Date(a.meetingDate);
               return normalize(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
@@ -528,11 +555,12 @@ function DirectorScheduleContent() {
   useEffect(() => {
     if (!isRescheduleModalOpen || !rescheduleTarget) return;
 
-    // Only fetch for mentors, not for pastors
-    const isMentorRecipient = rescheduleTarget.user?.id && rescheduleTarget.user.id !== directorId;
-    if (!isMentorRecipient) return;
-
-    const mentorId = rescheduleTarget.mentor?.id;
+    const mentorId =
+      rescheduleTarget.mentor?._id ||
+      (typeof (rescheduleTarget as any).mentorId === "string"
+        ? (rescheduleTarget as any).mentorId
+        : (rescheduleTarget as any).mentorId?._id) ||
+      "";
     if (!mentorId) return;
 
     const fetchAvailability = async () => {
@@ -659,13 +687,26 @@ function DirectorScheduleContent() {
   const handleCancelAppointment = async (appt: AppointmentResponse) => {
     const id = appointmentEntityId(appt);
     if (!id) return;
+
     try {
       await apiCancelAppointment(id);
-      setAppointments((prev) => prev.filter((a) => appointmentEntityId(a) !== id));
-      setShowMenu(null);
-      showToast("Appointment cancelled");
     } catch (e) {
-      showToast(extractApiErrorMessage(e) || "Failed to cancel appointment");
+      console.error(e);
+    }
+
+    try {
+      const res = await apiGetAppointments({ futureOnly: false });
+      const freshList = unwrapAppointmentsAxiosData(res);
+      setAppointments(freshList);
+      setShowMenu(null);
+      const stillActive = freshList.find(
+        (a: AppointmentResponse) =>
+          appointmentEntityId(a) === id &&
+          !["cancelled", "canceled"].includes((a.status || "").toLowerCase()),
+      );
+      showToast(stillActive ? "Failed to cancel appointment" : "Appointment cancelled");
+    } catch (_) {
+      showToast("Failed to cancel appointment");
     }
   };
 
@@ -708,8 +749,11 @@ function DirectorScheduleContent() {
     const id = appt ? appointmentEntityId(appt) : "";
     if (!id) return;
 
-    // Determine if recipient is a mentor
-    const isMentorRecipient = appt?.user?.id && appt.user.id !== directorId;
+    // Determine if recipient is a mentor (by presence of a mentor ID)
+    const isMentorRecipient = !!(
+      appt?.mentor?._id ||
+      (typeof (appt as any).mentorId === "string" ? (appt as any).mentorId : (appt as any).mentorId?._id)
+    );
 
     // Validate based on recipient type
     if (isMentorRecipient) {
@@ -728,12 +772,22 @@ function DirectorScheduleContent() {
     setIsRescheduling(true);
 
     try {
-      const meetingDate = isMentorRecipient
+      const newDate = isMentorRecipient
         ? rescheduleSelectedSlot
         : new Date(rescheduleDateTime).toISOString();
 
+      // Extract startTime/startPeriod from the resolved ISO
+      const _d = new Date(newDate);
+      const _h24 = _d.getHours();
+      const _min = _d.getMinutes();
+      const startPeriod = _h24 < 12 ? "AM" : "PM";
+      const _h12 = _h24 % 12 === 0 ? 12 : _h24 % 12;
+      const startTime = `${_h12}:${String(_min).padStart(2, "0")}`;
+
       await apiRescheduleAppointment(id, {
-        meetingDate,
+        newDate,
+        startTime,
+        startPeriod,
         platform: reschedulePlatform as any,
       });
       const refresh = await apiGetAppointments({ futureOnly: false, status: "scheduled" });
@@ -804,11 +858,10 @@ function DirectorScheduleContent() {
                     if (tab === "Schedule") { setIsDrawerOpen(true); setDrawerStep(1); }
                     else setIsDrawerOpen(false);
                   }}
-                  className={`relative h-8 rounded-md px-5 text-sm font-semibold transition-all ${
-                    activeTab === tab
+                  className={`relative h-8 rounded-md px-5 text-sm font-semibold transition-all ${activeTab === tab
                       ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/35"
                       : "bg-transparent text-white/70 hover:text-white"
-                  }`}
+                    }`}
                 >
                   {tab}
                 </button>
@@ -843,8 +896,10 @@ function DirectorScheduleContent() {
                     const apptKey = appointmentEntityId(appt) || `history-${historyPage}-${index}`;
                     const mentor = appt.mentor ?? (typeof appt.mentorId === "object" ? appt.mentorId : undefined);
                     const mentee = appt.user ?? (typeof appt.userId === "object" ? appt.userId : undefined);
-                    const mentorName = labelPerson(mentor, "Mentor");
-                    const menteeName = labelPerson(mentee, "Mentee");
+                    const mentorName = labelPerson(mentor, "Unknown");
+                    const menteeName = labelPerson(mentee, "Unknown");
+                    const mentorRole = mentor?.role ? (mentor.role.charAt(0).toUpperCase() + mentor.role.slice(1).toLowerCase()) : "Mentor";
+                    const menteeRole = mentee?.role ? (mentee.role.charAt(0).toUpperCase() + mentee.role.slice(1).toLowerCase()) : "Pastor";
                     const mentorId =
                       typeof appt.mentorId === "string" ? appt.mentorId : appt.mentorId?._id ?? appt.mentor?._id;
                     const menteeId =
@@ -853,18 +908,46 @@ function DirectorScheduleContent() {
                     return (
                       <div
                         key={apptKey}
-                        className={`${directorGlassCard} relative flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center`}
                       >
                         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-6">
                           <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
-                            <Image
+                            {/* <Image
                               src={appt.platform === "gmeet" || appt.platform === "google-meet" ? MeetIcon : DuoIcon}
                               alt={appt.platform}
+                              className="h-10 w-10"
+                            /> */}
+                            <Image
+                              src={getPlatformIcon(appt.platform)}
+                              alt={appt.platform || "Meeting platform"}
                               className="h-10 w-10"
                             />
                           </div>
                         </div>
                         <div className="relative min-w-0 flex-1 px-4 py-4 sm:px-5">
+                          <div className="absolute right-4 top-4 z-10 sm:right-5">
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={() => setShowHistoryMenu(showHistoryMenu === apptKey ? null : apptKey)}
+                                className="rounded-lg px-3 py-1 text-[#8ec5eb] transition hover:bg-white/10 hover:text-white"
+                                aria-label="Appointment actions"
+                              >
+                                <i className="fa-solid fa-ellipsis-vertical" />
+                              </button>
+                              {showHistoryMenu === apptKey && (
+                                <div className="absolute right-0 top-9 z-[100] w-[200px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                                  <button
+                                    type="button"
+                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                                    onClick={() => { router.push(`/director/schedule/${encodeURIComponent(apptKey)}`); setShowHistoryMenu(null); }}
+                                  >
+                                    <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" />
+                                    View Details
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                           <div className="mb-2 flex items-center gap-3">
                             <Image
                               src={mentor?.profilePicture || UserProfile}
@@ -875,26 +958,36 @@ function DirectorScheduleContent() {
                               className="rounded-full border border-white/20"
                             />
                             <div>
-                              <h4 className="text-sm font-semibold text-white">
+                              <h4 className="pr-10 text-sm font-semibold text-white">
                                 {mentorId ? (
                                   <Link href={`/director/mentors/profile/${encodeURIComponent(mentorId)}`} className="hover:text-[#8ec5eb]">
                                     {mentorName}
                                   </Link>
                                 ) : mentorName}
                               </h4>
-                              <p className="text-[12px] text-[#cde2f2]/90">Mentor</p>
+                              <p className="text-[12px] text-[#cde2f2]/90">{mentorRole}</p>
                             </div>
                           </div>
-                          <p className="mb-2 text-[12px] text-[#cde2f2]">
-                            with{" "}
-                            <span className="font-medium text-white">
-                              {menteeId ? (
-                                <Link href={`/director/mentees/profile/${encodeURIComponent(menteeId)}`} className="hover:text-[#8ec5eb]">
-                                  {menteeName}
-                                </Link>
-                              ) : menteeName}
-                            </span>
-                          </p>
+                          <div className="mb-2 flex items-center gap-3">
+                            <Image
+                              src={mentee?.profilePicture || UserProfile}
+                              alt={menteeName}
+                              width={36}
+                              height={36}
+                              unoptimized={mentee?.profilePicture ? isRemoteImageSrc(mentee.profilePicture) : false}
+                              className="rounded-full border border-white/20"
+                            />
+                            <div>
+                              <h4 className="text-sm font-semibold text-white">
+                                {menteeId ? (
+                                  <Link href={`/director/mentees/profile/${encodeURIComponent(menteeId)}`} className="hover:text-[#8ec5eb]">
+                                    {menteeName}
+                                  </Link>
+                                ) : menteeName}
+                              </h4>
+                              <p className="text-[12px] text-[#cde2f2]/90">{menteeRole}</p>
+                            </div>
+                          </div>
                           <div className="mb-2 flex flex-wrap gap-2">
                             <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
                               <i className="fa-regular fa-calendar text-[#8ec5eb]" />
@@ -902,20 +995,11 @@ function DirectorScheduleContent() {
                             </span>
                             <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
                               <i className="fa-regular fa-clock text-[#8ec5eb]" />
-                              {md.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              {md.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
                             </span>
                             <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] capitalize text-[#d9ebf8]">
                               {appt.platform}
                             </span>
-                          </div>
-                          <div className="mt-3 flex justify-end">
-                            <button
-                              type="button"
-                              onClick={() => router.push(`/director/schedule/${encodeURIComponent(apptKey)}`)}
-                              className={`${directorBtnPrimary} px-4 py-1.5 text-xs`}
-                            >
-                              Details
-                            </button>
                           </div>
                         </div>
                       </div>
@@ -998,11 +1082,10 @@ function DirectorScheduleContent() {
                         <div
                           key={index}
                           onClick={() => !isPast && setSelectedAppointmentDate(dateStr)}
-                          className={`rounded-md py-1 transition ${isPast ? "opacity-40 cursor-not-allowed pointer-events-none" : "cursor-pointer"} ${
-                            isSelected || isT
+                          className={`rounded-md py-1 transition ${isPast ? "opacity-40 cursor-not-allowed pointer-events-none" : "cursor-pointer"} ${isSelected || isT
                               ? "bg-[#8ec5eb]/35 font-semibold text-white ring-1 ring-[#8ec5eb]/50"
                               : "text-[#d9ebf8] hover:bg-white/10"
-                          } ${hasAppointment && !isPast ? "ring-1 ring-amber-300/60" : ""}`}
+                            } ${hasAppointment && !isPast ? "ring-1 ring-amber-300/60" : ""}`}
                         >
                           {day}
                         </div>
@@ -1028,8 +1111,10 @@ function DirectorScheduleContent() {
                     const apptKey = appointmentEntityId(appt) || String(index);
                     const mentor = appt.mentor ?? (typeof appt.mentorId === "object" ? appt.mentorId : undefined);
                     const mentee = appt.user ?? (typeof appt.userId === "object" ? appt.userId : undefined);
-                    const mentorName = labelPerson(mentor, "Mentor");
-                    const menteeName = labelPerson(mentee, "Mentee");
+                    const mentorName = labelPerson(mentor, "Unknown");
+                    const menteeName = labelPerson(mentee, "Unknown");
+                    const mentorRole = mentor?.role ? (mentor.role.charAt(0).toUpperCase() + mentor.role.slice(1).toLowerCase()) : "Mentor";
+                    const menteeRole = mentee?.role ? (mentee.role.charAt(0).toUpperCase() + mentee.role.slice(1).toLowerCase()) : "Pastor";
                     const mentorId =
                       typeof appt.mentorId === "string" ? appt.mentorId : appt.mentorId?._id ?? appt.mentor?._id;
                     const menteeId =
@@ -1037,13 +1122,19 @@ function DirectorScheduleContent() {
                     return (
                       <div
                         key={apptKey}
-                        className={`${directorGlassCard} relative flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center`}
+                        className={`${directorGlassCard} relative flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showMenu === index ? "z-[60]" : ""}`}
+                        style={showMenu === index ? { overflow: "visible" } : undefined}
                       >
                         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-6">
                           <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
-                            <Image
+                            {/* <Image
                               src={appt.platform === "gmeet" || appt.platform === "google-meet" ? MeetIcon : DuoIcon}
                               alt={appt.platform}
+                              className="h-10 w-10"
+                            /> */}
+                            <Image
+                              src={getPlatformIcon(appt.platform)}
+                              alt={appt.platform || "Meeting platform"}
                               className="h-10 w-10"
                             />
                           </div>
@@ -1060,7 +1151,15 @@ function DirectorScheduleContent() {
                                 <i className="fa-solid fa-ellipsis-vertical" />
                               </button>
                               {showMenu === index && (
-                                <div className="absolute right-0 top-9 z-10 w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                                <div className="absolute right-0 top-9 z-[100] w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                                  <button
+                                    type="button"
+                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                                    onClick={() => { router.push(`/director/schedule/${encodeURIComponent(apptKey)}`); setShowMenu(null); }}
+                                  >
+                                    <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" />
+                                    View Details
+                                  </button>
                                   <button
                                     type="button"
                                     className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1098,19 +1197,29 @@ function DirectorScheduleContent() {
                                   </Link>
                                 ) : mentorName}
                               </h4>
-                              <p className="text-[12px] text-[#cde2f2]/90">Mentor</p>
+                              <p className="text-[12px] text-[#cde2f2]/90">{mentorRole}</p>
                             </div>
                           </div>
-                          <p className="mb-2 text-[12px] text-[#cde2f2]">
-                            with{" "}
-                            <span className="font-medium text-white">
-                              {menteeId ? (
-                                <Link href={`/director/mentees/profile/${encodeURIComponent(menteeId)}`} className="hover:text-[#8ec5eb]">
-                                  {menteeName}
-                                </Link>
-                              ) : menteeName}
-                            </span>
-                          </p>
+                          <div className="mb-2 flex items-center gap-3">
+                            <Image
+                              src={mentee?.profilePicture || UserProfile}
+                              alt={menteeName}
+                              width={36}
+                              height={36}
+                              unoptimized={mentee?.profilePicture ? isRemoteImageSrc(mentee.profilePicture) : false}
+                              className="rounded-full border border-white/20"
+                            />
+                            <div>
+                              <h4 className="text-sm font-semibold text-white">
+                                {menteeId ? (
+                                  <Link href={`/director/mentees/profile/${encodeURIComponent(menteeId)}`} className="hover:text-[#8ec5eb]">
+                                    {menteeName}
+                                  </Link>
+                                ) : menteeName}
+                              </h4>
+                              <p className="text-[12px] text-[#cde2f2]/90">{menteeRole}</p>
+                            </div>
+                          </div>
                           <div className="mb-2 flex flex-wrap gap-2">
                             <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
                               <i className="fa-regular fa-calendar text-[#8ec5eb]" />
@@ -1163,22 +1272,22 @@ function DirectorScheduleContent() {
                       const day = date.toLocaleDateString("default", { weekday: "short" });
                       const isSelected = selectedAvailabilityDay === dayIndex;
                       const isPast = isPastDate(date.toISOString().split("T")[0]);
+                      const isToday = date.toDateString() === new Date().toDateString();
                       return (
                         <div
                           key={date.toISOString()}
                           onClick={() => !isPast && setSelectedAvailabilityDay(dayIndex)}
-                          className={`rounded-md py-2 text-center transition ${
-                            isPast
+                          className={`rounded-md py-2 text-center transition ${isPast
                               ? "opacity-40 cursor-not-allowed pointer-events-none"
                               : "cursor-pointer"
-                          } ${
-                            isSelected
+                            } ${isSelected
                               ? "bg-[#8ec5eb]/30 font-semibold text-white ring-1 ring-[#8ec5eb]/55"
                               : "text-[#d9ebf8] hover:bg-white/10"
-                          } ${hasSlots && !isPast ? "ring-1 ring-amber-300/55" : ""}`}
+                            } ${hasSlots && !isPast ? "ring-1 ring-amber-300/55" : ""}`}
                         >
                           <div>{day}</div>
                           <div className="text-xs text-white/80">{date.getDate()}</div>
+                          {isToday && <div className="mx-auto mt-0.5 h-1 w-1 rounded-full bg-[#8ec5eb]" />}
                         </div>
                       );
                     })}
@@ -1207,7 +1316,7 @@ function DirectorScheduleContent() {
                   <div>
                     <label className="mb-1 block text-xs text-[#cde2f2]">Preferred Mode</label>
                     <select className={directorSelectDark}><option>Zoom</option>
-                    {/* <option>Google Meet</option> */}
+                      {/* <option>Google Meet</option> */}
                     </select>
                   </div>
                 </div>
@@ -1361,7 +1470,7 @@ function DirectorScheduleContent() {
                     className={directorBtnPrimary}
                     onClick={() => {
                       const newStart = slotToMins(newSlot.startTime, newSlot.startPeriod);
-                      const newEnd   = slotToMins(newSlot.endTime,   newSlot.endPeriod);
+                      const newEnd = slotToMins(newSlot.endTime, newSlot.endPeriod);
                       if (newEnd <= newStart) {
                         setSlotError("End time must be after start time.");
                         return;
@@ -1369,12 +1478,30 @@ function DirectorScheduleContent() {
                       const daySlots = (availability.find((d) => d.day === selectedAvailabilityDay)?.slots || []) as any[];
                       const overlaps = daySlots.some((s: any) => {
                         const sStart = slotToMins(s.startTime, s.startPeriod);
-                        const sEnd   = slotToMins(s.endTime,   s.endPeriod);
+                        const sEnd = slotToMins(s.endTime, s.endPeriod);
                         return newStart < sEnd && newEnd > sStart;
                       });
                       if (overlaps) {
                         setSlotError("This time range overlaps with an existing slot.");
                         return;
+                      }
+                      // Check against scheduled appointments on this date
+                      const selectedDayAvail = availability.find((d) => d.day === selectedAvailabilityDay);
+                      const slotDateStr = selectedDayAvail ? resolveAvailabilityRowDate(selectedDayAvail) : null;
+                      if (slotDateStr) {
+                        const conflictingAppt = appointments.find((a) => {
+                          if (!a.meetingDate.startsWith(slotDateStr)) return false;
+                          if (["cancelled", "canceled"].includes((a.status || "").toLowerCase())) return false;
+                          const d = new Date(a.meetingDate);
+                          const apptStart = d.getHours() * 60 + d.getMinutes();
+                          const apptEnd = apptStart + 60; // meetings are 60 min
+                          return newStart < apptEnd && newEnd > apptStart;
+                        });
+                        if (conflictingAppt) {
+                          const apptTime = new Date(conflictingAppt.meetingDate).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
+                          setSlotError(`This time conflicts with an existing appointment at ${apptTime}.`);
+                          return;
+                        }
                       }
                       setAvailability((prev) =>
                         prev.map((d) =>
@@ -1451,11 +1578,10 @@ function DirectorScheduleContent() {
                       key={type}
                       type="button"
                       onClick={() => { setScheduleRecipientType(type); setSelectedRecipient(null); }}
-                      className={`rounded-lg px-4 py-2 text-sm font-medium capitalize transition ${
-                        scheduleRecipientType === type
+                      className={`rounded-lg px-4 py-2 text-sm font-medium capitalize transition ${scheduleRecipientType === type
                           ? "bg-white/15 text-white ring-1 ring-[#8ec5eb]/40"
                           : "border border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
-                      }`}
+                        }`}
                     >
                       {type}
                     </button>
@@ -1482,11 +1608,10 @@ function DirectorScheduleContent() {
                         type="button"
                         key={personId}
                         onClick={() => setSelectedRecipient(person)}
-                        className={`flex w-full items-center justify-between gap-4 rounded-xl border px-4 py-3 text-left transition ${
-                          isSelected
+                        className={`flex w-full items-center justify-between gap-4 rounded-xl border px-4 py-3 text-left transition ${isSelected
                             ? "border-[#8ec5eb]/45 bg-[#8ec5eb]/15"
                             : "border-white/15 bg-white/5 hover:border-white/25 hover:bg-white/10"
-                        }`}
+                          }`}
                       >
                         <div className="flex min-w-0 items-center gap-3">
                           <Image
@@ -1498,13 +1623,13 @@ function DirectorScheduleContent() {
                             className="shrink-0 rounded-full border border-white/20"
                           />
                           <div className="flex min-w-0 flex-col">
-                              <span className="truncate text-sm font-medium text-white">
-                                {person.firstName} {person.lastName}
-                              </span>
-                              <span className="text-[11px] capitalize text-[#8ec5eb]/80">
-                                {person.role || scheduleRecipientType}
-                              </span>
-                            </div>
+                            <span className="truncate text-sm font-medium text-white">
+                              {person.firstName} {person.lastName}
+                            </span>
+                            <span className="text-[11px] capitalize text-[#8ec5eb]/80">
+                              {person.role || scheduleRecipientType}
+                            </span>
+                          </div>
                         </div>
                         <input type="radio" checked={isSelected} readOnly className="accent-[#8ec5eb]" aria-hidden />
                       </button>
@@ -1653,11 +1778,10 @@ function DirectorScheduleContent() {
                               key={label}
                               type="button"
                               onClick={() => setSelectedSlot(label)}
-                              className={`rounded-lg border px-3 py-2 text-sm transition ${
-                                selectedSlot === label
+                              className={`rounded-lg border px-3 py-2 text-sm transition ${selectedSlot === label
                                   ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20 text-white"
                                   : "border-white/15 bg-white/5 text-[#d9ebf8] hover:bg-white/10"
-                              }`}
+                                }`}
                             >
                               {label}
                             </button>
@@ -1672,14 +1796,14 @@ function DirectorScheduleContent() {
                     <select
                       value={selectedPlatform}
                       onChange={(e) => setSelectedPlatform(e.target.value)}
-                    className={directorSelectDark}
-                  >
-                    <option value="zoom">Zoom</option>
-                    {/* <option value="google meet">Google Meet</option>
+                      className={directorSelectDark}
+                    >
+                      <option value="zoom">Zoom</option>
+                      {/* <option value="google meet">Google Meet</option>
                     <option value="teams">Microsoft Teams</option>
                     <option value="phone">Phone</option> */}
-                  </select>
-                </div>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-3 border-t border-white/10 pt-6 shrink-0">
@@ -1706,7 +1830,7 @@ function DirectorScheduleContent() {
         </div>
       )}
 
-      {/* ── Reschedule Modal ── */}
+      {/* ── Reschedule Drawer ── */}
       {isRescheduleModalOpen && rescheduleTarget && (
         <>
           <div
@@ -1714,95 +1838,98 @@ function DirectorScheduleContent() {
             onClick={() => { if (!isRescheduling) setIsRescheduleModalOpen(false); }}
             aria-hidden
           />
-          <div className="fixed left-1/2 top-1/2 z-[71] w-[92vw] max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/20 bg-[#041f35] p-5 text-white shadow-2xl max-h-[85vh] flex flex-col">
-            <h3 className="mb-4 text-base font-semibold shrink-0">Reschedule meeting</h3>
-            <div className="flex-1 overflow-y-auto pr-3 mb-4">
-              {/* Check if recipient is a mentor */}
-              {rescheduleTarget.user?.id && rescheduleTarget.user.id !== directorId ? (
+          <div className="fixed right-0 top-0 z-[71] h-full w-full border-l border-white/15 bg-[#041f35] text-white shadow-2xl flex flex-col sm:max-w-[480px]">
+            {/* Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-white/15 px-6 py-5">
+              <div>
+                <h3 className="flex items-center gap-2 text-[18px] font-semibold text-white">
+                  <i className="fa-regular fa-calendar text-[#8ec5eb]" />
+                  Reschedule meeting
+                </h3>
+                {(() => {
+                  const m = rescheduleTarget.mentor ?? (typeof (rescheduleTarget as any).mentorId === "object" ? (rescheduleTarget as any).mentorId : undefined);
+                  const name = labelPerson(m, "");
+                  return name ? <p className="mt-1 pl-6 text-sm font-medium text-[#8ec5eb]">{name}</p> : null;
+                })()}
+              </div>
+              <button
+                type="button"
+                onClick={() => { if (!isRescheduling) setIsRescheduleModalOpen(false); }}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[#d9ebf8] transition hover:bg-white/20"
+              >
+                <i className="fa-solid fa-xmark text-sm" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-6 mb-0">
+              {/* Show availability calendar if appointment has a mentor, else simple datetime */}
+              {(() => {
+                const resolvedMentorId =
+                  rescheduleTarget.mentor?._id ||
+                  (typeof (rescheduleTarget as any).mentorId === "string"
+                    ? (rescheduleTarget as any).mentorId
+                    : (rescheduleTarget as any).mentorId?._id) ||
+                  "";
+                return resolvedMentorId;
+              })() ? (
                 // ── Mentor: Show availability calendar ──
                 <>
-                  <div className="mb-4">
-                    <label className="block text-xs text-[#cde2f2] font-semibold mb-3">
-                      Select available time
-                    </label>
-                    
-                    {/* Month navigation */}
-                    <div className="flex items-center justify-between mb-4">
-                      <button
-                        onClick={handleReschedulePrevMonth}
-                        className="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 transition"
-                      >
-                        ← Prev
-                      </button>
-                      <span className="text-sm font-semibold">
-                        {new Date(rescheduleYear, rescheduleMonth).toLocaleDateString("en", {
-                          month: "long",
-                          year: "numeric",
-                        })}
-                      </span>
-                      <button
-                        onClick={handleRescheduleNextMonth}
-                        className="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 transition"
-                      >
-                        Next →
-                      </button>
-                    </div>
+                  <p className="text-sm mb-2 font-medium text-[#d9ebf8]">Mentor Availability</p>
+                  <AvailabilityCalendar
+                    mentorId={(() => {
+                      return (
+                        rescheduleTarget.mentor?._id ||
+                        (typeof (rescheduleTarget as any).mentorId === "string"
+                          ? (rescheduleTarget as any).mentorId
+                          : (rescheduleTarget as any).mentorId?._id) ||
+                        ""
+                      );
+                    })()}
+                    currentMonth={rescheduleMonth}
+                    currentYear={rescheduleYear}
+                    selectedDate={rescheduleSelectedDate}
+                    onDateSelect={setRescheduleSelectedDate}
+                    onPrevMonth={handleReschedulePrevMonth}
+                    onNextMonth={handleRescheduleNextMonth}
+                    availabilitySlots={rescheduleMonthlyAvailabilitySlots}
+                    isLoading={rescheduleAvailabilityLoading}
+                  />
 
-                    {/* Calendar */}
-                    {rescheduleAvailabilityLoading ? (
-                      <div className="flex justify-center py-8">
-                        <div className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-r-white" />
+                  {/* Time slots for selected date */}
+                  <p className="text-sm mt-5 mb-2 font-medium text-[#d9ebf8]">Select a Time</p>
+                  {rescheduleAvailabilityLoading ? (
+                    <div className="flex justify-center py-4">
+                      <div className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-r-white" />
+                    </div>
+                  ) : (() => {
+                    const slots = rescheduleMonthlyAvailabilitySlots
+                      .filter((s) => new Date(s.date).getDate() === rescheduleSelectedDate)
+                      .flatMap((s) =>
+                        (s.slots || []).map((raw: any) => {
+                          const label = formatAvailabilitySlotLabel(raw);
+                          const iso = parseSlotStartToIso((s.date as string).slice(0, 10), label);
+                          return { label, iso };
+                        })
+                      )
+                      .filter((item) => item.label);
+                    return slots.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        {slots.map((item, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => setRescheduleSelectedSlot(item.iso)}
+                            className={`px-3 py-2 rounded-xl border text-sm transition ${rescheduleSelectedSlot === item.iso
+                                ? "bg-blue-600 text-white font-semibold border-blue-500"
+                                : "border-white/20 bg-white/10 text-white hover:bg-white/20"
+                              }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
                       </div>
                     ) : (
-                      <AvailabilityCalendar
-                        mentorId={rescheduleTarget.mentor?.id || ""}
-                        currentMonth={rescheduleMonth}
-                        currentYear={rescheduleYear}
-                        selectedDate={rescheduleSelectedDate}
-                        onDateSelect={setRescheduleSelectedDate}
-                        onPrevMonth={handleReschedulePrevMonth}
-                        onNextMonth={handleRescheduleNextMonth}
-                        availabilitySlots={rescheduleMonthlyAvailabilitySlots}
-                        isLoading={rescheduleAvailabilityLoading}
-                      />
-                    )}
-
-                    {/* Time slots for selected date */}
-                    {rescheduleMonthlyAvailabilitySlots.length > 0 && (
-                      <div className="mt-4">
-                        <label className="block text-xs text-[#cde2f2] font-semibold mb-2">
-                          Available times
-                        </label>
-                        <div className="grid grid-cols-3 gap-2 max-h-40 overflow-y-auto">
-                          {rescheduleMonthlyAvailabilitySlots
-                            .filter((slot) => {
-                              const slotDate = new Date(slot.date).getDate();
-                              return slotDate === rescheduleSelectedDate;
-                            })
-                            .flatMap((slot) =>
-                              (slot.times || []).map((time) => ({
-                                date: slot.date,
-                                time,
-                                iso: new Date(`${slot.date}T${time}`).toISOString(),
-                              }))
-                            )
-                            .map((item, idx) => (
-                              <button
-                                key={idx}
-                                onClick={() => setRescheduleSelectedSlot(item.iso)}
-                                className={`px-3 py-2 rounded text-xs font-medium transition ${
-                                  rescheduleSelectedSlot === item.iso
-                                    ? "bg-blue-600 text-white"
-                                    : "bg-white/10 hover:bg-white/20 text-white"
-                                }`}
-                              >
-                                {item.time}
-                              </button>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      <p className="text-xs text-[#cde2f2]/70 mb-4">No available time slots for the selected date. Please choose a different day.</p>
+                    );
+                  })()}
                 </>
               ) : (
                 // ── Pastor/Default: Show simple datetime input ──
@@ -1838,7 +1965,7 @@ function DirectorScheduleContent() {
             </div>
 
             {/* Action buttons (fixed at bottom) */}
-            <div className="flex justify-end gap-3 shrink-0 border-t border-white/10 pt-4">
+            <div className="flex justify-end gap-3 shrink-0 border-t border-white/10 px-6 py-4">
               <button
                 type="button"
                 className={directorBtnSecondary}

@@ -103,6 +103,7 @@ export interface AssignRoadmapPayload {
 export interface AssignAssessmentPayload {
   userIds: string[];
   assessmentIds: string[];
+  dueDate?: string;
 }
 
 export interface UpdateRoadmapProgressPayload {

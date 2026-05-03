@@ -3,7 +3,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import RoadmapCard from "@/app/Components/RoadmapCard";
 import FeaturedAvatars from "@/app/Components/FeaturedAvatars";
-import MentorCard from "@/app/Components/Card/MentorCard";
 import PastorCard from "@/app/Components/Card/PastorCard";
 import HeroBg from "../../Assets/roadmap-bg.png";
 import Mentor1 from "../../Assets/mentor1.png";
@@ -12,7 +11,6 @@ import Mentor3 from "../../Assets/mentor3.png";
 import Card1 from "../../Assets/card1.png";
 import {
   apiGetRoadmaps,
-  apiGetMentorList,
   apiGetOverallProgress,
   apiDeleteRoadmap,
 } from "@/app/Services/api";
@@ -21,13 +19,21 @@ import DirectorHero from "../DirectorHero";
 import {
   directorBtnPrimary,
   directorBtnSecondary,
-  directorGlassCard,
   directorPageContainer,
   directorPageRoot,
   directorSpinner,
 } from "../directorUi";
 import { DirectorFilterSection } from "../ui";
 import SearchBar from "@/app/Components/SearchBar";
+
+/** API may return `_id` as string, `id`, or Mongo `{ $oid }` — progress assign needs string ids. */
+function stringifyRoadmapId(raw) {
+  if (raw == null) return "";
+  if (typeof raw === "object" && raw !== null && "$oid" in raw) {
+    return String((raw).$oid);
+  }
+  return String(raw).trim();
+}
 
 /** Unwrap `roadmaps` as array or `{ items: [] }` (list API). */
 function roadmapChildrenList(rm) {
@@ -90,9 +96,7 @@ export default function RevitalizationRoadmapPage() {
   const pathname = usePathname();
   const [activeTab, setActiveTab] = useState("roadmap-library");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState("least-mentees");
   const [filterCount, setFilterCount] = useState(3);
-  const [showSortPopup, setShowSortPopup] = useState(false);
   const [showFilterPopup, setShowFilterPopup] = useState(false);
   const [filters, setFilters] = useState({
     country: true,
@@ -101,37 +105,15 @@ export default function RevitalizationRoadmapPage() {
   });
   const [roadmapLibrary, setRoadmapLibrary] = useState([]);
   const [loadingRoadmaps, setLoadingRoadmaps] = useState(false);
-  const [mentorsList, setMentorsList] = useState([]);
-  const [loadingMentors, setLoadingMentors] = useState(false);
   const [pastorProgressList, setPastorProgressList] = useState([]);
   const [loadingPastors, setLoadingPastors] = useState(false);
 
   useEffect(() => {
-    setShowSortPopup(false);
     setShowFilterPopup(false);
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab !== "mentors" || mentorsList.length > 0) return;
-    const fetchMentors = async () => {
-      try {
-        setLoadingMentors(true);
-        const res = await apiGetMentorList({ status: "active", limit: 9999 });
-        const raw = res.data?.data?.users || res.data?.data?.mentors || [];
-        const data = raw.filter((m) => {
-          if (m?.isDeleted === true || m?.deletedAt) return false;
-          const s = String(m?.status || "").toLowerCase();
-          if (s === "inactive" || s === "deleted") return false;
-          return true;
-        });
-        setMentorsList(data);
-      } catch (err) {
-        console.error("Error fetching mentors:", err);
-      } finally {
-        setLoadingMentors(false);
-      }
-    };
-    fetchMentors();
+    if (activeTab === "mentors") setActiveTab("roadmap-library");
   }, [activeTab]);
 
   useEffect(() => {
@@ -151,7 +133,6 @@ export default function RevitalizationRoadmapPage() {
     fetchPastors();
   }, [activeTab]);
 
-  const sortPopupRef = useRef(null);
   const filterPopupRef = useRef(null);
 
   const fetchRoadmaps = useCallback(async () => {
@@ -170,15 +151,16 @@ export default function RevitalizationRoadmapPage() {
           (nested0 && String(nested0.duration || "").trim()) || String(item.duration || "").trim() || "N/A";
         const img = (nested0 && nested0.imageUrl) || item.imageUrl || Card1;
 
+        const rid = stringifyRoadmapId(item._id ?? item.id);
         return {
-          id: item._id,
+          id: rid,
           title,
           description,
           completionTime,
           img,
           raw: item,
         };
-      });
+      }).filter((row) => Boolean(row.id));
       setRoadmapLibrary(mapped);
     } catch (err) {
       console.error("Error fetching roadmaps:", err);
@@ -208,9 +190,6 @@ export default function RevitalizationRoadmapPage() {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (sortPopupRef.current && !sortPopupRef.current.contains(event.target)) {
-        setShowSortPopup(false);
-      }
       if (filterPopupRef.current && !filterPopupRef.current.contains(event.target)) {
         setShowFilterPopup(false);
       }
@@ -232,11 +211,6 @@ export default function RevitalizationRoadmapPage() {
       setFilterCount(activeFilters);
       return newFilters;
     });
-  };
-
-  const handleClearSort = () => {
-    setSortBy("least-mentees");
-    setShowSortPopup(false);
   };
 
   const handleDeleteRoadmap = async (id) => {
@@ -355,7 +329,7 @@ export default function RevitalizationRoadmapPage() {
     <div className={directorPageRoot}>
       <DirectorHero
         title="Revitalization Roadmap"
-        subtitle="Library, mentors, and pastor progress — unified for directors."
+        subtitle="Library and pastor progress — unified for directors."
         image={HeroBg}
         breadcrumbItems={[
           { label: "Home", href: "/director/home" },
@@ -371,7 +345,7 @@ export default function RevitalizationRoadmapPage() {
                 <SearchBar
                   value={searchQuery}
                   onChange={setSearchQuery}
-                  placeholder="Search roadmaps, mentors, or pastors…"
+                  placeholder="Search roadmaps or pastors…"
                   variant="dark"
                   className="w-full"
                 />
@@ -384,13 +358,6 @@ export default function RevitalizationRoadmapPage() {
                   className={`shrink-0 rounded-lg border px-3 py-2.5 text-[13px] font-semibold transition-all sm:px-4 sm:text-[14px] ${tabBtn(activeTab === "roadmap-library")}`}
                 >
                   Roadmap library
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("mentors")}
-                  className={`shrink-0 rounded-lg border px-3 py-2.5 text-[13px] font-semibold transition-all sm:px-4 sm:text-[14px] ${tabBtn(activeTab === "mentors")}`}
-                >
-                  Mentors
                 </button>
                 <button
                   type="button"
@@ -469,182 +436,6 @@ export default function RevitalizationRoadmapPage() {
             </div>
           )}
 
-          {activeTab === "mentors" && (
-            <div>
-              {loadingMentors ? (
-                <div className="flex justify-center py-16">
-                  <div className={directorSpinner} />
-                </div>
-              ) : (
-                <>
-                  <FeaturedAvatars
-                    items={mentorsList.map((mentor, idx) => {
-                      const defaultImages = [Mentor1, Mentor2, Mentor3];
-                      return {
-                        id: mentor._id || mentor.id,
-                        name: `${mentor.firstName} ${mentor.lastName}`,
-                        img: mentor.profilePicture || defaultImages[idx % defaultImages.length],
-                      };
-                    })}
-                    gapClass="gap-4"
-                    nameClass="text-sm text-white/90"
-                    className="mb-6"
-                    showGradientBorder={false}
-                  />
-
-                  <div
-                    className={`mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between ${directorGlassCard} p-4 sm:p-5`}
-                  >
-                    <div className="relative flex items-center gap-3" ref={sortPopupRef}>
-                      <button
-                        type="button"
-                        onClick={() => setShowSortPopup(!showSortPopup)}
-                        className={glassTrigger}
-                      >
-                        <span>
-                          {sortBy === "least-mentees" ? "Least mentees" : "Most mentees"}
-                        </span>
-                        <i className="fa-solid fa-chevron-down text-xs text-white/60" />
-                      </button>
-
-                      {showSortPopup && (
-                        <div className={`${glassPopover} left-0 top-full`}>
-                          <h3 className="mb-3 text-[13px] font-bold uppercase tracking-wide text-[#8ec5eb]">
-                            Sort by mentee count
-                          </h3>
-                          <div className="mb-4 space-y-3">
-                            <label className="flex cursor-pointer items-center gap-3">
-                              <input
-                                type="radio"
-                                name="sort"
-                                value="least-mentees"
-                                checked={sortBy === "least-mentees"}
-                                onChange={(e) => {
-                                  setSortBy(e.target.value);
-                                  setShowSortPopup(false);
-                                }}
-                                className="h-4 w-4 border-white/30 bg-white/10 text-[#8ec5eb] focus:ring-[#8ec5eb]/40"
-                              />
-                              <span className="text-[14px] text-white/90">Least mentees</span>
-                            </label>
-                            <label className="flex cursor-pointer items-center gap-3">
-                              <input
-                                type="radio"
-                                name="sort"
-                                value="most-mentees"
-                                checked={sortBy === "most-mentees"}
-                                onChange={(e) => {
-                                  setSortBy(e.target.value);
-                                  setShowSortPopup(false);
-                                }}
-                                className="h-4 w-4 border-white/30 bg-white/10 text-[#8ec5eb] focus:ring-[#8ec5eb]/40"
-                              />
-                              <span className="text-[14px] text-white/90">Most mentees</span>
-                            </label>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleClearSort}
-                            className="text-[13px] font-semibold text-[#8ec5eb] transition hover:text-white"
-                          >
-                            Clear sort
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="relative sm:ml-auto" ref={filterPopupRef}>
-                      <button
-                        type="button"
-                        onClick={() => setShowFilterPopup(!showFilterPopup)}
-                        className={glassTrigger}
-                      >
-                        <i className="fa-solid fa-filter text-[#8ec5eb]" />
-                        <span>Filter</span>
-                        <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/20 px-1.5 text-[11px] font-bold text-[#cde2f2]">
-                          {filterCount}
-                        </span>
-                        <i className="fa-solid fa-chevron-down text-xs text-white/60" />
-                      </button>
-
-                      {showFilterPopup && (
-                        <div className={`${glassPopover} right-0 top-full`}>
-                          <h3 className="mb-3 text-[13px] font-bold uppercase tracking-wide text-[#8ec5eb]">
-                            Filter
-                          </h3>
-                          <div className="mb-4 space-y-3">
-                            {["country", "state", "conference"].map((key) => (
-                              <label
-                                key={key}
-                                className="flex cursor-pointer items-center justify-between gap-4"
-                              >
-                                <span className="text-[14px] capitalize text-white/90">{key}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleFilter(key)}
-                                  className={`flex h-5 w-5 items-center justify-center rounded border-2 transition-all ${
-                                    filters[key]
-                                      ? "border-[#8ec5eb] bg-[#8ec5eb]/40"
-                                      : "border-white/25 bg-white/5"
-                                  }`}
-                                >
-                                  {filters[key] && (
-                                    <i className="fa-solid fa-check text-[10px] text-white" />
-                                  )}
-                                </button>
-                              </label>
-                            ))}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleClearFilter}
-                            className="text-[13px] font-semibold text-[#8ec5eb] transition hover:text-white"
-                          >
-                            Clear filter
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {mentorsList
-                      .filter((m) =>
-                        `${m.firstName} ${m.lastName}`
-                          .toLowerCase()
-                          .includes((searchQuery || "").toLowerCase())
-                      )
-                      .sort((a, b) => {
-                        const aC = a.assignedId?.length || 0;
-                        const bC = b.assignedId?.length || 0;
-                        return sortBy === "most-mentees" ? bC - aC : aC - bC;
-                      })
-                      .map((mentor, idx) => {
-                        const defaultImages = [Mentor1, Mentor2, Mentor3];
-                        const fallback = defaultImages[idx % defaultImages.length];
-                        return (
-                          <MentorCard
-                            key={mentor._id || mentor.id}
-                            variant="glass"
-                            image={mentor.profilePicture || fallback}
-                            name={`${mentor.firstName} ${mentor.lastName}`}
-                            role={mentor.role || "Mentor"}
-                            menteeCount={mentor.assignedId?.length || 0}
-                            onViewDetails={() =>
-                              router.push(`/director/mentors/profile/${mentor._id || mentor.id}`)
-                            }
-                          />
-                        );
-                      })}
-                    {mentorsList.length === 0 && (
-                      <p className="col-span-full py-8 text-center text-white/70">No mentors found.</p>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
           {activeTab === "pastor-roadmaps" && (
             <div>
               {loadingPastors ? (
@@ -666,6 +457,13 @@ export default function RevitalizationRoadmapPage() {
                     nameClass="text-sm text-white/90"
                     className="mb-6"
                     showGradientBorder={false}
+                    onItemClick={(item) => {
+                      if (item?.id) {
+                        router.push(
+                          `/director/pastor-assignments?assignUser=${encodeURIComponent(String(item.id))}`,
+                        );
+                      }
+                    }}
                   />
 
                   <div className="mb-6 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
@@ -747,7 +545,9 @@ export default function RevitalizationRoadmapPage() {
                             progress={pastor.overallRoadmapProgress || 0}
                             onViewDetails={() => {
                               if (pid) {
-                                router.push(`/director/mentees/profile/${pid}`);
+                                router.push(
+                                  `/director/pastor-assignments?assignUser=${encodeURIComponent(String(pid))}`,
+                                );
                               }
                             }}
                           />

@@ -197,6 +197,12 @@ function deriveEditFormValues(
 }
 
 /** Axios response body: { data: roadmap } or { success, data } */
+/** Windows / some pickers leave `type` empty; still allow common image extensions. */
+function isLikelyImageFile(file: File): boolean {
+  if (file.type && file.type.startsWith("image/")) return true;
+  return /\.(png|jpe?g|gif|webp|bmp|svg|avif|heic|heif|tif|tiff)$/i.test(file.name);
+}
+
 function extractCreatedRoadmapId(apiBody: unknown): string | null {
   const doc = unwrapRoadmap(apiBody);
   const id = doc?._id;
@@ -233,6 +239,7 @@ function CreateRoadmapStepOnePage() {
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [bannerDragOver, setBannerDragOver] = useState(false);
+  const [bannerFileError, setBannerFileError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [fetchLoading, setFetchLoading] = useState(false);
@@ -287,7 +294,12 @@ function CreateRoadmapStepOnePage() {
   }, [roadmapIdParam]);
 
   const applyBannerFile = useCallback((file: File | undefined) => {
-    if (!file || !file.type.startsWith("image/")) return;
+    if (!file) return;
+    if (!isLikelyImageFile(file)) {
+      setBannerFileError("Please choose a PNG, JPG, or other image file.");
+      return;
+    }
+    setBannerFileError("");
     setBannerFile(file);
     const next = URL.createObjectURL(file);
     if (bannerBlobUrlRef.current) URL.revokeObjectURL(bannerBlobUrlRef.current);
@@ -347,18 +359,28 @@ function CreateRoadmapStepOnePage() {
       setError("Roadmap subheading is required.");
       return;
     }
+    if (type === "Phase" && divisions.length === 0) {
+      setError("Please add at least one division (e.g. church or pastor).");
+      return;
+    }
 
     try {
       setSubmitting(true);
 
       if (isEditMode && roadmapIdParam) {
+        const sub = roadmapSubheading.trim();
+        const normalizedDivisions = divisions
+          .map((d) => d.trim().toLowerCase())
+          .filter(Boolean);
         await apiUpdateRoadmap(
           roadmapIdParam,
           {
             name: name.trim(),
-            description: roadmapSubheading.trim(),
+            description: sub,
+            roadMapDetails: sub,
             duration: duration.trim(),
-            type,
+            type: type === "Phase" ? "phase" : "single",
+            ...(normalizedDivisions.length ? { divisions: normalizedDivisions } : {}),
           },
           bannerFile ?? undefined
         );
@@ -367,21 +389,21 @@ function CreateRoadmapStepOnePage() {
         return;
       }
 
-      // Mobile parity: create parent roadmap first, then route into form flow.
+      // Mobile / CreateRoadmapModal parity: type + multipart fields the API validates (not JSON-stringified arrays).
+      const sub = roadmapSubheading.trim();
+      const normalizedDivisions = divisions
+        .map((d) => d.trim().toLowerCase())
+        .filter(Boolean);
       const payload = {
         type: type === "Phase" ? "phase" : "single",
         name: name.trim(),
-        roadMapDetails: roadmapSubheading.trim(),
+        roadMapDetails: sub,
+        description: sub,
         duration: duration.trim(),
-        divisions:
-          type === "Phase"
-            ? (divisions.length ? divisions : ["All"])
-            : (divisions.length ? divisions : ["All"]),
-        extras: [],
-        roadmaps: [],
+        divisions: normalizedDivisions.length ? normalizedDivisions : ["church"],
       };
 
-      const res = await apiCreateRoadmap(payload as any, bannerFile ?? undefined);
+      const res = await apiCreateRoadmap(payload, bannerFile ?? undefined);
       const id = extractCreatedRoadmapId(res.data);
       if (!id) {
         setError("Roadmap was created but no ID was returned. Open the roadmap library.");
@@ -399,7 +421,13 @@ function CreateRoadmapStepOnePage() {
         qp.set("name", name.trim());
         qp.set("subheading", roadmapSubheading.trim());
         qp.set("completionTime", duration.trim());
-        if (bannerPreview) qp.set("bannerImage", bannerPreview);
+        if (
+          bannerPreview &&
+          !bannerPreview.startsWith("blob:") &&
+          !bannerPreview.startsWith("data:")
+        ) {
+          qp.set("bannerImage", bannerPreview);
+        }
         router.push(`/director/revitalization-roadmap/roadmap-form?${qp.toString()}`);
       }
     } catch (err: unknown) {
@@ -606,6 +634,7 @@ function CreateRoadmapStepOnePage() {
                         URL.revokeObjectURL(bannerBlobUrlRef.current);
                         bannerBlobUrlRef.current = null;
                       }
+                      setBannerFileError("");
                       setBannerFile(null);
                       setBannerPreview(null);
                     }}
@@ -629,32 +658,28 @@ function CreateRoadmapStepOnePage() {
                   ref={bannerFileInputRef}
                   id={bannerInputId}
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.heic,.heif"
                   className="sr-only"
                   onChange={handleBannerChange}
                   aria-labelledby={`${bannerInputId}-label`}
                 />
                 <div className="mb-3 flex flex-wrap justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => bannerFileInputRef.current?.click()}
-                    className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                  <label
+                    htmlFor={bannerInputId}
+                    className="cursor-pointer rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
                   >
                     {bannerPreview ? "Replace image" : "Upload image"}
-                  </button>
+                  </label>
                 </div>
+                {bannerFileError ? (
+                  <p className="mb-2 text-center text-sm text-amber-200/95" role="status">
+                    {bannerFileError}
+                  </p>
+                ) : null}
                 {bannerPreview ? (
-                  <div
-                    className="relative mx-auto h-36 w-full max-w-md cursor-pointer overflow-hidden rounded-lg"
-                    onClick={() => bannerFileInputRef.current?.click()}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        bannerFileInputRef.current?.click();
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
+                  <label
+                    htmlFor={bannerInputId}
+                    className="relative mx-auto flex h-36 w-full max-w-md cursor-pointer overflow-hidden rounded-lg"
                     aria-label="Change banner image"
                   >
                     {bannerPreview.startsWith("blob:") || bannerPreview.startsWith("data:") ? (
@@ -678,12 +703,11 @@ function CreateRoadmapStepOnePage() {
                     <span className="pointer-events-none absolute bottom-2 left-1/2 w-[90%] -translate-x-1/2 rounded-md bg-black/50 px-2 py-1 text-center text-xs text-white/90">
                       Click to replace
                     </span>
-                  </div>
+                  </label>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => bannerFileInputRef.current?.click()}
-                    className="flex w-full flex-col items-center py-4"
+                  <label
+                    htmlFor={bannerInputId}
+                    className="flex w-full cursor-pointer flex-col items-center py-4"
                   >
                     <i
                       className={`fa-solid mb-2 text-2xl text-[#8ec5eb] ${bannerDragOver ? "fa-file-image" : "fa-cloud-arrow-up"}`}
@@ -692,7 +716,7 @@ function CreateRoadmapStepOnePage() {
                       {bannerDragOver ? "Drop image here" : "Or click here to choose a file"}
                     </span>
                     <span className="mt-1 text-xs text-white/45">PNG, JPG — optional</span>
-                  </button>
+                  </label>
                 )}
               </div>
             </div>

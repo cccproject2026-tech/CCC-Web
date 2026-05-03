@@ -43,11 +43,16 @@ export function buildCreateAssessmentSectionsFromWizard(
         choices: texts.map((text) => ({ text })),
       };
     });
-    const recommendations =
-      section.plans?.map((plan, idx) => ({
-        level: (idx + 1) as 1 | 2 | 3 | 4,
-        items: plan.items.map((t) => t.trim()).filter(Boolean),
-      })) ?? [];
+    /** CDP: always levels 1–4; `plans[0]..[3]` — independent of how many choice layers exist. */
+    const recPlans = section.plans ?? [];
+    const recommendations: Array<{ level: 1 | 2 | 3 | 4; items: string[] }> = [0, 1, 2, 3].map(
+      (i) => ({
+        level: (i + 1) as 1 | 2 | 3 | 4,
+        items: (recPlans[i]?.items ?? [])
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0),
+      }),
+    );
     return {
       title: section.name.trim() || `Section ${sIdx + 1}`,
       description,
@@ -315,23 +320,20 @@ export function newDirectorEditSection(): DirectorEditSection {
  * Extra API layers after the 4th are not shown; missing layers are padded.
  */
 export function sectionToDirectorEditWizard(s: Section): DirectorEditSection {
-  const layers: DirectorWizardLayer[] = [];
-  for (let i = 0; i < WIZARD_LAYER_COUNT; i++) {
-    const L = s.layers[i];
-    if (L) {
-      const choiceTexts = L.choices.length
-        ? L.choices.map((c) => c.text)
-        : [""];
-      const notes = L.recommendations
-        .map((r) => r.text)
-        .map((t) => t.trim())
-        .filter(Boolean)
-        .join("\n");
-      layers.push({ id: i + 1, choices: choiceTexts, notes });
-    } else {
-      layers.push({ id: i + 1, choices: [""], notes: "" });
-    }
-  }
+  const sourceLayers = Array.isArray(s.layers) && s.layers.length > 0
+    ? s.layers
+    : [{ id: "fallback-layer", name: "Layer 1", choices: [{ id: "c1", text: "" }], recommendations: [] }];
+  const layers: DirectorWizardLayer[] = sourceLayers.map((L, i) => {
+    const choiceTexts = L.choices.length
+      ? L.choices.map((c) => c.text)
+      : [""];
+    const notes = L.recommendations
+      .map((r) => r.text)
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .join("\n");
+    return { id: i + 1, choices: choiceTexts, notes };
+  });
 
   const plans: DirectorWizardPlan[] = [];
   for (let i = 0; i < WIZARD_LAYER_COUNT; i++) {

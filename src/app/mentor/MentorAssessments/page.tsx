@@ -7,13 +7,16 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { ApiAvatarPlaceholder, ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import {
+  apiGetAssignedAssessments,
   apiGetAssessmentById,
   apiGetAssessmentRecommendationRules,
   apiCreateAssessment,
   apiDeleteAssessments,
+  flattenAssignedAssessmentRow,
   apiGetAssessments,
   apiGetSectionRecommendations,
   apiGetUserAnswers,
+  parseAssignedAssessmentsListBody,
   parseAssessmentDetailPayload,
   parseAssessmentsListPayload,
   apiSendSectionRecommendations,
@@ -84,6 +87,27 @@ function statusLabel(status: MentorAssessmentStatus): string {
   if (status === "completed") return "Completed";
   if (status === "submitted") return "Submitted";
   return "Not Started";
+}
+
+function formatDueDate(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function toDateInputValue(value?: string): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function extractAssessmentIdFromProgressRow(row: any): string {
@@ -330,6 +354,7 @@ export default function MentorAssessments() {
   const [assignLoading, setAssignLoading] = useState(false);
   const [assignSearch, setAssignSearch] = useState("");
   const [selectedAssignUserIds, setSelectedAssignUserIds] = useState<string[]>([]);
+  const [assignDueDate, setAssignDueDate] = useState("");
   const [assignSubmitting, setAssignSubmitting] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [assessments, setAssessments] = useState<any[]>([]);
@@ -355,7 +380,11 @@ export default function MentorAssessments() {
       try {
         setLoading(true);
         if (selectedMenteeId) {
-          const progressRes = await apiGetUserProgress(selectedMenteeId);
+          const [assignedRes, progressRes] = await Promise.all([
+            apiGetAssignedAssessments(selectedMenteeId),
+            apiGetUserProgress(selectedMenteeId),
+          ]);
+          const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
           const progressData = unwrapProgressData(progressRes);
           const assessmentProgress = Array.isArray(progressData?.assessments)
             ? progressData.assessments
@@ -374,25 +403,28 @@ export default function MentorAssessments() {
               arr.findIndex((x) => x.assessmentId === row.assessmentId) === idx,
           );
 
-          const details = await Promise.allSettled(
-            uniqById.map(async (row: { assessmentId: string; status: MentorAssessmentStatus; assignmentId?: string }) => {
-              const detailRes = await apiGetAssessmentById(row.assessmentId);
-              const detail = parseAssessmentDetailPayload(detailRes.data);
-              if (!detail) return null;
-              return {
-                ...(detail as any),
-                _id: String((detail as any)._id ?? row.assessmentId),
-                id: String((detail as any)._id ?? row.assessmentId),
-                _mentorAssignmentStatus: row.status,
-                _mentorAssignmentId: row.assignmentId,
-              };
-            }),
+          const statusByAssessmentId = new Map(
+            uniqById.map((row) => [row.assessmentId, row]),
           );
 
-          const assigned = details
-            .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
-            .map((r) => r.value)
-            .filter((v) => v !== null);
+          const assigned = assignedRows
+            .map((item) => {
+              const flat = flattenAssignedAssessmentRow(item);
+              if (!flat) return null;
+              const assessment = flat.assessment as any;
+              const assessmentId = String(assessment?._id ?? assessment?.id ?? flat.assessmentId ?? "");
+              if (!assessmentId) return null;
+              const progressRow = statusByAssessmentId.get(assessmentId);
+              return {
+                ...assessment,
+                _id: assessmentId,
+                id: assessmentId,
+                _mentorAssignmentStatus: progressRow?.status || "not_started",
+                _mentorAssignmentId: flat.assignmentId ?? progressRow?.assignmentId,
+                _mentorDueDate: flat.dueDate,
+              };
+            })
+            .filter((value): value is any => value != null);
 
           const q = searchTerm.trim().toLowerCase();
           const filteredAssigned = !q
@@ -458,6 +490,7 @@ export default function MentorAssessments() {
     if (!showAssignDrawer) {
       setAssignUsers([]);
       setAssignSearch("");
+      setAssignDueDate("");
       setSelectedAssignUserIds([]);
       setAssignAssessmentId(null);
       return;
@@ -514,8 +547,10 @@ export default function MentorAssessments() {
       await apiAssignAssessment({
         userIds: selectedAssignUserIds,
         assessmentIds: [assignAssessmentId],
+        dueDate: assignDueDate ? new Date(`${assignDueDate}T23:59:59`).toISOString() : undefined,
       });
       setShowAssignDrawer(false);
+      setAssignDueDate("");
       setToastMsg("Assessment assigned successfully");
       setTimeout(() => setToastMsg(""), 3000);
     } catch (e) {
@@ -936,17 +971,24 @@ export default function MentorAssessments() {
                           <p className="mt-1 line-clamp-2 text-sm text-[#cde2f2]/90">{item.description}</p>
 
                           {selectedMenteeId && (
-                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                              <span className="text-[#cde2f2]/80">Status</span>
-                              <span
-                                className={`rounded-md border px-2 py-1 font-medium ${statusChipClass(
-                                  (item._mentorAssignmentStatus as MentorAssessmentStatus) || "not_started",
-                                )}`}
-                              >
-                                {statusLabel(
-                                  (item._mentorAssignmentStatus as MentorAssessmentStatus) || "not_started",
-                                )}
-                              </span>
+                            <div className="mt-3 space-y-2 text-xs">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-[#cde2f2]/80">Status</span>
+                                <span
+                                  className={`rounded-md border px-2 py-1 font-medium ${statusChipClass(
+                                    (item._mentorAssignmentStatus as MentorAssessmentStatus) || "not_started",
+                                  )}`}
+                                >
+                                  {statusLabel(
+                                    (item._mentorAssignmentStatus as MentorAssessmentStatus) || "not_started",
+                                  )}
+                                </span>
+                              </div>
+                              {formatDueDate(item._mentorDueDate) ? (
+                                <div className="text-[#cde2f2]/80">
+                                  Due {formatDueDate(item._mentorDueDate)}
+                                </div>
+                              ) : null}
                             </div>
                           )}
                         </div>
@@ -1198,6 +1240,15 @@ export default function MentorAssessments() {
                 aria-label="Search pastors to assign"
                 className="w-full"
               />
+              <label className="mt-4 block">
+                <span className="mb-1 block text-sm font-medium text-white">Due date</span>
+                <input
+                  type="date"
+                  value={toDateInputValue(assignDueDate) || assignDueDate}
+                  onChange={(e) => setAssignDueDate(e.target.value)}
+                  className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-sm text-white outline-none transition focus:border-[#8ec5eb] focus:ring-2 focus:ring-[#8ec5eb]/30"
+                />
+              </label>
             </div>
 
             <div className="flex-1 space-y-2 overflow-y-auto p-4">

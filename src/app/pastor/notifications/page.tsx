@@ -1,6 +1,7 @@
 "use client";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { getNotifications } from "@/app/Services/pastor.service";
 import { getPastorUserId } from "@/app/utils/pastor-auth";
@@ -8,6 +9,7 @@ import { mapNotificationItemToPopup, unwrapNotificationsList } from "@/app/Servi
 import type { NotificationItem } from "@/app/Services/types/home.types";
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -18,8 +20,12 @@ export default function NotificationsPage() {
         if (!userId) return;
 
         const res = await getNotifications(userId);
+        // const list = unwrapNotificationsList(res);
+        // setNotifications(list);
         const list = unwrapNotificationsList(res);
-        setNotifications(list);
+const newestFirst = [...list].reverse();
+
+setNotifications(newestFirst);
       } catch (err) {
         console.error("Error loading notifications:", err);
       } finally {
@@ -63,10 +69,31 @@ export default function NotificationsPage() {
             {notifications.map((note) => {
               const p = mapNotificationItemToPopup(note);
               return (
+                // <div
+                //   key={note._id}
+                //   className="rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-3 text-white shadow-sm transition hover:shadow-md sm:flex sm:items-start sm:justify-between sm:gap-0 sm:p-4"
+                // >
                 <div
-                  key={note._id}
-                  className="rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-3 text-white shadow-sm transition hover:shadow-md sm:flex sm:items-start sm:justify-between sm:gap-0 sm:p-4"
-                >
+  key={note._id}
+  role={p.link ? "button" : undefined}
+  tabIndex={p.link ? 0 : undefined}
+  onClick={() => {
+    if (p.link) {
+      router.push(p.link);
+    }
+  }}
+  onKeyDown={(e) => {
+    if (!p.link) return;
+
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      router.push(p.link);
+    }
+  }}
+  className={`rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-3 text-white shadow-sm transition hover:shadow-md sm:flex sm:items-start sm:justify-between sm:gap-0 sm:p-4 ${
+    p.link ? "cursor-pointer hover:bg-white/[0.03]" : ""
+  }`}
+>
                   <div className="flex items-start gap-3 sm:gap-4">
                     <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-base sm:text-lg">
                       <i className={`${p.icon} ${p.iconColor}`} aria-hidden />

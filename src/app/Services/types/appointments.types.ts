@@ -61,7 +61,9 @@ export interface CancelAppointmentPayload {
 }
 
 export interface RescheduleAppointmentPayload {
-  meetingDate: string;
+  newDate: string;       // ISO datetime string
+  startTime: string;     // e.g. "3:00"
+  startPeriod: string;   // "AM" | "PM"
   platform?: AppointmentPlatform;
   meetingLink?: string;
 }

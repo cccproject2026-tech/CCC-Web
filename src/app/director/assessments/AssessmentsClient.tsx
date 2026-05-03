@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import DirectorHero from "../DirectorHero";
+import FeaturedAvatars, { type FeaturedAvatarItem } from "@/app/Components/FeaturedAvatars";
 import {
   directorBtnPrimary,
   directorBtnSecondary,
@@ -14,14 +15,20 @@ import {
   directorToastClass,
 } from "../directorUi";
 import { DirectorFilterSection, DirectorSlideOver } from "../ui";
+import { mentorFilterPanel } from "@/app/Components/mentor/mentor-theme";
 import SearchBar from "@/app/Components/SearchBar";
 import ConfirmModal from "@/app/Components/ConfirmModal";
 import AssessmentBg from "../../Assets/assessment-bg.png";
 import Thumb1 from "../../Assets/thumb1.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import {
+  apiGetAssignedAssessments,
+  apiGetAssessmentById,
   apiDeleteAssessments,
+  flattenAssignedAssessmentRow,
   apiGetAssessments,
+  parseAssignedAssessmentsListBody,
+  parseAssessmentDetailPayload,
   parseAssessmentsListPayload,
 } from "@/app/Services/assessment.service";
 import { apiGetAllUsers } from "@/app/Services/users.service";
@@ -48,6 +55,56 @@ type AssignUserRow = {
   avatar: string | typeof Mentor1;
 };
 
+type AssessmentCardRow = {
+  id: string;
+  title: string;
+  description: string;
+  image: string | typeof Thumb1;
+  type?: unknown;
+  progressStatus?: "not_started" | "submitted" | "completed";
+  dueDate?: string;
+};
+
+function toDateInputValue(value?: string): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDueDate(value?: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function normalizeAssessmentStatus(raw: unknown): "not_started" | "submitted" | "completed" {
+  const s = String(raw || "").toLowerCase().replace(/\s+/g, "_");
+  if (s === "submitted") return "submitted";
+  if (s === "completed" || s === "reviewed") return "completed";
+  return "not_started";
+}
+
+function assessmentStatusLabel(status: AssessmentCardRow["progressStatus"]): string {
+  if (status === "completed") return "Completed";
+  if (status === "submitted") return "Submitted";
+  return "Not Started";
+}
+
+function assessmentStatusChipClass(status: AssessmentCardRow["progressStatus"]): string {
+  if (status === "completed") return "border-emerald-300/35 bg-emerald-500/20 text-emerald-100";
+  if (status === "submitted") return "border-amber-300/35 bg-amber-500/20 text-amber-100";
+  return "border-white/20 bg-white/10 text-[#cde2f2]";
+}
+
 const mapUserToAssignUser = (user: any): AssignUserRow => ({
   id: String(user.id ?? user._id ?? ""),
   name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "User",
@@ -69,13 +126,17 @@ function AssessmentsPageContent() {
   const [showOptionsMenu, setShowOptionsMenu] = useState<string | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
-  const [assessments, setAssessments] = useState<any[]>([]);
+  const [assessments, setAssessments] = useState<AssessmentCardRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<AssignUserRow[]>([]);
   const [userSearch, setUserSearch] = useState("");
   const [loadingAssessments, setLoadingAssessments] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [listRefetchKey, setListRefetchKey] = useState(0);
+  const [featuredItems, setFeaturedItems] = useState<FeaturedAvatarItem[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(false);
+  const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(assignUserFromQuery);
+  const [assignDueDate, setAssignDueDate] = useState("");
   const lastAssignBootstrap = useRef<string | null>(null);
 
   useEffect(() => {
@@ -98,9 +159,17 @@ function AssessmentsPageContent() {
 
         const body = res?.data;
         const list = parseAssessmentsListPayload(body);
-        const mapped: any[] = [];
+        const mapped: AssessmentCardRow[] = [];
         for (const item of list) {
-          const rawItem = item as Record<string, unknown>;
+          const rawItem = item as {
+            _id?: unknown;
+            id?: unknown;
+            bannerImage?: unknown;
+            name?: unknown;
+            title?: unknown;
+            description?: unknown;
+            type?: unknown;
+          };
           const rawId = rawItem._id ?? rawItem.id;
           const id = rawId != null && String(rawId).trim() !== "" ? String(rawId) : "";
           if (!id) continue;
@@ -120,22 +189,67 @@ function AssessmentsPageContent() {
           });
         }
 
-        if (assignUserFromQuery) {
+        if (selectedMenteeId) {
           try {
-            const progRes = await apiGetUserProgress(assignUserFromQuery);
+            const [assignedRes, progRes] = await Promise.all([
+              apiGetAssignedAssessments(selectedMenteeId),
+              apiGetUserProgress(selectedMenteeId),
+            ]);
+            const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
             const pr = unwrapProgressData(progRes);
             const rows = pr?.assessments ?? [];
-            const allowed = new Set<string>();
+            const byAssessmentId = new Map<string, "not_started" | "submitted" | "completed">();
             for (const row of rows) {
-              const aid = (row as { assessmentId?: string }).assessmentId;
+              const typedRow = row as { assessmentId?: string; status?: string };
+              const aid = typedRow.assessmentId;
               if (aid != null && String(aid).trim() !== "") {
-                allowed.add(String(aid).trim());
+                byAssessmentId.set(String(aid).trim(), normalizeAssessmentStatus(typedRow.status));
               }
             }
-            if (allowed.size === 0) {
+            const assigned = assignedRows
+              .map((item) => {
+                const flat = flattenAssignedAssessmentRow(item);
+                if (!flat) return null;
+
+                const detailObj = flat.assessment as {
+                  _id?: string;
+                  id?: string;
+                  bannerImage?: string;
+                  name?: string;
+                  description?: string;
+                  type?: unknown;
+                };
+
+                const raw = detailObj.bannerImage;
+                const image =
+                  (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
+                const assessmentId = String(detailObj._id ?? detailObj.id ?? flat.assessmentId);
+
+                return {
+                  id: assessmentId,
+                  title: String(detailObj.name || "Untitled"),
+                  description: String(detailObj.description || ""),
+                  image,
+                  type: detailObj.type,
+                  progressStatus: byAssessmentId.get(assessmentId) || "not_started",
+                  dueDate: flat.dueDate,
+                } satisfies AssessmentCardRow;
+              })
+              .filter((item): item is NonNullable<typeof item> => item != null);
+
+            if (assigned.length === 0) {
               setAssessments([]);
             } else {
-              setAssessments(mapped.filter((a) => allowed.has(String(a.id))));
+              if (!debouncedSearch) {
+                setAssessments(assigned);
+              } else {
+                const q = debouncedSearch.toLowerCase();
+                setAssessments(
+                  assigned.filter((a) =>
+                    `${a.title} ${a.description}`.toLowerCase().includes(q),
+                  ),
+                );
+              }
             }
           } catch (e) {
             console.error("Failed to load pastor assessment assignments", e);
@@ -154,7 +268,51 @@ function AssessmentsPageContent() {
     };
 
     fetchAssessments();
-  }, [pathname, debouncedSearch, assignUserFromQuery, listRefetchKey]);
+  }, [pathname, debouncedSearch, selectedMenteeId, listRefetchKey]);
+
+  useEffect(() => {
+    if (pathname !== "/director/assessments") return;
+
+    const fetchFeaturedPastors = async () => {
+      try {
+        setFeaturedLoading(true);
+        const res = await apiGetAllUsers({
+          role: "pastor",
+          roleMatch: "mixed",
+          page: 1,
+          limit: 20,
+        });
+
+        const inner = res?.data?.data;
+        let listUsers: unknown[] = [];
+        if (inner && typeof inner === "object") {
+          const payload = inner as { users?: unknown[]; rows?: unknown[] };
+          if (Array.isArray(payload.users)) listUsers = payload.users;
+          else if (Array.isArray(payload.rows)) listUsers = payload.rows;
+        }
+
+        setFeaturedItems(
+          listUsers
+            .map((user) => {
+              const row = mapUserToAssignUser(user as Record<string, unknown>);
+              return {
+                id: row.id,
+                name: row.name,
+                img: resolveApiMediaUrl(typeof row.avatar === "string" ? row.avatar : "") || row.avatar,
+              } satisfies FeaturedAvatarItem;
+            })
+            .filter((item) => String(item.id).trim() !== ""),
+        );
+      } catch (error) {
+        console.error("Failed to fetch featured pastors", error);
+        setFeaturedItems([]);
+      } finally {
+        setFeaturedLoading(false);
+      }
+    };
+
+    void fetchFeaturedPastors();
+  }, [pathname]);
 
   useEffect(() => {
     if (pathname !== "/director/assessments") return;
@@ -169,6 +327,7 @@ function AssessmentsPageContent() {
     if (!assignUserFromQuery) return;
     if (lastAssignBootstrap.current === assignUserFromQuery) return;
     lastAssignBootstrap.current = assignUserFromQuery;
+    setSelectedMenteeId(assignUserFromQuery);
     setSelectedUsers([assignUserFromQuery]);
     setIsSelectionMode(true);
     setToast("Select assessments, then tap Assigned to.");
@@ -192,7 +351,7 @@ function AssessmentsPageContent() {
         const inner = res?.data?.data;
         let listUsers: unknown[] = [];
         if (inner && typeof inner === "object") {
-          const o = inner as Record<string, unknown>;
+          const o = inner as { users?: unknown[]; rows?: unknown[] };
           if (Array.isArray(o.users)) listUsers = o.users;
           else if (Array.isArray(o.rows)) listUsers = o.rows;
         }
@@ -205,6 +364,12 @@ function AssessmentsPageContent() {
 
     fetchPastors();
   }, [showAssignModal, userSearch]);
+
+  useEffect(() => {
+    if (!showAssignModal) {
+      setAssignDueDate("");
+    }
+  }, [showAssignModal]);
 
   const handleSelectAssessment = (id: string) => {
     setSelectedAssessments((prev) =>
@@ -245,6 +410,7 @@ function AssessmentsPageContent() {
         await apiAssignAssessment({
           userIds,
           assessmentIds: [assessmentId],
+          dueDate: assignDueDate ? new Date(`${assignDueDate}T23:59:59`).toISOString() : undefined,
         });
       }
 
@@ -252,6 +418,7 @@ function AssessmentsPageContent() {
 
       setShowAssignModal(false);
       setIsSelectionMode(false);
+      setAssignDueDate("");
       setSelectedUsers([]);
       setSelectedAssessments([]);
 
@@ -324,8 +491,8 @@ function AssessmentsPageContent() {
       <DirectorHero
         title="Assessments"
         subtitle={
-          assignUserFromQuery
-            ? "Assessments assigned to this pastor."
+          selectedMenteeId
+            ? "Assessments assigned to the selected pastor."
             : "Create, edit, and assign assessments to pastors."
         }
         image={AssessmentBg}
@@ -389,6 +556,34 @@ function AssessmentsPageContent() {
             </div>
           </DirectorFilterSection>
 
+          {!featuredLoading && featuredItems.length > 0 && (
+            <div className={`mb-6 ${mentorFilterPanel}`}>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-[#cde2f2]">
+                  {selectedMenteeId
+                    ? "Showing assigned assessments for selected pastor"
+                    : "Showing all assessments"}
+                </p>
+                {selectedMenteeId && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMenteeId(null)}
+                    className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/15"
+                  >
+                    Clear filter
+                  </button>
+                )}
+              </div>
+              <FeaturedAvatars
+                items={featuredItems}
+                showDivider={false}
+                className="mb-0"
+                selectedId={selectedMenteeId}
+                onItemClick={(item) => setSelectedMenteeId(String(item.id))}
+              />
+            </div>
+          )}
+
           {isSelectionMode && (
             <div className={`mb-6 flex flex-wrap items-center justify-between gap-4 p-5 ${directorGlassCard}`}>
               <div className="flex flex-wrap items-center gap-4">
@@ -450,7 +645,7 @@ function AssessmentsPageContent() {
                     </div>
                   )}
 
-                  {!isSelectionMode && (
+                  {!isSelectionMode && !selectedMenteeId && (
                     <div className="options-menu-container absolute right-4 top-4 z-[60]">
                       <button
                         type="button"
@@ -525,13 +720,73 @@ function AssessmentsPageContent() {
                         <p className="text-sm text-white/65">{assessment.description}</p>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => router.push(`/director/assessments/${assessment.id}`)}
-                        className="mt-4 self-end rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
-                      >
-                        View / edit
-                      </button>
+                      {selectedMenteeId ? (
+                        <div className="mt-4 space-y-3">
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="font-semibold text-white/80">Status</span>
+                            <span
+                              className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${assessmentStatusChipClass(
+                                assessment.progressStatus,
+                              )}`}
+                            >
+                              {assessmentStatusLabel(assessment.progressStatus)}
+                            </span>
+                          </div>
+                          {formatDueDate(assessment.dueDate) ? (
+                            <div className="text-sm text-[#cde2f2]">
+                              <span className="font-semibold text-white/80">Due</span>{" "}
+                              {formatDueDate(assessment.dueDate)}
+                            </div>
+                          ) : null}
+                          <div className="flex flex-wrap items-center gap-2">
+                            {(assessment.progressStatus === "submitted" ||
+                              assessment.progressStatus === "completed") && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  router.push(
+                                    `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}`,
+                                  )
+                                }
+                                className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                              >
+                                View Result
+                              </button>
+                            )}
+                            {(assessment.progressStatus === "submitted" ||
+                              assessment.progressStatus === "completed") && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  router.push(
+                                    `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}&editRecommendation=1`,
+                                  )
+                                }
+                                className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+                              >
+                                Edit Recommendation
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                router.push(`/director/assessments/${assessment.id}?viewUser=${selectedMenteeId}`)
+                              }
+                              className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+                            >
+                              View
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/director/assessments/${assessment.id}`)}
+                          className="mt-4 self-end rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+                        >
+                          View / edit
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -543,12 +798,12 @@ function AssessmentsPageContent() {
                 <i className="fa-regular fa-folder-open text-2xl text-[#8ec5eb]" />
               </div>
               <p className="text-lg font-semibold text-white">
-                {assignUserFromQuery
+                {selectedMenteeId
                   ? "No assessments assigned to this pastor."
                   : "No assessments found"}
               </p>
               <p className="mt-2 text-sm text-white/60">
-                {assignUserFromQuery
+                {selectedMenteeId
                   ? "Assign assessments from the full list when needed."
                   : "Try another search or create an assessment with Add."}
               </p>
@@ -557,67 +812,110 @@ function AssessmentsPageContent() {
         </div>
       </section>
 
-      <DirectorSlideOver
-        open={showAssignModal}
-        onClose={() => setShowAssignModal(false)}
-        title="Assign to"
-        footer={
-          <div>
-            <p className="mb-3 text-center text-sm text-gray-600">
-              {selectedUsers.length === 0
-                ? "Select one or more pastors."
-                : `${selectedUsers.length} pastor${selectedUsers.length === 1 ? "" : "s"} selected`}
-            </p>
-            <button
-              type="button"
-              onClick={handleAssign}
-              disabled={selectedUsers.length === 0 || loading}
-              className="w-full rounded-lg bg-[#2E3B8E] px-6 py-3 font-semibold text-white transition hover:bg-[#1F2A6E] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {loading ? "Assigning…" : "Assign"}
-            </button>
-          </div>
-        }
-      >
-        <div className="border-b border-gray-100 px-6 py-4">
-          <SearchBar
-            value={userSearch}
-            onChange={setUserSearch}
-            placeholder="Search pastors…"
-            variant="light"
-            className="w-full"
-          />
-        </div>
-        <div className="px-6 py-4">
-          <div className="space-y-2">
-            {users.map((user) => (
-              <label
-                key={user.id}
-                className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-100 p-3 transition hover:bg-gray-50"
+      {showAssignModal ? (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4"
+          onClick={() => setShowAssignModal(false)}
+          role="presentation"
+        >
+          <div
+            className="flex w-full max-w-md max-h-[90vh] flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="assign-assessment-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <header className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <div>
+                <h2 id="assign-assessment-title" className="text-lg font-bold text-gray-900">
+                  Assign to pastors
+                </h2>
+                <p className="mt-0.5 text-sm text-gray-600">
+                  Choose pastors and assign selected assessments.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAssignModal(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-gray-800"
+                aria-label="Close assign popup"
               >
+                <i className="fa-solid fa-xmark text-xl" />
+              </button>
+            </header>
+
+            <div className="border-b border-gray-100 px-6 py-4">
+              <SearchBar
+                value={userSearch}
+                onChange={setUserSearch}
+                placeholder="Search pastors…"
+                variant="light"
+                className="w-full"
+              />
+              <label className="mt-4 block">
+                <span className="mb-1 block text-sm font-medium text-gray-700">Due date</span>
                 <input
-                  type="checkbox"
-                  checked={selectedUsers.includes(user.id)}
-                  onChange={() => handleUserToggle(user.id)}
-                  className="h-5 w-5 rounded text-[#2E3B8E] focus:ring-2 focus:ring-[#2E3B8E]"
+                  type="date"
+                  value={toDateInputValue(assignDueDate) || assignDueDate}
+                  onChange={(e) => setAssignDueDate(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-[#2E3B8E] focus:ring-2 focus:ring-[#2E3B8E]/20"
                 />
-                <Image
-                  src={user.avatar}
-                  alt=""
-                  width={40}
-                  height={40}
-                  className="rounded-full object-cover"
-                  unoptimized={typeof user.avatar === "string" && isRemoteImageSrc(user.avatar)}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-gray-900">{user.name}</div>
-                  <div className="truncate text-sm text-gray-600">{user.role}</div>
-                </div>
               </label>
-            ))}
+            </div>
+
+            <div className="flex-1 overflow-auto px-6 py-4">
+              <div className="space-y-2">
+                {users.map((user) => (
+                  <label
+                    key={user.id}
+                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-gray-100 p-3 transition hover:bg-gray-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedUsers.includes(user.id)}
+                      onChange={() => handleUserToggle(user.id)}
+                      className="h-5 w-5 rounded text-[#2E3B8E] focus:ring-2 focus:ring-[#2E3B8E]"
+                    />
+                    <Image
+                      src={user.avatar}
+                      alt=""
+                      width={40}
+                      height={40}
+                      className="rounded-full object-cover"
+                      unoptimized={typeof user.avatar === "string" && isRemoteImageSrc(user.avatar)}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-gray-900">{user.name}</div>
+                      <div className="truncate text-sm text-gray-600">{user.role}</div>
+                    </div>
+                  </label>
+                ))}
+                {users.length === 0 ? (
+                  <p className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-6 text-center text-sm text-gray-500">
+                    No pastors found.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <footer className="border-t border-gray-200 px-6 py-4">
+              <p className="mb-3 text-center text-sm text-gray-600">
+                {selectedUsers.length === 0
+                  ? "Select one or more pastors."
+                  : `${selectedUsers.length} pastor${selectedUsers.length === 1 ? "" : "s"} selected`}
+              </p>
+              <button
+                type="button"
+                onClick={handleAssign}
+                disabled={selectedUsers.length === 0 || loading}
+                className="w-full rounded-lg bg-[#2E3B8E] px-6 py-3 font-semibold text-white transition hover:bg-[#1F2A6E] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {loading ? "Assigning…" : "Assign"}
+              </button>
+            </footer>
           </div>
         </div>
-      </DirectorSlideOver>
+      ) : null}
 
       <ConfirmModal
         isOpen={showDeleteModal}

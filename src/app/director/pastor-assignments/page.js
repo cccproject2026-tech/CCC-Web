@@ -19,6 +19,15 @@ import MentorBg from "../../Assets/mentor-bg.png";
 import Card1 from "../../Assets/card1.png";
 import { apiGetRoadmaps, apiGetRoadmapsByUser, apiDeleteRoadmap } from "@/app/Services/api";
 
+function stringifyRoadmapItemId(item) {
+  const raw = item?._id ?? item?.id;
+  if (raw == null) return "";
+  if (typeof raw === "object" && raw !== null && "$oid" in raw) {
+    return String(raw.$oid);
+  }
+  return String(raw).trim();
+}
+
 export default function PastorAssignmentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -54,12 +63,14 @@ export default function PastorAssignmentsPage() {
             ? envelope.data
             : [];
       setRoadmaps(
-        data.map((item) => ({
-          id: item._id ?? item.id,
-          title: item.name,
-          description: item.description || item.roadMapDetails || "No description",
-          image: item.imageUrl || Card1,
-        }))
+        data
+          .map((item) => ({
+            id: stringifyRoadmapItemId(item),
+            title: item.name,
+            description: item.description || item.roadMapDetails || "No description",
+            image: item.imageUrl || Card1,
+          }))
+          .filter((r) => Boolean(r.id))
       );
     } catch (err) {
       console.error("Error fetching roadmaps:", err);

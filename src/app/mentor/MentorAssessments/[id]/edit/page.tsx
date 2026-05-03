@@ -1,47 +1,96 @@
 "use client";
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import {
+  apiPatchAssessment,
   apiGetAssessmentById,
+  apiUploadAssessmentBanner,
   apiUpdateInstructions,
   apiUpdateSections,
+  formatAssessmentApiErrorMessage,
   parseAssessmentDetailPayload,
 } from "@/app/Services/assessment.service";
 import {
+  buildPreSurveyPayloadForDirectorCreate,
   mapAssessmentFromApi,
   buildSectionsPayload,
   type Section,
+  type LevelPlanBlock,
 } from "@/app/Services/utils/assessment-mapper";
+import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
+
+type InstructionItem = {
+  id: string;
+  text: string;
+  checked: boolean;
+};
+
+type PreSurveyRow = {
+  id: number;
+  text: string;
+  type: "text" | "number";
+  placeholder: string;
+};
+
+const MAX_BANNER_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_BANNER_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp"]);
+
+const defaultPreSurveyRow = (): PreSurveyRow => ({
+  id: Date.now(),
+  text: "",
+  type: "number",
+  placeholder: "Enter number",
+});
+
+function preSurveyFromApiDetail(raw: unknown): PreSurveyRow[] {
+  const d = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+  const arr = d?.preSurvey;
+  if (!Array.isArray(arr) || arr.length === 0) {
+    return [{ id: 1, text: "", type: "number", placeholder: "Enter number" }];
+  }
+  return arr.map((q: unknown, i: number) => {
+    const qo = q && typeof q === "object" ? (q as Record<string, unknown>) : {};
+    const t = String(qo.text ?? (qo as { question?: string }).question ?? "");
+    const typ = qo.type === "text" ? "text" : "number";
+    return {
+      id: i + 1,
+      text: t,
+      type: typ,
+      placeholder: String(qo.placeholder ?? " "),
+    };
+  });
+}
 
 export default function MentorEditAssessmentPage() {
   const router = useRouter();
   const params = useParams();
   const [toast, setToast] = useState<string | null>(null);
   const [selectedSection, setSelectedSection] = useState<string>("");
-  const [isSelectionMode, setIsSelectionMode] = useState(false);
-  const [selectedChoices, setSelectedChoices] = useState<number[]>([]);
+  const [isEditMode, setIsEditMode] = useState(false);
   const [assessment, setAssessment] = useState<any>(null);
+  const [assessmentName, setAssessmentName] = useState("");
+  const [description, setDescription] = useState("");
+  const [hasPreSurvey, setHasPreSurvey] = useState(false);
 
   // Modals
   const [showAddSectionModal, setShowAddSectionModal] = useState(false);
   const [showAddLayerModal, setShowAddLayerModal] = useState(false);
-  const [showRecommendationsModal, setShowRecommendationsModal] =
-    useState(false);
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
-  const [currentLayerId, setCurrentLayerId] = useState<string | null>(null);
-  const [recSelectionMode, setRecSelectionMode] = useState(false);
-  const [selectedRecs, setSelectedRecs] = useState<string[]>([]);
 
   // Form state for Add Section
   const [newSectionName, setNewSectionName] = useState("");
   const [newSectionGuidelines, setNewSectionGuidelines] = useState("");
   const [newSectionLayers, setNewSectionLayers] = useState(2);
-  const [newChoiceText, setNewChoiceText] = useState("");
 
   // Instructions state
-  const [instructions, setInstructions] = useState([]);
+  const [instructions, setInstructions] = useState<InstructionItem[]>([]);
+  const [preSurveyRows, setPreSurveyRows] = useState<PreSurveyRow[]>([defaultPreSurveyRow()]);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
 
   const [sections, setSections] = useState<Section[]>([]);
 
@@ -59,8 +108,21 @@ export default function MentorEditAssessmentPage() {
         const mapped = mapAssessmentFromApi(raw);
 
         setAssessment(mapped);
-        setSections(mapped.sections);
+        setAssessmentName(mapped.name || "");
+        setDescription(mapped.description || "");
+        setBannerPreview(resolveApiMediaUrl(mapped.bannerImage));
+        // Layer-level recommendations are intentionally removed for mentor edit flow.
+        setSections(
+          mapped.sections.map((section: Section) => ({
+            ...section,
+            layers: section.layers.map((layer) => ({ ...layer, recommendations: [] })),
+          })),
+        );
         setInstructions(mapped.instructions);
+        setHasPreSurvey(
+          (mapped.type as string) === "CMA" || preSurveyFromApiDetail(raw).some((r) => r.text.trim().length > 0),
+        );
+        setPreSurveyRows(preSurveyFromApiDetail(raw));
 
         if (mapped.sections.length > 0) {
           setSelectedSection(mapped.sections[0].id);
@@ -73,34 +135,71 @@ export default function MentorEditAssessmentPage() {
     fetchAssessment();
   }, [params?.id]);
 
-  const handleAddChoice = (sectionId: string, layerId: string) => {
-    if (!newChoiceText.trim()) return;
-
-    setSections(prev =>
-      prev.map(section =>
-        section.id !== sectionId
-          ? section
-          : {
-            ...section,
-            layers: section.layers.map(layer =>
-              layer.id !== layerId
-                ? layer
-                : {
-                  ...layer,
-                  choices: [
-                    ...layer.choices,
-                    {
-                      id: crypto.randomUUID(),
-                      text: newChoiceText,
-                    },
-                  ],
-                }
-            ),
-          }
-      )
+  const handleUpdateChoiceText = (
+    sectionId: string,
+    layerId: string,
+    choiceId: string,
+    text: string,
+  ) => {
+    setSections((prev) =>
+      prev.map((section) => {
+        if (section.id !== sectionId) return section;
+        return {
+          ...section,
+          layers: section.layers.map((layer) => {
+            if (layer.id !== layerId) return layer;
+            return {
+              ...layer,
+              choices: layer.choices.map((choice) =>
+                choice.id === choiceId ? { ...choice, text } : choice,
+              ),
+            };
+          }),
+        };
+      }),
     );
+  };
 
-    setNewChoiceText("");
+  const handleAddChoice = (sectionId: string, layerId: string) => {
+    const id =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `choice-${Date.now()}`;
+
+    setSections((prev) =>
+      prev.map((section) => {
+        if (section.id !== sectionId) return section;
+        return {
+          ...section,
+          layers: section.layers.map((layer) => {
+            if (layer.id !== layerId) return layer;
+            return {
+              ...layer,
+              choices: [...layer.choices, { id, text: "" }],
+            };
+          }),
+        };
+      }),
+    );
+  };
+
+  const handleRemoveChoice = (sectionId: string, layerId: string, choiceId: string) => {
+    setSections((prev) =>
+      prev.map((section) => {
+        if (section.id !== sectionId) return section;
+        return {
+          ...section,
+          layers: section.layers.map((layer) => {
+            if (layer.id !== layerId) return layer;
+            if (layer.choices.length <= 1) return layer;
+            return {
+              ...layer,
+              choices: layer.choices.filter((choice) => choice.id !== choiceId),
+            };
+          }),
+        };
+      }),
+    );
   };
 
   const showToast = (message: string) => {
@@ -108,37 +207,12 @@ export default function MentorEditAssessmentPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSelectChoice = (choiceIdx: number) => {
-    if (selectedChoices.includes(choiceIdx)) {
-      setSelectedChoices(selectedChoices.filter((idx) => idx !== choiceIdx));
-    } else {
-      setSelectedChoices([...selectedChoices, choiceIdx]);
-    }
-  };
-
-  const handleDeleteSelected = () => {
-    showToast("Choices of Survey has been Deleted");
-    setSelectedChoices([]);
-    setIsSelectionMode(false);
-  };
-
-  const handleSelectRec = (recId: string) => {
-    if (selectedRecs.includes(recId)) {
-      setSelectedRecs(selectedRecs.filter((id) => id !== recId));
-    } else {
-      setSelectedRecs([...selectedRecs, recId]);
-    }
-  };
-
-  const handleDeleteRecs = () => {
-    showToast("Deleted Suggestions");
-    setSelectedRecs([]);
-    setRecSelectionMode(false);
-  };
-
-  const handleSaveRecommendations = () => {
-    showToast("Suggestions Edited Successfully");
-    setShowRecommendationsModal(false);
+  const focusField = (id: string) => {
+    if (typeof document === "undefined") return;
+    const el = document.getElementById(id) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.focus();
   };
 
   const handleAddSection = () => {
@@ -161,6 +235,134 @@ export default function MentorEditAssessmentPage() {
     setShowInstructionsModal(false);
   };
 
+  const handleUpdateInstructionText = (id: string, text: string) => {
+    setInstructions((prev) => prev.map((inst) => (inst.id === id ? { ...inst, text } : inst)));
+  };
+
+  const handleAddInstruction = () => {
+    const id =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `inst-${Date.now()}`;
+    setInstructions((prev) => [...prev, { id, text: "", checked: true }]);
+  };
+
+  const handleRemoveInstruction = (id: string) => {
+    setInstructions((prev) => (prev.length <= 1 ? prev : prev.filter((inst) => inst.id !== id)));
+  };
+
+  const handleUpdatePreSurvey = (
+    idx: number,
+    field: keyof Pick<PreSurveyRow, "text" | "type" | "placeholder">,
+    value: string,
+  ) => {
+    setPreSurveyRows((prev) => {
+      const next = [...prev];
+      if (field === "type" && (value === "text" || value === "number")) {
+        next[idx] = { ...next[idx], type: value };
+      } else if (field === "text" || field === "placeholder") {
+        next[idx] = { ...next[idx], [field]: value };
+      }
+      return next;
+    });
+  };
+
+  const handleAddPreSurveyQuestion = () => {
+    setPreSurveyRows((prev) => [...prev, defaultPreSurveyRow()]);
+  };
+
+  const handleRemovePreSurveyQuestion = (idx: number) => {
+    setPreSurveyRows((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
+  };
+
+  const handleUpdateLevelPlanItem = (
+    sectionId: string,
+    level: 1 | 2 | 3 | 4,
+    itemId: string,
+    text: string,
+  ) => {
+    setSections((prev) =>
+      prev.map((section) => {
+        if (section.id !== sectionId) return section;
+        const current = section.levelPlans ?? [];
+        const hasLevel = current.some((b) => b.level === level);
+        const withLevel = hasLevel
+          ? current
+          : [
+              ...current,
+              {
+                id: `${section.id}-level-${level}`,
+                level,
+                items: [{ id: `${section.id}-level-${level}-item-0`, text: "" }],
+              },
+            ];
+
+        const nextBlocks = withLevel.map((block) => {
+          if (block.level !== level) return block;
+          return {
+            ...block,
+            items: block.items.map((it) => (it.id === itemId ? { ...it, text } : it)),
+          };
+        });
+
+        return { ...section, levelPlans: nextBlocks };
+      }),
+    );
+  };
+
+  const handleAddLevelPlanItem = (sectionId: string, level: 1 | 2 | 3 | 4) => {
+    setSections((prev) =>
+      prev.map((section) => {
+        if (section.id !== sectionId) return section;
+        const current = section.levelPlans ?? [];
+        const hasLevel = current.some((b) => b.level === level);
+        const withLevel = hasLevel
+          ? current
+          : [
+              ...current,
+              {
+                id: `${section.id}-level-${level}`,
+                level,
+                items: [],
+              },
+            ];
+
+        const nextBlocks = withLevel.map((block) => {
+          if (block.level !== level) return block;
+          const id = `${section.id}-level-${level}-item-${Date.now()}`;
+          return {
+            ...block,
+            items: [...block.items, { id, text: "" }],
+          };
+        });
+
+        return { ...section, levelPlans: nextBlocks };
+      }),
+    );
+  };
+
+  const handleRemoveLevelPlanItem = (
+    sectionId: string,
+    level: 1 | 2 | 3 | 4,
+    itemId: string,
+  ) => {
+    setSections((prev) =>
+      prev.map((section) => {
+        if (section.id !== sectionId) return section;
+        const current = section.levelPlans ?? [];
+        const nextBlocks = current.map((block) => {
+          if (block.level !== level) return block;
+          if (block.items.length <= 1) return block;
+          return {
+            ...block,
+            items: block.items.filter((it) => it.id !== itemId),
+          };
+        });
+        return { ...section, levelPlans: nextBlocks };
+      }),
+    );
+  };
+
   const handleSaveInstructions = async () => {
     try {
       await apiUpdateInstructions(
@@ -177,22 +379,111 @@ export default function MentorEditAssessmentPage() {
 
   const handleSaveChanges = async () => {
     try {
+      if (!assessment?.id) {
+        showToast("Could not save: assessment id is missing.");
+        return;
+      }
+
+      if (!assessmentName.trim()) {
+        showToast("Please enter an assessment name.");
+        focusField("mentor-assessment-name");
+        return;
+      }
+
+      if (!description.trim()) {
+        showToast("Please enter a short description.");
+        focusField("mentor-assessment-description");
+        return;
+      }
+
+      const instructionLines = instructions
+        .map((instruction) => instruction.text.trim())
+        .filter(Boolean);
+      if (instructionLines.length === 0) {
+        showToast("Please add at least one instruction.");
+        focusField("mentor-instruction-0");
+        return;
+      }
+
+      const invalidSectionName = sections.find((section) => !section.name.trim());
+      if (invalidSectionName) {
+        showToast("Each section must have a section name.");
+        setSelectedSection(invalidSectionName.id);
+        setTimeout(() => focusField(`mentor-section-card-${invalidSectionName.id}`), 0);
+        return;
+      }
+
+      const invalidChoice = sections
+        .flatMap((section) =>
+          section.layers.flatMap((layer) =>
+            layer.choices.map((choice) => ({
+              sectionId: section.id,
+              layerId: layer.id,
+              choiceId: choice.id,
+              text: choice.text.trim(),
+            })),
+          ),
+        )
+        .find((item) => item.text.length === 0);
+      if (invalidChoice) {
+        showToast("Every choice field in each layer must be filled.");
+        setSelectedSection(invalidChoice.sectionId);
+        setIsEditMode(true);
+        setTimeout(() => {
+          focusField(`mentor-choice-${invalidChoice.sectionId}-${invalidChoice.layerId}-${invalidChoice.choiceId}`);
+        }, 0);
+        return;
+      }
+
+      const preSurveyPayload = buildPreSurveyPayloadForDirectorCreate(preSurveyRows);
+      if (hasPreSurvey && preSurveyPayload.length === 0) {
+        showToast("Include pre-survey is on — add at least one pre-survey question with text.");
+        focusField("mentor-presurvey-question-0");
+        return;
+      }
+      const firstEmptyPreSurveyIdx = hasPreSurvey
+        ? preSurveyRows.findIndex((row) => row.text.trim().length === 0)
+        : -1;
+      if (firstEmptyPreSurveyIdx !== -1) {
+        showToast("Fill all pre-survey question fields or remove empty rows.");
+        focusField(`mentor-presurvey-question-${firstEmptyPreSurveyIdx}`);
+        return;
+      }
+
+      await apiPatchAssessment(assessment.id, {
+        name: assessmentName.trim(),
+        description: description.trim(),
+        type: hasPreSurvey ? "CMA" : "PMP",
+        preSurvey: hasPreSurvey ? preSurveyPayload : [],
+      });
+
       await apiUpdateSections(
         assessment.id,
         buildSectionsPayload(sections)
       );
 
+      if (bannerFile) {
+        await apiUploadAssessmentBanner(assessment.id, bannerFile);
+      }
+
       showToast("Survey Edited Successfully");
       router.push("/mentor/MentorAssessments");
-    } catch (e) {
+    } catch (e: unknown) {
       console.error(e);
+      showToast(formatAssessmentApiErrorMessage(e));
     }
   };
 
   const selectedSectionData = sections.find((s) => s.id === selectedSection);
-  const currentLayer = selectedSectionData?.layers.find(
-    (l) => l.id === currentLayerId
-  );
+  const levelPlanFor = (section: Section, level: 1 | 2 | 3 | 4): LevelPlanBlock => {
+    const found = (section.levelPlans ?? []).find((b) => b.level === level);
+    if (found) return found;
+    return {
+      id: `${section.id}-level-${level}`,
+      level,
+      items: [{ id: `${section.id}-level-${level}-item-0`, text: "" }],
+    };
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
@@ -209,19 +500,21 @@ export default function MentorEditAssessmentPage() {
                 <i className="fa-solid fa-plus"></i>
                 Section
               </button>
-              <button
+              {/* <button
                 onClick={() => setShowInstructionsModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-transparent text-white rounded-lg font-semibold border-2 border-white/40 hover:border-white/60 hover:bg-white/10 text-sm"
               >
                 <i className="fa-solid fa-pen-to-square"></i>
-                Edit Next Section
-              </button>
+                Edit Instructions
+              </button> */}
             </div>
 
             {sections.map((section, index) => (
               <div
                 key={section.id}
+                id={`mentor-section-card-${section.id}`}
                 onClick={() => setSelectedSection(section.id)}
+                tabIndex={-1}
                 className={`cursor-pointer rounded-xl border-2 p-4 transition-all ${selectedSection === section.id
                   ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
                   : "border-white/15 bg-white/5 text-[#cde2f2] hover:border-white/25 hover:bg-white/10"
@@ -263,54 +556,269 @@ export default function MentorEditAssessmentPage() {
                   </p>
                 </div>
 
+                <div className="rounded-xl border border-white/20 bg-white/5 p-5 mb-6">
+                  <div className="mb-4">
+                    <h3 className="text-white font-semibold">Basics</h3>
+                    <p className="mt-1 text-sm text-white/60">
+                      Update the assessment name and description shown in the list and detail views.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+                        Assessment Name
+                      </label>
+                      <input
+                        id="mentor-assessment-name"
+                        type="text"
+                        value={assessmentName}
+                        onChange={(e) => setAssessmentName(e.target.value)}
+                        placeholder="e.g. Ministry readiness survey"
+                        className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+                        Description
+                      </label>
+                      <textarea
+                        id="mentor-assessment-description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        rows={3}
+                        placeholder="Brief description for thumbnail / cards"
+                        className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <label className="block text-sm font-semibold text-[#cde2f2]">
+                          Banner image (optional)
+                        </label>
+                        {bannerFile || bannerPreview ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (bannerPreview?.startsWith("blob:")) URL.revokeObjectURL(bannerPreview);
+                              setBannerFile(null);
+                              setBannerPreview(null);
+                            }}
+                            className="text-xs font-semibold text-red-300/90 hover:underline"
+                          >
+                            Remove image
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <input
+                        ref={bannerInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        id="assessment-banner-edit"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] || null;
+                          e.target.value = "";
+
+                          if (f && !ALLOWED_BANNER_TYPES.has(f.type)) {
+                            showToast("Use a PNG, JPG, or WEBP image.");
+                            return;
+                          }
+
+                          if (f && f.size > MAX_BANNER_SIZE_BYTES) {
+                            showToast("File size must be less than 10 MB.");
+                            return;
+                          }
+
+                          if (bannerPreview?.startsWith("blob:")) {
+                            URL.revokeObjectURL(bannerPreview);
+                          }
+
+                          setBannerFile(f);
+                          setBannerPreview(f ? URL.createObjectURL(f) : null);
+                        }}
+                      />
+
+                      <div className="space-y-3 rounded-2xl border border-dashed border-white/25 bg-white/[0.04] px-4 py-4">
+                        <button
+                          type="button"
+                          onClick={() => bannerInputRef.current?.click()}
+                          className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                        >
+                          {bannerPreview ? "Replace banner" : "Upload banner"}
+                        </button>
+
+                        {bannerPreview ? (
+                          <div
+                            className="relative h-40 w-full max-w-md cursor-pointer overflow-hidden rounded-xl border border-white/20"
+                            onClick={() => bannerInputRef.current?.click()}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                bannerInputRef.current?.click();
+                              }
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Change banner image"
+                          >
+                            {bannerPreview.startsWith("blob:") || bannerPreview.startsWith("data:") ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={bannerPreview} alt="Assessment banner preview" className="h-40 w-full object-cover" />
+                            ) : (
+                              <Image
+                                src={bannerPreview}
+                                alt="Assessment banner preview"
+                                fill
+                                className="object-cover"
+                                sizes="(max-width: 768px) 100vw, 520px"
+                                unoptimized={isRemoteImageSrc(bannerPreview)}
+                              />
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/20 bg-white/5 p-5 mb-6">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-white font-semibold">Edit Instructions</h3>
+                    <button
+                      onClick={handleAddInstruction}
+                      className="rounded-lg bg-[#8ec5eb]/90 px-3 py-2 text-xs font-semibold text-[#062946] hover:bg-[#8ec5eb]"
+                    >
+                      <i className="fa-solid fa-plus mr-1"></i>
+                      Instruction
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {instructions.map((instruction, idx) => (
+                      <div key={instruction.id} className="flex items-center gap-2">
+                        <input
+                          id={`mentor-instruction-${idx}`}
+                          type="text"
+                          value={instruction.text}
+                          onChange={(e) => handleUpdateInstructionText(instruction.id, e.target.value)}
+                          placeholder={`Instruction ${idx + 1}`}
+                          className="flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                        />
+                        {instructions.length > 1 ? (
+                          <button
+                            onClick={() => handleRemoveInstruction(instruction.id)}
+                            className="rounded-lg border border-red-300/40 bg-red-500/15 px-3 py-2 text-red-200"
+                            aria-label={`Remove instruction ${idx + 1}`}
+                          >
+                            <i className="fa-solid fa-trash"></i>
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-white/20 bg-white/5 p-5 mb-6">
+                  <div className="mb-4">
+                    <span className="mb-2 block text-sm font-semibold text-[#cde2f2]">Include Pre-Survey Questions?</span>
+                    <p className="mb-3 text-sm text-white/60">
+                      Select Yes to add pre-survey questions before the main assessment.
+                    </p>
+                    <div className="flex flex-wrap gap-6">
+                      <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
+                        <input
+                          type="radio"
+                          name="hasPreSurvey"
+                          checked={!hasPreSurvey}
+                          onChange={() => setHasPreSurvey(false)}
+                          className="h-4 w-4"
+                        />
+                        No
+                      </label>
+                      <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
+                        <input
+                          type="radio"
+                          name="hasPreSurvey"
+                          checked={hasPreSurvey}
+                          onChange={() => setHasPreSurvey(true)}
+                          className="h-4 w-4"
+                        />
+                        Yes
+                      </label>
+                    </div>
+                  </div>
+
+                  {hasPreSurvey ? (
+                    <div className="rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6">
+                      <h2 className="mb-1 text-lg font-bold text-white">Pre-Survey Question</h2>
+                      <p className="mb-4 text-sm text-white/70">
+                        These questions will be shown before the main assessment.
+                      </p>
+                      <div className="space-y-5">
+                        {preSurveyRows.map((row, qIdx) => (
+                          <div
+                            key={row.id}
+                            className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-4"
+                          >
+                            <div className="flex flex-wrap items-end gap-3">
+                              <div className="min-w-[220px] flex-1">
+                                <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">Question {qIdx + 1}</label>
+                                <input
+                                  id={`mentor-presurvey-question-${qIdx}`}
+                                  type="text"
+                                  value={row.text}
+                                  onChange={(e) => handleUpdatePreSurvey(qIdx, "text", e.target.value)}
+                                  placeholder="e.g. What is your current church?"
+                                  className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                                />
+                              </div>
+                              {preSurveyRows.length > 1 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemovePreSurveyQuestion(qIdx)}
+                                  className="rounded-lg border border-red-300/40 bg-red-500/15 px-3 py-2 text-sm text-red-200"
+                                >
+                                  Remove
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={handleAddPreSurveyQuestion}
+                          className="rounded-lg bg-[#8ec5eb]/90 px-3 py-2 text-xs font-semibold text-[#062946] hover:bg-[#8ec5eb]"
+                        >
+                          <i className="fa-solid fa-plus mr-1"></i>
+                          Add pre-survey question
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
                 {/* Divider and Action Buttons */}
                 <div className="border-t border-white/20 mb-6"></div>
 
                 <div className="flex justify-end gap-2 mb-6">
-                  {!isSelectionMode ? (
-                    <>
-                      <button
-                        onClick={() => setIsSelectionMode(true)}
-                        className="px-5 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 text-sm flex items-center gap-2 shadow-md"
-                      >
-                        <i className="fa-solid fa-check-square"></i>
-                        Select
-                      </button>
-                      <button
-                        onClick={() => setShowAddLayerModal(true)}
-                        className="px-5 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 text-sm flex items-center gap-2 shadow-md"
-                      >
-                        <i className="fa-solid fa-layer-group"></i>
-                        Layer
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-white font-semibold flex items-center">
-                        {selectedChoices.length} Selected
-                      </span>
-                      <button
-                        onClick={handleDeleteSelected}
-                        disabled={selectedChoices.length === 0}
-                        className={`px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 ${selectedChoices.length > 0
-                          ? "bg-white text-red-600 hover:bg-red-50"
-                          : "bg-white/20 text-white/50 cursor-not-allowed"
-                          }`}
-                      >
-                        <i className="fa-solid fa-trash"></i>
-                        Delete
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsSelectionMode(false);
-                          setSelectedChoices([]);
-                        }}
-                        className="px-4 py-2 bg-white/20 text-white rounded-lg font-semibold hover:bg-white/30 text-sm border border-white/30"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setIsEditMode((prev) => !prev)}
+                    className="px-5 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 text-sm flex items-center gap-2 shadow-md"
+                  >
+                    <i className="fa-solid fa-pen-to-square"></i>
+                    {isEditMode ? "Done" : "Edit"}
+                  </button>
+                  <button
+                    onClick={() => setShowAddLayerModal(true)}
+                    className="px-5 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 text-sm flex items-center gap-2 shadow-md"
+                  >
+                    <i className="fa-solid fa-layer-group"></i>
+                    Layer
+                  </button>
                 </div>
 
                 {/* Layers - Each in its own bordered container */}
@@ -320,68 +828,133 @@ export default function MentorEditAssessmentPage() {
                       key={layer.id}
                       className="rounded-xl border-2 border-white/20 bg-white/5 p-5"
                     >
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-white font-semibold">
-                          {/* Layer name is not displayed as per Figma */}
-                        </h3>
-                        <button
-                          onClick={() => {
-                            setCurrentLayerId(layer.id);
-                            setShowRecommendationsModal(true);
-                          }}
-                          className="flex items-center gap-2 rounded-lg bg-[#8ec5eb]/90 px-4 py-2 text-sm font-semibold text-[#062946] shadow-md hover:bg-[#8ec5eb]"
-                        >
-                          <i className="fa-solid fa-pen-to-square"></i>
-                          Edit Recommendations
-                        </button>
+                      <div className="mb-4 flex items-center justify-between">
+                        <h3 className="text-white font-semibold">Layer {layerIdx + 1}</h3>
+                        <span className="text-xs text-white/60">Choices</span>
                       </div>
 
                       <div className="space-y-2 mb-4">
                         {layer.choices.map((choice, choiceIdx) => (
                           <div
                             key={choiceIdx}
-                            className={`bg-white/10 border rounded-lg p-3 text-white flex items-center gap-3 transition-all ${selectedChoices.includes(
-                              layerIdx * 10 + choiceIdx
-                            )
-                              ? "border-white ring-2 ring-white"
-                              : "border-white/25"
-                              } ${isSelectionMode
-                                ? "cursor-pointer hover:border-white"
-                                : ""
-                              }`}
-                            onClick={() =>
-                              isSelectionMode &&
-                              handleSelectChoice(layerIdx * 10 + choiceIdx)
-                            }
+                            className="bg-white/10 border border-white/25 rounded-lg p-3 text-white flex items-center gap-3 transition-all"
                           >
-                            {isSelectionMode && (
-                              <input
-                                type="checkbox"
-                                checked={selectedChoices.includes(
-                                  layerIdx * 10 + choiceIdx
-                                )}
-                                onChange={() =>
-                                  handleSelectChoice(layerIdx * 10 + choiceIdx)
-                                }
-                                className="w-5 h-5 text-[#2E3B8E] rounded focus:ring-[#2E3B8E]"
-                              />
-                            )}
                             <span className="text-sm font-semibold">
                               {choiceIdx + 1}.
                             </span>
-                            <span className="text-sm flex-1">{choice.text}</span>
+                            <input
+                              id={`mentor-choice-${selectedSectionData.id}-${layer.id}-${choice.id}`}
+                              value={choice.text}
+                              onChange={(e) =>
+                                handleUpdateChoiceText(
+                                  selectedSectionData.id,
+                                  layer.id,
+                                  choice.id,
+                                  e.target.value,
+                                )
+                              }
+                              className="flex-1 rounded border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/40"
+                              placeholder={`Choice ${choiceIdx + 1}`}
+                              readOnly={!isEditMode}
+                            />
+                            {isEditMode && layer.choices.length > 1 ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleRemoveChoice(selectedSectionData.id, layer.id, choice.id)
+                                }
+                                className="rounded-lg border border-red-300/40 bg-red-500/15 px-2.5 py-2 text-red-200"
+                                aria-label={`Remove choice ${choiceIdx + 1}`}
+                              >
+                                <i className="fa-solid fa-trash"></i>
+                              </button>
+                            ) : null}
                           </div>
                         ))}
                       </div>
 
-                      <div className="flex justify-end">
-                        <button className="px-4 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 text-sm flex items-center gap-2 shadow-md">
-                          <i className="fa-solid fa-plus"></i>
-                          Choice
-                        </button>
-                      </div>
+                      {isEditMode ? (
+                        <div className="mb-4 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleAddChoice(selectedSectionData.id, layer.id)}
+                            className="px-4 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 text-sm flex items-center gap-2 shadow-md"
+                          >
+                            <i className="fa-solid fa-plus"></i>
+                            Choice
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
+                </div>
+
+                <div className="rounded-xl border-2 border-white/20 bg-white/5 p-5 mt-6">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-white font-semibold">Customized Development Plans</h3>
+                    <span className="text-xs text-white/70">Edit Level 1-4 items</span>
+                  </div>
+
+                  <div className="space-y-4">
+                    {[1, 2, 3, 4].map((levelNum) => {
+                      const level = levelNum as 1 | 2 | 3 | 4;
+                      const block = levelPlanFor(selectedSectionData, level);
+                      return (
+                        <div key={levelNum} className="rounded-lg border border-white/15 bg-white/[0.03] p-4">
+                          <div className="mb-3 flex items-center justify-between">
+                            <h4 className="text-sm font-semibold text-[#cde2f2]">
+                              Level {levelNum} - Customized Development Plans
+                            </h4>
+                            <button
+                              type="button"
+                              onClick={() => handleAddLevelPlanItem(selectedSectionData.id, level)}
+                              className="rounded-lg border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white hover:bg-white/15"
+                            >
+                              <i className="fa-solid fa-plus mr-1"></i>
+                              Plan
+                            </button>
+                          </div>
+
+                          <div className="space-y-2">
+                            {block.items.map((item, itemIdx) => (
+                              <div key={item.id} className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  value={item.text}
+                                  onChange={(e) =>
+                                    handleUpdateLevelPlanItem(
+                                      selectedSectionData.id,
+                                      level,
+                                      item.id,
+                                      e.target.value,
+                                    )
+                                  }
+                                  placeholder={`Plan item ${itemIdx + 1}`}
+                                  className="flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                                />
+                                {block.items.length > 1 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleRemoveLevelPlanItem(
+                                        selectedSectionData.id,
+                                        level,
+                                        item.id,
+                                      )
+                                    }
+                                    className="rounded-lg border border-red-300/40 bg-red-500/15 px-3 py-2 text-red-200"
+                                    aria-label={`Remove level ${levelNum} plan item ${itemIdx + 1}`}
+                                  >
+                                    <i className="fa-solid fa-trash"></i>
+                                  </button>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </>
             ) : (
@@ -587,17 +1160,12 @@ export default function MentorEditAssessmentPage() {
               <div className="border-t pt-4">
                 <div className="flex items-center justify-between mb-3">
                   <label className="text-base font-bold text-white">
-                    Layer {selectedSectionData?.layers.length! + 1} -
-                    Recommendations
+                    Layer {selectedSectionData?.layers.length! + 1}
                   </label>
-                  <button className="px-3 py-1 bg-white/10 border border-[#8ec5eb]/60 text-[#8ec5eb] rounded-lg text-sm font-semibold hover:bg-white/5 flex items-center gap-1">
-                    <i className="fa-solid fa-plus"></i>
-                    Suggestion
-                  </button>
                 </div>
                 <input
                   type="text"
-                  placeholder="Suggestion 1"
+                  placeholder="Choice 2"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900 placeholder-gray-400"
                 />
               </div>
@@ -615,113 +1183,6 @@ export default function MentorEditAssessmentPage() {
                 className="flex-1 px-6 py-3 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E]"
               >
                 Create Layer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Recommendations Modal */}
-      {showRecommendationsModal && currentLayer && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-[#0a3558] shadow-2xl">
-            <div className="p-6 border-b border-white/20 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-white">
-                Layer {currentLayerId} - Recommendations
-              </h3>
-              <button
-                onClick={() => {
-                  setShowRecommendationsModal(false);
-                  setRecSelectionMode(false);
-                  setSelectedRecs([]);
-                }}
-                className="w-8 h-8 flex items-center justify-center hover:bg-white/10 rounded-lg text-white"
-              >
-                <i className="fa-solid fa-xmark"></i>
-              </button>
-            </div>
-
-            <div className="p-6">
-              <div className="flex gap-2 mb-4">
-                {!recSelectionMode ? (
-                  <>
-                    <button
-                      onClick={() => setRecSelectionMode(true)}
-                      className="px-4 py-2 bg-[#8ec5eb]/90 text-[#062946] rounded-lg font-semibold hover:bg-[#8ec5eb] text-sm flex items-center gap-2"
-                    >
-                      <i className="fa-solid fa-check"></i>
-                      Select
-                    </button>
-                    <button className="px-4 py-2 bg-[#8ec5eb]/90 text-[#062946] rounded-lg font-semibold hover:bg-[#8ec5eb] text-sm flex items-center gap-2">
-                      <i className="fa-solid fa-lightbulb"></i>
-                      Suggestion
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-white font-semibold">
-                      {selectedRecs.length} Selected
-                    </span>
-                    <button
-                      onClick={handleDeleteRecs}
-                      disabled={selectedRecs.length === 0}
-                      className={`px-4 py-2 rounded-lg font-semibold text-sm flex items-center gap-2 ${selectedRecs.length > 0
-                        ? "bg-white text-red-600 hover:bg-red-50"
-                        : "bg-white/20 text-white/50 cursor-not-allowed"
-                        }`}
-                    >
-                      <i className="fa-solid fa-trash"></i>
-                      Delete
-                    </button>
-                  </>
-                )}
-              </div>
-
-              <div className="space-y-2 mb-6 max-h-96 overflow-y-auto">
-                {currentLayer.recommendations.map((rec) => (
-                  <div
-                    key={rec.id}
-                    className={`bg-white/10 border rounded-lg p-3 text-white flex items-center gap-3 transition-all ${selectedRecs.includes(rec.id)
-                      ? "border-white ring-2 ring-white"
-                      : "border-white/30"
-                      } ${recSelectionMode
-                        ? "cursor-pointer hover:border-white"
-                        : ""
-                      }`}
-                    onClick={() => recSelectionMode && handleSelectRec(rec.id)}
-                  >
-                    {recSelectionMode ? (
-                      <input
-                        type="checkbox"
-                        checked={selectedRecs.includes(rec.id)}
-                        onChange={() => handleSelectRec(rec.id)}
-                        className="w-5 h-5 text-[#2E3B8E] rounded"
-                      />
-                    ) : (
-                      <i className="fa-solid fa-star text-yellow-400"></i>
-                    )}
-                    <span className="text-sm flex-1">{rec.text}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="p-6 border-t border-white/20 flex justify-between gap-4">
-              <button
-                onClick={() => {
-                  setShowRecommendationsModal(false);
-                  setRecSelectionMode(false);
-                  setSelectedRecs([]);
-                }}
-                className="flex-1 px-6 py-3 bg-white text-gray-700 rounded-lg font-semibold hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveRecommendations}
-                className="flex-1 px-6 py-3 bg-[#8ec5eb]/90 text-[#062946] rounded-lg font-semibold hover:bg-[#8ec5eb]"
-              >
-                Save Changes
               </button>
             </div>
           </div>
