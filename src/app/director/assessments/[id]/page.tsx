@@ -41,6 +41,9 @@ type PreSurveyRow = {
   placeholder: string;
 };
 
+const MAX_BANNER_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_BANNER_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp"]);
+
 const defaultPreSurveyRow = (): PreSurveyRow => ({
   id: Date.now(),
   text: "",
@@ -96,6 +99,14 @@ export default function ViewEditAssessmentPage() {
   const scrollToId = useCallback((id: string) => {
     if (typeof document === "undefined") return;
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
+  const focusField = useCallback((id: string) => {
+    if (typeof document === "undefined") return;
+    const el = document.getElementById(id) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.focus();
   }, []);
 
   useEffect(() => {
@@ -315,41 +326,68 @@ export default function ViewEditAssessmentPage() {
   };
 
   const handleSaveChanges = async () => {
-    if (!assessment?.id) return;
+    if (!assessment?.id) {
+      showToast("Could not save: assessment id is missing.");
+      return;
+    }
     setSaveSuccess(false);
     const name = assessmentName.trim();
     if (!name) {
       showToast("Please enter a name for this assessment.");
-      scrollToId("edit-basics");
+      focusField("field-assessment-name");
       return;
     }
     if (!description.trim()) {
       showToast("Add a short description (it appears on cards and the list).");
-      scrollToId("edit-basics");
+      focusField("field-assessment-desc");
       return;
     }
     const instructionLines = instructions.map((i) => i.trim()).filter(Boolean);
     if (instructionLines.length === 0) {
       showToast("Add at least one line of instructions for people taking the survey.");
-      scrollToId("edit-instructions");
+      focusField("director-instruction-0");
       return;
     }
-    const invalidSection = wizardSections.some(
-      (s) =>
-        s.layers.length < 1 ||
-        s.layers.some((l) => !l.choices.some((c) => c.trim())),
-    );
-    if (invalidSection) {
+    const invalidSectionNameIdx = wizardSections.findIndex((s) => !s.name.trim());
+    if (invalidSectionNameIdx !== -1) {
       showToast(
-        "Each section needs at least one step (layer), and every step needs at least one filled-in answer choice. Scroll to Survey content to fix it.",
+        "Each section needs a name, and every choice field in each step must be filled. Scroll to Survey content to fix it.",
       );
-      scrollToId("edit-content");
+      focusField(`director-section-name-${invalidSectionNameIdx}`);
+      return;
+    }
+
+    const invalidChoice = wizardSections
+      .flatMap((section, sectionIdx) =>
+        section.layers.flatMap((layer, layerIdx) =>
+          layer.choices.map((choice, choiceIdx) => ({
+            sectionIdx,
+            layerIdx,
+            choiceIdx,
+            text: choice.trim(),
+          })),
+        ),
+      )
+      .find((item) => item.text.length === 0);
+    if (invalidChoice) {
+      showToast(
+        "Each section needs a name, and every choice field in each step must be filled. Scroll to Survey content to fix it.",
+      );
+      focusField(`director-choice-${invalidChoice.sectionIdx}-${invalidChoice.layerIdx}-${invalidChoice.choiceIdx}`);
       return;
     }
     const preSurveyPayload = buildPreSurveyPayloadForDirectorCreate(preSurveyRows);
     if (hasPreSurvey && preSurveyPayload.length === 0) {
       showToast("Pre-survey is on — add at least one question with some text, or turn pre-survey off.");
-      scrollToId("edit-pre");
+      focusField("director-presurvey-question-0");
+      return;
+    }
+    const firstEmptyPreSurveyIdx = hasPreSurvey
+      ? preSurveyRows.findIndex((row) => row.text.trim().length === 0)
+      : -1;
+    if (firstEmptyPreSurveyIdx !== -1) {
+      showToast("Fill all pre-survey question fields or remove empty rows.");
+      focusField(`director-presurvey-question-${firstEmptyPreSurveyIdx}`);
       return;
     }
 
@@ -621,6 +659,7 @@ export default function ViewEditAssessmentPage() {
                 {instructions.map((instruction, idx) => (
                   <div key={idx} className="flex items-center gap-2">
                     <input
+                      id={`director-instruction-${idx}`}
                       type="text"
                       value={instruction}
                       onChange={(e) => handleUpdateInstruction(idx, e.target.value)}
@@ -662,6 +701,7 @@ export default function ViewEditAssessmentPage() {
                         <div className="min-w-[220px] flex-1">
                           <label className={directorLabelClass}>Question {qIdx + 1}</label>
                           <input
+                            id={`director-presurvey-question-${qIdx}`}
                             type="text"
                             value={row.text}
                             onChange={(e) => handleUpdatePreSurvey(qIdx, "text", e.target.value)}
@@ -733,6 +773,7 @@ export default function ViewEditAssessmentPage() {
                   <div>
                     <label className={directorLabelClass}>Section name</label>
                     <input
+                      id={`director-section-name-${sectionIdx}`}
                       type="text"
                       value={section.name}
                       onChange={(e) => handleUpdateSection(sectionIdx, "name", e.target.value)}
@@ -770,6 +811,7 @@ export default function ViewEditAssessmentPage() {
                       {layer.choices.map((choice, choiceIdx) => (
                         <div key={choiceIdx} className="mb-2 flex items-center gap-2">
                           <input
+                            id={`director-choice-${sectionIdx}-${layerIdx}-${choiceIdx}`}
                             type="text"
                             value={choice}
                             onChange={(e) =>
@@ -876,6 +918,17 @@ export default function ViewEditAssessmentPage() {
                 onChange={(e) => {
                   const f = e.target.files?.[0] || null;
                   e.target.value = "";
+
+                  if (f && !ALLOWED_BANNER_TYPES.has(f.type)) {
+                    showToast("Use a PNG, JPG, or WEBP image.");
+                    return;
+                  }
+
+                  if (f && f.size > MAX_BANNER_SIZE_BYTES) {
+                    showToast("File size must be less than 10 MB.");
+                    return;
+                  }
+
                   if (bannerPreview?.startsWith("blob:")) URL.revokeObjectURL(bannerPreview);
                   setBannerFile(f);
                   setBannerPreview(f ? URL.createObjectURL(f) : resolveApiMediaUrl(assessment.bannerImage) || null);
