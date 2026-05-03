@@ -1019,7 +1019,7 @@ export default function MentorAssessments() {
                                 onClick={() => openRecommendationEditor(item)}
                                 className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
                               >
-                                Edit Recommendation
+                                Send CDP
                               </button>
                             )}
 

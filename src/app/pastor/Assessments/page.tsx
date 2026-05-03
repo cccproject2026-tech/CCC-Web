@@ -74,7 +74,7 @@ function isDueNowOrPast(dueDateRaw?: string): boolean {
 
 function getAssessmentPrimaryHref(assessmentId: string, status: Row["status"]): string {
   if (status === "Completed" || status === "Submitted") {
-    return `/pastor/AssessmentEvaluation?assessmentId=${encodeURIComponent(assessmentId)}`;
+    return `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(assessmentId)}&readOnly=1`;
   }
   return `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(assessmentId)}`;
 }

@@ -261,6 +261,7 @@ export default function MentorAssessmentResultPage() {
   const [assessmentTitle, setAssessmentTitle] = useState("Assessment Result");
   const [answers, setAnswers] = useState<AnswersMap>({});
   const [mentorLayerCdp, setMentorLayerCdp] = useState<CdpMap>({});
+  const [hasRecommendations, setHasRecommendations] = useState(false);
 
   useEffect(() => {
     if (!assessmentId || !userId) {
@@ -292,7 +293,16 @@ export default function MentorAssessmentResultPage() {
             setAnswers(buildAnswerMapFromSections(normalizedSections, sectionsData));
           }
 
+          // Check if any section has recommendations
+          let hasRecs = false;
           if (Array.isArray(sectionsData)) {
+            hasRecs = sectionsData.some(
+              (section: any) => Array.isArray(section?.recommendations) && section.recommendations.length > 0,
+            );
+            if (!cancelled) {
+              setHasRecommendations(hasRecs);
+            }
+
             sectionsData.forEach((section: any, sectionIndex: number) => {
               section?.layers?.forEach((layer: any, layerIndex: number) => {
                 const lid = resolveLayerKey(layer, sectionIndex, layerIndex);
@@ -343,9 +353,22 @@ export default function MentorAssessmentResultPage() {
         style={{ backgroundImage: `url(${headerBg.src})` }}
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.92)_100%)]" />
-        <div className="relative z-10">
-          <h1 className="text-xl font-bold sm:text-2xl md:text-3xl">{assessmentTitle}</h1>
-          <p className="mt-2 text-sm text-[#d9ebf8]">Mentor view of mentee submitted answers.</p>
+        <div className="relative z-10 flex w-full items-start justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold sm:text-2xl md:text-3xl">{assessmentTitle}</h1>
+            <p className="mt-2 text-sm text-[#d9ebf8]">Mentor view of mentee submitted answers.</p>
+          </div>
+          {hasRecommendations && (
+            <button
+              type="button"
+              onClick={() => {
+                router.push(`/mentor/MentorAssessments?tab=submitted&menteeId=${userId}`);
+              }}
+              className="mt-2 shrink-0 rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30 sm:text-sm whitespace-nowrap"
+            >
+              Send CDP
+            </button>
+          )}
         </div>
       </header>
 
