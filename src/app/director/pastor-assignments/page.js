@@ -32,6 +32,7 @@ export default function PastorAssignmentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const assignUserId = searchParams.get("assignUser");
+  const roadmapIdParam = searchParams.get("roadmapId");
   const [searchQuery, setSearchQuery] = useState("");
   const [roadmaps, setRoadmaps] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -47,6 +48,17 @@ export default function PastorAssignmentsPage() {
   useEffect(() => {
     fetchRoadmaps();
   }, [assignUserId]);
+
+  /** Deep link from Revitalization Roadmap — open assign modal like mobile “Assign to”. */
+  useEffect(() => {
+    if (!roadmapIdParam || loading) return;
+    setSelectedAssignment([roadmapIdParam]);
+    setShowAssignModal(true);
+    const qs = new URLSearchParams();
+    if (assignUserId) qs.set("assignUser", assignUserId);
+    const tail = qs.toString();
+    router.replace(tail ? `/director/pastor-assignments?${tail}` : "/director/pastor-assignments");
+  }, [roadmapIdParam, loading, assignUserId, router]);
 
   const fetchRoadmaps = async () => {
     try {

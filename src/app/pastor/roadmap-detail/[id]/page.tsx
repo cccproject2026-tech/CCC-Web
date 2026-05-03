@@ -1,8 +1,18 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
+import {
+  directorBtnPrimary,
+  directorGlassCard,
+  directorSpinner,
+} from "@/app/director/directorUi";
+import {
+  PastorRoadmapDashboardBody,
+  pastorRoadmapDashboardPageRoot,
+} from "@/app/pastor/pastor-roadmap-dashboard-shell";
 import { apiGetRoadmapById } from "@/app/Services/api";
 
 function unwrapRoadmapDoc(data: unknown): Record<string, unknown> | null {
@@ -47,15 +57,36 @@ export default function RoadmapDetailPage() {
     };
   }, [roadmapId, router]);
 
-  return (
-    <div className="min-h-screen flex flex-col bg-[#062946] text-white">
-      <PastorHeader showFullHeader={true} />
-      <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
-        <p className="max-w-md text-white/80">
-          {error || "Opening roadmap..."}
-        </p>
+  if (error) {
+    return (
+      <div className={pastorRoadmapDashboardPageRoot}>
+        <PastorHeader showFullHeader={true} />
+        <PastorRoadmapDashboardBody>
+          <div className="flex min-h-[70vh] flex-1 items-center justify-center px-4">
+            <div className={`${directorGlassCard} max-w-xl p-6 text-center`}>
+              <p className="text-red-100">{error}</p>
+              <Link
+                href="/pastor/revitalization-roadmap"
+                className={`${directorBtnPrimary} mt-6 inline-flex no-underline`}
+              >
+                Back to roadmap
+              </Link>
+            </div>
+          </div>
+        </PastorRoadmapDashboardBody>
       </div>
+    );
+  }
+
+  return (
+    <div className={pastorRoadmapDashboardPageRoot}>
+      <PastorHeader showFullHeader={true} />
+      <PastorRoadmapDashboardBody>
+        <div className="flex min-h-[70vh] flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+          <div className={directorSpinner} />
+          <p className="text-sm text-white/75">Opening roadmap…</p>
+        </div>
+      </PastorRoadmapDashboardBody>
     </div>
   );
 }

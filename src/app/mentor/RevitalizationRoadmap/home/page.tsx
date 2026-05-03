@@ -1,7 +1,6 @@
 "use client";
 import { useState, useRef, useEffect, Suspense, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
@@ -11,6 +10,8 @@ import { apiGetUserById } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { unwrapProgressData, resolveMentorUserRoadmapsList } from "@/app/Services/roadmap-assignments";
 import MentorHeader from "@/app/Components/MentorHeader";
+import DirectorHero from "@/app/director/DirectorHero";
+import { mentorPageRoot, mentorRoadmapHubMain, mentorSpinner } from "@/app/Components/mentor/mentor-theme";
 import { verifyMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
 
 function RevitalizationRoadmapHomeContent() {
@@ -202,35 +203,23 @@ function RevitalizationRoadmapHomeContent() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
+    <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
-      <section
-        className="relative flex min-h-[200px] flex-col justify-end bg-cover bg-bottom px-6 pb-8 pt-8 text-white sm:min-h-[240px] sm:px-10 sm:pb-10 md:px-20 md:pb-12"
-        style={{ backgroundImage: `url(${HeroBg.src})` }}
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]" />
-        <div className="relative z-10 mx-auto w-full max-w-7xl">
-          <nav className="mb-6 text-sm text-[#d9ebf8]">
-            <Link href="/mentor/RevitalizationRoadmap" className="hover:text-white">
-              Revitalization Roadmap
-            </Link>
-            <span className="mx-2 opacity-70">&gt;</span>
-            <span className="font-semibold text-white">{userName}</span>
-          </nav>
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
-            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
-            Leadership Support Network
-          </p>
-          <h1 className="mt-4 text-2xl font-semibold sm:text-3xl md:text-4xl">Pastor roadmaps</h1>
-          <p className="mt-2 max-w-2xl text-sm text-[#cde2f2] md:text-base">
-            Review assigned roadmaps and open jump-start or phase flows for this pastor.
-          </p>
-        </div>
-      </section>
+      <DirectorHero
+        title="Pastor roadmaps"
+        subtitle="Review assigned roadmaps and open jump-start or phase flows for this pastor."
+        image={HeroBg}
+        pill="Leadership Support Network"
+        breadcrumbItems={[
+          { label: "Revitalization Roadmap", href: "/mentor/RevitalizationRoadmap" },
+          { label: userName },
+        ]}
+        className="mb-6"
+      />
 
-      <main className="relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-8 sm:px-8 md:px-16 md:py-10">
-        <div className="mx-auto max-w-7xl">
+      <main className={`${mentorRoadmapHubMain} pb-12`}>
+        <div className="mx-auto w-full max-w-7xl">
           <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="relative flex w-full max-w-md items-center rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 shadow-sm backdrop-blur">
               <i className="fa-solid fa-magnifying-glass mr-3 shrink-0 text-[#8ec5eb]" />
@@ -296,7 +285,7 @@ function RevitalizationRoadmapHomeContent() {
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
             {loadingRoadmaps && (
               <div className="col-span-full flex justify-center py-16">
-                <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+                <div className={mentorSpinner} />
               </div>
             )}
 
@@ -364,8 +353,8 @@ export default function RevitalizationRoadmapHome() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#062946] text-[#cde2f2]">
-          Loading…
+        <div className={`${mentorPageRoot} flex flex-1 items-center justify-center py-24 text-[#cde2f2]`}>
+          <div className={mentorSpinner} />
         </div>
       }
     >

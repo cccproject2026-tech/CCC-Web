@@ -3,6 +3,20 @@ import Image from "next/image";
 import { useState, useEffect, Suspense, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
+import SearchBar from "@/app/Components/SearchBar";
+import DirectorHero from "@/app/director/DirectorHero";
+import {
+  directorBtnPrimary,
+  directorBtnSecondary,
+  directorGlassCard,
+  directorPageContainer,
+  directorSpinner,
+} from "@/app/director/directorUi";
+import { DirectorFilterSection } from "@/app/director/ui";
+import {
+  PastorRoadmapDashboardBody,
+  pastorRoadmapDashboardPageRoot,
+} from "@/app/pastor/pastor-roadmap-dashboard-shell";
 import HeroBg from "@/app/Assets/self-revitalization-hero.png";
 import PhaseImg from "@/app/Assets/phase-img.png";
 import { apiGetRoadmapById } from "@/app/Services/api";
@@ -15,8 +29,13 @@ import {
 import type { ProgressResponse } from "@/app/Services/types/progress.types";
 import { getPastorUserId } from "@/app/utils/pastor-auth";
 import { subscribeProgressUpdated } from "@/app/utils/progress-sync";
-import { pastorRoadmapDescription } from "@/app/Components/pastor/pastor-theme";
+import { pastorRoadmapDescriptionLineClamp3 } from "@/app/Components/pastor/pastor-theme";
 import { resolveApiMediaUrl, isRemoteImageSrc } from "@/app/utils/image";
+
+const tabBtn = (isActive: boolean) =>
+  isActive
+    ? "border-[#3498DB]/40 bg-[#3498DB]/20 text-white ring-1 ring-[#3498DB]/35"
+    : "border-white/15 bg-white/5 text-[#d9ebf8] hover:border-white/25 hover:bg-white/10";
 
 function getSessionUserId(): string {
   return getPastorUserId() || "";
@@ -260,206 +279,192 @@ function SelfRevitalizationContent() {
     return matchesSearch && matchesFilter;
   });
 
+  const cardStatusBadge = (status: string) => {
+    if (isCompletedStatus(status)) return "border-emerald-400/35 bg-emerald-500/15 text-emerald-100";
+    if (status === "In-progress") return "border-[#3498DB]/40 bg-[#3498DB]/15 text-[#aed6f1]";
+    if (status === "Due") return "border-red-400/45 bg-red-500/15 text-red-100";
+    return "border-white/20 bg-white/10 text-white/85";
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#062946]">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent"></div>
+      <div className={pastorRoadmapDashboardPageRoot}>
+        <PastorHeader showFullHeader={true} />
+        <PastorRoadmapDashboardBody>
+          <div className="flex min-h-[70vh] flex-1 items-center justify-center">
+            <div className={directorSpinner} />
+          </div>
+        </PastorRoadmapDashboardBody>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">
+      <div className={pastorRoadmapDashboardPageRoot}>
         <PastorHeader showFullHeader={true} />
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-          <p className="max-w-md text-white/80">{error}</p>
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <button
-              type="button"
-              onClick={() => void loadRoadmapAndProgress()}
-              className="rounded-md bg-white px-5 py-2 text-sm font-semibold text-[#0f4a76] shadow-sm transition hover:bg-[#e7f1fa]"
-            >
-              Retry
-            </button>
-            <button
-              type="button"
-              onClick={() => router.push("/pastor/revitalization-roadmap")}
-              className="rounded-md border border-white/30 bg-white/10 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
-            >
-              Back
-            </button>
+        <PastorRoadmapDashboardBody>
+          <div className="flex min-h-[60vh] flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+            <p className="max-w-md text-white/80">{error}</p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button type="button" onClick={() => void loadRoadmapAndProgress()} className={directorBtnPrimary}>
+                Retry
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/pastor/revitalization-roadmap")}
+                className={directorBtnSecondary}
+              >
+                Back
+              </button>
+            </div>
           </div>
-        </div>
+        </PastorRoadmapDashboardBody>
       </div>
     );
   }
 
+  const heroSubtitle =
+    subtitle ||
+    (roadmap?.duration ? `Completion time ${roadmap.duration}` : "Browse tasks and continue your revitalization journey.");
+  const heroPill = phaseBadgeText || "Leadership Support Network";
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">
+    <div className={pastorRoadmapDashboardPageRoot}>
       <PastorHeader showFullHeader={true} />
 
-      {/* HERO SECTION */}
-      <section
-        className="relative flex h-[320px] flex-col justify-end bg-cover bg-center px-6 pb-10 text-white md:px-12 lg:px-20"
-        style={{ backgroundImage: `url(${HeroBg.src})` }}
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]"></div>
-        <div className="relative z-10">
-          <p className="text-xs text-white/80 mb-2">
-            Revitalization Roadmap &gt;{" "}
-            <span className="text-white font-medium">{title}</span>
-          </p>
-          <div className="flex items-center gap-2">
-            {phaseBadgeText && (
-              <span className="bg-[#FFD84E] text-[#0B1C58] text-xs font-semibold px-3 py-[3px] rounded-md">
-                {phaseBadgeText}
-              </span>
-            )}
-            <h1 className="text-3xl font-semibold">{title}</h1>
-          </div>
-          {subtitle && (
-            <p className="text-white/80 text-sm mt-1">{subtitle}</p>
-          )}
-          {roadmap?.duration && (
-            <p className="text-white/70 text-sm mt-1">Completion Time {roadmap.duration}</p>
-          )}
-        </div>
-      </section>
+      <PastorRoadmapDashboardBody>
+        <DirectorHero
+          title={title}
+          subtitle={heroSubtitle}
+          image={HeroBg}
+          pill={heroPill}
+          breadcrumbItems={[
+            { label: "Home", href: "/pastor/home" },
+            { label: "Revitalization Roadmap", href: "/pastor/revitalization-roadmap" },
+            { label: title },
+          ]}
+        />
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-10 md:px-10 lg:px-16">
-        <div className="max-w-7xl mx-auto">
-
-          {/* Search & Filter Row */}
-          <div className="flex justify-between items-center mb-8">
-            <div className="flex items-center w-[40%] rounded-xl border border-white/20 bg-white/10 overflow-hidden shadow-sm backdrop-blur">
-              <i className="fa-solid fa-magnifying-glass text-[#cde2f2] px-3"></i>
-              <input
-                type="text"
-                placeholder="Search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-transparent px-3 py-2 text-sm text-white placeholder:text-[#cde2f2] focus:outline-none"
-              />
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="flex rounded-xl border border-white/20 bg-white/10 shadow-sm overflow-hidden p-1 backdrop-blur">
-                {filterTabs.map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setFilter(tab)}
-                    className={`relative px-5 py-[7px] text-sm font-medium transition-all duration-200 ${
-                      filter === tab ? "bg-white text-[#0f4a76]" : "text-[#d9ebf8] hover:bg-white/15"
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
+        <main className="flex-1 pb-12">
+          <div className={`${directorPageContainer} max-w-7xl px-4 sm:px-6 lg:px-8`}>
+            <DirectorFilterSection bare className="!mb-6 !p-4 sm:!p-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+                <div className="min-w-0 w-full lg:max-w-[min(100%,28rem)] lg:flex-1">
+                  <SearchBar
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Search tasks…"
+                    variant="dark"
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex min-w-0 w-full flex-nowrap items-stretch gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:ml-auto lg:w-auto lg:justify-end [&::-webkit-scrollbar]:hidden">
+                  {filterTabs.map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setFilter(tab)}
+                      className={`shrink-0 rounded-lg border px-3 py-2.5 text-[12px] font-semibold transition-all sm:px-4 sm:text-[13px] ${tabBtn(filter === tab)}`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <button className="h-10 w-8 flex items-center justify-center rounded-lg border border-white/20 bg-white/10 shadow-sm hover:bg-white/15">
-                <i className="fa-solid fa-ellipsis-vertical text-[#d9ebf8]"></i>
-              </button>
-            </div>
-          </div>
+            </DirectorFilterSection>
 
-          {/* Cards Grid */}
-          {filteredCards.length === 0 ? (
-            <div className="text-center py-20 text-white/60">
-              {nestedRoadmaps.length === 0 ? "No phases found for this roadmap." : "No results match your filter."}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {filteredCards.map((item, index) => {
-                const resolvedImage = resolveApiMediaUrl(item.imageUrl) || "";
-                const imgSrc = isValidImageUrl(resolvedImage) ? resolvedImage : PhaseImg;
-                const status = taskStatusFromProgress(item);
+            {filteredCards.length === 0 ? (
+              <div className={`${directorGlassCard} px-5 py-16 text-center text-sm text-white/65`}>
+                {nestedRoadmaps.length === 0 ? "No phases found for this roadmap." : "No results match your filter."}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
+                {filteredCards.map((item, index) => {
+                  const resolvedImage = resolveApiMediaUrl(item.imageUrl) || "";
+                  const imgSrc = isValidImageUrl(resolvedImage) ? resolvedImage : PhaseImg;
+                  const status = taskStatusFromProgress(item);
 
-                return (
-                  <div
-                    key={item._id || index}
-                    className="flex overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] shadow-[0_2px_6px_rgba(0,0,0,0.05)] transition-all hover:shadow-md"
-                  >
-                    {/* Left Image */}
-                    <div className="relative w-[42%] h-[200px] shrink-0 m-3">
-                      <Image
-                        src={imgSrc}
-                        alt={item.name}
-                        fill
-                        className="object-cover rounded-l-2xl"
-                        unoptimized={typeof imgSrc === "string" && (imgSrc.startsWith("blob:") || isRemoteImageSrc(imgSrc))}
-                      />
-                    </div>
-
-                    {/* Right Content */}
-                    <div className="flex w-[58%] flex-col justify-between px-5 py-4 text-white">
-                      <div>
-                        <h3 className="text-[15px] font-semibold leading-snug mb-[6px]">
-                          {item.name}
-                        </h3>
-                        <p className={`mb-[8px] ${pastorRoadmapDescription}`}>
-                          {item.description || item.roadMapDetails || ""}
-                        </p>
-
-                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                          <span className="text-[12px] font-medium text-[#d9ebf8]">Status</span>
-                          <span className={`text-[11px] px-2 py-[3px] rounded-full font-medium border ${
-                            isCompletedStatus(status)
-                              ? "bg-[#d8fff2] text-[#00A878] border-transparent"
-                              : status === "In-progress"
-                              ? "bg-[#fff6d8] text-[#d38a00] border-transparent"
-                              : status === "Due"
-                              ? "bg-[#ffe4e6] text-[#be123c] border-transparent"
-                              : "bg-[#e6edff] text-[#1e40af] border-transparent"
-                          }`}>
+                  return (
+                    <div
+                      key={item._id || index}
+                      className={`${directorGlassCard} flex flex-col overflow-hidden sm:flex-row`}
+                    >
+                      <div className="relative h-44 w-full shrink-0 sm:h-auto sm:min-h-[200px] sm:w-[42%] sm:max-w-[220px]">
+                        <Image
+                          src={imgSrc}
+                          alt=""
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 100vw, 220px"
+                          unoptimized={
+                            typeof imgSrc === "string" && (imgSrc.startsWith("blob:") || isRemoteImageSrc(imgSrc))
+                          }
+                        />
+                        <div className="absolute left-3 top-3">
+                          <span
+                            className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${cardStatusBadge(status)}`}
+                          >
                             {status}
                           </span>
                         </div>
-
-                        {item.phase ? (
-                          <p className="text-[12px] text-[#d9ebf8]">
-                            Division <span className="font-semibold text-white">{item.phase}</span>
-                          </p>
-                        ) : null}
-
-                        {item.duration && (
-                          <p className="mt-2 text-[12px] text-[#d9ebf8]">
-                            Completion Time{" "}
-                            <span className="font-semibold text-white">{item.duration}</span>
-                          </p>
-                        )}
                       </div>
 
-                      {/* View Button */}
-                      <div className="flex justify-end mt-3">
-                        <button
-                          onClick={() => router.push(`/pastor/jumpstart?id=${item._id}&parentId=${roadmapId}`)}
-                          className="rounded-md bg-white px-6 py-[6px] text-[12px] font-semibold text-[#0f4a76] shadow-sm transition hover:bg-[#e7f1fa]"
-                        >
-                          View
-                        </button>
+                      <div className="flex min-w-0 flex-1 flex-col justify-between gap-4 p-4 sm:p-5">
+                        <div className="min-w-0 space-y-2">
+                          <h3 className="text-base font-bold leading-snug text-white sm:text-lg">{item.name}</h3>
+                          <p className={pastorRoadmapDescriptionLineClamp3}>
+                            {item.description || item.roadMapDetails || ""}
+                          </p>
+
+                          {item.phase ? (
+                            <p className="text-xs text-[#3498DB]/90">
+                              Division <span className="font-semibold text-white">{item.phase}</span>
+                            </p>
+                          ) : null}
+
+                          {item.duration ? (
+                            <p className="text-sm text-white/75">
+                              Completion time <span className="font-semibold text-white">{item.duration}</span>
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div className="flex justify-end border-t border-white/10 pt-3 sm:border-0 sm:pt-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              router.push(`/pastor/jumpstart?id=${item._id}&parentId=${roadmapId}`)
+                            }
+                            className={`${directorBtnPrimary} !px-5 !py-2.5 !text-sm`}
+                          >
+                            View
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </main>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </main>
+      </PastorRoadmapDashboardBody>
     </div>
   );
 }
 
 export default function SelfRevitalizationPhasePage() {
-
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-[#062946]">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent"></div>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className={pastorRoadmapDashboardPageRoot}>
+          <div className="flex min-h-screen flex-1 items-center justify-center">
+            <div className={directorSpinner} />
+          </div>
+        </div>
+      }
+    >
       <SelfRevitalizationContent />
     </Suspense>
   );

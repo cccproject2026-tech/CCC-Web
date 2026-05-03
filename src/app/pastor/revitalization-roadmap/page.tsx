@@ -1,26 +1,20 @@
 "use client";
+
 import { useState, useEffect, useCallback, useMemo, useLayoutEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorSearchBar from "@/app/Components/pastor/PastorSearchBar";
-import PastorFilterTabGroup from "@/app/Components/pastor/PastorFilterTabGroup";
+import SearchBar from "@/app/Components/SearchBar";
+import DirectorHero from "@/app/director/DirectorHero";
 import {
-  pastorContainer,
-  pastorControlsRow,
-  pastorEmptyPanel,
-  pastorEyebrowDot,
-  pastorEyebrowPill,
-  pastorGlassCard,
-  pastorHeroOverlay,
-  pastorIconButton,
-  pastorMainGradient,
-  pastorPageRoot,
-  pastorPrimaryCta,
-  pastorRoadmapDescriptionPre,
-  pastorSpinner,
-} from "@/app/Components/pastor/pastor-theme";
+  directorBtnPrimary,
+  directorGlassCard,
+  directorIconButton,
+  directorPageContainer,
+  directorSpinner,
+} from "@/app/director/directorUi";
+import { DirectorFilterSection } from "@/app/director/ui";
 import PhaseImg from "@/app/Assets/phase-img.png";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -32,6 +26,10 @@ import {
   type RoadmapAssignmentUi,
 } from "@/app/Services/roadmap-assignments";
 import { subscribeProgressUpdated } from "@/app/utils/progress-sync";
+import {
+  PastorRoadmapDashboardBody,
+  pastorRoadmapDashboardPageRoot,
+} from "../pastor-roadmap-dashboard-shell";
 
 type TabKey = "All" | "Due" | "In Progress" | "Not Started" | "Completed";
 type UiStatus = "Not Started" | "In-progress" | "Due" | "Completed";
@@ -46,11 +44,9 @@ interface PhaseCard {
   status: UiStatus;
   sessionDate?: string;
   imageUrl: string;
-  /** Parent roadmap has nested tasks — View opens sub-phase list (SelfRevitalizationPhasePage). */
   hasNestedTasks?: boolean;
 }
 
-/** Canonical order matches director roadmap home: Jump-start → Self → Church → Community. */
 function phaseSequenceIndex(phase: PhaseCard): number {
   const text = `${phase.title} ${phase.parentRoadmapName}`.toLowerCase();
   if (text.includes("jump") && text.includes("start")) return 0;
@@ -91,10 +87,33 @@ function tabKeyFromSearchParam(raw: string | null): TabKey | null {
   return map[d] ?? null;
 }
 
+function tabToQueryValue(tab: TabKey): string {
+  if (tab === "In Progress") return "In Progress";
+  return tab;
+}
+
 function formatStatusDisplay(status: UiStatus): string {
   if (status === "In-progress") return "In Progress";
   return status;
 }
+
+function statusBadgeClasses(status: UiStatus): string {
+  switch (status) {
+    case "Completed":
+      return "border-emerald-400/35 bg-emerald-500/15 text-emerald-100";
+    case "In-progress":
+      return "border-[#3498DB]/40 bg-[#3498DB]/15 text-[#aed6f1]";
+    case "Due":
+      return "border-red-400/45 bg-red-500/15 text-red-100";
+    default:
+      return "border-white/20 bg-white/10 text-white/85";
+  }
+}
+
+const tabBtn = (isActive: boolean) =>
+  isActive
+    ? "border-[#3498DB]/40 bg-[#3498DB]/20 text-white ring-1 ring-[#3498DB]/35"
+    : "border-white/15 bg-white/5 text-[#d9ebf8] hover:border-white/25 hover:bg-white/10";
 
 export default function RevitalizationRoadmap() {
   const router = useRouter();
@@ -170,10 +189,11 @@ export default function RevitalizationRoadmap() {
 
       setPhases(mappedPhases);
       setError("");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
       setPhases([]);
-      setError(err?.response?.data?.message || "Unable to fetch roadmap data from API.");
+      const anyErr = err as { response?: { data?: { message?: string } }; message?: string };
+      setError(anyErr?.response?.data?.message || anyErr?.message || "Unable to fetch roadmap data from API.");
     } finally {
       if (showLoader) setLoading(false);
     }
@@ -203,6 +223,16 @@ export default function RevitalizationRoadmap() {
       unsubProgress();
     };
   }, [fetchRoadmaps, pathname]);
+
+  const setTab = useCallback(
+    (tab: TabKey) => {
+      setActiveTab(tab);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", tabToQueryValue(tab));
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
 
   const phasesSortedForSequence = useMemo(() => {
     const known = phases.filter((p) => phaseSequenceIndex(p) >= 0);
@@ -234,9 +264,7 @@ export default function RevitalizationRoadmap() {
         openPhaseRoute(phase);
         return;
       }
-      const prevPhase = phasesSortedForSequence.find(
-        (p) => phaseSequenceIndex(p) === idx - 1,
-      );
+      const prevPhase = phasesSortedForSequence.find((p) => phaseSequenceIndex(p) === idx - 1);
       if (prevPhase && prevPhase.status !== "Completed") {
         setSequenceGate({
           previousName: roadmapDisplayName(prevPhase),
@@ -259,20 +287,21 @@ export default function RevitalizationRoadmap() {
         phase.parentRoadmapName.toLowerCase().includes(q);
 
       const matchesTab =
-        activeTab === "All" ||
-        normalizeStatus(phase.status) === normalizeStatus(activeTab);
+        activeTab === "All" || normalizeStatus(phase.status) === normalizeStatus(activeTab);
       return matchesSearch && matchesTab;
     });
   }, [phases, searchTerm, activeTab]);
 
   if (loading) {
     return (
-      <div className={pastorPageRoot}>
+      <div className={pastorRoadmapDashboardPageRoot}>
         <PastorHeader showFullHeader={true} />
-        <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4">
-          <div className={pastorSpinner} />
-          <p className="text-sm text-[#cde2f2]">Loading your roadmap...</p>
-        </div>
+        <PastorRoadmapDashboardBody>
+          <div className="flex min-h-[70vh] flex-1 flex-col items-center justify-center">
+            <div className={directorSpinner} />
+            <p className="text-sm text-white/75">Loading your roadmap…</p>
+          </div>
+        </PastorRoadmapDashboardBody>
       </div>
     );
   }
@@ -281,174 +310,165 @@ export default function RevitalizationRoadmap() {
     const showLogin =
       /sign in|log in|session|not found/i.test(error) && !/Unable to fetch/i.test(error);
     return (
-      <div className={pastorPageRoot}>
+      <div className={pastorRoadmapDashboardPageRoot}>
         <PastorHeader showFullHeader={true} />
-        <div className="flex min-h-[70vh] items-center justify-center px-4">
-          <div className="max-w-xl rounded-2xl border border-red-400/25 bg-red-500/10 p-5 text-center">
-            <p className="text-red-100">{error}</p>
-            {showLogin && (
-              <p className="mt-3 text-sm text-[#cde2f2]">
-                <Link href="/pastor/login" className="font-semibold text-white underline underline-offset-2 hover:text-[#8ec5eb]">
-                  Go to pastor login
-                </Link>
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => fetchRoadmaps()}
-              className="mt-4 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#0f4a76] hover:bg-[#e7f1fa]"
-            >
-              Retry
-            </button>
+        <PastorRoadmapDashboardBody>
+          <div className="flex min-h-[70vh] flex-1 items-center justify-center px-4">
+            <div className={`${directorGlassCard} max-w-xl p-6 text-center`}>
+              <p className="text-red-100">{error}</p>
+              {showLogin && (
+                <p className="mt-3 text-sm text-white/75">
+                  <Link
+                    href="/pastor/login"
+                    className="font-semibold text-[#aed6f1] underline underline-offset-2 hover:text-white"
+                  >
+                    Go to pastor login
+                  </Link>
+                </p>
+              )}
+              <button type="button" onClick={() => fetchRoadmaps()} className={`${directorBtnPrimary} mt-6`}>
+                Retry
+              </button>
+            </div>
           </div>
-        </div>
+        </PastorRoadmapDashboardBody>
       </div>
     );
   }
 
   return (
-    <div className={pastorPageRoot}>
+    <div className={pastorRoadmapDashboardPageRoot}>
       <PastorHeader showFullHeader={true} />
 
-      {/* HERO SECTION */}
-      <section
-        className="
-          relative flex h-[180px] items-end bg-cover bg-bottom
-          px-6 pb-6 text-white
-          sm:h-[200px] sm:px-10 sm:pb-8
-          md:h-[250px] md:px-20 md:pb-10
-        "
-        style={{ backgroundImage: `url(${HeroBg.src})` }}
-      >
-        <div className={pastorHeroOverlay} />
-        <div className="relative z-10">
-          <p className={pastorEyebrowPill}>
-            <span className={pastorEyebrowDot} />
-            Leadership Support Network
-          </p>
-          <h1 className="text-2xl sm:text-3xl font-semibold">
-            Revitalization Roadmap
-          </h1>
-          <p className="mt-2 max-w-xl text-sm text-[#d9ebf8] md:text-base">
-            Follow your phase-by-phase roadmap and track active milestones.
-          </p>
-        </div>
-      </section>
+      <PastorRoadmapDashboardBody>
+        <DirectorHero
+          title="Revitalization Roadmap"
+          subtitle="Follow your phase-by-phase roadmap and track active milestones."
+          image={HeroBg}
+          pill="Leadership Support Network"
+          breadcrumbItems={[{ label: "Home", href: "/pastor/home" }, { label: "Revitalization Roadmap" }]}
+        />
 
-      {/* MAIN CONTENT */}
-      <main className={pastorMainGradient}>
-        <div className={pastorContainer}>
-          {/* Top Controls */}
-          <div className={pastorControlsRow}>
-            <PastorSearchBar
-              value={searchTerm}
-              onChange={setSearchTerm}
-              placeholder="Search"
-              aria-label="Search roadmaps"
-            />
-
-            <div className="flex w-full items-center gap-3 lg:w-auto">
-              <PastorFilterTabGroup tabs={TABS} active={activeTab} onChange={setActiveTab} className="flex-1" />
-
-              <button
-                type="button"
-                onClick={() => fetchRoadmaps()}
-                className={pastorIconButton}
-                aria-label="Refresh roadmap"
-                title="Refresh roadmap"
-              >
-                <i className="fa-solid fa-rotate-right text-sm" />
-              </button>
-            </div>
-          </div>
-
-          {phases.length === 0 ? (
-            <div className={pastorEmptyPanel}>
-              No roadmap assignments found. Please contact your administrator.
-            </div>
-          ) : filteredPhases.length === 0 ? (
-            <div className={pastorEmptyPanel}>No roadmaps match this filter.</div>
-          ) : (
-            <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2">
-              {filteredPhases.map((phase) => (
-                <div
-                  key={`${phase.parentRoadmapId || "parent"}-${phase.id}`}
-                  className={pastorGlassCard}
-                >
-                  <div className="relative w-full sm:w-[180px] md:w-[200px] h-[180px] md:h-[200px] flex-shrink-0 m-4">
-                    <Image
-                      src={phase.imageUrl}
-                      alt={phase.title}
-                      width={200}
-                      height={200}
-                      className="w-full h-full object-cover rounded-lg"
-                      unoptimized={isRemoteImageSrc(phase.imageUrl) || String(phase.imageUrl).startsWith("blob:")}
+        <main className="flex-1 pb-10 sm:pb-12">
+            <div className={`${directorPageContainer} max-w-7xl px-4 sm:px-6 lg:px-8`}>
+              <DirectorFilterSection bare className="!mb-6 !p-4 sm:!p-6">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+                  <div className="min-w-0 w-full lg:max-w-[min(100%,28rem)] lg:flex-1">
+                    <SearchBar
+                      value={searchTerm}
+                      onChange={setSearchTerm}
+                      placeholder="Search roadmaps…"
+                      variant="dark"
+                      className="w-full"
                     />
                   </div>
 
-                  <div className="flex flex-col justify-between flex-1 p-4 md:p-5">
-                    <div>
-                      <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-[#8ec5eb]/90">
-                        {phase.parentRoadmapName}
-                      </p>
-                      <h3 className="mb-1 text-[16px] font-semibold text-white md:text-[17px]">
-                        {phase.title}
-                      </h3>
-                      <p className={`mb-3 ${pastorRoadmapDescriptionPre}`}>{phase.description}</p>
-
-                      <div className="flex flex-wrap items-center gap-2 mb-3">
-                        <span className="text-xs font-medium text-[#d9ebf8]">
-                          Status
-                        </span>
-                        <span
-                          className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${
-                            phase.status === "Completed"
-                              ? "bg-[#d8fff2] text-[#00A878]"
-                              : phase.status === "In-progress"
-                              ? "bg-[#fff6d8] text-[#d38a00]"
-                              : phase.status === "Due"
-                              ? "bg-[#ffe4e6] text-[#be123c]"
-                              : "bg-[#e6edff] text-[#1e40af]"
-                          }`}
-                        >
-                          {formatStatusDisplay(phase.status)}
-                        </span>
-                      </div>
-
-                      {phase.sessionDate && (
-                        <div className="flex items-center gap-2 mb-3">
-                          <i className="fa-regular fa-calendar text-[#8ec5eb] text-sm"></i>
-                          <input
-                            type="text"
-                            value={phase.sessionDate}
-                            readOnly
-                            className="w-[140px] rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-[#d9ebf8] focus:outline-none sm:w-[150px]"
-                          />
-                        </div>
-                      )}
-
-                      <p className="text-sm text-[#d9ebf8]">
-                        Completion Time{" "}
-                        <span className="font-semibold text-white">{phase.months}</span>
-                      </p>
-                    </div>
-
-                    <div className="flex justify-end mt-3 sm:mt-0">
+                  <div className="flex min-w-0 w-full flex-nowrap items-stretch justify-start gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:ml-auto lg:w-auto lg:justify-end [&::-webkit-scrollbar]:hidden">
+                    {TABS.map((tab) => (
                       <button
+                        key={tab}
                         type="button"
-                        onClick={() => handleViewPhase(phase)}
-                        className={pastorPrimaryCta}
+                        onClick={() => setTab(tab)}
+                        className={`shrink-0 rounded-lg border px-3 py-2.5 text-[12px] font-semibold transition-all sm:px-4 sm:text-[13px] ${tabBtn(activeTab === tab)}`}
                       >
-                        View
+                        {tab}
                       </button>
-                    </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => fetchRoadmaps(false)}
+                      className={directorIconButton}
+                      aria-label="Refresh roadmap"
+                      title="Refresh roadmap"
+                    >
+                      <i className="fa-solid fa-rotate-right text-sm" />
+                    </button>
                   </div>
                 </div>
-              ))}
+              </DirectorFilterSection>
+
+              {phases.length === 0 ? (
+                <div className={`${directorGlassCard} px-5 py-12 text-center text-sm text-white/65`}>
+                  No roadmap assignments found. Please contact your administrator.
+                </div>
+              ) : filteredPhases.length === 0 ? (
+                <div className={`${directorGlassCard} px-5 py-12 text-center text-sm text-white/65`}>
+                  No roadmaps match this filter.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
+                  {filteredPhases.map((phase) => {
+                    const img =
+                      typeof phase.imageUrl === "string"
+                        ? resolveApiMediaUrl(phase.imageUrl) || phase.imageUrl
+                        : phase.imageUrl;
+                    return (
+                      <div
+                        key={`${phase.parentRoadmapId || "parent"}-${phase.id}`}
+                        className={`${directorGlassCard} flex flex-col overflow-hidden sm:flex-row`}
+                      >
+                        <div className="relative h-44 w-full shrink-0 sm:h-auto sm:min-h-[200px] sm:w-[42%] sm:max-w-[220px]">
+                          <Image
+                            src={img}
+                            alt=""
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 640px) 100vw, 220px"
+                            unoptimized={
+                              typeof img === "string" &&
+                              (img.startsWith("blob:") || isRemoteImageSrc(img))
+                            }
+                          />
+                          <div className="absolute left-3 top-3">
+                            <span
+                              className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${statusBadgeClasses(phase.status)}`}
+                            >
+                              {formatStatusDisplay(phase.status)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex min-w-0 flex-1 flex-col justify-between gap-4 p-4 sm:p-5">
+                          <div className="min-w-0 space-y-2">
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#3498DB]/90">
+                              {phase.parentRoadmapName}
+                            </p>
+                            <h3 className="text-base font-bold leading-snug text-white sm:text-lg">{phase.title}</h3>
+                            <p className="line-clamp-3 text-sm leading-relaxed text-white/65">{phase.description}</p>
+
+                            {phase.sessionDate ? (
+                              <div className="flex flex-wrap items-center gap-2 pt-1">
+                                <i className="fa-regular fa-calendar text-[#8ec5eb] text-sm" aria-hidden />
+                                <span className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-[#d9ebf8]">
+                                  {phase.sessionDate}
+                                </span>
+                              </div>
+                            ) : null}
+
+                            <p className="text-sm text-white/75">
+                              Completion time{" "}
+                              <span className="font-semibold text-white">{phase.months}</span>
+                            </p>
+                          </div>
+
+                          <div className="flex justify-end border-t border-white/10 pt-3 sm:border-0 sm:pt-0">
+                            <button
+                              type="button"
+                              onClick={() => handleViewPhase(phase)}
+                              className={`${directorBtnPrimary} !px-5 !py-2.5 !text-sm`}
+                            >
+                              View
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </main>
+          </main>
+      </PastorRoadmapDashboardBody>
 
       {sequenceGate && (
         <div
@@ -459,13 +479,13 @@ export default function RevitalizationRoadmap() {
           onClick={() => setSequenceGate(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-white/15 bg-[linear-gradient(180deg,#0c3f66_0%,#082a47_100%)] p-6 text-center shadow-2xl"
+            className={`${directorGlassCard} w-full max-w-md p-6 text-center shadow-2xl`}
             onClick={(e) => e.stopPropagation()}
           >
             <h2 id="roadmap-sequence-title" className="text-lg font-semibold text-white">
               Complete the previous roadmap first
             </h2>
-            <p className="mt-4 text-sm leading-relaxed text-[#d9ebf8]">
+            <p className="mt-4 text-sm leading-relaxed text-white/75">
               Complete{" "}
               <span className="font-semibold text-white">{sequenceGate.previousName}</span> to begin{" "}
               <span className="font-semibold text-white">{sequenceGate.currentName}</span>.
@@ -473,7 +493,7 @@ export default function RevitalizationRoadmap() {
             <button
               type="button"
               onClick={() => setSequenceGate(null)}
-              className="mt-6 inline-flex min-w-[120px] items-center justify-center rounded-xl bg-[#8ec5eb] px-5 py-2.5 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#b8daf3]"
+              className={`${directorBtnPrimary} mt-6 min-w-[120px]`}
             >
               OK
             </button>

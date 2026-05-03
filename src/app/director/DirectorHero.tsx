@@ -17,6 +17,8 @@ type DirectorHeroProps = {
   compact?: boolean;
   /** e.g. “Change banner” — aligned to the top-right of the hero. */
   topRight?: ReactNode;
+  /** Small pill above the title (e.g. Leadership Support Network). */
+  pill?: string;
   breadcrumbItems?: Array<{ label: string; href?: string }>;
 };
 
@@ -29,6 +31,7 @@ export default function DirectorHero({
   compact = false,
   topRight,
   breadcrumbItems,
+  pill,
 }: DirectorHeroProps) {
   const hasCrumbs = breadcrumbItems && breadcrumbItems.length > 0;
   const hasImage = typeof image === "string" ? image.trim().length > 0 : Boolean(image);
@@ -61,46 +64,60 @@ export default function DirectorHero({
             unoptimized={imageUnoptimized}
           />
         ) : null}
-        {/* Reference-style readability: strong dark blue on the left, image visible toward the right */}
-        <div
-          className={`absolute inset-0 ${hasImage ? "bg-gradient-to-r from-[#041f35]/93 via-[#062946]/55 to-transparent" : ""}`}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#062946]/90 via-[#062946]/35 to-[#0a3558]/45" />
-        {!hasImage ? (
-          <div className="absolute inset-0 bg-gradient-to-r from-[#041f35]/85 via-transparent to-transparent" />
-        ) : null}
-        <div className="relative z-10 flex h-full flex-col justify-between gap-6 p-6 sm:p-8">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            {hasCrumbs ? (
-              <div className="min-w-0 flex-1 text-sm text-white/75">
-                {breadcrumbItems!.map((item, idx) => (
-                  <span key={`${item.label}-${idx}`}>
-                    {item.href ? (
-                      <Link href={item.href} className="hover:text-white">
-                        {item.label}
-                      </Link>
-                    ) : (
-                      <span className={idx === breadcrumbItems!.length - 1 ? "font-semibold text-white" : ""}>
-                        {item.label}
-                      </span>
-                    )}
-                    {idx < breadcrumbItems!.length - 1 && <span className="mx-2">&gt;</span>}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div />
-            )}
-            {topRight ? <div className="shrink-0">{topRight}</div> : null}
-          </div>
-          <div className="max-w-3xl lg:max-w-4xl">
-            <h1 className="text-2xl font-bold tracking-tight text-white drop-shadow-sm sm:text-3xl lg:text-4xl">
-              {title}
-            </h1>
-            {subtitle ? (
-              <p className="mt-2 text-sm text-white/85 sm:text-base">{subtitle}</p>
-            ) : null}
-            {detail ? <p className="mt-1.5 text-xs text-white/60 sm:text-sm">{detail}</p> : null}
+        {hasImage ? (
+          <>
+            <div className="absolute inset-0 bg-gradient-to-r from-[#041f35]/93 via-[#062946]/55 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#062946]/90 via-[#062946]/35 to-[#0a3558]/45" />
+          </>
+        ) : (
+          <>
+            <div className="absolute inset-0 bg-[linear-gradient(145deg,#070f22_0%,#0A1128_45%,#0f1f42_100%)]" />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#041f35]/90 via-[#0A1128]/75 to-[#0d1836]/90" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0A1128]/92 via-transparent to-[#1e4d7b]/18" />
+          </>
+        )}
+        <div className="relative z-10 flex h-full w-full flex-col justify-between gap-6 p-6 sm:p-8">
+          <div className="flex min-w-0 w-full flex-1 flex-col justify-between gap-6">
+            <div className="flex w-full flex-wrap items-start justify-between gap-3">
+              {hasCrumbs ? (
+                <div className="min-w-0 flex-1 text-sm text-white/75">
+                  {breadcrumbItems!.map((item, idx) => (
+                    <span key={`${item.label}-${idx}`}>
+                      {item.href ? (
+                        <Link href={item.href} className="hover:text-white">
+                          {item.label}
+                        </Link>
+                      ) : (
+                        <span className={idx === breadcrumbItems!.length - 1 ? "font-semibold text-white" : ""}>
+                          {item.label}
+                        </span>
+                      )}
+                      {idx < breadcrumbItems!.length - 1 && (
+                        <span className="mx-2 font-normal text-white/45">&gt;</span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div />
+              )}
+              {topRight ? <div className="shrink-0">{topRight}</div> : null}
+            </div>
+            <div className="ml-auto w-full max-w-3xl text-right lg:max-w-xl">
+              {pill ? (
+                <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-[#3498DB]" aria-hidden />
+                  {pill}
+                </p>
+              ) : null}
+              <h1 className="text-2xl font-bold tracking-tight text-white drop-shadow-sm sm:text-3xl lg:text-4xl">
+                {title}
+              </h1>
+              {subtitle ? (
+                <p className="mt-2 text-sm text-white/85 sm:text-base">{subtitle}</p>
+              ) : null}
+              {detail ? <p className="mt-1.5 text-xs text-white/60 sm:text-sm">{detail}</p> : null}
+            </div>
           </div>
         </div>
       </div>

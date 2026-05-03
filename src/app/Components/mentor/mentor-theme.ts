@@ -1,15 +1,18 @@
 /**
  * Mentor module — shared visual tokens (Tailwind class strings).
- * Aligns with pastor navy/glass system (#062946, #8ec5eb) for a unified Leadership Support Network look.
+ * Accent #3498DB aligns with the director Revitalization Roadmap dashboard; RoleShell `variant="mentor"` supplies #0A1128 base.
  */
 
-/** Root: full-height navy shell + Albert Sans */
+/** Root: fills RoleShell (transparent so dashboard / default shell shows through). */
 export const mentorPageRoot =
-  "flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white antialiased";
+  "flex min-h-screen flex-col bg-transparent font-[Albert_Sans] text-white antialiased";
 
-/** Main band under hero */
+/** Main band under hero (classic mentor pages); roadmap hub uses transparent main instead. */
 export const mentorMainGradient =
   "relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)]";
+
+/** Revitalization Roadmap hub — no second gradient over dashboard RoleShell. */
+export const mentorRoadmapHubMain = "relative z-10 flex-1 bg-transparent";
 
 export const mentorContainer = "mx-auto w-full max-w-7xl px-4 py-8 sm:px-8 md:px-16 md:py-10";
 
@@ -20,10 +23,10 @@ export const mentorHeroOverlay =
 export const mentorEyebrowPill =
   "inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]";
 
-export const mentorEyebrowDot = "h-2 w-2 rounded-full bg-[#8ec5eb]";
+export const mentorEyebrowDot = "h-2 w-2 rounded-full bg-[#3498DB]";
 
 export const mentorSpinner =
-  "h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent";
+  "h-12 w-12 animate-spin rounded-full border-4 border-[#3498DB] border-t-transparent";
 
 /** Row: search + filters (stacks on mobile) */
 export const mentorControlsRow =
@@ -33,7 +36,7 @@ export const mentorControlsRow =
 export const mentorSearchBarWrap =
   "flex w-full min-w-0 items-center rounded-full border border-white/20 bg-white/10 px-4 py-2.5 shadow-sm backdrop-blur lg:max-w-md";
 
-export const mentorSearchIcon = "fa-solid fa-magnifying-glass mr-3 shrink-0 text-[#8ec5eb]";
+export const mentorSearchIcon = "fa-solid fa-magnifying-glass mr-3 shrink-0 text-[#3498DB]";
 
 export const mentorSearchInput =
   "min-w-0 flex-1 bg-transparent text-sm text-white placeholder:text-[#cde2f2] outline-none";
@@ -45,7 +48,7 @@ export const mentorSearchIconAbsolute =
   "fa-solid fa-magnifying-glass pointer-events-none absolute left-4 top-1/2 z-[1] -translate-y-1/2 text-sm text-[#cde2f2]";
 
 export const mentorSearchInputAbsolute =
-  "w-full rounded-xl border border-white/20 bg-white/10 py-2 pl-10 pr-4 text-sm text-white shadow-sm outline-none backdrop-blur placeholder:text-[#cde2f2] focus:ring-2 focus:ring-[#8ec5eb]";
+  "w-full rounded-xl border border-white/20 bg-white/10 py-2 pl-10 pr-4 text-sm text-white shadow-sm outline-none backdrop-blur placeholder:text-[#cde2f2] focus:ring-2 focus:ring-[#3498DB]";
 
 /** Filter pill tabs */
 export const mentorFilterStrip =
@@ -53,6 +56,12 @@ export const mentorFilterStrip =
 
 export const mentorFilterTabBase =
   "whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-medium transition-all sm:px-4 sm:text-sm";
+
+/** Dashboard-style tab (Revitalization hub). */
+export const mentorFilterTabActiveDashboard =
+  "border-[#3498DB]/40 bg-[#3498DB]/20 text-white ring-1 ring-[#3498DB]/35 shadow-sm";
+
+export const mentorFilterTabIdleDashboard = "border-transparent text-[#d9ebf8] hover:bg-white/10";
 
 export const mentorFilterTabActive = "bg-white text-[#0f4a76]";
 
@@ -62,7 +71,7 @@ export const mentorFilterTabIdle = "text-[#d9ebf8] hover:bg-white/15";
  * Primary list card — horizontal roadmap / assignment (matches Revitalization Roadmap mentor cards).
  */
 export const mentorGlassCardRoadmap =
-  "flex w-full flex-col overflow-hidden rounded-2xl border border-[#8ec5eb]/25 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] shadow-[0_8px_32px_rgba(2,20,40,0.45)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#8ec5eb]/35 hover:shadow-[0_12px_40px_rgba(2,24,48,0.5)] sm:flex-row";
+  "flex w-full flex-col overflow-hidden rounded-2xl border border-[#3498DB]/25 bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0.03)_100%)] backdrop-blur-xl shadow-[0_8px_40px_rgba(3,24,43,0.45)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#3498DB]/40 hover:shadow-[0_12px_48px_rgba(3,24,43,0.5)] sm:flex-row";
 
 /**
  * Frosted glass — dashboard tiles (mentor home quick links, etc.)
@@ -77,10 +86,14 @@ export const mentorFilterPanel =
 export const mentorFieldLabel = "mb-1.5 block text-xs font-medium text-[#d9ebf8]";
 
 export const mentorSelectDark =
-  "w-full rounded-xl border border-white/20 bg-[#062946] px-3 py-2.5 text-sm text-white outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30 [&>option]:bg-[#062946] [&>option]:text-white";
+  "w-full rounded-xl border border-white/20 bg-[#062946] px-3 py-2.5 text-sm text-white outline-none focus:border-[#3498DB]/50 focus:ring-2 focus:ring-[#3498DB]/30 [&>option]:bg-[#062946] [&>option]:text-white";
 
 export const mentorDateInputDark =
-  "w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-white outline-none [color-scheme:dark] focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30";
+  "w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2.5 text-sm text-white outline-none [color-scheme:dark] focus:border-[#3498DB]/50 focus:ring-2 focus:ring-[#3498DB]/30";
+
+/** Dashboard primary CTA on dark glass (#3498DB). */
+export const mentorPrimaryCtaDashboard =
+  "rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/20 px-5 py-2 text-sm font-semibold text-white shadow-md transition hover:bg-[#3498DB]/32";
 
 export const mentorPrimaryCta =
   "rounded-lg bg-white px-5 py-2 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa]";

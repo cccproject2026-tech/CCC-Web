@@ -18,9 +18,9 @@ export default function DirectorLayoutShell({
   }
 
   return (
-    <RoleShell>
+    <RoleShell variant="director">
       <AppHeader showFullHeader={true} />
-      <main className="relative z-10 mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col px-4 pb-10 pt-4 sm:px-6 sm:pb-12 lg:px-8 lg:pt-6">
+      <main className="relative z-10 mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col px-4 pb-10 pt-4 sm:px-6 sm:pb-12 lg:px-8 lg:pt-6">
         {children}
       </main>
     </RoleShell>

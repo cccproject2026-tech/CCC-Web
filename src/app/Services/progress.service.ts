@@ -577,20 +577,37 @@ export function unwrapOverallProgressList(res: { data?: unknown }): UserOverallP
   return [];
 }
 
+/** Normalize ids returned from overview/list payloads (string, number, Mongo $oid). */
+function coerceProgressUserId(raw: unknown): string {
+  if (raw == null) return "";
+  if (typeof raw === "string") return raw.trim();
+  if (typeof raw === "number") return String(raw);
+  if (typeof raw === "object" && raw !== null && "$oid" in (raw as object)) {
+    return String((raw as { $oid: string }).$oid);
+  }
+  if (typeof raw === "object" && raw !== null && "_id" in (raw as object)) {
+    return coerceProgressUserId((raw as { _id: unknown })._id);
+  }
+  return "";
+}
+
 /**
  * Row `userId` may be a string id or a populated `{ _id }` (some API versions).
  */
 export function extractUserIdFromOverallProgressRow(
   item: UserOverallProgress | Record<string, unknown>,
 ): string | undefined {
-  const u = (item as Record<string, unknown>).userId as unknown;
+  const row = item as Record<string, unknown>;
+  const u = row.userId as unknown;
   if (typeof u === "string" && u.trim()) return u.trim();
-  if (u && typeof u === "object" && "_id" in (u as object)) {
-    const id = (u as { _id?: string })._id;
-    if (id != null && String(id).trim() !== "") return String(id);
+  if (u && typeof u === "object") {
+    const nested = coerceProgressUserId(
+      (u as Record<string, unknown>)._id ?? (u as Record<string, unknown>).id,
+    );
+    if (nested) return nested;
   }
-  const id = (item as Record<string, unknown>)._id;
-  if (typeof id === "string" && id.trim()) return id.trim();
+  const fromId = coerceProgressUserId(row.id ?? row._id);
+  if (fromId) return fromId;
   return undefined;
 }
 

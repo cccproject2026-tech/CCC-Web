@@ -4,6 +4,17 @@ import Image from "next/image";
 import { isAxiosError } from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
+import DirectorHero from "@/app/director/DirectorHero";
+import {
+  directorBtnPrimary,
+  directorGlassCard,
+  directorPageContainer,
+  directorSpinner,
+} from "@/app/director/directorUi";
+import {
+  PastorRoadmapDashboardBody,
+  pastorRoadmapDashboardPageRoot,
+} from "@/app/pastor/pastor-roadmap-dashboard-shell";
 import HeroBg from "@/app/Assets/jumpstart-hero.png";
 import UserPlaceholder from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -353,17 +364,6 @@ function JumpStartContent() {
     [roadmap?.extras],
   );
 
-  const heroBackgroundStyle = useMemo(() => {
-    const u = roadmap?.imageUrl;
-    if (
-      typeof u === "string" &&
-      u.trim() &&
-      (u.startsWith("http://") || u.startsWith("https://") || u.startsWith("/"))
-    ) {
-      return `url(${u})`;
-    }
-    return `url(${HeroBg.src})`;
-  }, [roadmap?.imageUrl]);
 // Prevent roadmap completion when a required signature field is still empty.
   const hasRequiredSignature = useMemo(() => {
   const checkExtras = (
@@ -1211,40 +1211,53 @@ if (!hasRequiredSubmissions) {
 
   if (!nestedItemId) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#062946] px-6 text-center text-white">
+      <div className={pastorRoadmapDashboardPageRoot}>
         <PastorHeader showFullHeader={true} />
-        <p className="max-w-md text-white/80">
-          Missing task link. Open a phase from{" "}
-          <a href="/pastor/revitalization-roadmap" className="text-[#8ec5eb] underline">
-            Revitalization Roadmap
-          </a>{" "}
-          and select a task.
-        </p>
+        <PastorRoadmapDashboardBody>
+          <div className="flex min-h-[60vh] flex-1 flex-col items-center justify-center px-4 text-center">
+            <div className={`${directorGlassCard} max-w-md p-6`}>
+              <p className="text-white/80">
+                Missing task link. Open a phase from{" "}
+                <a
+                  href="/pastor/revitalization-roadmap"
+                  className="font-semibold text-[#aed6f1] underline underline-offset-2 hover:text-white"
+                >
+                  Revitalization Roadmap
+                </a>{" "}
+                and select a task.
+              </p>
+            </div>
+          </div>
+        </PastorRoadmapDashboardBody>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#062946]">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent"></div>
+      <div className={pastorRoadmapDashboardPageRoot}>
+        <PastorHeader showFullHeader={true} />
+        <PastorRoadmapDashboardBody>
+          <div className="flex min-h-[70vh] flex-1 items-center justify-center">
+            <div className={directorSpinner} />
+          </div>
+        </PastorRoadmapDashboardBody>
       </div>
     );
   }
 
   if (roadmapLoadError || !roadmap) {
     return (
-      <div className="min-h-screen flex flex-col bg-[#062946] text-white">
+      <div className={pastorRoadmapDashboardPageRoot}>
         <PastorHeader showFullHeader={true} />
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
-          <p className="max-w-md text-amber-100/95">{roadmapLoadError || "Task not found."}</p>
-          <a
-            href="/pastor/revitalization-roadmap"
-            className="rounded-md border border-white/30 bg-white/10 px-5 py-2 text-sm font-semibold text-white hover:bg-white/15"
-          >
-            Back to Revitalization Roadmap
-          </a>
-        </div>
+        <PastorRoadmapDashboardBody>
+          <div className="flex min-h-[60vh] flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+            <p className="max-w-md text-amber-100/95">{roadmapLoadError || "Task not found."}</p>
+            <a href="/pastor/revitalization-roadmap" className={`${directorBtnPrimary} inline-flex no-underline`}>
+              Back to Revitalization Roadmap
+            </a>
+          </div>
+        </PastorRoadmapDashboardBody>
       </div>
     );
   }
@@ -1254,55 +1267,58 @@ if (!hasRequiredSubmissions) {
   const description = roadmap?.description || roadmap?.roadMapDetails || "";
   const extras: ExtraComponent[] = roadmap?.extras || [];
   const phaseTag = typeof roadmap?.phase === "string" ? roadmap.phase.trim() : "";
-  const breadcrumbParent = parentPhaseLabel?.trim() || "Revitalization Roadmap";
+
+  const heroCoverSrc =
+    typeof roadmap.imageUrl === "string" &&
+    roadmap.imageUrl.trim() &&
+    (roadmap.imageUrl.startsWith("http://") ||
+      roadmap.imageUrl.startsWith("https://") ||
+      roadmap.imageUrl.startsWith("/"))
+      ? roadmap.imageUrl.trim()
+      : HeroBg;
+
+  const heroSubtitle = [
+    `Status: ${formatListStatusLabel(listAlignedStatus)}`,
+    duration ? `Completion time ${duration}` : "",
+    roadmap?.startDate || roadmap?.endDate
+      ? `${roadmap?.startDate ? formatDate(String(roadmap.startDate)) : "—"} — ${roadmap?.endDate ? formatDate(String(roadmap.endDate)) : "—"}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#062946] text-white font-[Albert_Sans]">
+    <div className={pastorRoadmapDashboardPageRoot}>
       <PastorHeader showFullHeader={true} />
 
-      {/* HERO SECTION */}
-      <section
-        className="relative flex h-[320px] flex-col justify-end bg-cover bg-center px-6 pb-10 text-white md:px-12 lg:px-20"
-        style={{ backgroundImage: heroBackgroundStyle }}
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]"></div>
-        <div className="relative z-10">
-          <p className="text-sm text-white/80 mb-2">
-            {breadcrumbParent} &gt; <span className="text-white">{title}</span>
-          </p>
-          <h1 className="text-3xl font-semibold">{title}</h1>
-          {phaseTag && (
-            <p className="text-white/60 text-sm mt-1 capitalize">{phaseTag}</p>
-          )}
-          {duration && (
-            <p className="text-white/70 text-sm mt-1">Completion Time {duration}</p>
-          )}
-          {(roadmap?.startDate || roadmap?.endDate) && (
-            <p className="text-white/60 text-sm mt-1">
-              {roadmap?.startDate ? formatDate(String(roadmap.startDate)) : "—"}
-              {" — "}
-              {roadmap?.endDate ? formatDate(String(roadmap.endDate)) : "—"}
-            </p>
-          )}
-          <p className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-            <span className="text-white/70">Status</span>
-            <span
-              className={`rounded-full border px-3 py-1 text-xs font-semibold ${listStatusBadgeClass(
-                listAlignedStatus,
-              )}`}
-            >
-              {formatListStatusLabel(listAlignedStatus)}
-            </span>
-          </p>
-        </div>
-      </section>
+      <PastorRoadmapDashboardBody>
+        <DirectorHero
+          title={title}
+          subtitle={heroSubtitle}
+          detail={phaseTag ? phaseTag : undefined}
+          image={heroCoverSrc}
+          pill="Leadership Support Network"
+          breadcrumbItems={[
+            { label: "Home", href: "/pastor/home" },
+            { label: "Revitalization Roadmap", href: "/pastor/revitalization-roadmap" },
+            ...(parentRoadmapId && parentPhaseLabel?.trim()
+              ? [
+                  {
+                    label: parentPhaseLabel.trim(),
+                    href: `/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(parentRoadmapId)}`,
+                  },
+                ]
+              : []),
+            { label: title },
+          ]}
+        />
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-12 md:px-10 lg:px-16">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-10">
+      <main className="flex-1 pb-12">
+        <div className={`${directorPageContainer} max-w-7xl px-4 sm:px-6 lg:px-8`}>
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[250px_1fr] lg:gap-10">
 
           {/* LEFT PANEL */}
-          <div className="h-fit w-full rounded-xl border border-white/20 bg-white/10 p-4 shadow-md backdrop-blur flex flex-col gap-2">
+          <div className={`${directorGlassCard} flex h-fit w-full flex-col gap-2 p-3`}>
             {[
               { key: "overview", label: "Over View", count: 0 },
               { key: "comments", label: "Comments", count: commentsCount },
@@ -1311,10 +1327,10 @@ if (!hasRequiredSubmissions) {
               <button
                 key={item.key}
                 onClick={() => setActiveTab(item.key)}
-                className={`flex justify-between items-center px-4 py-3 rounded-md text-sm font-medium transition-all ${
+                className={`flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
                   activeTab === item.key
-                    ? "bg-white text-[#0f4a76] shadow-sm"
-                    : "bg-transparent text-[#d9ebf8] hover:bg-white/15"
+                    ? "border-[#3498DB]/40 bg-[#3498DB]/15 text-white shadow-sm"
+                    : "border-transparent text-[#d9ebf8] hover:bg-white/10"
                 }`}
               >
                 <span>{item.label}</span>
@@ -1654,6 +1670,7 @@ disabled={
             )}
           </div>
         </div>
+        </div>
 
         {/* Signature Drawing Modal */}
         {signatureModalOpen && (
@@ -1728,6 +1745,7 @@ disabled={
           </div>
         )}
       </main>
+      </PastorRoadmapDashboardBody>
     </div>
   );
 }
@@ -1736,8 +1754,10 @@ export default function JumpStartPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#062946]">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent"></div>
+        <div className={pastorRoadmapDashboardPageRoot}>
+          <div className="flex min-h-screen flex-1 items-center justify-center">
+            <div className={directorSpinner} />
+          </div>
         </div>
       }
     >

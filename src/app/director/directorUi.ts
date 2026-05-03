@@ -42,9 +42,9 @@ export const directorLabelClass = "mb-1.5 block text-[13px] font-semibold text-w
 export const directorSelectTriggerClass =
   "flex w-full min-w-[160px] items-center justify-between gap-3 rounded-lg border border-white/15 bg-white/10 px-4 py-2.5 text-[13px] font-medium text-white shadow-sm transition-all hover:bg-white/15 sm:min-w-[180px] sm:text-[14px]";
 
-/** Primary / secondary actions in filter toolbars. */
+/** Primary / secondary actions in filter toolbars (accent aligns with dashboard #3498DB). */
 export const directorBtnPrimary =
-  "inline-flex items-center justify-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-3 text-[15px] font-semibold text-white shadow-md transition hover:bg-[#8ec5eb]/25 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-2 rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/20 px-6 py-3 text-[15px] font-semibold text-white shadow-md transition hover:bg-[#3498DB]/32 disabled:cursor-not-allowed disabled:opacity-50";
 
 export const directorBtnSecondary =
   "inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 px-6 py-3 text-[15px] font-semibold text-white shadow-md transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50";

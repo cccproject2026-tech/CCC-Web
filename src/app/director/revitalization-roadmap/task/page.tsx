@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState, Suspense } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -19,9 +18,11 @@ import {
   apiReplyToQuery,
 } from "@/app/Services/roadmaps.service";
 import { apiGetUserById } from "@/app/Services/users.service";
-import MentorHeader from "@/app/Components/MentorHeader";
+import DirectorHero from "../../DirectorHero";
+import { directorPageContainer, directorPageRoot, directorSpinner } from "../../directorUi";
+import { getDirectorUserId } from "@/app/utils/director-auth";
 import { getMentorUserId } from "@/app/utils/mentor-auth";
-import { verifyMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
+import { verifyDirectorOrMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
 
 const glassPanel =
   "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.88)_0%,rgba(10,53,88,0.95)_100%)] shadow-md backdrop-blur-sm";
@@ -126,7 +127,7 @@ function TaskPageContent() {
 
     const loadUser = async () => {
       try {
-        const access = await verifyMentorPastorAccess(userId);
+        const access = await verifyDirectorOrMentorPastorAccess(userId);
         if (!access.ok) {
           setAccessError(access.reason);
           setUser(null);
@@ -180,7 +181,7 @@ function TaskPageContent() {
       setLoading(true);
       setLoadError(null);
       try {
-        const access = await verifyMentorPastorAccess(userId);
+        const access = await verifyDirectorOrMentorPastorAccess(userId);
         if (!access.ok) {
           setAccessError(access.reason);
           setTask(null);
@@ -273,9 +274,9 @@ function TaskPageContent() {
 
   const handleSendComment = async () => {
     if (!newComment.trim() || !roadmapId || !userId) return;
-    const mentorId = getMentorUserId();
+    const mentorId = getDirectorUserId() ?? getMentorUserId();
     if (!mentorId) {
-      console.warn("No mentor session; cannot post comment.");
+      console.warn("No director or mentor session; cannot post comment.");
       return;
     }
 
@@ -295,9 +296,9 @@ function TaskPageContent() {
   const handleSendAnswer = async (queryId: string) => {
     const answer = queryAnswers[queryId];
     if (!answer?.trim() || !roadmapId) return;
-    const mentorId = getMentorUserId();
+    const mentorId = getDirectorUserId() ?? getMentorUserId();
     if (!mentorId) {
-      console.warn("No mentor session; cannot reply.");
+      console.warn("No director or mentor session; cannot reply.");
       return;
     }
 
@@ -317,6 +318,15 @@ function TaskPageContent() {
     setQueryAnswers((prev) => ({ ...prev, [qid]: value }));
   };
 
+  const pastorHubHref = userId
+    ? `/director/pastor-assignments?assignUser=${encodeURIComponent(userId)}`
+    : "/director/pastor-assignments";
+
+  const phaseHref =
+    userId && roadmapId
+      ? `/director/revitalization-roadmap/phase?userId=${encodeURIComponent(userId)}&roadmapId=${encodeURIComponent(roadmapId)}`
+      : null;
+
   const userName = user
     ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "Pastor"
     : userId
@@ -328,67 +338,42 @@ function TaskPageContent() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
-        <MentorHeader showFullHeader={true} />
+      <div className={directorPageRoot}>
+        <DirectorHero
+          title="Task"
+          subtitle="Loading…"
+          image={HeroBg}
+          breadcrumbItems={[
+            { label: "Home", href: "/director/home" },
+            { label: "Revitalization Roadmap", href: "/director/revitalization-roadmap" },
+            { label: "Task" },
+          ]}
+        />
         <div className="flex flex-1 items-center justify-center px-6 py-20">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+          <div className={directorSpinner} />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
-      <MentorHeader showFullHeader={true} />
+    <div className={directorPageRoot}>
+      <DirectorHero
+        title={task ? taskTitle : "Task"}
+        subtitle="Read this pastor&apos;s submitted responses, add comments, and reply to queries."
+        image={HeroBg}
+        pill="Director · Revitalization Roadmap"
+        breadcrumbItems={[
+          { label: "Home", href: "/director/home" },
+          { label: "Revitalization Roadmap", href: "/director/revitalization-roadmap" },
+          ...(userId ? [{ label: userName, href: pastorHubHref }] : []),
+          ...(phaseHref ? [{ label: phaseName ?? "Phase", href: phaseHref }] : []),
+          { label: task ? taskTitle : "Task" },
+        ]}
+      />
 
-      <section
-        className="relative flex min-h-[200px] flex-col justify-end bg-cover bg-bottom px-6 pb-8 pt-8 text-white sm:min-h-[240px] sm:px-10 sm:pb-10 md:px-20 md:pb-12"
-        style={{ backgroundImage: `url(${HeroBg.src})` }}
-      >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]" />
-        <div className="relative z-10 mx-auto w-full max-w-7xl">
-          <nav className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[#d9ebf8]">
-            <Link href="/mentor/RevitalizationRoadmap" className="hover:text-white">
-              Revitalization Roadmap
-            </Link>
-            <span className="opacity-70">&gt;</span>
-            {userId ? (
-              <>
-                <Link
-                  href={`/mentor/RevitalizationRoadmap/home?userId=${encodeURIComponent(userId)}`}
-                  className="hover:text-white"
-                >
-                  {userName}
-                </Link>
-                <span className="opacity-70">&gt;</span>
-              </>
-            ) : null}
-            {userId && roadmapId && phaseName ? (
-              <>
-                <Link
-                  href={`/mentor/RevitalizationRoadmap/phase?userId=${encodeURIComponent(userId)}&roadmapId=${encodeURIComponent(roadmapId)}`}
-                  className="hover:text-white"
-                >
-                  {phaseName}
-                </Link>
-                <span className="opacity-70">&gt;</span>
-              </>
-            ) : null}
-            <span className="font-semibold text-white">{task ? taskTitle : "Task"}</span>
-          </nav>
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
-            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
-            Leadership Support Network
-          </p>
-          <h1 className="mt-4 text-2xl font-semibold sm:text-3xl md:text-4xl">{task ? taskTitle : "Task"}</h1>
-          <p className="mt-2 max-w-2xl text-sm text-[#cde2f2] md:text-base">
-            Read this pastor&apos;s submitted responses, add comments, and reply to queries.
-          </p>
-        </div>
-      </section>
-
-      <main className="relative z-10 flex-1 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)] px-4 py-8 sm:px-8 md:px-16 md:py-10">
-        <div className="mx-auto max-w-7xl">
+      <main className="flex-1 pb-12">
+        <div className={`${directorPageContainer} max-w-7xl`}>
           {loadError && (
             <div className="mb-8 rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
               {loadError}
@@ -833,8 +818,8 @@ export default function TaskPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen flex-col items-center justify-center bg-[#062946] font-[Albert_Sans] text-[#cde2f2]">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+        <div className={`${directorPageRoot} items-center justify-center text-white/75`}>
+          <div className={directorSpinner} />
         </div>
       }
     >

@@ -6,20 +6,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { useRouter } from "next/navigation";
 
+import DirectorHero from "@/app/director/DirectorHero";
 import MentorHeader from "@/app/Components/MentorHeader";
 import MentorSearchBar from "@/app/Components/mentor/MentorSearchBar";
 import {
-  mentorControlsRow,
-  mentorEyebrowDot,
-  mentorEyebrowPill,
+  mentorFilterPanel,
   mentorFilterStrip,
-  mentorFilterTabActive,
+  mentorFilterTabActiveDashboard,
   mentorFilterTabBase,
-  mentorFilterTabIdle,
+  mentorFilterTabIdleDashboard,
   mentorGlassCardRoadmap,
-  mentorHeroOverlay,
-  mentorMainGradient,
   mentorPageRoot,
+  mentorPrimaryCtaDashboard,
+  mentorRoadmapHubMain,
   mentorSpinner,
 } from "@/app/Components/mentor/mentor-theme";
 import RoadmapHero from "@/app/Assets/roadmap-bg.png";
@@ -177,26 +176,18 @@ export default function RevitalizationRoadmapPage() {
     <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
-      <section
-        className="relative flex h-[180px] items-end bg-cover bg-bottom px-6 pb-6 text-white sm:h-[200px] sm:px-10 sm:pb-8 md:h-[250px] md:px-20 md:pb-10"
-        style={{ backgroundImage: `url(${RoadmapHero.src})` }}
-      >
-        <div className={mentorHeroOverlay} />
-        <div className="relative z-10 mx-auto w-full max-w-7xl">
-          <p className={mentorEyebrowPill}>
-            <span className={mentorEyebrowDot} />
-            Leadership Support Network
-          </p>
-          <h1 className="mt-3 text-2xl font-semibold sm:text-3xl">Revitalization Roadmap</h1>
-          <p className="mt-2 max-w-xl text-sm text-[#d9ebf8] md:text-base">
-            Open a pastor&apos;s assigned roadmaps or browse templates from the library.
-          </p>
-        </div>
-      </section>
+      <DirectorHero
+        pill="Leadership Support Network"
+        title="Revitalization Roadmap"
+        subtitle="Open a pastor&apos;s assigned roadmaps or browse templates from the library."
+        image={RoadmapHero}
+        className="mb-6"
+      />
 
-      <main className={mentorMainGradient}>
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-8 md:px-16 md:py-10">
-          <div className={mentorControlsRow}>
+      <main className={mentorRoadmapHubMain}>
+        <div className="py-6 md:py-8">
+          <div className={`${mentorFilterPanel} mb-8`}>
+            <div className="flex flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-center">
             <MentorSearchBar
               value={searchQuery}
               onChange={setSearchQuery}
@@ -209,8 +200,8 @@ export default function RevitalizationRoadmapPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("Pastor")}
-                className={`${mentorFilterTabBase} px-4 py-1.5 sm:px-4 ${
-                  activeTab === "Pastor" ? mentorFilterTabActive : mentorFilterTabIdle
+                className={`${mentorFilterTabBase} border px-4 py-2 sm:px-4 ${
+                  activeTab === "Pastor" ? mentorFilterTabActiveDashboard : mentorFilterTabIdleDashboard
                 }`}
               >
                 Pastor&apos;s roadmaps
@@ -218,13 +209,14 @@ export default function RevitalizationRoadmapPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("Library")}
-                className={`${mentorFilterTabBase} px-4 py-1.5 sm:px-4 ${
-                  activeTab === "Library" ? mentorFilterTabActive : mentorFilterTabIdle
+                className={`${mentorFilterTabBase} border px-4 py-2 sm:px-4 ${
+                  activeTab === "Library" ? mentorFilterTabActiveDashboard : mentorFilterTabIdleDashboard
                 }`}
               >
                 Roadmap library
               </button>
             </div>
+          </div>
           </div>
 
           {activeTab === "Pastor" && (
@@ -241,7 +233,7 @@ export default function RevitalizationRoadmapPage() {
                   </p>
                   <Link
                     href="/mentor/login?returnUrl=%2Fmentor%2FRevitalizationRoadmap"
-                    className="mt-4 inline-block rounded-lg bg-white px-5 py-2 text-sm font-semibold text-[#0f4a76]"
+                    className="mt-4 inline-block rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/20 px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#3498DB]/32"
                   >
                     Mentor sign in
                   </Link>
@@ -288,21 +280,19 @@ export default function RevitalizationRoadmapPage() {
                           </p>
                           <div className="mb-3 flex items-center gap-2">
                             <span className="text-xs font-medium text-[#d9ebf8]">Overall progress</span>
-                            <span className="rounded bg-[#e6edff] px-2 py-[2px] text-xs font-medium text-[#1e40af]">
+                            <span className="rounded-full border border-[#3498DB]/35 bg-[#3498DB]/15 px-2 py-[2px] text-xs font-semibold text-[#aed6f1]">
                               {Math.min(100, Math.round(mentee.progress))}%
                             </span>
                           </div>
                           <div className="h-1.5 w-full max-w-xs rounded-full bg-white/15">
                             <div
-                              className="h-1.5 rounded-full bg-[#8ec5eb]"
+                              className="h-1.5 rounded-full bg-[#3498DB]"
                               style={{ width: `${Math.min(100, mentee.progress)}%` }}
                             />
                           </div>
                         </div>
                         <div className="mt-4 flex justify-end sm:mt-0">
-                          <span className="rounded-lg bg-white px-5 py-2 text-sm font-semibold text-[#0f4a76]">
-                            View roadmaps
-                          </span>
+                          <span className={mentorPrimaryCtaDashboard}>View roadmaps</span>
                         </div>
                       </div>
                     </button>

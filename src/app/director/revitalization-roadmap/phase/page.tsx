@@ -6,23 +6,20 @@ import { useSearchParams, useRouter } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
-import MentorSearchBar from "@/app/Components/mentor/MentorSearchBar";
+import SearchBar from "@/app/Components/SearchBar";
+import DirectorHero from "../../DirectorHero";
 import {
-  mentorBreadcrumbText,
-  mentorContainer,
-  mentorHeroOverlay,
-  mentorMainGradient,
-  mentorPageRoot,
-  mentorSpinner,
-  mentorWarningPanel,
-} from "@/app/Components/mentor/mentor-theme";
+  directorGlassCard,
+  directorPageContainer,
+  directorPageRoot,
+  directorSpinner,
+} from "../../directorUi";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
 import { apiGetUserById } from "@/app/Services/users.service";
-import MentorHeader from "@/app/Components/MentorHeader";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { mergeProgressOntoRoadmaps, unwrapProgressData } from "@/app/Services/roadmap-assignments";
-import { verifyMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
+import { verifyDirectorOrMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
 
 function isHttpUrl(u?: string): boolean {
   return !!u && (u.startsWith("http://") || u.startsWith("https://"));
@@ -53,6 +50,8 @@ function taskCounts(task: Record<string, unknown>): { completed: number; total: 
   return { completed, total: Math.max(total, completed, 1) };
 }
 
+const warnPanel = `${directorGlassCard} border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-100`;
+
 function PhasePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -72,7 +71,7 @@ function PhasePageContent() {
 
     const load = async () => {
       try {
-        const access = await verifyMentorPastorAccess(userId);
+        const access = await verifyDirectorOrMentorPastorAccess(userId);
         if (!access.ok) {
           setAccessError(access.reason);
           setUser(null);
@@ -87,7 +86,7 @@ function PhasePageContent() {
       }
     };
 
-    load();
+    void load();
   }, [userId]);
 
   useEffect(() => {
@@ -101,7 +100,7 @@ function PhasePageContent() {
     const fetchRoadmap = async () => {
       try {
         setLoading(true);
-        const access = await verifyMentorPastorAccess(userId);
+        const access = await verifyDirectorOrMentorPastorAccess(userId);
         if (!access.ok) {
           setAccessError(access.reason);
           setPhase(null);
@@ -118,18 +117,11 @@ function PhasePageContent() {
         const roadmap = (raw?.data ?? roadmapRes.data) as Record<string, unknown> | null;
 
         const progress = progressRes ? unwrapProgressData(progressRes) : null;
-        const merged = roadmap ? mergeProgressOntoRoadmaps([roadmap as any], progress)[0] : null;
+        const merged = roadmap ? mergeProgressOntoRoadmaps([roadmap as never], progress)[0] : null;
 
         setPhase((merged ?? roadmap) as Record<string, unknown> | null);
         const nested = (merged ?? roadmap)?.roadmaps;
         setTasks(Array.isArray(nested) ? (nested as Record<string, unknown>[]) : []);
-
-        console.debug("[mentor/phase] loaded phase", {
-          userId,
-          roadmapId,
-          tasks: Array.isArray(nested) ? (nested as unknown[]).length : 0,
-          progressMerged: Boolean(progress),
-        });
       } catch (err) {
         console.error("Failed to fetch roadmap:", err);
         setPhase(null);
@@ -139,13 +131,13 @@ function PhasePageContent() {
       }
     };
 
-    fetchRoadmap();
+    void fetchRoadmap();
   }, [roadmapId, userId]);
 
   const openTask = (taskId: string) => {
     if (!userId || !roadmapId) return;
     router.push(
-      `/mentor/RevitalizationRoadmap/task?userId=${encodeURIComponent(userId)}&roadmapId=${encodeURIComponent(
+      `/director/revitalization-roadmap/task?userId=${encodeURIComponent(userId)}&roadmapId=${encodeURIComponent(
         roadmapId,
       )}&taskId=${encodeURIComponent(taskId)}`,
     );
@@ -168,99 +160,88 @@ function PhasePageContent() {
     });
   }, [tasks, searchQuery]);
 
+  const pastorHubHref = userId
+    ? `/director/pastor-assignments?assignUser=${encodeURIComponent(userId)}`
+    : "/director/pastor-assignments";
+
   if (loading) {
     return (
-      <div className={mentorPageRoot}>
-        <MentorHeader showFullHeader={true} />
+      <div className={directorPageRoot}>
+        <DirectorHero
+          title="Phase"
+          subtitle="Loading…"
+          image={HeroBg}
+          breadcrumbItems={[
+            { label: "Home", href: "/director/home" },
+            { label: "Revitalization Roadmap", href: "/director/revitalization-roadmap" },
+            { label: "Phase" },
+          ]}
+        />
         <div className="flex flex-1 items-center justify-center px-6 py-20">
-          <div className={mentorSpinner} />
+          <div className={directorSpinner} />
         </div>
       </div>
     );
   }
 
   return (
-    <div className={mentorPageRoot}>
-      <MentorHeader showFullHeader={true} />
+    <div className={directorPageRoot}>
+      <DirectorHero
+        title={phaseName}
+        subtitle="Review tasks for this pastor’s phase and open items for responses and comments."
+        image={HeroBg}
+        pill="Director · Revitalization Roadmap"
+        breadcrumbItems={[
+          { label: "Home", href: "/director/home" },
+          { label: "Revitalization Roadmap", href: "/director/revitalization-roadmap" },
+          ...(userId ? [{ label: userName, href: pastorHubHref }] : []),
+          { label: phaseName },
+        ]}
+      />
 
-      <section
-        className="relative flex min-h-[200px] flex-col justify-end bg-cover bg-bottom px-6 pb-8 pt-8 text-white sm:min-h-[240px] sm:px-10 sm:pb-10 md:px-20 md:pb-12"
-        style={{ backgroundImage: `url(${HeroBg.src})` }}
-      >
-        <div className={mentorHeroOverlay} />
-        <div className="relative z-10 mx-auto w-full max-w-7xl">
-          <nav className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <Link href="/mentor/RevitalizationRoadmap" className={mentorBreadcrumbText}>
-              Revitalization Roadmap
-            </Link>
-            <span className="opacity-70">&gt;</span>
-            {userId ? (
-              <>
-                <Link
-                  href={`/mentor/RevitalizationRoadmap/home?userId=${encodeURIComponent(userId)}`}
-                  className={mentorBreadcrumbText}
-                >
-                  {userName}
-                </Link>
-                <span className="opacity-70">&gt;</span>
-              </>
-            ) : null}
-            <span className="font-semibold text-white">{phaseName}</span>
-          </nav>
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
-            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
-            Leadership Support Network
-          </p>
-          <h1 className="mt-4 text-2xl font-semibold sm:text-3xl md:text-4xl">{phaseName}</h1>
-          <p className="mt-2 max-w-2xl text-sm text-[#cde2f2] md:text-base">
-            Open a task to review details and continue supporting this pastor along this phase.
-          </p>
-        </div>
-      </section>
-
-      <main className={mentorMainGradient}>
-        <div className={mentorContainer}>
+      <main className="flex-1 pb-12">
+        <div className={`${directorPageContainer} max-w-7xl`}>
           {!roadmapId && (
-            <p className={`${mentorWarningPanel} mb-6`}>
-              Missing <code className="rounded bg-white/10 px-1">roadmapId</code> in the URL. Open a phase from the pastor&apos;s roadmap list.
+            <p className={`${warnPanel} mb-6`}>
+              Missing <code className="rounded bg-white/10 px-1">roadmapId</code> in the URL. Open a phase from a
+              pastor&apos;s assignments or roadmap home.
             </p>
           )}
 
-          {accessError && <p className={`${mentorWarningPanel} mb-6`}>{accessError}</p>}
+          {accessError && <p className={`${warnPanel} mb-6`}>{accessError}</p>}
 
           {roadmapId && !userId && (
-            <p className={`${mentorWarningPanel} mb-6`}>
-              Missing <code className="rounded bg-white/10 px-1">userId</code>. Task links need a pastor context — open this phase from{" "}
-              <Link href="/mentor/RevitalizationRoadmap" className="font-semibold text-white underline-offset-2 hover:underline">
+            <p className={`${warnPanel} mb-6`}>
+              Missing <code className="rounded bg-white/10 px-1">userId</code>. Open this phase from{" "}
+              <Link href="/director/revitalization-roadmap" className="font-semibold text-white underline-offset-2 hover:underline">
                 Revitalization Roadmap
+              </Link>{" "}
+              or{" "}
+              <Link href="/director/pastor-assignments" className="font-semibold text-white underline-offset-2 hover:underline">
+                Roadmap assignments
               </Link>
               .
             </p>
           )}
 
           <div className="mb-8 max-w-md">
-            <MentorSearchBar
+            <SearchBar
               value={searchQuery}
               onChange={setSearchQuery}
               placeholder="Search tasks…"
-              aria-label="Search tasks"
-              showClear={!!roadmapId}
-              disabled={!roadmapId}
+              variant="dark"
+              className="w-full"
             />
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
             {roadmapId && tasks.length === 0 && (
-              <p className="col-span-full text-center text-sm text-[#cde2f2]">
-                No tasks found for this phase.
-              </p>
+              <p className="col-span-full text-center text-sm text-white/65">No tasks found for this phase.</p>
             )}
 
-            {roadmapId &&
-              tasks.length > 0 &&
-              filteredTasks.length === 0 && (
-                <p className="col-span-full text-center text-sm text-[#cde2f2]">No tasks match your search.</p>
-              )}
+            {roadmapId && tasks.length > 0 && filteredTasks.length === 0 && (
+              <p className="col-span-full text-center text-sm text-white/65">No tasks match your search.</p>
+            )}
 
             {roadmapId &&
               filteredTasks.map((task) => {
@@ -298,12 +279,12 @@ function PhasePageContent() {
   );
 }
 
-export default function PhasePage() {
+export default function DirectorPhasePage() {
   return (
     <Suspense
       fallback={
-        <div className={`${mentorPageRoot} items-center justify-center text-[#cde2f2]`}>
-          <div className={mentorSpinner} />
+        <div className={`${directorPageRoot} items-center justify-center text-white/75`}>
+          <div className={directorSpinner} />
         </div>
       }
     >

@@ -55,7 +55,7 @@ export default function VideoPage() {
           <p className="hidden text-sm text-[#cde2f2] sm:block">CCC video library</p>
         </div>
 
-        <div className="flex flex-col gap-10 lg:flex-row lg:gap-8">
+        <div className="flex flex-col gap-10 lg:flex-row-reverse lg:gap-8">
           <div className="min-w-0 flex-1">
             <div
               className={`overflow-hidden rounded-3xl border border-white/15 p-1 ${glassCard}`}

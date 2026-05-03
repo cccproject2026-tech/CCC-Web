@@ -1,4 +1,5 @@
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
+import { hasDirectorSession } from "@/app/utils/director-auth";
 import { getMentorUserId } from "@/app/utils/mentor-auth";
 
 function normalizeId(value: unknown): string {
@@ -42,4 +43,33 @@ export async function verifyMentorPastorAccess(
     console.error("[mentor-link] failed to verify mentor/pastor access", error);
     return { ok: false, reason: "Could not verify mentor to pastor access." };
   }
+}
+
+/** Directors may review any pastor’s roadmap tasks; mentors only their assignees. */
+export async function verifyDirectorOrMentorPastorAccess(
+  pastorUserId: string | null | undefined,
+): Promise<
+  | { ok: true; pastorUserId: string; viewer: "director" | "mentor"; mentorId?: string }
+  | { ok: false; reason: string }
+> {
+  const pastorId = normalizeId(pastorUserId);
+  if (!pastorId) {
+    return { ok: false, reason: "Missing pastor userId." };
+  }
+
+  if (typeof window !== "undefined" && hasDirectorSession()) {
+    return { ok: true, pastorUserId: pastorId, viewer: "director" };
+  }
+
+  const mentorCheck = await verifyMentorPastorAccess(pastorId);
+  if (!mentorCheck.ok) {
+    return { ok: false, reason: mentorCheck.reason };
+  }
+
+  return {
+    ok: true,
+    pastorUserId: pastorId,
+    viewer: "mentor",
+    mentorId: mentorCheck.mentorId,
+  };
 }

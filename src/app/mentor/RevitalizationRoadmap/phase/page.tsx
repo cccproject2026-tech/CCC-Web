@@ -1,18 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState, Suspense } from "react";
-import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
 import MentorSearchBar from "@/app/Components/mentor/MentorSearchBar";
 import {
-  mentorBreadcrumbText,
   mentorContainer,
-  mentorHeroOverlay,
-  mentorMainGradient,
   mentorPageRoot,
+  mentorRoadmapHubMain,
   mentorSpinner,
   mentorWarningPanel,
 } from "@/app/Components/mentor/mentor-theme";
@@ -20,6 +17,7 @@ import HeroBg from "@/app/Assets/roadmap-bg.png";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
 import { apiGetUserById } from "@/app/Services/users.service";
 import MentorHeader from "@/app/Components/MentorHeader";
+import DirectorHero from "@/app/director/DirectorHero";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { mergeProgressOntoRoadmaps, unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { verifyMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
@@ -214,6 +212,16 @@ function PhasePageContent() {
     return (
       <div className={mentorPageRoot}>
         <MentorHeader showFullHeader={true} />
+        <DirectorHero
+          title="Phase"
+          subtitle="Loading…"
+          image={HeroBg}
+          breadcrumbItems={[
+            { label: "Revitalization Roadmap", href: "/mentor/RevitalizationRoadmap" },
+            { label: "Phase" },
+          ]}
+          className="mb-6"
+        />
         <div className="flex flex-1 items-center justify-center px-6 py-20">
           <div className={mentorSpinner} />
         </div>
@@ -221,46 +229,28 @@ function PhasePageContent() {
     );
   }
 
+  const pastorHomeHref = userId
+    ? `/mentor/RevitalizationRoadmap/home?userId=${encodeURIComponent(userId)}`
+    : "/mentor/RevitalizationRoadmap";
+
   return (
     <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
-      <section
-        className="relative flex min-h-[200px] flex-col justify-end bg-cover bg-bottom px-6 pb-8 pt-8 text-white sm:min-h-[240px] sm:px-10 sm:pb-10 md:px-20 md:pb-12"
-        style={{ backgroundImage: `url(${HeroBg.src})` }}
-      >
-        <div className={mentorHeroOverlay} />
-        <div className="relative z-10 mx-auto w-full max-w-7xl">
-          <nav className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <Link href="/mentor/RevitalizationRoadmap" className={mentorBreadcrumbText}>
-              Revitalization Roadmap
-            </Link>
-            <span className="opacity-70">&gt;</span>
-            {userId ? (
-              <>
-                <Link
-                  href={`/mentor/RevitalizationRoadmap/home?userId=${encodeURIComponent(userId)}`}
-                  className={mentorBreadcrumbText}
-                >
-                  {userName}
-                </Link>
-                <span className="opacity-70">&gt;</span>
-              </>
-            ) : null}
-            <span className="font-semibold text-white">{phaseName}</span>
-          </nav>
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
-            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
-            Leadership Support Network
-          </p>
-          <h1 className="mt-4 text-2xl font-semibold sm:text-3xl md:text-4xl">{phaseName}</h1>
-          <p className="mt-2 max-w-2xl text-sm text-[#cde2f2] md:text-base">
-            Open a task to review details and continue supporting this pastor along this phase.
-          </p>
-        </div>
-      </section>
+      <DirectorHero
+        title={phaseName}
+        subtitle="Open a task to review details and continue supporting this pastor along this phase."
+        image={HeroBg}
+        pill="Leadership Support Network"
+        breadcrumbItems={[
+          { label: "Revitalization Roadmap", href: "/mentor/RevitalizationRoadmap" },
+          ...(userId ? [{ label: userName, href: pastorHomeHref }] : []),
+          { label: phaseName },
+        ]}
+        className="mb-6"
+      />
 
-      <main className={mentorMainGradient}>
+      <main className={`${mentorRoadmapHubMain} pb-12`}>
         <div className={mentorContainer}>
           {!roadmapId && (
             <p className={`${mentorWarningPanel} mb-6`}>
@@ -273,9 +263,9 @@ function PhasePageContent() {
           {roadmapId && !userId && (
             <p className={`${mentorWarningPanel} mb-6`}>
               Missing <code className="rounded bg-white/10 px-1">userId</code>. Task links need a pastor context — open this phase from{" "}
-              <Link href="/mentor/RevitalizationRoadmap" className="font-semibold text-white underline-offset-2 hover:underline">
+              <a href="/mentor/RevitalizationRoadmap" className="font-semibold text-white underline-offset-2 hover:underline">
                 Revitalization Roadmap
-              </Link>
+              </a>
               .
             </p>
           )}
@@ -344,7 +334,7 @@ export default function PhasePage() {
   return (
     <Suspense
       fallback={
-        <div className={`${mentorPageRoot} items-center justify-center text-[#cde2f2]`}>
+        <div className={`${mentorPageRoot} flex flex-1 items-center justify-center py-24 text-[#cde2f2]`}>
           <div className={mentorSpinner} />
         </div>
       }
