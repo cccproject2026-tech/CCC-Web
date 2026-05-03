@@ -1,8 +1,13 @@
 "use client";
 
 import Link from "next/link";
+<<<<<<< Updated upstream
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+=======
+import { Suspense, useState, useEffect, useCallback, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+>>>>>>> Stashed changes
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/hero-bg.png";
 import { apiGetInterestByEmail } from "@/app/Services/interests.service";
@@ -19,7 +24,7 @@ function normStatus(s: string | undefined | null): string {
  * Interest approval tracking — same visual system as `/pastor/Thankyou` and `/pastor/home`.
  * Copy aligns with CCC-Mobile pending panel; polling keeps status fresh after director action.
  */
-export default function ProcessingPage() {
+function ProcessingPageContent() {
   const router = useRouter();
   const [interest, setInterest] = useState<Interest | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
@@ -34,10 +39,22 @@ export default function ProcessingPage() {
       return null;
     }
 
+<<<<<<< Updated upstream
     const res = await apiGetInterestByEmail(email);
     const body = res.data;
+=======
+  if (!email?.trim()) {
+    setStatusError("No saved email. Open the interest link from your confirmation email or resubmit the form.");
+    setInterest(null);
+    return null;
+  }
+
+  const res = await apiGetInterestByEmail(email);
+    const body = res.data as { success?: boolean; data?: Interest | null };
+>>>>>>> Stashed changes
     if (body && body.success === false) {
-      throw new Error(body.message || "Unable to load status");
+      const message = (res.data as { message?: string } | undefined)?.message;
+      throw new Error(message || "Unable to load status");
     }
     const data = body?.data ?? null;
     setInterest(data);
@@ -82,14 +99,25 @@ export default function ProcessingPage() {
       try {
         const data = await fetchStatus();
         const next = normStatus(data?.status);
+<<<<<<< Updated upstream
         if (next === "accepted" && !navigatedRef.current) {
           navigatedRef.current = true;
           if (intervalId != null) window.clearInterval(intervalId);
           setTimeout(() => router.push("/pastor/setpassword"), 1500);
+=======
+        // if (next === "accepted" && !navigatedRef.current) {
+        //   navigatedRef.current = true;
+        //   if (intervalId != null) window.clearInterval(intervalId);
+        //   setTimeout(() => router.push("/pastor/setpassword"), 1500);
+        //   return;
+        // }
+        if (next === "accepted" && intervalId != null) {
+          clearInterval(intervalId);
+>>>>>>> Stashed changes
           return;
         }
         if (next === "rejected" && intervalId != null) {
-          window.clearInterval(intervalId);
+          clearInterval(intervalId);
         }
       } catch (err) {
         // Polling failed, will retry next interval
@@ -98,9 +126,9 @@ export default function ProcessingPage() {
 
     // Start polling immediately, then every 20 seconds
     tick();
-    intervalId = window.setInterval(tick, 20000);
+    intervalId = setInterval(tick, 20000);
     return () => {
-      if (intervalId != null) window.clearInterval(intervalId);
+      if (intervalId != null) clearInterval(intervalId);
     };
   }, [fetchStatus, router]);
 
@@ -223,8 +251,15 @@ export default function ProcessingPage() {
                     <p>{statusError}</p>
                   ) : isAccepted ? (
                     <>
+<<<<<<< Updated upstream
                       <p>You’re approved to continue. You’ll be redirected to set your password shortly.</p>
                       <p>If nothing happens, go to Set Password from your email or open the button below.</p>
+=======
+                      <p>You’re approved to continue. Complete your account setup by creating your password.</p>
+                      <div className="mt-6">
+                        <SetPasswordInlinePanel />
+                      </div>
+>>>>>>> Stashed changes
                     </>
                   ) : isRejected ? (
                     <p>
@@ -333,5 +368,22 @@ export default function ProcessingPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function ProcessingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#062946] px-4 text-white font-[Albert_Sans]">
+          <div className="text-center">
+            <i className="fa-solid fa-circle-notch animate-spin text-2xl text-[#8ec5eb]" aria-hidden />
+            <p className="mt-3 text-sm text-[#cde2f2]">Loading application status...</p>
+          </div>
+        </div>
+      }
+    >
+      <ProcessingPageContent />
+    </Suspense>
   );
 }
