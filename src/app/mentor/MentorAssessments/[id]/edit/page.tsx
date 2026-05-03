@@ -1,13 +1,16 @@
 "use client";
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import {
   apiPatchAssessment,
   apiGetAssessmentById,
+  apiUploadAssessmentBanner,
   apiUpdateInstructions,
   apiUpdateSections,
+  formatAssessmentApiErrorMessage,
   parseAssessmentDetailPayload,
 } from "@/app/Services/assessment.service";
 import {
@@ -17,6 +20,7 @@ import {
   type Section,
   type LevelPlanBlock,
 } from "@/app/Services/utils/assessment-mapper";
+import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 
 type InstructionItem = {
   id: string;
@@ -30,6 +34,9 @@ type PreSurveyRow = {
   type: "text" | "number";
   placeholder: string;
 };
+
+const MAX_BANNER_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_BANNER_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp"]);
 
 const defaultPreSurveyRow = (): PreSurveyRow => ({
   id: Date.now(),
@@ -81,6 +88,9 @@ export default function MentorEditAssessmentPage() {
   // Instructions state
   const [instructions, setInstructions] = useState<InstructionItem[]>([]);
   const [preSurveyRows, setPreSurveyRows] = useState<PreSurveyRow[]>([defaultPreSurveyRow()]);
+  const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
 
   const [sections, setSections] = useState<Section[]>([]);
 
@@ -100,6 +110,7 @@ export default function MentorEditAssessmentPage() {
         setAssessment(mapped);
         setAssessmentName(mapped.name || "");
         setDescription(mapped.description || "");
+        setBannerPreview(resolveApiMediaUrl(mapped.bannerImage));
         // Layer-level recommendations are intentionally removed for mentor edit flow.
         setSections(
           mapped.sections.map((section: Section) => ({
@@ -194,6 +205,14 @@ export default function MentorEditAssessmentPage() {
   const showToast = (message: string) => {
     setToast(message);
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const focusField = (id: string) => {
+    if (typeof document === "undefined") return;
+    const el = document.getElementById(id) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.focus();
   };
 
   const handleAddSection = () => {
@@ -360,19 +379,74 @@ export default function MentorEditAssessmentPage() {
 
   const handleSaveChanges = async () => {
     try {
+      if (!assessment?.id) {
+        showToast("Could not save: assessment id is missing.");
+        return;
+      }
+
       if (!assessmentName.trim()) {
         showToast("Please enter an assessment name.");
+        focusField("mentor-assessment-name");
         return;
       }
 
       if (!description.trim()) {
         showToast("Please enter a short description.");
+        focusField("mentor-assessment-description");
+        return;
+      }
+
+      const instructionLines = instructions
+        .map((instruction) => instruction.text.trim())
+        .filter(Boolean);
+      if (instructionLines.length === 0) {
+        showToast("Please add at least one instruction.");
+        focusField("mentor-instruction-0");
+        return;
+      }
+
+      const invalidSectionName = sections.find((section) => !section.name.trim());
+      if (invalidSectionName) {
+        showToast("Each section must have a section name.");
+        setSelectedSection(invalidSectionName.id);
+        setTimeout(() => focusField(`mentor-section-card-${invalidSectionName.id}`), 0);
+        return;
+      }
+
+      const invalidChoice = sections
+        .flatMap((section) =>
+          section.layers.flatMap((layer) =>
+            layer.choices.map((choice) => ({
+              sectionId: section.id,
+              layerId: layer.id,
+              choiceId: choice.id,
+              text: choice.text.trim(),
+            })),
+          ),
+        )
+        .find((item) => item.text.length === 0);
+      if (invalidChoice) {
+        showToast("Every choice field in each layer must be filled.");
+        setSelectedSection(invalidChoice.sectionId);
+        setIsEditMode(true);
+        setTimeout(() => {
+          focusField(`mentor-choice-${invalidChoice.sectionId}-${invalidChoice.layerId}-${invalidChoice.choiceId}`);
+        }, 0);
         return;
       }
 
       const preSurveyPayload = buildPreSurveyPayloadForDirectorCreate(preSurveyRows);
       if (hasPreSurvey && preSurveyPayload.length === 0) {
         showToast("Include pre-survey is on — add at least one pre-survey question with text.");
+        focusField("mentor-presurvey-question-0");
+        return;
+      }
+      const firstEmptyPreSurveyIdx = hasPreSurvey
+        ? preSurveyRows.findIndex((row) => row.text.trim().length === 0)
+        : -1;
+      if (firstEmptyPreSurveyIdx !== -1) {
+        showToast("Fill all pre-survey question fields or remove empty rows.");
+        focusField(`mentor-presurvey-question-${firstEmptyPreSurveyIdx}`);
         return;
       }
 
@@ -388,10 +462,15 @@ export default function MentorEditAssessmentPage() {
         buildSectionsPayload(sections)
       );
 
+      if (bannerFile) {
+        await apiUploadAssessmentBanner(assessment.id, bannerFile);
+      }
+
       showToast("Survey Edited Successfully");
       router.push("/mentor/MentorAssessments");
-    } catch (e) {
+    } catch (e: unknown) {
       console.error(e);
+      showToast(formatAssessmentApiErrorMessage(e));
     }
   };
 
@@ -433,7 +512,9 @@ export default function MentorEditAssessmentPage() {
             {sections.map((section, index) => (
               <div
                 key={section.id}
+                id={`mentor-section-card-${section.id}`}
                 onClick={() => setSelectedSection(section.id)}
+                tabIndex={-1}
                 className={`cursor-pointer rounded-xl border-2 p-4 transition-all ${selectedSection === section.id
                   ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
                   : "border-white/15 bg-white/5 text-[#cde2f2] hover:border-white/25 hover:bg-white/10"
@@ -489,6 +570,7 @@ export default function MentorEditAssessmentPage() {
                         Assessment Name
                       </label>
                       <input
+                        id="mentor-assessment-name"
                         type="text"
                         value={assessmentName}
                         onChange={(e) => setAssessmentName(e.target.value)}
@@ -502,12 +584,103 @@ export default function MentorEditAssessmentPage() {
                         Description
                       </label>
                       <textarea
+                        id="mentor-assessment-description"
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         rows={3}
                         placeholder="Brief description for thumbnail / cards"
                         className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
                       />
+                    </div>
+
+                    <div>
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <label className="block text-sm font-semibold text-[#cde2f2]">
+                          Banner image (optional)
+                        </label>
+                        {bannerFile || bannerPreview ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (bannerPreview?.startsWith("blob:")) URL.revokeObjectURL(bannerPreview);
+                              setBannerFile(null);
+                              setBannerPreview(null);
+                            }}
+                            className="text-xs font-semibold text-red-300/90 hover:underline"
+                          >
+                            Remove image
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <input
+                        ref={bannerInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        id="assessment-banner-edit"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] || null;
+                          e.target.value = "";
+
+                          if (f && !ALLOWED_BANNER_TYPES.has(f.type)) {
+                            showToast("Use a PNG, JPG, or WEBP image.");
+                            return;
+                          }
+
+                          if (f && f.size > MAX_BANNER_SIZE_BYTES) {
+                            showToast("File size must be less than 10 MB.");
+                            return;
+                          }
+
+                          if (bannerPreview?.startsWith("blob:")) {
+                            URL.revokeObjectURL(bannerPreview);
+                          }
+
+                          setBannerFile(f);
+                          setBannerPreview(f ? URL.createObjectURL(f) : null);
+                        }}
+                      />
+
+                      <div className="space-y-3 rounded-2xl border border-dashed border-white/25 bg-white/[0.04] px-4 py-4">
+                        <button
+                          type="button"
+                          onClick={() => bannerInputRef.current?.click()}
+                          className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                        >
+                          {bannerPreview ? "Replace banner" : "Upload banner"}
+                        </button>
+
+                        {bannerPreview ? (
+                          <div
+                            className="relative h-40 w-full max-w-md cursor-pointer overflow-hidden rounded-xl border border-white/20"
+                            onClick={() => bannerInputRef.current?.click()}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                bannerInputRef.current?.click();
+                              }
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Change banner image"
+                          >
+                            {bannerPreview.startsWith("blob:") || bannerPreview.startsWith("data:") ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={bannerPreview} alt="Assessment banner preview" className="h-40 w-full object-cover" />
+                            ) : (
+                              <Image
+                                src={bannerPreview}
+                                alt="Assessment banner preview"
+                                fill
+                                className="object-cover"
+                                sizes="(max-width: 768px) 100vw, 520px"
+                                unoptimized={isRemoteImageSrc(bannerPreview)}
+                              />
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -527,6 +700,7 @@ export default function MentorEditAssessmentPage() {
                     {instructions.map((instruction, idx) => (
                       <div key={instruction.id} className="flex items-center gap-2">
                         <input
+                          id={`mentor-instruction-${idx}`}
                           type="text"
                           value={instruction.text}
                           onChange={(e) => handleUpdateInstructionText(instruction.id, e.target.value)}
@@ -593,6 +767,7 @@ export default function MentorEditAssessmentPage() {
                               <div className="min-w-[220px] flex-1">
                                 <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">Question {qIdx + 1}</label>
                                 <input
+                                  id={`mentor-presurvey-question-${qIdx}`}
                                   type="text"
                                   value={row.text}
                                   onChange={(e) => handleUpdatePreSurvey(qIdx, "text", e.target.value)}
@@ -668,6 +843,7 @@ export default function MentorEditAssessmentPage() {
                               {choiceIdx + 1}.
                             </span>
                             <input
+                              id={`mentor-choice-${selectedSectionData.id}-${layer.id}-${choice.id}`}
                               value={choice.text}
                               onChange={(e) =>
                                 handleUpdateChoiceText(
