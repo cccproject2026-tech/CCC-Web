@@ -406,7 +406,7 @@ return {
     },
     {
       id: "survey-submissions",
-      title: "Survey Submissions (in time order)",
+      title: "Survey Submissions",
       emptyMessage: "No survey submissions pending review.",
       items: surveySubmissions,
     },

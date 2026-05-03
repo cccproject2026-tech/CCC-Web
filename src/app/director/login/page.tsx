@@ -162,7 +162,7 @@ function DirectorLoginInner() {
             <p className="mt-3 text-sm leading-7 text-[#cde2f2]">
               Sign in to oversee mentors and mentees, track progress, and manage programs from one place.
             </p>
-            <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
+            {/* <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-xl border border-white/15 bg-[#0a3558] p-3">
                 <p className="text-[#8ec5eb] font-semibold">Oversight</p>
                 <p className="text-[#d9ebf8]">Network-wide view</p>
@@ -171,7 +171,7 @@ function DirectorLoginInner() {
                 <p className="text-[#8ec5eb] font-semibold">Programs</p>
                 <p className="text-[#d9ebf8]">Courses & interests</p>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
 

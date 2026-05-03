@@ -29,12 +29,13 @@ export default function ThankyouPage() {
               <i className="fa-solid fa-circle-check text-emerald-300" aria-hidden />
               Submission received
             </div>
-            <p className="text-center text-xs uppercase tracking-[0.2em] text-white/75 sm:order-1 sm:text-left">
+            {/* <p className="text-center text-xs uppercase tracking-[0.2em] text-white/75 sm:order-1 sm:text-left">
               Step complete
-            </p>
+            </p> */}
           </div>
 
-          <div className="grid gap-8 lg:grid-cols-12 lg:gap-10">
+          {/* <div className="grid gap-8 lg:grid-cols-12 lg:gap-10"> */}
+          <div className="grid items-center gap-8 lg:grid-cols-12 lg:gap-10">
             <div className="lg:col-span-7 xl:col-span-8">
               <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.55)_0%,rgba(9,49,80,0.72)_100%)] p-8 shadow-[0_20px_50px_rgba(2,20,38,0.4)] backdrop-blur-md md:p-10 lg:p-12">
                 <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-2xl border border-emerald-400/30 bg-emerald-500/15 md:h-20 md:w-20">
@@ -46,17 +47,17 @@ export default function ThankyouPage() {
                 </h1>
 
                 <p className="mt-6 max-w-2xl text-base leading-relaxed text-[#cde2f2] md:text-lg">
-                  Your interest form was submitted successfully. We’re glad you’re here — our team will review your
+                  Your interest form was submitted successfully. We’re glad you’re here our team will review your
                   application and follow up as soon as we can.
                 </p>
 
-                <p className="mt-6 text-sm leading-relaxed text-[#8ec5eb]/95">
+                {/* <p className="mt-6 text-sm leading-relaxed text-[#8ec5eb]/95">
                   <strong className="font-semibold text-white">What’s different from the next page?</strong> This screen
                   confirms we got your form. The{" "}
                   <strong className="font-semibold text-white">Processing</strong> page is where you{" "}
                   <strong className="font-semibold text-white">track approval</strong>, see updates, and continue when
                   you’re accepted.
-                </p>
+                </p> */}
 
                 <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                   <button
@@ -66,17 +67,18 @@ export default function ThankyouPage() {
                   >
                     Track application status
                   </button>
-                  <Link
+                  {/* <Link
                     href="/"
                     className="rounded-xl border border-white/30 bg-white/10 px-8 py-3 text-center text-sm font-semibold text-white transition hover:bg-white/15 md:text-base"
                   >
                     Back to home
-                  </Link>
+                  </Link> */}
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-col gap-6 lg:col-span-5 xl:col-span-4">
+            {/* <div className="flex flex-col gap-6 lg:col-span-5 xl:col-span-4"> */}
+            <div className="flex h-full flex-col justify-center gap-6 lg:col-span-5 xl:col-span-4">
               <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] p-6 backdrop-blur-md">
                 <div className="mb-4 flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
@@ -99,7 +101,7 @@ export default function ThankyouPage() {
                   </li>
                 </ul>
               </div>
-
+{/* 
               <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] p-6 backdrop-blur-md">
                 <div className="mb-4 flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
@@ -125,7 +127,7 @@ export default function ThankyouPage() {
                     Log in
                   </Link>
                 </p>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>

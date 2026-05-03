@@ -14,7 +14,13 @@ import SettingsModal from "../SettingsModal";
 import CoursesDropdown from "../CoursesDropdown";
 import CCCDropdown from "../CCCDropdown";
 import DocumentsModal from "../DocumentsModal";
-import { getNotification, apiGetRoadmaps, apiGetAssessments, apiGetAllUsers } from "@/app/Services/api";
+import {
+  getNotification,
+  apiGetRoadmaps,
+  apiGetAssessments,
+  apiGetAllUsers,
+  apiGetAllInterests,
+} from "@/app/Services/api";
 import { parseAssessmentsListPayload } from "@/app/Services/assessment.service";
 // import {
 //   mapNotificationItemToPopup,
@@ -38,6 +44,7 @@ export default function AppHeader({ showFullHeader = false }) {
   const [showCoursesDropdown, setShowCoursesDropdown] = useState(false);
   const [showCCCDropdown, setShowCCCDropdown] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [newInterestCount, setNewInterestCount] = useState(0);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -145,6 +152,46 @@ setNotificationItems(newestFirst.slice(0, 6).map(mapNotificationItemToPopup));
     return "/director/mentees";
   };
 
+  useEffect(() => {
+  let cancelled = false;
+
+  const loadNewInterestCount = async () => {
+    try {
+      // const res = await apiGetAllInterests();
+     const res = await apiGetAllInterests({});
+const raw: any = res.data?.data;
+
+const list: any[] = Array.isArray(raw)
+  ? raw
+  : Array.isArray(raw?.interests)
+    ? raw.interests
+    : Array.isArray(raw?.items)
+      ? raw.items
+      : Array.isArray(raw?.data)
+        ? raw.data
+        : [];
+      const count = list.filter(
+        (item: any) => String(item?.status || "").trim().toLowerCase() === "new"
+      ).length;
+
+      if (!cancelled) {
+        setNewInterestCount(count);
+      }
+    } catch (error) {
+      console.error("Failed to load new interest count:", error);
+      if (!cancelled) {
+        setNewInterestCount(0);
+      }
+    }
+  };
+
+  void loadNewInterestCount();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
+
   const navLinks = [
     { name: "Home", path: "/director/home" },
     { name: "Mentors", path: "/director/mentors" },
@@ -155,7 +202,11 @@ setNotificationItems(newestFirst.slice(0, 6).map(mapNotificationItemToPopup));
       hasDropdown: true,
       onClick: () => setShowCCCDropdown(!showCCCDropdown),
     },
-    { name: "New Interests", path: "/director/interest-list", hasBadge: "3" },
+   {
+  name: "New Interests",
+  path: "/director/interest-list",
+  hasBadge: newInterestCount > 0 ? String(newInterestCount) : undefined,
+},
     {
       name: "CCC",
       path: "/director/ccc",

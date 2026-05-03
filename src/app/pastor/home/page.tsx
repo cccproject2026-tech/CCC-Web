@@ -216,9 +216,9 @@ export default function PastorDashboard() {
       [
         {
           icon: "fa-regular fa-calendar-check",
-          line1: "Today's",
+          line1: "Upcoming",
           line2: "Meetings",
-          sheetTitle: "Today's Meetings",
+          sheetTitle: "Upcoming Meetings",
           sectionId: "meetings",
         },
         {

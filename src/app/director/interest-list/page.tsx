@@ -243,7 +243,7 @@ export default function InterestReceivedPage() {
     <div className={directorPageRoot}>
       <DirectorHero
         title="Interest received"
-        subtitle="Review and follow up on new leads."
+        subtitle="Manage new interest submissions and update each applicant’s status."
         image={MentorBg}
       />
 
@@ -416,14 +416,24 @@ export default function InterestReceivedPage() {
                     key={rowId}
                     className={`relative p-6 transition-all ${directorGlassCard} ${directorGlassCardHover}`}
                   >
-                    <div className="absolute right-4 top-4">
+                    {/* <div className="absolute right-4 top-4">
                       <input
                         type="checkbox"
                         checked={selectedPastors.includes(rowId)}
                         onChange={() => handleToggleSelect(rowId)}
                         className="h-5 w-5 cursor-pointer accent-[#8ec5eb]"
                       />
-                    </div>
+                    </div> */}
+                    {activeTab === "accepted" && (
+  <div className="absolute right-4 top-4">
+    <input
+      type="checkbox"
+      checked={selectedPastors.includes(rowId)}
+      onChange={() => handleToggleSelect(rowId)}
+      className="h-5 w-5 cursor-pointer accent-[#8ec5eb]"
+    />
+  </div>
+)}
 
                     <div className="mb-4 flex items-start justify-between pr-8">
                       <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-xl border border-white/15 bg-[#8ec5eb]/15">
@@ -446,7 +456,7 @@ export default function InterestReceivedPage() {
                     </div>
 
                     <div className="flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-4 text-[18px] text-white/55">
+                      {/* <div className="flex items-center gap-4 text-[18px] text-white/55">
                         <button type="button" className="hover:text-[#8ec5eb]" aria-label="Email">
                           <i className="fa-regular fa-envelope" />
                         </button>
@@ -456,7 +466,25 @@ export default function InterestReceivedPage() {
                         <button type="button" className="hover:text-[#8ec5eb]" aria-label="Call">
                           <i className="fa-solid fa-phone" />
                         </button>
-                      </div>
+                      </div> */}
+                      <div className="flex items-center gap-4 text-[18px] text-white/55">
+  {/* <button type="button" className="hover:text-[#8ec5eb]" aria-label="Email">
+    <i className="fa-regular fa-envelope" />
+  </button> */}
+  <button
+  type="button"
+  className="hover:text-[#8ec5eb]"
+  aria-label={`Email ${interest.email}`}
+  onClick={() => {
+    if (!interest.email) return;
+
+    const subject = encodeURIComponent("Community Change Interest Form");
+    window.location.href = `mailto:${interest.email}?subject=${subject}`;
+  }}
+>
+  <i className="fa-regular fa-envelope" />
+</button>
+</div>
 
                       <button
                         type="button"

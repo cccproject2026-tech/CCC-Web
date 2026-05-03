@@ -135,7 +135,7 @@ export default function MentorHomePage() {
           icon: "fa-regular fa-file-lines",
           line1: "Survey",
           line2: "Submissions",
-          sheetTitle: "Survey Submissions (in time order)",
+          sheetTitle: "Survey Submissions",
           sectionId: "survey-submissions",
         },
       ] as const,

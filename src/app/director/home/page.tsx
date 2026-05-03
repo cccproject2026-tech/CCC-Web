@@ -27,6 +27,7 @@ import {
   apiGetDirectorOverview,
   DirectorOverviewDto,
   apiGetTodaysAppointments,
+  apiGetAppointments,
   apiGetAllInterests,
   apiGetMentors,
   apiGetPastors,
@@ -44,7 +45,11 @@ import {
   MentorPastor,
   User,
 } from "@/app/Services/api";
-import { unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
+// import { unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
+import {
+  appointmentEntityId,
+  unwrapAppointmentsAxiosData,
+} from "@/app/Services/appointment-utils";
 import type { UserRole } from "@/app/Services/types/users.types";
 import type { UserOverallProgress } from "@/app/Services/types/progress.types";
 import { getPastorMedia } from "@/app/Services/pastor.service";
@@ -240,7 +245,9 @@ export default function DirectorHome() {
   const [resolvedUserId, setResolvedUserId] = useState<string>("");
 
   const [activeTab, setActiveTab] = useState<"mentors" | "pastors">("mentors");
-  const [fullName, setFullName] = useState("");
+  // const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+const [lastName, setLastName] = useState("");
   const [userForm, setUserForm] = useState({
     email: "",
     role: "",
@@ -376,11 +383,11 @@ export default function DirectorHome() {
     }
   }, []);
 
-  useEffect(() => {
-    const silent = networkMapFirstLoadDone.current;
-    networkMapFirstLoadDone.current = true;
-    void loadNetworkMap(silent);
-  }, [resolvedUserId, loadNetworkMap]);
+  // useEffect(() => {
+  //   const silent = networkMapFirstLoadDone.current;
+  //   networkMapFirstLoadDone.current = true;
+  //   void loadNetworkMap(silent);
+  // }, [resolvedUserId, loadNetworkMap]);
 
   useEffect(() => {
     let onVisible: () => void;
@@ -471,7 +478,8 @@ export default function DirectorHome() {
       const uid = resolvedUserId;
 
       const results = await Promise.allSettled([
-        apiGetTodaysAppointments(uid || undefined),
+        // apiGetTodaysAppointments(uid || undefined),
+        apiGetAppointments({ futureOnly: false, status: "scheduled" }),
         apiGetAllInterests({ status: 'new' }),
         apiGetMentors({ limit: 4, roleMatch: "mixed" }),
         apiGetPastors({ limit: 4, roleMatch: "mixed" }),
@@ -486,29 +494,84 @@ export default function DirectorHome() {
       ]);
 
       // Handle appointments (envelope shapes vary — same as schedule / mentor pages)
+      // if (results[0].status === "fulfilled") {
+      //   setAppointments((unwrapAppointmentsAxiosData(results[0].value) || []) as Appointment[]);
+      // } else {
+      //   console.error("Error fetching appointments:", results[0].reason);
+      //   setAppointments([]);
+      // }
+      // setAppointmentsLoading(false);
       if (results[0].status === "fulfilled") {
-        setAppointments((unwrapAppointmentsAxiosData(results[0].value) || []) as Appointment[]);
-      } else {
-        console.error("Error fetching appointments:", results[0].reason);
-        setAppointments([]);
-      }
-      setAppointmentsLoading(false);
+  const list = (unwrapAppointmentsAxiosData(results[0].value) || []) as Appointment[];
+
+  const today = new Date();
+
+  const todaysAppointments = list
+    .filter((appointment) => {
+      const meetingDate = new Date(appointment.meetingDate);
+      return (
+        meetingDate.getDate() === today.getDate() &&
+        meetingDate.getMonth() === today.getMonth() &&
+        meetingDate.getFullYear() === today.getFullYear() &&
+        meetingDate.getTime() >= Date.now()
+      );
+    })
+    .sort(
+      (a, b) =>
+        new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime()
+    );
+
+  setAppointments(todaysAppointments);
+} else {
+  console.error("Error fetching appointments:", results[0].reason);
+  setAppointments([]);
+}
+setAppointmentsLoading(false);
 
       // Handle interests
-      if (results[1].status === "fulfilled") {
-        const intRes = results[1].value;
-        const raw = intRes?.data as Record<string, unknown> | undefined;
-        const list = Array.isArray(raw?.data)
+      // if (results[1].status === "fulfilled") {
+      //   const intRes = results[1].value;
+      //   const raw = intRes?.data as Record<string, unknown> | undefined;
+      //   const list = Array.isArray(raw?.data)
+      //     ? raw.data
+      //     : Array.isArray(raw)
+      //       ? raw
+      //       : [];
+      //   setInterests((list || []) as Interest[]);
+      // } else {
+      //   console.error("Error fetching interests:", results[1].reason);
+      //   setInterests([]);
+      // }
+      // setInterestsLoading(false);
+
+      // Handle interests
+if (results[1].status === "fulfilled") {
+  const intRes = results[1].value;
+  const body: any = intRes?.data;
+  const raw: any = body?.data;
+
+  const list: Interest[] = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.interests)
+      ? raw.interests
+      : Array.isArray(raw?.items)
+        ? raw.items
+        : Array.isArray(raw?.data)
           ? raw.data
-          : Array.isArray(raw)
-            ? raw
+          : Array.isArray(body)
+            ? body
             : [];
-        setInterests((list || []) as Interest[]);
-      } else {
-        console.error("Error fetching interests:", results[1].reason);
-        setInterests([]);
-      }
-      setInterestsLoading(false);
+
+  const newOnly = list.filter(
+    (item: any) => String(item?.status || "").trim().toLowerCase() === "new"
+  );
+
+  setInterests(newOnly);
+} else {
+  console.error("Error fetching interests:", results[1].reason);
+  setInterests([]);
+}
+setInterestsLoading(false);
 
       // Handle mentors / pastors — use same unwrap as fetchMentors / fetchPastors (users list or array)
       if (results[2].status === "fulfilled") {
@@ -656,26 +719,46 @@ export default function DirectorHome() {
   const handleAddUser = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const nameParts = fullName.trim().split(/\s+/);
-    const firstName = nameParts[0] || "";
-    const lastName = nameParts.slice(1).join(" ") || "";
+    // const nameParts = fullName.trim().split(/\s+/);
+    // const firstName = nameParts[0] || "";
+    // const lastName = nameParts.slice(1).join(" ") || "";
 
-    if (!firstName) {
-      alert("Please enter a full name");
-      return;
-    }
+    // if (!firstName) {
+    //   alert("Please enter a full name");
+    //   return;
+    // }
+    const trimmedFirstName = firstName.trim();
+const trimmedLastName = lastName.trim();
 
+if (!trimmedFirstName) {
+  alert("Please enter first name");
+  return;
+}
+
+if (!trimmedLastName) {
+  alert("Please enter last name");
+  return;
+}
+
+    // const userData: CreateUserDto = {
+    //   firstName,
+    //   lastName,
+    //   email: userForm.email,
+    //   role: userForm.role as UserRole,
+    // };
     const userData: CreateUserDto = {
-      firstName,
-      lastName,
-      email: userForm.email,
-      role: userForm.role as UserRole,
-    };
+  firstName: trimmedFirstName,
+  lastName: trimmedLastName,
+  email: userForm.email,
+  role: userForm.role as UserRole,
+};
 
     try {
       setAddUserLoading(true);
       await apiCreateUser(userData);
-      setFullName("");
+      // setFullName("");
+      setFirstName("");
+setLastName("");
       setUserForm({ email: "", role: "" });
 
       fetchMentors();
@@ -688,7 +771,8 @@ export default function DirectorHome() {
     } finally {
       setAddUserLoading(false);
     }
-  }, [fullName, userForm, fetchMentors, fetchPastors]);
+  // }, [fullName, userForm, fetchMentors, fetchPastors]);
+  }, [firstName, lastName, userForm, fetchMentors, fetchPastors]);
 
   // Get current data based on active tab
   const currentData = useMemo(() => activeTab === "mentors" ? mentors : pastors, [activeTab, mentors, pastors]);
@@ -746,7 +830,7 @@ export default function DirectorHome() {
               <p className="text-xs text-white/60 sm:text-sm">{formattedDate}</p>
             </div>
 
-            <button
+            {/* <button
               type="button"
               onClick={() => router.push("/director/profile")}
               className="mt-4 flex w-full max-w-sm items-center gap-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-left backdrop-blur-md transition hover:bg-white/15 lg:mt-0 lg:w-auto"
@@ -761,13 +845,25 @@ export default function DirectorHome() {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-white">{displayName}</p>
               </div>
-            </button>
+            </button> */}
+            <div className="mt-4 flex w-full max-w-sm items-center gap-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-left backdrop-blur-md lg:mt-0 lg:w-auto">
+  <Image
+    src={UserProfile}
+    alt=""
+    width={48}
+    height={48}
+    className="rounded-full border-2 border-white/30"
+  />
+  <div className="min-w-0 flex-1">
+    <p className="text-sm font-semibold text-white">{displayName}</p>
+  </div>
+</div>
           </div>
         </div>
       </section>
 
       {/* Continue watching */}
-      <section className="mt-10 flex flex-col items-start justify-between gap-10 py-10 lg:flex-row">
+      {/* <section className="mt-10 flex flex-col items-start justify-between gap-10 py-10 lg:flex-row">
         <div className="flex flex-col justify-center lg:w-1/4">
           <h2 className="mb-4 text-3xl font-semibold leading-tight text-white">
             Continue <br /> Watching{" "}
@@ -834,10 +930,275 @@ export default function DirectorHome() {
             ))}
           </Swiper>
         </div>
-      </section>
+      </section> */}
+
+      {/* Today's Appointments + New Interests */}
+<section className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
+  {/* Today's Appointments */}
+  <div className={`${directorGlassCard} p-5 sm:p-6`}>
+    <div className="mb-5 flex items-center justify-between gap-3">
+      <h2 className="text-base font-semibold text-white sm:text-lg">
+        Today's Appointments
+      </h2>
+
+      <Link
+        href="/director/schedule"
+        className="text-xs font-semibold text-[#8ec5eb] hover:text-[#b8ddf5]"
+      >
+        See all
+      </Link>
+    </div>
+
+    {appointmentsLoading ? (
+      <p className="py-8 text-center text-sm text-white/55">
+        Loading appointments…
+      </p>
+    ) : appointments.length === 0 ? (
+      <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-8 text-center text-sm text-white/55">
+        No appointments scheduled for today.
+      </div>
+    ) : (
+      <div className="space-y-4">
+        {/* {appointments.slice(0, 2).map((appointment) => {
+          const { platformIcon, mentorName, mentorRole, meetingTime } =
+            formatAppointment(appointment);
+
+          return ( */}
+          {appointments.slice(0, 2).map((appointment) => {
+            const appointmentId = appointmentEntityId(appointment);
+  const { platformIcon, meetingTime } = formatAppointment(appointment);
+
+  const mentor =
+    appointment.mentor ??
+    (typeof (appointment as any).mentorId === "object"
+      ? (appointment as any).mentorId
+      : undefined);
+
+  const attendee =
+    appointment.user ??
+    (typeof (appointment as any).userId === "object"
+      ? (appointment as any).userId
+      : undefined);
+
+  const mentorName =
+    `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.trim() ||
+    mentor?.email ||
+    "Director";
+
+  const attendeeName =
+    `${attendee?.firstName ?? ""} ${attendee?.lastName ?? ""}`.trim() ||
+    attendee?.email ||
+    "Participant";
+
+  const attendeeRole = attendee?.role || "Pastor";
+  const attendeeEmail = attendee?.email || "";
+
+  return (
+            <div
+              key={appointment.id}
+              className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10">
+                  <Image
+                    src={platformIcon}
+                    alt={appointment.platform}
+                    className="h-10 w-10"
+                  />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  {/* <h4 className="text-sm font-semibold text-white">
+                    {mentorName}
+                  </h4>
+
+                  <p className="mt-0.5 text-xs capitalize text-white/60">
+                    {mentorRole}
+                  </p> */}
+                  <h4 className="text-sm font-semibold text-white">
+  {mentorName}
+</h4>
+
+<p className="mt-0.5 text-xs capitalize text-white/60">
+  Director
+</p>
+
+<p className="mt-2 text-sm font-semibold text-white">
+  {attendeeName}
+</p>
+
+<p className="mt-0.5 text-xs capitalize text-white/60">
+  {attendeeRole}
+</p>
+
+                  <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                    <span className="rounded-lg border border-emerald-400/25 bg-emerald-500/10 px-2 py-1 text-emerald-100">
+                      <i className="fa-solid fa-circle mr-1 text-[7px]" />
+                      In discussion
+                    </span>
+
+                    <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-white/80">
+                      <i className="fa-regular fa-clock mr-1 text-[#8ec5eb]" />
+                      {meetingTime}
+                    </span>
+                  </div>
+
+                  <p className="mt-4 text-[11px] text-white/55">
+                    Mode:{" "}
+                    <span className="capitalize text-[#cde2f2]">
+                      {appointment.platform}
+                    </span>
+                  </p>
+
+                  {/* <div className="mt-2 flex gap-4 text-sm text-white/70">
+                    <i className="fa-solid fa-phone" />
+                    <i className="fa-regular fa-comment" />
+                    <i className="fa-brands fa-whatsapp" />
+                  </div> */}
+                  <div className="mt-2 flex gap-4 text-sm text-white/70">
+  <button
+    type="button"
+    disabled={!attendeeEmail}
+    className="hover:text-[#8ec5eb] disabled:cursor-not-allowed disabled:opacity-40"
+    aria-label={`Email ${attendeeEmail || attendeeName}`}
+    onClick={() => {
+      if (!attendeeEmail) return;
+
+      const subject = encodeURIComponent("Community Change Appointment");
+      window.location.href = `mailto:${attendeeEmail}?subject=${subject}`;
+    }}
+  >
+    <i className="fa-regular fa-envelope" />
+  </button>
+</div>
+                </div>
+
+                {/* <button
+                  type="button"
+                  onClick={() => router.push("/director/schedule")}
+                  className="self-end rounded-lg border border-white/20 bg-white/10 px-5 py-2 text-xs font-semibold text-white transition hover:bg-white/15"
+                >
+                  Details
+                </button> */}
+                <button
+  type="button"
+  disabled={!appointmentId}
+  onClick={() => {
+    if (!appointmentId) return;
+    router.push(`/director/schedule/${encodeURIComponent(appointmentId)}`);
+  }}
+  className="self-end rounded-lg border border-white/20 bg-white/10 px-5 py-2 text-xs font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+>
+  Details
+</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+
+  {/* New Interests */}
+  <div className={`${directorGlassCard} p-5 sm:p-6`}>
+    <div className="mb-5 flex items-start justify-between gap-3">
+      <div>
+        <h2 className="text-base font-semibold text-white sm:text-lg">
+          New Interests
+        </h2>
+
+        <p className="mt-1 max-w-md text-xs leading-relaxed text-white/60">
+          Review the details of the newly submitted interest and take the next
+          steps to guide and support.
+        </p>
+      </div>
+
+      <Link
+        href="/director/interest-list"
+        className="shrink-0 text-xs font-semibold text-[#8ec5eb] hover:text-[#b8ddf5]"
+      >
+        See all
+      </Link>
+    </div>
+
+    {interestsLoading ? (
+      <p className="py-8 text-center text-sm text-white/55">
+        Loading interests…
+      </p>
+    ) : interests.length === 0 ? (
+      <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-8 text-center text-sm text-white/55">
+        No new interests
+      </div>
+    ) : (
+      <div className="space-y-3">
+        {interests.slice(0, 4).map((interest) => (
+          <div
+            key={interest._id}
+            className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-[#8ec5eb]/20">
+              <i className="fa-solid fa-user text-sm text-[#8ec5eb]" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <h4 className="truncate text-sm font-semibold text-white">
+                {interest.firstName} {interest.lastName}
+              </h4>
+
+              <p className="mt-0.5 truncate text-xs text-white/55">
+                {interest.title || "No title"}
+              </p>
+            </div>
+{/* 
+            <div className="flex items-center gap-4 text-[#8ec5eb]">
+              <button type="button" className="hover:opacity-80" aria-label="Email">
+                <i className="fa-solid fa-envelope text-sm" />
+              </button>
+
+              <button type="button" className="hover:opacity-80" aria-label="Chat">
+                <i className="fa-regular fa-comment text-sm" />
+              </button>
+
+              <button type="button" className="hover:opacity-80" aria-label="Call">
+                <i className="fa-solid fa-phone text-sm" />
+              </button>
+            </div> */}
+
+            <div className="flex items-center gap-4 text-[#8ec5eb]">
+  {/* <button type="button" className="hover:opacity-80" aria-label="Email">
+    <i className="fa-solid fa-envelope text-sm" />
+  </button> */}
+  <button
+  type="button"
+  className="hover:opacity-80"
+  aria-label={`Email ${interest.email}`}
+  onClick={() => {
+    if (!interest.email) return;
+
+    const subject = encodeURIComponent("Community Change Interest Form");
+    window.location.href = `mailto:${interest.email}?subject=${subject}`;
+  }}
+>
+  <i className="fa-solid fa-envelope text-sm" />
+</button>
+</div>
+
+            <button
+              type="button"
+              onClick={() => router.push(`/director/interest-list/${interest._id}`)}
+              className="rounded-lg border border-white/20 bg-white/10 px-5 py-2 text-xs font-semibold text-white transition hover:bg-white/15"
+            >
+              View
+            </button>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+</section>
 
       {/* Today's Appointments */}
-      <section className="relative mt-10 overflow-hidden py-10">
+      {/* <section className="relative mt-10 overflow-hidden py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold sm:text-xl">Today&apos;s Appointments</h2>
           <Link
@@ -937,10 +1298,10 @@ export default function DirectorHome() {
             })}
           </div>
         )}
-      </section>
+      </section> */}
 
       {/* New Interests Section */}
-      <section className="mt-10 py-10">
+      {/* <section className="mt-10 py-10">
         <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2 lg:gap-12">
           <div>
             <h2 className="mb-4 text-2xl font-semibold sm:text-3xl md:text-[32px]">New Interests</h2>
@@ -1003,7 +1364,7 @@ export default function DirectorHome() {
             )}
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* Add User Section */}
       <section className="mt-6 py-8 sm:py-12 md:py-16">
@@ -1021,7 +1382,7 @@ export default function DirectorHome() {
 
             {/* Right side - Form */}
             <form onSubmit={handleAddUser} className="space-y-4">
-              <div>
+              {/* <div>
                 <label className="text-white text-sm mb-2 block">
                   Full Name
                 </label>
@@ -1033,7 +1394,36 @@ export default function DirectorHome() {
                   required
                   className="w-full px-4 py-3 rounded-md bg-white/10 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
                 />
-              </div>
+              </div> */}
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+  <div>
+    <label className="text-white text-sm mb-2 block">
+      First Name
+    </label>
+    <input
+      type="text"
+      placeholder="Enter first name"
+      value={firstName}
+      onChange={(e) => setFirstName(e.target.value)}
+      required
+      className="w-full px-4 py-3 rounded-md bg-white/10 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
+    />
+  </div>
+
+  <div>
+    <label className="text-white text-sm mb-2 block">
+      Last Name
+    </label>
+    <input
+      type="text"
+      placeholder="Enter last name"
+      value={lastName}
+      onChange={(e) => setLastName(e.target.value)}
+      required
+      className="w-full px-4 py-3 rounded-md bg-white/10 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
+    />
+  </div>
+</div>
 
               <div>
                 <label className="text-white text-sm mb-2 block">
