@@ -295,6 +295,13 @@ export default function PastorMyProgressPage() {
   );
 }
 
+function formatDateShort(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
 function PastorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: () => void }) {
   const title = roadmap.title || "Roadmap";
   const desc = roadmap.description || "";
@@ -303,6 +310,8 @@ function PastorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: 
   const time = roadmap.timeline || "—";
   const statusLabel = formatRoadmapStatusLabel(roadmap.status);
   const chip = progressStatusChipClass(roadmap.status);
+  const completedOnRaw = roadmap.completedAt ?? roadmap.roadmapCompletedAt ?? roadmap.completionDate ?? roadmap.courseCompletedAt ?? null;
+  const completedOn = formatDateShort(completedOnRaw);
   const imgUrl =
     typeof roadmap.imageUrl === "string" && (roadmap.imageUrl.startsWith("http://") || roadmap.imageUrl.startsWith("https://"))
       ? roadmap.imageUrl
@@ -336,6 +345,11 @@ function PastorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: 
           <p className="text-[12px] text-[#cde2f2]/80">
             Timeline <span className="font-semibold text-[#8ec5eb]">{time}</span>
           </p>
+          {completedOn && (
+            <p className="mt-1 text-[12px] text-[#cde2f2]/80">
+              Completed on <span className="font-semibold text-[#8ec5eb]">{completedOn}</span>
+            </p>
+          )}
           <div className="mt-4 flex justify-end">
             <button
               type="button"
@@ -412,14 +426,8 @@ function PastorAssessmentProgressCard({ assessment, onOpen }: { assessment: any;
           </button>
         </div>
         <div className="mt-3 flex justify-between text-[12px] text-[#8ec5eb]/80">
-          {isDone ? (
-            <span className="font-semibold text-white">Submitted</span>
-          ) : (
-            <>
-              <span className="font-semibold text-[#cde2f2]">Due date</span>
-              <span className="font-semibold text-[#8ec5eb]">{assessment.dueDate || "—"}</span>
-            </>
-          )}
+          <span className="font-semibold text-[#cde2f2]">{isDone ? "Submitted" : "Due date"}</span>
+          <span className="font-semibold text-[#8ec5eb]">{assessment.dueDate || "—"}</span>
         </div>
       </div>
     </div>

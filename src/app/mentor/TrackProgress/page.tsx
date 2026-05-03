@@ -20,19 +20,31 @@ import {
   mentorSpinner,
   mentorWarningPanel,
 } from "@/app/Components/mentor/mentor-theme";
-import { apiGetUserProgress } from "@/app/Services/progress.service";
+import {
+  apiGetOverallProgress,
+  extractUserIdFromOverallProgressRow,
+  unwrapOverallProgressList,
+} from "@/app/Services/progress.service";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 import { isRemoteImageSrc } from "@/app/utils/image";
 
+function numFromApi(v: unknown): number {
+  if (typeof v === "number" && !Number.isNaN(v)) return v;
+  if (typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))) return Number(v);
+  return 0;
+}
+
 export default function TrackProgressPage() {
   const [filter, setFilter] = useState<"All" | "In-Progress" | "Completed">("All");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const router = useRouter();
 
   const [pastors, setPastors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     const fetchPastors = async () => {
@@ -49,37 +61,39 @@ export default function TrackProgressPage() {
         const res = await apiGetAssignedUsers(String(mentorId));
         const users = Array.isArray(res.data?.data) ? res.data.data : [];
 
-        const results = await Promise.all(
-          users.map(async (u: any) => {
+        const overallRes = await apiGetOverallProgress();
+        const rows = unwrapOverallProgressList(overallRes as unknown as { data?: unknown });
+        const byUserId = new Map<string, Record<string, unknown>>();
+        for (const row of rows) {
+          const rowObj = row as unknown as Record<string, unknown>;
+          const userId = extractUserIdFromOverallProgressRow(rowObj);
+          if (!userId) continue;
+          byUserId.set(userId, rowObj);
+        }
+
+        const results = users
+          .map((u: any) => {
             const uid = u._id ?? u.id;
             if (uid == null || String(uid).trim() === "") {
               return null;
             }
-            try {
-              const progressRes = await apiGetUserProgress(String(uid));
+            const id = String(uid);
+            const row = byUserId.get(id);
+            return {
+              id,
+              name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Pastor",
+              desc: u.profileInfo || "Assigned pastor",
+              img: u.profilePicture || PastorImg,
+              progress: Math.min(100, Math.max(0, numFromApi(row?.overallProgress ?? row?.overall_progress))),
+              roadmapDone: numFromApi(row?.completedRoadmaps ?? row?.completed_roadmaps),
+              roadmapTotal: numFromApi(row?.totalRoadmaps ?? row?.total_roadmaps),
+              assessmentDone: numFromApi(row?.completedAssessments ?? row?.completed_assessments),
+              assessmentTotal: numFromApi(row?.totalAssessments ?? row?.total_assessments),
+            };
+          })
+          .filter((p): p is NonNullable<typeof p> => p != null && Boolean(p.id));
 
-              return {
-                id: String(uid),
-                name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Pastor",
-                desc: u.profileInfo || "Assigned pastor",
-                img: u.profilePicture || PastorImg,
-                progress: progressRes.data?.data?.overallProgress ?? 0,
-              };
-            } catch {
-              return {
-                id: String(uid),
-                name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Pastor",
-                desc: u.profileInfo || "Assigned pastor",
-                img: u.profilePicture || PastorImg,
-                progress: 0,
-              };
-            }
-          }),
-        );
-
-        setPastors(
-          results.filter((p): p is NonNullable<typeof p> => p != null && Boolean(p.id)),
-        );
+        setPastors(results);
       } catch (err) {
         console.error("Failed to load pastors", err);
         setLoadError("Could not load progress. Please try again.");
@@ -101,6 +115,15 @@ export default function TrackProgressPage() {
   const visible = filtered.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  const totalPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pagedVisible = visible.slice(pageStart, pageStart + PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filter, search]);
 
   return (
     <div className={mentorPageRoot}>
@@ -161,8 +184,9 @@ export default function TrackProgressPage() {
           ) : null}
 
           {!loading && visible.length > 0 ? (
+            <>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
-              {visible.map((pastor) => (
+              {pagedVisible.map((pastor) => (
                 <div
                   key={pastor.id}
                   role="button"
@@ -191,6 +215,24 @@ export default function TrackProgressPage() {
                   <div className="flex min-w-0 flex-1 flex-col text-left">
                     <h4 className="text-base font-semibold text-white">{pastor.name}</h4>
                     <p className="mt-0.5 text-sm text-[#cde2f2]/90">{pastor.desc}</p>
+
+                    {/* Roadmap & Assessment stats */}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-md border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 px-2.5 py-1 text-[11px] font-medium text-[#cde2f2]">
+                        <i className="fa-solid fa-map-signs text-[#8ec5eb]" aria-hidden />
+                        Roadmaps&nbsp;
+                        <span className="font-bold text-white tabular-nums">
+                          {pastor.roadmapDone}/{pastor.roadmapTotal}
+                        </span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-md border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 px-2.5 py-1 text-[11px] font-medium text-[#cde2f2]">
+                        <i className="fa-solid fa-clipboard-list text-[#8ec5eb]" aria-hidden />
+                        Surveys&nbsp;
+                        <span className="font-bold text-white tabular-nums">
+                          {pastor.assessmentDone}/{pastor.assessmentTotal}
+                        </span>
+                      </span>
+                    </div>
 
                     <div className="mt-4">
                       <p className="mb-1 text-xs font-medium text-[#cde2f2]">Progress</p>
@@ -231,6 +273,35 @@ export default function TrackProgressPage() {
                 </div>
               ))}
             </div>
+            {totalPages > 1 ? (
+              <div className="mt-6 flex flex-col items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#cde2f2] sm:flex-row">
+                <p>
+                  Showing {pageStart + 1}-{Math.min(pageStart + PAGE_SIZE, visible.length)} of {visible.length}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={currentPage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="rounded-md border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 px-3 py-1.5 text-xs font-semibold text-[#cde2f2] transition hover:bg-[#8ec5eb]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs font-semibold text-white">
+                    Page {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={currentPage >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className="rounded-md border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 px-3 py-1.5 text-xs font-semibold text-[#cde2f2] transition hover:bg-[#8ec5eb]/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            </>
           ) : null}
         </div>
       </main>

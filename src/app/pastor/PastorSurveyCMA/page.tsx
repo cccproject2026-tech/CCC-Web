@@ -17,6 +17,7 @@ import { getCookie } from "@/app/utils/cookies";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { apiCreateAppointment } from "@/app/Services/appointments.service";
 import axiosInstance from "@/app/Services/config/axios-instance";
+import { formatAvailabilitySlotLabel, parseSlotStartToIso, unwrapMonthlyAvailabilityPayload } from "@/app/Services/appointment-utils";
 import { isAxiosError } from "axios";
 
 /** HTML `input[type=date]` value is YYYY-MM-DD — parse without UTC day-shift. */
@@ -35,19 +36,6 @@ function slotDateToYmd(raw: unknown): string | null {
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString("en-CA");
-}
-
-function unwrapMonthlyAvailabilityPayload(availRes: { data?: unknown }): any[] {
-  const body = availRes?.data as Record<string, unknown> | undefined;
-  if (!body) return [];
-  const inner = body.data;
-  if (Array.isArray(inner)) return inner;
-  if (inner && typeof inner === "object") {
-    const o = inner as Record<string, unknown>;
-    if (Array.isArray(o.days)) return o.days as any[];
-    if (Array.isArray(o.slots)) return o.slots as any[];
-  }
-  return [];
 }
 
 /** Ensure layers have question + choices the CMA UI can render (API may use title/text). */
@@ -273,7 +261,9 @@ function isPastDate(dateStr: string): boolean {
 /** Check if date has available slots */
 function hasAvailability(dateStr: string, availability: any[]): boolean {
   return availability.some((slot: any) => {
-    const ymd = slotDateToYmd(slot?.date);
+    const ymd = slotDateToYmd(
+      slot?.date ?? slot?.day ?? slot?.calendarDate ?? slot?.meetingDate ?? slot?.dateString,
+    );
     if (ymd !== dateStr) return false;
     return Array.isArray(slot?.slots) && slot.slots.length > 0;
   });
@@ -282,16 +272,16 @@ function hasAvailability(dateStr: string, availability: any[]): boolean {
 /** Get available times for a specific date */
 function getTimesForDate(dateStr: string, availability: any[]): string[] {
   const dateSlot = availability.find((slot: any) => {
-    const ymd = slotDateToYmd(slot?.date);
+    const ymd = slotDateToYmd(
+      slot?.date ?? slot?.day ?? slot?.calendarDate ?? slot?.meetingDate ?? slot?.dateString,
+    );
     return ymd === dateStr;
   });
   
   if (dateSlot && dateSlot.slots && Array.isArray(dateSlot.slots)) {
-    return dateSlot.slots.map((raw: any) => {
-      const start = `${raw.startTime} ${String(raw.startPeriod ?? "").toLowerCase()}`;
-      const end = `${raw.endTime} ${String(raw.endPeriod ?? "").toLowerCase()}`;
-      return `${start} – ${end}`;
-    });
+    return dateSlot.slots
+      .map((raw: any) => formatAvailabilitySlotLabel(raw))
+      .filter((label: string) => Boolean(label.trim()));
   }
   return [];
 }
@@ -337,12 +327,8 @@ function buildMeetingDateIso(dateYmd: string, timeRange: string): string | null 
   const parsed = parseStartTimeFromRange(timeRange);
   if (!parsed) return null;
 
-  const year = Number(dateMatch[1]);
-  const month = Number(dateMatch[2]);
-  const day = Number(dateMatch[3]);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
-
-  return new Date(Date.UTC(year, month - 1, day, parsed.hour24, parsed.minute, 0, 0)).toISOString();
+  // Keep behavior aligned with other scheduling screens to avoid timezone slot mismatches.
+  return parseSlotStartToIso(dateYmd, timeRange);
 }
 
 function resolveCookieUserId(): string | null {
@@ -535,11 +521,26 @@ function PastorSurveyCMAContent() {
     const fetchAvailability = async () => {
       try {
         let slots: any[] = [];
-        const availRes = await axiosInstance.get(`/appointments/availability/${selectedMentor}/month`, {
-          params: { year: currentYear, month: currentMonth },
-        });
-        const raw = availRes.data?.data;
-        slots = Array.isArray(raw) ? raw : [];
+        try {
+          const availRes = await axiosInstance.get(`/appointments/availability/${selectedMentor}/month`, {
+            params: { year: currentYear, month: currentMonth },
+          });
+          slots = unwrapMonthlyAvailabilityPayload(availRes as { data?: unknown });
+          if (!slots.length) {
+            const raw = availRes.data?.data ?? availRes.data;
+            slots = Array.isArray(raw) ? raw : [];
+          }
+        } catch {
+          const monthDate = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`;
+          const weekRes = await axiosInstance.get(`/appointments/availability/${selectedMentor}/week`, {
+            params: { date: monthDate },
+          });
+          slots = unwrapMonthlyAvailabilityPayload(weekRes as { data?: unknown });
+          if (!slots.length) {
+            const raw = weekRes.data?.data ?? weekRes.data;
+            slots = Array.isArray(raw) ? raw : [];
+          }
+        }
         setAvailability(slots);
       } catch (err) {
         console.error("Failed to fetch availability", err);
@@ -552,15 +553,15 @@ function PastorSurveyCMAContent() {
   useEffect(() => {
     if (selectedDate && availability.length > 0) {
       const dateSlot = availability.find((slot: any) => {
-        const ymd = slotDateToYmd(slot?.date);
+        const ymd = slotDateToYmd(
+          slot?.date ?? slot?.day ?? slot?.calendarDate ?? slot?.meetingDate ?? slot?.dateString,
+        );
         return ymd === selectedDate;
       });
       if (dateSlot && dateSlot.slots) {
-        const times = dateSlot.slots.map((raw: any) => {
-          const start = `${raw.startTime} ${String(raw.startPeriod ?? "").toLowerCase()}`;
-          const end = `${raw.endTime} ${String(raw.endPeriod ?? "").toLowerCase()}`;
-          return `${start} – ${end}`;
-        });
+        const times = dateSlot.slots
+          .map((raw: any) => formatAvailabilitySlotLabel(raw))
+          .filter((label: string) => Boolean(label.trim()));
         setAvailableTimes(times);
       } else {
         setAvailableTimes([]);
@@ -674,6 +675,9 @@ function PastorSurveyCMAContent() {
   const handleScheduleMeeting = () => {
     setShowSchedulePrompt(false);
     setShowMentorSidebar(true);
+    setMentorStep(1);
+    setSelectedMentor("");
+    setAvailability([]);
     setSelectedDate("");
     setSelectedTime("");
     setAvailableTimes([]);
@@ -1301,13 +1305,21 @@ function PastorSurveyCMAContent() {
               <>
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold">Choose Mentor for the Meeting</h2>
-                  <button
-                    onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
-                    className="text-white/60 transition hover:text-white"
-                    aria-label="Close"
-                  >
-                    <i className="fa-solid fa-xmark text-lg" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
+                      className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-[#d8ecfa] transition hover:bg-white/10"
+                    >
+                      Close
+                    </button>
+                    <button
+                      onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
+                      className="text-white/60 transition hover:text-white"
+                      aria-label="Close"
+                    >
+                      <i className="fa-solid fa-xmark text-lg" />
+                    </button>
+                  </div>
                 </div>
                 {mentors.length === 0 ? (
                   <p className="text-[#cbe6f9]">No mentors assigned.</p>
@@ -1337,7 +1349,13 @@ function PastorSurveyCMAContent() {
                     </div>
                   ))
                 )}
-                <div className="flex justify-end">
+                <div className="flex justify-between gap-3">
+                  <button
+                    onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
+                    className="rounded-xl border border-white/30 px-5 py-2 text-sm font-semibold text-[#d8ecfa] transition hover:bg-white/10"
+                  >
+                    Skip
+                  </button>
                   <button
                     onClick={() => setMentorStep(2)}
                     disabled={!selectedMentor || mentors.length === 0}
@@ -1351,13 +1369,21 @@ function PastorSurveyCMAContent() {
               <>
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold">Schedule a Meeting</h2>
-                  <button
-                    onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
-                    className="text-white/60 transition hover:text-white"
-                    aria-label="Close"
-                  >
-                    <i className="fa-solid fa-xmark text-lg" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
+                      className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-[#d8ecfa] transition hover:bg-white/10"
+                    >
+                      Close
+                    </button>
+                    <button
+                      onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
+                      className="text-white/60 transition hover:text-white"
+                      aria-label="Close"
+                    >
+                      <i className="fa-solid fa-xmark text-lg" />
+                    </button>
+                  </div>
                 </div>
                 {selectedMentor && (
                   <p className="mb-6 text-sm text-[#cbe6f9]">
@@ -1504,6 +1530,12 @@ function PastorSurveyCMAContent() {
                     Back
                   </button>
                   <button
+                    onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
+                    className="flex-1 rounded-xl border border-white/30 px-5 py-2 text-[#d8ecfa] transition hover:bg-white/10"
+                  >
+                    Skip
+                  </button>
+                  <button
                     onClick={handleFinalSchedule}
                     disabled={!selectedDate || !selectedTime}
                     className={`flex-1 rounded-xl px-6 py-2 text-sm font-semibold transition ${selectedDate && selectedTime ? "bg-[#8ec5eb] text-[#062946] hover:bg-[#a9d5f2]" : "cursor-not-allowed bg-white/20 text-white/60"}`}
@@ -1519,9 +1551,34 @@ function PastorSurveyCMAContent() {
 
       {showFinalPopup && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
-          <div className="flex items-center gap-3 rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-10 py-6 text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)]">
-            <i className="fa-solid fa-circle-check text-[#7be495] text-2xl"></i>
-            <p className="font-medium">New Appointment has been Scheduled</p>
+          <div className="relative mx-4 w-full max-w-[420px] rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-8 py-8 text-center text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)]">
+            <button
+              onClick={() => {
+                setShowFinalPopup(false);
+                setShowMentorSidebar(false);
+                setShowSchedulePrompt(false);
+                router.push("/pastor/Assessments");
+              }}
+              className="absolute right-4 top-4 text-white/60 transition hover:text-white"
+              aria-label="Close"
+            >
+              <i className="fa-solid fa-xmark text-lg" />
+            </button>
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <i className="fa-solid fa-circle-check text-[#7be495] text-2xl"></i>
+              <p className="font-medium">New Appointment has been Scheduled</p>
+            </div>
+            <button
+              onClick={() => {
+                setShowFinalPopup(false);
+                setShowMentorSidebar(false);
+                setShowSchedulePrompt(false);
+                router.push("/pastor/Assessments");
+              }}
+              className="w-full rounded-xl bg-[#8ec5eb] px-6 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}
