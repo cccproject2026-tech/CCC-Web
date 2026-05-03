@@ -11,7 +11,7 @@ import {
 } from "@/app/Services/assessment.service";
 import type { DashboardFocusItem, DashboardFocusSection } from "./types";
 
-const MAX_ITEMS_PER_SECTION = 3;
+const MAX_ITEMS_PER_SECTION = 10;
 const MAX_MENTEES = 5;
 const MAX_ROADMAPS_PER_MENTEE = 3;
 
@@ -26,6 +26,30 @@ const toEpochMs = (value?: string | null) => {
   if (!value) return 0;
   const t = Date.parse(value);
   return Number.isNaN(t) ? 0 : t;
+};
+
+const addDaysToDateOnlyISO = (dateOnlyISO: string, days: number) => {
+  const [year, month, day] = dateOnlyISO.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const getDateOnlyFromDateTime = (value?: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
 };
 
 function appointmentMeetingDate(a: unknown): string {
@@ -71,7 +95,7 @@ export type MentorFocusInput = {
 };
 
 export async function loadMentorFocusSections(input: MentorFocusInput): Promise<DashboardFocusSection[]> {
-  const { mentees, otherAppointments, todayDateOnlyISO } = input;
+  const { mentees, otherAppointments } = input;
   const limitedMentees = mentees.slice(0, MAX_MENTEES);
   const menteeNameById = new Map(
     limitedMentees.map((m) => {
@@ -83,7 +107,7 @@ export async function loadMentorFocusSections(input: MentorFocusInput): Promise<
   const startOfTodayLocal = new Date();
   startOfTodayLocal.setHours(0, 0, 0, 0);
   const dayEnd = startOfTodayLocal.getTime() + 24 * 60 * 60 * 1000;
-
+  
   const allProgramSessions: {
     session: Record<string, unknown>;
     pastorName: string;
@@ -165,26 +189,82 @@ export async function loadMentorFocusSections(input: MentorFocusInput): Promise<
   const apptRecords = (otherAppointments || []).map((a) =>
     typeof a === "object" && a ? (a as Record<string, unknown>) : {},
   );
+ 
 
   const otherMeetings: DashboardFocusItem[] = apptRecords
+    // .filter((apt) => {
+    //   const md = appointmentMeetingDate(apt);
+    //   if (!md) return false;
+    //   return md.split("T")[0] !== todayDateOnlyISO;
+    // })
     .filter((apt) => {
-      const md = appointmentMeetingDate(apt);
-      if (!md) return false;
-      return md.split("T")[0] !== todayDateOnlyISO;
-    })
+  const md = appointmentMeetingDate(apt);
+  if (!md) return false;
+
+  return toEpochMs(md) >= Date.now();
+})
+
     .sort((a, b) => toEpochMs(appointmentMeetingDate(a)) - toEpochMs(appointmentMeetingDate(b)))
     .slice(0, MAX_ITEMS_PER_SECTION)
     .map((apt) => {
       const md = appointmentMeetingDate(apt);
-      const uid = String(apt.userId ?? "");
-      const pastorName = menteeNameById.get(uid) ?? "Pastor";
-      return {
-        id: `mentor-other-meeting-${String(apt.id ?? apt._id ?? md)}`,
-        title: "Upcoming meeting",
-        description: `Meeting starts ${formatDateTime(md)}.`,
-        meta: `${pastorName} • ${String(apt.platform ?? "")}`,
-        href: "/mentor/MentorSchedule",
-      };
+      // const uid = String(apt.userId ?? "");
+      // const pastorName = menteeNameById.get(uid) ?? "Pastor";
+      const uid = String(
+  apt.userId ??
+    apt.pastorId ??
+    apt.menteeId ??
+    apt.assignedUserId ??
+    (apt.user && typeof apt.user === "object" ? (apt.user as Record<string, unknown>)._id : "") ??
+    (apt.pastor && typeof apt.pastor === "object" ? (apt.pastor as Record<string, unknown>)._id : "") ??
+    ""
+);
+
+const directName =
+  apt.user && typeof apt.user === "object"
+    ? `${String((apt.user as Record<string, unknown>).firstName ?? "")} ${String(
+        (apt.user as Record<string, unknown>).lastName ?? ""
+      )}`.trim()
+    : apt.pastor && typeof apt.pastor === "object"
+      ? `${String((apt.pastor as Record<string, unknown>).firstName ?? "")} ${String(
+          (apt.pastor as Record<string, unknown>).lastName ?? ""
+        )}`.trim()
+      : "";
+
+// const pastorName = directName || menteeNameById.get(uid) || "Pastor";
+
+//       return {
+//         id: `mentor-other-meeting-${String(apt.id ?? apt._id ?? md)}`,
+//         title: "Upcoming meeting",
+//         description: `Meeting starts ${formatDateTime(md)}.`,
+//         meta: `${pastorName} • ${String(apt.platform ?? "")}`,
+//         href: "/mentor/MentorSchedule",
+//       };
+// const pastorName = directName || menteeNameById.get(uid) || "Pastor";
+// const appointmentId = String(apt.id ?? apt._id ?? "");
+
+// return {
+//   id: `mentor-other-meeting-${String(apt.id ?? apt._id ?? md)}`,
+//   title: "Upcoming meeting",
+//   description: `Meeting starts ${formatDateTime(md)}.`,
+//   meta: `${pastorName} • ${String(apt.platform ?? "")}`,
+//   href: appointmentId
+  
+//   ? `/mentor/MentorSchedule/${encodeURIComponent(appointmentId)}`
+//   : "/mentor/MentorSchedule",
+// };
+const pastorName = directName || menteeNameById.get(uid) || "Pastor";
+const appointmentId = String(apt.id ?? apt._id ?? "");
+
+return {
+  id: `mentor-other-meeting-${String(apt.id ?? apt._id ?? md)}`,
+  title: "Upcoming meeting",
+  description: `Meeting starts ${formatDateTime(md)}.`,
+  meta: `${pastorName} • ${String(apt.platform ?? "")}`,
+  href: appointmentId
+    ? `/mentor/MentorSchedule/${encodeURIComponent(appointmentId)}`
+    : "/mentor/MentorSchedule",
+};
     });
 
   function unwrapQueriesFromResponse(res: { data?: unknown }): Record<string, unknown>[] {
@@ -225,6 +305,7 @@ export async function loadMentorFocusSections(input: MentorFocusInput): Promise<
             if (!qid || seenQueryIds.has(qid)) continue;
             seenQueryIds.add(qid);
             const createdAt = String(q.createdDate ?? q.created_at ?? "");
+           
             pastorQueryTemp.push({
               id: `pastor-query-${qid}`,
               title: "Pastor query",

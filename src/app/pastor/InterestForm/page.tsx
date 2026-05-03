@@ -193,7 +193,20 @@ const sanitizeName = (value: string) => value.replace(/[^A-Za-z\s'-]/g, "");
   //   return Object.keys(errs).length === 0;
   // };
 /// Country/state data is powered by country-state-city so the dropdown supports more than US/Canada.
-  const countryOptions = Country.getAllCountries();
+  // const countryOptions = Country.getAllCountries();
+  const countryOptions = (() => {
+  const allCountries = Country.getAllCountries();
+
+  const topCountries = allCountries.filter((country) =>
+    ["US", "CA"].includes(country.isoCode)
+  );
+
+  const remainingCountries = allCountries.filter(
+    (country) => !["US", "CA"].includes(country.isoCode)
+  );
+
+  return [...topCountries, ...remainingCountries];
+})();
 
 const getStateOptions = (countryName: string) => {
   const selectedCountry = countryOptions.find((c) => c.name === countryName);
@@ -512,7 +525,7 @@ try {
     )} relative z-50 flex !h-[42px] !min-h-[42px] !max-h-[42px] w-full items-center overflow-visible !p-0`}
   >
     <PhoneInput
-      defaultCountry="in"
+      defaultCountry="us"
       value={form.phoneNumber}
       onChange={(phone) => {
         setField("phoneNumber", phone || "");
@@ -632,7 +645,7 @@ try {
     )} relative z-50 flex !h-[42px] !min-h-[42px] !max-h-[42px] w-full items-center overflow-visible !p-0`}
   >
     <PhoneInput
-      defaultCountry="in"
+      defaultCountry="us"
       value={church.churchPhone}
       onChange={(phone) => {
         setChurchField(idx, "churchPhone", phone || "");
@@ -715,11 +728,16 @@ try {
     <option value="" disabled>
       Country *
     </option>
-    {countryOptions.map((country) => (
+    {/* {countryOptions.map((country) => (
       <option key={country.isoCode} value={country.name}>
         {country.name} {country.phonecode ? `(+${country.phonecode})` : ""}
       </option>
-    ))}
+    ))} */}
+    {countryOptions.map((country) => (
+  <option key={country.isoCode} value={country.name}>
+    {country.name}
+  </option>
+))}
   </select>
   <Err k={`country${p}`} />
 </div>

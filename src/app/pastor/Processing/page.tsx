@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/hero-bg.png";
 import { apiGetInterestByEmail } from "@/app/Services/interests.service";
 import { getCookie } from "@/app/utils/cookies";
 import { Interest } from "@/app/Services/types";
+import SetPasswordInlinePanel from "@/app/Components/SetPasswordInlinePanel";
 
 function normStatus(s: string | undefined | null): string {
   return String(s ?? "")
@@ -15,51 +16,46 @@ function normStatus(s: string | undefined | null): string {
     .toLowerCase();
 }
 
-/**
- * Interest approval tracking — same visual system as `/pastor/Thankyou` and `/pastor/home`.
- * Copy aligns with CCC-Mobile pending panel; polling keeps status fresh after director action.
- */
-export default function ProcessingPage() {
-  const router = useRouter();
+function ProcessingPageContent() {
+  const searchParams = useSearchParams();
+  const emailFromUrl = searchParams.get("email") ?? "";
+
   const [interest, setInterest] = useState<Interest | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [statusError, setStatusError] = useState<string | null>(null);
-  const navigatedRef = useRef(false);
 
   const fetchStatus = useCallback(async (): Promise<Interest | null> => {
-    const email = getCookie("interestEmail");
+    const email = emailFromUrl || getCookie("interestEmail");
+
     if (!email?.trim()) {
-      setStatusError("No saved email. Open the interest link from your confirmation email or resubmit the form.");
+      setStatusError(
+        "No saved email. Open the interest link from your confirmation email or resubmit the form.",
+      );
       setInterest(null);
       return null;
     }
 
     const res = await apiGetInterestByEmail(email);
-    const body = res.data;
-    if (body && body.success === false) {
+    const body = res.data as { success?: boolean; message?: string; data?: Interest | null };
+
+    if (body.success === false) {
       throw new Error(body.message || "Unable to load status");
     }
-    const data = body?.data ?? null;
+
+    const data = body.data ?? null;
     setInterest(data);
     setStatusError(null);
     return data;
-  }, []);
+  }, [emailFromUrl]);
 
   useEffect(() => {
     let cancelled = false;
+
     (async () => {
       try {
         setStatusLoading(true);
-        const data = await fetchStatus();
-        if (!cancelled) {
-          const statusNorm = normStatus(data?.status);
-          // Check if already accepted on load
-          if (statusNorm === "accepted" && !navigatedRef.current) {
-            navigatedRef.current = true;
-            setTimeout(() => router.push("/pastor/setpassword"), 1500);
-          }
-        }
-      } catch (err) {
+        await fetchStatus();
+      } catch {
         if (!cancelled) {
           setStatusError("Unable to load your status. Please try again later.");
         }
@@ -67,13 +63,14 @@ export default function ProcessingPage() {
         if (!cancelled) setStatusLoading(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
-  }, [fetchStatus, router]);
+  }, [fetchStatus]);
 
   useEffect(() => {
-    const email = getCookie("interestEmail");
+    const email = emailFromUrl || getCookie("interestEmail");
     if (!email?.trim()) return;
 
     let intervalId: ReturnType<typeof setInterval> | undefined;
@@ -82,27 +79,24 @@ export default function ProcessingPage() {
       try {
         const data = await fetchStatus();
         const next = normStatus(data?.status);
-        if (next === "accepted" && !navigatedRef.current) {
-          navigatedRef.current = true;
-          if (intervalId != null) window.clearInterval(intervalId);
-          setTimeout(() => router.push("/pastor/setpassword"), 1500);
-          return;
+
+        if ((next === "accepted" || next === "rejected") && intervalId != null) {
+          clearInterval(intervalId);
         }
-        if (next === "rejected" && intervalId != null) {
-          window.clearInterval(intervalId);
-        }
-      } catch (err) {
-        // Polling failed, will retry next interval
+      } catch {
+        // Polling failed, retry on next interval.
       }
     };
 
-    // Start polling immediately, then every 20 seconds
-    tick();
-    intervalId = window.setInterval(tick, 20000);
+    void tick();
+    intervalId = setInterval(() => {
+      void tick();
+    }, 20000);
+
     return () => {
-      if (intervalId != null) window.clearInterval(intervalId);
+      if (intervalId != null) clearInterval(intervalId);
     };
-  }, [fetchStatus, router]);
+  }, [emailFromUrl, fetchStatus]);
 
   const status = normStatus(interest?.status);
   const isAccepted = status === "accepted";
@@ -110,18 +104,15 @@ export default function ProcessingPage() {
   const isPending = !isAccepted && !isRejected && !statusError;
 
   const handleCheckStatus = async () => {
-    const email = getCookie("interestEmail");
-    if (!email) return;
+    const email = emailFromUrl || getCookie("interestEmail");
+    if (!email?.trim()) return;
+
     setStatusLoading(true);
     setStatusError(null);
+
     try {
-      const data = await fetchStatus();
-      const st = normStatus(data?.status);
-      if (st === "accepted" && !navigatedRef.current) {
-        navigatedRef.current = true;
-        setTimeout(() => router.push("/pastor/setpassword"), 1500);
-      }
-    } catch (err) {
+      await fetchStatus();
+    } catch {
       setStatusError("Unable to load your status. Please try again later.");
     } finally {
       setStatusLoading(false);
@@ -139,8 +130,7 @@ export default function ProcessingPage() {
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.72)_0%,rgba(6,41,70,0.78)_45%,rgba(6,41,70,0.96)_100%)]" />
 
         <div className="relative z-10 mx-auto w-full max-w-6xl">
-          <div className="mb-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-between sm:items-start">
-            {/* Live status pill — gradient when waiting; solid accents when terminal */}
+          <div className="mb-8 flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div
               className={`inline-flex items-center gap-3 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-lg sm:order-2 ${
                 isAccepted
@@ -161,9 +151,7 @@ export default function ProcessingPage() {
                 <i className="fa-solid fa-circle-notch animate-spin text-white/90" aria-hidden />
               ) : (
                 <span
-                  className={`h-2.5 w-2.5 rounded-full ${
-                    isAccepted ? "bg-white" : isRejected ? "bg-white" : statusError ? "bg-white" : "bg-white"
-                  }`}
+                  className="h-2.5 w-2.5 rounded-full bg-white"
                   style={
                     isPending && !statusLoading
                       ? { boxShadow: "0 0 0 3px rgba(255,255,255,0.25)" }
@@ -180,9 +168,7 @@ export default function ProcessingPage() {
                     : isRejected
                       ? "Application not approved"
                       : "Waiting for Approval"}
-              {!statusLoading && !statusError && (isPending || isAccepted || isRejected) && (
-                <i className="fa-solid fa-chevron-right text-xs text-white/80" aria-hidden />
-              )}
+              {!statusLoading && !statusError && <i className="fa-solid fa-chevron-right text-xs text-white/80" aria-hidden />}
             </div>
             <p className="text-center text-xs uppercase tracking-[0.2em] text-white/75 sm:order-1 sm:text-left">
               Live status · updates
@@ -208,7 +194,7 @@ export default function ProcessingPage() {
 
                 <h1 className="text-3xl font-semibold leading-tight text-white md:text-4xl lg:text-[2.5rem] lg:leading-snug">
                   {statusLoading
-                    ? "Checking your application…"
+                    ? "Checking your application..."
                     : statusError
                       ? "We couldn’t refresh your status"
                       : isAccepted
@@ -223,13 +209,14 @@ export default function ProcessingPage() {
                     <p>{statusError}</p>
                   ) : isAccepted ? (
                     <>
-                      <p>You’re approved to continue. You’ll be redirected to set your password shortly.</p>
-                      <p>If nothing happens, go to Set Password from your email or open the button below.</p>
+                      <p>You’re approved to continue. Complete your account setup by creating your password.</p>
+                      <div className="mt-6">
+                        <SetPasswordInlinePanel />
+                      </div>
                     </>
                   ) : isRejected ? (
                     <p>
-                      If you have questions, please contact us using the information on this page. We’re grateful for
-                      your interest in Community Change.
+                      If you have questions, please contact us using the information on this page. We’re grateful for your interest in Community Change.
                     </p>
                   ) : (
                     <>
@@ -240,32 +227,24 @@ export default function ProcessingPage() {
                   )}
                 </div>
 
-                {isPending && !statusLoading && (
+                {isPending && !statusLoading ? (
                   <p className="mt-6 flex flex-wrap items-center gap-2 text-sm text-[#8ec5eb]/95">
                     <i className="fa-solid fa-rotate text-[#8ec5eb]" aria-hidden />
-                    This page rechecks your approval about every 20 seconds. Use{" "}
-                    <strong className="font-semibold text-white">Check Status</strong> for an immediate refresh.
+                    This page rechecks your approval about every 20 seconds. Use <strong className="font-semibold text-white">Check Status</strong> for an immediate refresh.
                   </p>
-                )}
+                ) : null}
 
                 <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                   <button
                     type="button"
                     disabled={statusLoading}
-                    onClick={handleCheckStatus}
+                    onClick={() => {
+                      void handleCheckStatus();
+                    }}
                     className="rounded-xl bg-white px-8 py-3 text-sm font-semibold text-[#0f4a76] shadow-[0_8px_24px_rgba(0,0,0,0.2)] transition hover:bg-[#e7f1fa] disabled:cursor-not-allowed disabled:opacity-70 md:px-10 md:text-base"
                   >
-                    {statusLoading ? "Checking…" : "Check Status"}
+                    {statusLoading ? "Checking..." : "Check Status"}
                   </button>
-                  {isAccepted && (
-                    <button
-                      type="button"
-                      onClick={() => router.push("/pastor/setpassword")}
-                      className="rounded-xl border border-white/30 bg-white/10 px-8 py-3 text-sm font-semibold text-white transition hover:bg-white/15 md:text-base"
-                    >
-                      Go to Set Password
-                    </button>
-                  )}
                   <Link
                     href="/pastor/Thankyou"
                     className="text-center text-sm font-medium text-[#8ec5eb] underline-offset-4 hover:underline sm:text-left"
@@ -333,5 +312,22 @@ export default function ProcessingPage() {
         </div>
       </section>
     </div>
+  );
+}
+
+export default function ProcessingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-[#062946] px-4 text-white font-[Albert_Sans]">
+          <div className="text-center">
+            <i className="fa-solid fa-circle-notch animate-spin text-2xl text-[#8ec5eb]" aria-hidden />
+            <p className="mt-3 text-sm text-[#cde2f2]">Loading application status...</p>
+          </div>
+        </div>
+      }
+    >
+      <ProcessingPageContent />
+    </Suspense>
   );
 }

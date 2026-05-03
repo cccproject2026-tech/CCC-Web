@@ -83,7 +83,16 @@ export default function MentorHomePage() {
 
   const userId = mentorUser?.id ?? mentorUser?._id ?? userIdStatic;
 
-  const todayDateOnlyISO = useMemo(() => new Date().toISOString().split("T")[0], []);
+  // const todayDateOnlyISO = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const todayDateOnlyISO = useMemo(() => {
+  const today = new Date();
+
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, "0");
+  const dd = String(today.getDate()).padStart(2, "0");
+
+  return `${yyyy}-${mm}-${dd}`;
+}, []);
 
   const menteesForFocus = useMemo(
     () =>
@@ -186,13 +195,25 @@ export default function MentorHomePage() {
     (async () => {
       try {
         let list: any[] = [];
+        // try {
+        //   const res = await apiGetMentorSchedule(userId);
+        //   list = unwrapAppointmentsAxiosData(res);
+        // } catch {
+        //   const res = await apiGetMentorAppointments(userId, false);
+        //   list = unwrapAppointmentsAxiosData(res);
+        // }
         try {
-          const res = await apiGetMentorSchedule(userId);
-          list = unwrapAppointmentsAxiosData(res);
-        } catch {
-          const res = await apiGetMentorAppointments(userId, false);
-          list = unwrapAppointmentsAxiosData(res);
-        }
+  const res = await apiGetMentorSchedule(userId);
+  list = unwrapAppointmentsAxiosData(res);
+
+  if (!Array.isArray(list) || list.length === 0) {
+    const fallbackRes = await apiGetMentorAppointments(userId, false);
+    list = unwrapAppointmentsAxiosData(fallbackRes);
+  }
+} catch {
+  const res = await apiGetMentorAppointments(userId, false);
+  list = unwrapAppointmentsAxiosData(res);
+}
         if (!cancelled) setScheduleList(Array.isArray(list) ? list : []);
       } catch (err) {
         console.error("Failed to load mentor schedule:", err);
@@ -305,13 +326,13 @@ export default function MentorHomePage() {
                     <p className="mt-1 text-xs text-white/65">Tap to view your profile</p>
                   </div>
                 </button>
-                <button
+                {/* <button
                   type="button"
                   onClick={() => router.push("/mentor/MentorProgress")}
                   className="self-stretch rounded-xl border border-white/15 bg-white/5 py-2 text-center text-xs font-semibold text-[#8ec5eb] transition hover:bg-white/10 lg:self-end lg:px-6"
                 >
                   View progress
-                </button>
+                </button> */}
               </div>
             </div>
           </div>
