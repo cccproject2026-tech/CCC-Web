@@ -23,7 +23,7 @@ function ProcessingPageContent() {
   const [interest, setInterest] = useState<Interest | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [statusError, setStatusError] = useState<string | null>(null);
-
+const [showStatusText, setShowStatusText] = useState(false);
   const fetchStatus = useCallback(async (): Promise<Interest | null> => {
     const email = emailFromUrl || getCookie("interestEmail");
 
@@ -103,21 +103,31 @@ function ProcessingPageContent() {
   const isRejected = status === "rejected";
   const isPending = !isAccepted && !isRejected && !statusError;
 
-  const handleCheckStatus = async () => {
-    const email = emailFromUrl || getCookie("interestEmail");
-    if (!email?.trim()) return;
+  const statusLabel = statusLoading
+  ? "Checking..."
+  : statusError
+    ? "Unavailable"
+    : isAccepted
+      ? "Accepted"
+      : isRejected
+        ? "Rejected"
+        : "Waiting for Approval";
 
-    setStatusLoading(true);
-    setStatusError(null);
+  // const handleCheckStatus = async () => {
+  //   const email = emailFromUrl || getCookie("interestEmail");
+  //   if (!email?.trim()) return;
 
-    try {
-      await fetchStatus();
-    } catch {
-      setStatusError("Unable to load your status. Please try again later.");
-    } finally {
-      setStatusLoading(false);
-    }
-  };
+  //   setStatusLoading(true);
+  //   setStatusError(null);
+
+  //   try {
+  //     await fetchStatus();
+  //   } catch {
+  //     setStatusError("Unable to load your status. Please try again later.");
+  //   } finally {
+  //     setStatusLoading(false);
+  //   }
+  // };
 
   return (
     <div className="flex min-h-screen flex-col bg-transparent text-white font-[Albert_Sans]">
@@ -131,7 +141,7 @@ function ProcessingPageContent() {
 
         <div className="relative z-10 mx-auto w-full max-w-6xl">
           <div className="mb-8 flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div
+            {/* <div
               className={`inline-flex items-center gap-3 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-lg sm:order-2 ${
                 isAccepted
                   ? "bg-emerald-600/90 shadow-emerald-900/30"
@@ -169,13 +179,55 @@ function ProcessingPageContent() {
                       ? "Application not approved"
                       : "Waiting for Approval"}
               {!statusLoading && !statusError && <i className="fa-solid fa-chevron-right text-xs text-white/80" aria-hidden />}
-            </div>
+            </div> */}
+            <button
+  type="button"
+  onClick={() => setShowStatusText((prev) => !prev)}
+  className={`inline-flex items-center gap-3 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:scale-[1.02] sm:order-2 ${
+    isAccepted
+      ? "bg-emerald-600/90 shadow-emerald-900/30"
+      : isRejected
+        ? "bg-red-600/85 shadow-red-900/30"
+        : statusError
+          ? "bg-amber-600/85 shadow-amber-900/30"
+          : ""
+  }`}
+  style={
+    isPending || statusLoading
+      ? { background: "linear-gradient(90deg, #B83AF3 0%, #21B6E9 100%)" }
+      : undefined
+  }
+>
+  {statusLoading ? (
+    <i className="fa-solid fa-circle-notch animate-spin text-white/90" aria-hidden />
+  ) : (
+    <span
+      className="h-2.5 w-2.5 rounded-full bg-white"
+      style={
+        isPending && !statusLoading
+          ? { boxShadow: "0 0 0 3px rgba(255,255,255,0.25)" }
+          : undefined
+      }
+    />
+  )}
+
+  <span>Status</span>
+
+  {!statusLoading && !statusError && (
+    <i className="fa-solid fa-chevron-right text-xs text-white/80" aria-hidden />
+  )}
+
+  {showStatusText && (
+    <span>{statusLabel}</span>
+  )}
+</button>
             <p className="text-center text-xs uppercase tracking-[0.2em] text-white/75 sm:order-1 sm:text-left">
               Live status · updates
             </p>
           </div>
 
-          <div className="grid gap-8 lg:grid-cols-12 lg:gap-10">
+          {/* <div className="grid gap-8 lg:grid-cols-12 lg:gap-10"> */}
+          <div className="grid items-center gap-8 lg:grid-cols-12 lg:gap-10">
             <div className="lg:col-span-7 xl:col-span-8">
               <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.55)_0%,rgba(9,49,80,0.72)_100%)] p-8 shadow-[0_20px_50px_rgba(2,20,38,0.4)] backdrop-blur-md md:p-10 lg:p-12">
                 <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/15 bg-white/10 md:h-20 md:w-20">
@@ -226,16 +278,16 @@ function ProcessingPageContent() {
                     </>
                   )}
                 </div>
-
-                {isPending && !statusLoading ? (
+{/* 
+                {/* {isPending && !statusLoading ? (
                   <p className="mt-6 flex flex-wrap items-center gap-2 text-sm text-[#8ec5eb]/95">
                     <i className="fa-solid fa-rotate text-[#8ec5eb]" aria-hidden />
-                    This page rechecks your approval about every 20 seconds. Use <strong className="font-semibold text-white">Check Status</strong> for an immediate refresh.
-                  </p>
-                ) : null}
-
+                     This page rechecks your approval about every 20 seconds. Use <strong className="font-semibold text-white">Check Status</strong> for an immediate refresh. */}
+                     {/* This page rechecks your approval about every 20 seconds.  */}
+                   {/* </p> 
+                  ) : null}   */}
                 <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                  <button
+                  {/* <button
                     type="button"
                     disabled={statusLoading}
                     onClick={() => {
@@ -244,7 +296,7 @@ function ProcessingPageContent() {
                     className="rounded-xl bg-white px-8 py-3 text-sm font-semibold text-[#0f4a76] shadow-[0_8px_24px_rgba(0,0,0,0.2)] transition hover:bg-[#e7f1fa] disabled:cursor-not-allowed disabled:opacity-70 md:px-10 md:text-base"
                   >
                     {statusLoading ? "Checking..." : "Check Status"}
-                  </button>
+                  </button> */}
                   <Link
                     href="/pastor/Thankyou"
                     className="text-center text-sm font-medium text-[#8ec5eb] underline-offset-4 hover:underline sm:text-left"
@@ -279,7 +331,7 @@ function ProcessingPageContent() {
                 </ul>
               </div>
 
-              <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] p-6 backdrop-blur-md">
+              {/* <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] p-6 backdrop-blur-md">
                 <div className="mb-4 flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
                     <i className="fa-solid fa-satellite-dish text-[#8ec5eb]" aria-hidden />
@@ -306,7 +358,7 @@ function ProcessingPageContent() {
                     </span>
                   </li>
                 </ul>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>

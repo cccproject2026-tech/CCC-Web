@@ -112,12 +112,24 @@ export const apiSetPassword = (email: string, password: string, confirmPassword:
   );
 
 // POST /auth/forgot-password
+// export const apiForgotPassword = (payload: ForgotPasswordPayload) =>
+//   axiosInstance.post<{ success: boolean; message: string }>("/auth/forgot-password", payload);
 export const apiForgotPassword = (payload: ForgotPasswordPayload) =>
-  axiosInstance.post<{ success: boolean; message: string }>("/auth/forgot-password", payload);
+  axiosInstance.post<{ success: boolean; message: string }>(
+    "/auth/forgot-password",
+    payload,
+    { skipAuth: true },
+  );
 
 // POST /auth/reset-password
+// export const apiResetPassword = (payload: ResetPasswordPayload) =>
+//   axiosInstance.post<{ success: boolean; message: string }>("/auth/reset-password", payload);
 export const apiResetPassword = (payload: ResetPasswordPayload) =>
-  axiosInstance.post<{ success: boolean; message: string }>("/auth/reset-password", payload);
+  axiosInstance.post<{ success: boolean; message: string }>(
+    "/auth/reset-password",
+    payload,
+    { skipAuth: true },
+  );
 
 // POST /auth/refresh-token
 export const apiRefreshToken = (payload: RefreshTokenPayload) =>

@@ -86,21 +86,54 @@ function LoginInner() {
         return;
       }
 
+      // const { accessToken, refreshToken, user } = json.data || {};
+
+      // if (accessToken) setCookie("accessToken", accessToken);
+      // if (refreshToken) setCookie("refreshToken", refreshToken);
+
       const { accessToken, refreshToken, user } = json.data || {};
 
-      if (accessToken) setCookie("accessToken", accessToken);
-      if (refreshToken) setCookie("refreshToken", refreshToken);
-      if (user) {
-        const normalized = normalizeUserCookieForClient(user as Record<string, unknown>);
-        setCookie("mentor", JSON.stringify(normalized));
-        const uid = (normalized.id ?? normalized._id) as string | undefined;
-        if (uid) setCookie("userId", String(uid));
-      }
+const userRole = String(user?.role || "").toLowerCase();
 
-      const next = searchParams.get("returnUrl");
-      const destination = isSafeMentorReturnUrl(next)
-        ? next
-        : "/mentor/profile-incomplete";
+if (userRole !== "mentor") {
+  setErrorMsg("Invalid email or password.");
+  return;
+}
+
+if (accessToken) setCookie("accessToken", accessToken);
+if (refreshToken) setCookie("refreshToken", refreshToken);
+      // if (user) {
+      //   const normalized = normalizeUserCookieForClient(user as Record<string, unknown>);
+      //   setCookie("mentor", JSON.stringify(normalized));
+      //   const uid = (normalized.id ?? normalized._id) as string | undefined;
+      //   if (uid) setCookie("userId", String(uid));
+      // }
+
+      // const next = searchParams.get("returnUrl");
+      // const destination = isSafeMentorReturnUrl(next)
+      //   ? next
+      //   : "/mentor/profile-incomplete";
+      let hasProfilePicture = false;
+
+if (user) {
+  const normalized = normalizeUserCookieForClient(user as Record<string, unknown>);
+  setCookie("mentor", JSON.stringify(normalized));
+
+  const uid = (normalized.id ?? normalized._id) as string | undefined;
+  if (uid) setCookie("userId", String(uid));
+
+  hasProfilePicture = Boolean(
+    typeof normalized.profilePicture === "string" &&
+      normalized.profilePicture.trim()
+  );
+}
+
+const next = searchParams.get("returnUrl");
+const destination = isSafeMentorReturnUrl(next)
+  ? next
+  : hasProfilePicture
+    ? "/mentor/home"
+    : "/mentor/profile-incomplete";
 
       showToast("Login successful. Redirecting...");
       setTimeout(() => router.push(destination), 350);
@@ -141,7 +174,7 @@ function LoginInner() {
             <p className="mt-3 text-sm leading-7 text-[#cde2f2]">
               Support leaders with clarity and consistency through mentoring tools built for meaningful ministry outcomes.
             </p>
-            <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
+            {/* <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
               <div className="rounded-xl border border-white/15 bg-[#0a3558] p-3">
                 <p className="text-[#8ec5eb] font-semibold">Connect</p>
                 <p className="text-[#d9ebf8]">Guide mentees easily</p>
@@ -150,7 +183,7 @@ function LoginInner() {
                 <p className="text-[#8ec5eb] font-semibold">Impact</p>
                 <p className="text-[#d9ebf8]">Measure growth</p>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
 
@@ -201,7 +234,7 @@ function LoginInner() {
                 {isLoading ? "Logging in…" : "Log in"}
               </button>
 
-              <div className="relative flex items-center justify-center py-1">
+              {/* <div className="relative flex items-center justify-center py-1">
                 <span className="absolute inset-x-0 top-1/2 h-px bg-white/15" aria-hidden />
                 <span className="relative bg-white/5 px-3 text-[11px] font-medium uppercase tracking-wide text-[#cde2f2]/90">
                   or
@@ -214,7 +247,7 @@ function LoginInner() {
                 onClick={() => router.push(`/pastor/InterestForm`)}
               >
                 Submit interest
-              </button>
+              </button> */}
             </form>
           </div>
 

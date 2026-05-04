@@ -180,26 +180,55 @@ const handleAssign = async () => {
 };
 
 
-  const handleReject = async () => {
-    if (!interestData?.userId) {
-      setToast("Missing user id — cannot reject.");
-      setTimeout(() => setToast(null), 3000);
-      return;
-    }
+  // const handleReject = async () => {
+  //   if (!interestData?.userId) {
+  //     setToast("Missing user id — cannot reject.");
+  //     setTimeout(() => setToast(null), 3000);
+  //     return;
+  //   }
 
-    try {
-      await apiUpdateInterestStatus(interestData.userId, "rejected");
-      setInterestData({ ...interestData, status: "rejected" });
-      setToast("Interest rejected successfully");
-      setShowRejectModal(false);
-      setTimeout(() => router.back(), 1200);
-    } catch (error) {
-      console.error("Failed to reject interest", error);
-      setToast("Failed to reject interest");
-    } finally {
-      setTimeout(() => setToast(null), 3000);
-    }
-  };
+  //   try {
+  //     await apiUpdateInterestStatus(interestData.userId, "rejected");
+  //     setInterestData({ ...interestData, status: "rejected" });
+  //     setToast("Interest rejected successfully");
+  //     setShowRejectModal(false);
+  //     setTimeout(() => router.back(), 1200);
+  //   } catch (error) {
+  //     console.error("Failed to reject interest", error);
+  //     setToast("Failed to reject interest");
+  //   } finally {
+  //     setTimeout(() => setToast(null), 3000);
+  //   }
+  // };
+
+  const handleReject = async () => {
+  if (!interestData?.userId) {
+    setToast("Missing user id — cannot reject.");
+    setTimeout(() => setToast(null), 3000);
+    return;
+  }
+
+  const applicantName =
+    `${interestData.firstName ?? ""} ${interestData.lastName ?? ""}`.trim() ||
+    interestData.email ||
+    "Applicant";
+
+  try {
+    await apiUpdateInterestStatus(interestData.userId, "rejected");
+
+    setInterestData({ ...interestData, status: "rejected" as const });
+    setShowRejectModal(false);
+    setToast(`${applicantName} has been rejected.`);
+
+    setTimeout(() => {
+      router.push("/director/interest-list");
+    }, 1800);
+  } catch (error) {
+    console.error("Failed to reject interest", error);
+    setToast("Failed to reject interest");
+    setTimeout(() => setToast(null), 3000);
+  }
+};
 
   const handlePending = async () => {
   if (!interestData?.userId) {
@@ -489,6 +518,33 @@ const assignModalDescription = isMentorInterest
 >
   Add to pending
 </button>
+
+{/* <button
+  type="button"
+  onClick={() => {
+    setSelectedAssignUserId("");
+    setAssignError(null);
+    setShowAssignModal(true);
+  }}
+  className="mx-auto mt-3 flex w-fit items-center justify-center gap-2 rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/15 px-5 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+>
+  <i className="fa-solid fa-user-plus text-[11px]" />
+  {assignButtonLabel}
+</button> */}
+{interestData.status === "accepted" && (
+  <button
+    type="button"
+    onClick={() => {
+      setSelectedAssignUserId("");
+      setAssignError(null);
+      setShowAssignModal(true);
+    }}
+    className="mx-auto mt-3 flex w-fit items-center justify-center gap-2 rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/15 px-5 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+  >
+    <i className="fa-solid fa-user-plus text-[11px]" />
+    {assignButtonLabel}
+  </button>
+)}
                   </div>
                 </div>
               </div>
@@ -689,7 +745,7 @@ const assignModalDescription = isMentorInterest
         </div>
       </section>
 
-      {toast ? (
+      {/* {toast ? (
         <div className="fixed right-4 top-20 z-[60] max-w-sm sm:right-8">
           <div
             className={`${directorGlassCard} flex items-center gap-3 px-5 py-3 text-sm font-medium text-white shadow-2xl`}
@@ -698,7 +754,23 @@ const assignModalDescription = isMentorInterest
             {toast}
           </div>
         </div>
-      ) : null}
+      ) : null} */}
+      {toast ? (
+  <div className="fixed left-1/2 top-24 z-[100] -translate-x-1/2 max-w-sm px-4">
+    <div
+      className={`${directorGlassCard} flex items-center gap-3 px-5 py-3 text-sm font-semibold text-white shadow-2xl`}
+    >
+      <i
+        className={
+          toast.toLowerCase().includes("rejected")
+            ? "fa-solid fa-circle-xmark text-red-300"
+            : "fa-solid fa-circle-check text-emerald-300"
+        }
+      />
+      {toast}
+    </div>
+  </div>
+) : null}
 
       {showAcceptedModal ? (
   <div
@@ -721,13 +793,23 @@ const assignModalDescription = isMentorInterest
         </p>
 
         <div className="mt-6 flex gap-3">
-          <button
+          {/* <button
             type="button"
             onClick={() => setShowAcceptedModal(false)}
             className="flex-1 rounded-xl border border-white/20 py-2.5 text-sm font-semibold text-white/90 transition hover:bg-white/10"
           >
             Later
-          </button>
+          </button> */}
+          <button
+  type="button"
+  onClick={() => {
+    setShowAcceptedModal(false);
+    router.push("/director/interest-list");
+  }}
+  className="flex-1 rounded-xl border border-white/20 py-2.5 text-sm font-semibold text-white/90 transition hover:bg-white/10"
+>
+  Later
+</button>
 
           <button
             type="button"
@@ -817,13 +899,23 @@ const assignModalDescription = isMentorInterest
 
 
               <div className="mt-6 flex gap-3">
-                <button
+                {/* <button
                   type="button"
                   onClick={() => setShowAssignModal(false)}
                   className="flex-1 rounded-xl border border-white/20 py-2.5 text-sm font-semibold text-white/90 transition hover:bg-white/10"
                 >
                   Cancel
-                </button>
+                </button> */}
+                <button
+  type="button"
+  onClick={() => {
+    setShowAssignModal(false);
+    setShowAcceptedModal(true);
+  }}
+  className="flex-1 rounded-xl border border-white/20 py-2.5 text-sm font-semibold text-white/90 transition hover:bg-white/10"
+>
+  Back
+</button>
                 {/* <button
                   type="button"
                   onClick={handleAssign}
