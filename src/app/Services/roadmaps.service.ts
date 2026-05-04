@@ -239,9 +239,12 @@ export const apiReplyToQuery = (roadMapId: string, queryItemId: string, payload:
 
 // ─── Extras ──────────────────────────────────────────────────────────────────
 
-// GET /roadmaps/:roadMapId/extras?userId=&nestedRoadMapItemId=
-function isObjectId(v?: string): v is string {
-  return typeof v === "string" && /^[0-9a-fA-F]{24}$/.test(v.trim());
+/** Mongo ObjectId or other backend ids (query-safe alphanumeric / hyphen). */
+function isRoadmapScopeId(v?: string): v is string {
+  const t = typeof v === "string" ? v.trim() : "";
+  if (!t || t.length > 80) return false;
+  if (/^[0-9a-fA-F]{24}$/.test(t)) return true;
+  return /^[a-zA-Z0-9_-]+$/.test(t) && t.length >= 8;
 }
 
 function cleanQueryIds(userId: string, nestedRoadMapItemId?: string): {
@@ -249,7 +252,7 @@ function cleanQueryIds(userId: string, nestedRoadMapItemId?: string): {
   nestedRoadMapItemId?: string;
 } {
   const out: { userId: string; nestedRoadMapItemId?: string } = { userId };
-  if (isObjectId(nestedRoadMapItemId)) out.nestedRoadMapItemId = nestedRoadMapItemId.trim();
+  if (isRoadmapScopeId(nestedRoadMapItemId)) out.nestedRoadMapItemId = nestedRoadMapItemId!.trim();
   return out;
 }
 
@@ -271,11 +274,8 @@ export async function apiTriggerJumpstartComplete(
   if (!userId?.trim()) throw new Error("userId is required to trigger jumpstart completion");
 
   const validNestedId =
-    nestedRoadMapItemId &&
-    nestedRoadMapItemId.trim() !== "" &&
-    nestedRoadMapItemId.length === 24 &&
-    /^[0-9a-fA-F]{24}$/.test(nestedRoadMapItemId)
-      ? nestedRoadMapItemId
+    nestedRoadMapItemId && isRoadmapScopeId(nestedRoadMapItemId)
+      ? nestedRoadMapItemId.trim()
       : undefined;
 
   const body: {

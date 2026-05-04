@@ -68,6 +68,42 @@ type Props = {
   menteeId: string;
 };
 
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+/** Parse Retry-After for 429; default stagger when header missing. */
+function retryDelayMsFor429(error: unknown): number {
+  if (!isAxiosError(error) || error.response?.status !== 429) return 0;
+  const h = error.response.headers;
+  const raw = h?.["retry-after"] ?? h?.["Retry-After"];
+  if (raw != null) {
+    const sec = parseInt(String(raw), 10);
+    if (!Number.isNaN(sec) && sec >= 0) {
+      return Math.min(Math.max(sec, 1) * 1000, 60_000);
+    }
+  }
+  return 2000;
+}
+
+async function with429Retries<T>(fn: () => Promise<T>, maxAttempts = 4): Promise<T> {
+  let last: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      last = e;
+      const delay = retryDelayMsFor429(e);
+      if (delay > 0 && attempt < maxAttempts - 1) {
+        await sleep(delay);
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw last;
+}
+
 export default function MenteeProfileClient({ menteeId }: Props) {
   const router = useRouter();
 
@@ -117,10 +153,9 @@ export default function MenteeProfileClient({ menteeId }: Props) {
     setLoadError(null);
     try {
       setLoading(true);
-      const [userRes, progressRes] = await Promise.all([
-        apiGetUserById(menteeId),
-        apiGetUserProgress(menteeId),
-      ]);
+      // Sequential calls reduce burst traffic; retries absorb API 429 rate limits.
+      const userRes = await with429Retries(() => apiGetUserById(menteeId));
+      const progressRes = await with429Retries(() => apiGetUserProgress(menteeId));
 
       const user = userRes.data.data;
       const progress = unwrapProgressData(progressRes as { data: unknown }) as ProgressResponse | null;
@@ -177,7 +212,11 @@ export default function MenteeProfileClient({ menteeId }: Props) {
       );
     } catch (err) {
       console.error("Failed to fetch mentee profile", err);
-      setLoadError("Could not load this mentee. Check your connection and try again.");
+      if (isAxiosError(err) && err.response?.status === 429) {
+        setLoadError("Too many requests right now. Wait a few seconds and use Retry below.");
+      } else {
+        setLoadError("Could not load this mentee. Check your connection and try again.");
+      }
     } finally {
       setLoading(false);
     }

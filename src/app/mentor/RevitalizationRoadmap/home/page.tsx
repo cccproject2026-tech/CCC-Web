@@ -5,10 +5,7 @@ import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import { useSearchParams } from "next/navigation";
-import { apiGetUserRoadmaps } from "@/app/Services/roadmaps.service";
-import { apiGetUserById } from "@/app/Services/users.service";
-import { apiGetUserProgress } from "@/app/Services/progress.service";
-import { unwrapProgressData, resolveMentorUserRoadmapsList } from "@/app/Services/roadmap-assignments";
+import { fetchMergedRoadmapsForAssignedUser } from "@/app/Services/roadmap-assignments";
 import MentorHeader from "@/app/Components/MentorHeader";
 import DirectorHero from "@/app/director/DirectorHero";
 import { mentorPageRoot, mentorRoadmapHubMain, mentorSpinner } from "@/app/Components/mentor/mentor-theme";
@@ -50,13 +47,7 @@ function RevitalizationRoadmapHomeContent() {
           return;
         }
 
-        const [res, progressRes] = await Promise.all([
-          apiGetUserRoadmaps(userId),
-          apiGetUserProgress(userId).catch(() => null),
-        ]);
-
-        const progress = progressRes ? unwrapProgressData(progressRes) : null;
-        const data = await resolveMentorUserRoadmapsList(res, progress);
+        const data = await fetchMergedRoadmapsForAssignedUser(userId);
         setRoadmaps(data as any[]);
       } catch (err: unknown) {
         console.error("Failed to fetch user roadmaps", err);

@@ -109,6 +109,7 @@ export interface AssignAssessmentPayload {
 export interface UpdateRoadmapProgressPayload {
   userId: string;
   roadMapId: string;
+  /** Nested task id under `roadMapId`. Also sent as `nestedRoadMapItemId` for backends that expect extras-style naming. */
   nestedRoadmapId?: string;
   completedSteps?: number;
   status?: string;

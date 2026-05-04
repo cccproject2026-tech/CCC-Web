@@ -53,7 +53,9 @@ export default function MentorAssignmentsPage() {
           return;
         }
         setMentorUserId(String(mentorId));
-        const rows = await fetchRoadmapAssignmentsForUser(String(mentorId));
+        const rows = await fetchRoadmapAssignmentsForUser(String(mentorId), {
+          mode: "mentor-catalog",
+        });
         setAssignments(rows);
       } catch (e) {
         console.error(e);
