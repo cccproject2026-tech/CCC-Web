@@ -61,6 +61,8 @@ type Row = {
   completedAt?: string;
   imgUrl: string | null;
   button: string;
+  createdOn?: string;
+  createdBy?: string;
 };
 
 function isDueNowOrPast(dueDateRaw?: string): boolean {
@@ -176,6 +178,8 @@ export default function PastorAssessments() {
                   : status === "Submitted"
                     ? "View submission"
                     : "Start Now",
+              createdOn: typeof a.createdAt === "string" ? new Date(a.createdAt).toLocaleDateString() : undefined,
+              createdBy: (typeof a.createdBy === "string" ? a.createdBy : undefined) || "Admin",
             };
           }),
         )).filter((r): r is NonNullable<typeof r> => r != null);
@@ -323,7 +327,7 @@ export default function PastorAssessments() {
                   </div>
 
                   <div className="flex flex-1 flex-col justify-between p-4 md:p-5">
-                    <div>
+                    <div className="border-b border-white/10 pb-4">
                       <h3 className="mb-1 text-[15px] font-semibold leading-tight text-white md:text-[17px]">
                         {item.title}
                       </h3>
@@ -351,11 +355,25 @@ export default function PastorAssessments() {
                       )}
                     </div>
 
-                    <div className="mt-3 flex justify-end">
+                    <div className="mt-4 flex items-center justify-between gap-4">
+                      <div className="grid grid-cols-3 gap-8 flex-1">
+                        <div className="text-center">
+                          <p className="text-xs text-[#d9ebf8]/60 mb-1">Created on</p>
+                          <p className="text-sm font-semibold text-white">{item.createdOn || "N/A"}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-[#d9ebf8]/60 mb-1">Created by</p>
+                          <p className="text-sm font-semibold text-white">{item.createdBy || "Admin"}</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-xs text-[#d9ebf8]/60 mb-1">Status</p>
+                          <p className="text-sm font-semibold text-white">{item.status}</p>
+                        </div>
+                      </div>
                       <button
                         type="button"
                         onClick={() => router.push(getAssessmentPrimaryHref(item.id, item.status))}
-                        className={`${pastorPrimaryCta} px-4 text-xs md:px-5 md:text-sm`}
+                        className={`${pastorPrimaryCta} shrink-0 px-4 text-xs md:px-5 md:text-sm`}
                       >
                         {item.button}
                       </button>
