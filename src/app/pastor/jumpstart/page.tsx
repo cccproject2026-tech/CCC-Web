@@ -25,6 +25,7 @@ import {
   apiSaveExtras,
   apiUpdateExtras,
   apiUploadExtrasDocuments,
+  apiGetExtrasDocuments,
   apiGetComments,
   apiAddQuery,
   apiGetQueries,
@@ -148,6 +149,9 @@ function JumpStartContent() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({});
+  const [savedUploadDocs, setSavedUploadDocs] = useState<
+    Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]>
+  >({});
   const [extrasExist, setExtrasExist] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -595,6 +599,41 @@ const hasRequiredSubmissions = useMemo(() => {
 
   const scopedNestedId = nestedRoadMapItemIdForExtras;
 
+  // Mobile parity: show server-saved upload documents after refresh.
+  useEffect(() => {
+    if (!roadmapId || !userId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiGetExtrasDocuments(roadmapId, userId, scopedNestedId);
+        const list = (res?.data?.data || res?.data) as any[];
+        const batches = Array.isArray(list) ? list : [];
+        const byName: Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]> = {};
+        batches.forEach((b: any) => {
+          const name = String(b?.name ?? "").trim();
+          const batchId = String(b?.uploadBatchId ?? "").trim();
+          const files = Array.isArray(b?.files) ? b.files : [];
+          if (!name || !batchId || files.length === 0) return;
+          const mapped = files
+            .map((f: any) => ({
+              fileName: String(f?.fileName ?? "").trim(),
+              fileUrl: String(f?.fileUrl ?? "").trim(),
+              uploadBatchId: batchId,
+            }))
+            .filter((f: any) => f.fileName && f.fileUrl);
+          if (!mapped.length) return;
+          byName[name] = [...(byName[name] || []), ...mapped];
+        });
+        if (!cancelled) setSavedUploadDocs(byName);
+      } catch {
+        if (!cancelled) setSavedUploadDocs({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [roadmapId, userId, scopedNestedId]);
+
   /** Reload nested item / roadmap. Optionally skip GET /progress so PATCH responses are not overwritten (stale read). */
   const refetchRoadmap = async (opts?: { skipProgressRefetch?: boolean }): Promise<Record<string, unknown> | null> => {
     if (!nestedItemId) return null;
@@ -780,6 +819,31 @@ const hasRequiredSubmissions = useMemo(() => {
       lastExtrasSaveAtRef.current = Date.now();
       for (const [key, file] of Object.entries(uploadedFiles)) {
         await apiUploadExtrasDocuments(roadmapId, userId, [file], scopedNestedId, key);
+      }
+      // Refresh server uploads so the UI shows "uploaded" after reload.
+      try {
+        const resDocs = await apiGetExtrasDocuments(roadmapId, userId, scopedNestedId);
+        const list = (resDocs?.data?.data || resDocs?.data) as any[];
+        const batches = Array.isArray(list) ? list : [];
+        const byName: Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]> = {};
+        batches.forEach((b: any) => {
+          const name = String(b?.name ?? "").trim();
+          const batchId = String(b?.uploadBatchId ?? "").trim();
+          const files = Array.isArray(b?.files) ? b.files : [];
+          if (!name || !batchId || files.length === 0) return;
+          const mapped = files
+            .map((f: any) => ({
+              fileName: String(f?.fileName ?? "").trim(),
+              fileUrl: String(f?.fileUrl ?? "").trim(),
+              uploadBatchId: batchId,
+            }))
+            .filter((f: any) => f.fileName && f.fileUrl);
+          if (!mapped.length) return;
+          byName[name] = [...(byName[name] || []), ...mapped];
+        });
+        setSavedUploadDocs(byName);
+      } catch {
+        // ignore doc refresh failures; upload already succeeded
       }
       await refetchRoadmap();
       await refetchProgressData();
@@ -1177,6 +1241,38 @@ if (!hasRequiredSubmissions) {
                   <i className="fa-solid fa-xmark"></i>
                 </button>
               </div>
+            ) : (savedUploadDocs[fieldKey]?.length ? (
+              <div className="bg-white/10 border border-[#5A8DCB] rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <i className="fa-solid fa-cloud-check text-emerald-300" />
+                  <span className="text-sm text-white font-semibold">Uploaded</span>
+                </div>
+                <div className="mt-2 space-y-1">
+                  {savedUploadDocs[fieldKey].slice(0, 3).map((f) => (
+                    <div key={f.fileUrl} className="text-xs text-white/80 truncate">
+                      {f.fileName}
+                    </div>
+                  ))}
+                  {savedUploadDocs[fieldKey].length > 3 ? (
+                    <div className="text-xs text-white/60">
+                      +{savedUploadDocs[fieldKey].length - 3} more
+                    </div>
+                  ) : null}
+                </div>
+                <div className="mt-3 border-t border-white/10 pt-3">
+                  <input
+                    type="file"
+                    onChange={(e) =>
+                      e.target.files?.[0] && handleFileUpload(fieldKey, e.target.files[0])
+                    }
+                    className="hidden"
+                    id={`upload-${fieldKey}`}
+                  />
+                  <label htmlFor={`upload-${fieldKey}`} className="cursor-pointer text-sm text-[#aed6f1] hover:text-white">
+                    Replace upload
+                  </label>
+                </div>
+              </div>
             ) : (
               <div className="border-2 border-dashed border-[#5A8DCB] rounded-lg p-5 text-center">
                 <input
@@ -1192,7 +1288,7 @@ if (!hasRequiredSubmissions) {
                   <span className="text-sm text-white/70">Click to upload file</span>
                 </label>
               </div>
-            )}
+            ))}
           </div>
         );
 
