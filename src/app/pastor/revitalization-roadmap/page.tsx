@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useLayoutEffect } from "react";
+import { useState, useEffect, useCallback, useMemo, useLayoutEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
@@ -18,7 +18,7 @@ import { DirectorFilterSection } from "@/app/director/ui";
 import PhaseImg from "@/app/Assets/phase-img.png";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import { getCookie } from "@/app/utils/cookies";
+import { getPastorUserId } from "@/app/utils/pastor-auth";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 import {
   collapseRoadmapAssignmentsToParents,
@@ -69,6 +69,25 @@ function roadmapDisplayName(phase: PhaseCard): string {
 }
 
 const TABS: TabKey[] = ["All", "Due", "In Progress", "Not Started", "Completed"];
+
+/** Minimum gap between background refreshes (focus / visibility) to avoid API rate limits. */
+const SILENT_REFRESH_MIN_MS = 45_000;
+
+function roadmapFetchErrorMessage(err: unknown): string {
+  const ax = err as {
+    response?: { status?: number; data?: { message?: string } };
+    message?: string;
+  };
+  const status = ax?.response?.status;
+  const raw = String(ax?.response?.data?.message || ax?.message || "").trim();
+  if (
+    status === 429 ||
+    /too many requests|throttlerexception|rate limit/i.test(raw)
+  ) {
+    return "Too many requests right now. Please wait a moment, then tap Retry.";
+  }
+  return raw || "Unable to fetch roadmap data from API.";
+}
 
 function tabKeyFromSearchParam(raw: string | null): TabKey | null {
   if (!raw) return null;
@@ -129,6 +148,9 @@ export default function RevitalizationRoadmap() {
     currentName: string;
   } | null>(null);
 
+  const lastSilentFetchAtRef = useRef(0);
+  const progressRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const toUiStatus = (rawStatus: unknown): UiStatus => {
     const t = String(rawStatus ?? "").trim();
     if (t === "Not Started" || t === "In-progress" || t === "Due" || t === "Completed") {
@@ -145,18 +167,15 @@ export default function RevitalizationRoadmap() {
   const normalizeStatus = (raw: string): string =>
     raw.trim().toLowerCase().replace(/[_\s]+/g, "-");
 
-  const getSessionUserId = (): string => {
-    const direct = getCookie("userId")?.trim();
-    if (direct) return direct;
-    try {
-      const user = JSON.parse(getCookie("user") || "{}") as { id?: string; _id?: string };
-      return String(user?.id || user?._id || "");
-    } catch {
-      return "";
-    }
-  };
+  const getSessionUserId = (): string => getPastorUserId()?.trim() || "";
 
-  const fetchRoadmaps = useCallback(async (showLoader = true) => {
+  const fetchRoadmaps = useCallback(async (showLoader = true, bypassSilentThrottle = false) => {
+    const now = Date.now();
+    if (!showLoader && !bypassSilentThrottle) {
+      if (now - lastSilentFetchAtRef.current < SILENT_REFRESH_MIN_MS) return;
+      lastSilentFetchAtRef.current = now;
+    }
+
     try {
       if (showLoader) setLoading(true);
       const userId = getSessionUserId();
@@ -189,11 +208,14 @@ export default function RevitalizationRoadmap() {
 
       setPhases(mappedPhases);
       setError("");
+      lastSilentFetchAtRef.current = Date.now();
     } catch (err: unknown) {
       console.error(err);
-      setPhases([]);
-      const anyErr = err as { response?: { data?: { message?: string } }; message?: string };
-      setError(anyErr?.response?.data?.message || anyErr?.message || "Unable to fetch roadmap data from API.");
+      if (showLoader) {
+        setPhases([]);
+        setError(roadmapFetchErrorMessage(err));
+      }
+      /* Silent refresh failures: keep existing roadmap list to avoid flashing errors from rate limits. */
     } finally {
       if (showLoader) setLoading(false);
     }
@@ -205,7 +227,7 @@ export default function RevitalizationRoadmap() {
   }, [searchParams]);
 
   useEffect(() => {
-    fetchRoadmaps();
+    fetchRoadmaps(true);
 
     const onFocus = () => fetchRoadmaps(false);
     const onVisibility = () => {
@@ -215,11 +237,17 @@ export default function RevitalizationRoadmap() {
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
     const unsubProgress = subscribeProgressUpdated((uid) => {
-      if (uid === getSessionUserId()) fetchRoadmaps(false);
+      if (uid !== getSessionUserId()) return;
+      if (progressRefreshTimerRef.current) clearTimeout(progressRefreshTimerRef.current);
+      progressRefreshTimerRef.current = setTimeout(() => {
+        progressRefreshTimerRef.current = null;
+        fetchRoadmaps(false, true);
+      }, 1500);
     });
     return () => {
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);
+      if (progressRefreshTimerRef.current) clearTimeout(progressRefreshTimerRef.current);
       unsubProgress();
     };
   }, [fetchRoadmaps, pathname]);
@@ -345,31 +373,35 @@ export default function RevitalizationRoadmap() {
           title="Revitalization Roadmap"
           subtitle="Follow your phase-by-phase roadmap and track active milestones."
           image={HeroBg}
+          titleAlign="start"
+          tightenMobileLayout
           pill="Leadership Support Network"
           breadcrumbItems={[{ label: "Home", href: "/pastor/home" }, { label: "Revitalization Roadmap" }]}
+          className="!rounded-2xl md:!rounded-3xl"
         />
 
-        <main className="flex-1 pb-10 sm:pb-12">
-            <div className={`${directorPageContainer} max-w-7xl px-4 sm:px-6 lg:px-8`}>
-              <DirectorFilterSection bare className="!mb-6 !p-4 sm:!p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+        <main className="flex min-h-0 w-full min-w-0 flex-1 overflow-x-hidden pb-8 sm:pb-12">
+          <div className={`${directorPageContainer} w-full min-w-0 max-w-7xl px-3 sm:px-6 lg:px-8`}>
+              <DirectorFilterSection bare className="!mb-5 !p-3 sm:!mb-6 sm:!p-6">
+                <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
                   <div className="min-w-0 w-full lg:max-w-[min(100%,28rem)] lg:flex-1">
                     <SearchBar
                       value={searchTerm}
                       onChange={setSearchTerm}
                       placeholder="Search roadmaps…"
+                      aria-label="Search roadmaps"
                       variant="dark"
                       className="w-full"
                     />
                   </div>
 
-                  <div className="flex min-w-0 w-full flex-nowrap items-stretch justify-start gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] lg:ml-auto lg:w-auto lg:justify-end [&::-webkit-scrollbar]:hidden">
+                  <div className="flex w-full min-w-0 flex-wrap items-center gap-2 md:flex-nowrap md:justify-end md:gap-2 md:overflow-x-auto md:pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                     {TABS.map((tab) => (
                       <button
                         key={tab}
                         type="button"
                         onClick={() => setTab(tab)}
-                        className={`shrink-0 rounded-lg border px-3 py-2.5 text-[12px] font-semibold transition-all sm:px-4 sm:text-[13px] ${tabBtn(activeTab === tab)}`}
+                        className={`min-h-[44px] shrink-0 rounded-lg border px-3 py-2 text-[11px] font-semibold transition-all sm:px-4 sm:text-[13px] md:py-2.5 ${tabBtn(activeTab === tab)}`}
                       >
                         {tab}
                       </button>
@@ -377,7 +409,7 @@ export default function RevitalizationRoadmap() {
                     <button
                       type="button"
                       onClick={() => fetchRoadmaps(false)}
-                      className={directorIconButton}
+                      className={`${directorIconButton} min-h-[44px] min-w-[44px] shrink-0`}
                       aria-label="Refresh roadmap"
                       title="Refresh roadmap"
                     >
@@ -396,7 +428,7 @@ export default function RevitalizationRoadmap() {
                   No roadmaps match this filter.
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
+                <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 md:gap-6">
                   {filteredPhases.map((phase) => {
                     const img =
                       typeof phase.imageUrl === "string"
@@ -407,7 +439,7 @@ export default function RevitalizationRoadmap() {
                         key={`${phase.parentRoadmapId || "parent"}-${phase.id}`}
                         className={`${directorGlassCard} flex flex-col overflow-hidden sm:flex-row`}
                       >
-                        <div className="relative h-44 w-full shrink-0 sm:h-auto sm:min-h-[200px] sm:w-[42%] sm:max-w-[220px]">
+                        <div className="relative aspect-[16/10] max-h-52 w-full shrink-0 sm:aspect-auto sm:h-auto sm:max-h-none sm:min-h-[200px] sm:w-[42%] sm:max-w-[220px]">
                           <Image
                             src={img}
                             alt=""
@@ -428,13 +460,17 @@ export default function RevitalizationRoadmap() {
                           </div>
                         </div>
 
-                        <div className="flex min-w-0 flex-1 flex-col justify-between gap-4 p-4 sm:p-5">
+                        <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 p-4 sm:gap-4 sm:p-5">
                           <div className="min-w-0 space-y-2">
-                            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#3498DB]/90">
+                            <p className="break-words text-[10px] font-semibold uppercase tracking-wide text-[#3498DB]/90">
                               {phase.parentRoadmapName}
                             </p>
-                            <h3 className="text-base font-bold leading-snug text-white sm:text-lg">{phase.title}</h3>
-                            <p className="line-clamp-3 text-sm leading-relaxed text-white/65">{phase.description}</p>
+                            <h3 className="break-words text-base font-bold leading-snug text-white sm:text-lg">
+                              {phase.title}
+                            </h3>
+                            <p className="line-clamp-4 text-sm leading-relaxed text-white/65 sm:line-clamp-3">
+                              {phase.description}
+                            </p>
 
                             {phase.sessionDate ? (
                               <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -451,11 +487,11 @@ export default function RevitalizationRoadmap() {
                             </p>
                           </div>
 
-                          <div className="flex justify-end border-t border-white/10 pt-3 sm:border-0 sm:pt-0">
+                          <div className="flex border-t border-white/10 pt-3 sm:justify-end sm:border-0 sm:pt-0">
                             <button
                               type="button"
                               onClick={() => handleViewPhase(phase)}
-                              className={`${directorBtnPrimary} !px-5 !py-2.5 !text-sm`}
+                              className={`${directorBtnPrimary} min-h-[44px] w-full !px-5 !py-2.5 !text-sm sm:min-h-0 sm:w-auto`}
                             >
                               View
                             </button>
@@ -466,8 +502,8 @@ export default function RevitalizationRoadmap() {
                   })}
                 </div>
               )}
-            </div>
-          </main>
+          </div>
+        </main>
       </PastorRoadmapDashboardBody>
 
       {sequenceGate && (

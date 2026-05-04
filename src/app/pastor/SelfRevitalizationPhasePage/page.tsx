@@ -24,6 +24,8 @@ import { apiGetUserProgress } from "@/app/Services/progress.service";
 import {
   deriveTaskStatusForList,
   unwrapProgressData,
+  mergeProgressOntoRoadmaps,
+  normalizeRoadmapId,
   type RoadmapAssignmentUi,
 } from "@/app/Services/roadmap-assignments";
 import type { ProgressResponse } from "@/app/Services/types/progress.types";
@@ -117,7 +119,7 @@ function SelfRevitalizationContent() {
   const taskStatusFromProgress = (
     item: { _id?: string; id?: string; status?: unknown; endDate?: string },
   ): string => {
-    const tid = String(item._id ?? item.id ?? "").trim();
+    const tid = normalizeRoadmapId(item._id ?? item.id);
     const ov = tid ? statusOverrides[tid] : undefined;
     if (ov) return ov;
     if (!roadmapId || !tid) return statusLabel(item.status);
@@ -127,29 +129,6 @@ function SelfRevitalizationContent() {
       itemStatus: item.status != null && String(item.status).trim() !== "" ? String(item.status) : undefined,
       endDate: typeof item.endDate === "string" ? item.endDate : undefined,
     });
-
-    // If derived says "Not Started", check raw progress data — API sometimes returns
-    // completedSteps > 0 with totalSteps: 0 and pct: 0 and status: "not_started" which
-    // mapNestedStatus cannot detect. Compute directly from completedSteps in that case.
-    if (derived === "Not Started" && progressData) {
-      const parentPr = (progressData.roadmaps ?? []).find(
-        (rp) => String(rp.roadMapId ?? "").trim() === roadmapId,
-      );
-      if (parentPr) {
-        const nestedPr = (parentPr.nestedRoadmaps ?? []).find(
-          (np) => String(np.nestedRoadmapId ?? "").trim() === tid,
-        );
-        if (nestedPr) {
-          const completed = Number(nestedPr.completedSteps) || 0;
-          const total = Number(nestedPr.totalSteps) || 0;
-          // Only compute from steps when totalSteps > 0; otherwise keep "Not Started"
-          if (total > 0) {
-            if (completed >= total) return "Completed";
-            if (completed > 0) return "In-progress";
-          }
-        }
-      }
-    }
 
     if (derived === "In-progress") return "In-progress";
     return derived;
@@ -167,12 +146,16 @@ function SelfRevitalizationContent() {
       const userId = getSessionUserId();
       const rmRes = await apiGetRoadmapById(roadmapId);
       const body = rmRes.data as { data?: unknown };
-      const doc = body?.data ?? rmRes.data;
-      setRoadmap(doc);
+      let doc = body?.data ?? rmRes.data;
       if (userId) {
         try {
           const progRes = await apiGetUserProgress(userId);
-          setProgressData(unwrapProgressData(progRes));
+          const prog = unwrapProgressData(progRes);
+          setProgressData(prog);
+          if (doc && typeof doc === "object" && !Array.isArray(doc) && prog) {
+            const merged = mergeProgressOntoRoadmaps([doc as never], prog);
+            doc = merged[0] ?? doc;
+          }
         } catch {
           setProgressData(null);
         }
@@ -180,6 +163,7 @@ function SelfRevitalizationContent() {
         setProgressData(null);
         setError("User session not found. Please sign in again.");
       }
+      setRoadmap(doc);
     } catch (err) {
       console.error("Failed to fetch roadmap", err);
       setRoadmap(null);

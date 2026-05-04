@@ -130,6 +130,8 @@ export interface RoadMapResponse {
   roadmaps: NestedRoadMapItem[];
   createdAt?: string;
   updatedAt?: string;
+  /** Populated creator or raw id — backend may use `created_by` before normalization. */
+  createdBy?: PopulatedUser | string | Record<string, unknown>;
 }
 
 export interface CreateRoadMapPayload {
