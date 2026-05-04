@@ -4,13 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 // import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/hero-bg.png";
+import { useSearchParams } from "next/navigation";
 
 /**
  * Immediate confirmation after submitting the interest form — gratitude + clear next step.
  * For live approval status, polling, and outcomes use `/pastor/Processing` (different copy).
  */
 export default function ThankyouPage() {
+  
   const router = useRouter();
+  const searchParams = useSearchParams();
+const emailFromUrl = searchParams.get("email") ?? "";
 
   return (
     <div className="flex min-h-screen flex-col bg-transparent text-white font-[Albert_Sans]">
@@ -62,7 +66,23 @@ export default function ThankyouPage() {
                 <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                   <button
                     type="button"
-                    onClick={() => router.push("/pastor/Processing")}
+                    // onClick={() => router.push("/pastor/Processing")}
+                    onClick={() => {
+  const email =
+    typeof window !== "undefined"
+      ? document.cookie
+          .split("; ")
+          .find((row) => row.startsWith("interestEmail="))
+          ?.split("=")[1]
+      : "";
+
+  if (email) {
+    router.push(`/pastor/Processing?email=${encodeURIComponent(decodeURIComponent(email))}`);
+    return;
+  }
+
+  router.push("/pastor/Processing");
+}}
                     className="rounded-xl bg-white px-8 py-3 text-sm font-semibold text-[#0f4a76] shadow-[0_8px_24px_rgba(0,0,0,0.2)] transition hover:bg-[#e7f1fa] md:px-10 md:text-base"
                   >
                     Track application status

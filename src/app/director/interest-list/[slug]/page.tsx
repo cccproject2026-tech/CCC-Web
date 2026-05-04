@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
-import AppFooter from "@/app/Components/AppFooter";
+// import AppFooter from "@/app/Components/AppFooter";
 import DirectorHero from "../../DirectorHero";
 import MentorBg from "../../../Assets/mentor-bg.png";
 import Mentor1 from "../../../Assets/mentor1.png";
@@ -298,7 +298,7 @@ const handleAssign = async () => {
             <p className="text-sm text-[#cde2f2]">Loading interest details…</p>
           </div>
         </section>
-        <AppFooter />
+        {/* <AppFooter /> */}
       </div>
     );
   }
@@ -319,7 +319,7 @@ const handleAssign = async () => {
             </button>
           </div>
         </section>
-        <AppFooter />
+        {/* <AppFooter /> */}
       </div>
     );
   }
@@ -973,7 +973,7 @@ const assignModalDescription = isMentorInterest
         </div>
       ) : null}
 
-      <AppFooter />
+      {/* <AppFooter /> */}
     </div>
   );
 }

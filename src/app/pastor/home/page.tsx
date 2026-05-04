@@ -485,8 +485,8 @@ export default function PastorDashboard() {
 
   return (
     <div className={pastorPageRoot}>
-      <PastorHeader showFullHeader={true} />
-
+      {/* <PastorHeader showFullHeader={true} /> */}
+{/* 
       <section
         className="relative overflow-hidden bg-cover bg-top px-4 pb-8 pt-6 sm:px-8 lg:px-20"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
@@ -545,10 +545,186 @@ export default function PastorDashboard() {
             </div>
           </div>
         </div>
-      </section>
+      </section> */}
+{/* <PastorHeader showFullHeader={true} />
+
+<div className="px-4 pt-8 sm:px-8 lg:px-20"> */}
+<PastorHeader showFullHeader={true} />
+
+<main className={`${pastorMainGradient} min-h-screen`}>
+  <div className="relative z-10 px-4 pt-8 sm:px-8 lg:px-20">
+  {/* <section
+    className="relative overflow-hidden rounded-3xl border border-white/10 bg-cover bg-center"
+    style={{ backgroundImage: `url(${HeroBg.src})` }}
+  >
+    <div className="absolute inset-0 bg-gradient-to-t from-[#062946] via-[#062946]/75 to-[#0a3558]/50" />
+    <div className="absolute inset-0 bg-gradient-to-r from-[#041f35]/90 via-transparent to-transparent" /> */}
+
+<section className="relative overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#0a2b45_0%,#08243b_100%)]">
+  <div
+    className="absolute inset-0 bg-cover bg-center opacity-[0.32]"
+    style={{ backgroundImage: `url(${HeroBg.src})` }}
+  />
+  {/* <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(142,197,235,0.10),transparent_28%),linear-gradient(180deg,rgba(7,40,66,0.55)_0%,rgba(6,33,56,0.78)_55%,rgba(5,28,48,0.96)_100%)]" /> */}
+  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(142,197,235,0.14),transparent_30%),linear-gradient(180deg,rgba(7,40,66,0.35)_0%,rgba(6,33,56,0.58)_55%,rgba(5,28,48,0.82)_100%)]" />
+  <div className="absolute inset-y-0 left-0 w-[58%] bg-[linear-gradient(90deg,rgba(4,24,41,0.88)_0%,rgba(4,24,41,0.62)_58%,rgba(4,24,41,0)_100%)]" />
+    <div className="relative z-10 flex min-h-[340px] flex-col justify-between p-5 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
+      <div className="max-w-full space-y-2 lg:max-w-2xl">
+        {/* <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
+          {greeting}
+        </p> */}
+
+        <h1 className="text-xl font-semibold leading-snug sm:text-3xl lg:text-4xl">
+         Cultivate Spiritual, Professional, Social, And Community
+<br className="hidden sm:block" />
+Development
+        </h1>
+
+        <p className="text-sm text-white/80">{currentTime}</p>
+        <p className="text-xs text-white/60 sm:text-sm">{currentDate}</p>
+      </div>
+
+      {/* <button
+        type="button"
+        onClick={() => router.push("/pastor/profile")}
+        // className="mt-4 flex w-full max-w-sm flex-col gap-3 rounded-2xl border border-white/20 bg-white/10 p-4 text-left backdrop-blur-md transition hover:bg-white/15 lg:mt-0 lg:w-auto"
+        className="mt-4 flex w-full max-w-sm flex-col gap-3 rounded-2xl border border-white/15 bg-[#173653]/78 p-4 text-left backdrop-blur-md transition hover:bg-[#1b3c5c]/82 lg:mt-0 lg:w-auto"
+      >
+        <div className="flex items-center gap-4">
+          <Image
+            src={UserProfile}
+            alt="User"
+            width={48}
+            height={48}
+            className="h-12 w-12 rounded-full border-2 border-white/30 object-cover"
+          />
+
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-white">
+              Welcome Aboard!
+            </p>
+
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs font-semibold text-[#cde2f2]">
+                Progress
+              </span>
+
+              <span className="ml-auto text-xs font-bold text-white">
+                {progressPercent}%
+              </span>
+            </div>
+
+            <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-white/20">
+              <div
+                className="h-full rounded-full bg-[#8ec5eb] transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {overallProgressWarning ? (
+          <p className="text-xs text-amber-200/90">{overallProgressWarning}</p>
+        ) : null}
+
+        <span
+          onClick={(e) => {
+            e.stopPropagation();
+            router.push("/pastor/Myprogress");
+          }}
+          className="text-xs font-semibold text-[#8ec5eb] hover:text-white"
+        >
+          View Progress Tracker
+        </span>
+      </button> */}
+      {/* <div className="mt-4 flex w-full max-w-[280px] items-center gap-3 rounded-2xl border border-white/15 bg-[#173653]/70 px-4 py-3 text-left backdrop-blur-md lg:mt-0">
+  <Image
+    src={UserProfile}
+    alt="User"
+    width={44}
+    height={44}
+    className="h-11 w-11 rounded-full border-2 border-white/30 object-cover"
+  />
+
+  <div className="min-w-0 flex-1">
+    <div className="mb-1.5 flex items-center justify-between gap-3">
+      <span className="text-xs font-semibold text-[#cde2f2]">
+        Progress
+      </span>
+
+      <span className="text-xs font-bold text-white">
+        {progressPercent}%
+      </span>
+    </div>
+
+    <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
+      <div
+        className="h-full rounded-full bg-[#8ec5eb] transition-all duration-500"
+        style={{ width: `${progressPercent}%` }}
+      />
+    </div>
+
+    {overallProgressWarning ? (
+      <p className="mt-1.5 truncate text-[10px] text-amber-200/90">
+        {overallProgressWarning}
+      </p>
+    ) : null}
+  </div>
+</div> */}
+<div className="mt-4 w-full max-w-[330px] rounded-2xl border border-white/15 bg-[#173653]/70 px-4 py-3 text-left backdrop-blur-md lg:mt-0 lg:self-end">
+  <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
+    {greeting}
+  </p>
+
+  <div className="flex items-center gap-3">
+    <Image
+      src={UserProfile}
+      alt="User"
+      width={44}
+      height={44}
+      className="h-11 w-11 rounded-full border-2 border-white/30 object-cover"
+    />
+
+    <div className="min-w-0 flex-1">
+      <p className="mb-1 truncate text-sm font-semibold text-white">
+        Grace Miller
+      </p>
+
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold text-[#cde2f2]">
+          Progress
+        </span>
+
+        <span className="text-xs font-bold text-white">
+          {progressPercent}%
+        </span>
+      </div>
+
+      <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
+        <div
+          className="h-full rounded-full bg-[#8ec5eb] transition-all duration-500"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+    </div>
+  </div>
+
+  {overallProgressWarning ? (
+    <p className="mt-2 truncate text-[10px] text-amber-200/90">
+      {overallProgressWarning}
+    </p>
+  ) : null}
+</div>
+    </div>
+  </section>
+{/* </div>
+    
 
       <main className={pastorMainGradient}>
-        <div className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-6 sm:px-8 lg:px-20">
+        <div className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-6 sm:px-8 lg:px-20"> */}
+        </div>
+
+<div className="relative z-10 mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-6 sm:px-8 lg:px-20">
           <section className="mt-2 sm:mt-4">
             <div className={`p-5 sm:p-6 lg:p-8 ${pastorFocusGlass}`}>
               <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
