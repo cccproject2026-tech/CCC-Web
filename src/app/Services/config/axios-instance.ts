@@ -60,7 +60,7 @@ const baseCandidates = [
   "https://api.wisdomtooth.tech/api/v1",
 ].filter(Boolean) as string[];
 
-/** Same-origin path — `next.config` rewrites to `app.wisdomtooth.tech/api/v1`. Required in the browser to avoid CORS. */
+/** Same-origin path — `next.config` rewrites to API_PROXY_TARGET / NEXT_PUBLIC_API_BASE_URL / default host. Required in the browser to avoid CORS. */
 export const BROWSER_API_BASE = "/api-proxy";
 
 const resolvedBaseURL =

@@ -31,6 +31,8 @@ import {
   apiUpdateRoadmapProgress,
   apiGetUserProgress,
   apiTriggerJumpstartComplete,
+  apiUpdateNestedRoadmapItem,
+  apiUpdateRoadmap,
 } from "@/app/Services/api";
 import {
   deriveTaskStatusForList,
@@ -40,6 +42,7 @@ import {
 import { pastorRoadmapDescriptionOverview } from "@/app/Components/pastor/pastor-theme";
 import type { ProgressResponse } from "@/app/Services/types/progress.types";
 import { getCookie } from "@/app/utils/cookies";
+import { getPastorUserId } from "@/app/utils/pastor-auth";
 import { emitProgressUpdated } from "@/app/utils/progress-sync";
 import type {
   CommentItem,
@@ -275,10 +278,8 @@ function JumpStartContent() {
   }, [userId]);
 
   useEffect(() => {
-    const fromCookie = getCookie("userId")?.trim();
-    if (fromCookie) {
-      setUserId(fromCookie);
-    }
+    const resolved = getPastorUserId()?.trim() || "";
+    if (resolved) setUserId(resolved);
     try {
       const u = JSON.parse(getCookie("user") || "{}") as {
         id?: string;
@@ -287,13 +288,13 @@ function JumpStartContent() {
         lastName?: string;
         name?: string;
       };
-      if (!fromCookie) setUserId((u?.id || u?._id || "") as string);
+      if (!resolved) setUserId(String(u?.id || u?._id || "").trim());
       const dn =
         [u.firstName, u.lastName].filter(Boolean).join(" ").trim() ||
         (typeof u.name === "string" ? u.name.trim() : "");
       setSessionDisplayName(dn || null);
     } catch {
-      if (!fromCookie) setUserId("");
+      if (!resolved) setUserId("");
       setSessionDisplayName(null);
     }
   }, []);
@@ -346,9 +347,7 @@ function JumpStartContent() {
     if (!roadmapId || !userId) return;
     if (jumpstartTriggeredRef.current) return;
     const nestedForExtras =
-      parentRoadmapId && nestedItemId && /^[0-9a-fA-F]{24}$/.test(nestedItemId)
-        ? nestedItemId
-        : undefined;
+      parentRoadmapId && nestedItemId?.trim() ? nestedItemId.trim() : undefined;
     try {
       const r = await apiTriggerJumpstartComplete(roadmapId, userId, nestedForExtras);
       if (r?.success || r?.alreadyExists) {
@@ -676,9 +675,7 @@ const hasRequiredSubmissions = useMemo(() => {
       const extrasArray = buildTypedExtrasPayload(mergedForm, roadmap.extras as ExtraComponent[] | undefined);
       const createPayload = {
         userId,
-        ...(scopedNestedId && /^[0-9a-fA-F]{24}$/.test(scopedNestedId)
-          ? { nestedRoadMapItemId: scopedNestedId }
-          : {}),
+        ...(scopedNestedId?.trim() ? { nestedRoadMapItemId: scopedNestedId.trim() } : {}),
         extras: extrasArray,
       };
       if (extrasExist) {
@@ -803,6 +800,36 @@ if (!hasRequiredSubmissions) {
           console.error("Mark complete — progress:", e1, e2);
           progressErrors.push(axiosMessage(e1));
           progressErrors.push(axiosMessage(e2));
+        }
+      }
+
+      if (!progressOk) {
+        const completedOn = new Date().toISOString();
+        try {
+          if (parentRoadmapId?.trim() && nestedItemId?.trim()) {
+            await apiUpdateNestedRoadmapItem(parentRoadmapId.trim(), nestedItemId.trim(), {
+              status: "completed",
+              completedOn,
+            });
+          } else if (nestedItemId?.trim()) {
+            await apiUpdateRoadmap(nestedItemId.trim(), {
+              status: "completed",
+              completedOn,
+            });
+          }
+          progressUpdateAxios = await apiUpdateRoadmapProgress({
+            userId,
+            roadMapId,
+            nestedRoadmapId,
+            completedSteps: totalSteps,
+            status: "completed",
+          });
+          if ((progressUpdateAxios as { data?: { success?: boolean } })?.data?.success !== false) {
+            progressOk = true;
+          }
+        } catch (e3) {
+          console.error("Mark complete — template + progress retry:", e3);
+          progressErrors.push(axiosMessage(e3));
         }
       }
 

@@ -1,5 +1,5 @@
-import { apiGetRoadmapsByUser, apiGetRoadmapById } from "./roadmaps.service";
-import { apiGetUserProgress } from "./progress.service";
+import { apiGetRoadmaps, apiGetRoadmapsByUser, apiGetRoadmapById } from "./roadmaps.service";
+import { apiGetUserProgress, unwrapUserProgressDetail } from "./progress.service";
 import type { ProgressResponse, ProgressRoadmap, NestedRoadmapProgress } from "./types/progress.types";
 import type { RoadMapResponse, NestedRoadMapItem } from "./types/roadmaps.types";
 
@@ -28,6 +28,7 @@ function extractRoadmapArrayFromAxiosData(body: unknown): unknown[] {
 
   if (Array.isArray(o.data)) return o.data;
   if (Array.isArray(o.roadmaps)) return o.roadmaps;
+  if (Array.isArray(o.roadMaps)) return o.roadMaps;
   if (Array.isArray(o.items)) return o.items;
   if (Array.isArray(o.results)) return o.results;
 
@@ -35,6 +36,7 @@ function extractRoadmapArrayFromAxiosData(body: unknown): unknown[] {
     const d = o.data as Record<string, unknown>;
     if (Array.isArray(d.data)) return d.data;
     if (Array.isArray(d.roadmaps)) return d.roadmaps;
+    if (Array.isArray(d.roadMaps)) return d.roadMaps;
     if (Array.isArray(d.items)) return d.items;
     if (Array.isArray(d.rows)) return d.rows;
     if (Array.isArray(d.assignments)) return d.assignments;
@@ -66,6 +68,11 @@ function coerceMongoId(raw: unknown): string | null {
   return null;
 }
 
+/** Match progress ↔ catalogue docs when ids are strings, numbers, or `{ $oid }`. */
+export function normalizeRoadmapId(raw: unknown): string {
+  return (coerceMongoId(raw) ?? String(raw ?? "").trim()).trim();
+}
+
 /** Merge assignment-style row `{ roadmap, progress }` into a single object for list UIs. */
 export function normalizeUserRoadmapListItem(row: unknown): RoadMapResponse | null {
   if (!row || typeof row !== "object") return null;
@@ -94,6 +101,64 @@ export function normalizeUserRoadmapListItem(row: unknown): RoadMapResponse | nu
       base.haveNextedRoadMaps ?? (roadmaps.length > 0),
     ),
   };
+
+  /** Assignment/list wrappers often put audit fields on the outer row, not on nested `roadmap`. */
+  const pickAudit = <T,>(inner: T | null | undefined, outer: T | null | undefined): T | undefined => {
+    if (inner !== undefined && inner !== null) return inner;
+    if (outer !== undefined && outer !== null) return outer;
+    return undefined;
+  };
+
+  const pickAuditString = (
+    inner?: string | null,
+    outer?: string | null,
+  ): string | undefined => {
+    const i = typeof inner === "string" ? inner.trim() : "";
+    if (i) return inner ?? undefined;
+    const o = typeof outer === "string" ? outer.trim() : "";
+    if (o) return outer ?? undefined;
+    return undefined;
+  };
+
+  const createdAt =
+    pickAuditString(
+      (base as Record<string, unknown>).createdAt as string | undefined,
+      (r as Record<string, unknown>).createdAt as string | undefined,
+    ) ??
+    pickAuditString(
+      (base as Record<string, unknown>).created_at as string | undefined,
+      (r as Record<string, unknown>).created_at as string | undefined,
+    );
+  if (createdAt != null && String(createdAt).trim() !== "") {
+    (merged as Record<string, unknown>).createdAt = createdAt;
+  }
+
+  const updatedAt =
+    pickAuditString(
+      (base as Record<string, unknown>).updatedAt as string | undefined,
+      (r as Record<string, unknown>).updatedAt as string | undefined,
+    ) ??
+    pickAuditString(
+      (base as Record<string, unknown>).updated_at as string | undefined,
+      (r as Record<string, unknown>).updated_at as string | undefined,
+    );
+  if (updatedAt != null && String(updatedAt).trim() !== "") {
+    (merged as Record<string, unknown>).updatedAt = updatedAt;
+  }
+
+  const createdBy =
+    pickAudit(
+      (base as Record<string, unknown>).createdBy as unknown,
+      (r as Record<string, unknown>).createdBy as unknown,
+    ) ??
+    pickAudit(
+      (base as Record<string, unknown>).created_by as unknown,
+      (r as Record<string, unknown>).created_by as unknown,
+    );
+  if (createdBy !== undefined && createdBy !== null) {
+    (merged as Record<string, unknown>).createdBy = createdBy;
+  }
+
   if (progress != null && typeof progress === "object") {
     (merged as RoadMapResponse & { progress?: unknown }).progress = progress;
   }
@@ -125,8 +190,8 @@ export function unwrapProgressData(res: { data: unknown }): ProgressResponse | n
   if (!body || typeof body !== "object") return null;
   const o = body as Record<string, unknown>;
   if (o.success === false) return null;
-  if (o.data && typeof o.data === "object") return normalizeProgressResponse(o.data as ProgressResponse);
-  return normalizeProgressResponse(body as ProgressResponse);
+  const detail = unwrapUserProgressDetail(res as { data?: unknown });
+  return normalizeProgressResponse(detail);
 }
 
 /** Backend may nest `roadmaps` or `nestedRoadmaps` as `{ items: [...] }`. */
@@ -152,31 +217,63 @@ function nestedProgressList(pr: ProgressRoadmap | undefined): NestedRoadmapProgr
   return [];
 }
 
-/** Trimmed string compare — backend may add whitespace or mix id field shapes. */
-function sameId(a: unknown, b: unknown): boolean {
-  return String(a ?? "").trim() === String(b ?? "").trim();
-}
-
 /** Parent id on progress rows — backend may use roadMapId, roadmapId, or _id. */
 function progressRowParentId(p: ProgressRoadmap | Record<string, unknown>): string {
   const r = p as Record<string, unknown>;
-  return String(r.roadMapId ?? r.roadmapId ?? r.roadMapID ?? r._id ?? "").trim();
+  return normalizeRoadmapId(r.roadMapId ?? r.roadmapId ?? r.roadMapID ?? r._id);
+}
+
+/**
+ * Matches CCC-Mobile `useAssignedRoadmaps`: `progressData.roadmaps.items[].roadMapId`
+ * (web normalizes `items` onto `roadmaps` first).
+ */
+function assignedRoadmapIdsFromProgress(progress: ProgressResponse | null | undefined): string[] {
+  const norm = normalizeProgressResponse(progress);
+  const rows = norm?.roadmaps;
+  if (!rows?.length) return [];
+  const ids = rows.map((p) => progressRowParentId(p)).filter(Boolean);
+  return [...new Set(ids)];
+}
+
+function roadmapDocId(rm: RoadMapResponse): string {
+  const raw =
+    (rm as { _id?: unknown })._id ??
+    (rm as { id?: unknown }).id ??
+    (rm as { roadMapId?: unknown }).roadMapId ??
+    (rm as { roadmapId?: unknown }).roadmapId;
+  return normalizeRoadmapId(raw);
+}
+
+function filterRoadmapsByAssignedIds(all: RoadMapResponse[], assignedIds: string[]): RoadMapResponse[] {
+  if (!assignedIds.length) return [];
+  const want = new Set(assignedIds.map((id) => normalizeRoadmapId(id)).filter(Boolean));
+  return all.filter((rm) => {
+    const id = roadmapDocId(rm);
+    return id && want.has(id);
+  });
 }
 
 /** Nested task id on progress rows — backend may use nestedRoadmapId, _id, or id. */
 function nestedRowTaskId(n: NestedRoadmapProgress | Record<string, unknown>): string {
   const r = n as Record<string, unknown>;
-  return String(r.nestedRoadmapId ?? r.nestedItemId ?? r._id ?? r.id ?? "").trim();
+  return normalizeRoadmapId(r.nestedRoadmapId ?? r.nestedItemId ?? r._id ?? r.id);
+}
+
+/** Trimmed string compare — backend may add whitespace or mix id field shapes. */
+function sameId(a: unknown, b: unknown): boolean {
+  const ca = normalizeRoadmapId(a);
+  const cb = normalizeRoadmapId(b);
+  return ca !== "" && cb !== "" && ca === cb;
 }
 
 /** Find parent progress row when roadMapId does not strictly equal phase _id (API quirks). */
-function findProgressRoadmapForParent(
+export function findProgressRoadmapForParent(
   progress: ProgressResponse | null | undefined,
   parentRoadmapId: string,
 ): ProgressRoadmap | undefined {
-  const pid = String(parentRoadmapId).trim();
+  const pid = normalizeRoadmapId(parentRoadmapId);
   const list = normalizeProgressResponse(progress)?.roadmaps;
-  if (!list?.length) return undefined;
+  if (!list?.length || !pid) return undefined;
   return list.find((p) => sameId(progressRowParentId(p), pid));
 }
 
@@ -184,12 +281,12 @@ function findProgressRoadmapForParent(
  * Find nested progress for a task: prefer the parent’s nested list, then scan all progress parents
  * (nested row is sometimes stored under a mismatched roadMapId).
  */
-function findNestedProgressForTask(
+export function findNestedProgressForTask(
   progress: ProgressResponse | null | undefined,
   parentRoadmapId: string,
   taskId: string,
 ): NestedRoadmapProgress | undefined {
-  const tid = String(taskId).trim();
+  const tid = normalizeRoadmapId(taskId);
   if (!tid) return undefined;
 
   const pr = findProgressRoadmapForParent(progress, parentRoadmapId);
@@ -297,6 +394,9 @@ export function deriveTaskStatusForList(
   const { parentRoadmapId, taskId, itemStatus, endDate } = args;
   const pr = findProgressRoadmapForParent(progress, parentRoadmapId);
   const np = findNestedProgressForTask(progress, parentRoadmapId, taskId);
+  if (!np && pr && parentPhaseCompletedWithoutNestedBreakdown(pr)) {
+    return "Completed";
+  }
   return mapNestedStatus(np, {
     itemStatus,
     endDate,
@@ -314,9 +414,11 @@ export function buildRoadmapAssignments(
   const out: RoadmapAssignmentUi[] = [];
 
   for (const rm of roadmaps) {
-    const parentId = String(rm._id ?? (rm as { id?: string }).id ?? "").trim();
+    const parentId = normalizeRoadmapId(rm._id ?? (rm as { id?: string }).id);
+    if (!parentId) continue;
     const pr = findProgressRoadmapForParent(progress, parentId);
     const parentProgressStatus = pr?.status;
+    const phaseCompleteNoNestedTasks = parentPhaseCompletedWithoutNestedBreakdown(pr);
 
     const children: NestedRoadMapItem[] = Array.isArray(rm.roadmaps) ? rm.roadmaps : [];
 
@@ -339,20 +441,29 @@ export function buildRoadmapAssignments(
       });
     } else {
       for (const child of children) {
-        const cid = String(child._id ?? (child as { id?: string }).id ?? "").trim();
+        const cid = normalizeRoadmapId(child._id ?? (child as { id?: string }).id);
         if (!cid) continue;
         const np = findNestedProgressForTask(progress, parentId, cid);
+        const status: RoadmapAssignmentUi["status"] = np
+          ? mapNestedStatus(np, {
+              itemStatus: child.status,
+              endDate: resolveItemEndDate(child as unknown as Record<string, unknown>) ?? child.endDate,
+              parentProgressStatus,
+            })
+          : phaseCompleteNoNestedTasks
+            ? "Completed"
+            : mapNestedStatus(undefined, {
+                itemStatus: child.status,
+                endDate: resolveItemEndDate(child as unknown as Record<string, unknown>) ?? child.endDate,
+                parentProgressStatus,
+              });
         out.push({
           id: cid,
           parentRoadmapId: parentId,
           parentRoadmapName: rm.name,
           title: child.name,
           desc: child.roadMapDetails || child.description || "",
-          status: mapNestedStatus(np, {
-            itemStatus: child.status,
-            endDate: resolveItemEndDate(child as unknown as Record<string, unknown>) ?? child.endDate,
-            parentProgressStatus,
-          }),
+          status,
           months: child.duration || rm.duration || "—",
           imageUrl: child.imageUrl,
           meetings: child.meetings,
@@ -382,7 +493,7 @@ function mergeGroupStatus(statuses: RoadmapAssignmentUi["status"][]): RoadmapAss
 export function collapseRoadmapAssignmentsToParents(items: RoadmapAssignmentUi[]): RoadmapAssignmentUi[] {
   const byParent = new Map<string, RoadmapAssignmentUi[]>();
   for (const it of items) {
-    const pid = String(it.parentRoadmapId ?? it.id ?? "").trim();
+    const pid = normalizeRoadmapId(it.parentRoadmapId ?? it.id);
     if (!pid) continue;
     const list = byParent.get(pid) ?? [];
     list.push(it);
@@ -390,7 +501,7 @@ export function collapseRoadmapAssignmentsToParents(items: RoadmapAssignmentUi[]
   }
   const out: RoadmapAssignmentUi[] = [];
   for (const [parentId, group] of byParent) {
-    if (group.length === 1 && String(group[0].id ?? "").trim() === parentId) {
+    if (group.length === 1 && normalizeRoadmapId(group[0].id) === normalizeRoadmapId(parentId)) {
       out.push({ ...group[0], hasNestedTasks: false });
       continue;
     }
@@ -399,7 +510,9 @@ export function collapseRoadmapAssignmentsToParents(items: RoadmapAssignmentUi[]
     const firstMeeting = group.map((g) => g.meetings?.[0]).find((m) => m && String(m).trim());
     const img = group.find((g) => g.imageUrl && String(g.imageUrl).trim())?.imageUrl;
     const descFromNestedOnly =
-      group.length > 1 || String(group[0]?.id ?? "").trim() !== parentId ? "" : group[0]?.desc ?? "";
+      group.length > 1 || normalizeRoadmapId(group[0]?.id) !== normalizeRoadmapId(parentId)
+        ? ""
+        : group[0]?.desc ?? "";
     out.push({
       id: parentId,
       parentRoadmapId: parentId,
@@ -419,12 +532,28 @@ export function collapseRoadmapAssignmentsToParents(items: RoadmapAssignmentUi[]
 /** When there are no nested children, map parent-level progress row to pseudo nested metrics. */
 function mapNestedProgressSelf(pr: ProgressRoadmap): NestedRoadmapProgress | undefined {
   return {
-    nestedRoadmapId: pr.roadMapId,
+    nestedRoadmapId: normalizeRoadmapId(pr.roadMapId),
     completedSteps: pr.completedSteps ?? 0,
     totalSteps: pr.totalSteps ?? 0,
     progressPercentage: pr.progressPercentage ?? 0,
     status: pr.status ?? "",
   };
+}
+
+/**
+ * Some APIs mark an entire phase complete on the parent progress row only and omit `nestedRoadmaps[]`.
+ * Without this, every nested template task stays "not started" even though the phase is done.
+ */
+function parentPhaseCompletedWithoutNestedBreakdown(pr: ProgressRoadmap | undefined): boolean {
+  if (!pr) return false;
+  if (nestedProgressList(pr).length > 0) return false;
+  return (
+    mapNestedStatus(mapNestedProgressSelf(pr), {
+      itemStatus: typeof pr.status === "string" ? pr.status : undefined,
+      endDate: undefined,
+      parentProgressStatus: undefined,
+    }) === "Completed"
+  );
 }
 
 /** Throw when API returns { success: false, message? } with HTTP 200 */
@@ -448,11 +577,13 @@ export function mergeProgressOntoRoadmaps(
   if (!progressNorm?.roadmaps?.length) return roadmaps;
 
   return roadmaps.map((r) => {
-    const rid = String(r._id ?? (r as { id?: string }).id ?? "").trim();
+    const rid = normalizeRoadmapId(r._id ?? (r as { id?: string }).id);
+    if (!rid) return r;
     const pr = progressNorm.roadmaps.find((p) => sameId(progressRowParentId(p), rid));
     if (!pr) return r;
 
     const parentProgressStatus = pr.status;
+    const phaseCompleteNoNestedTasks = parentPhaseCompletedWithoutNestedBreakdown(pr);
     const children: NestedRoadMapItem[] = Array.isArray(r.roadmaps) ? r.roadmaps : [];
 
     if (children.length === 0) {
@@ -474,14 +605,22 @@ export function mergeProgressOntoRoadmaps(
     }
 
     const updatedChildren = children.map((child) => {
-      const cid = String(child._id ?? (child as { id?: string }).id ?? "").trim();
+      const cid = normalizeRoadmapId(child._id ?? (child as { id?: string }).id);
       if (!cid) return child;
       const np = findNestedProgressForTask(progressNorm, rid, cid);
-      const derived = mapNestedStatus(np, {
-        itemStatus: child.status,
-        endDate: resolveItemEndDate(child as unknown as Record<string, unknown>) ?? child.endDate,
-        parentProgressStatus,
-      });
+      const derived: RoadmapAssignmentUi["status"] = np
+        ? mapNestedStatus(np, {
+            itemStatus: child.status,
+            endDate: resolveItemEndDate(child as unknown as Record<string, unknown>) ?? child.endDate,
+            parentProgressStatus,
+          })
+        : phaseCompleteNoNestedTasks
+          ? "Completed"
+          : mapNestedStatus(undefined, {
+              itemStatus: child.status,
+              endDate: resolveItemEndDate(child as unknown as Record<string, unknown>) ?? child.endDate,
+              parentProgressStatus,
+            });
       return {
         ...child,
         status: uiStatusToRoadmapDocStatus(derived),
@@ -500,30 +639,138 @@ export function mergeProgressOntoRoadmaps(
   });
 }
 
+/** Parse Nest/throttler `Retry-After` (seconds). Cap to avoid blocking the UI forever. */
+function retryAfterDelayMs(headers: unknown): number | null {
+  if (headers == null) return null;
+  const h = headers as { get?: (key: string) => string | undefined } & Record<string, unknown>;
+  const raw =
+    typeof h.get === "function"
+      ? h.get("retry-after") ?? h.get("Retry-After")
+      : String(h["retry-after"] ?? h["Retry-After"] ?? "").trim();
+  if (!raw) return null;
+  const sec = Number.parseInt(raw, 10);
+  if (!Number.isFinite(sec)) return null;
+  return Math.min(Math.max(sec, 1), 60) * 1000;
+}
+
+/** Retry transient rate limits; honors `Retry-After` when present. */
+async function axiosCallWith429Retry<T>(fn: () => Promise<T>, maxAttempts = 7): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (e: unknown) {
+      lastErr = e;
+      const ax = e as { response?: { status?: number; headers?: unknown } };
+      if (ax.response?.status !== 429 || attempt === maxAttempts - 1) throw e;
+      const fromHeader = retryAfterDelayMs(ax.response.headers);
+      const exponential = Math.min(1100 * 2 ** attempt + Math.floor(Math.random() * 500), 28_000);
+      const backoff = fromHeader ?? exponential;
+      await new Promise((r) => setTimeout(r, backoff));
+    }
+  }
+  throw lastErr;
+}
+
+/** Avoid firing two user-specific GETs in the same throttler window when possible. */
+function staggerBetweenUserRoadmapCalls(): Promise<void> {
+  return new Promise((r) => setTimeout(r, 520));
+}
+
+/** Coalesce concurrent loads per user + strategy (pastor vs mentor catalog). */
+const roadmapAssignmentsInflight = new Map<string, Promise<RoadmapAssignmentUi[]>>();
+
+export type FetchRoadmapAssignmentsMode = "pastor" | "mentor-catalog";
+
 /** When GET /roadmaps/user/:id returns an empty list, build cards from GET /progress/:id roadMapIds + GET /roadmaps/:id */
 async function hydrateRoadmapsFromProgress(progress: ProgressResponse): Promise<RoadMapResponse[]> {
-  const ids = [...new Set(progress.roadmaps.map((p) => p.roadMapId).filter(Boolean))];
+  const ids = [...new Set(progress.roadmaps.map((p) => progressRowParentId(p)).filter(Boolean))];
   if (ids.length === 0) return [];
-  const settled = await Promise.allSettled(ids.map((id) => apiGetRoadmapById(id)));
   const out: RoadMapResponse[] = [];
-  for (const s of settled) {
-    if (s.status !== "fulfilled") continue;
-    const ax = s.value;
-    const rawBody = ax.data as Record<string, unknown> | undefined;
-    const doc = (rawBody?.data ?? ax.data) as unknown;
-    const n = normalizeUserRoadmapListItem(doc);
-    if (n) {
-      out.push(n);
-      continue;
-    }
-    if (doc && typeof doc === "object") {
-      const o = doc as Record<string, unknown>;
-      if (o._id != null || o.id != null) {
-        out.push(doc as RoadMapResponse);
+  for (let i = 0; i < ids.length; i++) {
+    const id = String(ids[i] ?? "").trim();
+    if (!id) continue;
+    if (i > 0) await new Promise((r) => setTimeout(r, 240));
+    try {
+      const ax = await axiosCallWith429Retry(() => apiGetRoadmapById(id));
+      const rawBody = ax.data as Record<string, unknown> | undefined;
+      const doc = (rawBody?.data ?? ax.data) as unknown;
+      const n = normalizeUserRoadmapListItem(doc);
+      if (n) {
+        out.push(n);
+        continue;
       }
+      if (doc && typeof doc === "object") {
+        const o = doc as Record<string, unknown>;
+        if (o._id != null || o.id != null) {
+          out.push(doc as RoadMapResponse);
+        }
+      }
+    } catch {
+      /* skip missing roadmap doc */
     }
   }
   return out;
+}
+
+/**
+ * Pastor / mentee parity with CCC-Mobile `useAssignedRoadmaps`:
+ * progress-derived IDs → full catalog filtered → `/roadmaps/user` → hydrate by id.
+ */
+async function loadPastorParityRoadmapsAndProgress(userId: string): Promise<{
+  roadmaps: RoadMapResponse[];
+  progressNorm: ProgressResponse | null;
+}> {
+  const uid = String(userId).trim();
+
+  const progRes = await axiosCallWith429Retry(() => apiGetUserProgress(uid));
+  assertRoadmapsEnvelopeSuccess(progRes.data);
+  const progress = unwrapProgressData(progRes);
+  const progressNorm = normalizeProgressResponse(progress);
+
+  await staggerBetweenUserRoadmapCalls();
+
+  let roadmaps: RoadMapResponse[] = [];
+  const assignedIds = assignedRoadmapIdsFromProgress(progressNorm);
+
+  if (assignedIds.length > 0) {
+    const allRes = await axiosCallWith429Retry(() => apiGetRoadmaps("all", ""));
+    assertRoadmapsEnvelopeSuccess(allRes.data);
+    roadmaps = filterRoadmapsByAssignedIds(unwrapRoadmapsList(allRes), assignedIds);
+  }
+
+  if (roadmaps.length === 0) {
+    const rmUserRes = await axiosCallWith429Retry(() => apiGetRoadmapsByUser(uid));
+    assertRoadmapsEnvelopeSuccess(rmUserRes.data);
+    roadmaps = unwrapRoadmapsList(rmUserRes);
+  }
+
+  if (roadmaps.length === 0 && progressNorm?.roadmaps?.length) {
+    roadmaps = await hydrateRoadmapsFromProgress(progressNorm);
+  }
+
+  roadmaps = mergeProgressOntoRoadmaps(roadmaps, progressNorm);
+  return { roadmaps, progressNorm };
+}
+
+/** Mentor hub: merged roadmap docs for a pastor/mentee `userId` (same loading rules as pastor revitalization). */
+const mergedAssignedRoadmapsInflight = new Map<string, Promise<RoadMapResponse[]>>();
+
+export async function fetchMergedRoadmapsForAssignedUser(userId: string): Promise<RoadMapResponse[]> {
+  const uid = String(userId ?? "").trim();
+  if (!uid) return [];
+
+  const existing = mergedAssignedRoadmapsInflight.get(uid);
+  if (existing) return existing;
+
+  const promise = loadPastorParityRoadmapsAndProgress(uid)
+    .then(({ roadmaps }) => roadmaps)
+    .finally(() => {
+      mergedAssignedRoadmapsInflight.delete(uid);
+    });
+
+  mergedAssignedRoadmapsInflight.set(uid, promise);
+  return promise;
 }
 
 /**
@@ -543,17 +790,52 @@ export async function resolveMentorUserRoadmapsList(
   return mergeProgressOntoRoadmaps(list, progressNorm);
 }
 
-export async function fetchRoadmapAssignmentsForUser(userId: string): Promise<RoadmapAssignmentUi[]> {
-  const [rmRes, progRes] = await Promise.all([
-    apiGetRoadmapsByUser(userId),
-    apiGetUserProgress(userId),
-  ]);
-  assertRoadmapsEnvelopeSuccess(rmRes.data);
-  let roadmaps = unwrapRoadmapsList(rmRes);
-  const progress = unwrapProgressData(progRes);
-  if (roadmaps.length === 0 && progress?.roadmaps?.length) {
-    roadmaps = await hydrateRoadmapsFromProgress(progress);
+/**
+ * Pastor: matches CCC-Mobile `useAssignedRoadmaps` — progress IDs → `GET /roadmaps` → filter,
+ * then `/roadmaps/user` + per-id hydrate fallbacks when needed.
+ * Mentor list: matches `useRoadmaps('mentor')` / `useAllRoadmaps` — full catalog merged with that user’s progress.
+ */
+async function fetchRoadmapAssignmentsForUserUncached(
+  userId: string,
+  mode: FetchRoadmapAssignmentsMode,
+): Promise<RoadmapAssignmentUi[]> {
+  const uid = String(userId).trim();
+
+  if (mode === "mentor-catalog") {
+    const progRes = await axiosCallWith429Retry(() => apiGetUserProgress(uid));
+    assertRoadmapsEnvelopeSuccess(progRes.data);
+    const progress = unwrapProgressData(progRes);
+    const progressNorm = normalizeProgressResponse(progress);
+
+    await staggerBetweenUserRoadmapCalls();
+
+    const allRes = await axiosCallWith429Retry(() => apiGetRoadmaps("all", ""));
+    assertRoadmapsEnvelopeSuccess(allRes.data);
+    let roadmaps = unwrapRoadmapsList(allRes);
+    roadmaps = mergeProgressOntoRoadmaps(roadmaps, progressNorm);
+    return buildRoadmapAssignments(roadmaps, progressNorm);
   }
-  roadmaps = mergeProgressOntoRoadmaps(roadmaps, progress);
-  return buildRoadmapAssignments(roadmaps, progress);
+
+  const { roadmaps, progressNorm } = await loadPastorParityRoadmapsAndProgress(uid);
+  return buildRoadmapAssignments(roadmaps, progressNorm);
+}
+
+export async function fetchRoadmapAssignmentsForUser(
+  userId: string,
+  options?: { mode?: FetchRoadmapAssignmentsMode },
+): Promise<RoadmapAssignmentUi[]> {
+  const uid = String(userId ?? "").trim();
+  const mode = options?.mode ?? "pastor";
+  if (!uid) return [];
+
+  const inflightKey = `${uid}:${mode}`;
+  const existing = roadmapAssignmentsInflight.get(inflightKey);
+  if (existing) return existing;
+
+  const promise = fetchRoadmapAssignmentsForUserUncached(uid, mode).finally(() => {
+    roadmapAssignmentsInflight.delete(inflightKey);
+  });
+
+  roadmapAssignmentsInflight.set(inflightKey, promise);
+  return promise;
 }

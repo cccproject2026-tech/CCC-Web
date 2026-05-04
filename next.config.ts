@@ -1,6 +1,27 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+/** Must match server-side base resolution in `axios-instance.ts` so `/api-proxy` hits the same API as SSR. */
+function resolveApiProxyRewriteDestination(): string {
+  const raw = (
+    process.env.API_PROXY_TARGET ||
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    ""
+  ).trim();
+  let base: string;
+  if (!raw) {
+    base = "https://app.wisdomtooth.tech/api/v1";
+  } else {
+    base = raw.replace(/\/+$/, "");
+    if (!base.includes("/api/v1")) {
+      if (base.endsWith("/api")) base = `${base}/v1`;
+      else base = `${base}/api/v1`;
+    }
+  }
+  return `${base}/:path*`;
+}
+
 const nextConfig: NextConfig = {
   /* options here */
   output: "standalone",
@@ -37,12 +58,12 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  /** Proxy API in dev/prod so the browser calls same-origin URLs — avoids CORS blocking localhost → wisdomtooth.tech */
+  /** Proxy API in dev/prod so the browser calls same-origin URLs — avoids CORS blocking localhost → remote API */
   async rewrites() {
     return [
       {
         source: "/api-proxy/:path*",
-        destination: "https://app.wisdomtooth.tech/api/v1/:path*",
+        destination: resolveApiProxyRewriteDestination(),
       },
       /** Case-only aliases — avoids 404 when nav/bookmarks use lowercase (routes use PascalCase folders). */
       { source: "/pastor/appointments", destination: "/pastor/Appointments" },

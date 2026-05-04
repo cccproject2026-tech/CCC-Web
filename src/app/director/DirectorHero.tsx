@@ -15,6 +15,10 @@ type DirectorHeroProps = {
   className?: string;
   /** Shorter header when there is no background image. */
   compact?: boolean;
+  /** Shorter min-heights below `lg` for dense mobile dashboards (e.g. pastor roadmap). */
+  tightenMobileLayout?: boolean;
+  /** Title block alignment (`start` = left). Default matches legacy director hero (right). */
+  titleAlign?: "start" | "end";
   /** e.g. “Change banner” — aligned to the top-right of the hero. */
   topRight?: ReactNode;
   /** Small pill above the title (e.g. Leadership Support Network). */
@@ -29,6 +33,8 @@ export default function DirectorHero({
   image,
   className = "",
   compact = false,
+  tightenMobileLayout = false,
+  titleAlign = "end",
   topRight,
   breadcrumbItems,
   pill,
@@ -41,8 +47,12 @@ export default function DirectorHero({
       ? "min-h-[120px] sm:min-h-[140px]"
       : "min-h-[100px] sm:min-h-[120px]"
     : hasCrumbs
-      ? "min-h-[220px] sm:min-h-[260px] lg:min-h-[280px]"
-      : "h-[180px] sm:h-[220px] lg:h-[260px]";
+      ? tightenMobileLayout
+        ? "min-h-[168px] sm:min-h-[220px] lg:min-h-[280px]"
+        : "min-h-[220px] sm:min-h-[260px] lg:min-h-[280px]"
+      : tightenMobileLayout
+        ? "min-h-[148px] sm:h-[200px] lg:h-[260px]"
+        : "h-[180px] sm:h-[220px] lg:h-[260px]";
 
   const imageUnoptimized =
     typeof image === "string" &&
@@ -76,8 +86,8 @@ export default function DirectorHero({
             <div className="absolute inset-0 bg-gradient-to-t from-[#0A1128]/92 via-transparent to-[#1e4d7b]/18" />
           </>
         )}
-        <div className="relative z-10 flex h-full w-full flex-col justify-between gap-6 p-6 sm:p-8">
-          <div className="flex min-w-0 w-full flex-1 flex-col justify-between gap-6">
+        <div className="relative z-10 flex h-full w-full flex-col justify-between gap-4 p-4 sm:gap-6 sm:p-8">
+          <div className="flex min-w-0 w-full flex-1 flex-col justify-between gap-4 sm:gap-6">
             <div className="flex w-full flex-wrap items-start justify-between gap-3">
               {hasCrumbs ? (
                 <div className="min-w-0 flex-1 text-sm text-white/75">
@@ -103,18 +113,30 @@ export default function DirectorHero({
               )}
               {topRight ? <div className="shrink-0">{topRight}</div> : null}
             </div>
-            <div className="ml-auto w-full max-w-3xl text-right lg:max-w-xl">
+            <div
+              className={
+                titleAlign === "start"
+                  ? "w-full max-w-3xl text-left lg:max-w-2xl"
+                  : "ml-auto w-full max-w-3xl text-right lg:max-w-xl"
+              }
+            >
               {pill ? (
-                <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
+                <p className="mb-2 inline-flex max-w-full items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] text-[#d9ebf8] sm:mb-3 sm:text-xs">
                   <span className="h-2 w-2 shrink-0 rounded-full bg-[#3498DB]" aria-hidden />
-                  {pill}
+                  <span className="min-w-0 truncate">{pill}</span>
                 </p>
               ) : null}
-              <h1 className="text-2xl font-bold tracking-tight text-white drop-shadow-sm sm:text-3xl lg:text-4xl">
+              <h1
+                className={`font-bold tracking-tight text-white drop-shadow-sm sm:text-3xl lg:text-4xl ${tightenMobileLayout ? "text-xl" : "text-2xl"}`}
+              >
                 {title}
               </h1>
               {subtitle ? (
-                <p className="mt-2 text-sm text-white/85 sm:text-base">{subtitle}</p>
+                <p
+                  className={`mt-1.5 text-sm leading-snug text-white/85 sm:mt-2 sm:text-base sm:leading-normal ${tightenMobileLayout ? "line-clamp-3 lg:line-clamp-none" : ""}`}
+                >
+                  {subtitle}
+                </p>
               ) : null}
               {detail ? <p className="mt-1.5 text-xs text-white/60 sm:text-sm">{detail}</p> : null}
             </div>

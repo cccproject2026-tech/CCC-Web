@@ -77,12 +77,16 @@ export default function ExpectedOutcomePage() {
       const opt = {
         margin: 10,
         filename: `${title.replace(/\s+/g, "-").toLowerCase()}.pdf`,
-        image: { type: "jpeg", quality: 0.98 },
+        image: { type: "jpeg" as const, quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { orientation: "portrait", unit: "mm", format: "a4" },
+        jsPDF: { orientation: "portrait" as const, unit: "mm" as const, format: "a4" as const },
       };
 
-      html2pdf().set(opt).from(element).save();
+      // html2pdf.js typings are loose; runtime API is `.set().from().save()`.
+      (html2pdf() as { set: (o: typeof opt) => { from: (el: HTMLElement) => { save: () => void } } })
+        .set(opt)
+        .from(element)
+        .save();
     } catch (error) {
       console.error("Error generating PDF:", error);
       alert("Failed to generate PDF. Please try again.");

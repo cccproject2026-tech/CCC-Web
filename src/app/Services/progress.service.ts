@@ -490,11 +490,23 @@ export const apiAssignAssessment = (payload: AssignAssessmentPayload) =>
   );
 
 // PATCH /progress/roadmap/update
-export const apiUpdateRoadmapProgress = (payload: UpdateRoadmapProgressPayload) =>
-  axiosInstance.patch<{ success: boolean; data: ProgressResponse }>(
+export const apiUpdateRoadmapProgress = (payload: UpdateRoadmapProgressPayload) => {
+  const nested = payload.nestedRoadmapId?.trim();
+  const body: Record<string, unknown> = {
+    userId: payload.userId,
+    roadMapId: payload.roadMapId,
+  };
+  if (payload.completedSteps !== undefined) body.completedSteps = payload.completedSteps;
+  if (payload.status !== undefined) body.status = payload.status;
+  if (nested) {
+    body.nestedRoadmapId = nested;
+    body.nestedRoadMapItemId = nested;
+  }
+  return axiosInstance.patch<{ success: boolean; data: ProgressResponse }>(
     "/progress/roadmap/update",
-    payload,
+    body,
   );
+};
 
 // PATCH /progress/assessment/update
 export const apiUpdateAssessmentProgress = (payload: UpdateAssessmentProgressPayload) =>
