@@ -791,13 +791,6 @@ const hasRequiredSubmissions = useMemo(() => {
       setTimeout(() => {
         setSaveSuccess(false);
         setSaveFeedback(null);
-        if (parentRoadmapId) {
-          router.push(
-            `/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(parentRoadmapId)}`,
-          );
-        } else {
-          router.push("/pastor/revitalization-roadmap");
-        }
       }, 1200);
     } catch (err) {
       console.error("Save error:", err);
