@@ -687,8 +687,13 @@ const hasRequiredSubmissions = useMemo(() => {
       });
       await ensureJumpstartTriggered();
       const mergedForm: Record<string, any> = { ...formData };
+      // Mobile parity: only UPLOAD extras become boolean flags.
+      // Do NOT overwrite SIGNATURE dataUrl with `true` (that breaks persistence + hydration).
       Object.keys(uploadedFiles).forEach((k) => {
-        mergedForm[k] = true;
+        const extraDef = (roadmap?.extras as ExtraComponent[] | undefined)?.find(
+          (e) => e.name === k,
+        );
+        if (extraDef?.type === "UPLOAD") mergedForm[k] = true;
       });
 
       // Mobile parity: build extrasArray from Object.entries(formData), no name transforms.
@@ -1226,10 +1231,10 @@ if (!hasRequiredSubmissions) {
           <div key={`${fieldKey}_${index}`} className="mb-5">
             <h4 className="text-sm font-semibold text-white mb-2">{extra.name}</h4>
             <div className="border border-[#5A8DCB] rounded-lg bg-white/5 p-4">
-              {formData[fieldKey] ? (
+              {typeof formData[fieldKey] === "string" && String(formData[fieldKey]).trim() ? (
                 <div className="space-y-3">
                   <img
-                    src={typeof formData[fieldKey] === "string" ? formData[fieldKey] : ""}
+                    src={String(formData[fieldKey]).trim()}
                     alt="Signature"
                     className="max-h-24 bg-white rounded"
                   />
@@ -1243,7 +1248,9 @@ if (!hasRequiredSubmissions) {
                 onClick={() => openSignatureModal(fieldKey)}
                 className="w-full bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-5 py-2 rounded-md shadow mt-3"
               >
-                {formData[fieldKey] ? "Redraw Signature" : "Draw Signature"}
+                {typeof formData[fieldKey] === "string" && String(formData[fieldKey]).trim()
+                  ? "Redraw Signature"
+                  : "Draw Signature"}
               </button>
             </div>
           </div>
