@@ -63,6 +63,9 @@ type AssessmentCardRow = {
   type?: unknown;
   progressStatus?: "not_started" | "submitted" | "completed";
   dueDate?: string;
+  createdOn?: string;
+  createdBy?: string;
+  pastorsAssigned?: number;
 };
 
 function toDateInputValue(value?: string): string {
@@ -84,6 +87,37 @@ function formatDueDate(value?: string): string | null {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatCreatedDate(value?: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function countPastorsAssigned(item: any): number {
+  // If the backend provides pastorsAssigned directly, use it
+  if (typeof item.pastorsAssigned === "number") {
+    return item.pastorsAssigned;
+  }
+
+  // Otherwise, count unique userIds from assignments array
+  if (Array.isArray(item.assignments) && item.assignments.length > 0) {
+    const uniqueUserIds = new Set<string>();
+    for (const assignment of item.assignments) {
+      if (typeof assignment?.userId === "string" && assignment.userId.trim()) {
+        uniqueUserIds.add(assignment.userId);
+      }
+    }
+    return uniqueUserIds.size;
+  }
+
+  return 0;
 }
 
 function normalizeAssessmentStatus(raw: unknown): "not_started" | "submitted" | "completed" {
@@ -169,6 +203,9 @@ function AssessmentsPageContent() {
             title?: unknown;
             description?: unknown;
             type?: unknown;
+            createdAt?: unknown;
+            createdBy?: unknown;
+            pastorsAssigned?: unknown;
           };
           const rawId = rawItem._id ?? rawItem.id;
           const id = rawId != null && String(rawId).trim() !== "" ? String(rawId) : "";
@@ -186,6 +223,9 @@ function AssessmentsPageContent() {
             description: typeof rawItem.description === "string" ? rawItem.description : "",
             image: resolved,
             type: rawItem.type,
+            createdOn: typeof rawItem.createdAt === "string" ? rawItem.createdAt : undefined,
+            createdBy: typeof rawItem.createdBy === "string" ? rawItem.createdBy : undefined,
+            pastorsAssigned: countPastorsAssigned(rawItem),
           });
         }
 
@@ -218,6 +258,9 @@ function AssessmentsPageContent() {
                   name?: string;
                   description?: string;
                   type?: unknown;
+                  createdAt?: string;
+                  createdBy?: string;
+                  pastorsAssigned?: number;
                 };
 
                 const raw = detailObj.bannerImage;
@@ -233,6 +276,9 @@ function AssessmentsPageContent() {
                   type: detailObj.type,
                   progressStatus: byAssessmentId.get(assessmentId) || "not_started",
                   dueDate: flat.dueDate,
+                  createdOn: detailObj.createdAt,
+                  createdBy: detailObj.createdBy,
+                  pastorsAssigned: countPastorsAssigned(flat.assessment),
                 } satisfies AssessmentCardRow;
               })
               .filter((item): item is NonNullable<typeof item> => item != null);
@@ -684,8 +730,8 @@ function AssessmentsPageContent() {
               {filteredAssessments.map((assessment) => (
                 <div
                   key={assessment.id}
-                  className={`relative ${directorListCardRadius} border border-white/10 transition-all ${directorGlassCard} ${
-                    selectedAssessments.includes(assessment.id) ? "ring-2 ring-[#8ec5eb]/60" : ""
+                  className={`relative ${directorListCardRadius} transition-all ${directorGlassCard} ${
+                    selectedAssessments.includes(assessment.id) ? "bg-[#f59e0b]/15 border-transparent" : "border border-white/10"
                   }`}
                 >
                   {isSelectionMode && (
@@ -754,45 +800,41 @@ function AssessmentsPageContent() {
                     </div>
                   )}
 
-                  <div className="flex gap-4 p-6">
-                    <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
-                      <Image
-                        src={assessment.image || Thumb1}
-                        alt={assessment.title}
-                        fill
-                        className="object-cover"
-                        unoptimized={
-                          typeof assessment.image === "string" &&
-                          (assessment.image.startsWith("blob:") || isRemoteImageSrc(assessment.image))
-                        }
-                      />
-                    </div>
-
-                    <div className="flex flex-1 flex-col justify-between">
-                      <div>
-                        <h3 className="mb-2 text-lg font-bold text-white">{assessment.title}</h3>
-                        <p className="text-sm text-white/65">{assessment.description}</p>
+                  <div className="flex flex-col gap-0 p-0">
+                    {/* Row 1: Image + Title + Description */}
+                    <div className="flex gap-4 p-6 pb-4">
+                      <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
+                        <Image
+                          src={assessment.image || Thumb1}
+                          alt={assessment.title}
+                          fill
+                          className="object-cover"
+                          unoptimized={
+                            typeof assessment.image === "string" &&
+                            (assessment.image.startsWith("blob:") || isRemoteImageSrc(assessment.image))
+                          }
+                        />
                       </div>
 
-                      {selectedMenteeId ? (
-                        <div className="mt-4 space-y-3">
-                          <div className="flex items-center gap-2 text-sm">
-                            <span className="font-semibold text-white/80">Status</span>
-                            <span
-                              className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${assessmentStatusChipClass(
-                                assessment.progressStatus,
-                              )}`}
-                            >
-                              {assessmentStatusLabel(assessment.progressStatus)}
-                            </span>
-                          </div>
-                          {formatDueDate(assessment.dueDate) ? (
-                            <div className="text-sm text-[#cde2f2]">
-                              <span className="font-semibold text-white/80">Due</span>{" "}
-                              {formatDueDate(assessment.dueDate)}
-                            </div>
-                          ) : null}
-                          <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-1 flex-col justify-between">
+                        <div>
+                          <h3 className="mb-2 text-lg font-bold text-white">{assessment.title}</h3>
+                          <p className="text-sm text-white/65">{assessment.description}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {selectedMenteeId ? (
+                      <div className="w-full border-t border-white/10">
+                        <div className="flex items-center px-6 py-4">
+                          <span
+                            className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${assessmentStatusChipClass(
+                              assessment.progressStatus,
+                            )}`}
+                          >
+                            {assessmentStatusLabel(assessment.progressStatus)}
+                          </span>
+                          <div className="ml-auto flex items-center gap-2">
                             {(assessment.progressStatus === "submitted" ||
                               assessment.progressStatus === "completed") && (
                               <button
@@ -832,16 +874,35 @@ function AssessmentsPageContent() {
                             </button>
                           </div>
                         </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => router.push(`/director/assessments/${assessment.id}`)}
-                          className="mt-4 self-end rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
-                        >
-                          View / edit
-                        </button>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Row 2: Metadata + Button */}
+                        <div className="flex items-center justify-between gap-4 border-t border-white/10 px-6 py-4">
+                          <div className="grid grid-cols-3 gap-8 flex-1">
+                            <div className="text-center">
+                              <p className="text-xs text-white/60 mb-1">Created on</p>
+                              <p className="text-sm font-semibold text-white">{formatCreatedDate(assessment.createdOn) || "N/A"}</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs text-white/60 mb-1">Created by</p>
+                              <p className="text-sm font-semibold text-white">{assessment.createdBy || "Director"}</p>
+                            </div>
+                            <div className="text-center">
+                              <p className="text-xs text-white/60 mb-1">Pastors Assigned</p>
+                              <p className="text-sm font-semibold text-white">{assessment.pastorsAssigned || 0}</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/director/assessments/${assessment.id}`)}
+                            className="shrink-0 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+                          >
+                            View / Edit
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}

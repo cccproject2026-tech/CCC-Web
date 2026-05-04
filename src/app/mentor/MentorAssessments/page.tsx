@@ -3,7 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import HeroBg from "@/app/Assets/assignments-bg.png";
 import UserProfile from "@/app/Assets/user-profile.png";
+import Thumb1 from "@/app/Assets/thumb1.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import { isRemoteImageSrc } from "@/app/utils/image";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { ApiAvatarPlaceholder, ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import {
@@ -89,8 +91,27 @@ function statusLabel(status: MentorAssessmentStatus): string {
   return "Not Started";
 }
 
+function assessmentStatusLabel(status?: MentorAssessmentStatus): string {
+  return statusLabel(status || "not_started");
+}
+
+function assessmentStatusChipClass(status?: MentorAssessmentStatus): string {
+  return statusChipClass(status || "not_started");
+}
+
 function formatDueDate(value: unknown): string | null {
   if (typeof value !== "string" || !value.trim()) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatCreatedDate(value?: string): string | null {
+  if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return date.toLocaleDateString("en-US", {
@@ -340,6 +361,26 @@ function extractRecommendationPreview(body: unknown): Array<{ sectionId: string;
   }));
 }
 
+function countMenteesAssigned(item: any): number {
+  // If the backend provides menteeAssigned directly, use it
+  if (typeof item.menteeAssigned === "number") {
+    return item.menteeAssigned;
+  }
+
+  // Otherwise, count unique userIds from assignments array
+  if (Array.isArray(item.assignments) && item.assignments.length > 0) {
+    const uniqueUserIds = new Set<string>();
+    for (const assignment of item.assignments) {
+      if (typeof assignment?.userId === "string" && assignment.userId.trim()) {
+        uniqueUserIds.add(assignment.userId);
+      }
+    }
+    return uniqueUserIds.size;
+  }
+
+  return 0;
+}
+
 export default function MentorAssessments() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
@@ -347,6 +388,7 @@ export default function MentorAssessments() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
+  const [showOptionsMenu, setShowOptionsMenu] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState<string | null>(null);
   const [showAssignDrawer, setShowAssignDrawer] = useState(false);
   const [assignAssessmentId, setAssignAssessmentId] = useState<string | null>(null);
@@ -422,6 +464,7 @@ export default function MentorAssessments() {
                 _mentorAssignmentStatus: progressRow?.status || "not_started",
                 _mentorAssignmentId: flat.assignmentId ?? progressRow?.assignmentId,
                 _mentorDueDate: flat.dueDate,
+                menteeAssigned: countMenteesAssigned(assessment),
               };
             })
             .filter((value): value is any => value != null);
@@ -439,7 +482,12 @@ export default function MentorAssessments() {
           const res = await apiGetAssessments({
             search: searchTerm || undefined,
           });
-          setAssessments(parseAssessmentsListPayload(res.data));
+          const parsed = parseAssessmentsListPayload(res.data);
+          const withMenteeCounts = parsed.map((item: any) => ({
+            ...item,
+            menteeAssigned: countMenteesAssigned(item),
+          }));
+          setAssessments(withMenteeCounts);
         }
       } catch (err) {
         console.error("Failed to load assessments", err);
@@ -519,6 +567,23 @@ export default function MentorAssessments() {
       cancelled = true;
     };
   }, [showAssignDrawer]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest(".options-menu-container")) {
+        setShowOptionsMenu(null);
+      }
+    };
+
+    if (showOptionsMenu !== null) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showOptionsMenu]);
 
   const filteredAssignUsers = useMemo(() => {
     const q = assignSearch.trim().toLowerCase();
@@ -871,174 +936,161 @@ export default function MentorAssessments() {
                 </div>
               )}
 
-              {loading && <div className="py-16 text-center text-[#cde2f2]">Loading assessments…</div>}
-
-              {!loading && filtered.length === 0 && (
-                <div className={mentorEmptyPanel}>No assessments found.</div>
-              )}
-
-              <div className="grid gap-6 sm:grid-cols-2">
-                {filtered.map((item, index) => {
-                  const aid = getAssessmentId(item);
-                  return (
+              {loading ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb]/30 border-t-[#8ec5eb]" />
+                    <p className="font-semibold text-white">Loading assessments…</p>
+                  </div>
+                </div>
+              ) : filtered.length > 0 ? (
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  {filtered.map((assessment: any, idx: number) => (
                     <div
-                      key={aid || `row-${index}`}
-                      className={`relative flex overflow-hidden ${mentorGlassCardRoadmap} ${selectedIds.includes(aid) ? "ring-2 ring-[#8ec5eb]/50" : ""
-                        }`}
+                      key={getAssessmentId(assessment) || `assessment-${idx}`}
+                      className={`relative rounded-xl transition-all ${mentorGlassCardRoadmap} ${
+                        selectedIds.includes(getAssessmentId(assessment))
+                          ? "bg-[#f59e0b]/15 border-transparent"
+                          : "border border-white/10"
+                      }`}
                     >
                       {mode === "select" && (
-                        <div className="absolute right-3 top-3 z-20">
+                        <div className="absolute left-4 top-4 z-10">
                           <input
                             type="checkbox"
-                            checked={selectedIds.includes(aid)}
-                            onChange={() => toggleSelect(aid)}
-                            className="h-5 w-5 accent-[#8ec5eb]"
-                            aria-label={`Select ${item.name || "assessment"}`}
+                            checked={selectedIds.includes(getAssessmentId(assessment))}
+                            onChange={() => toggleSelect(getAssessmentId(assessment))}
+                            className="h-5 w-5 cursor-pointer rounded accent-[#8ec5eb] focus:ring-2 focus:ring-[#8ec5eb]/50"
                           />
                         </div>
                       )}
 
-                      <div className="m-4 h-[140px] w-[180px] flex-shrink-0 overflow-hidden rounded-xl border border-white/20">
-                        {isHttpUrl(item.bannerImage) ? (
-                          <Image
-                            src={item.bannerImage}
-                            alt={item.name || "Assessment"}
-                            width={180}
-                            height={140}
-                            className="h-full w-full object-cover"
-                            unoptimized
-                          />
-                        ) : (
-                          <ApiImagePlaceholder className="h-full w-full rounded-xl" />
-                        )}
-                      </div>
+                      <div className="flex flex-col gap-0 p-0">
+                        {/* Row 1: Image + Title + Description */}
+                        <div className="flex gap-4 p-6 pb-4">
+                          <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
+                            <Image
+                              src={assessment.image || Thumb1}
+                              alt={assessment.name || "Assessment"}
+                              fill
+                              className="object-cover"
+                              unoptimized={
+                                typeof assessment.image === "string" &&
+                                (assessment.image.startsWith("blob:") || isRemoteImageSrc(assessment.image))
+                              }
+                            />
+                          </div>
 
-                      <div className="flex min-w-0 flex-1 flex-col justify-between p-4 pr-3">
-                        <div>
-                          <div className="flex items-start justify-between gap-2">
-                            <h3 className="text-[15px] font-semibold text-white">{item.name}</h3>
-                            <div className="relative shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => setShowDropdown(showDropdown === aid ? null : aid)}
-                                className="text-[#8ec5eb] hover:text-white"
-                                aria-label="More actions"
-                              >
-                                <i className="fa-solid fa-ellipsis-vertical" />
-                              </button>
-
-                              {showDropdown === aid && (
-                                <div className="absolute right-0 top-8 z-40 min-w-[9rem] rounded-xl border border-white/20 bg-[#0a3558] py-1 text-sm shadow-xl">
-                                  <button
-                                    type="button"
-                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-[#cde2f2] hover:bg-white/10"
-                                    onClick={() => {
-                                      setShowDropdown(null);
-                                      setAssignAssessmentId(aid);
-                                      setSelectedAssignUserIds([]);
-                                      setShowAssignDrawer(true);
-                                    }}
-                                  >
-                                    <i className="fa-solid fa-user-plus text-[#8ec5eb]" />
-                                    Assign to
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-[#cde2f2] hover:bg-white/10"
-                                    onClick={() => {
-                                      setShowDropdown(null);
-                                      if (aid) router.push(`/mentor/MentorAssessments/${aid}/edit`);
-                                    }}
-                                  >
-                                    <i className="fa-regular fa-pen-to-square text-[#8ec5eb]" />
-                                    Edit
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-red-300 hover:bg-white/10"
-                                    onClick={() => {
-                                      setShowDropdown(null);
-                                      setSelectedIds([aid]);
-                                      setShowDeleteConfirm(true);
-                                    }}
-                                  >
-                                    <i className="fa-solid fa-trash" /> Delete
-                                  </button>
-                                </div>
-                              )}
+                          <div className="flex flex-1 flex-col justify-between">
+                            <div>
+                              <h3 className="mb-2 text-lg font-bold text-white">{assessment.name}</h3>
+                              <p className="text-sm text-white/65">{assessment.description}</p>
                             </div>
                           </div>
-                          <p className="mt-1 line-clamp-2 text-sm text-[#cde2f2]/90">{item.description}</p>
+                        </div>
 
-                          {selectedMenteeId && (
-                            <div className="mt-3 space-y-2 text-xs">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-[#cde2f2]/80">Status</span>
-                                <span
-                                  className={`rounded-md border px-2 py-1 font-medium ${statusChipClass(
-                                    (item._mentorAssignmentStatus as MentorAssessmentStatus) || "not_started",
-                                  )}`}
-                                >
-                                  {statusLabel(
-                                    (item._mentorAssignmentStatus as MentorAssessmentStatus) || "not_started",
+                        {selectedMenteeId ? (
+                          <div className="w-full border-t border-white/10">
+                            <div className="flex items-center px-6 py-4">
+                              <span
+                                className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${assessmentStatusChipClass(
+                                  assessment._mentorAssignmentStatus,
+                                )}`}
+                              >
+                                {assessmentStatusLabel(assessment._mentorAssignmentStatus)}
+                              </span>
+                              <div className="ml-auto flex items-center gap-2">
+                                {(assessment._mentorAssignmentStatus === "submitted" ||
+                                  assessment._mentorAssignmentStatus === "completed") && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        router.push(
+                                          `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}`,
+                                        )
+                                      }
+                                      className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                                    >
+                                      View Result
+                                    </button>
                                   )}
-                                </span>
+                                {(assessment._mentorAssignmentStatus === "submitted" ||
+                                  assessment._mentorAssignmentStatus === "completed") && (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        router.push(
+                                          `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}&editRecommendation=1`,
+                                        )
+                                      }
+                                      className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+                                    >
+                                      Edit Recommendation
+                                    </button>
+                                  )}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    router.push(`/director/assessments/${assessment.id}?viewUser=${selectedMenteeId}`)
+                                  }
+                                  className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+                                >
+                                  View
+                                </button>
                               </div>
-                              {formatDueDate(item._mentorDueDate) ? (
-                                <div className="text-[#cde2f2]/80">
-                                  Due {formatDueDate(item._mentorDueDate)}
-                                </div>
-                              ) : null}
                             </div>
-                          )}
-                        </div>
-                        <div className="relative z-10 mt-3 flex flex-wrap justify-end gap-2">
-                          {selectedMenteeId &&
-                            ((item._mentorAssignmentStatus as MentorAssessmentStatus) === "submitted" ||
-                              (item._mentorAssignmentStatus as MentorAssessmentStatus) === "completed") && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const aid = getAssessmentId(item);
-                                  if (!aid || !selectedMenteeId) return;
-                                  router.push(
-                                    `/mentor/MentorAssessments/result?assessmentId=${encodeURIComponent(aid)}&userId=${encodeURIComponent(selectedMenteeId)}`,
-                                  );
-                                }}
-                                className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/15"
-                              >
-                                View Result
-                              </button>
-                            )}
-
-                          {selectedMenteeId &&
-                            ((item._mentorAssignmentStatus as MentorAssessmentStatus) === "submitted" ||
-                              (item._mentorAssignmentStatus as MentorAssessmentStatus) === "completed") && (
-                              <button
-                                type="button"
-                                onClick={() => openRecommendationEditor(item)}
-                                className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
-                              >
-                                Send CDP
-                              </button>
-                            )}
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (aid) router.push(`/mentor/MentorAssessments/${aid}`);
-                            }}
-                            disabled={!aid}
-                            className="rounded-xl bg-[#8ec5eb]/90 px-5 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#8ec5eb] disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            View
-                          </button>
-                        </div>
+                          </div>
+                        ) : (
+                          <>
+                            {/* Row 2: Metadata + Button */}
+                            <div className="border-t border-white/10">
+                              <div className="flex items-center justify-between gap-4 px-6 py-4">
+                                <div className="grid grid-cols-3 gap-8 flex-1">
+                                  <div className="text-center">
+                                    <p className="text-xs text-white/60 mb-1">Created on</p>
+                                    <p className="text-sm font-semibold text-white">{formatCreatedDate(assessment.createdOn) || "N/A"}</p>
+                                  </div>
+                                  <div className="text-center">
+                                    <p className="text-xs text-white/60 mb-1">Created by</p>
+                                    <p className="text-sm font-semibold text-white">{assessment.createdBy || "Director"}</p>
+                                  </div>
+                                  <div className="text-center">
+                                    <p className="text-xs text-white/60 mb-1">Mentees Assigned</p>
+                                    <p className="text-sm font-semibold text-white">{assessment.menteeAssigned || 0}</p>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => router.push(`/director/assessments/${assessment.id}`)}
+                                  className="shrink-0 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+                                >
+                                  View / Edit
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className={`mx-auto max-w-md px-8 py-14 text-center ${mentorGlassCardRoadmap} rounded-xl border border-white/10`}>
+                  <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/10">
+                    <i className="fa-regular fa-folder-open text-2xl text-[#8ec5eb]" />
+                  </div>
+                  <p className="text-lg font-semibold text-white">
+                    {selectedMenteeId
+                      ? "No assessments assigned to this pastor."
+                      : "No assessments found"}
+                  </p>
+                  <p className="mt-2 text-sm text-white/60">
+                    {selectedMenteeId
+                      ? "Assign assessments from the full list when needed."
+                      : "Try another search or create an assessment with Add."}
+                  </p>
+                </div>
+              )}
             </>
           ) : (
             <>

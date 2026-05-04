@@ -273,11 +273,25 @@ export const apiUpdateSections = (assessmentId: string, sections: AssessmentSect
 // Do not set Content-Type manually — the boundary is required; axios/browser set it for FormData.
 export const apiUploadAssessmentBanner = (assessmentId: string, file: File) => {
   const formData = new FormData();
-  formData.append("image", file);
-  return axiosInstance.post<{ success: boolean; data: { bannerImage: string } }>(
+  formData.append("file", file);
+  
+  console.log("Banner upload attempt:", {
+    assessmentId,
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
+    endpoint: `/assessment/${assessmentId}/banner-image`
+  });
+
+  return axiosInstance.patch<{ success: boolean; data: { bannerImage: string } }>(
     `/assessment/${assessmentId}/banner-image`,
     formData,
-    { timeout: 60_000 },
+    { 
+      timeout: 60_000,
+      headers: {
+        "Content-Type": undefined
+      }
+    },
   );
 };
 
