@@ -131,7 +131,7 @@ const [showStatusText, setShowStatusText] = useState(false);
 
   return (
     <div className="flex min-h-screen flex-col bg-transparent text-white font-[Albert_Sans]">
-      <PastorHeader showFullHeader={true} />
+      {/* <PastorHeader showFullHeader={true} /> */}
 
       <section
         className="relative flex-1 overflow-hidden bg-cover bg-top px-4 pb-16 pt-6 sm:px-8 lg:px-20"

@@ -376,7 +376,8 @@ function AssessmentsPageContent() {
     setSelectedMenteeId(assignUserFromQuery);
     setSelectedUsers([assignUserFromQuery]);
     setIsSelectionMode(true);
-    setToast("Select assessments, then tap Assigned to.");
+    // setToast("Select assessments, then tap Assigned to.");
+    setToast("Select assessments, then tap Assign.");
     const t = setTimeout(() => setToast(null), 4500);
     return () => clearTimeout(t);
   }, [assignUserFromQuery]);
@@ -566,7 +567,7 @@ function AssessmentsPageContent() {
               ) : null}
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            {/* <div className="flex flex-wrap gap-3">
               {!isSelectionMode ? (
                 <>
                   <button type="button" onClick={handleSelectMode} className={directorBtnSecondary}>
@@ -599,7 +600,25 @@ function AssessmentsPageContent() {
                   Assigned to
                 </button>
               )}
-            </div>
+            </div> */}
+            <div className="flex flex-wrap gap-3">
+  {!isSelectionMode && (
+    <>
+      <button type="button" onClick={handleSelectMode} className={directorBtnSecondary}>
+        <i className="fa-solid fa-check-square"></i>
+        Select
+      </button>
+      <button
+        type="button"
+        onClick={() => router.push("/director/assessments/create")}
+        className={directorBtnPrimary}
+      >
+        <i className="fa-solid fa-plus"></i>
+        Add
+      </button>
+    </>
+  )}
+</div>
           </DirectorFilterSection>
 
           {!featuredLoading && featuredItems.length > 0 && (
@@ -644,7 +663,7 @@ function AssessmentsPageContent() {
                   Select All
                 </button>
               </div>
-              <div className="flex gap-2">
+              {/* <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setShowDeleteModal(true)}
@@ -660,7 +679,42 @@ function AssessmentsPageContent() {
                 >
                   <i className="fa-solid fa-xmark"></i>
                 </button>
-              </div>
+              </div> */}
+              <div className="flex gap-2">
+  <button
+    type="button"
+    onClick={() => {
+      if (selectedAssessments.length === 0) {
+        setToast("Select at least one assessment first.");
+        setTimeout(() => setToast(null), 3500);
+        return;
+      }
+      setShowAssignModal(true);
+    }}
+    disabled={selectedAssessments.length === 0}
+    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/20 px-4 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    <i className="fa-solid fa-user-plus text-xs"></i>
+    Assign
+  </button>
+
+  <button
+    type="button"
+    onClick={() => setShowDeleteModal(true)}
+    disabled={selectedAssessments.length === 0}
+    className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-400/40 bg-red-500/20 text-red-200 hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    <i className="fa-solid fa-trash"></i>
+  </button>
+
+  <button
+    type="button"
+    onClick={handleCancelSelection}
+    className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white hover:bg-white/15"
+  >
+    <i className="fa-solid fa-xmark"></i>
+  </button>
+</div>
             </div>
           )}
 

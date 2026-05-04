@@ -35,6 +35,7 @@ import {
   apiGetUserById,
   apiGetAllUsers,
   apiGetOverallProgress,
+   apiAssignUsers,
   unwrapDirectorOverview,
   unwrapOverallProgressList,
   aggregateDirectorOverviewFromUsers,
@@ -45,6 +46,12 @@ import {
   MentorPastor,
   User,
 } from "@/app/Services/api";
+import { apiGetAssignedUsers } from "@/app/Services/users.service";
+import {
+  apiGetAssignedAssessments,
+  flattenAssignedAssessmentRow,
+  parseAssignedAssessmentsListBody,
+} from "@/app/Services/assessment.service";
 // import { unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
 import {
   appointmentEntityId,
@@ -212,6 +219,33 @@ const NETWORK_MAP_OVERLAY_SLOTS: { top: string; left: string }[] = [
   { top: "58%", left: "88%" },
 ];
 const MAX_NETWORK_MAP_MARKERS = 15;
+const directorQuickLinks = [
+  {
+    title: "Mentor-Mentee Mapping",
+    icon: "fa-solid fa-users",
+    route: "/director/mentees",
+  },
+  {
+    title: "Monthly Appointments",
+    icon: "fa-regular fa-calendar-check",
+    route: "/director/schedule",
+  },
+  {
+    title: "Pastors Roadmap",
+    icon: "fa-solid fa-route",
+    route: "/director/pastor-assignments",
+  },
+  {
+    title: "Assign Mentors",
+    icon: "fa-solid fa-user-plus",
+    route: "/director/pastor-assignments",
+  },
+  {
+    title: "Customized Development Plan",
+    icon: "fa-solid fa-clipboard-list",
+    route: "/director/revitalization-roadmap",
+  },
+];
 
 const directorExploreCards = [
   {
@@ -252,6 +286,39 @@ const [lastName, setLastName] = useState("");
     email: "",
     role: "",
   });
+  
+  const [showQuickAssignModal, setShowQuickAssignModal] = useState(false);
+const [quickAssignPastors, setQuickAssignPastors] = useState<any[]>([]);
+const [quickAssignMentors, setQuickAssignMentors] = useState<any[]>([]);
+const [quickAssignLoading, setQuickAssignLoading] = useState(false);
+const [quickAssignSaving, setQuickAssignSaving] = useState(false);
+const [selectedQuickPastorId, setSelectedQuickPastorId] = useState("");
+const [selectedQuickMentorId, setSelectedQuickMentorId] = useState("");
+const [quickAssignToast, setQuickAssignToast] = useState<string | null>(null);
+
+const [showPastorRoadmapModal, setShowPastorRoadmapModal] = useState(false);
+const [roadmapPastors, setRoadmapPastors] = useState<any[]>([]);
+const [roadmapPastorsLoading, setRoadmapPastorsLoading] = useState(false);
+
+const [showMonthlyAppointmentsModal, setShowMonthlyAppointmentsModal] = useState(false);
+const [monthlyAppointments, setMonthlyAppointments] = useState<Appointment[]>([]);
+const [monthlyAppointmentsLoading, setMonthlyAppointmentsLoading] = useState(false);
+const [monthlyAppointmentDate, setMonthlyAppointmentDate] = useState("");
+
+const [showMentorMenteeModal, setShowMentorMenteeModal] = useState(false);
+const [mappingMentors, setMappingMentors] = useState<any[]>([]);
+const [mappingMentees, setMappingMentees] = useState<any[]>([]);
+const [mappingLoading, setMappingLoading] = useState(false);
+const [mappingMenteesLoading, setMappingMenteesLoading] = useState(false);
+const [selectedMappingMentorId, setSelectedMappingMentorId] = useState("");
+
+const [showCdpModal, setShowCdpModal] = useState(false);
+const [cdpPastors, setCdpPastors] = useState<any[]>([]);
+const [cdpAssessments, setCdpAssessments] = useState<any[]>([]);
+const [cdpPastorsLoading, setCdpPastorsLoading] = useState(false);
+const [cdpAssessmentsLoading, setCdpAssessmentsLoading] = useState(false);
+const [selectedCdpPastorId, setSelectedCdpPastorId] = useState("");
+const [selectedCdpPastorName, setSelectedCdpPastorName] = useState("");
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [interests, setInterests] = useState<Interest[]>([]);
@@ -800,7 +867,351 @@ setLastName("");
     user?.firstName || cookieUser?.firstName
       ? `${user?.firstName ?? cookieUser?.firstName ?? ""} ${user?.lastName ?? cookieUser?.lastName ?? ""}, Welcome Aboard!`
       : "Welcome Aboard!";
+      const openQuickAssignMentors = async () => {
+  try {
+    setShowQuickAssignModal(true);
+    setQuickAssignLoading(true);
+    setSelectedQuickPastorId("");
+    setSelectedQuickMentorId("");
 
+    const [pastorsRes, mentorsRes] = await Promise.all([
+      apiGetAllUsers({
+        role: "pastor",
+        roleMatch: "mixed",
+        page: 1,
+        limit: 100,
+        t: Date.now(),
+      }),
+      apiGetAllUsers({
+        role: "mentor",
+        roleMatch: "mixed",
+        page: 1,
+        limit: 100,
+        t: Date.now(),
+      }),
+    ]);
+
+    const pastorsData: any = pastorsRes?.data?.data;
+    const mentorsData: any = mentorsRes?.data?.data;
+
+    const pastorsList = Array.isArray(pastorsData)
+      ? pastorsData
+      : Array.isArray(pastorsData?.users)
+        ? pastorsData.users
+        : [];
+
+    const mentorsList = Array.isArray(mentorsData)
+      ? mentorsData
+      : Array.isArray(mentorsData?.users)
+        ? mentorsData.users
+        : [];
+
+    setQuickAssignPastors(pastorsList);
+    setQuickAssignMentors(mentorsList);
+  } catch (error) {
+    console.error("Failed to load pastors/mentors", error);
+    alert("Could not load pastors and mentors.");
+  } finally {
+    setQuickAssignLoading(false);
+  }
+};
+
+const handleQuickAssignMentor = async () => {
+  if (!selectedQuickPastorId || !selectedQuickMentorId) {
+    setQuickAssignToast("Please select one pastor and one mentor.");
+    setTimeout(() => setQuickAssignToast(null), 3000);
+    return;
+  }
+
+  const selectedPastor = quickAssignPastors.find(
+    (pastor) => String(pastor._id ?? pastor.id ?? "") === selectedQuickPastorId
+  );
+
+  const selectedMentor = quickAssignMentors.find(
+    (mentor) => String(mentor._id ?? mentor.id ?? "") === selectedQuickMentorId
+  );
+
+  const pastorName =
+    `${selectedPastor?.firstName ?? ""} ${selectedPastor?.lastName ?? ""}`.trim() ||
+    selectedPastor?.email ||
+    "Pastor";
+
+  const mentorName =
+    `${selectedMentor?.firstName ?? ""} ${selectedMentor?.lastName ?? ""}`.trim() ||
+    selectedMentor?.email ||
+    "Mentor";
+
+  try {
+    setQuickAssignSaving(true);
+
+    await apiAssignUsers(selectedQuickPastorId, [selectedQuickMentorId]);
+
+    setShowQuickAssignModal(false);
+    setSelectedQuickPastorId("");
+    setSelectedQuickMentorId("");
+
+    setQuickAssignToast(`${mentorName} assigned to ${pastorName} successfully.`);
+    setTimeout(() => setQuickAssignToast(null), 3500);
+  } catch (error) {
+    console.error("Failed to assign mentor", error);
+    setQuickAssignToast("Failed to assign mentor. Please try again.");
+    setTimeout(() => setQuickAssignToast(null), 3500);
+  } finally {
+    setQuickAssignSaving(false);
+  }
+};
+
+const openPastorsRoadmapModal = async () => {
+  try {
+    setShowPastorRoadmapModal(true);
+    setRoadmapPastorsLoading(true);
+
+    const res = await apiGetAllUsers({
+      role: "pastor",
+      roleMatch: "mixed",
+      page: 1,
+      limit: 100,
+      t: Date.now(),
+    });
+
+    const data: any = res?.data?.data;
+
+    const pastorsList = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.users)
+        ? data.users
+        : [];
+
+    setRoadmapPastors(pastorsList);
+  } catch (error) {
+    console.error("Failed to load pastors for roadmap", error);
+    setRoadmapPastors([]);
+  } finally {
+    setRoadmapPastorsLoading(false);
+  }
+};
+const openMonthlyAppointmentsModal = async () => {
+  try {
+    setShowMonthlyAppointmentsModal(true);
+    setMonthlyAppointmentsLoading(true);
+    setMonthlyAppointmentDate("");
+
+    const res = await apiGetAppointments({
+      futureOnly: false,
+      status: "scheduled",
+      t: Date.now(),
+    } as any);
+
+    const list = (unwrapAppointmentsAxiosData(res) || []) as Appointment[];
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const thisMonthAppointments = list
+      .filter((appointment) => {
+        const meetingDate = new Date(appointment.meetingDate);
+        return (
+          meetingDate.getMonth() === currentMonth &&
+          meetingDate.getFullYear() === currentYear
+        );
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime()
+      );
+
+    setMonthlyAppointments(thisMonthAppointments);
+  } catch (error) {
+    console.error("Failed to load monthly appointments", error);
+    setMonthlyAppointments([]);
+  } finally {
+    setMonthlyAppointmentsLoading(false);
+  }
+};
+
+const filteredMonthlyAppointments = monthlyAppointmentDate
+  ? monthlyAppointments.filter((appointment) => {
+      const appointmentDate = new Date(appointment.meetingDate)
+        .toISOString()
+        .slice(0, 10);
+
+      return appointmentDate === monthlyAppointmentDate;
+    })
+  : monthlyAppointments;
+
+  const selectedQuickPastor = quickAssignPastors.find(
+  (pastor) => String(pastor._id ?? pastor.id ?? "") === selectedQuickPastorId
+);
+
+const selectedQuickPastorName =
+  `${selectedQuickPastor?.firstName ?? ""} ${selectedQuickPastor?.lastName ?? ""}`.trim() ||
+  selectedQuickPastor?.email ||
+  "Selected pastor";
+
+  const openMentorMenteeMappingModal = async () => {
+  try {
+    setShowMentorMenteeModal(true);
+    setMappingLoading(true);
+    setSelectedMappingMentorId("");
+    setMappingMentees([]);
+
+    const res = await apiGetAllUsers({
+      role: "mentor",
+      roleMatch: "mixed",
+      page: 1,
+      limit: 100,
+      t: Date.now(),
+    });
+
+    const data: any = res?.data?.data;
+
+    const mentorsList = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.users)
+        ? data.users
+        : [];
+
+    setMappingMentors(mentorsList);
+  } catch (error) {
+    console.error("Failed to load mentors", error);
+    setMappingMentors([]);
+  } finally {
+    setMappingLoading(false);
+  }
+};
+
+const loadMenteesForMentor = async (mentorId: string) => {
+  try {
+    setSelectedMappingMentorId(mentorId);
+    setMappingMenteesLoading(true);
+    setMappingMentees([]);
+
+    const res = await apiGetAssignedUsers(mentorId);
+    const assignedUsers = Array.isArray(res?.data?.data) ? res.data.data : [];
+
+    setMappingMentees(assignedUsers);
+  } catch (error) {
+    console.error("Failed to load assigned mentees", error);
+    setMappingMentees([]);
+  } finally {
+    setMappingMenteesLoading(false);
+  }
+};
+
+const openCdpModal = async () => {
+  try {
+    setShowCdpModal(true);
+    setCdpPastorsLoading(true);
+    setSelectedCdpPastorId("");
+    setSelectedCdpPastorName("");
+    setCdpAssessments([]);
+
+    const res = await apiGetAllUsers({
+      role: "pastor",
+      roleMatch: "mixed",
+      page: 1,
+      limit: 100,
+      t: Date.now(),
+    });
+
+    const data: any = res?.data?.data;
+
+    const pastorsList = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.users)
+        ? data.users
+        : [];
+
+    setCdpPastors(pastorsList);
+  } catch (error) {
+    console.error("Failed to load pastors for CDP", error);
+    setCdpPastors([]);
+  } finally {
+    setCdpPastorsLoading(false);
+  }
+};
+
+const loadCdpAssessmentsForPastor = async (pastor: any) => {
+  const pastorId = String(pastor._id ?? pastor.id ?? "");
+  const pastorName =
+    `${pastor.firstName ?? ""} ${pastor.lastName ?? ""}`.trim() ||
+    pastor.email ||
+    "Selected pastor";
+
+  if (!pastorId) return;
+
+  try {
+    setSelectedCdpPastorId(pastorId);
+    setSelectedCdpPastorName(pastorName);
+    setCdpAssessmentsLoading(true);
+    setCdpAssessments([]);
+
+    const res = await apiGetAssignedAssessments(pastorId);
+    const rows = parseAssignedAssessmentsListBody(res.data);
+
+    const completedWithCdp = rows
+      .map((item: any) => {
+        // const flat = flattenAssignedAssessmentRow(item);
+        // if (!flat) return null;
+
+        // const assessment: any = flat.assessment ?? {};
+        const flatRaw = flattenAssignedAssessmentRow(item);
+if (!flatRaw) return null;
+
+const flat: any = flatRaw;
+const rawItem: any = item;
+
+const assessment: any = flat.assessment ?? {};
+        const assessmentId = String(
+          assessment._id ?? assessment.id ?? flat.assessmentId ?? ""
+        );
+
+        const status = String(
+          flat.status ??
+            flat.progressStatus ??
+            item?.status ??
+            item?.progressStatus ??
+            ""
+        )
+          .toLowerCase()
+          .trim();
+
+        const hasCdp =
+          Boolean(flat.customizedDevelopmentPlan) ||
+          Boolean(flat.customizedDevelopmentPlanId) ||
+          Boolean(flat.cdp) ||
+          Boolean(flat.recommendation) ||
+          Boolean(flat.recommendations) ||
+          Boolean(item?.customizedDevelopmentPlan) ||
+          Boolean(item?.customizedDevelopmentPlanId) ||
+          Boolean(item?.cdp) ||
+          Boolean(item?.recommendation) ||
+          Boolean(item?.recommendations);
+
+        const isCompleted =
+          status === "completed" ||
+          status === "reviewed" ||
+          status === "submitted";
+
+        if (!assessmentId || !isCompleted || !hasCdp) return null;
+
+        return {
+          id: assessmentId,
+          title: assessment.name || assessment.title || "Untitled assessment",
+          description: assessment.description || "",
+        };
+      })
+      .filter(Boolean);
+
+    setCdpAssessments(completedWithCdp);
+  } catch (error) {
+    console.error("Failed to load CDP assessments", error);
+    setCdpAssessments([]);
+  } finally {
+    setCdpAssessmentsLoading(false);
+  }
+};
   return (
     <div className={directorPageRoot}>
       {/* Hero — mentor / pastor glass + image */}
@@ -822,7 +1233,7 @@ setLastName("");
                 {getGreeting()}
               </p>
               <h1 className="text-xl font-semibold leading-snug sm:text-3xl lg:text-4xl">
-                Cultivate Spiritual, Professional, Social, And Community–
+                Cultivate Spiritual, Professional, Social, And Community
                 <br className="hidden sm:block" />
                 Engagement Developments
               </h1>
@@ -933,7 +1344,7 @@ setLastName("");
       </section> */}
 
       {/* Today's Appointments + New Interests */}
-<section className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-2">
+<section className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
   {/* Today's Appointments */}
   <div className={`${directorGlassCard} p-5 sm:p-6`}>
     <div className="mb-5 flex items-center justify-between gap-3">
@@ -1055,7 +1466,7 @@ setLastName("");
                     <i className="fa-regular fa-comment" />
                     <i className="fa-brands fa-whatsapp" />
                   </div> */}
-                  <div className="mt-2 flex gap-4 text-sm text-white/70">
+         <div className="mt-2 flex gap-4 text-sm text-white/70">
   <button
     type="button"
     disabled={!attendeeEmail}
@@ -1069,6 +1480,36 @@ setLastName("");
     }}
   >
     <i className="fa-regular fa-envelope" />
+  </button>
+
+  <button
+    type="button"
+    disabled
+    className="cursor-not-allowed opacity-40"
+    aria-label="Call disabled"
+    title="Call disabled"
+  >
+    <i className="fa-solid fa-phone" />
+  </button>
+
+  <button
+    type="button"
+    disabled
+    className="cursor-not-allowed opacity-40"
+    aria-label="Chat disabled"
+    title="Chat disabled"
+  >
+    <i className="fa-regular fa-comment" />
+  </button>
+
+  <button
+    type="button"
+    disabled
+    className="cursor-not-allowed opacity-40"
+    aria-label="WhatsApp disabled"
+    title="WhatsApp disabled"
+  >
+    <i className="fa-brands fa-whatsapp" />
   </button>
 </div>
                 </div>
@@ -1164,23 +1605,40 @@ setLastName("");
               </button>
             </div> */}
 
-            <div className="flex items-center gap-4 text-[#8ec5eb]">
-  {/* <button type="button" className="hover:opacity-80" aria-label="Email">
-    <i className="fa-solid fa-envelope text-sm" />
-  </button> */}
+         <div className="flex items-center gap-4 text-[#8ec5eb]">
   <button
-  type="button"
-  className="hover:opacity-80"
-  aria-label={`Email ${interest.email}`}
-  onClick={() => {
-    if (!interest.email) return;
+    type="button"
+    className="hover:opacity-80"
+    aria-label={`Email ${interest.email}`}
+    onClick={() => {
+      if (!interest.email) return;
 
-    const subject = encodeURIComponent("Community Change Interest Form");
-    window.location.href = `mailto:${interest.email}?subject=${subject}`;
-  }}
->
-  <i className="fa-solid fa-envelope text-sm" />
-</button>
+      const subject = encodeURIComponent("Community Change Interest Form");
+      window.location.href = `mailto:${interest.email}?subject=${subject}`;
+    }}
+  >
+    <i className="fa-solid fa-envelope text-sm" />
+  </button>
+
+  <button
+    type="button"
+    disabled
+    className="cursor-not-allowed opacity-40"
+    aria-label="Chat disabled"
+    title="Chat disabled"
+  >
+    <i className="fa-regular fa-comment text-sm" />
+  </button>
+
+  <button
+    type="button"
+    disabled
+    className="cursor-not-allowed opacity-40"
+    aria-label="Call disabled"
+    title="Call disabled"
+  >
+    <i className="fa-solid fa-phone text-sm" />
+  </button>
 </div>
 
             <button
@@ -1367,9 +1825,11 @@ setLastName("");
       </section> */}
 
       {/* Add User Section */}
-      <section className="mt-6 py-8 sm:py-12 md:py-16">
-        <div className={`mx-auto max-w-6xl rounded-3xl border border-white/15 bg-[linear-gradient(135deg,rgba(142,197,235,0.12)_0%,rgba(6,41,70,0.95)_45%,#041f35_100%)] p-8 shadow-lg sm:p-12`}>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-start">
+      {/* <section className="mt-6 py-8 sm:py-6 md:py-8"> */}
+      <section className="mt-5 py-5 sm:py-6 md:py-6">
+        {/* <div className={`mx-auto max-w-6xl rounded-3xl border border-white/15 bg-[linear-gradient(135deg,rgba(142,197,235,0.12)_0%,rgba(6,41,70,0.95)_45%,#041f35_100%)] p-8 shadow-lg sm:p-12`}> */}
+        <div className={`mx-auto max-w-6xl p-6 sm:p-8 ${directorGlassCard}`}>
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
             {/* Left side */}
             <div className="text-white">
               <h2 className="text-2xl sm:text-3xl md:text-[32px] font-bold mb-3">
@@ -1469,9 +1929,72 @@ setLastName("");
           </div>
         </div>
 
+         {/* Quick Links */}
+{/* <section className="mt-8 py-8"> */}
+<section className="mt-6 py-4">
+  <div className={`${directorGlassCard} p-4 sm:p-5`}>
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <h2 className="text-base font-semibold text-white sm:text-lg">
+        Quick Links
+      </h2>
+
+      {/* <button
+        type="button"
+        className="text-xs font-semibold text-[#8ec5eb] hover:text-[#b8ddf5]"
+      >
+        See all
+      </button> */}
+    </div>
+
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      {directorQuickLinks.map((item) => (
+        <button
+          key={item.title}
+          type="button"
+          // onClick={() => router.push(item.route)}
+  onClick={() => {
+  if (item.title === "Assign Mentors") {
+    void openQuickAssignMentors();
+    return;
+  }
+
+  if (item.title === "Pastors Roadmap") {
+    void openPastorsRoadmapModal();
+    return;
+  }
+    if (item.title === "Monthly Appointments") {
+    void openMonthlyAppointmentsModal();
+    return;
+  }
+if (item.title === "Mentor-Mentee Mapping") {
+  void openMentorMenteeMappingModal();
+  return;
+}
+if (item.title === "Customized Development Plan") {
+  void openCdpModal();
+  return;
+}
+  router.push(item.route);
+}}
+          className="group flex min-h-[120px] flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-5 text-center transition hover:border-[#8ec5eb]/35 hover:bg-[#8ec5eb]/10"
+        >
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#8ec5eb]/10 text-[#8ec5eb] transition group-hover:bg-[#8ec5eb]/20">
+            <i className={`${item.icon} text-xl`} />
+          </span>
+
+          <span className="text-xs font-semibold leading-snug text-white/90 sm:text-sm">
+            {item.title}
+          </span>
+        </button>
+      ))}
+    </div>
+  </div>
+</section>
+
+
         {/* Mentors/Pastors Section */}
-        <div className="mt-12 sm:mt-16">
-          <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+       <div className="mt-5 sm:mt-6">
+          <div className="mb-4 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex w-full gap-2 rounded-[20px] border border-white/10 bg-white/5 p-2 sm:w-auto sm:gap-4">
               <button
                 type="button"
@@ -1536,9 +2059,9 @@ setLastName("");
           )}
         </div>
       </section>
-
+     
       {/* Explore CCC */}
-      <section className="py-16">
+      <section className="py-8">
         <h2 className="mb-10 text-[22px] font-semibold text-white">Explore CCC</h2>
 
         <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
@@ -1570,7 +2093,7 @@ setLastName("");
       </section>
 
       {/* Overview + roadmap & assessment progress (matches director / track-progress language) */}
-      <section className="py-12 sm:py-16">
+      <section className="py-12 sm:py-8">
         <div className={directorPageContainer}>
           <h2 className="text-lg font-semibold text-white sm:text-xl">Overview</h2>
           <p className="mt-1 text-sm text-white/55">Network headcount and completions at a glance.</p>
@@ -1801,7 +2324,7 @@ setLastName("");
       </section>
 
       {/* Course Completed & Invite */}
-      <section className="py-16">
+      <section className="py-8">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
           <button
             type="button"
@@ -1919,6 +2442,761 @@ setLastName("");
           </span>
         </div>
       </section>
+           {showQuickAssignModal && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b18]/75 px-4 backdrop-blur-md">
+    <div className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}>
+      <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4">
+        <div>
+          <h3 className="text-lg font-semibold text-white">
+            {selectedQuickPastorId ? "Assign Mentor" : "Select Pastor"}
+          </h3>
+          <p className="mt-1 text-sm text-white/60">
+            {selectedQuickPastorId
+              ? `Choose a mentor to assign to ${selectedQuickPastorName}.`
+              : "Select a pastor first, then assign a mentor."}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setShowQuickAssignModal(false);
+            setSelectedQuickPastorId("");
+            setSelectedQuickMentorId("");
+          }}
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+        >
+          <i className="fa-solid fa-xmark" />
+        </button>
+      </div>
+
+      {quickAssignLoading ? (
+        <div className="flex min-h-[300px] items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
+        </div>
+      ) : (
+        <div className="max-h-[65vh] overflow-y-auto bg-[#07172a]/30 p-6">
+          {!selectedQuickPastorId ? (
+            <>
+              <h4 className="mb-4 text-sm font-semibold text-[#8ec5eb]">
+                Pastors
+              </h4>
+
+              {quickAssignPastors.length === 0 ? (
+                <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/60">
+                  No pastors found.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {quickAssignPastors.map((pastor) => {
+                    const pastorId = String(pastor._id ?? pastor.id ?? "");
+                    const pastorName =
+                      `${pastor.firstName ?? ""} ${pastor.lastName ?? ""}`.trim() ||
+                      pastor.email ||
+                      "Unnamed pastor";
+
+                    return (
+                      <button
+                        key={pastorId}
+                        type="button"
+                        onClick={() => {
+                          setSelectedQuickPastorId(pastorId);
+                          setSelectedQuickMentorId("");
+                        }}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 text-left shadow-sm transition hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
+                      >
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                          <i className="fa-solid fa-user" />
+                        </span>
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-white">
+                            {pastorName}
+                          </span>
+                          <span className="block truncate text-xs text-white/55">
+                            {pastor.email ?? "Pastor"}
+                          </span>
+                        </span>
+
+                        <span className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-3 py-1.5 text-xs font-semibold text-white">
+                          Assign mentor
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8ec5eb]">
+                    Selected Pastor
+                  </p>
+                  <h4 className="mt-1 text-base font-semibold text-white">
+                    {selectedQuickPastorName}
+                  </h4>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedQuickPastorId("");
+                    setSelectedQuickMentorId("");
+                  }}
+                  className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+                >
+                  Change Pastor
+                </button>
+              </div>
+
+              <h4 className="mb-4 text-sm font-semibold text-[#8ec5eb]">
+                Select Mentor
+              </h4>
+
+              {quickAssignMentors.length === 0 ? (
+                <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/60">
+                  No mentors found.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {quickAssignMentors.map((mentor) => {
+                    const mentorId = String(mentor._id ?? mentor.id ?? "");
+                    const mentorName =
+                      `${mentor.firstName ?? ""} ${mentor.lastName ?? ""}`.trim() ||
+                      mentor.email ||
+                      "Unnamed mentor";
+
+                    const selected = selectedQuickMentorId === mentorId;
+
+                    return (
+                      <button
+                        key={mentorId}
+                        type="button"
+                        onClick={() => setSelectedQuickMentorId(mentorId)}
+                        className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-4 text-left shadow-sm transition ${
+                          selected
+                            ? "border-[#8ec5eb]/70 bg-[#8ec5eb]/20"
+                            : "border-white/10 bg-[#132a42]/80 hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
+                        }`}
+                      >
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                          <i className="fa-solid fa-user-tie" />
+                        </span>
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-white">
+                            {mentorName}
+                          </span>
+                          <span className="block truncate text-xs text-white/55">
+                            {mentor.email ?? "Mentor"}
+                          </span>
+                        </span>
+
+                        {selected && (
+                          <i className="fa-solid fa-circle-check text-[#8ec5eb]" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      <div className="flex justify-end gap-3 border-t border-white/10 bg-white/[0.03] px-6 py-4">
+        <button
+          type="button"
+          onClick={() => {
+            setShowQuickAssignModal(false);
+            setSelectedQuickPastorId("");
+            setSelectedQuickMentorId("");
+          }}
+          className="rounded-xl border border-white/20 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/15"
+        >
+          Cancel
+        </button>
+
+        {selectedQuickPastorId && (
+          <button
+            type="button"
+            onClick={handleQuickAssignMentor}
+            disabled={quickAssignSaving || !selectedQuickMentorId}
+            className="rounded-xl border border-[#8ec5eb]/45 bg-[#8ec5eb]/20 px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {quickAssignSaving ? "Assigning..." : "Assign Mentor"}
+          </button>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+      {quickAssignToast && (
+  <div className="fixed left-1/2 top-24 z-[120] -translate-x-1/2 px-4">
+    <div className={`${directorGlassCard} flex items-center gap-3 px-5 py-3 text-sm font-semibold text-white shadow-2xl`}>
+      <i
+        className={`fa-solid ${
+          quickAssignToast.toLowerCase().includes("failed") ||
+          quickAssignToast.toLowerCase().includes("please")
+            ? "fa-circle-exclamation text-amber-300"
+            : "fa-circle-check text-emerald-300"
+        }`}
+      />
+      <span>{quickAssignToast}</span>
+    </div>
+  </div>
+)}
+
+{showPastorRoadmapModal && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b18]/75 px-4 backdrop-blur-md">
+  <div className={`${directorGlassCard} w-full max-w-3xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}>
+      <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4">
+        <div>
+          <h3 className="text-lg font-semibold text-white">Pastors Roadmap</h3>
+          <p className="mt-1 text-sm text-white/60">
+            Select a pastor to view assigned roadmaps.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowPastorRoadmapModal(false)}
+          className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white hover:bg-white/15"
+        >
+          <i className="fa-solid fa-xmark" />
+        </button>
+      </div>
+
+      {roadmapPastorsLoading ? (
+        <div className="flex min-h-[300px] items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
+        </div>
+      ) : (
+        <div className="max-h-[65vh] overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-[#8ec5eb]/40 scrollbar-track-white/5">
+          {roadmapPastors.length === 0 ? (
+            <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/60">
+              No pastors found.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {roadmapPastors.map((pastor) => {
+                const pastorId = String(pastor._id ?? pastor.id ?? "");
+                const pastorName =
+                  `${pastor.firstName ?? ""} ${pastor.lastName ?? ""}`.trim() ||
+                  pastor.email ||
+                  "Unnamed pastor";
+
+                return (
+                  <button
+                    key={pastorId}
+                    type="button"
+                    onClick={() => {
+                      if (!pastorId) return;
+
+                      setShowPastorRoadmapModal(false);
+                      router.push(
+                        `/director/pastor-assignments?assignUser=${encodeURIComponent(
+                          pastorId
+                        )}`
+                      );
+                    }}
+                   className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 text-left shadow-sm transition hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
+                  >
+                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                      <i className="fa-solid fa-user" />
+                    </span>
+
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-white">
+                        {pastorName}
+                      </span>
+                      <span className="block truncate text-xs text-white/55">
+                        {pastor.email ?? "Pastor"}
+                      </span>
+                    </span>
+
+                    <i className="fa-solid fa-arrow-right ml-auto text-xs text-[#8ec5eb]" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+)}
+{showMonthlyAppointmentsModal && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b18]/70 px-4 backdrop-blur-md">
+  <div className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}>
+      <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+        <div>
+          <h3 className="text-lg font-semibold text-white">
+            Monthly Appointments
+          </h3>
+          <p className="mt-1 text-sm text-white/60">
+            View this month&apos;s appointments and filter by date.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowMonthlyAppointmentsModal(false)}
+         className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+        >
+          <i className="fa-solid fa-xmark" />
+        </button>
+      </div>
+
+      <div className="border-b border-white/10 px-6 py-4">
+        <label className="block text-sm font-semibold text-white">
+          Search by date
+        </label>
+
+        <div className="mt-2 flex flex-col gap-3 sm:flex-row">
+          <input
+            type="date"
+            value={monthlyAppointmentDate}
+            onChange={(e) => setMonthlyAppointmentDate(e.target.value)}
+           className="w-full rounded-xl border border-white/15 bg-[#17334d]/80 px-4 py-2.5 text-sm text-white outline-none [color-scheme:dark] placeholder:text-white/45 focus:border-[#8ec5eb]/60 sm:max-w-xs"
+          />
+
+          {monthlyAppointmentDate && (
+            <button
+              type="button"
+              onClick={() => setMonthlyAppointmentDate("")}
+              className="rounded-lg border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/15"
+            >
+              Clear date
+            </button>
+          )}
+        </div>
+      </div>
+
+      {monthlyAppointmentsLoading ? (
+        <div className="flex min-h-[300px] items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
+        </div>
+      ) : (
+        <div className="max-h-[65vh] overflow-y-auto bg-[#07172a]/30 p-6">
+          {filteredMonthlyAppointments.length === 0 ? (
+            <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-white/60">
+              No appointments found for this month or selected date.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {filteredMonthlyAppointments.map((appointment) => {
+                const appointmentId = appointmentEntityId(appointment);
+
+                const mentor =
+                  appointment.mentor ??
+                  (typeof (appointment as any).mentorId === "object"
+                    ? (appointment as any).mentorId
+                    : undefined);
+
+                const attendee =
+                  appointment.user ??
+                  (typeof (appointment as any).userId === "object"
+                    ? (appointment as any).userId
+                    : undefined);
+
+                const mentorName =
+                  `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.trim() ||
+                  mentor?.email ||
+                  "Mentor";
+
+                const attendeeName =
+                  `${attendee?.firstName ?? ""} ${attendee?.lastName ?? ""}`.trim() ||
+                  attendee?.email ||
+                  "Participant";
+
+                const meetingDate = new Date(appointment.meetingDate);
+
+                const dateText = meetingDate.toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
+
+                const timeText = meetingDate.toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: true,
+                });
+
+                return (
+                  <div
+                    key={appointmentId || appointment.id}
+                    className="rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 shadow-sm"
+                  >
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <h4 className="truncate text-sm font-semibold text-white">
+                          {attendeeName}
+                        </h4>
+
+                        <p className="mt-1 text-xs text-white/60">
+                          Mentor:{" "}
+                          <span className="text-[#cde2f2]">{mentorName}</span>
+                        </p>
+
+                        <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
+                          <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-white/80">
+                            <i className="fa-regular fa-calendar mr-1 text-[#8ec5eb]" />
+                            {dateText}
+                          </span>
+
+                          <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-white/80">
+                            <i className="fa-regular fa-clock mr-1 text-[#8ec5eb]" />
+                            {timeText}
+                          </span>
+
+                          <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 capitalize text-white/80">
+                            Mode: {appointment.platform || "—"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={!appointmentId}
+                        onClick={() => {
+                          if (!appointmentId) return;
+                          setShowMonthlyAppointmentsModal(false);
+                          router.push(
+                            `/director/schedule/${encodeURIComponent(appointmentId)}`
+                          );
+                        }}
+                        className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/25 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Details
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+)}
+{showMentorMenteeModal && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b18]/75 px-4 backdrop-blur-md">
+    <div className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}>
+      <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4">
+        <div>
+          <h3 className="text-lg font-semibold text-white">
+            {selectedMappingMentorId ? "Assigned Mentees" : "Mentor-Mentee Mapping"}
+          </h3>
+          <p className="mt-1 text-sm text-white/60">
+            {selectedMappingMentorId
+              ? "View mentees assigned to the selected mentor."
+              : "Select a mentor to view assigned mentees."}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setShowMentorMenteeModal(false);
+            setSelectedMappingMentorId("");
+            setMappingMentees([]);
+          }}
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+        >
+          <i className="fa-solid fa-xmark" />
+        </button>
+      </div>
+
+      {mappingLoading ? (
+        <div className="flex min-h-[300px] items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
+        </div>
+      ) : (
+        <div className="max-h-[65vh] overflow-y-auto bg-[#07172a]/30 p-6">
+          {!selectedMappingMentorId ? (
+            <>
+              <h4 className="mb-4 text-sm font-semibold text-[#8ec5eb]">
+                Mentors
+              </h4>
+
+              {mappingMentors.length === 0 ? (
+                <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/60">
+                  No mentors found.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {mappingMentors.map((mentor) => {
+                    const mentorId = String(mentor._id ?? mentor.id ?? "");
+                    const mentorName =
+                      `${mentor.firstName ?? ""} ${mentor.lastName ?? ""}`.trim() ||
+                      mentor.email ||
+                      "Unnamed mentor";
+
+                    return (
+                      <button
+                        key={mentorId}
+                        type="button"
+                        onClick={() => {
+                          if (!mentorId) return;
+                          void loadMenteesForMentor(mentorId);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 text-left shadow-sm transition hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
+                      >
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                          <i className="fa-solid fa-user-tie" />
+                        </span>
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-white">
+                            {mentorName}
+                          </span>
+                          <span className="block truncate text-xs text-white/55">
+                            {mentor.email ?? "Mentor"}
+                          </span>
+                        </span>
+
+                        <span className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-3 py-1.5 text-xs font-semibold text-white">
+                          View mentees
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8ec5eb]">
+                    Assigned Mentees
+                  </p>
+                  <h4 className="mt-1 text-base font-semibold text-white">
+                    Selected mentor
+                  </h4>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedMappingMentorId("");
+                    setMappingMentees([]);
+                  }}
+                  className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+                >
+                  Change Mentor
+                </button>
+              </div>
+
+              {mappingMenteesLoading ? (
+                <div className="flex min-h-[220px] items-center justify-center">
+                  <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
+                </div>
+              ) : mappingMentees.length === 0 ? (
+                <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-white/60">
+                  No mentees assigned to this mentor.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {mappingMentees.map((mentee) => {
+                    const menteeId = String(mentee._id ?? mentee.id ?? "");
+                    const menteeName =
+                      `${mentee.firstName ?? ""} ${mentee.lastName ?? ""}`.trim() ||
+                      mentee.email ||
+                      "Unnamed mentee";
+
+                    return (
+                      <div
+                        key={menteeId}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 shadow-sm"
+                      >
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                          <i className="fa-solid fa-user" />
+                        </span>
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-white">
+                            {menteeName}
+                          </span>
+                          <span className="block truncate text-xs text-white/55">
+                            {mentee.email ?? "Mentee"}
+                          </span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+)}
+{showCdpModal && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b18]/75 px-4 backdrop-blur-md">
+    <div className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}>
+      <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4">
+        <div>
+          <h3 className="text-lg font-semibold text-white">
+            {selectedCdpPastorId ? "Customized Development Plan" : "Select Pastor"}
+          </h3>
+          <p className="mt-1 text-sm text-white/60">
+            {selectedCdpPastorId
+              ? `Showing completed assessments with CDP for ${selectedCdpPastorName}.`
+              : "Select a pastor to view completed assessments with customized development plans."}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setShowCdpModal(false);
+            setSelectedCdpPastorId("");
+            setSelectedCdpPastorName("");
+            setCdpAssessments([]);
+          }}
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+        >
+          <i className="fa-solid fa-xmark" />
+        </button>
+      </div>
+
+      {cdpPastorsLoading ? (
+        <div className="flex min-h-[300px] items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
+        </div>
+      ) : (
+        <div className="max-h-[65vh] overflow-y-auto bg-[#07172a]/30 p-6">
+          {!selectedCdpPastorId ? (
+            <>
+              <h4 className="mb-4 text-sm font-semibold text-[#8ec5eb]">
+                Pastors
+              </h4>
+
+              {cdpPastors.length === 0 ? (
+                <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/60">
+                  No pastors found.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {cdpPastors.map((pastor) => {
+                    const pastorId = String(pastor._id ?? pastor.id ?? "");
+                    const pastorName =
+                      `${pastor.firstName ?? ""} ${pastor.lastName ?? ""}`.trim() ||
+                      pastor.email ||
+                      "Unnamed pastor";
+
+                    return (
+                      <button
+                        key={pastorId}
+                        type="button"
+                        onClick={() => void loadCdpAssessmentsForPastor(pastor)}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 text-left shadow-sm transition hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
+                      >
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                          <i className="fa-solid fa-user" />
+                        </span>
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-white">
+                            {pastorName}
+                          </span>
+                          <span className="block truncate text-xs text-white/55">
+                            {pastor.email ?? "Pastor"}
+                          </span>
+                        </span>
+
+                        <span className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-3 py-1.5 text-xs font-semibold text-white">
+                          View CDP
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8ec5eb]">
+                    Selected Pastor
+                  </p>
+                  <h4 className="mt-1 text-base font-semibold text-white">
+                    {selectedCdpPastorName}
+                  </h4>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCdpPastorId("");
+                    setSelectedCdpPastorName("");
+                    setCdpAssessments([]);
+                  }}
+                  className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+                >
+                  Change Pastor
+                </button>
+              </div>
+
+              {cdpAssessmentsLoading ? (
+                <div className="flex min-h-[220px] items-center justify-center">
+                  <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
+                </div>
+              ) : cdpAssessments.length === 0 ? (
+                <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-white/60">
+                  No completed assessments with customized development plan found.
+                </p>
+              ) : (
+                <div className="grid grid-cols-1 gap-3">
+                  {cdpAssessments.map((assessment) => (
+                    <button
+                      key={assessment.id}
+                      type="button"
+                      onClick={() => {
+                        setShowCdpModal(false);
+                        router.push(
+                          `/director/assessments/result?assessmentId=${encodeURIComponent(
+                            assessment.id
+                          )}&userId=${encodeURIComponent(selectedCdpPastorId)}`
+                        );
+                      }}
+                      className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 text-left shadow-sm transition hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
+                    >
+                      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                        <i className="fa-solid fa-clipboard-check" />
+                      </span>
+
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-white">
+                          {assessment.title}
+                        </span>
+                        <span className="block truncate text-xs text-white/55">
+                          Completed assessment with CDP
+                        </span>
+                      </span>
+
+                      <i className="fa-solid fa-arrow-right text-xs text-[#8ec5eb]" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+)}
     </div>
   );
 }

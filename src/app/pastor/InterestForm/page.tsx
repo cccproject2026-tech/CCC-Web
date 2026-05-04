@@ -942,12 +942,15 @@ try {
             </div>
             <h2 className="text-white text-lg font-semibold">Interest Submitted !</h2>
             <p className="text-[#cde2f2] text-sm mt-1 mb-5">Please wait for approval</p>
-            <button
-              onClick={() => router.push("/pastor/Thankyou")}
-              className="border border-white/40 text-white px-6 py-1.5 rounded-md hover:bg-white/10 font-semibold"
-            >
-              Close
-            </button>
+           <button
+  onClick={() => {
+    const email = form.email.trim();
+    router.push(`/pastor/Thankyou?email=${encodeURIComponent(email)}`);
+  }}
+  className="border border-white/40 text-white px-6 py-1.5 rounded-md hover:bg-white/10 font-semibold"
+>
+  Close
+</button>
           </div>
         </div>
       )}

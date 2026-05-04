@@ -279,6 +279,19 @@ export default function MentorHomePage() {
       </div>
     );
   }
+  const currentTime = new Date()
+  .toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  })
+  .replace(":", " : ");
+
+const currentDate = new Date().toLocaleDateString("en-US", {
+  weekday: "long",
+  month: "short",
+  day: "numeric",
+});
 
   return (
     <div className={mentorPageRoot}>
@@ -286,7 +299,7 @@ export default function MentorHomePage() {
 
       <main className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-4 pb-28 pt-4 sm:px-6 sm:pb-10 lg:px-8 lg:pt-6">
         {/* Hero — CCC-Mobile: greeting on hero, compact welcome card, showClockDate false */}
-        <section
+        {/* <section
           className={`relative overflow-hidden rounded-3xl border border-white/10 ${mentorGlassCardFrost}`}
         >
           <div className="relative min-h-[162px] sm:min-h-[200px] lg:min-h-[210px]">
@@ -333,10 +346,63 @@ export default function MentorHomePage() {
                 >
                   View progress
                 </button> */}
-              </div>
+              {/* </div>
             </div>
           </div>
-        </section>
+        </section> */} 
+        {/* Hero — director-style */}
+<section
+  className={`relative overflow-hidden rounded-3xl border border-white/10 ${mentorGlassCardFrost}`}
+>
+  <div className="relative h-[240px] sm:h-[300px] lg:h-[340px]">
+    <Image
+      src={HeroBg}
+      alt=""
+      fill
+      className="object-cover object-center"
+      priority
+    />
+    <div className="absolute inset-0 bg-gradient-to-t from-[#062946] via-[#062946]/75 to-[#0a3558]/50" />
+    <div className="absolute inset-0 bg-gradient-to-r from-[#041f35]/90 via-transparent to-transparent" />
+
+    <div className="relative z-10 flex h-full flex-col justify-between p-5 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
+      <div className="max-w-full space-y-2 lg:max-w-2xl">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
+          {getGreeting()}
+        </p>
+
+        <h1 className="text-xl font-semibold leading-snug sm:text-3xl lg:text-4xl">
+          Cultivate Spiritual, Professional, Social, And Community
+          <br className="hidden sm:block" />
+          Engagement Developments
+        </h1>
+        <p className="text-sm text-white/80">{currentTime}</p>
+<p className="text-xs text-white/60 sm:text-sm">{currentDate}</p>
+      </div>
+
+      {/* <button
+        type="button"
+        onClick={() => router.push("/mentor/profile")}
+        className="mt-4 flex w-full max-w-sm items-center gap-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-left backdrop-blur-md transition hover:bg-white/15 lg:mt-0 lg:w-auto"
+      > */}
+      <div className="mt-4 flex w-full max-w-sm items-center gap-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-left backdrop-blur-md lg:mt-0 lg:w-auto">
+        <Image
+          src={UserProfile}
+          alt=""
+          width={48}
+          height={48}
+          className="rounded-full border-2 border-white/30"
+        />
+
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-white">
+            {welcomeLine}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
 
         {/* Things to Focus On */}
         <section className="mt-3 sm:mt-4">

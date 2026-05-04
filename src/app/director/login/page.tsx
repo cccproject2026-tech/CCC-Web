@@ -147,9 +147,9 @@ function DirectorLoginInner() {
           <Image src={Framelogo1} alt="CCC" width={26} height={26} />
           <span className="hidden text-sm font-medium sm:inline">Center for Community Change</span>
         </Link>
-        <Link href="/" className="text-sm text-[#cde2f2] transition hover:text-white">
+        {/* <Link href="/" className="text-sm text-[#cde2f2] transition hover:text-white">
           Back to home
-        </Link>
+        </Link> */}
       </header>
 
       <section className="relative z-10 flex flex-col md:flex-row min-h-[calc(100vh-64px)]">
