@@ -780,15 +780,8 @@ export default function DirectorRoadmapFormPage() {
           meetings: (existing as any)?.meetings || [],
           status: (existing as any)?.status || "not started",
         };
-        if (bannerFile && existing?._id) {
-          await apiUpdateNestedRoadmapItem(roadmapId, String(existing._id), updatedNested, bannerFile);
-        } else {
-          await apiUpdateRoadmap(roadmapId, {
-            name: safeString(parent.name) || nestedPayloadBase.name,
-            roadmaps: [updatedNested],
-            ...(Array.isArray(parent.divisions) ? { divisions: parent.divisions } : {}),
-          } as any);
-        }
+        if (!existing?._id) throw new Error("Missing nested roadmap id for save.");
+        await apiUpdateNestedRoadmapItem(roadmapId, String(existing._id), updatedNested, bannerFile ?? undefined);
         setSaveToast("Roadmap updated successfully.");
         return;
       }
@@ -800,26 +793,15 @@ export default function DirectorRoadmapFormPage() {
           setSaveToast("Phase created successfully.");
           return;
         }
-        const updatedRoadmaps =
-          parent.roadmaps?.map((n: any) => {
-            if (String(n?._id) !== nestedRoadmapId) return n;
-            return {
-              _id: n._id,
-              ...nestedPayloadBase,
-              meetings: n.meetings || [],
-              status: n.status || "not started",
-            };
-          }) || [];
-        if (bannerFile && nestedRoadmapId) {
-          const updatedOne = updatedRoadmaps.find((x: any) => String(x?._id) === nestedRoadmapId);
-          await apiUpdateNestedRoadmapItem(roadmapId, nestedRoadmapId, updatedOne ?? (nestedPayloadBase as any), bannerFile);
-        } else {
-          await apiUpdateRoadmap(roadmapId, {
-            name: safeString(parent.name) || nestedPayloadBase.name,
-            roadmaps: updatedRoadmaps,
-            ...(Array.isArray(parent.divisions) ? { divisions: parent.divisions } : {}),
-          } as any);
-        }
+        if (!nestedRoadmapId) throw new Error("Missing nested roadmap id for phase save.");
+        const existing = parent.roadmaps?.find((n: any) => String(n?._id) === nestedRoadmapId);
+        const updatedOne: any = {
+          _id: existing?._id || nestedRoadmapId,
+          ...nestedPayloadBase,
+          meetings: existing?.meetings || [],
+          status: existing?.status || "not started",
+        };
+        await apiUpdateNestedRoadmapItem(roadmapId, nestedRoadmapId, updatedOne, bannerFile ?? undefined);
         setSaveToast("Phase updated successfully.");
         return;
       }

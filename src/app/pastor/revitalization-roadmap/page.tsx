@@ -143,10 +143,7 @@ export default function RevitalizationRoadmap() {
   const [phases, setPhases] = useState<PhaseCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [sequenceGate, setSequenceGate] = useState<{
-    previousName: string;
-    currentName: string;
-  } | null>(null);
+  // Sequence gating removed: View should always open.
 
   const lastSilentFetchAtRef = useRef(0);
   const progressRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -287,22 +284,9 @@ export default function RevitalizationRoadmap() {
 
   const handleViewPhase = useCallback(
     (phase: PhaseCard) => {
-      const idx = phaseSequenceIndex(phase);
-      if (idx <= 0) {
-        openPhaseRoute(phase);
-        return;
-      }
-      const prevPhase = phasesSortedForSequence.find((p) => phaseSequenceIndex(p) === idx - 1);
-      if (prevPhase && prevPhase.status !== "Completed") {
-        setSequenceGate({
-          previousName: roadmapDisplayName(prevPhase),
-          currentName: roadmapDisplayName(phase),
-        });
-        return;
-      }
       openPhaseRoute(phase);
     },
-    [openPhaseRoute, phasesSortedForSequence],
+    [openPhaseRoute],
   );
 
   const filteredPhases = useMemo(() => {
@@ -506,36 +490,6 @@ export default function RevitalizationRoadmap() {
         </main>
       </PastorRoadmapDashboardBody>
 
-      {sequenceGate && (
-        <div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="roadmap-sequence-title"
-          onClick={() => setSequenceGate(null)}
-        >
-          <div
-            className={`${directorGlassCard} w-full max-w-md p-6 text-center shadow-2xl`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="roadmap-sequence-title" className="text-lg font-semibold text-white">
-              Complete the previous roadmap first
-            </h2>
-            <p className="mt-4 text-sm leading-relaxed text-white/75">
-              Complete{" "}
-              <span className="font-semibold text-white">{sequenceGate.previousName}</span> to begin{" "}
-              <span className="font-semibold text-white">{sequenceGate.currentName}</span>.
-            </p>
-            <button
-              type="button"
-              onClick={() => setSequenceGate(null)}
-              className={`${directorBtnPrimary} mt-6 min-w-[120px]`}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

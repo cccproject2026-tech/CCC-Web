@@ -25,6 +25,7 @@ import {
   apiSaveExtras,
   apiUpdateExtras,
   apiUploadExtrasDocuments,
+  apiGetExtrasDocuments,
   apiGetComments,
   apiAddQuery,
   apiGetQueries,
@@ -101,6 +102,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function isMongoObjectId(v: unknown): v is string {
+  return typeof v === "string" && /^[0-9a-fA-F]{24}$/.test(v.trim());
+}
+
 interface ExtraComponent {
   type:
     | "TEXT_DISPLAY"
@@ -123,89 +128,6 @@ interface ExtraComponent {
   sections?: ExtraComponent[];
 }
 
-/** Stable field id aligned with mobile (name-based paths under parent `::`). */
-function fieldKeyFor(parentKey: string, extra: ExtraComponent): string {
-  return parentKey ? `${parentKey}::${extra.name}` : extra.name;
-}
-
-/** Walk task extras tree: fieldKey → definition + default dates (dynamic from roadmap JSON). */
-function collectExtraFieldMeta(
-  list: ExtraComponent[] | undefined,
-  parentKey = "",
-): { meta: Map<string, ExtraComponent>; defaults: Record<string, unknown> } {
-  const meta = new Map<string, ExtraComponent>();
-  const defaults: Record<string, unknown> = {};
-  if (!list?.length) return { meta, defaults };
-  for (const e of list) {
-    const fk = fieldKeyFor(parentKey, e);
-    meta.set(fk, e);
-    if (e.type === "DATE_PICKER" && e.date) defaults[fk] = e.date;
-    if (e.checkboxes?.length) {
-      const inner = collectExtraFieldMeta(e.checkboxes, fk);
-      inner.meta.forEach((v, k) => meta.set(k, v));
-      Object.assign(defaults, inner.defaults);
-    }
-    if (e.type === "SECTION" && e.sections?.length) {
-      const inner = collectExtraFieldMeta(e.sections, fk);
-      inner.meta.forEach((v, k) => meta.set(k, v));
-      Object.assign(defaults, inner.defaults);
-    }
-  }
-  return { meta, defaults };
-}
-
-function resolveFieldKeyFromApiName(apiName: string, validKeys: string[]): string | null {
-  if (validKeys.includes(apiName)) return apiName;
-  const matches = validKeys.filter((k) => k.endsWith(`::${apiName}`));
-  if (matches.length >= 1) return matches[matches.length - 1];
-  return null;
-}
-
-function leafNameFromFieldKey(fieldKey: string): string {
-  const parts = fieldKey.split("::");
-  return parts[parts.length - 1] || fieldKey;
-}
-
-function buildTypedExtrasPayload(
-  formData: Record<string, any>,
-  roots: ExtraComponent[] | undefined,
-): Record<string, any>[] {
-  const { meta } = collectExtraFieldMeta(roots);
-  const out: Record<string, any>[] = [];
-  for (const [fieldKey, raw] of Object.entries(formData)) {
-    if (raw === undefined) continue;
-    const def = meta.get(fieldKey);
-    if (!def) continue;
-    const leaf = leafNameFromFieldKey(fieldKey);
-    if (def.type === "SIGNATURE") {
-      out.push({
-        type: "SIGNATURE",
-        name: leaf,
-        key: leaf,
-        signatureData: raw,
-      });
-      continue;
-    }
-    if (def.type === "UPLOAD") {
-      out.push({
-        type: "UPLOAD",
-        name: leaf,
-        key: leaf,
-        value: raw === true || raw === "true" ? true : raw,
-      });
-      continue;
-    }
-    if (def.type === "TEXT_DISPLAY") continue;
-    out.push({
-      type: def.type,
-      name: leaf,
-      key: leaf,
-      value: raw,
-    });
-  }
-  return out;
-}
-
 function JumpStartContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -215,6 +137,11 @@ function JumpStartContent() {
   // For extras/comments/queries the roadmapId is always the parent roadmap ID
   const roadmapId = parentRoadmapId || nestedItemId;
 
+  // Mobile parity (CCC-Mobile `DynamicFormTask.tsx`):
+  // Only send `nestedRoadMapItemId` when it is a real Mongo ObjectId.
+  const nestedRoadMapItemIdForExtras =
+    parentRoadmapId && nestedItemId && isMongoObjectId(nestedItemId) ? nestedItemId : undefined;
+
   const [activeTab, setActiveTab] = useState("overview");
   const [queryTab, setQueryTab] = useState("New");
   const [roadmap, setRoadmap] = useState<any>(null);
@@ -222,6 +149,9 @@ function JumpStartContent() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({});
+  const [savedUploadDocs, setSavedUploadDocs] = useState<
+    Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]>
+  >({});
   const [extrasExist, setExtrasExist] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -258,6 +188,8 @@ function JumpStartContent() {
 
   /** Same as mobile `DynamicFormTask` — POST JUMPSTART_COMPLETE before first extras save. */
   const jumpstartTriggeredRef = useRef(false);
+  /** Prevent "empty after save" when backend read is briefly stale. */
+  const lastExtrasSaveAtRef = useRef<number>(0);
 
   useEffect(() => {
     jumpstartTriggeredRef.current = false;
@@ -345,6 +277,11 @@ function JumpStartContent() {
 
   const ensureJumpstartTriggered = useCallback(async () => {
     if (!roadmapId || !userId) return;
+    // If the extras row already exists, the backend may 400 this POST; no need to trigger.
+    if (extrasExist) {
+      jumpstartTriggeredRef.current = true;
+      return;
+    }
     if (jumpstartTriggeredRef.current) return;
     const nestedForExtras =
       parentRoadmapId && nestedItemId?.trim() ? nestedItemId.trim() : undefined;
@@ -356,12 +293,17 @@ function JumpStartContent() {
     } catch (e) {
       console.warn("[Jumpstart trigger] non-blocking:", e);
     }
-  }, [roadmapId, userId, parentRoadmapId, nestedItemId]);
+  }, [roadmapId, userId, parentRoadmapId, nestedItemId, extrasExist]);
 
-  const extraFieldMeta = useMemo(
-    () => collectExtraFieldMeta(roadmap?.extras as ExtraComponent[] | undefined),
-    [roadmap?.extras],
-  );
+  // Mobile parity: defaults only from the task definition itself.
+  const buildDefaultFormDataFromTemplate = useCallback((): Record<string, any> => {
+    const init: Record<string, any> = {};
+    const extras = (roadmap?.extras as ExtraComponent[] | undefined) ?? [];
+    extras.forEach((extra) => {
+      if (extra?.date) init[extra.name] = extra.date;
+    });
+    return init;
+  }, [roadmap?.extras]);
 
 // Prevent roadmap completion when a required signature field is still empty.
   const hasRequiredSignature = useMemo(() => {
@@ -372,7 +314,7 @@ function JumpStartContent() {
     if (!items?.length) return true;
 
     for (const extra of items) {
-      const fieldKey = fieldKeyFor(parentFieldKey, extra);
+      const fieldKey = extra.name;
 
       if (extra.type === "SIGNATURE") {
         if (!formData[fieldKey]) return false;
@@ -401,7 +343,7 @@ const hasRequiredUploads = useMemo(() => {
     if (!items?.length) return true;
 
     for (const extra of items) {
-      const fieldKey = fieldKeyFor(parentFieldKey, extra);
+      const fieldKey = extra.name;
 
       if (extra.type === "UPLOAD") {
         const hasUploadedFile = !!uploadedFiles[fieldKey];
@@ -436,7 +378,7 @@ const hasRequiredSubmissions = useMemo(() => {
     if (!items?.length) return true;
 
     for (const extra of items) {
-      const fieldKey = fieldKeyFor(parentFieldKey, extra);
+      const fieldKey = extra.name;
 
       if (extra.type === "CHECKBOX") {
         if (!formData[fieldKey]) return false;
@@ -476,6 +418,26 @@ const hasRequiredSubmissions = useMemo(() => {
         if (parentRoadmapId) {
           const res = await apiGetNestedRoadmapItem(parentRoadmapId, nestedItemId);
           data = extractRoadmapDocumentFromResponse(res);
+          // Some backend deployments return partial nested docs (missing extras). Fallback: merge from parent.roadmaps[].
+          const needsExtras =
+            !data ||
+            !("extras" in data) ||
+            !Array.isArray((data as any).extras) ||
+            (data as any).extras.length === 0;
+          if (needsExtras) {
+            try {
+              const parentRes = await apiGetRoadmapById(parentRoadmapId);
+              const parentDoc = extractRoadmapDocumentFromResponse(parentRes) as any;
+              const fromParent = Array.isArray(parentDoc?.roadmaps)
+                ? parentDoc.roadmaps.find((r: any) => String(r?._id) === String(nestedItemId))
+                : null;
+              if (fromParent && Array.isArray(fromParent.extras) && fromParent.extras.length > 0) {
+                data = { ...(data || {}), extras: fromParent.extras };
+              }
+            } catch {
+              // ignore fallback failures
+            }
+          }
         } else {
           const res = await apiGetRoadmapById(nestedItemId);
           data = extractRoadmapDocumentFromResponse(res);
@@ -504,40 +466,71 @@ const hasRequiredSubmissions = useMemo(() => {
   useEffect(() => {
     if (!roadmapId || !userId || !roadmap) return;
     const loadExtras = async () => {
-      const defaults = extraFieldMeta.defaults;
-      const validKeys = [...extraFieldMeta.meta.keys()];
+      const justSaved = Date.now() - lastExtrasSaveAtRef.current < 8_000;
 
       try {
-        const res = await apiGetExtras(roadmapId, userId, parentRoadmapId ? nestedItemId! : undefined);
-        const data = res.data?.data || res.data;
-        const rows = data?.extras;
-        const saved: Record<string, any> = { ...defaults };
+        const nestedScopeId = nestedRoadMapItemIdForExtras;
 
-        if (rows && Array.isArray(rows) && rows.length > 0) {
-          rows.forEach((item: any) => {
+        const unwrapExtrasDoc = (res: any): { exists: boolean; rows: any[] } => {
+          const data = res?.data?.data || res?.data;
+          const rows = data?.extras;
+          const exists =
+            Boolean(data) &&
+            typeof data === "object" &&
+            !Array.isArray(data) &&
+            (typeof (data as any)?.id === "string" ||
+              typeof (data as any)?._id === "string" ||
+              typeof (data as any)?.roadMapId === "string");
+          return { exists, rows: Array.isArray(rows) ? rows : [] };
+        };
+
+        const fetchRowsForScope = async (scope?: string) =>
+          unwrapExtrasDoc(await apiGetExtras(roadmapId, userId, scope));
+
+        // Mobile parity: single scope only.
+        let fetched = await fetchRowsForScope(nestedScopeId);
+
+        // Mobile parity: backend may take a moment before GET reflects the latest PATCH/POST.
+        if (justSaved && fetched.rows.length === 0) {
+          for (let attempt = 0; attempt < 2; attempt++) {
+            await sleep(650);
+            const retried = await fetchRowsForScope(nestedScopeId);
+            if (retried.rows.length) {
+              fetched = retried;
+              break;
+            }
+          }
+        }
+
+        if (fetched.rows.length > 0) {
+          // Mobile parity: defaults from template, then override with API extras by `item.name` only.
+          const init: Record<string, any> = buildDefaultFormDataFromTemplate();
+          fetched.rows.forEach((item: any) => {
             if (String(item.type || "").toUpperCase() === "JUMPSTART_COMPLETE") return;
-            const rawName = item.name ?? item.key;
-            if (rawName === undefined || rawName === null) return;
-            const nm = String(rawName);
-            const fieldKey = resolveFieldKeyFromApiName(nm, validKeys) || nm;
+            if (!item.name) return;
             if (item.type === "SIGNATURE" && item.signatureData != null) {
-              saved[fieldKey] = item.signatureData;
+              init[item.name] = item.signatureData;
             } else if (item.value !== undefined) {
-              saved[fieldKey] = item.value;
+              init[item.name] = item.value;
             }
           });
-          setFormData(saved);
+          setFormData(init);
           setExtrasExist(true);
         } else {
-          setFormData((prev) => ({ ...defaults, ...prev }));
-          setExtrasExist(false);
+          // Mobile parity + prevent wipe right after save:
+          // initialize defaults on first load, but don't overwrite to empty during a stale read.
+          if (!justSaved) {
+            setFormData(buildDefaultFormDataFromTemplate());
+          }
+          // If server says an extras doc exists (even with empty extras), treat as update-mode.
+          if (!justSaved) setExtrasExist(fetched.exists);
         }
       } catch {
-        setFormData((prev) => ({ ...extraFieldMeta.defaults, ...prev }));
+        setFormData(buildDefaultFormDataFromTemplate());
       }
     };
     loadExtras();
-  }, [roadmapId, userId, nestedItemId, parentRoadmapId, roadmap, extraFieldMeta]);
+  }, [roadmapId, userId, roadmap, nestedRoadMapItemIdForExtras, buildDefaultFormDataFromTemplate]);
 
   const fetchComments = useCallback(async (showLoader = false) => {
     if (!roadmapId || !userId) return;
@@ -604,7 +597,42 @@ const hasRequiredSubmissions = useMemo(() => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
-  const scopedNestedId = parentRoadmapId ? nestedItemId! : undefined;
+  const scopedNestedId = nestedRoadMapItemIdForExtras;
+
+  // Mobile parity: show server-saved upload documents after refresh.
+  useEffect(() => {
+    if (!roadmapId || !userId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiGetExtrasDocuments(roadmapId, userId, scopedNestedId);
+        const list = (res?.data?.data || res?.data) as any[];
+        const batches = Array.isArray(list) ? list : [];
+        const byName: Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]> = {};
+        batches.forEach((b: any) => {
+          const name = String(b?.name ?? "").trim();
+          const batchId = String(b?.uploadBatchId ?? "").trim();
+          const files = Array.isArray(b?.files) ? b.files : [];
+          if (!name || !batchId || files.length === 0) return;
+          const mapped = files
+            .map((f: any) => ({
+              fileName: String(f?.fileName ?? "").trim(),
+              fileUrl: String(f?.fileUrl ?? "").trim(),
+              uploadBatchId: batchId,
+            }))
+            .filter((f: any) => f.fileName && f.fileUrl);
+          if (!mapped.length) return;
+          byName[name] = [...(byName[name] || []), ...mapped];
+        });
+        if (!cancelled) setSavedUploadDocs(byName);
+      } catch {
+        if (!cancelled) setSavedUploadDocs({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [roadmapId, userId, scopedNestedId]);
 
   /** Reload nested item / roadmap. Optionally skip GET /progress so PATCH responses are not overwritten (stale read). */
   const refetchRoadmap = async (opts?: { skipProgressRefetch?: boolean }): Promise<Record<string, unknown> | null> => {
@@ -614,6 +642,25 @@ const hasRequiredSubmissions = useMemo(() => {
       if (parentRoadmapId) {
         const res = await apiGetNestedRoadmapItem(parentRoadmapId, nestedItemId);
         data = extractRoadmapDocumentFromResponse(res);
+        const needsExtras =
+          !data ||
+          !("extras" in data) ||
+          !Array.isArray((data as any).extras) ||
+          (data as any).extras.length === 0;
+        if (needsExtras) {
+          try {
+            const parentRes = await apiGetRoadmapById(parentRoadmapId);
+            const parentDoc = extractRoadmapDocumentFromResponse(parentRes) as any;
+            const fromParent = Array.isArray(parentDoc?.roadmaps)
+              ? parentDoc.roadmaps.find((r: any) => String(r?._id) === String(nestedItemId))
+              : null;
+            if (fromParent && Array.isArray(fromParent.extras) && fromParent.extras.length > 0) {
+              data = { ...(data || {}), extras: fromParent.extras } as any;
+            }
+          } catch {
+            // ignore fallback failures
+          }
+        }
       } else {
         const res = await apiGetRoadmapById(nestedItemId);
         data = extractRoadmapDocumentFromResponse(res);
@@ -667,37 +714,136 @@ const hasRequiredSubmissions = useMemo(() => {
     setSaving(true);
     setSaveFeedback(null);
     try {
+      console.log("[Pastor Jumpstart] Save clicked", {
+        roadmapId,
+        userId,
+        scopedNestedId,
+        parentRoadmapId,
+        nestedItemId,
+        extrasExist,
+        formKeys: Object.keys(formData || {}),
+        uploadKeys: Object.keys(uploadedFiles || {}),
+      });
       await ensureJumpstartTriggered();
       const mergedForm: Record<string, any> = { ...formData };
+      // Mobile parity: only UPLOAD extras become boolean flags.
+      // Do NOT overwrite SIGNATURE dataUrl with `true` (that breaks persistence + hydration).
       Object.keys(uploadedFiles).forEach((k) => {
-        mergedForm[k] = true;
+        const extraDef = (roadmap?.extras as ExtraComponent[] | undefined)?.find(
+          (e) => e.name === k,
+        );
+        if (extraDef?.type === "UPLOAD") mergedForm[k] = true;
       });
-      const extrasArray = buildTypedExtrasPayload(mergedForm, roadmap.extras as ExtraComponent[] | undefined);
+
+      // Mobile parity: build extrasArray from Object.entries(formData), no name transforms.
+      const getExtraType = (fieldName: string, value: any): string => {
+        const extraDef = (roadmap?.extras as ExtraComponent[] | undefined)?.find(
+          (e) => e.name === fieldName,
+        );
+        if (extraDef) return extraDef.type;
+
+        if (typeof value === "boolean") return "CHECKBOX";
+        if (typeof value === "object" && value?.uri) return "UPLOAD";
+        if (fieldName.toLowerCase().includes("date")) return "DATE_PICKER";
+        if (typeof value === "string" && value.length > 100) return "TEXT_AREA";
+        return "TEXT_FIELD";
+      };
+
+      const extrasArray = Object.entries(mergedForm).map(([name, value]) => {
+        const type = getExtraType(name, value);
+        if (type === "SIGNATURE") {
+          return { type: "SIGNATURE", name, signatureData: value };
+        }
+        return { type, name, value: type === "UPLOAD" ? true : value };
+      });
+      console.log("[Pastor Jumpstart] Built extrasArray", {
+        count: extrasArray.length,
+        sample: extrasArray.slice(0, 10),
+      });
       const createPayload = {
         userId,
+        roadMapId: roadmapId,
         ...(scopedNestedId?.trim() ? { nestedRoadMapItemId: scopedNestedId.trim() } : {}),
         extras: extrasArray,
       };
+      console.log("[Pastor Jumpstart] Extras payload (create/update)", createPayload);
       if (extrasExist) {
         try {
-          await apiUpdateExtras(roadmapId, userId, { extras: extrasArray }, scopedNestedId);
+          const res = await apiUpdateExtras(roadmapId, userId, { extras: extrasArray }, scopedNestedId);
+          console.log("[Pastor Jumpstart] PATCH /extras ok", res?.data);
+          try {
+            const stored = await apiGetExtras(roadmapId, userId, scopedNestedId);
+            console.log("[Pastor Jumpstart] GET /extras after PATCH", stored?.data);
+          } catch (e) {
+            console.warn("[Pastor Jumpstart] GET /extras after PATCH failed", e);
+          }
         } catch (errUpdate) {
           // Mobile fallback: if update target is missing, create it.
-          await apiSaveExtras(roadmapId, createPayload);
+          console.warn("[Pastor Jumpstart] PATCH /extras failed; falling back to POST", errUpdate);
+          const res = await apiSaveExtras(roadmapId, createPayload);
+          console.log("[Pastor Jumpstart] POST /extras ok (fallback)", res?.data);
+          try {
+            const stored = await apiGetExtras(roadmapId, userId, scopedNestedId);
+            console.log("[Pastor Jumpstart] GET /extras after POST fallback", stored?.data);
+          } catch (e) {
+            console.warn("[Pastor Jumpstart] GET /extras after POST fallback failed", e);
+          }
           setExtrasExist(true);
         }
       } else {
         try {
-          await apiSaveExtras(roadmapId, createPayload);
+          const res = await apiSaveExtras(roadmapId, createPayload);
+          console.log("[Pastor Jumpstart] POST /extras ok", res?.data);
+          try {
+            const stored = await apiGetExtras(roadmapId, userId, scopedNestedId);
+            console.log("[Pastor Jumpstart] GET /extras after POST", stored?.data);
+          } catch (e) {
+            console.warn("[Pastor Jumpstart] GET /extras after POST failed", e);
+          }
           setExtrasExist(true);
         } catch (errSave) {
           // If extras already exist, update instead.
-          await apiUpdateExtras(roadmapId, userId, { extras: extrasArray }, scopedNestedId);
+          console.warn("[Pastor Jumpstart] POST /extras failed; falling back to PATCH", errSave);
+          const res = await apiUpdateExtras(roadmapId, userId, { extras: extrasArray }, scopedNestedId);
+          console.log("[Pastor Jumpstart] PATCH /extras ok (fallback)", res?.data);
+          try {
+            const stored = await apiGetExtras(roadmapId, userId, scopedNestedId);
+            console.log("[Pastor Jumpstart] GET /extras after PATCH fallback", stored?.data);
+          } catch (e) {
+            console.warn("[Pastor Jumpstart] GET /extras after PATCH fallback failed", e);
+          }
           setExtrasExist(true);
         }
       }
+      // Mark save time so the extras loader can retry without wiping UI fields.
+      lastExtrasSaveAtRef.current = Date.now();
       for (const [key, file] of Object.entries(uploadedFiles)) {
         await apiUploadExtrasDocuments(roadmapId, userId, [file], scopedNestedId, key);
+      }
+      // Refresh server uploads so the UI shows "uploaded" after reload.
+      try {
+        const resDocs = await apiGetExtrasDocuments(roadmapId, userId, scopedNestedId);
+        const list = (resDocs?.data?.data || resDocs?.data) as any[];
+        const batches = Array.isArray(list) ? list : [];
+        const byName: Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]> = {};
+        batches.forEach((b: any) => {
+          const name = String(b?.name ?? "").trim();
+          const batchId = String(b?.uploadBatchId ?? "").trim();
+          const files = Array.isArray(b?.files) ? b.files : [];
+          if (!name || !batchId || files.length === 0) return;
+          const mapped = files
+            .map((f: any) => ({
+              fileName: String(f?.fileName ?? "").trim(),
+              fileUrl: String(f?.fileUrl ?? "").trim(),
+              uploadBatchId: batchId,
+            }))
+            .filter((f: any) => f.fileName && f.fileUrl);
+          if (!mapped.length) return;
+          byName[name] = [...(byName[name] || []), ...mapped];
+        });
+        setSavedUploadDocs(byName);
+      } catch {
+        // ignore doc refresh failures; upload already succeeded
       }
       await refetchRoadmap();
       await refetchProgressData();
@@ -705,17 +851,10 @@ const hasRequiredSubmissions = useMemo(() => {
       await fetchComments(false);
       await fetchQueries(undefined, false);
       setSaveSuccess(true);
-      setSaveFeedback("Progress saved.");
+      setSaveFeedback(extrasExist ? "Progress updated." : "Progress saved.");
       setTimeout(() => {
         setSaveSuccess(false);
         setSaveFeedback(null);
-        if (parentRoadmapId) {
-          router.push(
-            `/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(parentRoadmapId)}`,
-          );
-        } else {
-          router.push("/pastor/revitalization-roadmap");
-        }
       }, 1200);
     } catch (err) {
       console.error("Save error:", err);
@@ -1022,7 +1161,8 @@ if (!hasRequiredSubmissions) {
     index: number,
     parentFieldKey = "",
   ) => {
-    const fieldKey = fieldKeyFor(parentFieldKey, extra);
+    // Mobile parity: field key is the exact extra name (no section paths).
+    const fieldKey = extra.name;
 
     switch (extra.type) {
       case "TEXT_DISPLAY":
@@ -1101,6 +1241,38 @@ if (!hasRequiredSubmissions) {
                   <i className="fa-solid fa-xmark"></i>
                 </button>
               </div>
+            ) : (savedUploadDocs[fieldKey]?.length ? (
+              <div className="bg-white/10 border border-[#5A8DCB] rounded-lg p-3">
+                <div className="flex items-center gap-2">
+                  <i className="fa-solid fa-cloud-check text-emerald-300" />
+                  <span className="text-sm text-white font-semibold">Uploaded</span>
+                </div>
+                <div className="mt-2 space-y-1">
+                  {savedUploadDocs[fieldKey].slice(0, 3).map((f) => (
+                    <div key={f.fileUrl} className="text-xs text-white/80 truncate">
+                      {f.fileName}
+                    </div>
+                  ))}
+                  {savedUploadDocs[fieldKey].length > 3 ? (
+                    <div className="text-xs text-white/60">
+                      +{savedUploadDocs[fieldKey].length - 3} more
+                    </div>
+                  ) : null}
+                </div>
+                <div className="mt-3 border-t border-white/10 pt-3">
+                  <input
+                    type="file"
+                    onChange={(e) =>
+                      e.target.files?.[0] && handleFileUpload(fieldKey, e.target.files[0])
+                    }
+                    className="hidden"
+                    id={`upload-${fieldKey}`}
+                  />
+                  <label htmlFor={`upload-${fieldKey}`} className="cursor-pointer text-sm text-[#aed6f1] hover:text-white">
+                    Replace upload
+                  </label>
+                </div>
+              </div>
             ) : (
               <div className="border-2 border-dashed border-[#5A8DCB] rounded-lg p-5 text-center">
                 <input
@@ -1116,7 +1288,7 @@ if (!hasRequiredSubmissions) {
                   <span className="text-sm text-white/70">Click to upload file</span>
                 </label>
               </div>
-            )}
+            ))}
           </div>
         );
 
@@ -1148,10 +1320,10 @@ if (!hasRequiredSubmissions) {
           <div key={`${fieldKey}_${index}`} className="mb-5">
             <h4 className="text-sm font-semibold text-white mb-2">{extra.name}</h4>
             <div className="border border-[#5A8DCB] rounded-lg bg-white/5 p-4">
-              {formData[fieldKey] ? (
+              {typeof formData[fieldKey] === "string" && String(formData[fieldKey]).trim() ? (
                 <div className="space-y-3">
                   <img
-                    src={typeof formData[fieldKey] === "string" ? formData[fieldKey] : ""}
+                    src={String(formData[fieldKey]).trim()}
                     alt="Signature"
                     className="max-h-24 bg-white rounded"
                   />
@@ -1165,7 +1337,9 @@ if (!hasRequiredSubmissions) {
                 onClick={() => openSignatureModal(fieldKey)}
                 className="w-full bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-5 py-2 rounded-md shadow mt-3"
               >
-                {formData[fieldKey] ? "Redraw Signature" : "Draw Signature"}
+                {typeof formData[fieldKey] === "string" && String(formData[fieldKey]).trim()
+                  ? "Redraw Signature"
+                  : "Draw Signature"}
               </button>
             </div>
           </div>
@@ -1447,7 +1621,7 @@ if (!hasRequiredSubmissions) {
                       disabled={saving || !roadmapId || !userId}
                       className="rounded-md border border-white/30 bg-white/10 px-6 py-2 text-sm font-semibold text-white shadow transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {saving ? "Saving…" : "Save"}
+                      {saving ? "Saving…" : extrasExist ? "Update" : "Save"}
                     </button>
                     <button
                       type="button"

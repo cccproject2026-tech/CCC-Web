@@ -236,6 +236,8 @@ export interface QueriesThread {
 
 export interface CreateExtrasPayload {
   userId: string;
+  /** Some backend deployments still require roadMapId in body (mobile parity). */
+  roadMapId?: string;
   nestedRoadMapItemId?: string;
   extras?: Record<string, any>[];
 }
