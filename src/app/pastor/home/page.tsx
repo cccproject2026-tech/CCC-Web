@@ -15,6 +15,7 @@ import UserProfile from "../../Assets/user-profile.png";
 import { useRouter } from "next/navigation";
 import { getUpcomingAppointments, getUserAppointments } from "@/app/Services/pastor.service";
 import { apiGetAssignedUsers, apiGetRoadmapsByUser } from "@/app/Services/api";
+import { unwrapRoadmapsList } from "@/app/Services/roadmap-assignments";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import {
   apiGetAssignedAssessments,
@@ -308,21 +309,32 @@ export default function PastorDashboard() {
     if (!pastorUserId) return;
     try {
       const res = await apiGetRoadmapsByUser(pastorUserId);
-      const data = Array.isArray(res.data) ? res.data : res.data?.data || [];
-      setRoadmapsFull(Array.isArray(data) ? data : []);
-      const mapped = data.map((item: any) => ({
-        id: item._id,
-        title: item.name,
-        hasNested: Array.isArray(item.roadmaps) && item.roadmaps.length > 0,
-        status:
-          item.status?.toLowerCase() === "in progress"
+      const list = unwrapRoadmapsList(res as unknown as { data: unknown });
+      setRoadmapsFull(list);
+
+      const mapped = list.map((item: any) => {
+        const rawStatus = String(item?.status ?? "")
+          .trim()
+          .toLowerCase()
+          .replace(/[_\s]+/g, " ");
+        const status =
+          rawStatus === "in progress" || rawStatus === "in-progress"
             ? "In Progress"
-            : item.status?.toLowerCase() === "completed"
+            : rawStatus === "completed"
               ? "Completed"
-              : item.status?.toLowerCase() === "due"
+              : rawStatus === "due" || rawStatus === "overdue"
                 ? "Due"
-                : "Remaining",
-      }));
+                : "Remaining";
+
+        return {
+          id: String(item?._id ?? item?.id ?? "").trim(),
+          title: String(item?.name ?? item?.title ?? "Roadmap"),
+          hasNested:
+            (Array.isArray(item?.roadmaps) && item.roadmaps.length > 0) ||
+            (item?.roadmaps && typeof item.roadmaps === "object" && Array.isArray(item.roadmaps.items) && item.roadmaps.items.length > 0),
+          status,
+        };
+      }).filter((r: any) => Boolean(r.id));
       setRoadmaps(mapped);
     } catch (err) {
       console.error("Error fetching roadmaps:", err);

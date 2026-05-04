@@ -69,6 +69,93 @@ export const apiGetRoadmapById = (id: string) =>
   });
 
 /**
+ * Nested roadmap items use the same Nest/Multer bracket syntax as parent roadmaps.
+ * IMPORTANT: Do NOT JSON.stringify arrays/objects into FormData, because the backend DTO expects
+ * indexed keys like `extras[0][type]`, `meetings[0]`, etc.
+ */
+function appendNestedRoadmapItemToFormData(
+  formData: FormData,
+  payload: NestedRoadMapItem | UpdateNestedRoadMapItemPayload,
+) {
+  const p = payload as Record<string, unknown>;
+
+  const add = (k: string, v: unknown) => {
+    if (v === undefined || v === null) return;
+    const s = typeof v === "string" ? v : typeof v === "number" ? String(v) : typeof v === "boolean" ? String(v) : null;
+    if (s === null) return;
+    if (s.trim() === "") return;
+    formData.append(k, s);
+  };
+
+  add("name", p.name);
+  add("duration", p.duration);
+  add("roadMapDetails", p.roadMapDetails);
+  add("description", p.description);
+  add("status", p.status);
+  add("phase", p.phase);
+  add("totalSteps", p.totalSteps);
+  add("startDate", p.startDate);
+  add("endDate", p.endDate);
+  add("completedOn", p.completedOn);
+  add("imageUrl", p.imageUrl);
+
+  const meetings = p.meetings;
+  if (Array.isArray(meetings) && meetings.length) {
+    meetings.forEach((m, i) => {
+      if (m != null && String(m).trim() !== "") {
+        formData.append(`meetings[${i}]`, String(m));
+      }
+    });
+  }
+
+  const extras = p.extras;
+  if (Array.isArray(extras) && extras.length) {
+    extras.forEach((extra, i) => {
+      if (!extra || typeof extra !== "object") return;
+      const e = extra as Record<string, unknown>;
+      const b = `extras[${i}]`;
+      if (e.type != null) formData.append(`${b}[type]`, String(e.type));
+      if (e.name != null) formData.append(`${b}[name]`, String(e.name));
+      if (e.placeHolder) formData.append(`${b}[placeHolder]`, String(e.placeHolder));
+      if (e.buttonName) formData.append(`${b}[buttonName]`, String(e.buttonName));
+      if (e.haveButton !== undefined) formData.append(`${b}[haveButton]`, String(e.haveButton));
+      if (String(e.type) === "ASSESSMENT" && e.assessmentId) {
+        formData.append(`${b}[assessmentId]`, String(e.assessmentId));
+      }
+      // If backend supports nested checkbox lists on certain extras, send them with bracket paths.
+      const checkboxes = e.checkboxes;
+      if (Array.isArray(checkboxes) && checkboxes.length) {
+        checkboxes.forEach((cb, j) => {
+          if (!cb || typeof cb !== "object") return;
+          const c = cb as Record<string, unknown>;
+          const cbBase = `${b}[checkboxes][${j}]`;
+          if (c.type != null) formData.append(`${cbBase}[type]`, String(c.type));
+          if (c.name != null) formData.append(`${cbBase}[name]`, String(c.name));
+          if (c.haveButton !== undefined) formData.append(`${cbBase}[haveButton]`, String(c.haveButton));
+          if (c.buttonName) formData.append(`${cbBase}[buttonName]`, String(c.buttonName));
+        });
+      }
+      const sections = e.sections;
+      if (Array.isArray(sections) && sections.length) {
+        sections.forEach((sec, j) => {
+          if (!sec || typeof sec !== "object") return;
+          const s = sec as Record<string, unknown>;
+          const secBase = `${b}[sections][${j}]`;
+          if (s.type != null) formData.append(`${secBase}[type]`, String(s.type));
+          if (s.name != null) formData.append(`${secBase}[name]`, String(s.name));
+          if (s.placeHolder) formData.append(`${secBase}[placeHolder]`, String(s.placeHolder));
+          if (s.buttonName) formData.append(`${secBase}[buttonName]`, String(s.buttonName));
+          if (s.haveButton !== undefined) formData.append(`${secBase}[haveButton]`, String(s.haveButton));
+          if (String(s.type) === "ASSESSMENT" && s.assessmentId) {
+            formData.append(`${secBase}[assessmentId]`, String(s.assessmentId));
+          }
+        });
+      }
+    });
+  }
+}
+
+/**
  * Nest/Multer: arrays must be sent as `divisions[0]`, `extras[0][type]`, etc.
  * Stringifying `[]` to `"[]"` breaks ValidationPipe (400).
  * Matches `CreateRoadmapModal` + mobile multipart shape.
@@ -110,7 +197,7 @@ function appendRoadmapWritePayloadToFormData(
       const b = `extras[${i}]`;
       formData.append(`${b}[type]`, String(extra.type));
       formData.append(`${b}[name]`, String(extra.name));
-      const e = extra as Record<string, unknown>;
+      const e = extra as unknown as Record<string, unknown>;
       if (e.placeHolder) formData.append(`${b}[placeHolder]`, String(e.placeHolder));
       if (e.buttonName) formData.append(`${b}[buttonName]`, String(e.buttonName));
       if (e.haveButton !== undefined) formData.append(`${b}[haveButton]`, String(e.haveButton));
@@ -135,7 +222,7 @@ function appendRoadmapWritePayloadToFormData(
         const e = `roadmaps[${i}][extras][${j}]`;
         formData.append(`${e}[type]`, String(extra.type));
         formData.append(`${e}[name]`, String(extra.name));
-        const ex = extra as Record<string, unknown>;
+        const ex = extra as unknown as Record<string, unknown>;
         if (ex.placeHolder) formData.append(`${e}[placeHolder]`, String(ex.placeHolder));
         if (ex.buttonName) formData.append(`${e}[buttonName]`, String(ex.buttonName));
         if (ex.haveButton !== undefined) formData.append(`${e}[haveButton]`, String(ex.haveButton));
@@ -145,6 +232,22 @@ function appendRoadmapWritePayloadToFormData(
       });
     });
   }
+}
+
+function shouldUseMultipartForRoadmapPatch(payload: UpdateRoadMapPayload): boolean {
+  const p = payload as Record<string, unknown>;
+  // Backend (Nest + Multer) expects bracket-indexed fields for arrays/objects.
+  // Sending JSON for these updates can silently drop nested array fields (e.g. extras).
+  const keysThatOftenRequireMultipart = ["extras", "divisions", "meetings", "roadmaps"];
+  return keysThatOftenRequireMultipart.some((k) => Array.isArray(p[k]) && (p[k] as unknown[]).length > 0);
+}
+
+function shouldUseMultipartForNestedPatch(payload: UpdateNestedRoadMapItemPayload): boolean {
+  const p = payload as Record<string, unknown>;
+  return (
+    (Array.isArray(p.extras) && (p.extras as unknown[]).length > 0) ||
+    (Array.isArray(p.meetings) && (p.meetings as unknown[]).length > 0)
+  );
 }
 
 // POST /roadmaps — always multipart (parity with CreateRoadmapModal; server expects indexed fields, not JSON-stringified arrays)
@@ -157,9 +260,9 @@ export const apiCreateRoadmap = (payload: CreateRoadMapPayload, image?: File) =>
 
 // PATCH /roadmaps/:id  (multipart/form-data when image provided)
 export const apiUpdateRoadmap = (id: string, payload: UpdateRoadMapPayload, image?: File) => {
-  if (image) {
+  if (image || shouldUseMultipartForRoadmapPatch(payload)) {
     const formData = new FormData();
-    formData.append("image", image);
+    if (image) formData.append("image", image);
     appendRoadmapWritePayloadToFormData(formData, payload);
     return axiosInstance.patch(`/roadmaps/${id}`, formData);
   }
@@ -181,11 +284,7 @@ export const apiAddNestedRoadmapItem = (roadMapId: string, payload: NestedRoadMa
   if (image) {
     const formData = new FormData();
     formData.append('image', image);
-    Object.entries(payload).forEach(([key, val]) => {
-      if (val !== undefined) {
-        formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
-      }
-    });
+    appendNestedRoadmapItemToFormData(formData, payload);
     return axiosInstance.post(`/roadmaps/${roadMapId}/nested`, formData);
   }
   return axiosInstance.post(`/roadmaps/${roadMapId}/nested`, payload);
@@ -198,14 +297,10 @@ export const apiUpdateNestedRoadmapItem = (
   payload: UpdateNestedRoadMapItemPayload,
   image?: File,
 ) => {
-  if (image) {
+  if (image || shouldUseMultipartForNestedPatch(payload)) {
     const formData = new FormData();
-    formData.append('image', image);
-    Object.entries(payload).forEach(([key, val]) => {
-      if (val !== undefined) {
-        formData.append(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
-      }
-    });
+    if (image) formData.append("image", image);
+    appendNestedRoadmapItemToFormData(formData, payload);
     return axiosInstance.patch(`/roadmaps/${roadMapId}/nested/${nestedItemId}`, formData);
   }
   return axiosInstance.patch(`/roadmaps/${roadMapId}/nested/${nestedItemId}`, payload);
@@ -307,7 +402,10 @@ export async function apiTriggerJumpstartComplete(
       err?.response?.data?.message || err?.message || "Failed to trigger jumpstart completion";
     if (
       status === 409 ||
-      (status === 400 && /already exists|duplicate|already/i.test(String(message)))
+      (status === 400 &&
+        /already exists|duplicate|already|Extras already exist for this roadmap/i.test(
+          String(message),
+        ))
     ) {
       return {
         success: true,
@@ -321,7 +419,7 @@ export async function apiTriggerJumpstartComplete(
 
 // POST /roadmaps/:roadMapId/extras  body: { userId, nestedRoadMapItemId?, extras? }
 export const apiSaveExtras = (roadMapId: string, payload: CreateExtrasPayload) =>
-  axiosInstance.post(`/roadmaps/${roadMapId}/extras`, payload);
+  axiosInstance.post(`/roadmaps/${roadMapId}/extras`, { ...payload, roadMapId });
 
 // PATCH /roadmaps/:roadMapId/extras?userId=&nestedRoadMapItemId=  body: { extras? }
 export const apiUpdateExtras = (

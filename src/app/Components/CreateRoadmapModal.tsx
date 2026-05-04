@@ -219,6 +219,8 @@ export default function CreateRoadmapModal({
   const divisionRef = useRef<HTMLDivElement>(null);
 
   const isPhase = type === "Phase";
+  /** Backend expects canonical values (`phase` / `single`). UI uses human labels. */
+  const apiType = isPhase ? "phase" : "single";
 
   // Close division dropdown on outside click
   useEffect(() => {
@@ -351,12 +353,15 @@ export default function CreateRoadmapModal({
       setSubmitting(true);
 
       const formData = new FormData();
-      formData.append("type", type);
+      formData.append("type", apiType);
       formData.append("name", name.trim());
       formData.append("duration", duration.trim());
       if (description.trim()) formData.append("description", description.trim());
-      if (phase.trim()) formData.append("phase", phase.trim());
-      divisions.forEach((d, i) => formData.append(`divisions[${i}]`, d));
+      if (phase.trim()) formData.append("phase", phase.trim().toLowerCase());
+      divisions
+        .map((d) => d.trim().toLowerCase())
+        .filter(Boolean)
+        .forEach((d, i) => formData.append(`divisions[${i}]`, d));
       if (bannerFile) formData.append("image", bannerFile);
 
       // Append extras as indexed keys so NestJS ValidationPipe parses them as array of objects
