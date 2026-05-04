@@ -6,6 +6,7 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import { useSearchParams } from "next/navigation";
 import { fetchMergedRoadmapsForAssignedUser } from "@/app/Services/roadmap-assignments";
+import { apiGetUserById } from "@/app/Services/users.service";
 import MentorHeader from "@/app/Components/MentorHeader";
 import DirectorHero from "@/app/director/DirectorHero";
 import { mentorPageRoot, mentorRoadmapHubMain, mentorSpinner } from "@/app/Components/mentor/mentor-theme";

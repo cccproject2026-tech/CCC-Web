@@ -543,7 +543,12 @@ function JumpStartPageContent() {
                       const author = c.mentorId ?? c.user;
                       const name =
                         author ? `${author.firstName ?? ""} ${author.lastName ?? ""}`.trim() : "";
-                      const avatar = author?.profilePicture ?? (author as any)?.profileImage;
+                      const authorAv =
+                        author as
+                          | { profilePicture?: string; profileImage?: string }
+                          | null
+                          | undefined;
+                      const avatar = authorAv?.profilePicture ?? authorAv?.profileImage;
                       const isHttp = typeof avatar === "string" && /^https?:\/\//i.test(avatar);
                       const date = c.addedDate ?? c.createdAt;
                       return (
