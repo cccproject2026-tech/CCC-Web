@@ -56,16 +56,25 @@ type Row = {
   title: string;
   desc: string;
   status: "Due" | "Not Started" | "Completed" | "Submitted";
-  date: string;
+  dueDate: string;
   submittedAt?: string;
+  completedAt?: string;
   imgUrl: string | null;
   button: string;
-  meeting?: string;
 };
+
+function isDueNowOrPast(dueDateRaw?: string): boolean {
+  if (!dueDateRaw) return false;
+  const due = new Date(dueDateRaw);
+  if (Number.isNaN(due.getTime())) return false;
+  // Treat the whole due day as valid by comparing against local end-of-day.
+  due.setHours(23, 59, 59, 999);
+  return Date.now() > due.getTime();
+}
 
 function getAssessmentPrimaryHref(assessmentId: string, status: Row["status"]): string {
   if (status === "Completed" || status === "Submitted") {
-    return `/pastor/AssessmentEvaluation?assessmentId=${encodeURIComponent(assessmentId)}`;
+    return `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(assessmentId)}&readOnly=1`;
   }
   return `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(assessmentId)}`;
 }
@@ -113,11 +122,12 @@ export default function PastorAssessments() {
 
         const progressData = unwrapProgressData(progressRes);
         const assessmentProgress = progressData?.assessments || [];
-        const mapped = list
-          .map((item) => {
+
+        const mapped = (await Promise.all(
+          list.map(async (item) => {
             const flat = flattenAssignedAssessmentRow(item);
             if (!flat) return null;
-            const { assessment, assessmentId: aid, assignmentId, dueDate, meetingDate, updatedAt } = flat;
+            const { assessment, assessmentId: aid, assignmentId, dueDate, updatedAt } = flat;
             const progress = assessmentProgress.find(
               (p: { assessmentId?: string; assignmentId?: string }) =>
                 String(p.assessmentId) === aid ||
@@ -127,16 +137,18 @@ export default function PastorAssessments() {
             const ps = String(progress?.status || "").toLowerCase().replace(/\s+/g, "_");
             let status: Row["status"] = "Not Started";
             if (ps === "completed" || ps === "reviewed") {
-              status = meetingDate && new Date(meetingDate).getTime() < Date.now() ? "Completed" : "Submitted";
-            }
-            else if (ps === "submitted") status = "Submitted";
-            else if (
+              status = "Completed";
+            } else if (ps === "submitted") {
+              status = "Submitted";
+            } else if (
               ps === "in_progress" ||
               ps === "inprogress" ||
-              ps === "assigned" ||
               ps === "due"
-            )
+            ) {
               status = "Due";
+            } else if (isDueNowOrPast(dueDate)) {
+              status = "Due";
+            }
 
             const a = assessment as Record<string, unknown>;
             const rawBanner =
@@ -151,8 +163,12 @@ export default function PastorAssessments() {
               title: (assessment?.name as string) || "Assessment",
               desc: (assessment?.description as string) || "",
               status,
-              date: dueDate ? new Date(dueDate).toLocaleDateString() : "",
+              dueDate: dueDate ? new Date(dueDate).toLocaleDateString() : "",
               submittedAt: updatedAt ? new Date(updatedAt).toLocaleDateString() : undefined,
+              completedAt:
+                status === "Completed" && updatedAt
+                  ? new Date(updatedAt).toLocaleDateString()
+                  : undefined,
               imgUrl,
               button:
                 status === "Completed"
@@ -160,10 +176,9 @@ export default function PastorAssessments() {
                   : status === "Submitted"
                     ? "View submission"
                     : "Start Now",
-              meeting: meetingDate ? new Date(meetingDate).toLocaleDateString() : undefined,
             };
-          })
-          .filter((r): r is NonNullable<typeof r> => r != null);
+          }),
+        )).filter((r): r is NonNullable<typeof r> => r != null);
 
         setAssessments(mapped as Row[]);
       } catch (error) {
@@ -299,10 +314,10 @@ export default function PastorAssessments() {
                     ) : (
                       <ApiImagePlaceholder className="h-full w-full rounded-lg" />
                     )}
-                    {(item.status === "Due" || item.status === "Not Started") && item.date ? (
+                    {(item.status === "Due" || item.status === "Not Started") && item.dueDate ? (
                       <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-md bg-[#fff6d8] px-2 py-[3px] text-xs font-semibold text-[#d38a00]">
                         <i className="fa-regular fa-calendar text-xs" />
-                        Due: {item.date}
+                        Due: {item.dueDate}
                       </div>
                     ) : null}
                   </div>
@@ -323,19 +338,16 @@ export default function PastorAssessments() {
                         </span>
                       </div>
 
+                      {item.dueDate && (
+                        <p className="mb-2 text-xs text-[#d9ebf8]">Due on : {item.dueDate}</p>
+                      )}
+
                       {item.status === "Submitted" && (
-                        <>
-                          <p className="mb-2 text-xs text-[#d9ebf8]">Submitted on : {item.submittedAt ?? item.date}</p>
-                          {item.meeting ? (
-                            <p className="inline-block rounded-md bg-white/15 px-3 py-2 text-xs font-medium text-[#d9ebf8]">
-                              Meeting: {item.meeting}
-                            </p>
-                          ) : null}
-                        </>
+                        <p className="mb-2 text-xs text-[#d9ebf8]">Submitted on : {item.submittedAt ?? item.dueDate}</p>
                       )}
 
                       {item.status === "Completed" && (
-                        <p className="mt-2 text-xs text-[#d9ebf8]">Completed on : {item.meeting ?? item.date}</p>
+                        <p className="mt-2 text-xs text-[#d9ebf8]">Completed on : {item.completedAt ?? item.submittedAt ?? item.dueDate}</p>
                       )}
                     </div>
 

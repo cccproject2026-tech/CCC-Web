@@ -331,34 +331,6 @@ const [showStatusText, setShowStatusText] = useState(false);
                 </ul>
               </div>
 
-              {/* <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] p-6 backdrop-blur-md">
-                <div className="mb-4 flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
-                    <i className="fa-solid fa-satellite-dish text-[#8ec5eb]" aria-hidden />
-                  </div>
-                  <h2 className="text-xl font-semibold text-white">How this page works</h2>
-                </div>
-                <ul className="space-y-3 text-sm leading-relaxed text-[#cde2f2]">
-                  <li className="flex gap-2">
-                    <span className="text-[#8ec5eb]">•</span>
-                    <span>Loads your real status from the server (same email you used on the form).</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="text-[#8ec5eb]">•</span>
-                    <span>Polls in the background so you see approval without refreshing manually.</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="text-[#8ec5eb]">•</span>
-                    <span>
-                      The{" "}
-                      <Link href="/pastor/Thankyou" className="font-semibold text-[#8ec5eb] underline-offset-2 hover:underline">
-                        confirmation screen
-                      </Link>{" "}
-                      only says we received your form — it does not check status.
-                    </span>
-                  </li>
-                </ul>
-              </div> */}
             </div>
           </div>
         </div>

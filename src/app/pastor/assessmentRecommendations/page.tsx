@@ -7,6 +7,7 @@ import PastorHeader from "@/app/Components/PastorHeader";
 import { getCookie } from "@/app/utils/cookies";
 import {
   apiGetAssessmentById,
+  apiGetUserAnswers,
   parseAssessmentDetailPayload,
 } from "@/app/Services/assessment.service";
 import { parseRecommendationSectionsForPastorView } from "@/app/utils/assessment-recommendation-view";
@@ -14,8 +15,10 @@ import axiosInstance from "@/app/Services/config/axios-instance";
 
 type SectionRecommendationRow = {
   sectionId: string;
+  sectionNumber?: number;
   sectionTitle: string;
   message: string;
+  level?: number;
   sentAt?: string;
 };
 
@@ -100,6 +103,71 @@ export default function PastorAssessmentRecommendationsPage() {
             recommendationsRes.data,
             Array.isArray(detail?.sections) ? detail.sections : [],
           );
+          
+          // Fetch user answers to get section scores
+          let answersBySection: Record<string, number> = {};
+          try {
+            const answersRes = await apiGetUserAnswers(requestedAssessmentId, pastorId);
+            const answerData = answersRes.data as Record<string, unknown>;
+            const answersInner = (answerData?.data as Record<string, unknown>) || answerData;
+            const answerSections = answersInner?.sections as unknown;
+            
+            if (Array.isArray(answerSections)) {
+              answerSections.forEach((section: any) => {
+                const sectionId = String(section?.sectionId || section?._id || "");
+                const score = section?.sectionScore ?? section?.score;
+                if (sectionId && score != null) {
+                  answersBySection[sectionId] = Number(score);
+                }
+              });
+            }
+          } catch {
+            // If answer fetch fails, continue without scores
+          }
+          
+          // Extract level from scores or recommendations
+          const enrichLevelInfo = (rows: SectionRecommendationRow[]): SectionRecommendationRow[] => {
+            const responseData = recommendationsRes.data as Record<string, unknown>;
+            const sections = Array.isArray(responseData?.sections) ? responseData.sections : [];
+            
+            return rows.map((row, rowIndex) => {
+              // Get section number from the position in the recommendations sections array
+              let sectionNumber = rowIndex + 1;
+              const matchingSectionInResponse = sections.findIndex((s: any) => String(s?.sectionId || s?._id) === row.sectionId);
+              if (matchingSectionInResponse >= 0) {
+                sectionNumber = matchingSectionInResponse + 1;
+              }
+              
+              // First priority: get score from answers
+              const scoreFromAnswers = answersBySection[row.sectionId];
+              if (scoreFromAnswers != null) {
+                return {
+                  ...row,
+                  sectionNumber,
+                  level: scoreFromAnswers
+                };
+              }
+              
+              // Fallback: get level from recommendations
+              const matchingSection = sections.find((s: any) => String(s?.sectionId || s?._id) === row.sectionId);
+              if (matchingSection && Array.isArray(matchingSection?.recommendations)) {
+                const rec = matchingSection.recommendations[0];
+                if (rec && typeof rec === 'object') {
+                  return {
+                    ...row,
+                    sectionNumber,
+                    level: (rec as { level?: number }).level || undefined
+                  };
+                }
+              }
+              return {
+                ...row,
+                sectionNumber
+              };
+            });
+          };
+          
+          mapped = enrichLevelInfo(mapped);
           mapped = mapped.filter((row) => row.message.trim() !== "");
           if (sentIds.size > 0) {
             mapped = mapped.filter((row) => sentIds.has(row.sectionId));
@@ -171,23 +239,37 @@ export default function PastorAssessmentRecommendationsPage() {
                 {sectionRecommendations.length === 0 ? (
                   <Empty text="No recommendations have been sent for this assessment yet." />
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-5">
                     {sectionRecommendations.map((section) => (
                       <div
                         key={section.sectionId}
-                        className="rounded-xl border border-white/15 bg-white/5 p-4"
+                        className="rounded-xl border border-white/15 bg-white/5 p-5"
                       >
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <h3 className="font-semibold text-[#8ec5eb]">{section.sectionTitle}</h3>
-                          <span className="text-xs text-white/60">
-                            {section.sentAt
-                              ? `Sent on ${new Date(section.sentAt).toLocaleString()}`
-                              : "Sent"}
-                          </span>
+                        <div className="mb-4">
+                          <h3 className="font-semibold text-base text-[#8ec5eb]">
+                            Section {section.sectionNumber} - {section.sectionTitle}
+                          </h3>
+                          {section.level != null && (
+                            <p className="mt-2 text-sm text-white/70">
+                              <span className="font-semibold text-white">Level:</span> {section.level}
+                            </p>
+                          )}
                         </div>
-                        <p className="mt-3 whitespace-pre-wrap text-sm text-white/85">
-                          {section.message}
-                        </p>
+                        
+                        <div className="border-t border-white/10 pt-3">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-white/60 mb-2">
+                            Customized Development Plan:
+                          </p>
+                          <p className="whitespace-pre-wrap text-sm text-white/85 leading-relaxed">
+                            {section.message}
+                          </p>
+                        </div>
+                        
+                        {section.sentAt && (
+                          <p className="mt-3 text-xs text-white/50">
+                            Sent on {new Date(section.sentAt).toLocaleString()}
+                          </p>
+                        )}
                       </div>
                     ))}
                   </div>
