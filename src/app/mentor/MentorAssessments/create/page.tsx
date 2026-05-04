@@ -785,16 +785,6 @@
 //               />
 
 //               <div className="mt-2 space-y-3 rounded-2xl border-2 border-dashed border-white/25 bg-white/[0.04] px-4 py-6">
-//                 <div className="flex flex-wrap justify-center gap-2">
-//                   <button
-//                     type="button"
-//                     onClick={() => bannerInputRef.current?.click()}
-//                     className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
-//                   >
-//                     {bannerPreview ? "Replace banner" : "Upload banner"}
-//                   </button>
-//                 </div>
-
 //                 {bannerPreview ? (
 //                   <div
 //                     className="relative mx-auto h-40 w-full max-w-md cursor-pointer overflow-hidden rounded-xl"
@@ -834,7 +824,7 @@
 //                     className="flex w-full flex-col items-center justify-center gap-2 py-6 text-center transition hover:border-[#8ec5eb]/40"
 //                   >
 //                     <i className="fa-solid fa-cloud-arrow-up text-2xl text-[#8ec5eb]" />
-//                     <span className="text-sm font-semibold text-white">Or click here to choose a file</span>
+//                     <span className="text-sm font-semibold text-white">Drag & Drop or Click here to choose file</span>
 //                     <span className="text-xs text-white/50">PNG or JPG — max 10 MB</span>
 //                   </button>
 //                 )}
@@ -1183,24 +1173,40 @@ export default function CreateAssessmentPage() {
       const newId =
         created?._id != null ? String(created._id) : created?.id != null ? String(created.id) : null;
 
+      console.log("Assessment created with ID:", newId);
+      console.log("Banner file exists:", !!bannerFile);
+
       if (bannerFile && newId) {
         try {
+          console.log("Uploading banner for assessment:", newId);
           await apiUploadAssessmentBanner(newId, bannerFile);
+          console.log("Banner uploaded successfully");
+          showToast("Assessment created successfully");
+          setTimeout(() => {
+            if (!newId) router.refresh();
+            router.push("/mentor/MentorAssessments");
+          }, 800);
         } catch (e) {
-          console.error(e);
+          console.error("Banner upload error:", e);
+          console.error("Error details:", {
+            status: (e as any)?.response?.status,
+            statusText: (e as any)?.response?.statusText,
+            endpoint: (e as any)?.config?.url,
+            message: (e as any)?.message
+          });
           showToast("Assessment created; banner upload failed — you can add a banner when editing.");
           setTimeout(() => router.push("/mentor/MentorAssessments"), 1800);
-          return;
         }
+      } else {
+        // No banner file to upload
+        showToast("Assessment created successfully");
+        setTimeout(() => {
+          if (!newId) router.refresh();
+          router.push("/mentor/MentorAssessments");
+        }, 800);
       }
-
-      showToast("Assessment created successfully");
-      setTimeout(() => {
-        if (!newId) router.refresh();
-        router.push("/mentor/MentorAssessments");
-      }, 800);
     } catch (err: unknown) {
-      console.error(err);
+      console.error("Assessment creation error:", err);
       showToast(formatAssessmentApiErrorMessage(err));
     } finally {
       setCreating(false);
@@ -1213,7 +1219,7 @@ export default function CreateAssessmentPage() {
       <div className={`${directorPageContainer} px-4 pt-3 sm:px-6 lg:px-10 sm:pt-5`}>
         <DirectorHero
           title="Create assessment"
-          subtitle="CMA includes a pre-survey; PMP does not. Layers are multiple-choice steps (you can add or remove). Levels 1–4 are four CDP plan blocks per section and stay fixed."
+          subtitle=""
           image={AssessmentBg}
           // breadcrumbItems={[
           //   { label: "Home", href: "/director/home" },
@@ -1257,7 +1263,7 @@ export default function CreateAssessmentPage() {
               <div>
                 <span className={directorLabelClass}>Include Pre-Survey Questions?</span>
                 <p className="mb-3 text-sm text-white/60">
-                  Select Yes to add pre-survey questions before the main assessment.
+                  Select Yes to add pre-survey questions.
                 </p>
                 <div className="flex flex-wrap gap-6">
                   <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
@@ -1324,9 +1330,6 @@ export default function CreateAssessmentPage() {
             {hasPreSurvey ? (
               <div className="mb-8 rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6">
                 <h2 className="mb-1 text-lg font-bold text-white">Pre-Survey Question</h2>
-                <p className="mb-4 text-sm text-white/70">
-                  These questions will be shown before the main assessment.
-                </p>
                 <div className="space-y-5">
                   {preSurveyRows.map((row, qIdx) => (
                     <div
@@ -1432,10 +1435,10 @@ export default function CreateAssessmentPage() {
                     </button>
                   </div> */}
                   <div className="flex flex-wrap items-end justify-between gap-3">
-  <p className="text-sm text-white/70">
+  {/* <p className="text-sm text-white/70">
     {section.layers.length} layer{section.layers.length === 1 ? "" : "s"} — not the same
     as CDP levels 1–4 below. At least one filled option per layer.
-  </p>
+  </p> */}
 
   <div className="flex items-center gap-2">
     <button
@@ -1517,10 +1520,6 @@ export default function CreateAssessmentPage() {
                   ))}
 
                   <h4 className="pt-2 text-sm font-semibold text-white/90">Levels 1–4 (CDP)</h4>
-                  <p className="text-xs text-white/55">
-                    Exactly four development-plan levels per section, independent of how many choice
-                    layers you added above.
-                  </p>
                   {section.plans.map((plan, planIdx) => (
                     <div key={plan.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
                       <div className="mb-2 flex items-center justify-between gap-2">
@@ -1597,7 +1596,7 @@ export default function CreateAssessmentPage() {
                 }}
               />
               <div className="mt-2 space-y-3 rounded-2xl border-2 border-dashed border-white/25 bg-white/[0.04] px-4 py-6">
-                <div className="flex flex-wrap justify-center gap-2">
+                {/* <div className="flex flex-wrap justify-center gap-2">
                   <button
                     type="button"
                     onClick={() => bannerInputRef.current?.click()}
@@ -1605,7 +1604,7 @@ export default function CreateAssessmentPage() {
                   >
                     {bannerPreview ? "Replace banner" : "Upload banner"}
                   </button>
-                </div>
+                </div> */}
                 {bannerPreview ? (
                   <div
                     className="relative h-40 w-full max-w-md mx-auto cursor-pointer overflow-hidden rounded-xl"
@@ -1649,7 +1648,7 @@ export default function CreateAssessmentPage() {
                     className="flex w-full flex-col items-center justify-center gap-2 py-6 text-center transition hover:border-[#8ec5eb]/40"
                   >
                     <i className="fa-solid fa-cloud-arrow-up text-2xl text-[#8ec5eb]" />
-                    <span className="text-sm font-semibold text-white">Or click here to choose a file</span>
+                    <span className="text-sm font-semibold text-white">Drag & Drop or Click here to choose file</span>
                     <span className="text-xs text-white/50">PNG or JPG — max 10 MB</span>
                   </button>
                 )}
