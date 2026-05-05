@@ -202,7 +202,10 @@ export default function IndividualProgressPage() {
   const [isInviteFieldMentorModalOpen, setIsInviteFieldMentorModalOpen] = useState(false);
   const [finalComments, setFinalComments] = useState("");
   const [hasComments, setHasComments] = useState(false);
+  const [isMarkingProgramComplete, setIsMarkingProgramComplete] = useState(false);
   const [isInvitingFieldMentor, setIsInvitingFieldMentor] = useState(false);
+  const [completionMessage, setCompletionMessage] = useState<string | null>(null);
+  const [inviteMessage, setInviteMessage] = useState<string | null>(null);
   const [roadmapFilter, setRoadmapFilter] = useState<"All" | "Completed" | "Remaining">("All");
   const [surveyFilter, setSurveyFilter] = useState<"All" | "Completed" | "Remaining">("All");
   const [progressData, setProgressData] = useState<ProgressResponse | null>(null);
@@ -269,34 +272,61 @@ export default function IndividualProgressPage() {
   };
 
   const handleMarkAsCompleted = async () => {
+    if (!userId) return;
     try {
+      setIsMarkingProgramComplete(true);
+      setCompletionMessage(null);
+      setInviteMessage(null);
       await apiMarkProgramComplete(userId);
-      
+
       // Fetch latest progress after marking complete
       const progressRes = await apiGetUserProgress(userId);
       setProgressData(unwrapUserProgressDetail(progressRes));
-      
+
       setIsFinalCommentsModalOpen(false);
-      // Show field mentor invitation modal after marking complete
-      setIsInviteFieldMentorModalOpen(true);
+      setCompletionMessage("Programme marked as completed.");
+      if (user?.email && directorId) {
+        setIsInviteFieldMentorModalOpen(true);
+      } else {
+        setInviteMessage("Programme completed, but the field mentor invitation cannot be sent because the pastor email or director session is missing.");
+      }
     } catch (error) {
       console.error("Failed to mark program as completed", error);
+      setCompletionMessage("Failed to mark programme as completed.");
+    } finally {
+      setIsMarkingProgramComplete(false);
     }
   };
 
   const handleInviteAsFieldMentor = async () => {
+    if (!user?.email) {
+      setInviteMessage("Pastor email is missing. Unable to send the field mentor invitation.");
+      return;
+    }
+    if (!directorId) {
+      setInviteMessage("Director session is missing. Sign in again and retry the invitation.");
+      return;
+    }
+
     try {
       setIsInvitingFieldMentor(true);
+      setInviteMessage(null);
       await apiInviteFieldMentor({
-        userId,
+        email: user.email,
+        invitedBy: directorId,
       });
-      
+
       setIsInviteFieldMentorModalOpen(false);
-      // Optionally refresh user data
+      setInviteMessage("Field mentor invitation sent successfully.");
       const userRes = await apiGetUserById(userId);
       setUser(unwrapUserResponse(userRes));
     } catch (error) {
       console.error("Failed to invite as field mentor", error);
+      const message =
+        error && typeof error === "object" && "response" in error
+          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setInviteMessage(typeof message === "string" ? message : "Failed to send the field mentor invitation.");
     } finally {
       setIsInvitingFieldMentor(false);
     }
@@ -482,6 +512,23 @@ export default function IndividualProgressPage() {
         <section className="relative px-4 pb-12 sm:px-6 md:px-12 lg:px-20">
           <div className="mx-auto max-w-lg rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-6 text-center text-red-100">
             {loadError}
+          </div>
+        </section>
+      ) : null}
+
+      {!loadError && (completionMessage || inviteMessage) ? (
+        <section className="relative px-4 pb-6 sm:px-6 md:px-12 lg:px-20">
+          <div className="mx-auto max-w-[1400px] space-y-3">
+            {completionMessage ? (
+              <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
+                {completionMessage}
+              </div>
+            ) : null}
+            {inviteMessage ? (
+              <div className="rounded-xl border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 px-4 py-3 text-sm text-[#d8edf9]">
+                {inviteMessage}
+              </div>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -723,9 +770,10 @@ export default function IndividualProgressPage() {
                 <button
                   type="button"
                   onClick={handleMarkAsCompleted}
-                  className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                  disabled={isMarkingProgramComplete}
+                  className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Mark programme as completed
+                  {isMarkingProgramComplete ? "Marking programme..." : "Mark programme as completed"}
                 </button>
               ) : (
                 <button
@@ -777,6 +825,11 @@ export default function IndividualProgressPage() {
                 Do you want to invite <span className="font-semibold text-white">{userName}</span> to become a{" "}
                 <span className="font-semibold text-[#8ec5eb]">Field Mentor</span>? This will change their role and give them access to mentor other pastors.
               </p>
+              {user?.email ? (
+                <p className="mt-3 text-sm text-white/55">Invitation email: {user.email}</p>
+              ) : (
+                <p className="mt-3 text-sm text-amber-200/85">No email is available for this user, so the invitation cannot be sent yet.</p>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-3 border-t border-white/10 px-6 py-4">
@@ -790,7 +843,7 @@ export default function IndividualProgressPage() {
               <button
                 type="button"
                 onClick={handleInviteAsFieldMentor}
-                disabled={isInvitingFieldMentor}
+                disabled={isInvitingFieldMentor || !user?.email || !directorId}
                 className="rounded-xl border border-emerald-400/50 bg-emerald-500/20 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isInvitingFieldMentor ? "Sending invitation..." : "Invite as Field Mentor"}

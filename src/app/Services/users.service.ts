@@ -145,7 +145,7 @@ export const apiInviteFieldMentor = (payload: InviteFieldMentorPayload) =>
 
 // POST /users/accept-invitation
 export const apiAcceptInvitation = (payload: AcceptInvitationPayload) =>
-  axiosInstance.post<{ success: boolean; message: string }>("/users/accept-invitation", payload);
+  axiosInstance.post<{ success: boolean; message: string; data: UserResponse }>("/users/accept-invitation", payload);
 
 /** Normalize GET `/users/:id` — envelope shapes differ by deploy/version. */
 export function unwrapUserResponse(res: { data?: unknown }): UserResponse | null {

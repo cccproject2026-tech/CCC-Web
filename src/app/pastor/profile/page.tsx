@@ -3,12 +3,14 @@ import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { getCookie, setCookie } from "@/app/utils/cookies";
 import {
+  apiAcceptInvitation,
   apiUploadProfilePicture,
   apiUpdateUserById,
 } from "@/app/Services/users.service";
 import PastorHeader from "@/app/Components/PastorHeader";
 import ProfilePic from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import type { FieldMentorInvitation } from "@/app/Services/types/users.types";
 import {
   getSingleUser,
   updateInterestByEmail,
@@ -34,6 +36,9 @@ export default function PastorProfile() {
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [form, setForm] = useState<any>({});
+  const [invitationActionLoading, setInvitationActionLoading] = useState(false);
+  const [invitationMessage, setInvitationMessage] = useState<string | null>(null);
+  const [invitationMessageTone, setInvitationMessageTone] = useState<"success" | "error" | "info">("info");
 
   // Document modal state
   const [showDocsModal, setShowDocsModal] = useState(false);
@@ -43,6 +48,60 @@ export default function PastorProfile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profileImageInputRef = useRef<HTMLInputElement | null>(null);
 const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
+
+  const fieldMentorInvitation = profile?.fieldMentorInvitation as FieldMentorInvitation | undefined;
+  const hasFieldMentorInvitation = profile?.role === "pastor" && Boolean(fieldMentorInvitation);
+  const invitationExpired = Boolean(
+    fieldMentorInvitation?.expiresAt && new Date(fieldMentorInvitation.expiresAt) < new Date(),
+  );
+
+  const handleAcceptInvitation = async () => {
+    const token = fieldMentorInvitation?.token;
+    if (!token) {
+      setInvitationMessageTone("error");
+      setInvitationMessage("Invitation token is missing. Please contact support.");
+      return;
+    }
+
+    try {
+      setInvitationActionLoading(true);
+      setInvitationMessage(null);
+      const res = await apiAcceptInvitation({ token });
+
+      const updatedUser = res.data?.data;
+      if (updatedUser) {
+        setProfile((prev: any) => ({
+          ...prev,
+          ...updatedUser,
+          fieldMentorInvitation: undefined,
+        }));
+
+        const storedUser = JSON.parse(getCookie("user") || "{}");
+        setCookie(
+          "user",
+          JSON.stringify({
+            ...storedUser,
+            ...updatedUser,
+            role: updatedUser.role,
+            hasCompleted: updatedUser.hasCompleted,
+          }),
+          30,
+        );
+      }
+      setInvitationMessageTone("success");
+      setInvitationMessage(res.data?.message || "Invitation accepted successfully.");
+    } catch (err: any) {
+      setInvitationMessageTone("error");
+      setInvitationMessage(err?.response?.data?.message || "Failed to accept invitation.");
+    } finally {
+      setInvitationActionLoading(false);
+    }
+  };
+
+  const handleRejectInvitation = () => {
+    setInvitationMessageTone("info");
+    setInvitationMessage("Reject invitation is not available because the backend controller does not expose a reject endpoint yet.");
+  };
 
   // -------------------------
   // FETCH USER
@@ -551,6 +610,58 @@ console.log("FRESH USER AFTER SAVE:", freshRes.data?.data?.lastName);
             <p className="mb-4 text-base capitalize text-[#cde2f2]">{profile.role}</p>
 
             <div className="my-3 border-t border-white/15"></div>
+
+            {hasFieldMentorInvitation && (
+              <>
+                <button
+                  type="button"
+                  className="mb-4 flex w-full items-center justify-center rounded-xl border border-[#8ec5eb]/45 bg-[#062946]/55 px-4 py-3 text-sm font-semibold text-[#d9ebf8] transition hover:border-[#8ec5eb]/70 hover:bg-[#0d426d]"
+                >
+                  Download Certificate
+                </button>
+
+                <div className="mb-5 rounded-2xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 p-4 text-left">
+                  <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white">You have been invited as a Field Mentor.</p>
+                      {!invitationExpired ? (
+                        <div className="mt-4 space-y-3">
+                          {invitationMessage ? (
+                            <p
+                              className={`text-xs ${
+                                invitationMessageTone === "success"
+                                  ? "text-emerald-200"
+                                  : invitationMessageTone === "error"
+                                    ? "text-rose-200"
+                                    : "text-[#d9ebf8]"
+                              }`}
+                            >
+                              {invitationMessage}
+                            </p>
+                          ) : null}
+                          <div className="flex gap-3">
+                            <button
+                              type="button"
+                              onClick={handleAcceptInvitation}
+                              disabled={invitationActionLoading}
+                              className="flex-1 rounded-xl bg-[#8ec5eb] px-4 py-2.5 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2] disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {invitationActionLoading ? "Accepting..." : "Accept"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleRejectInvitation}
+                              disabled={invitationActionLoading}
+                              className="flex-1 rounded-xl border border-white/30 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                  </div>
+                </div>
+              </>
+            )}
 
             <p className="mb-2 text-left text-sm font-semibold text-[#d9ebf8]">
               Profile Information
