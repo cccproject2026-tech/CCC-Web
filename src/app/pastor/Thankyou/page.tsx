@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Suspense } from "react";
 // import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/hero-bg.png";
 import { useSearchParams } from "next/navigation";
@@ -10,11 +11,11 @@ import { useSearchParams } from "next/navigation";
  * Immediate confirmation after submitting the interest form — gratitude + clear next step.
  * For live approval status, polling, and outcomes use `/pastor/Processing` (different copy).
  */
-export default function ThankyouPage() {
-  
+function ThankyouContent() {
+
   const router = useRouter();
   const searchParams = useSearchParams();
-const emailFromUrl = searchParams.get("email") ?? "";
+  const emailFromUrl = searchParams.get("email") ?? "";
 
   return (
     <div className="flex min-h-screen flex-col bg-transparent text-white font-[Albert_Sans]">
@@ -68,21 +69,21 @@ const emailFromUrl = searchParams.get("email") ?? "";
                     type="button"
                     // onClick={() => router.push("/pastor/Processing")}
                     onClick={() => {
-  const email =
-    typeof window !== "undefined"
-      ? document.cookie
-          .split("; ")
-          .find((row) => row.startsWith("interestEmail="))
-          ?.split("=")[1]
-      : "";
+                      const email =
+                        typeof window !== "undefined"
+                          ? document.cookie
+                            .split("; ")
+                            .find((row) => row.startsWith("interestEmail="))
+                            ?.split("=")[1]
+                          : "";
 
-  if (email) {
-    router.push(`/pastor/Processing?email=${encodeURIComponent(decodeURIComponent(email))}`);
-    return;
-  }
+                      if (email) {
+                        router.push(`/pastor/Processing?email=${encodeURIComponent(decodeURIComponent(email))}`);
+                        return;
+                      }
 
-  router.push("/pastor/Processing");
-}}
+                      router.push("/pastor/Processing");
+                    }}
                     className="rounded-xl bg-white px-8 py-3 text-sm font-semibold text-[#0f4a76] shadow-[0_8px_24px_rgba(0,0,0,0.2)] transition hover:bg-[#e7f1fa] md:px-10 md:text-base"
                   >
                     Track application status
@@ -121,7 +122,7 @@ const emailFromUrl = searchParams.get("email") ?? "";
                   </li>
                 </ul>
               </div>
-{/* 
+              {/* 
               <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.5)_0%,rgba(9,49,80,0.65)_100%)] p-6 backdrop-blur-md">
                 <div className="mb-4 flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10">
@@ -153,5 +154,13 @@ const emailFromUrl = searchParams.get("email") ?? "";
         </div>
       </section>
     </div>
+  );
+}
+
+export default function ThankyouPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-white">Loading...</div>}>
+      <ThankyouContent />
+    </Suspense>
   );
 }
