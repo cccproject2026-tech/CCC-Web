@@ -1,12 +1,15 @@
 "use client";
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
-import { getCookie, setCookie } from "@/app/utils/cookies";
+import { useRouter } from "next/navigation";
+import { clearAllCookies, getCookie, setCookie } from "@/app/utils/cookies";
 import {
   apiAcceptInvitation,
+  apiRejectInvitation,
   apiUploadProfilePicture,
   apiUpdateUserById,
 } from "@/app/Services/users.service";
+import { apiLogout } from "@/app/Services/api";
 import PastorHeader from "@/app/Components/PastorHeader";
 import ProfilePic from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -33,12 +36,14 @@ type PendingFile = {
 };
 
 export default function PastorProfile() {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [form, setForm] = useState<any>({});
   const [invitationActionLoading, setInvitationActionLoading] = useState(false);
   const [invitationMessage, setInvitationMessage] = useState<string | null>(null);
   const [invitationMessageTone, setInvitationMessageTone] = useState<"success" | "error" | "info">("info");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Document modal state
   const [showDocsModal, setShowDocsModal] = useState(false);
@@ -47,6 +52,7 @@ export default function PastorProfile() {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profileImageInputRef = useRef<HTMLInputElement | null>(null);
+  const redirectTimeoutRef = useRef<number | null>(null);
 const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
 
   const fieldMentorInvitation = profile?.fieldMentorInvitation as FieldMentorInvitation | undefined;
@@ -54,6 +60,14 @@ const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const invitationExpired = Boolean(
     fieldMentorInvitation?.expiresAt && new Date(fieldMentorInvitation.expiresAt) < new Date(),
   );
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimeoutRef.current) {
+        window.clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleAcceptInvitation = async () => {
     const token = fieldMentorInvitation?.token;
@@ -88,8 +102,13 @@ const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
           30,
         );
       }
-      setInvitationMessageTone("success");
-      setInvitationMessage(res.data?.message || "Invitation accepted successfully.");
+      setInvitationMessage(null);
+      setToastMessage(res.data?.message || "Invitation accepted successfully. Role updated to field-mentor.");
+      redirectTimeoutRef.current = window.setTimeout(() => {
+        void apiLogout().catch(() => {});
+        clearAllCookies();
+        router.push("/mentor/login");
+      }, 1600);
     } catch (err: any) {
       setInvitationMessageTone("error");
       setInvitationMessage(err?.response?.data?.message || "Failed to accept invitation.");
@@ -98,9 +117,53 @@ const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
     }
   };
 
-  const handleRejectInvitation = () => {
-    setInvitationMessageTone("info");
-    setInvitationMessage("Reject invitation is not available because the backend controller does not expose a reject endpoint yet.");
+  const handleRejectInvitation = async () => {
+    const token = fieldMentorInvitation?.token;
+    if (!token) {
+      setInvitationMessageTone("error");
+      setInvitationMessage("Invitation token is missing. Please contact support.");
+      return;
+    }
+
+    try {
+      setInvitationActionLoading(true);
+      setInvitationMessage(null);
+      const res = await apiRejectInvitation({ token });
+
+      const updatedUser = res.data?.data;
+      if (updatedUser) {
+        setProfile((prev: any) => ({
+          ...prev,
+          ...updatedUser,
+          fieldMentorInvitation: undefined,
+        }));
+
+        const storedUser = JSON.parse(getCookie("user") || "{}");
+        setCookie(
+          "user",
+          JSON.stringify({
+            ...storedUser,
+            ...updatedUser,
+            role: updatedUser.role,
+            hasCompleted: updatedUser.hasCompleted,
+          }),
+          30,
+        );
+      } else {
+        setProfile((prev: any) => ({
+          ...prev,
+          fieldMentorInvitation: undefined,
+        }));
+      }
+
+      setInvitationMessageTone("success");
+      setInvitationMessage(res.data?.message || "Invitation rejected successfully.");
+    } catch (err: any) {
+      setInvitationMessageTone("error");
+      setInvitationMessage(err?.response?.data?.message || "Failed to reject invitation.");
+    } finally {
+      setInvitationActionLoading(false);
+    }
   };
 
   // -------------------------
@@ -554,6 +617,14 @@ console.log("FRESH USER AFTER SAVE:", freshRes.data?.data?.lastName);
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_20%_12%,rgba(141,211,243,0.18),transparent_38%),linear-gradient(180deg,#041f35_0%,#062946_100%)] text-white">
       <PastorHeader showFullHeader={true} />
+
+      {toastMessage ? (
+        <div className="fixed left-1/2 top-6 z-[120] -translate-x-1/2 px-4">
+          <div className="rounded-xl border border-emerald-400/35 bg-emerald-500/15 px-5 py-3 text-sm font-semibold text-emerald-50 shadow-[0_18px_40px_rgba(2,20,38,0.35)] backdrop-blur-sm">
+            {toastMessage}
+          </div>
+        </div>
+      ) : null}
 
       <main className="px-4 py-10 md:px-8 lg:px-16 flex justify-center">
         <div className="flex flex-col md:flex-row gap-8 w-full max-w-7xl">

@@ -27,7 +27,7 @@ import {
   apiMarkProgramComplete,
   unwrapUserProgressDetail,
 } from "@/app/Services/progress.service";
-import { apiGetUserById, apiInviteFieldMentor, unwrapUserResponse } from "@/app/Services/users.service";
+import { apiGetUserById, apiInviteFieldMentor, apiIssueCertificate, unwrapUserResponse } from "@/app/Services/users.service";
 import type {
   ProgressAssessment,
   ProgressResponse,
@@ -204,8 +204,11 @@ export default function IndividualProgressPage() {
   const [hasComments, setHasComments] = useState(false);
   const [isMarkingProgramComplete, setIsMarkingProgramComplete] = useState(false);
   const [isInvitingFieldMentor, setIsInvitingFieldMentor] = useState(false);
+  const [isIssuingCertificate, setIsIssuingCertificate] = useState(false);
   const [completionMessage, setCompletionMessage] = useState<string | null>(null);
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
+  const [certificateMessage, setCertificateMessage] = useState<string | null>(null);
+  const [showStatusMessages, setShowStatusMessages] = useState(false);
   const [roadmapFilter, setRoadmapFilter] = useState<"All" | "Completed" | "Remaining">("All");
   const [surveyFilter, setSurveyFilter] = useState<"All" | "Completed" | "Remaining">("All");
   const [progressData, setProgressData] = useState<ProgressResponse | null>(null);
@@ -217,6 +220,10 @@ export default function IndividualProgressPage() {
     : "—";
   const isCompleted = progressData?.overallCompleted ?? false;
   const [directorId, setDirectorId] = useState<string>("");
+  const canInviteFieldMentor = Boolean(directorId && user?.email && user?.hasCompleted);
+  const canIssueCertificate = Boolean(
+    directorId && userId && !user?.hasIssuedCertificate && user?.hasCompleted,
+  );
 
   useEffect(() => {
     const storedUserId = getCookie("userId");
@@ -248,6 +255,30 @@ export default function IndividualProgressPage() {
     }
   }, [progressData]);
 
+  useEffect(() => {
+    if (!completionMessage && !inviteMessage && !certificateMessage) {
+      setShowStatusMessages(false);
+      return;
+    }
+
+    setShowStatusMessages(true);
+
+    const fadeTimer = window.setTimeout(() => {
+      setShowStatusMessages(false);
+    }, 2600);
+
+    const clearTimer = window.setTimeout(() => {
+      setCompletionMessage(null);
+      setInviteMessage(null);
+      setCertificateMessage(null);
+    }, 3200);
+
+    return () => {
+      window.clearTimeout(fadeTimer);
+      window.clearTimeout(clearTimer);
+    };
+  }, [completionMessage, inviteMessage, certificateMessage]);
+
   const handleSubmitComments = async () => {
     if (!finalComments.trim()) return;
 
@@ -277,11 +308,16 @@ export default function IndividualProgressPage() {
       setIsMarkingProgramComplete(true);
       setCompletionMessage(null);
       setInviteMessage(null);
+      setCertificateMessage(null);
       await apiMarkProgramComplete(userId);
 
-      // Fetch latest progress after marking complete
-      const progressRes = await apiGetUserProgress(userId);
+      // Fetch latest progress and user state after marking complete
+      const [progressRes, userRes] = await Promise.all([
+        apiGetUserProgress(userId),
+        apiGetUserById(userId),
+      ]);
       setProgressData(unwrapUserProgressDetail(progressRes));
+      setUser(unwrapUserResponse(userRes));
 
       setIsFinalCommentsModalOpen(false);
       setCompletionMessage("Programme marked as completed.");
@@ -311,6 +347,7 @@ export default function IndividualProgressPage() {
     try {
       setIsInvitingFieldMentor(true);
       setInviteMessage(null);
+      setCertificateMessage(null);
       await apiInviteFieldMentor({
         email: user.email,
         invitedBy: directorId,
@@ -329,6 +366,33 @@ export default function IndividualProgressPage() {
       setInviteMessage(typeof message === "string" ? message : "Failed to send the field mentor invitation.");
     } finally {
       setIsInvitingFieldMentor(false);
+    }
+  };
+
+  const handleIssueCertificate = async () => {
+    if (!userId || !directorId) {
+      setCertificateMessage("Director session is missing. Sign in again and retry certificate issuance.");
+      return;
+    }
+
+    try {
+      setIsIssuingCertificate(true);
+      setCertificateMessage(null);
+      setCompletionMessage(null);
+      setInviteMessage(null);
+      const response = await apiIssueCertificate(userId, directorId);
+      const userRes = await apiGetUserById(userId);
+      setUser(unwrapUserResponse(userRes));
+      setCertificateMessage(response.data?.message || "Certificate issued successfully.");
+    } catch (error) {
+      console.error("Failed to issue certificate", error);
+      const message =
+        error && typeof error === "object" && "response" in error
+          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
+          : undefined;
+      setCertificateMessage(typeof message === "string" ? message : "Failed to issue certificate.");
+    } finally {
+      setIsIssuingCertificate(false);
     }
   };
 
@@ -516,9 +580,13 @@ export default function IndividualProgressPage() {
         </section>
       ) : null}
 
-      {!loadError && (completionMessage || inviteMessage) ? (
+      {!loadError && (completionMessage || inviteMessage || certificateMessage) ? (
         <section className="relative px-4 pb-6 sm:px-6 md:px-12 lg:px-20">
-          <div className="mx-auto max-w-[1400px] space-y-3">
+          <div
+            className={`mx-auto max-w-[1400px] space-y-3 transition-opacity duration-500 ${
+              showStatusMessages ? "opacity-100" : "opacity-0"
+            }`}
+          >
             {completionMessage ? (
               <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
                 {completionMessage}
@@ -529,6 +597,11 @@ export default function IndividualProgressPage() {
                 {inviteMessage}
               </div>
             ) : null}
+            {certificateMessage ? (
+              <div className="rounded-xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-sm text-amber-50">
+                {certificateMessage}
+              </div>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -536,7 +609,35 @@ export default function IndividualProgressPage() {
       <section className={`relative flex-1 px-4 pb-12 sm:px-6 md:px-12 lg:px-20 ${loadError ? "hidden" : ""}`}>
         <div className="mx-auto max-w-[1400px] space-y-10">
           <div className="relative">
-            <div className="mb-4 flex justify-end">
+            <div className="mb-4 flex flex-wrap justify-end gap-3">
+              {(user?.fieldMentorInvitation || canInviteFieldMentor) && (
+                <button
+                  type="button"
+                  onClick={handleInviteAsFieldMentor}
+                  disabled={isInvitingFieldMentor || Boolean(user?.fieldMentorInvitation) || !canInviteFieldMentor}
+                  className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {user?.fieldMentorInvitation
+                    ? "Invitation sent"
+                    : isInvitingFieldMentor
+                      ? "Sending invitation..."
+                      : "Invite as Field Mentor"}
+                </button>
+              )}
+              {(user?.hasIssuedCertificate || canIssueCertificate) && (
+                <button
+                  type="button"
+                  onClick={handleIssueCertificate}
+                  disabled={isIssuingCertificate || Boolean(user?.hasIssuedCertificate) || !canIssueCertificate}
+                  className="rounded-lg border border-amber-300/40 bg-amber-400/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-400/25 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {user?.hasIssuedCertificate
+                    ? "Certificate issued"
+                    : isIssuingCertificate
+                      ? "Issuing certificate..."
+                      : "Issue Certificate"}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setIsFinalCommentsModalOpen(true)}
