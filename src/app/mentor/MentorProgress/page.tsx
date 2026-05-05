@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
+import card from "@/app/Assets/card1.png";
 import { apiAddFinalComment, apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetUserById } from "@/app/Services/users.service";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
@@ -390,11 +391,10 @@ function PastorProgressPageContent() {
                     key={tab}
                     type="button"
                     onClick={() => setActiveTab(tab)}
-                    className={`flex-1 py-3 text-sm font-medium capitalize transition ${
-                      activeTab === tab
+                    className={`flex-1 py-3 text-sm font-medium capitalize transition ${activeTab === tab
                         ? "border-b-2 border-[#8ec5eb] text-white"
                         : "text-[#cde2f2]/80 hover:text-white"
-                    }`}
+                      }`}
                   >
                     {tab === "comments" ? "Final comments" : "Programme summary"}
                   </button>
@@ -474,56 +474,74 @@ function MentorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: 
   const progressPct = Number(roadmap.percent ?? 0);
   const completed = `${roadmap.completedSteps ?? 0}/${roadmap.totalSteps ?? 0}`;
   const time = roadmap.timeline || "—";
-  const statusLabel = formatRoadmapStatusLabel(roadmap.status);
-  const chip = progressStatusChipClass(roadmap.status);
+  const status = roadmap.status;
   const imgUrl =
     typeof roadmap.imageUrl === "string" && (roadmap.imageUrl.startsWith("http://") || roadmap.imageUrl.startsWith("https://"))
       ? roadmap.imageUrl
       : null;
 
+  const getStatusBadgeStyle = () => {
+    const s = String(status || "").toLowerCase().trim();
+    if (s === "completed" || s === "complete") return "border-emerald-400/40 bg-emerald-500/15 text-emerald-100";
+    if (s === "in_progress" || s === "in-progress") return "border-amber-400/40 bg-amber-500/15 text-amber-100";
+    if (s === "overdue" || s === "over_due") return "border-red-400/40 bg-red-500/15 text-red-100";
+    return "border-[#8ec5eb]/35 bg-[#8ec5eb]/10 text-[#cde9f7]";
+  };
+
+  const statusLabel = formatRoadmapStatusLabel(status);
+
   return (
-    <div className={`${mentorGlassCardRoadmap} overflow-hidden`}>
-      <div className="flex flex-col sm:flex-row">
-        <div className="relative h-44 w-full shrink-0 sm:h-auto sm:w-1/3 sm:min-h-[200px]">
-          {imgUrl ? (
-            <Image
-              src={imgUrl}
-              alt={title}
-              fill
-              className="object-cover"
-              unoptimized
-            />
-          ) : (
-            <ApiImagePlaceholder className="h-full min-h-[176px] w-full sm:min-h-[200px]" />
-          )}
+    <div className={`flex overflow-hidden rounded-2xl border border-white/12 ${mentorGlassCardRoadmap}`}>
+      <div className="relative w-1/3 shrink-0">
+        <Image
+          src={imgUrl || card}
+          alt={title}
+          fill
+          className="object-cover"
+          unoptimized={!!imgUrl}
+        />
+        {status && String(status).toLowerCase().includes("completed") && (
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="relative h-14 w-14">
+              <div className="absolute inset-0 rounded-full border-2 border-emerald-400/80" />
+              <div className="absolute inset-[6px] flex items-center justify-center rounded-full bg-emerald-500">
+                <i className="fa-solid fa-check text-sm font-bold text-white"></i>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col justify-between p-5">
+        <div>
+          <h3 className="mb-2 text-lg font-semibold text-white">{title}</h3>
+          <p className="mb-4 text-sm text-white/65">{desc || "—"}</p>
         </div>
-        <div className="flex flex-1 flex-col p-5">
-          <h4 className="mb-1 text-[15px] font-semibold text-white">{title}</h4>
-          <p className="mb-3 line-clamp-2 text-[13px] text-[#cde2f2]/90">{desc || "—"}</p>
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <span className="text-[12px] font-medium text-[#8ec5eb]/90">Status</span>
-            <span className={`rounded-full px-2 py-[3px] text-[11px] font-medium ${chip}`}>{statusLabel}</span>
+        <div className="flex flex-col gap-3">
+          <span className={`w-fit rounded-md border px-3 py-1 text-xs font-semibold ${getStatusBadgeStyle()}`}>
+            Status: {statusLabel}
+          </span>
+          <div className="flex flex-col gap-1">
+            <div className="h-2 w-full rounded-full bg-white/15">
+              <div
+                className="h-2 rounded-full bg-gradient-to-r from-[#5a9ec9] to-[#8ec5eb] transition-all duration-700"
+                style={{ width: `${Math.min(100, progressPct)}%` }}
+              />
+            </div>
+            <span className="text-xs text-white/55">Tasks: {completed}</span>
           </div>
-          <p className="mb-1 text-[12px] text-[#8ec5eb]/80">Tasks</p>
-          <div className="mb-1 h-2.5 w-full rounded-full bg-white/10 sm:h-3">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-[#5a9ec9] to-[#8ec5eb] transition-all duration-700"
-              style={{ width: `${Math.min(100, progressPct)}%` }}
-            />
-          </div>
-          <p className="mb-2 text-[12px] font-medium text-white">{completed}</p>
-          <p className="text-[12px] text-[#cde2f2]/80">
-            Timeline <span className="font-semibold text-[#8ec5eb]">{time}</span>
-          </p>
-          <div className="mt-4 flex justify-end">
-            <button
-              type="button"
-              onClick={onView}
-              className="rounded-lg bg-[#8ec5eb] px-6 py-2 text-[12px] font-semibold text-[#062946] transition hover:bg-[#b8daf2]"
-            >
-              View
-            </button>
-          </div>
+          <span className="text-xs text-white/70">
+            Timeline: <span className="font-semibold text-[#8ec5eb]">{time}</span>
+          </span>
+          <span className="text-xs text-white/70">
+            Completion time: <span className="font-semibold text-[#8ec5eb]">{roadmap.completionDate || "—"}</span>
+          </span>
+          {/* <button
+            type="button"
+            onClick={onView}
+            className="mt-2 inline-flex w-fit rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+          >
+            View Details
+          </button> */}
         </div>
       </div>
     </div>
@@ -572,11 +590,11 @@ function MentorAssessmentProgressCard({ assessment, onOpen }: { assessment: any;
                     assessment.status === "completed"
                       ? 100
                       : Number(
-                          assessment.progressPercentage ??
-                            (assessment.totalSections
-                              ? ((assessment.completedSections ?? 0) / Math.max(1, assessment.totalSections)) * 100
-                              : 0),
-                        ),
+                        assessment.progressPercentage ??
+                        (assessment.totalSections
+                          ? ((assessment.completedSections ?? 0) / Math.max(1, assessment.totalSections)) * 100
+                          : 0),
+                      ),
                   )}%`,
                 }}
               />

@@ -24,9 +24,10 @@ import Card4 from "../../../Assets/card4.png";
 import {
   apiAddFinalComment,
   apiGetUserProgress,
+  apiMarkProgramComplete,
   unwrapUserProgressDetail,
 } from "@/app/Services/progress.service";
-import { apiGetUserById, unwrapUserResponse } from "@/app/Services/users.service";
+import { apiGetUserById, apiInviteFieldMentor, unwrapUserResponse } from "@/app/Services/users.service";
 import type {
   ProgressAssessment,
   ProgressResponse,
@@ -198,8 +199,10 @@ export default function IndividualProgressPage() {
   const userId =
     typeof rawId === "string" ? decodeURIComponent(rawId) : Array.isArray(rawId) ? decodeURIComponent(rawId[0] ?? "") : "";
   const [isFinalCommentsModalOpen, setIsFinalCommentsModalOpen] = useState(false);
+  const [isInviteFieldMentorModalOpen, setIsInviteFieldMentorModalOpen] = useState(false);
   const [finalComments, setFinalComments] = useState("");
   const [hasComments, setHasComments] = useState(false);
+  const [isInvitingFieldMentor, setIsInvitingFieldMentor] = useState(false);
   const [roadmapFilter, setRoadmapFilter] = useState<"All" | "Completed" | "Remaining">("All");
   const [surveyFilter, setSurveyFilter] = useState<"All" | "Completed" | "Remaining">("All");
   const [progressData, setProgressData] = useState<ProgressResponse | null>(null);
@@ -265,10 +268,38 @@ export default function IndividualProgressPage() {
     }
   };
 
-  const handleMarkAsCompleted = () => {
-    // Mark programme as completed
-    setIsFinalCommentsModalOpen(false);
-    // Here you would typically update the status in your backend
+  const handleMarkAsCompleted = async () => {
+    try {
+      await apiMarkProgramComplete(userId);
+      
+      // Fetch latest progress after marking complete
+      const progressRes = await apiGetUserProgress(userId);
+      setProgressData(unwrapUserProgressDetail(progressRes));
+      
+      setIsFinalCommentsModalOpen(false);
+      // Show field mentor invitation modal after marking complete
+      setIsInviteFieldMentorModalOpen(true);
+    } catch (error) {
+      console.error("Failed to mark program as completed", error);
+    }
+  };
+
+  const handleInviteAsFieldMentor = async () => {
+    try {
+      setIsInvitingFieldMentor(true);
+      await apiInviteFieldMentor({
+        userId,
+      });
+      
+      setIsInviteFieldMentorModalOpen(false);
+      // Optionally refresh user data
+      const userRes = await apiGetUserById(userId);
+      setUser(unwrapUserResponse(userRes));
+    } catch (error) {
+      console.error("Failed to invite as field mentor", error);
+    } finally {
+      setIsInvitingFieldMentor(false);
+    }
   };
 
   const roadmapCards =
@@ -706,6 +737,64 @@ export default function IndividualProgressPage() {
                   Submit
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invite as Field Mentor Modal */}
+      {isInviteFieldMentorModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+          <div className={`max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl ${directorGlassCard}`}>
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Invite as Field Mentor</h2>
+                <p className="mt-1 text-sm text-white/55">{userName}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsInviteFieldMentorModalOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white transition hover:bg-white/20"
+              >
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+
+            <div className="p-6">
+              <div className="mb-6 rounded-lg border border-emerald-400/30 bg-emerald-500/10 p-4">
+                <div className="flex items-start gap-3">
+                  <i className="fa-solid fa-circle-check mt-0.5 text-emerald-300"></i>
+                  <div>
+                    <h3 className="font-semibold text-emerald-100">Program Completed</h3>
+                    <p className="mt-1 text-sm text-emerald-100/80">
+                      {userName} has successfully completed their program.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-white/80">
+                Do you want to invite <span className="font-semibold text-white">{userName}</span> to become a{" "}
+                <span className="font-semibold text-[#8ec5eb]">Field Mentor</span>? This will change their role and give them access to mentor other pastors.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-white/10 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setIsInviteFieldMentorModalOpen(false)}
+                className="rounded-xl border border-white/25 bg-white/10 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
+              >
+                Not Now
+              </button>
+              <button
+                type="button"
+                onClick={handleInviteAsFieldMentor}
+                disabled={isInvitingFieldMentor}
+                className="rounded-xl border border-emerald-400/50 bg-emerald-500/20 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isInvitingFieldMentor ? "Sending invitation..." : "Invite as Field Mentor"}
+              </button>
             </div>
           </div>
         </div>

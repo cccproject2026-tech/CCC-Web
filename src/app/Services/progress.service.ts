@@ -542,6 +542,12 @@ export const apiDeleteFinalComment = (payload: DeleteFinalCommentPayload) =>
     { data: payload },
   );
 
+// PATCH /progress/:userId/mark-complete
+export const apiMarkProgramComplete = (userId: string) =>
+  axiosInstance.patch<{ success: boolean; data: ProgressResponse }>(
+    `/progress/${userId}/mark-complete`,
+  );
+
 const OVERVIEW_LIST_KEYS = [
   "data",
   "users",
