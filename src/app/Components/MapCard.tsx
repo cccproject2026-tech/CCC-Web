@@ -10,7 +10,7 @@ export interface MapMarker {
   top: string;
   left: string;
   /** Director network map: ring color for mentor vs pastor (pastor / mentee). */
-  kind?: "mentor" | "pastor";
+ kind?: "mentor" | "pastor" | "field-mentor";
 }
 
 interface MapCardProps {
