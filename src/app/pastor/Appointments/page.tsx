@@ -913,7 +913,7 @@ export default function PastorAppointmentsPage() {
                             <button
                               type="button"
                               className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
-                              onClick={() => { router.push(`/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt))}`); setMenuOpenId(null); }}
+                              onClick={() => { router.push(`/pastor/Appointments/${encodeURIComponent(appointmentEntityId(appt))}`); setMenuOpenId(null); }}
                             >
                               <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" /> View Details
                             </button>
@@ -1027,7 +1027,7 @@ export default function PastorAppointmentsPage() {
                             <button
                               type="button"
                               className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
-                              onClick={() => { router.push(`/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt))}`); setMenuOpenId(null); }}
+                              onClick={() => { router.push(`/pastor/Appointments/${encodeURIComponent(appointmentEntityId(appt))}`); setMenuOpenId(null); }}
                             >
                               <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" /> View Details
                             </button>

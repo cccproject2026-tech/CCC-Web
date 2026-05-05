@@ -28,14 +28,34 @@ function parseYmdParts(ymd: string): { y: number; m: number } | null {
 }
 
 /** Compare API slot.date to selectedDate (both calendar YYYY-MM-DD). */
+// function slotDateToYmd(raw: unknown): string | null {
+//   if (raw == null) return null;
+//   const s = String(raw).trim();
+//   const head = s.match(/^(\d{4}-\d{2}-\d{2})/);
+//   if (head) return head[1];
+//   const d = new Date(s);
+//   if (Number.isNaN(d.getTime())) return null;
+//   return d.toLocaleDateString("en-CA");
+// }
 function slotDateToYmd(raw: unknown): string | null {
   if (raw == null) return null;
+
   const s = String(raw).trim();
-  const head = s.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (head) return head[1];
+
+  // Handles: 2026-05-06, 2026-05-06T00:00:00.000Z
+  const isoHead = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoHead) {
+    return `${isoHead[1]}-${isoHead[2]}-${isoHead[3]}`;
+  }
+
   const d = new Date(s);
   if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-CA");
+
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
 
 /** Ensure layers have question + choices the CMA UI can render (API may use title/text). */
@@ -377,6 +397,9 @@ function PastorSurveyCMAContent() {
   const searchParams = useSearchParams();
   const assessmentId = searchParams.get("assessmentId");
   const reviewUserId = (searchParams.get("userId") || "").trim();
+  // const shouldOpenScheduleMeeting = searchParams.get("scheduleMeeting") === "1";
+  // const shouldOpenScheduleMeeting =
+  // searchParams.get("scheduleMeeting") === "1" && readOnlySelf;
   /** Mentor opened a review link: ?viewOnly=1&userId=<pastorId> */
   const viewOnlyParam =
     searchParams.get("viewOnly") === "1" ||
@@ -385,6 +408,9 @@ function PastorSurveyCMAContent() {
   /** Pastor viewing their own submitted survey (guidelines "View response") — not mentor review */
   const readOnlySelf =
     searchParams.get("readOnly") === "1" || searchParams.get("readOnly") === "true";
+
+    const shouldOpenScheduleMeeting =
+  searchParams.get("scheduleMeeting") === "1" && readOnlySelf;
   const mentorReviewMode = viewOnlyParam && !!reviewUserId;
   const selfReadOnlyMode = readOnlySelf && !mentorReviewMode;
   const uiReadOnly = mentorReviewMode || selfReadOnlyMode;
@@ -407,6 +433,7 @@ function PastorSurveyCMAContent() {
   const [mentorStep, setMentorStep] = useState(1);
   const [showFinalPopup, setShowFinalPopup] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   /** Mentor Customized Development Plan (CDP) text per layer — from answers doc + GET recommendations. */
   const [mentorLayerCdp, setMentorLayerCdp] = useState<Record<string, string>>({});
   const [hasRecommendationsInAnswer, setHasRecommendationsInAnswer] = useState(false);
@@ -523,6 +550,19 @@ function PastorSurveyCMAContent() {
   }, [assessmentId, viewOnlyParam, reviewUserId]);
 
   useEffect(() => {
+  if (!shouldOpenScheduleMeeting) return;
+  if (loading) return;
+
+  setShowMentorSidebar(true);
+  setMentorStep(1);
+  setSelectedMentor("");
+  setAvailability([]);
+  setSelectedDate("");
+  setSelectedTime("");
+  setAvailableTimes([]);
+}, [shouldOpenScheduleMeeting, loading]);
+
+  useEffect(() => {
     if (!selectedMentor) {
       setAvailability([]);
       return;
@@ -611,6 +651,17 @@ function PastorSurveyCMAContent() {
   const handlePrev = () => {
     if (activeSection > 0) setActiveSection((prev) => prev - 1);
   };
+ const handleClearResponses = () => {
+  if (uiReadOnly) return;
+  setShowClearConfirm(true);
+};
+
+const confirmClearResponses = () => {
+  setAnswers({});
+  setShowClearConfirm(false);
+  setToast("Responses cleared.");
+  setTimeout(() => setToast(null), 2500);
+};
 
   // New Submit Flow
   const handleSubmitSurvey = async () => {
@@ -713,13 +764,20 @@ function PastorSurveyCMAContent() {
         return;
       }
 
+      // const payload = {
+      //   userId: uid,
+      //   mentorId: selectedMentor,
+      //   meetingDate: meetingDateIso,
+      //   platform: "zoom",
+      //   notes: "Initial mentorship session to review progress.",
+      // };
       const payload = {
-        userId: uid,
-        mentorId: selectedMentor,
-        meetingDate: meetingDateIso,
-        platform: "zoom",
-        notes: "Initial mentorship session to review progress.",
-      };
+  userId: uid,
+  mentorId: selectedMentor,
+  meetingDate: meetingDateIso,
+  platform: "zoom",
+  notes: `Assessment meeting | assessmentId=${assessmentId || ""} | title=${assessmentTitle || "Assessment"}`,
+};
 
       const createRes = await apiCreateAppointment(payload);
       const success = (createRes.data as { success?: boolean } | undefined)?.success;
@@ -937,7 +995,7 @@ function PastorSurveyCMAContent() {
               </div>
 
               <div className="mt-10 flex flex-col items-stretch gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <button
+                {/* <button
                   type="button"
                   onClick={handlePrev}
                   disabled={activeSection === 0}
@@ -949,7 +1007,33 @@ function PastorSurveyCMAContent() {
                 >
                   <i className="fa-solid fa-angle-left mr-2" aria-hidden />
                   View Previous Section
-                </button>
+                </button> */}
+                <div className="flex flex-col gap-3 sm:flex-row">
+  <button
+    type="button"
+    onClick={handlePrev}
+    disabled={activeSection === 0}
+    className={`rounded-lg border px-5 py-2.5 text-sm font-semibold transition sm:px-6 ${
+      activeSection === 0
+        ? "cursor-not-allowed border-white/10 text-[#cde2f2]/40"
+        : "border-white/25 bg-white/10 text-[#cde2f2] hover:bg-white/15"
+    }`}
+  >
+    <i className="fa-solid fa-angle-left mr-2" aria-hidden />
+    View Previous Section
+  </button>
+
+  {!uiReadOnly && (
+    <button
+      type="button"
+      onClick={handleClearResponses}
+      disabled={Object.keys(answers).length === 0}
+      className="rounded-lg border border-red-300/30 bg-red-500/10 px-5 py-2.5 text-sm font-semibold text-red-100 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40 sm:px-6"
+    >
+      Clear response
+    </button>
+  )}
+</div>
 
                 {activeSection === sections.length - 1 ? (
                   uiReadOnly ? (
@@ -1011,12 +1095,12 @@ function PastorSurveyCMAContent() {
               a meeting with your mentor.
             </p>
             <div className="flex items-center justify-center gap-3">
-              <button
+              {/* <button
                 onClick={() => { setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
                 className="rounded-xl border border-white/30 px-6 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
               >
                 Skip
-              </button>
+              </button> */}
               <button
                 onClick={handleScheduleMeeting}
                 className="rounded-xl bg-[#8ec5eb] px-8 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
@@ -1033,15 +1117,30 @@ function PastorSurveyCMAContent() {
           <div className="h-full w-full max-w-[480px] overflow-y-auto border-l border-white/15 bg-[linear-gradient(180deg,#062946_0%,#041f35_100%)] p-6 text-white shadow-[-20px_0_50px_rgba(2,20,38,0.55)] sm:p-8">
             {mentorStep === 1 ? (
               <>
-                <div className="flex items-center justify-between mb-6">
+                {/* <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold">Choose Mentor for the Meeting</h2>
-                  <div className="flex items-center gap-2">
-                    <button
+                  <div className="flex items-center gap-2"> */}
+                    {/* <button
                       onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
                       className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-[#d8ecfa] transition hover:bg-white/10"
                     >
                       Close
-                    </button>
+                    </button> */}
+
+                    <div className="mb-6 flex items-start justify-between gap-4">
+  <div>
+    <h2 className="text-xl font-semibold">Choose Mentor for the Meeting</h2>
+
+    <button
+      type="button"
+      onClick={() => setShowMentorSidebar(false)}
+      className="mt-2 text-sm font-semibold text-[#8ec5eb] transition hover:text-[#b8ddf5]"
+    >
+      View responses
+    </button>
+  </div>
+
+  <div className="flex items-center gap-2">
                     <button
                       onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
                       className="text-white/60 transition hover:text-white"
@@ -1080,12 +1179,12 @@ function PastorSurveyCMAContent() {
                   ))
                 )}
                 <div className="flex justify-between gap-3">
-                  <button
+                  {/* <button
                     onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
                     className="rounded-xl border border-white/30 px-5 py-2 text-sm font-semibold text-[#d8ecfa] transition hover:bg-white/10"
                   >
                     Skip
-                  </button>
+                  </button> */}
                   <button
                     onClick={() => setMentorStep(2)}
                     disabled={!selectedMentor || mentors.length === 0}
@@ -1100,12 +1199,12 @@ function PastorSurveyCMAContent() {
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold">Schedule a Meeting</h2>
                   <div className="flex items-center gap-2">
-                    <button
+                    {/* <button
                       onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
                       className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-[#d8ecfa] transition hover:bg-white/10"
                     >
                       Close
-                    </button>
+                    </button> */}
                     <button
                       onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
                       className="text-white/60 transition hover:text-white"
@@ -1247,7 +1346,7 @@ function PastorSurveyCMAContent() {
                   </div>
                 )}
                 
-                <div className="flex justify-between gap-3">
+                {/* <div className="flex justify-between gap-3">
                   <button
                     onClick={() => {
                       setMentorStep(1);
@@ -1272,7 +1371,20 @@ function PastorSurveyCMAContent() {
                   >
                     Schedule Meeting
                   </button>
-                </div>
+                </div> */}
+                <div className="flex justify-end">
+  <button
+    onClick={handleFinalSchedule}
+    disabled={!selectedDate || !selectedTime}
+    className={`rounded-xl px-8 py-3 text-sm font-semibold transition ${
+      selectedDate && selectedTime
+        ? "bg-[#8ec5eb] text-[#062946] hover:bg-[#a9d5f2]"
+        : "cursor-not-allowed bg-white/20 text-white/60"
+    }`}
+  >
+    Schedule Meeting
+  </button>
+</div>
               </>
             )}
           </div>
@@ -1312,7 +1424,44 @@ function PastorSurveyCMAContent() {
           </div>
         </div>
       )}
+{showClearConfirm && (
+  <div className="fixed inset-0 z-[80] flex items-center justify-center bg-[rgba(2,16,30,0.72)] px-4 backdrop-blur-sm">
+    <div className="w-full max-w-md rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#062946_100%)] p-6 text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)]">
+      <div className="mb-5 flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-200">
+          <i className="fa-solid fa-triangle-exclamation" />
+        </div>
 
+        <div>
+          <h3 className="text-lg font-semibold text-white">
+            Clear responses?
+          </h3>
+          <p className="mt-1 text-sm leading-relaxed text-[#cde2f2]">
+            This will remove all selected answers on this screen. Saved answers will not change until you submit again.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={() => setShowClearConfirm(false)}
+          className="rounded-xl border border-white/25 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          onClick={confirmClearResponses}
+          className="rounded-xl border border-red-300/30 bg-red-500/20 px-5 py-2.5 text-sm font-semibold text-red-50 transition hover:bg-red-500/30"
+        >
+          Clear response
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       {/* Toast Notification */}
       {toast && (
         <div className="fixed top-8 right-8 z-[70] animate-fade-in">
