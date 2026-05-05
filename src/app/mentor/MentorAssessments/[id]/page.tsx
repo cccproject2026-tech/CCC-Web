@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import MentorHeader from "@/app/Components/MentorHeader";import HeroBg from "@/app/Assets/assignments-bg.png";
+import MentorHeader from "@/app/Components/MentorHeader";
+import HeroBg from "@/app/Assets/assignments-bg.png";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import { apiGetAssessmentById, parseAssessmentDetailPayload } from "@/app/Services/assessment.service";
 import type { AssessmentResponse } from "@/app/Services/types/assessment.types";
@@ -77,14 +78,25 @@ export default function MentorAssessmentDetailPage() {
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.68)_0%,rgba(6,41,70,0.6)_50%,rgba(6,41,70,1)_100%)]" />
 
         <div className="relative z-10 mx-auto w-full max-w-4xl">
-          <button
-            type="button"
-            onClick={() => router.push("/mentor/MentorAssessments")}
-            className="mb-4 inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm text-[#cde2f2] transition hover:bg-white/15"
-          >
-            <i className="fa-solid fa-arrow-left" aria-hidden />
-            Back to assessments
-          </button>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => router.push("/mentor/MentorAssessments")}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm text-[#cde2f2] transition hover:bg-white/15"
+            >
+              <i className="fa-solid fa-arrow-left" aria-hidden />
+              Back to assessments
+            </button>
+
+            <button
+              type="button"
+              onClick={() => router.push(`/mentor/MentorAssessments/${id}/edit`)}
+              className="inline-flex items-center gap-2 rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+            >
+              <i className="fa-regular fa-pen-to-square" aria-hidden />
+              Edit Assessment
+            </button>
+          </div>
 
           <h1 className="text-2xl font-semibold sm:text-3xl">Assessment</h1>
           <p className="mt-2 text-sm text-[#cde2f2]">Review structure and instructions.</p>
@@ -208,6 +220,7 @@ export default function MentorAssessmentDetailPage() {
             </>
           )}
         </div>
-      </main>    </div>
+      </main>
+    </div>
   );
 }

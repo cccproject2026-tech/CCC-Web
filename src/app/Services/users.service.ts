@@ -53,8 +53,11 @@ export const apiMarkUserCompleted = (userId: string) =>
   axiosInstance.patch<{ success: boolean; data: UserResponse }>(`/users/${userId}/mark-completed`);
 
 // POST /users/:id/issue-certificate
-export const apiIssueCertificate = (userId: string) =>
-  axiosInstance.post<{ success: boolean; message: string }>(`/users/${userId}/issue-certificate`);
+export const apiIssueCertificate = (userId: string, issuedBy: string) =>
+  axiosInstance.post<{ success: boolean; message: string; data: UserResponse }>(
+    `/users/${userId}/issue-certificate`,
+    { issuedBy },
+  );
 
 // ─── Assign / Remove ──────────────────────────────────────────────────────────
 
@@ -145,7 +148,11 @@ export const apiInviteFieldMentor = (payload: InviteFieldMentorPayload) =>
 
 // POST /users/accept-invitation
 export const apiAcceptInvitation = (payload: AcceptInvitationPayload) =>
-  axiosInstance.post<{ success: boolean; message: string }>("/users/accept-invitation", payload);
+  axiosInstance.post<{ success: boolean; message: string; data: UserResponse }>("/users/accept-invitation", payload);
+
+// POST /users/reject-invitation
+export const apiRejectInvitation = (payload: AcceptInvitationPayload) =>
+  axiosInstance.post<{ success: boolean; message: string; data: UserResponse }>("/users/reject-invitation", payload);
 
 /** Normalize GET `/users/:id` — envelope shapes differ by deploy/version. */
 export function unwrapUserResponse(res: { data?: unknown }): UserResponse | null {

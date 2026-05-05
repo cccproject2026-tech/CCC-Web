@@ -21,7 +21,7 @@ import {
 import { getCookie } from "@/app/utils/cookies";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
-import { apiGetAssessmentById, parseAssessmentDetailPayload } from "@/app/Services/assessment.service";
+import { apiGetAssessmentById, apiGetUserAnswers, parseAssessmentDetailPayload } from "@/app/Services/assessment.service";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { subscribeProgressUpdated } from "@/app/utils/progress-sync";
 import { pastorRoadmapDescriptionLineClamp2 } from "@/app/Components/pastor/pastor-theme";
@@ -142,6 +142,18 @@ export default function PastorMyProgressPage() {
           progress.assessments.map(async (a: any) => {
             const res = await apiGetAssessmentById(a.assessmentId);
             const assessment = parseAssessmentDetailPayload(res.data);
+            
+            // Fetch answers to get the submission date
+            let submittedOnRaw = null;
+            if (a.status === "completed" && userId) {
+              try {
+                const answersRes = await apiGetUserAnswers(a.assessmentId, userId);
+                submittedOnRaw = answersRes.data?.data?.updatedAt || null;
+              } catch (err) {
+                console.error("Failed to fetch assessment answers", err);
+              }
+            }
+            
             return {
               ...a,
               title: assessment?.name,
@@ -151,6 +163,7 @@ export default function PastorMyProgressPage() {
               totalSections: assessment?.sections?.length || 0,
               dueDate: a.dueDate,
               status: a.status,
+              submittedOnRaw,
             };
           }),
         );
@@ -161,7 +174,7 @@ export default function PastorMyProgressPage() {
       }
     };
     hydrateAssessments();
-  }, [progress]);
+  }, [progress, userId]);
 
   const filteredRoadmaps = roadmaps.filter((r) => roadmapMatchesFilter(r, roadmapFilter));
   const filteredAssessments = assessments.filter((a) => assessmentMatchesFilter(a, surveyFilter));
@@ -216,13 +229,13 @@ export default function PastorMyProgressPage() {
             </p>
           )}
 
-          {userId && (
+          {userId && progress && (
             <>
               <section className="mb-8 rounded-2xl border border-[#8ec5eb]/40 bg-[#041f35]/60 p-5 shadow-lg backdrop-blur-md sm:p-7">
                 <h2 className="mb-6 text-base font-bold text-white sm:text-lg">
                   Overall Progress — Roadmap &amp; Assessments
                 </h2>
-                <OverallProgressDonut overallPercent={progress?.overallProgress ?? 0} />
+                <OverallProgressDonut overallPercent={progress.overallProgress ?? 0} />
               </section>
 
               <section className="mb-10 rounded-2xl border border-[#8ec5eb]/40 bg-[#041f35]/60 p-5 shadow-lg backdrop-blur-md sm:p-7">
@@ -232,6 +245,12 @@ export default function PastorMyProgressPage() {
                 <IndividualBreakdownBarChart progress={progress} />
               </section>
             </>
+          )}
+
+          {userId && !progress && (
+            <p className="mb-8 rounded-xl border border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-[#cde2f2]">
+              No progress records found. Once you start roadmaps or surveys, your progress will appear here.
+            </p>
           )}
 
           <section className="mb-12">
@@ -350,7 +369,7 @@ function PastorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: 
               Completed on <span className="font-semibold text-[#8ec5eb]">{completedOn}</span>
             </p>
           )}
-          <div className="mt-4 flex justify-end">
+          {/* <div className="mt-4 flex justify-end">
             <button
               type="button"
               onClick={onView}
@@ -358,7 +377,7 @@ function PastorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: 
             >
               View
             </button>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>
@@ -370,6 +389,7 @@ function PastorAssessmentProgressCard({ assessment, onOpen }: { assessment: any;
   const banner = assessment.bannerImage;
   const isHttp =
     typeof banner === "string" && (banner.startsWith("http://") || banner.startsWith("https://"));
+  const submittedOn = formatDateShort(assessment.submittedOnRaw);
 
   return (
     <div className="flex min-h-[200px] gap-4 rounded-2xl border border-white/15 bg-white/10 p-4 shadow-lg backdrop-blur-md transition hover:border-[#8ec5eb]/25">
@@ -391,7 +411,7 @@ function PastorAssessmentProgressCard({ assessment, onOpen }: { assessment: any;
         <div className="min-w-0 flex-1">
           <h4 className="mb-1 line-clamp-1 text-[15px] font-bold text-white">{assessment.title || "Assessment"}</h4>
           <p className={`mb-2 ${pastorRoadmapDescriptionLineClamp2}`}>{assessment.description || ""}</p>
-          <div className="mb-3">
+          {/* <div className="mb-3">
             <div className="mb-1 flex justify-between text-[11px] text-[#8ec5eb]/80">
               <span>Sections</span>
               <span className="tabular-nums text-[#cde2f2]">
@@ -416,7 +436,7 @@ function PastorAssessmentProgressCard({ assessment, onOpen }: { assessment: any;
                 }}
               />
             </div>
-          </div>
+          </div> */}
           <button
             type="button"
             onClick={onOpen}
@@ -426,8 +446,17 @@ function PastorAssessmentProgressCard({ assessment, onOpen }: { assessment: any;
           </button>
         </div>
         <div className="mt-3 flex justify-between text-[12px] text-[#8ec5eb]/80">
-          <span className="font-semibold text-[#cde2f2]">{isDone ? "Submitted" : "Due date"}</span>
-          <span className="font-semibold text-[#8ec5eb]">{assessment.dueDate || "—"}</span>
+          {isDone ? (
+            <>
+              <span className="font-semibold text-[#cde2f2]">Submitted on</span>
+              <span className="font-semibold text-[#8ec5eb]">{submittedOn || "—"}</span>
+            </>
+          ) : (
+            <>
+              <span className="font-semibold text-[#cde2f2]">Due date</span>
+              <span className="font-semibold text-[#8ec5eb]">{assessment.dueDate || "—"}</span>
+            </>
+          )}
         </div>
       </div>
     </div>

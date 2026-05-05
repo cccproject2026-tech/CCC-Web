@@ -88,7 +88,7 @@ export default function RevitalizationRoadmapPage() {
               const prog = unwrapProgressData(p);
               return {
                 userId: uid,
-                progress: prog?.overallProgress ?? 0,
+                progress: prog?.overallRoadmapProgress ?? 0,
               };
             } catch {
               return { userId: uid, progress: 0 };
