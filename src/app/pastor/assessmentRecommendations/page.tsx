@@ -206,9 +206,9 @@ export default function PastorAssessmentRecommendationsPage() {
         <div className="absolute inset-0 bg-black/60" />
         <div className="relative z-10 mx-auto max-w-6xl">
           <h1 className="text-2xl font-semibold">My Recommendations</h1>
-          <p className="mt-1 text-sm text-white/70">
+          {/* <p className="mt-1 text-sm text-white/70">
             View mentor recommendations and download your customized development plans.
-          </p>
+          </p> */}
         </div>
       </section>
 

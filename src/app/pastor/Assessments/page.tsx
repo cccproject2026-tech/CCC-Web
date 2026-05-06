@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorSearchBar from "@/app/Components/pastor/PastorSearchBar";
 import PastorFilterTabGroup from "@/app/Components/pastor/PastorFilterTabGroup";
+import { apiGetAppointments } from "@/app/Services/appointments.service";
 import {
   pastorContainer,
   pastorControlsRow,
@@ -51,6 +52,19 @@ function assessmentTabFromSearchParam(
   return match ?? null;
 }
 
+// type Row = {
+//   id: string;
+//   title: string;
+//   desc: string;
+//   status: "Due" | "Not Started" | "Completed" | "Submitted";
+//   dueDate: string;
+//   submittedAt?: string;
+//   completedAt?: string;
+//   imgUrl: string | null;
+//   button: string;
+//   createdOn?: string;
+//   createdBy?: string;
+// };
 type Row = {
   id: string;
   title: string;
@@ -63,6 +77,13 @@ type Row = {
   button: string;
   createdOn?: string;
   createdBy?: string;
+  meeting?: {
+    id: string;
+    mentorName: string;
+    meetingDate: string;
+    platform: string;
+    notes?: string;
+  };
 };
 
 function isDueNowOrPast(dueDateRaw?: string): boolean {
@@ -101,6 +122,7 @@ export default function PastorAssessments() {
   const [assessments, setAssessments] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [sessionUserId] = useState<string | null>(() => readSessionUserId());
+  const [selectedMeeting, setSelectedMeeting] = useState<Row["meeting"] | null>(null);
 
   useLayoutEffect(() => {
     const t = assessmentTabFromSearchParam(searchParams.get("tab"));
@@ -115,21 +137,51 @@ export default function PastorAssessments() {
       }
       if (!opts?.silent) setLoading(true);
       try {
-        const [assessmentRes, progressRes] = await Promise.all([
-          apiGetAssignedAssessments(sessionUserId),
-          apiGetUserProgress(sessionUserId),
-        ]);
+        // const [assessmentRes, progressRes] = await Promise.all([
+        //   apiGetAssignedAssessments(sessionUserId),
+        //   apiGetUserProgress(sessionUserId),
+        // ]);
+        const [assessmentRes, progressRes, appointmentsRes] = await Promise.all([
+  apiGetAssignedAssessments(sessionUserId),
+  apiGetUserProgress(sessionUserId),
+  apiGetAppointments({ userId: sessionUserId, futureOnly: false } as any),
+]);
 
         const list = parseAssignedAssessmentsListBody(assessmentRes.data);
 
         const progressData = unwrapProgressData(progressRes);
         const assessmentProgress = progressData?.assessments || [];
-
+const appointmentsBody: any = appointmentsRes?.data;
+const appointmentsList: any[] = Array.isArray(appointmentsBody)
+  ? appointmentsBody
+  : Array.isArray(appointmentsBody?.data)
+    ? appointmentsBody.data
+    : Array.isArray(appointmentsBody?.data?.data)
+      ? appointmentsBody.data.data
+      : [];
         const mapped = (await Promise.all(
           list.map(async (item) => {
             const flat = flattenAssignedAssessmentRow(item);
             if (!flat) return null;
-            const { assessment, assessmentId: aid, assignmentId, dueDate, updatedAt } = flat;
+           
+            // const { assessment, assessmentId: aid, assignmentId, dueDate, updatedAt } = flat;
+            const { assessment, assessmentId: aid, assignmentId, updatedAt } = flat;
+
+const rawItem: any = item;
+const rawFlat: any = flat;
+
+const dueDate =
+  rawFlat.dueDate ??
+  rawFlat.deadline ??
+  rawFlat.endDate ??
+  rawFlat.assignedDueDate ??
+  rawItem.dueDate ??
+  rawItem.deadline ??
+  rawItem.endDate ??
+  rawItem.assignedDueDate ??
+  rawItem.assignment?.dueDate ??
+  rawItem.assignment?.deadline ??
+  "";
             const progress = assessmentProgress.find(
               (p: { assessmentId?: string; assignmentId?: string }) =>
                 String(p.assessmentId) === aid ||
@@ -153,15 +205,55 @@ export default function PastorAssessments() {
             }
 
             const a = assessment as Record<string, unknown>;
-            const rawBanner =
-              (typeof a.bannerImage === "string" && a.bannerImage) ||
-              (typeof a.imageUrl === "string" && a.imageUrl) ||
-              (typeof a.image === "string" && a.image) ||
-              undefined;
-            const imgUrl = resolveApiMediaUrl(rawBanner);
+            // const rawBanner =
+            //   (typeof a.bannerImage === "string" && a.bannerImage) ||
+            //   (typeof a.imageUrl === "string" && a.imageUrl) ||
+            //   (typeof a.image === "string" && a.image) ||
+            //   undefined;
+            // const imgUrl = resolveApiMediaUrl(rawBanner);
 
-            return {
-              id: aid,
+            // return {
+            //   id: aid,
+            const rawBanner =
+  (typeof a.bannerImage === "string" && a.bannerImage) ||
+  (typeof a.imageUrl === "string" && a.imageUrl) ||
+  (typeof a.image === "string" && a.image) ||
+  undefined;
+
+const imgUrl = resolveApiMediaUrl(rawBanner);
+
+const linkedMeeting = appointmentsList.find((appointment: any) => {
+  const notes = String(appointment?.notes ?? "");
+  return notes.includes(`assessmentId=${aid}`);
+});
+
+const meeting = linkedMeeting
+  ? {
+      id: String(linkedMeeting._id ?? linkedMeeting.id ?? ""),
+      mentorName:
+        `${linkedMeeting?.mentor?.firstName ?? ""} ${linkedMeeting?.mentor?.lastName ?? ""}`.trim() ||
+        linkedMeeting?.mentor?.email ||
+        "Mentor",
+      // meetingDate: linkedMeeting.meetingDate
+      //   ? new Date(linkedMeeting.meetingDate).toLocaleString()
+      //   : "N/A",
+      meetingDate: linkedMeeting.meetingDate
+  ? new Date(linkedMeeting.meetingDate).toLocaleString("en-US", {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+  : "N/A",
+      platform: linkedMeeting.platform || "N/A",
+      notes: linkedMeeting.notes,
+    }
+  : undefined;
+
+return {
+  id: aid,
               title: (assessment?.name as string) || "Assessment",
               desc: (assessment?.description as string) || "",
               status,
@@ -179,7 +271,34 @@ export default function PastorAssessments() {
                     ? "View submission"
                     : "Start Now",
               createdOn: typeof a.createdAt === "string" ? new Date(a.createdAt).toLocaleDateString() : undefined,
-              createdBy: (typeof a.createdBy === "string" ? a.createdBy : undefined) || "Admin",
+              // createdBy: (typeof a.createdBy === "string" ? a.createdBy : undefined) || "Admin",
+              createdBy: (() => {
+  const rawItem = item as any;
+  const rawFlat = flat as any;
+
+  const assignedBy =
+    rawFlat.assignedBy ??
+    rawFlat.assignedByUser ??
+    rawFlat.createdBy ??
+    rawItem.assignedBy ??
+    rawItem.assignedByUser ??
+    rawItem.createdBy ??
+    a.assignedBy ??
+    a.createdBy;
+
+  if (typeof assignedBy === "string") return assignedBy;
+
+  if (assignedBy && typeof assignedBy === "object") {
+    const firstName = assignedBy.firstName ?? "";
+    const lastName = assignedBy.lastName ?? "";
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    return fullName || assignedBy.email || assignedBy.name;
+  }
+
+  return undefined;
+})(),
+meeting,
             };
           }),
         )).filter((r): r is NonNullable<typeof r> => r != null);
@@ -300,12 +419,26 @@ export default function PastorAssessments() {
             <div className={pastorEmptyPanel}>No assessments to show.</div>
           ) : (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-8">
-              {filtered.map((item) => (
+              {/* {filtered.map((item) => (
                 <div
                   key={item.id}
                   className={`${pastorGlassCard} md:flex-row`}
-                >
-                  <div className="relative m-4 h-[180px] w-full flex-shrink-0 md:m-5 md:h-[200px] md:w-[200px]">
+                > */}
+                {filtered.map((item) => {
+  const hasMeeting = Boolean(item.meeting?.id);
+
+  const displayStatus =
+    item.status === "Completed" && !hasMeeting ? "Submitted" : item.status;
+
+  const primaryButtonText =
+    item.status === "Completed" && !hasMeeting ? "Schedule Meeting" : item.button;
+
+  return (
+    <div
+      key={item.id}
+      className={`${pastorGlassCard} md:flex-row`}
+    >
+                  {/* <div className="relative m-4 h-[180px] w-full flex-shrink-0 md:m-5 md:h-[200px] md:w-[200px]">
                     {item.imgUrl ? (
                       <Image
                         src={item.imgUrl}
@@ -324,7 +457,54 @@ export default function PastorAssessments() {
                         Due: {item.dueDate}
                       </div>
                     ) : null}
-                  </div>
+                  </div> */}
+
+                  <div className="m-4 flex w-full flex-shrink-0 flex-col gap-3 md:m-5 md:w-[200px]">
+  <div className="relative h-[180px] w-full md:h-[200px]">
+    {item.imgUrl ? (
+      <Image
+        src={item.imgUrl}
+        alt=""
+        width={200}
+        height={200}
+        className="h-full w-full rounded-lg object-cover"
+        unoptimized
+      />
+    ) : (
+      <ApiImagePlaceholder className="h-full w-full rounded-lg" />
+    )}
+
+    {(item.status === "Due" || item.status === "Not Started") && item.dueDate ? (
+      <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-md bg-[#fff6d8] px-2 py-[3px] text-xs font-semibold text-[#d38a00]">
+        <i className="fa-regular fa-calendar text-xs" />
+        Due: {item.dueDate}
+      </div>
+    ) : null}
+  </div>
+{/* 
+  <div className="space-y-1 rounded-xl border border-white/10 bg-white/[0.04] p-3 text-xs text-[#d9ebf8]">
+    <p>
+      <span className="font-medium text-white">Assigned by :</span>{" "}
+      {item.createdBy || "N/A"}
+    </p>
+
+    <p>
+      <span className="font-medium text-white">Due date :</span>{" "}
+      {item.dueDate || "N/A"}
+    </p>
+
+    <p>
+      <span className="font-medium text-white">Completed on :</span>{" "}
+      {item.completedAt ?? item.submittedAt ?? ""}
+    </p>
+  </div> */}
+  <div className="text-xs text-[#d9ebf8]">
+  <p>
+    <span className="font-medium text-white">Completed on :</span>{" "}
+    {item.completedAt ?? item.submittedAt ?? "N/A"}
+  </p>
+</div>
+</div>
 
                   <div className="flex flex-1 flex-col justify-between p-4 md:p-5">
                     <div className="border-b border-white/10 pb-4">
@@ -335,27 +515,42 @@ export default function PastorAssessments() {
 
                       <div className="mb-3 flex items-center gap-2">
                         <span className="text-xs font-medium text-[#d9ebf8]">Status</span>
-                        <span
+                        {/* <span
                           className={`rounded px-2 py-[2px] text-xs font-medium ${getStatusColor(item.status)}`}
                         >
                           {item.status}
-                        </span>
+                        </span> */}
+                        <span
+  className={`rounded px-2 py-[2px] text-xs font-medium ${getStatusColor(displayStatus)}`}
+>
+  {displayStatus}
+</span>
                       </div>
+{/* <div className="mb-3 space-y-1 text-xs text-[#d9ebf8]">
+  <p>
+    <span className="font-medium">Assigned by :</span>{" "}
+    {item.createdBy || "N/A"}
+  </p>
 
-                      {item.dueDate && (
+  <p>
+    <span className="font-medium">Due date :</span>{" "}
+    {item.dueDate || "N/A"}
+  </p>
+</div> */}
+                      {/* {item.dueDate && (
                         <p className="mb-2 text-xs text-[#d9ebf8]">Due on : {item.dueDate}</p>
-                      )}
+                      )} */}
 
                       {item.status === "Submitted" && (
                         <p className="mb-2 text-xs text-[#d9ebf8]">Submitted on : {item.submittedAt ?? item.dueDate}</p>
                       )}
 
-                      {item.status === "Completed" && (
+                      {/* {item.status === "Completed" && (
                         <p className="mt-2 text-xs text-[#d9ebf8]">Completed on : {item.completedAt ?? item.submittedAt ?? item.dueDate}</p>
-                      )}
+                      )} */}
                     </div>
 
-                    <div className="mt-4 flex items-center justify-between gap-4">
+                    {/* <div className="mt-4 flex items-center justify-between gap-4">
                       <div className="grid grid-cols-3 gap-8 flex-1">
                         <div className="text-center">
                           <p className="text-xs text-[#d9ebf8]/60 mb-1">Created on</p>
@@ -377,14 +572,202 @@ export default function PastorAssessments() {
                       >
                         {item.button}
                       </button>
-                    </div>
+                    </div> */}
+                    {/* <div className="mt-4 flex justify-end">
+  <button
+    type="button"
+    onClick={() => router.push(getAssessmentPrimaryHref(item.id, item.status))}
+    className={`${pastorPrimaryCta} shrink-0 px-4 text-xs md:px-5 md:text-sm`}
+  >
+    {item.button}
+  </button>
+</div> */}
+{/* <div className="mt-4 flex justify-end gap-3">
+
+  {item.meeting?.id && (
+  <button
+    type="button"
+    onClick={() =>
+      router.push(
+        `/pastor/mentoring-session/${encodeURIComponent(item.meeting!.id)}`
+      )
+    }
+    className="shrink-0 rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/25 md:px-5 md:text-sm"
+  >
+    Meeting
+  </button>
+)}
+
+  <button
+    type="button"
+    onClick={() => router.push(getAssessmentPrimaryHref(item.id, item.status))}
+    className={`${pastorPrimaryCta} shrink-0 px-4 text-xs md:px-5 md:text-sm`}
+  >
+    {item.button}
+  </button>
+</div> */}
+{/* 
+<div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  <div className="min-h-[44px]">
+    {item.meeting?.id ? (
+      <div className="flex items-center gap-3">
+        <p className="text-xs font-medium text-[#d9ebf8] md:text-sm">
+          Meeting fixed on :
+          <span className="ml-1 text-white">
+            {item.meeting.meetingDate || "N/A"}
+          </span>
+        </p>
+
+        <button
+          type="button"
+          onClick={() =>
+            router.push(
+               `/pastor/Appointments/${encodeURIComponent(item.meeting!.id)}`
+            )
+          }
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb] transition hover:bg-[#8ec5eb]/25 hover:text-white"
+          title="View meeting"
+        >
+          <i className="fa-solid fa-arrow-right" />
+        </button>
+      </div>
+    ) : null}
+  </div>
+
+  <button
+    type="button"
+    onClick={() => router.push(getAssessmentPrimaryHref(item.id, item.status))}
+    className={`${pastorPrimaryCta} shrink-0 px-4 text-xs md:px-5 md:text-sm`}
+  >
+    {item.button}
+  </button>
+</div> */}
+<div className="mt-4 flex flex-col gap-3">
+  <div className="flex justify-end">
+    {/* <button
+      type="button"
+      onClick={() => router.push(getAssessmentPrimaryHref(item.id, item.status))}
+      className={`${pastorPrimaryCta} shrink-0 whitespace-nowrap px-4 text-xs md:px-5 md:text-sm`}
+    >
+      {item.button}
+    </button> */}
+    <button
+  type="button"
+  // onClick={() => {
+  //   if (item.status === "Completed" && !hasMeeting) {
+  //     router.push(
+  //       `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(item.id)}&readOnly=1&scheduleMeeting=1`
+  //     );
+  //     return;
+  //   }
+
+  //   router.push(getAssessmentPrimaryHref(item.id, item.status));
+  // }}
+  onClick={() => {
+  if (item.status === "Completed" && !hasMeeting) {
+    router.push(
+      `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(item.id)}&readOnly=1&scheduleMeeting=1`
+    );
+    return;
+  }
+
+  if (item.status === "Completed" && hasMeeting) {
+    router.push(
+      `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(item.id)}`
+    );
+    return;
+  }
+
+  router.push(getAssessmentPrimaryHref(item.id, item.status));
+}}
+  className={`${pastorPrimaryCta} shrink-0 whitespace-nowrap px-4 text-xs md:px-5 md:text-sm`}
+>
+  {primaryButtonText}
+</button>
+  </div>
+
+  {item.meeting?.id && (
+    <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8ec5eb]">
+          Meeting fixed on
+        </p>
+
+        <p className="mt-1 truncate text-xs font-semibold text-white md:text-sm">
+          {item.meeting.meetingDate || "N/A"}
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={() =>
+          router.push(
+            `/pastor/Appointments/${encodeURIComponent(item.meeting!.id)}`
+          )
+        }
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb] transition hover:bg-[#8ec5eb]/25 hover:text-white"
+        title="View meeting"
+        aria-label="View meeting"
+      >
+        <i className="fa-solid fa-arrow-right" />
+      </button>
+    </div>
+  )}
+</div>
                   </div>
                 </div>
-              ))}
+                            );
+            })}
             </div>
           )}
         </div>
+      {/* </main>
+    </div>
+  );
+} */}
       </main>
+
+      {selectedMeeting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-[#062946] p-6 text-white shadow-2xl">
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Meeting Details</h3>
+
+              <button
+                type="button"
+                onClick={() => setSelectedMeeting(null)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 hover:bg-white/15"
+              >
+                <i className="fa-solid fa-xmark" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-sm text-[#d9ebf8]">
+              <p>
+                <span className="font-semibold text-white">Mentor:</span>{" "}
+                {selectedMeeting.mentorName}
+              </p>
+
+              <p>
+                <span className="font-semibold text-white">Date & Time:</span>{" "}
+                {selectedMeeting.meetingDate}
+              </p>
+
+              <p>
+                <span className="font-semibold text-white">Platform:</span>{" "}
+                <span className="capitalize">{selectedMeeting.platform}</span>
+              </p>
+
+              {selectedMeeting.notes && (
+                <p>
+                  <span className="font-semibold text-white">Notes:</span>{" "}
+                  {selectedMeeting.notes}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

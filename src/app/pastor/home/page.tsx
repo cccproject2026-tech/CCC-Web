@@ -106,11 +106,28 @@ export default function PastorDashboard() {
   const router = useRouter();
 
   const [pastorUserId] = useState<string | null>(() => readPastorUserId());
+  const [pastorName, setPastorName] = useState("User");
 
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [loadingMentors, setLoadingMentors] = useState(false);
   const [mentorsError, setMentorsError] = useState<string | null>(null);
   const [appointments, setAppointments] = useState<any[]>([]);
+useEffect(() => {
+  try {
+    const storedUser = JSON.parse(getCookie("user") || "{}");
+
+    const name =
+      `${storedUser?.firstName || ""} ${storedUser?.lastName || ""}`.trim() ||
+      storedUser?.name ||
+      storedUser?.username ||
+      storedUser?.email ||
+      "User";
+
+    setPastorName(name);
+  } catch {
+    setPastorName("User");
+  }
+}, []);
 
   useEffect(() => {
     const fetchMentors = async () => {
