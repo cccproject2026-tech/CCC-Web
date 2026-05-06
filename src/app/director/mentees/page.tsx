@@ -603,6 +603,17 @@ export default function MenteesPage() {
     //   color: "text-red-500",
     //   onClick: handleTrackProgress,
     // },
+
+    {
+  icon: "fa-solid fa-user-group",
+  label: "Assigned Mentors",
+  color: "text-[#8ec5eb]",
+  onClick: async () => {
+    setSelectedMentee(menteeId);
+    await loadAssignedUsers(menteeId);
+    setShowRemoveModal(true);
+  },
+},
     {
       icon: "fa-solid fa-user-plus",
       label: "Assign New Mentor",

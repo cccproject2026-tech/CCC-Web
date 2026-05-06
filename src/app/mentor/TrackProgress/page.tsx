@@ -245,10 +245,6 @@ export default function TrackProgressPage() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-xs text-[#cde2f2]">{pastor.progress}%</p>
                         {pastor.progress === 100 ? (
-                          <span className="rounded-md border border-[#8ec5eb]/35 bg-[#8ec5eb]/25 px-3 py-1 text-xs font-medium text-[#8ec5eb]">
-                            Completed
-                          </span>
-                        ) : pastor.progress >= 90 ? (
                           <button
                             type="button"
                             className={`${mentorPrimaryCta} px-4 py-1.5 text-xs`}

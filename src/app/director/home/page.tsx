@@ -294,11 +294,18 @@ const [quickAssignLoading, setQuickAssignLoading] = useState(false);
 const [quickAssignSaving, setQuickAssignSaving] = useState(false);
 const [selectedQuickPastorId, setSelectedQuickPastorId] = useState("");
 const [selectedQuickMentorId, setSelectedQuickMentorId] = useState("");
-const [quickAssignToast, setQuickAssignToast] = useState<string | null>(null);
+const [quickAssignToast, setQuickAssignToast] = useState<{
+  message: string;
+  type: "success" | "error";
+} | null>(null);
+
+const [quickAssignMentorSearch, setQuickAssignMentorSearch] = useState("");
+const [quickAssignPastorSearch, setQuickAssignPastorSearch] = useState("");
 
 const [showPastorRoadmapModal, setShowPastorRoadmapModal] = useState(false);
 const [roadmapPastors, setRoadmapPastors] = useState<any[]>([]);
 const [roadmapPastorsLoading, setRoadmapPastorsLoading] = useState(false);
+const [roadmapPastorSearch, setRoadmapPastorSearch] = useState("");
 
 const [showMonthlyAppointmentsModal, setShowMonthlyAppointmentsModal] = useState(false);
 const [monthlyAppointments, setMonthlyAppointments] = useState<Appointment[]>([]);
@@ -311,6 +318,7 @@ const [mappingMentees, setMappingMentees] = useState<any[]>([]);
 const [mappingLoading, setMappingLoading] = useState(false);
 const [mappingMenteesLoading, setMappingMenteesLoading] = useState(false);
 const [selectedMappingMentorId, setSelectedMappingMentorId] = useState("");
+const [mappingMentorSearch, setMappingMentorSearch] = useState("");
 
 const [showCdpModal, setShowCdpModal] = useState(false);
 const [cdpPastors, setCdpPastors] = useState<any[]>([]);
@@ -319,6 +327,33 @@ const [cdpPastorsLoading, setCdpPastorsLoading] = useState(false);
 const [cdpAssessmentsLoading, setCdpAssessmentsLoading] = useState(false);
 const [selectedCdpPastorId, setSelectedCdpPastorId] = useState("");
 const [selectedCdpPastorName, setSelectedCdpPastorName] = useState("");
+const [cdpPastorSearch, setCdpPastorSearch] = useState("");
+
+const hasOpenQuickLinkModal =
+  showQuickAssignModal ||
+  showPastorRoadmapModal ||
+  showMonthlyAppointmentsModal ||
+  showMentorMenteeModal ||
+  showCdpModal;
+
+useEffect(() => {
+  if (!hasOpenQuickLinkModal) return;
+
+  const previousOverflow = document.body.style.overflow;
+  const previousPaddingRight = document.body.style.paddingRight;
+  const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+
+  document.body.style.overflow = "hidden";
+
+  if (scrollbarWidth > 0) {
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+  }
+
+  return () => {
+    document.body.style.overflow = previousOverflow;
+    document.body.style.paddingRight = previousPaddingRight;
+  };
+}, [hasOpenQuickLinkModal]);
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [interests, setInterests] = useState<Interest[]>([]);
@@ -873,6 +908,8 @@ setLastName("");
     setQuickAssignLoading(true);
     setSelectedQuickPastorId("");
     setSelectedQuickMentorId("");
+    setQuickAssignMentorSearch("");
+    setQuickAssignPastorSearch("");
 
     const [pastorsRes, mentorsRes] = await Promise.all([
       apiGetAllUsers({
@@ -918,7 +955,10 @@ setLastName("");
 
 const handleQuickAssignMentor = async () => {
   if (!selectedQuickPastorId || !selectedQuickMentorId) {
-    setQuickAssignToast("Please select one pastor and one mentor.");
+    setQuickAssignToast({
+  message: "Please select one pastor and one mentor.",
+  type: "error",
+});
     setTimeout(() => setQuickAssignToast(null), 3000);
     return;
   }
@@ -941,20 +981,67 @@ const handleQuickAssignMentor = async () => {
     selectedMentor?.email ||
     "Mentor";
 
+  // try {
+  //   setQuickAssignSaving(true);
+
+  //   await apiAssignUsers(selectedQuickPastorId, [selectedQuickMentorId]);
+
+  //   setShowQuickAssignModal(false);
+  //   setSelectedQuickPastorId("");
+  //   setSelectedQuickMentorId("");
+
+  //   setQuickAssignToast(`${mentorName} assigned to ${pastorName} successfully.`);
+  //   setTimeout(() => setQuickAssignToast(null), 3500);
+  // } catch (error) {
   try {
-    setQuickAssignSaving(true);
+  setQuickAssignSaving(true);
 
-    await apiAssignUsers(selectedQuickPastorId, [selectedQuickMentorId]);
+  const assignedRes = await apiGetAssignedUsers(selectedQuickPastorId);
 
-    setShowQuickAssignModal(false);
-    setSelectedQuickPastorId("");
-    setSelectedQuickMentorId("");
+  const alreadyAssignedUsers = Array.isArray(assignedRes?.data?.data)
+    ? assignedRes.data.data
+    : [];
 
-    setQuickAssignToast(`${mentorName} assigned to ${pastorName} successfully.`);
+  const isMentorAlreadyAssigned = alreadyAssignedUsers.some((user: any) => {
+    const assignedUserId = String(
+      user?._id ??
+        user?.id ??
+        user?.userId ??
+        user?.mentorId ??
+        user?.assignedUser?._id ??
+        user?.assignedUser?.id ??
+        ""
+    );
+
+    return assignedUserId === selectedQuickMentorId;
+  });
+
+  if (isMentorAlreadyAssigned) {
+    setQuickAssignToast({
+  message: `${mentorName} is already assigned to ${pastorName}.`,
+  type: "error",
+});
     setTimeout(() => setQuickAssignToast(null), 3500);
-  } catch (error) {
+    return;
+  }
+
+  await apiAssignUsers(selectedQuickPastorId, [selectedQuickMentorId]);
+
+  setShowQuickAssignModal(false);
+  setSelectedQuickPastorId("");
+  setSelectedQuickMentorId("");
+
+  setQuickAssignToast({
+  message: `${mentorName} assigned to ${pastorName} successfully.`,
+  type: "success",
+});
+  setTimeout(() => setQuickAssignToast(null), 3500);
+} catch (error) {
     console.error("Failed to assign mentor", error);
-    setQuickAssignToast("Failed to assign mentor. Please try again.");
+    setQuickAssignToast({
+  message: "Failed to assign mentor. Please try again.",
+  type: "error",
+});
     setTimeout(() => setQuickAssignToast(null), 3500);
   } finally {
     setQuickAssignSaving(false);
@@ -965,6 +1052,7 @@ const openPastorsRoadmapModal = async () => {
   try {
     setShowPastorRoadmapModal(true);
     setRoadmapPastorsLoading(true);
+    setRoadmapPastorSearch("");
 
     const res = await apiGetAllUsers({
       role: "pastor",
@@ -1055,7 +1143,7 @@ const selectedQuickPastorName =
     setMappingLoading(true);
     setSelectedMappingMentorId("");
     setMappingMentees([]);
-
+setMappingMentorSearch("");
     const res = await apiGetAllUsers({
       role: "mentor",
       roleMatch: "mixed",
@@ -1106,7 +1194,7 @@ const openCdpModal = async () => {
     setSelectedCdpPastorId("");
     setSelectedCdpPastorName("");
     setCdpAssessments([]);
-
+setCdpPastorSearch("");
     const res = await apiGetAllUsers({
       role: "pastor",
       roleMatch: "mixed",
@@ -1212,6 +1300,71 @@ const assessment: any = flat.assessment ?? {};
     setCdpAssessmentsLoading(false);
   }
 };
+
+const filteredQuickAssignMentors = quickAssignMentors.filter((mentor) => {
+  const fullName = `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`
+    .trim()
+    .toLowerCase();
+
+  const email = String(mentor?.email ?? "").toLowerCase();
+  const search = quickAssignMentorSearch.trim().toLowerCase();
+
+  if (!search) return true;
+
+  return fullName.includes(search) || email.includes(search);
+});
+
+const filteredQuickAssignPastors = quickAssignPastors.filter((pastor) => {
+  const fullName = `${pastor?.firstName ?? ""} ${pastor?.lastName ?? ""}`
+    .trim()
+    .toLowerCase();
+
+  const email = String(pastor?.email ?? "").toLowerCase();
+  const search = quickAssignPastorSearch.trim().toLowerCase();
+
+  if (!search) return true;
+
+  return fullName.includes(search) || email.includes(search);
+});
+
+const filteredRoadmapPastors = roadmapPastors.filter((pastor) => {
+  const fullName = `${pastor?.firstName ?? ""} ${pastor?.lastName ?? ""}`
+    .trim()
+    .toLowerCase();
+
+  const email = String(pastor?.email ?? "").toLowerCase();
+  const search = roadmapPastorSearch.trim().toLowerCase();
+
+  if (!search) return true;
+
+  return fullName.includes(search) || email.includes(search);
+});
+
+const filteredCdpPastors = cdpPastors.filter((pastor) => {
+  const fullName = `${pastor?.firstName ?? ""} ${pastor?.lastName ?? ""}`
+    .trim()
+    .toLowerCase();
+
+  const email = String(pastor?.email ?? "").toLowerCase();
+  const search = cdpPastorSearch.trim().toLowerCase();
+
+  if (!search) return true;
+
+  return fullName.includes(search) || email.includes(search);
+});
+
+const filteredMappingMentors = mappingMentors.filter((mentor) => {
+  const fullName = `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`
+    .trim()
+    .toLowerCase();
+
+  const email = String(mentor?.email ?? "").toLowerCase();
+  const search = mappingMentorSearch.trim().toLowerCase();
+
+  if (!search) return true;
+
+  return fullName.includes(search) || email.includes(search);
+});
   return (
     <div className={directorPageRoot}>
       {/* Hero — mentor / pastor glass + image */}
@@ -1825,10 +1978,10 @@ const assessment: any = flat.assessment ?? {};
       </section> */}
 
       {/* Add User Section */}
-      {/* <section className="mt-6 py-8 sm:py-6 md:py-8"> */}
-      <section className="mt-5 py-5 sm:py-6 md:py-6">
-        {/* <div className={`mx-auto max-w-6xl rounded-3xl border border-white/15 bg-[linear-gradient(135deg,rgba(142,197,235,0.12)_0%,rgba(6,41,70,0.95)_45%,#041f35_100%)] p-8 shadow-lg sm:p-12`}> */}
-        <div className={`mx-auto max-w-6xl p-6 sm:p-8 ${directorGlassCard}`}>
+     
+      <section className="mt-6 grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
+      
+       <div className={`p-5 sm:p-6 ${directorGlassCard}`}>
           <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
             {/* Left side */}
             <div className="text-white">
@@ -1842,19 +1995,7 @@ const assessment: any = flat.assessment ?? {};
 
             {/* Right side - Form */}
             <form onSubmit={handleAddUser} className="space-y-4">
-              {/* <div>
-                <label className="text-white text-sm mb-2 block">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter full name"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required
-                  className="w-full px-4 py-3 rounded-md bg-white/10 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
-                />
-              </div> */}
+             
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
   <div>
     <label className="text-white text-sm mb-2 block">
@@ -1928,10 +2069,11 @@ const assessment: any = flat.assessment ?? {};
             </form>
           </div>
         </div>
+        
 
          {/* Quick Links */}
 {/* <section className="mt-8 py-8"> */}
-<section className="mt-6 py-4">
+<section className="m-0">
   <div className={`${directorGlassCard} p-4 sm:p-5`}>
     <div className="mb-4 flex items-center justify-between gap-3">
       <h2 className="text-base font-semibold text-white sm:text-lg">
@@ -1946,7 +2088,7 @@ const assessment: any = flat.assessment ?? {};
       </button> */}
     </div>
 
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-5">
       {directorQuickLinks.map((item) => (
         <button
           key={item.title}
@@ -1990,10 +2132,11 @@ if (item.title === "Customized Development Plan") {
     </div>
   </div>
 </section>
+</section>
 
 
         {/* Mentors/Pastors Section */}
-       <div className="mt-5 sm:mt-6">
+      <div className="mt-10 sm:mt-12">
           <div className="mb-4 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
             <div className="flex w-full gap-2 rounded-[20px] border border-white/10 bg-white/5 p-2 sm:w-auto sm:gap-4">
               <button
@@ -2058,7 +2201,7 @@ if (item.title === "Customized Development Plan") {
             </div>
           )}
         </div>
-      </section>
+      
      
       {/* Explore CCC */}
       <section className="py-8">
@@ -2444,7 +2587,11 @@ if (item.title === "Customized Development Plan") {
       </section>
            {showQuickAssignModal && (
   <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b18]/75 px-4 backdrop-blur-md">
-    <div className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}>
+    {/* <div className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}> */}
+    <div
+  className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}
+  onWheel={(e) => e.stopPropagation()}
+>
       <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4">
         <div>
           <h3 className="text-lg font-semibold text-white">
@@ -2478,17 +2625,33 @@ if (item.title === "Customized Development Plan") {
         <div className="max-h-[65vh] overflow-y-auto bg-[#07172a]/30 p-6">
           {!selectedQuickPastorId ? (
             <>
-              <h4 className="mb-4 text-sm font-semibold text-[#8ec5eb]">
+              {/* <h4 className="mb-4 text-sm font-semibold text-[#8ec5eb]">
                 Pastors
-              </h4>
+              </h4> */}
+<div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  <h4 className="text-sm font-semibold text-[#8ec5eb]">
+    Pastors
+  </h4>
 
-              {quickAssignPastors.length === 0 ? (
+  <div className="relative w-full sm:w-[260px]">
+    <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/45" />
+
+    <input
+      type="text"
+      value={quickAssignPastorSearch}
+      onChange={(e) => setQuickAssignPastorSearch(e.target.value)}
+      placeholder="Search pastor"
+      className="h-10 w-full rounded-xl border border-white/15 bg-white/10 pl-9 pr-3 text-sm font-medium text-white outline-none transition placeholder:text-white/45 focus:border-[#8ec5eb]/60 focus:bg-white/[0.13]"
+    />
+  </div>
+</div>
+              {filteredQuickAssignPastors.length === 0 ? (
                 <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/60">
                   No pastors found.
                 </p>
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {quickAssignPastors.map((pastor) => {
+                  {filteredQuickAssignPastors.map((pastor) => {
                     const pastorId = String(pastor._id ?? pastor.id ?? "");
                     const pastorName =
                       `${pastor.firstName ?? ""} ${pastor.lastName ?? ""}`.trim() ||
@@ -2551,17 +2714,40 @@ if (item.title === "Customized Development Plan") {
                 </button>
               </div>
 
-              <h4 className="mb-4 text-sm font-semibold text-[#8ec5eb]">
+              {/* <h4 className="mb-4 text-sm font-semibold text-[#8ec5eb]">
                 Select Mentor
-              </h4>
+              </h4> */}
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  <h4 className="text-sm font-semibold text-[#8ec5eb]">
+    Select Mentor
+  </h4>
 
-              {quickAssignMentors.length === 0 ? (
+  <div className="relative w-full sm:w-[260px]">
+    <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/45" />
+
+    <input
+      type="text"
+    value={quickAssignMentorSearch}
+onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
+      placeholder="Search mentor"
+      className="h-10 w-full rounded-xl border border-white/15 bg-white/10 pl-9 pr-3 text-sm font-medium text-white outline-none transition placeholder:text-white/45 focus:border-[#8ec5eb]/60 focus:bg-white/[0.13]"
+    />
+  </div>
+</div>
+         
+
+              {/* {quickAssignMentors.length === 0 ? (
                 <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/60">
                   No mentors found.
                 </p>
-              ) : (
+              ) : ( */}
+           {filteredQuickAssignMentors.length === 0 ? (
+  <p className="...">
+    No mentors found.
+  </p>
+) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {quickAssignMentors.map((mentor) => {
+                 {filteredQuickAssignMentors.map((mentor) => {
                     const mentorId = String(mentor._id ?? mentor.id ?? "");
                     const mentorName =
                       `${mentor.firstName ?? ""} ${mentor.lastName ?? ""}`.trim() ||
@@ -2574,7 +2760,7 @@ if (item.title === "Customized Development Plan") {
                       <button
                         key={mentorId}
                         type="button"
-                        onClick={() => setSelectedQuickMentorId(mentorId)}
+       onClick={() => setSelectedQuickMentorId(mentorId)}
                         className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-4 text-left shadow-sm transition ${
                           selected
                             ? "border-[#8ec5eb]/70 bg-[#8ec5eb]/20"
@@ -2634,7 +2820,7 @@ if (item.title === "Customized Development Plan") {
     </div>
   </div>
 )}
-      {quickAssignToast && (
+      {/* {quickAssignToast && (
   <div className="fixed left-1/2 top-24 z-[120] -translate-x-1/2 px-4">
     <div className={`${directorGlassCard} flex items-center gap-3 px-5 py-3 text-sm font-semibold text-white shadow-2xl`}>
       <i
@@ -2647,6 +2833,24 @@ if (item.title === "Customized Development Plan") {
       />
       <span>{quickAssignToast}</span>
     </div>
+  </div>
+)} */}
+{quickAssignToast && (
+  <div
+    className={`fixed bottom-6 right-6 z-[120] flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold shadow-2xl ${
+      quickAssignToast.type === "success"
+        ? "border-emerald-400/30 bg-emerald-500/15 text-emerald-100"
+        : "border-red-400/30 bg-red-500/15 text-red-100"
+    }`}
+  >
+    <i
+      className={`fa-solid ${
+        quickAssignToast.type === "success"
+          ? "fa-circle-check text-emerald-300"
+          : "fa-circle-exclamation text-red-300"
+      }`}
+    />
+    <span>{quickAssignToast.message}</span>
   </div>
 )}
 
@@ -2676,13 +2880,31 @@ if (item.title === "Customized Development Plan") {
         </div>
       ) : (
         <div className="max-h-[65vh] overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-[#8ec5eb]/40 scrollbar-track-white/5">
-          {roadmapPastors.length === 0 ? (
+  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <h4 className="text-sm font-semibold text-[#8ec5eb]">
+      Pastors
+    </h4>
+
+    <div className="relative w-full sm:w-[260px]">
+      <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/45" />
+
+      <input
+        type="text"
+        value={roadmapPastorSearch}
+        onChange={(e) => setRoadmapPastorSearch(e.target.value)}
+        placeholder="Search pastor"
+        className="h-10 w-full rounded-xl border border-white/15 bg-white/10 pl-9 pr-3 text-sm font-medium text-white outline-none transition placeholder:text-white/45 focus:border-[#8ec5eb]/60 focus:bg-white/[0.13]"
+      />
+    </div>
+  </div>
+
+  {filteredRoadmapPastors.length === 0 ? (
             <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/60">
               No pastors found.
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {roadmapPastors.map((pastor) => {
+              {filteredRoadmapPastors.map((pastor) => {
                 const pastorId = String(pastor._id ?? pastor.id ?? "");
                 const pastorName =
                   `${pastor.firstName ?? ""} ${pastor.lastName ?? ""}`.trim() ||
@@ -2730,8 +2952,13 @@ if (item.title === "Customized Development Plan") {
   </div>
 )}
 {showMonthlyAppointmentsModal && (
-  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b18]/70 px-4 backdrop-blur-md">
-  <div className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}>
+  // <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b18]/70 px-4 backdrop-blur-md">
+  <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-[#020b18]/70 px-4 backdrop-blur-md">
+  {/* <div className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}> */}
+  <div
+  className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}
+  onWheel={(e) => e.stopPropagation()}
+>
       <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
         <div>
           <h3 className="text-lg font-semibold text-white">
@@ -2887,7 +3114,11 @@ if (item.title === "Customized Development Plan") {
 )}
 {showMentorMenteeModal && (
   <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b18]/75 px-4 backdrop-blur-md">
-    <div className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}>
+    {/* <div className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}> */}
+    <div
+  className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}
+  onWheel={(e) => e.stopPropagation()}
+>
       <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4">
         <div>
           <h3 className="text-lg font-semibold text-white">
@@ -2921,17 +3152,34 @@ if (item.title === "Customized Development Plan") {
         <div className="max-h-[65vh] overflow-y-auto bg-[#07172a]/30 p-6">
           {!selectedMappingMentorId ? (
             <>
-              <h4 className="mb-4 text-sm font-semibold text-[#8ec5eb]">
+              {/* <h4 className="mb-4 text-sm font-semibold text-[#8ec5eb]">
                 Mentors
-              </h4>
+              </h4> */}
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  <h4 className="text-sm font-semibold text-[#8ec5eb]">
+    Select Mentor
+  </h4>
 
-              {mappingMentors.length === 0 ? (
+  <div className="relative w-full sm:w-[260px]">
+    <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/45" />
+
+  <input
+  type="text"
+  value={mappingMentorSearch}
+  onChange={(e) => setMappingMentorSearch(e.target.value)}
+  placeholder="Search mentor"
+  className="h-10 w-full rounded-xl border border-white/15 bg-white/10 pl-9 pr-3 text-sm font-medium text-white outline-none transition placeholder:text-white/45 focus:border-[#8ec5eb]/60 focus:bg-white/[0.13]"
+/>
+  </div>
+</div>
+
+              {filteredMappingMentors.length === 0 ? (
                 <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/60">
                   No mentors found.
                 </p>
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {mappingMentors.map((mentor) => {
+                  {filteredMappingMentors.map((mentor) => {
                     const mentorId = String(mentor._id ?? mentor.id ?? "");
                     const mentorName =
                       `${mentor.firstName ?? ""} ${mentor.lastName ?? ""}`.trim() ||
@@ -3042,7 +3290,11 @@ if (item.title === "Customized Development Plan") {
 )}
 {showCdpModal && (
   <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b18]/75 px-4 backdrop-blur-md">
-    <div className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}>
+    {/* <div className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}> */}
+    <div
+  className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}
+  onWheel={(e) => e.stopPropagation()}
+>
       <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4">
         <div>
           <h3 className="text-lg font-semibold text-white">
@@ -3077,17 +3329,34 @@ if (item.title === "Customized Development Plan") {
         <div className="max-h-[65vh] overflow-y-auto bg-[#07172a]/30 p-6">
           {!selectedCdpPastorId ? (
             <>
-              <h4 className="mb-4 text-sm font-semibold text-[#8ec5eb]">
+              {/* <h4 className="mb-4 text-sm font-semibold text-[#8ec5eb]">
                 Pastors
-              </h4>
+              </h4> */}
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  <h4 className="text-sm font-semibold text-[#8ec5eb]">
+    Pastors
+  </h4>
 
-              {cdpPastors.length === 0 ? (
+  <div className="relative w-full sm:w-[260px]">
+    <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/45" />
+
+    <input
+      type="text"
+      value={cdpPastorSearch}
+      onChange={(e) => setCdpPastorSearch(e.target.value)}
+      placeholder="Search pastor"
+      className="h-10 w-full rounded-xl border border-white/15 bg-white/10 pl-9 pr-3 text-sm font-medium text-white outline-none transition placeholder:text-white/45 focus:border-[#8ec5eb]/60 focus:bg-white/[0.13]"
+    />
+  </div>
+</div>
+
+              {filteredCdpPastors.length === 0 ? (
                 <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/60">
                   No pastors found.
                 </p>
               ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {cdpPastors.map((pastor) => {
+                  {filteredCdpPastors.map((pastor) => {
                     const pastorId = String(pastor._id ?? pastor.id ?? "");
                     const pastorName =
                       `${pastor.firstName ?? ""} ${pastor.lastName ?? ""}`.trim() ||

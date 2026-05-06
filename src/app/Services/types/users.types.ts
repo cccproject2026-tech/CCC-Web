@@ -10,6 +10,14 @@ export interface UploadedDocument {
   uploadedAt: string;
 }
 
+export interface FieldMentorInvitation {
+  _id?: string;
+  invitedBy?: string | { _id?: string };
+  invitedAt?: string;
+  token?: string;
+  expiresAt?: string;
+}
+
 export interface Note {
   _id: string;
   /** Primary body — some API versions use `content` instead */
@@ -33,6 +41,7 @@ export interface UserResponse {
   status: UserStatus;
   /** Set when the pastor is marked complete (mentor/director) or program completed. */
   hasCompleted?: boolean;
+  hasIssuedCertificate?: boolean;
   profilePicture?: string;
   assignedId?: string[];
   phoneNumber?: string;
@@ -42,6 +51,7 @@ export interface UserResponse {
   bio?: string;
   interest?: any;
   uploadedDocuments?: UploadedDocument[];
+  fieldMentorInvitation?: FieldMentorInvitation;
   churchDetails?: ChurchDetails[];
   isEmailVerified?: boolean;
   createdAt?: string;
@@ -81,9 +91,6 @@ export interface InviteFieldMentorPayload {
 
 export interface AcceptInvitationPayload {
   token: string;
-  firstName: string;
-  lastName: string;
-  password: string;
 }
 
 export interface GetUsersParams {

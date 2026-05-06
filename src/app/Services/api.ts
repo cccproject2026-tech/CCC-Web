@@ -78,6 +78,7 @@ export {
   apiDeleteNote,
   apiInviteFieldMentor,
   apiAcceptInvitation,
+  apiRejectInvitation,
 } from './users.service';
 
 // ─── Mentors / Home ───────────────────────────────────────────────────────────
