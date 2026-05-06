@@ -17,8 +17,10 @@ type DirectorHeroProps = {
   compact?: boolean;
   /** Shorter min-heights below `lg` for dense mobile dashboards (e.g. pastor roadmap). */
   tightenMobileLayout?: boolean;
-  /** Title block alignment (`start` = left). Default matches legacy director hero (right). */
+  /** Title block alignment (`start` = left). */
   titleAlign?: "start" | "end";
+  /** Breadcrumb alignment (`start` = left). */
+  breadcrumbAlign?: "start" | "end";
   /** e.g. “Change banner” — aligned to the top-right of the hero. */
   topRight?: ReactNode;
   /** Small pill above the title (e.g. Leadership Support Network). */
@@ -34,7 +36,8 @@ export default function DirectorHero({
   className = "",
   compact = false,
   tightenMobileLayout = false,
-  titleAlign = "end",
+  titleAlign = "start",
+  breadcrumbAlign = "start",
   topRight,
   breadcrumbItems,
   pill,
@@ -90,7 +93,11 @@ export default function DirectorHero({
           <div className="flex min-w-0 w-full flex-1 flex-col justify-between gap-4 sm:gap-6">
             <div className="flex w-full flex-wrap items-start justify-between gap-3">
               {hasCrumbs ? (
-                <div className="min-w-0 flex-1 text-sm text-white/75">
+                <div
+                  className={`min-w-0 flex-1 text-sm text-white/75 ${
+                    breadcrumbAlign === "end" ? "text-right" : "text-left"
+                  }`}
+                >
                   {breadcrumbItems!.map((item, idx) => (
                     <span key={`${item.label}-${idx}`}>
                       {item.href ? (

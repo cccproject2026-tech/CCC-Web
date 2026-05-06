@@ -73,6 +73,36 @@ export function normalizeRoadmapId(raw: unknown): string {
   return (coerceMongoId(raw) ?? String(raw ?? "").trim()).trim();
 }
 
+/** Nested template rows under a phase: API may return `roadmaps: []` or `roadmaps: { items: [] }`. */
+export function unwrapNestedRoadmapsArray(roadmap: { roadmaps?: unknown } | null | undefined): NestedRoadMapItem[] {
+  if (!roadmap || typeof roadmap !== "object") return [];
+  const raw = (roadmap as { roadmaps?: unknown }).roadmaps;
+  if (Array.isArray(raw)) return raw as NestedRoadMapItem[];
+  if (raw && typeof raw === "object" && Array.isArray((raw as { items?: unknown }).items)) {
+    return (raw as { items: NestedRoadMapItem[] }).items;
+  }
+  return [];
+}
+
+/** Resolve Mongo id for a nested phase task (handles populated `roadmap` / alternate id fields). */
+export function resolveNestedTemplateItemId(item: unknown): string {
+  if (!item || typeof item !== "object" || Array.isArray(item)) return "";
+  const r = item as Record<string, unknown>;
+  const nestedDoc = r.roadmap ?? r.roadMap;
+  const fromPopulated =
+    nestedDoc && typeof nestedDoc === "object" && !Array.isArray(nestedDoc)
+      ? normalizeRoadmapId(
+          (nestedDoc as Record<string, unknown>)._id ?? (nestedDoc as Record<string, unknown>).id,
+        )
+      : "";
+  return (
+    normalizeRoadmapId(r._id ?? r.id) ||
+    normalizeRoadmapId(r.roadMapId ?? r.roadmapId ?? r.nestedRoadmapId) ||
+    fromPopulated ||
+    ""
+  );
+}
+
 /** Merge assignment-style row `{ roadmap, progress }` into a single object for list UIs. */
 export function normalizeUserRoadmapListItem(row: unknown): RoadMapResponse | null {
   if (!row || typeof row !== "object") return null;
@@ -584,7 +614,8 @@ export function mergeProgressOntoRoadmaps(
 
     const parentProgressStatus = pr.status;
     const phaseCompleteNoNestedTasks = parentPhaseCompletedWithoutNestedBreakdown(pr);
-    const children: NestedRoadMapItem[] = Array.isArray(r.roadmaps) ? r.roadmaps : [];
+    const rawRm = (r as { roadmaps?: unknown }).roadmaps;
+    const children: NestedRoadMapItem[] = unwrapNestedRoadmapsArray(r);
 
     if (children.length === 0) {
       const np = mapNestedProgressSelf(pr);
@@ -605,7 +636,7 @@ export function mergeProgressOntoRoadmaps(
     }
 
     const updatedChildren = children.map((child) => {
-      const cid = normalizeRoadmapId(child._id ?? (child as { id?: string }).id);
+      const cid = resolveNestedTemplateItemId(child);
       if (!cid) return child;
       const np = findNestedProgressForTask(progressNorm, rid, cid);
       const derived: RoadmapAssignmentUi["status"] = np
@@ -627,9 +658,14 @@ export function mergeProgressOntoRoadmaps(
       } as NestedRoadMapItem;
     });
 
+    const nextRoadmapsField: NestedRoadMapItem[] | Record<string, unknown> =
+      rawRm && typeof rawRm === "object" && !Array.isArray(rawRm) && Array.isArray((rawRm as { items?: unknown }).items)
+        ? { ...(rawRm as Record<string, unknown>), items: updatedChildren }
+        : updatedChildren;
+
     return {
       ...r,
-      roadmaps: updatedChildren,
+      roadmaps: nextRoadmapsField as RoadMapResponse["roadmaps"],
       progress: {
         status: pr.status,
         completedSteps: pr.completedSteps,

@@ -37,6 +37,8 @@ import {
 } from "@/app/Services/api";
 import {
   deriveTaskStatusForList,
+  normalizeRoadmapId,
+  unwrapNestedRoadmapsArray,
   unwrapProgressData,
   type RoadmapAssignmentUi,
 } from "@/app/Services/roadmap-assignments";
@@ -428,9 +430,10 @@ const hasRequiredSubmissions = useMemo(() => {
             try {
               const parentRes = await apiGetRoadmapById(parentRoadmapId);
               const parentDoc = extractRoadmapDocumentFromResponse(parentRes) as any;
-              const fromParent = Array.isArray(parentDoc?.roadmaps)
-                ? parentDoc.roadmaps.find((r: any) => String(r?._id) === String(nestedItemId))
-                : null;
+              const fromParent = unwrapNestedRoadmapsArray(parentDoc).find(
+                (r: any) =>
+                  normalizeRoadmapId(r?._id ?? r?.id) === normalizeRoadmapId(nestedItemId),
+              );
               if (fromParent && Array.isArray(fromParent.extras) && fromParent.extras.length > 0) {
                 data = { ...(data || {}), extras: fromParent.extras };
               }
@@ -651,9 +654,10 @@ const hasRequiredSubmissions = useMemo(() => {
           try {
             const parentRes = await apiGetRoadmapById(parentRoadmapId);
             const parentDoc = extractRoadmapDocumentFromResponse(parentRes) as any;
-            const fromParent = Array.isArray(parentDoc?.roadmaps)
-              ? parentDoc.roadmaps.find((r: any) => String(r?._id) === String(nestedItemId))
-              : null;
+            const fromParent = unwrapNestedRoadmapsArray(parentDoc).find(
+              (r: any) =>
+                normalizeRoadmapId(r?._id ?? r?.id) === normalizeRoadmapId(nestedItemId),
+            );
             if (fromParent && Array.isArray(fromParent.extras) && fromParent.extras.length > 0) {
               data = { ...(data || {}), extras: fromParent.extras } as any;
             }
@@ -1621,35 +1625,23 @@ if (!hasRequiredSubmissions) {
                       disabled={saving || !roadmapId || !userId}
                       className="rounded-md border border-white/30 bg-white/10 px-6 py-2 text-sm font-semibold text-white shadow transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {saving ? "Saving…" : extrasExist ? "Update" : "Save"}
+                      {saving ? "Updating…" : "Update"}
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleMarkComplete}
-                      // disabled={completeLoading || listAlignedStatus === "Completed"}
-                      // disabled={completeLoading || listAlignedStatus === "Completed" || !hasRequiredSignature}
-//                       disabled={
-//   completeLoading ||
-//   listAlignedStatus === "Completed" ||
-//   !hasRequiredSignature ||
-//   !hasRequiredUploads
-// }
-
-disabled={
-  completeLoading ||
-  listAlignedStatus === "Completed" ||
-  !hasRequiredSignature ||
-  !hasRequiredUploads ||
-  !hasRequiredSubmissions
-}
-                      className="rounded-md bg-white px-6 py-2 text-sm font-semibold text-[#0f4a76] shadow transition hover:bg-[#e7f1fa] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {completeLoading
-                        ? "Updating…"
-                        : listAlignedStatus === "Completed"
-                          ? "Completed"
-                          : "Mark as Completed"}
-                    </button>
+                    {listAlignedStatus !== "Completed" ? (
+                      <button
+                        type="button"
+                        onClick={handleMarkComplete}
+                        disabled={
+                          completeLoading ||
+                          !hasRequiredSignature ||
+                          !hasRequiredUploads ||
+                          !hasRequiredSubmissions
+                        }
+                        className="rounded-md bg-white px-6 py-2 text-sm font-semibold text-[#0f4a76] shadow transition hover:bg-[#e7f1fa] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {completeLoading ? "Submitting…" : "Submit"}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </>

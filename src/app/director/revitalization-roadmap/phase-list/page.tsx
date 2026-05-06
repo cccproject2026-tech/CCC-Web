@@ -142,7 +142,10 @@ export default function DirectorPhaseListPage() {
     qp.set("roadmapId", roadmapId);
     qp.set("type", "phase");
     qp.set("isEditMode", "false");
-    router.push(`/director/revitalization-roadmap/roadmap-creation?${qp.toString()}`);
+    qp.set("name", String(roadmap?.name || ""));
+    qp.set("completionTime", String(roadmap?.duration || ""));
+    qp.set("selectedDivision", "All");
+    router.push(`/director/revitalization-roadmap/roadmap-form?${qp.toString()}`);
   };
 
   const handleConfirmDeleteTask = async () => {
@@ -226,6 +229,8 @@ export default function DirectorPhaseListPage() {
           title="Phase list"
           subtitle="Loading…"
           image={JumpStartBg}
+          titleAlign="start"
+          breadcrumbAlign="start"
           breadcrumbItems={breadcrumbItems}
         />
         <div className="flex flex-1 items-center justify-center px-4 pb-16">
@@ -241,6 +246,8 @@ export default function DirectorPhaseListPage() {
         title={heroTitle}
         subtitle="Revitalization Roadmap — phases and tasks"
         image={JumpStartBg}
+        titleAlign="start"
+        breadcrumbAlign="start"
         breadcrumbItems={breadcrumbItems}
       />
 

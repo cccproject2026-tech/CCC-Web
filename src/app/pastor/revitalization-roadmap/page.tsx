@@ -15,7 +15,6 @@ import {
   directorSpinner,
 } from "@/app/director/directorUi";
 import { DirectorFilterSection } from "@/app/director/ui";
-import PhaseImg from "@/app/Assets/phase-img.png";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { getPastorUserId } from "@/app/utils/pastor-auth";
@@ -43,7 +42,7 @@ interface PhaseCard {
   months: string;
   status: UiStatus;
   sessionDate?: string;
-  imageUrl: string;
+  imageUrl?: string;
   hasNestedTasks?: boolean;
 }
 
@@ -60,12 +59,6 @@ function phaseSequenceIndex(phase: PhaseCard): number {
     return 3;
   }
   return -1;
-}
-
-function roadmapDisplayName(phase: PhaseCard): string {
-  const t = phase.title?.trim();
-  if (t) return t;
-  return phase.parentRoadmapName?.trim() || "this roadmap";
 }
 
 const TABS: TabKey[] = ["All", "Due", "In Progress", "Not Started", "Completed"];
@@ -184,9 +177,6 @@ export default function RevitalizationRoadmap() {
 
       const data: RoadmapAssignmentUi[] = await fetchRoadmapAssignmentsForUser(userId);
       const parentCards = collapseRoadmapAssignmentsToParents(data);
-      const isValidImageUrl = (url?: string) =>
-        !!url && (url.startsWith("http://") || url.startsWith("https://"));
-
       const mappedPhases: PhaseCard[] = parentCards.map((item) => ({
         id: item.id,
         title: item.title,
@@ -196,10 +186,7 @@ export default function RevitalizationRoadmap() {
         months: item.months || "N/A",
         status: toUiStatus(item.status),
         sessionDate: item.meetings?.[0] || "",
-        imageUrl: (() => {
-          const resolved = resolveApiMediaUrl(item.imageUrl) || "";
-          return isValidImageUrl(resolved) ? resolved : PhaseImg.src;
-        })(),
+        imageUrl: resolveApiMediaUrl(item.imageUrl) || "",
         hasNestedTasks: item.hasNestedTasks === true,
       }));
 
@@ -359,7 +346,6 @@ export default function RevitalizationRoadmap() {
           image={HeroBg}
           titleAlign="start"
           tightenMobileLayout
-          pill="Leadership Support Network"
           breadcrumbItems={[{ label: "Home", href: "/pastor/home" }, { label: "Revitalization Roadmap" }]}
           className="!rounded-2xl md:!rounded-3xl"
         />
@@ -375,7 +361,7 @@ export default function RevitalizationRoadmap() {
                       placeholder="Search roadmaps…"
                       aria-label="Search roadmaps"
                       variant="dark"
-                      className="w-full"
+                      className="w-full min-w-[260px] sm:min-w-[320px]"
                     />
                   </div>
 
@@ -424,17 +410,23 @@ export default function RevitalizationRoadmap() {
                         className={`${directorGlassCard} flex flex-col overflow-hidden sm:flex-row`}
                       >
                         <div className="relative aspect-[16/10] max-h-52 w-full shrink-0 sm:aspect-auto sm:h-auto sm:max-h-none sm:min-h-[200px] sm:w-[42%] sm:max-w-[220px]">
-                          <Image
-                            src={img}
-                            alt=""
-                            fill
-                            className="object-cover"
-                            sizes="(max-width: 640px) 100vw, 220px"
-                            unoptimized={
-                              typeof img === "string" &&
-                              (img.startsWith("blob:") || isRemoteImageSrc(img))
-                            }
-                          />
+                          {img ? (
+                            <Image
+                              src={img}
+                              alt=""
+                              fill
+                              className="object-cover"
+                              sizes="(max-width: 640px) 100vw, 220px"
+                              unoptimized={
+                                typeof img === "string" &&
+                                (img.startsWith("blob:") || isRemoteImageSrc(img))
+                              }
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-white/5 text-xs font-semibold uppercase tracking-wide text-white/45">
+                              No image
+                            </div>
+                          )}
                           <div className="absolute left-3 top-3">
                             <span
                               className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${statusBadgeClasses(phase.status)}`}
@@ -446,9 +438,6 @@ export default function RevitalizationRoadmap() {
 
                         <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 p-4 sm:gap-4 sm:p-5">
                           <div className="min-w-0 space-y-2">
-                            <p className="break-words text-[10px] font-semibold uppercase tracking-wide text-[#3498DB]/90">
-                              {phase.parentRoadmapName}
-                            </p>
                             <h3 className="break-words text-base font-bold leading-snug text-white sm:text-lg">
                               {phase.title}
                             </h3>
@@ -477,7 +466,7 @@ export default function RevitalizationRoadmap() {
                               onClick={() => handleViewPhase(phase)}
                               className={`${directorBtnPrimary} min-h-[44px] w-full !px-5 !py-2.5 !text-sm sm:min-h-0 sm:w-auto`}
                             >
-                              View
+                              {phase.status === "Not Started" ? "Start" : "View"}
                             </button>
                           </div>
                         </div>

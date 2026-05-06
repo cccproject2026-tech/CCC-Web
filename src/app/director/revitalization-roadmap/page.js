@@ -29,6 +29,7 @@ import {
   directorSpinner,
 } from "../directorUi";
 import SearchBar from "@/app/Components/SearchBar";
+import AssignRoadmapModal from "@/app/Components/AssignRoadmapModal";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 
 /** API may return `_id` as string, `id`, or Mongo `{ $oid }` — progress assign needs string ids. */
@@ -210,15 +211,6 @@ function extractRoadmapCreator(item) {
   return { name: "", avatar: null };
 }
 
-function roadmapTitleIconClass(title) {
-  const t = normLower(title);
-  if (t.includes("jump")) return "fa-paper-plane";
-  if (t.includes("self")) return "fa-heart";
-  if (t.includes("church") || t.includes("empowerment")) return "fa-church";
-  if (t.includes("community")) return "fa-users";
-  return "fa-route";
-}
-
 async function mapLimit(items, limit, fn) {
   const out = [];
   for (let i = 0; i < items.length; i += limit) {
@@ -287,6 +279,7 @@ export default function RevitalizationRoadmapPage() {
   const [pastorProgressList, setPastorProgressList] = useState([]);
   const [loadingPastors, setLoadingPastors] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(null);
+  const [assignModalRoadmap, setAssignModalRoadmap] = useState(null);
   const [libraryPage, setLibraryPage] = useState(1);
   const [metricsByRoadmapId, setMetricsByRoadmapId] = useState({});
   const [loadingMetrics, setLoadingMetrics] = useState(false);
@@ -984,7 +977,6 @@ export default function RevitalizationRoadmapPage() {
                     const imgRaw = roadmap?.img;
                     const thumb =
                       typeof imgRaw === "string" ? resolveApiMediaUrl(imgRaw) || imgRaw : imgRaw || Card1;
-                    const iconClass = roadmapTitleIconClass(roadmap.title);
                     const created = parseDate(roadmap.createdAt);
                     const creatorPic = roadmap.createdByAvatar;
                     const creatorFallback = Mentor1;
@@ -1016,9 +1008,6 @@ export default function RevitalizationRoadmapPage() {
                           <div className="min-w-0">
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex min-w-0 items-center gap-2">
-                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#3498DB]/18 text-[#85c1e9]">
-                                  <i className={`fa-solid ${iconClass}`} aria-hidden />
-                                </span>
                                 <h3 className="truncate text-base font-bold text-white sm:text-lg">{roadmap.title}</h3>
                               </div>
                               <div className="relative roadmap-options-menu shrink-0">
@@ -1038,9 +1027,10 @@ export default function RevitalizationRoadmapPage() {
                                       type="button"
                                       onClick={() => {
                                         setShowOptionsMenu(null);
-                                        router.push(
-                                          `/director/pastor-assignments?roadmapId=${encodeURIComponent(roadmap.id)}`,
-                                        );
+                                        setAssignModalRoadmap({
+                                          id: roadmap.id,
+                                          name: roadmap.title || "Roadmap",
+                                        });
                                       }}
                                       className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-white/90 hover:bg-white/10"
                                     >
@@ -1124,6 +1114,22 @@ export default function RevitalizationRoadmapPage() {
                               <span className="pl-5 text-[13px] text-white/90">{roadmap.completionTime}</span>
                             </div>
                           </div>
+                          <div className="mt-4 flex flex-wrap justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openRoadmapView(roadmap)}
+                              className="inline-flex items-center rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/18 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#3498DB]/28"
+                            >
+                              View
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openRoadmapEdit(roadmap)}
+                              className="inline-flex items-center rounded-lg border border-white/25 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/15"
+                            >
+                              Edit
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -1189,6 +1195,13 @@ export default function RevitalizationRoadmapPage() {
           )}
         </div>
       </main>
+      <AssignRoadmapModal
+        isOpen={Boolean(assignModalRoadmap?.id)}
+        onClose={() => setAssignModalRoadmap(null)}
+        roadmapIds={assignModalRoadmap?.id ? [String(assignModalRoadmap.id)] : []}
+        roadmapName={assignModalRoadmap?.name || "Roadmap"}
+        onSuccess={() => setAssignModalRoadmap(null)}
+      />
     </div>
   );
 }

@@ -272,6 +272,7 @@ export default function DirectorRoadmapFormPage() {
 
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
+  const bannerInputRef = useRef<HTMLInputElement | null>(null);
 
   const [parent, setParent] = useState<RoadmapDoc | null>(null);
   const [loading, setLoading] = useState(true);
@@ -289,9 +290,15 @@ export default function DirectorRoadmapFormPage() {
   const [saveToast, setSaveToast] = useState<string | null>(null);
   const saveNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const goToRoadmapLibrary = useCallback(() => {
+  const goToAfterSavePage = useCallback(() => {
+    if (roadmapType === "phase" && roadmapId) {
+      router.push(
+        `/director/revitalization-roadmap/phase-list?roadmapId=${encodeURIComponent(roadmapId)}`,
+      );
+      return;
+    }
     router.push("/director/revitalization-roadmap");
-  }, [router]);
+  }, [router, roadmapId, roadmapType]);
 
   const dismissSaveToast = useCallback(() => {
     if (saveNavTimerRef.current) {
@@ -299,8 +306,8 @@ export default function DirectorRoadmapFormPage() {
       saveNavTimerRef.current = null;
     }
     setSaveToast(null);
-    goToRoadmapLibrary();
-  }, [goToRoadmapLibrary]);
+    goToAfterSavePage();
+  }, [goToAfterSavePage]);
 
   const [fieldModalOpen, setFieldModalOpen] = useState(false);
   const [fieldParentSectionId, setFieldParentSectionId] = useState<string | null>(null);
@@ -318,6 +325,7 @@ export default function DirectorRoadmapFormPage() {
   >("text");
   const [fieldDraft, setFieldDraft] = useState<Record<string, any>>({});
   const [fieldModalError, setFieldModalError] = useState<string | null>(null);
+  const [openNestedPickerSectionId, setOpenNestedPickerSectionId] = useState<string | null>(null);
 
   const heroTitle = useMemo(() => {
     if (!isEditMode) return "Roadmap";
@@ -362,7 +370,6 @@ export default function DirectorRoadmapFormPage() {
             type: "assessment",
             selectedAssessment: extra.name,
             assessmentId: extra.assessmentId,
-            buttonName: extra.buttonName || "",
             scheduleMeeting: Array.isArray(extra.checkboxes) && extra.checkboxes.some((cb: any) => cb.name === "Schedule Meeting after the Assessment"),
           });
           break;
@@ -384,9 +391,6 @@ export default function DirectorRoadmapFormPage() {
             type: "digital_signature",
             fieldName: extra.name,
             placeholderText: extra.placeHolder || "Sign here",
-            clearButtonLabel: extra.buttonName || "Clear",
-            required: !!extra.required,
-            showOnInfoCard: !!extra.showOnCard,
           });
           break;
         case "SECTION":
@@ -394,8 +398,6 @@ export default function DirectorRoadmapFormPage() {
             id: fieldId,
             type: "section",
             name: extra.name,
-            buttonName: extra.buttonName || "",
-            showDuplicateButton: Array.isArray(extra.checkboxes) && extra.checkboxes.some((cb: any) => cb.haveButton),
           });
           if (Array.isArray(extra.sections)) {
             extra.sections.forEach((sectionExtra: any) => {
@@ -422,7 +424,6 @@ export default function DirectorRoadmapFormPage() {
                   type: "assessment",
                   selectedAssessment: sectionExtra.name,
                   assessmentId: sectionExtra.assessmentId,
-                  buttonName: sectionExtra.buttonName || "",
                   scheduleMeeting: Array.isArray(sectionExtra.checkboxes) && sectionExtra.checkboxes.some((cb: any) => cb.name === "Schedule Meeting after the Assessment"),
                 });
               }
@@ -468,7 +469,6 @@ export default function DirectorRoadmapFormPage() {
               type: "ASSESSMENT",
               name: nm || "Assessment",
               assessmentId: field.assessmentId || (typeof field.selectedAssessment === "object" ? field.selectedAssessment?.id : undefined),
-              ...(field.buttonName ? { buttonName: field.buttonName } : {}),
               ...(checkboxes.length ? { checkboxes } : {}),
             };
           }
@@ -481,14 +481,8 @@ export default function DirectorRoadmapFormPage() {
               type: "SIGNATURE",
               name: field.fieldName || "Digital Signature",
               placeHolder: field.placeholderText || "Sign here",
-              buttonName: field.clearButtonLabel || "Clear",
-              required: !!field.required,
-              showOnCard: !!field.showOnInfoCard,
             };
           case "section": {
-            const checkboxes = [
-              field.showDuplicateButton ? { type: "CHECKBOX", name: field.name || "Section", haveButton: true, buttonName: field.buttonName || "Add section steps" } : null,
-            ].filter(Boolean);
             const sections = nestedFields
               .map((nf) => {
                 if (nf.type === "text") return { type: "TEXT_FIELD", name: nf.label || "Text Field", ...(nf.placeholder ? { placeHolder: nf.placeholder } : {}) };
@@ -508,7 +502,7 @@ export default function DirectorRoadmapFormPage() {
                     nf.scheduleMeeting ? { type: "CHECKBOX", name: "Schedule Meeting after the Assessment", haveButton: false } : null,
                   ].filter(Boolean);
                   const nm = typeof nf.selectedAssessment === "object" ? nf.selectedAssessment?.name : nf.selectedAssessment;
-                  return { type: "ASSESSMENT", name: nm || "Assessment", assessmentId: nf.assessmentId || (typeof nf.selectedAssessment === "object" ? nf.selectedAssessment?.id : undefined), ...(nf.buttonName ? { buttonName: nf.buttonName } : {}), ...(cbs.length ? { checkboxes: cbs } : {}) };
+                  return { type: "ASSESSMENT", name: nm || "Assessment", assessmentId: nf.assessmentId || (typeof nf.selectedAssessment === "object" ? nf.selectedAssessment?.id : undefined), ...(cbs.length ? { checkboxes: cbs } : {}) };
                 }
                 return null;
               })
@@ -516,8 +510,6 @@ export default function DirectorRoadmapFormPage() {
             return {
               type: "SECTION",
               name: field.name || "Section",
-              ...(field.buttonName ? { buttonName: field.buttonName } : {}),
-              ...(checkboxes.length ? { checkboxes } : {}),
               ...(sections.length ? { sections } : {}),
             };
           }
@@ -536,7 +528,7 @@ export default function DirectorRoadmapFormPage() {
       const existing = customFields.find((f) => f.id === opts.fieldId);
       setFieldDraft(existing ? { ...existing } : {});
     } else {
-      setFieldDraft({ type });
+      setFieldDraft(type === "assessment" ? { type, scheduleMeeting: true } : { type });
     }
     setFieldModalError(null);
     setFieldModalOpen(true);
@@ -548,6 +540,7 @@ export default function DirectorRoadmapFormPage() {
     setEditingFieldId(null);
     setFieldDraft({});
     setFieldModalError(null);
+    setOpenNestedPickerSectionId(null);
   };
 
   const validateFieldDraft = (): string | null => {
@@ -580,9 +573,6 @@ export default function DirectorRoadmapFormPage() {
         return null;
       case "section":
         if (!String(fieldDraft.name ?? "").trim()) return "Section name is required.";
-        if (fieldDraft.showDuplicateButton && !String(fieldDraft.buttonName ?? "").trim()) {
-          return "Button name is required when section button is enabled.";
-        }
         return null;
       default:
         return null;
@@ -606,6 +596,13 @@ export default function DirectorRoadmapFormPage() {
 
   const deleteField = (id: string) => {
     setCustomFields((prev) => prev.filter((f) => f.id !== id && f.parentSectionId !== id));
+  };
+
+  const onBannerFileChange = (file?: File | null) => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setBannerPreview(url);
+    setBannerFile(file);
   };
 
   useEffect(() => {
@@ -745,7 +742,7 @@ export default function DirectorRoadmapFormPage() {
     saveNavTimerRef.current = window.setTimeout(() => {
       saveNavTimerRef.current = null;
       setSaveToast(null);
-      goToRoadmapLibrary();
+      goToAfterSavePage();
     }, 5000);
     return () => {
       if (saveNavTimerRef.current) {
@@ -753,7 +750,7 @@ export default function DirectorRoadmapFormPage() {
         saveNavTimerRef.current = null;
       }
     };
-  }, [saveToast, goToRoadmapLibrary]);
+  }, [saveToast, goToAfterSavePage]);
 
   const handleSubmit = async () => {
     if (viewOnly) return;
@@ -984,8 +981,10 @@ export default function DirectorRoadmapFormPage() {
                                 {f.type === "section" ? (
                                   <button
                                     type="button"
-                                    onClick={() => openFieldModal("text", { parentSectionId: f.id })}
-                                    className={`${fieldSectionEditBtn} border border-[#8ec5eb]/30 bg-[#8ec5eb]/15 text-white hover:bg-[#8ec5eb]/25`}
+                                    onClick={() =>
+                                      setOpenNestedPickerSectionId((prev) => (prev === f.id ? null : f.id))
+                                    }
+                                    className={`${fieldSectionEditBtn} border border-[#8ec5eb]/70 bg-[#8ec5eb] text-[#0b2340] shadow-[0_4px_14px_rgba(142,197,235,0.35)] hover:bg-[#9fd0ef]`}
                                   >
                                     <i className="fa-solid fa-plus text-[11px]" /> Nested field
                                   </button>
@@ -1009,6 +1008,40 @@ export default function DirectorRoadmapFormPage() {
                           </div>
 
                           <RoadmapFieldPreview f={f} />
+
+                          {f.type === "section" && openNestedPickerSectionId === f.id && !viewOnly ? (
+                            <div className="mt-4 rounded-xl border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 px-3 py-3">
+                              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#cde2f2]">
+                                Insert nested field
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {[
+                                  ["text", "Text Field"],
+                                  ["textarea", "Text Area"],
+                                  ["upload", "Upload"],
+                                  ["datepicker", "Date Picker"],
+                                  ["assessment", "Assessment"],
+                                  ["checkbox_item", "Check Box"],
+                                  ["text_display", "Text Display"],
+                                  ["digital_signature", "Signature"],
+                                  ["section", "Section"],
+                                ].map(([k, label]) => (
+                                  <button
+                                    key={`nested-${f.id}-${k}`}
+                                    type="button"
+                                    onClick={() => {
+                                      openFieldModal(k, { parentSectionId: f.id });
+                                      setOpenNestedPickerSectionId(null);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 rounded-lg border border-white/25 bg-white px-3 py-2 text-[11px] font-semibold text-[#1F2A6E] shadow-sm transition hover:bg-white/90 sm:text-[12px]"
+                                  >
+                                    <i className="fa-solid fa-plus text-[10px]" />
+                                    {label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
 
                           {f.type === "section" && nested.length > 0 ? (
                             <div className="mt-5 space-y-3 border-t border-white/10 pt-4">
@@ -1082,6 +1115,63 @@ export default function DirectorRoadmapFormPage() {
                       </div>
                     </div>
                   ) : null}
+
+                  {!viewOnly ? (
+                    <div>
+                      <label className={directorLabelClass}>Banner image</label>
+                      <div className="space-y-3">
+                        <label
+                          htmlFor="roadmap-banner-upload"
+                          className={`relative block h-36 w-full overflow-hidden rounded-xl border sm:h-44 ${
+                            heroImageSrc
+                              ? "cursor-pointer border-white/20 bg-white/5"
+                              : "cursor-pointer border-dashed border-[#8ec5eb]/45 bg-[#8ec5eb]/8 hover:bg-[#8ec5eb]/14"
+                          }`}
+                        >
+                          {heroImageSrc ? (
+                            <>
+                              <img
+                                src={heroImageSrc}
+                                alt="Roadmap banner"
+                                className="h-full w-full object-cover"
+                              />
+                              <div className="absolute inset-0 flex items-end justify-center bg-black/20 pb-3 text-xs font-semibold text-white/90">
+                                Click to change image
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-sm text-white/85">
+                              <i className="fa-solid fa-cloud-arrow-up text-xl text-[#8ec5eb]" />
+                              <span className="font-semibold">Upload image</span>
+                              <span className="text-xs text-white/60">Click to choose banner image</span>
+                            </div>
+                          )}
+                        </label>
+                        <input
+                          id="roadmap-banner-upload"
+                          ref={bannerInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => onBannerFileChange(e.target.files?.[0] ?? null)}
+                        />
+                        <div className="flex flex-wrap gap-3">
+                          {heroImageSrc ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBannerPreview(null);
+                                setBannerFile(null);
+                              }}
+                              className="rounded-xl border border-white/20 bg-white/8 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+                            >
+                              Remove banner
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
 
                 {!viewOnly ? (
@@ -1121,13 +1211,7 @@ export default function DirectorRoadmapFormPage() {
                     {editingFieldId ? "Edit field" : "Add field"}
                   </h3>
                 </div>
-                <button
-                  type="button"
-                  onClick={closeFieldModal}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/80 transition hover:bg-white/10 hover:text-white"
-                >
-                  <i className="fa-solid fa-xmark text-sm" />
-                </button>
+                <span />
               </div>
 
               {fieldModalError ? (
@@ -1201,14 +1285,6 @@ export default function DirectorRoadmapFormPage() {
                         style={{ colorScheme: "dark" }}
                       />
                     </div>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-white/70">Button name (optional)</label>
-                      <input
-                        value={fieldDraft.buttonName ?? ""}
-                        onChange={(e) => setFieldDraft((p) => ({ ...p, buttonName: e.target.value }))}
-                        className={directorInputClass}
-                      />
-                    </div>
                     <div className="sm:col-span-2 flex flex-wrap gap-4 pt-1">
                       <label className="inline-flex items-center gap-2 text-sm text-white/80">
                         <input
@@ -1244,24 +1320,17 @@ export default function DirectorRoadmapFormPage() {
                           setFieldDraft((p) => ({ ...p, assessmentId: id, selectedAssessment: hit?.name || "" }));
                           if (fieldModalError) setFieldModalError(null);
                         }}
-                        className={directorInputClass}
+                        className={`${directorInputClass} text-white`}
                       >
-                        <option value="">Select assessment</option>
+                        <option value="" style={{ color: "#111", backgroundColor: "#fff" }}>
+                          Select assessment
+                        </option>
                         {assessments.map((a) => (
-                          <option key={a.id} value={a.id}>
+                          <option key={a.id} value={a.id} style={{ color: "#111", backgroundColor: "#fff" }}>
                             {a.name}
                           </option>
                         ))}
                       </select>
-                    </div>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-white/70">Button name (optional)</label>
-                      <input
-                        value={fieldDraft.buttonName ?? ""}
-                        onChange={(e) => setFieldDraft((p) => ({ ...p, buttonName: e.target.value }))}
-                        className={directorInputClass}
-                        placeholder="Take Assessment"
-                      />
                     </div>
                     <div className="flex items-end">
                       <label className="inline-flex items-center gap-2 text-sm text-white/80">
@@ -1353,34 +1422,6 @@ export default function DirectorRoadmapFormPage() {
                         className={directorInputClass}
                       />
                     </div>
-                    <div>
-                      <label className="mb-1.5 block text-xs font-medium text-white/70">Clear button label</label>
-                      <input
-                        value={fieldDraft.clearButtonLabel ?? ""}
-                        onChange={(e) => setFieldDraft((p) => ({ ...p, clearButtonLabel: e.target.value }))}
-                        className={directorInputClass}
-                      />
-                    </div>
-                    <div className="flex items-end gap-4">
-                      <label className="inline-flex items-center gap-2 text-sm text-white/80">
-                        <input
-                          type="checkbox"
-                          checked={!!fieldDraft.required}
-                          onChange={(e) => setFieldDraft((p) => ({ ...p, required: e.target.checked }))}
-                          className="h-4 w-4 accent-[#8ec5eb]"
-                        />
-                        Required
-                      </label>
-                      <label className="inline-flex items-center gap-2 text-sm text-white/80">
-                        <input
-                          type="checkbox"
-                          checked={!!fieldDraft.showOnInfoCard}
-                          onChange={(e) => setFieldDraft((p) => ({ ...p, showOnInfoCard: e.target.checked }))}
-                          className="h-4 w-4 accent-[#8ec5eb]"
-                        />
-                        Show on info card
-                      </label>
-                    </div>
                   </>
                 ) : null}
 
@@ -1396,27 +1437,6 @@ export default function DirectorRoadmapFormPage() {
                         }}
                         className={directorInputClass}
                       />
-                    </div>
-                    <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3">
-                      <label className="inline-flex items-center gap-2 text-sm text-white/80">
-                        <input
-                          type="checkbox"
-                          checked={!!fieldDraft.showDuplicateButton}
-                          onChange={(e) => setFieldDraft((p) => ({ ...p, showDuplicateButton: e.target.checked }))}
-                          className="h-4 w-4 accent-[#8ec5eb]"
-                        />
-                        Show “Add section steps” button
-                      </label>
-                      {fieldDraft.showDuplicateButton ? (
-                        <div className="w-full sm:w-auto sm:flex-1">
-                          <input
-                            value={fieldDraft.buttonName ?? ""}
-                            onChange={(e) => setFieldDraft((p) => ({ ...p, buttonName: e.target.value }))}
-                            className={directorInputClass}
-                            placeholder="Add section steps"
-                          />
-                        </div>
-                      ) : null}
                     </div>
                   </>
                 ) : null}

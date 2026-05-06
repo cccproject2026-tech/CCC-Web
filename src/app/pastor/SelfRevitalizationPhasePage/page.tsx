@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import Link from "next/link";
 import { useState, useEffect, Suspense, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
@@ -25,7 +26,8 @@ import {
   deriveTaskStatusForList,
   unwrapProgressData,
   mergeProgressOntoRoadmaps,
-  normalizeRoadmapId,
+  resolveNestedTemplateItemId,
+  unwrapNestedRoadmapsArray,
   type RoadmapAssignmentUi,
 } from "@/app/Services/roadmap-assignments";
 import type { ProgressResponse } from "@/app/Services/types/progress.types";
@@ -119,7 +121,7 @@ function SelfRevitalizationContent() {
   const taskStatusFromProgress = (
     item: { _id?: string; id?: string; status?: unknown; endDate?: string },
   ): string => {
-    const tid = normalizeRoadmapId(item._id ?? item.id);
+    const tid = resolveNestedTemplateItemId(item);
     const ov = tid ? statusOverrides[tid] : undefined;
     if (ov) return ov;
     if (!roadmapId || !tid) return statusLabel(item.status);
@@ -222,7 +224,7 @@ function SelfRevitalizationContent() {
   const title = roadmap?.name || "Self Revitalization Phase";
   const phase = roadmap?.phase || "";
   const subtitle = String(roadmap?.roadMapDetails || roadmap?.description || "").trim();
-  const nestedRoadmaps: any[] = roadmap?.roadmaps || [];
+  const nestedRoadmaps = useMemo((): any[] => unwrapNestedRoadmapsArray(roadmap), [roadmap]);
   const divisions = useMemo(() => {
     const raw = Array.isArray(roadmap?.divisions) ? roadmap.divisions : [];
     const cleaned = raw.map((d: unknown) => String(d ?? "").trim()).filter(Boolean);
@@ -365,13 +367,18 @@ function SelfRevitalizationContent() {
             ) : (
               <div className="grid grid-cols-1 gap-5 md:grid-cols-2 md:gap-6">
                 {filteredCards.map((item, index) => {
+                  const taskId = resolveNestedTemplateItemId(item);
+                  const jumpHref =
+                    taskId && roadmapId
+                      ? `/pastor/jumpstart?id=${encodeURIComponent(taskId)}&parentId=${encodeURIComponent(roadmapId)}`
+                      : "";
                   const resolvedImage = resolveApiMediaUrl(item.imageUrl) || "";
                   const imgSrc = isValidImageUrl(resolvedImage) ? resolvedImage : PhaseImg;
                   const status = taskStatusFromProgress(item);
 
                   return (
                     <div
-                      key={item._id || index}
+                      key={taskId || `task-${index}`}
                       className={`${directorGlassCard} flex flex-col overflow-hidden sm:flex-row`}
                     >
                       <div className="relative h-44 w-full shrink-0 sm:h-auto sm:min-h-[200px] sm:w-[42%] sm:max-w-[220px]">
@@ -415,15 +422,22 @@ function SelfRevitalizationContent() {
                         </div>
 
                         <div className="flex justify-end border-t border-white/10 pt-3 sm:border-0 sm:pt-0">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              router.push(`/pastor/jumpstart?id=${item._id}&parentId=${roadmapId}`)
-                            }
-                            className={`${directorBtnPrimary} !px-5 !py-2.5 !text-sm`}
-                          >
-                            View
-                          </button>
+                          {jumpHref ? (
+                            <Link
+                              href={jumpHref}
+                              className={`${directorBtnPrimary} !px-5 !py-2.5 !text-sm no-underline`}
+                            >
+                              View
+                            </Link>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled
+                              className={`${directorBtnPrimary} !px-5 !py-2.5 !text-sm disabled:cursor-not-allowed disabled:opacity-50`}
+                            >
+                              View
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
