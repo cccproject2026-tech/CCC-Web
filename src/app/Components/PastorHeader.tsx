@@ -427,25 +427,25 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
 
               {/* Notification Dropdown */}
               {showNotifications && (
-                <div className="absolute -right-4 md:-right-8 mt-4 w-[300px] md:w-[450px] bg-white rounded-2xl shadow-lg border border-gray-100">
+                <div className="absolute -right-4 md:-right-8 mt-4 w-[300px] md:w-[450px] rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.98)_0%,rgba(6,36,62,0.98)_100%)] text-white shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
                   {/* Pointer */}
-                  <div className="absolute -top-2 right-4 md:right-8 w-4 h-4 bg-white rotate-45 border-t border-l border-gray-100"></div>
+                 <div className="absolute -top-2 right-4 md:right-8 h-4 w-4 rotate-45 border-l border-t border-white/15 bg-[#0c3a5f]" />
 
                   {/* Header */}
-                  <div className="px-5 py-3 border-b border-gray-200 flex justify-between items-center">
-                    <h2 className="font-semibold text-[17px] text-black">
+                  <div className="relative z-10 flex items-center justify-between border-b border-white/10 px-5 py-4">
+                    <h2 className="font-semibold text-[17px] text-white">
                       Notifications
                     </h2>
                     <a
                       href="/pastor/notifications"
-                      className="text-[#0f4a76] text-[14px] font-medium hover:underline"
+                      className="text-[#8ec5eb] text-[14px] font-medium hover:text-white"
                     >
                       View All
                     </a>
                   </div>
 
                   {/* Notifications List */}
-                  <div className="space-y-2 p-2">
+                  {/* <div className="space-y-2 p-2">
                     {notificationList.length === 0 ? (
                       <p className="rounded-xl bg-[#F5F7FA] px-3 py-4 text-center text-[13px] text-[#7A7A7A]">
                         No notifications yet.
@@ -458,7 +458,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
                       //       key={note._id}
                       //       className="flex items-start justify-between rounded-xl bg-[#F5F7FA] p-3"
                       //     >
-                      notificationList.slice(0, 4).map((note) => {
+                      notificationList.map((note) => {
   const p = mapNotificationItemToPopup(note);
   return (
     <div
@@ -511,7 +511,77 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
                         );
                       })
                     )}
-                  </div>
+                  </div> */}
+
+                  {/* Notifications List */}
+<div className="relative z-10 max-h-[520px] space-y-3 overflow-y-auto p-3 pr-2">
+  {notificationList.length === 0 ? (
+    <p className="rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-4 text-center text-[13px] text-[#cde2f2]">
+      No notifications yet.
+    </p>
+  ) : (
+    notificationList.map((note) => {
+      const p = mapNotificationItemToPopup(note);
+
+      return (
+        <div
+          key={note._id}
+          role={p.link ? "button" : undefined}
+          tabIndex={p.link ? 0 : undefined}
+          onClick={() => {
+            if (p.link) {
+              setShowNotifications(false);
+              router.push(p.link);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (!p.link) return;
+
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setShowNotifications(false);
+              router.push(p.link);
+            }
+          }}
+          className={`flex items-start justify-between rounded-2xl border border-white/10 bg-white/[0.06] p-4 transition hover:bg-white/[0.1] ${
+            p.link ? "cursor-pointer" : ""
+          }`}
+        >
+          <div className="flex w-full items-start gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/10">
+              <i className={`${p.icon} text-base ${p.iconColor}`} aria-hidden />
+            </div>
+
+            <div className="flex min-w-0 flex-1 flex-col">
+              <div className="flex justify-between gap-2">
+                <h3 className="text-[14px] font-semibold text-white">
+                  {p.title}
+                </h3>
+
+                {!note.isRead && (
+                  <span
+                    className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#FFD700]"
+                    title="Unread"
+                  />
+                )}
+              </div>
+
+              {p.subtitle ? (
+                <p className="mt-0.5 text-[13px] leading-snug text-[#cde2f2]">
+                  {p.subtitle}
+                </p>
+              ) : null}
+
+              <p className="mt-1 text-right text-[12px] text-white/50">
+                {p.time}
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    })
+  )}
+</div>
 
                 </div>
               )}

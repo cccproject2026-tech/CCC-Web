@@ -541,7 +541,7 @@ const handleSaveEdit = async () => {
           </div>
         </MainTag>
 
-        {variant === "pastor" ? <PastorFooter /> : null}
+        {/* {variant === "pastor" ? <PastorFooter /> : null} */}
       </div>
     </div>
   );

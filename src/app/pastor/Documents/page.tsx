@@ -88,7 +88,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { getCookie } from "@/app/utils/cookies";
-import { apiGetDocuments } from "@/app/Services/api";
+import { apiDeleteDocument, apiGetDocuments } from "@/app/Services/api";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { uploadDocument } from "@/app/Services/pastor.service";
 
@@ -101,6 +101,9 @@ export default function PastorDocumentsPage() {
   const [uploading, setUploading] = useState(false);
 const fileInputRef = useRef<HTMLInputElement>(null);
 const [userId, setUserId] = useState<string>("");
+const [selectMode, setSelectMode] = useState(false);
+const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
+const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -180,6 +183,90 @@ const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploading(false);
   }
 };
+
+const getDocKey = (doc: any, index: number) => String(doc._id || doc.id || doc.fileUrl || index);
+
+const openDocument = (fileUrl?: string) => {
+  if (!fileUrl) return;
+  window.open(fileUrl, "_blank", "noopener,noreferrer");
+};
+
+const toggleSelectedDoc = (key: string) => {
+  setSelectedDocs((prev) =>
+    prev.includes(key) ? prev.filter((id) => id !== key) : [...prev, key],
+  );
+};
+
+const handleDeleteDocument = async (doc: any) => {
+  try {
+    if (!userId || !doc?.fileUrl) return;
+
+    await apiDeleteDocument(userId, doc.fileUrl);
+
+    setDocuments((prev) =>
+      prev.filter((item) => item.fileUrl !== doc.fileUrl),
+    );
+
+    setOpenMenuKey(null);
+  } catch (error) {
+    console.error("Failed to delete document:", error);
+    alert("Failed to delete document.");
+  }
+};
+
+const handleShareDocument = async (doc: any) => {
+  const shareUrl = doc.fileUrl || "";
+
+  if (navigator.share && shareUrl) {
+    await navigator.share({
+      title: doc.fileName || "Document",
+      url: shareUrl,
+    });
+  } else if (shareUrl) {
+    await navigator.clipboard.writeText(shareUrl);
+    alert("Document link copied.");
+  }
+
+  setOpenMenuKey(null);
+};
+
+const handleBulkDelete = () => {
+  setDocuments((prev) =>
+    prev.filter((doc, index) => !selectedDocs.includes(getDocKey(doc, index))),
+  );
+  setSelectedDocs([]);
+};
+
+const handleBulkShare = async () => {
+  const links = filteredDocuments
+    .filter((doc, index) => selectedDocs.includes(getDocKey(doc, index)))
+    .map((doc) => doc.fileUrl)
+    .filter(Boolean)
+    .join("\n");
+
+  if (!links) return;
+
+  await navigator.clipboard.writeText(links);
+  alert("Selected document links copied.");
+};
+
+const handleDownloadDocument = async (doc: any) => {
+  if (!doc?.fileUrl) return;
+
+  const response = await fetch(doc.fileUrl);
+  const blob = await response.blob();
+
+  const blobUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = blobUrl;
+  link.download = doc.fileName || "document";
+  document.body.appendChild(link);
+  link.click();
+
+  link.remove();
+  window.URL.revokeObjectURL(blobUrl);
+};
   return (
     <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_20%_12%,rgba(141,211,243,0.18),transparent_38%),linear-gradient(180deg,#041f35_0%,#062946_100%)] text-white">
       <PastorHeader showFullHeader={true} />
@@ -225,7 +312,7 @@ const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
               />
             </div>
 
-            <select
+            {/* <select
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as "newest" | "oldest")}
               className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white outline-none"
@@ -236,7 +323,52 @@ const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
               <option className="bg-[#062946]" value="oldest">
                 Sort: Oldest
               </option>
-            </select>
+            </select> */}
+            <div className="flex items-center gap-3">
+  {selectMode && selectedDocs.length > 0 ? (
+    <>
+      <button
+        type="button"
+        onClick={handleBulkShare}
+        className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+      >
+        Share
+      </button>
+
+      <button
+        type="button"
+        onClick={handleBulkDelete}
+        className="rounded-xl border border-red-300/30 bg-red-500/15 px-4 py-3 text-sm font-semibold text-red-100 transition hover:bg-red-500/25"
+      >
+        Delete
+      </button>
+    </>
+  ) : null}
+
+  <button
+    type="button"
+    onClick={() => {
+      setSelectMode((prev) => !prev);
+      setSelectedDocs([]);
+    }}
+    className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+  >
+    {selectMode ? "Cancel" : "Select"}
+  </button>
+
+  <select
+    value={sortOrder}
+    onChange={(e) => setSortOrder(e.target.value as "newest" | "oldest")}
+    className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white outline-none"
+  >
+    <option className="bg-[#062946]" value="newest">
+      Sort: Newest
+    </option>
+    <option className="bg-[#062946]" value="oldest">
+      Sort: Oldest
+    </option>
+  </select>
+</div>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-white/15 bg-white/[0.03]">
@@ -255,7 +387,7 @@ const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
               <p className="px-6 py-8 text-sm text-[#cde2f2]">No documents uploaded yet.</p>
             )}
 
-            {!loading &&
+            {/* {!loading &&
               !error &&
               filteredDocuments.map((doc: any, index) => (
                 <div
@@ -305,7 +437,93 @@ const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
                     </a>
                   </div>
                 </div>
-              ))}
+              ))} */}
+              {!loading &&
+  !error &&
+  filteredDocuments.map((doc: any, index) => {
+    const docKey = getDocKey(doc, index);
+    const isSelected = selectedDocs.includes(docKey);
+
+    return (
+      <div
+        key={docKey}
+        className="grid grid-cols-[1.8fr_0.7fr_0.9fr_0.5fr] items-center border-b border-white/10 px-6 py-5 last:border-b-0"
+      >
+        <div className="flex min-w-0 items-center gap-4">
+          {selectMode && (
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={() => toggleSelectedDoc(docKey)}
+              className="h-4 w-4 accent-[#8ec5eb]"
+            />
+          )}
+
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/5">
+            <i className={`${getFileIcon(doc.fileName)} text-lg text-[#8ec5eb]`} />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => openDocument(doc.fileUrl)}
+            className="truncate text-left text-sm font-semibold text-white transition hover:text-[#8ec5eb] hover:underline"
+          >
+            {doc.fileName || "Document"}
+          </button>
+        </div>
+
+        <p className="text-sm text-[#d9ebf8]">{getFileType(doc.fileName)}</p>
+
+        <p className="text-sm text-[#d9ebf8]">
+          {doc.uploadedAt
+            ? new Date(doc.uploadedAt).toLocaleDateString("en-US", {
+                month: "short",
+                day: "2-digit",
+                year: "numeric",
+              })
+            : "Uploaded"}
+        </p>
+
+        <div className="relative flex justify-end gap-4 text-[#8ec5eb]">
+          <button
+            type="button"
+            onClick={() => setOpenMenuKey(openMenuKey === docKey ? null : docKey)}
+            className="transition hover:text-white"
+            aria-label="Document menu"
+          >
+            <i className="fa-solid fa-ellipsis-vertical" />
+          </button>
+
+          {openMenuKey === docKey && (
+            <div className="absolute right-8 top-6 z-20 w-32 overflow-hidden rounded-xl border border-white/15 bg-[#082f49] shadow-xl">
+              <button
+                type="button"
+                onClick={() => handleShareDocument(doc)}
+                className="block w-full px-4 py-2 text-left text-sm text-white hover:bg-white/10"
+              >
+                Share
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteDocument(doc)}
+                className="block w-full px-4 py-2 text-left text-sm text-red-200 hover:bg-red-500/20"
+              >
+                Delete
+              </button>
+            </div>
+          )}
+<button
+  type="button"
+  onClick={() => handleDownloadDocument(doc)}
+  className="transition hover:text-white"
+  aria-label="Download document"
+>
+  <i className="fa-solid fa-download" />
+</button>
+        </div>
+      </div>
+    );
+  })}
           </div>
         </div>
       </main>

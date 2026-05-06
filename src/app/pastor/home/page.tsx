@@ -19,6 +19,7 @@ import { getUpcomingAppointments, getUserAppointments } from "@/app/Services/pas
 import { apiGetAssignedUsers, apiGetRoadmapsByUser } from "@/app/Services/api";
 import { unwrapRoadmapsList } from "@/app/Services/roadmap-assignments";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
+import axiosInstance from "@/app/Services/config/axios-instance";
 import {
   apiGetAssignedAssessments,
   flattenAssignedAssessmentRow,
@@ -109,28 +110,83 @@ export default function PastorDashboard() {
 
   const [pastorUserId] = useState<string | null>(() => readPastorUserId());
   const [pastorName, setPastorName] = useState("User");
+  const [pastorProfilePicture, setPastorProfilePicture] = useState<string | null>(null);
 
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [loadingMentors, setLoadingMentors] = useState(false);
   const [mentorsError, setMentorsError] = useState<string | null>(null);
   const [appointments, setAppointments] = useState<any[]>([]);
+// useEffect(() => {
+//   try {
+//     const storedUser = JSON.parse(getCookie("user") || "{}");
+
+//     const name =
+//       `${storedUser?.firstName || ""} ${storedUser?.lastName || ""}`.trim() ||
+//       storedUser?.name ||
+//       storedUser?.username ||
+//       storedUser?.email ||
+//       "User";
+
+//     setPastorName(name);
+//   } catch {
+//     setPastorName("User");
+//   }
+// }, []);
 useEffect(() => {
-  try {
-    const storedUser = JSON.parse(getCookie("user") || "{}");
+  const loadPastorProfile = async () => {
+    try {
+      const storedUser = JSON.parse(getCookie("user") || "{}");
+      const userId = storedUser?.id || storedUser?._id;
 
-    const name =
-      `${storedUser?.firstName || ""} ${storedUser?.lastName || ""}`.trim() ||
-      storedUser?.name ||
-      storedUser?.username ||
-      storedUser?.email ||
-      "User";
+      const cookieName =
+        `${storedUser?.firstName || ""} ${storedUser?.lastName || ""}`.trim() ||
+        storedUser?.name ||
+        storedUser?.username ||
+        storedUser?.email ||
+        "User";
 
-    setPastorName(name);
-  } catch {
-    setPastorName("User");
-  }
+      setPastorName(cookieName);
+
+      const cookieImage =
+        storedUser?.profilePicture ||
+        storedUser?.profileImage ||
+        storedUser?.avatar ||
+        storedUser?.image ||
+        null;
+
+      if (cookieImage) {
+        setPastorProfilePicture(cookieImage);
+      }
+
+      if (!userId) return;
+
+      const res = await axiosInstance.get(`/users/${userId}`);
+      const user = res?.data?.data || res?.data?.user || res?.data || {};
+
+      const apiName =
+        `${user?.firstName || ""} ${user?.lastName || ""}`.trim() ||
+        user?.name ||
+        user?.username ||
+        user?.email ||
+        cookieName;
+
+      const apiImage =
+        user?.profilePicture ||
+        user?.profileImage ||
+        user?.avatar ||
+        user?.image ||
+        cookieImage ||
+        null;
+
+      setPastorName(apiName);
+      setPastorProfilePicture(apiImage);
+    } catch {
+      setPastorName("User");
+    }
+  };
+
+  loadPastorProfile();
 }, []);
-
   useEffect(() => {
     const fetchMentors = async () => {
       try {
@@ -738,17 +794,15 @@ Development
   </p>
 
   <div className="flex items-center gap-3">
-    <Image
-      src={UserProfile}
-      alt="User"
-      width={44}
-      height={44}
-      className="h-11 w-11 rounded-full border-2 border-white/30 object-cover"
-    />
+    <img
+  src={pastorProfilePicture || UserProfile.src}
+  alt={pastorName}
+  className="h-11 w-11 rounded-full border-2 border-white/30 object-cover"
+/>
 
     <div className="min-w-0 flex-1">
       <p className="mb-1 truncate text-sm font-semibold text-white">
-        Grace Miller
+        {pastorName}
       </p>
 
       <div className="mb-1.5 flex items-center justify-between gap-3">
@@ -834,7 +888,7 @@ Development
                 </div>
                 <div>
                   <h3 className="text-base font-semibold sm:text-lg">Need a Help?</h3>
-                  <p className="mt-1 text-sm text-[#cde2f2]">
+                  {/* <p className="mt-1 text-sm text-[#cde2f2]">
                     {(() => {
                       if (!nextAppointment) {
                         return "We've got simple steps to help you move forward.";
@@ -846,12 +900,15 @@ Development
                       }
                       return `Next: ${d.toLocaleString()}`;
                     })()}
-                  </p>
+                  </p> */}
+                  <p className="mt-1 text-sm text-[#cde2f2]">
+  We&apos;ve got simple steps to help you move forward.
+</p>
                 </div>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2 sm:gap-3">
                 <Link
-                  href={FOCUS_HREF.assessments}
+                  href="/pastor/help"
                   prefetch
                   className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium backdrop-blur-sm transition hover:bg-white/15"
                 >
@@ -913,7 +970,7 @@ Development
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
     <div className="w-full max-w-md rounded-3xl border border-white/15 bg-[#083b5c] p-6 text-white shadow-2xl">
       <div className="mb-5 flex items-center justify-between">
-        <h3 className="text-xl font-semibold">Assigned Mentor</h3>
+        {/* <h3 className="text-xl font-semibold">Assigned Mentor</h3> */}
         <button
           type="button"
           onClick={() => setShowAssignedMentorModal(false)}
