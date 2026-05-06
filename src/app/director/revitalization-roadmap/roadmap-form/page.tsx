@@ -426,6 +426,13 @@ export default function DirectorRoadmapFormPage() {
                   assessmentId: sectionExtra.assessmentId,
                   scheduleMeeting: Array.isArray(sectionExtra.checkboxes) && sectionExtra.checkboxes.some((cb: any) => cb.name === "Schedule Meeting after the Assessment"),
                 });
+              } else if (sectionExtra.type === "SIGNATURE") {
+                fields.push({
+                  ...base,
+                  type: "digital_signature",
+                  fieldName: sectionExtra.name,
+                  placeholderText: sectionExtra.placeHolder || "Sign here",
+                });
               }
             });
           }
@@ -503,6 +510,13 @@ export default function DirectorRoadmapFormPage() {
                   ].filter(Boolean);
                   const nm = typeof nf.selectedAssessment === "object" ? nf.selectedAssessment?.name : nf.selectedAssessment;
                   return { type: "ASSESSMENT", name: nm || "Assessment", assessmentId: nf.assessmentId || (typeof nf.selectedAssessment === "object" ? nf.selectedAssessment?.id : undefined), ...(cbs.length ? { checkboxes: cbs } : {}) };
+                }
+                if (nf.type === "digital_signature") {
+                  return {
+                    type: "SIGNATURE",
+                    name: nf.fieldName || "Digital Signature",
+                    placeHolder: nf.placeholderText || "Sign here",
+                  };
                 }
                 return null;
               })

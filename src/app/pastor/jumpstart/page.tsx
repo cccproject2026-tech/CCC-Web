@@ -130,6 +130,63 @@ interface ExtraComponent {
   sections?: ExtraComponent[];
 }
 
+/** Director / API may send mixed-case or legacy type strings; jumpstart switch is strict. */
+function normalizeExtraType(raw: unknown): ExtraComponent["type"] {
+  const t = String(raw ?? "").trim();
+  if (!t) return "TEXT_FIELD";
+  const u = t.toUpperCase().replace(/\s+/g, "_");
+  const aliases: Record<string, ExtraComponent["type"]> = {
+    TEXTFIELD: "TEXT_FIELD",
+    TEXTAREA: "TEXT_AREA",
+    DATEPICKER: "DATE_PICKER",
+    TEXTDISPLAY: "TEXT_DISPLAY",
+    CHECKBOX_ITEM: "CHECKBOX",
+    UPLOADER: "UPLOAD",
+    DIGITAL_SIGNATURE: "SIGNATURE",
+    SIGNATURE_FIELD: "SIGNATURE",
+  };
+  const next = aliases[u] ?? (u as ExtraComponent["type"]);
+  const legal: ExtraComponent["type"][] = [
+    "TEXT_DISPLAY",
+    "TEXT_AREA",
+    "TEXT_FIELD",
+    "DATE_PICKER",
+    "UPLOAD",
+    "CHECKBOX",
+    "ASSESSMENT",
+    "SECTION",
+    "SIGNATURE",
+  ];
+  return legal.includes(next) ? next : "TEXT_FIELD";
+}
+
+function normalizeExtraTree(extra: ExtraComponent): ExtraComponent {
+  const type = normalizeExtraType((extra as { type?: unknown }).type);
+  const out: ExtraComponent = { ...extra, type };
+  if (Array.isArray(extra.checkboxes) && extra.checkboxes.length > 0) {
+    out.checkboxes = extra.checkboxes.map((c) =>
+      normalizeExtraTree({
+        ...(c as ExtraComponent),
+        type:
+          ((c as { type?: unknown }).type != null ? (c as { type?: unknown }).type : "CHECKBOX") as ExtraComponent["type"],
+      } as ExtraComponent),
+    );
+  }
+  if (Array.isArray(extra.sections) && extra.sections.length > 0)
+    out.sections = extra.sections.map((s) => normalizeExtraTree(s));
+  return out;
+}
+
+function findExtraByFieldName(items: ExtraComponent[] | undefined, name: string): ExtraComponent | undefined {
+  if (!items?.length) return undefined;
+  for (const e of items) {
+    if (e.name === name) return e;
+    const inSections = findExtraByFieldName(e.sections, name);
+    if (inSections) return inSections;
+  }
+  return undefined;
+}
+
 function JumpStartContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -187,6 +244,13 @@ function JumpStartContent() {
   const [progressData, setProgressData] = useState<ProgressResponse | null>(null);
   /** When PATCH succeeds but GET /progress lags or nested rows disagree, still show Completed. */
   const [statusUiOverride, setStatusUiOverride] = useState<RoadmapAssignmentUi["status"] | null>(null);
+
+  /** Director “Insert field” extras: normalize types and keep nested SECTION trees intact. */
+  const templateExtras = useMemo((): ExtraComponent[] => {
+    const raw = roadmap?.extras;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((e) => normalizeExtraTree(e as ExtraComponent));
+  }, [roadmap?.extras]);
 
   /** Same as mobile `DynamicFormTask` — POST JUMPSTART_COMPLETE before first extras save. */
   const jumpstartTriggeredRef = useRef(false);
@@ -300,12 +364,17 @@ function JumpStartContent() {
   // Mobile parity: defaults only from the task definition itself.
   const buildDefaultFormDataFromTemplate = useCallback((): Record<string, any> => {
     const init: Record<string, any> = {};
-    const extras = (roadmap?.extras as ExtraComponent[] | undefined) ?? [];
-    extras.forEach((extra) => {
-      if (extra?.date) init[extra.name] = extra.date;
-    });
+    const walk = (list: ExtraComponent[]) => {
+      for (const extra of list) {
+        if (extra.type === "DATE_PICKER" && typeof extra.date === "string" && extra.date.trim()) {
+          init[extra.name] = extra.date.trim().slice(0, 10);
+        }
+        if (Array.isArray(extra.sections) && extra.sections.length > 0) walk(extra.sections);
+      }
+    };
+    walk(templateExtras);
     return init;
-  }, [roadmap?.extras]);
+  }, [templateExtras]);
 
 // Prevent roadmap completion when a required signature field is still empty.
   const hasRequiredSignature = useMemo(() => {
@@ -334,8 +403,8 @@ function JumpStartContent() {
     return true;
   };
 
-  return checkExtras(roadmap?.extras as ExtraComponent[] | undefined, "extra");
-}, [roadmap?.extras, formData]);
+  return checkExtras(templateExtras, "extra");
+}, [templateExtras, formData]);
 // Prevent roadmap completion when a required upload field has no uploaded or saved file.
 const hasRequiredUploads = useMemo(() => {
   const checkExtras = (
@@ -367,8 +436,8 @@ const hasRequiredUploads = useMemo(() => {
     return true;
   };
 
-  return checkExtras(roadmap?.extras as ExtraComponent[] | undefined, "extra");
-}, [roadmap?.extras, uploadedFiles, formData]);
+  return checkExtras(templateExtras, "extra");
+}, [templateExtras, uploadedFiles, formData]);
 
 // Prevent roadmap completion until required task submissions such as text fields,
 // text areas, and checkboxes are completed.
@@ -407,8 +476,8 @@ const hasRequiredSubmissions = useMemo(() => {
     return true;
   };
 
-  return checkExtras(roadmap?.extras as ExtraComponent[] | undefined, "extra");
-}, [roadmap?.extras, formData]);
+  return checkExtras(templateExtras, "extra");
+}, [templateExtras, formData]);
 
   useEffect(() => {
     if (!nestedItemId) return;
@@ -733,17 +802,13 @@ const hasRequiredSubmissions = useMemo(() => {
       // Mobile parity: only UPLOAD extras become boolean flags.
       // Do NOT overwrite SIGNATURE dataUrl with `true` (that breaks persistence + hydration).
       Object.keys(uploadedFiles).forEach((k) => {
-        const extraDef = (roadmap?.extras as ExtraComponent[] | undefined)?.find(
-          (e) => e.name === k,
-        );
+        const extraDef = findExtraByFieldName(templateExtras, k);
         if (extraDef?.type === "UPLOAD") mergedForm[k] = true;
       });
 
       // Mobile parity: build extrasArray from Object.entries(formData), no name transforms.
       const getExtraType = (fieldName: string, value: any): string => {
-        const extraDef = (roadmap?.extras as ExtraComponent[] | undefined)?.find(
-          (e) => e.name === fieldName,
-        );
+        const extraDef = findExtraByFieldName(templateExtras, fieldName);
         if (extraDef) return extraDef.type;
 
         if (typeof value === "boolean") return "CHECKBOX";
@@ -1203,10 +1268,30 @@ if (!hasRequiredSubmissions) {
           </div>
         );
 
-      case "DATE_PICKER":
+      case "DATE_PICKER": {
+        const allowPastorSelect =
+          Array.isArray(extra.checkboxes) &&
+          extra.checkboxes.some((cb) => String((cb as ExtraComponent)?.name ?? "") === "Allow pastor to select Date");
+        const defaultDate =
+          typeof extra.date === "string" && extra.date.trim() ? extra.date.trim().slice(0, 10) : "";
+        const value = String(formData[fieldKey] ?? defaultDate ?? "");
+        const metaNames = new Set(["Allow pastor to select Date", "Show date on info card"]);
+        const displayCheckboxes =
+          extra.checkboxes?.filter((cb) => !metaNames.has(String((cb as ExtraComponent)?.name ?? ""))) ?? [];
+
         return (
           <div key={`${fieldKey}_${index}`} className="mb-5">
             <h4 className="text-sm font-semibold text-white mb-2">{extra.name}</h4>
+            {allowPastorSelect ? (
+              <input
+                type="date"
+                value={value.slice(0, 10)}
+                onChange={(e) => handleInputChange(fieldKey, e.target.value)}
+                className="mb-3 w-full max-w-xs rounded-md border border-[#5A8DCB] bg-white/5 px-3 py-2 text-sm text-white [color-scheme:dark]"
+              />
+            ) : defaultDate ? (
+              <p className="mb-3 text-sm text-white/85">{formatDate(defaultDate)}</p>
+            ) : null}
             {extra.buttonName ? (
               <button
                 type="button"
@@ -1215,13 +1300,14 @@ if (!hasRequiredSubmissions) {
                 {extra.buttonName}
               </button>
             ) : null}
-            {extra.checkboxes && extra.checkboxes.length > 0 && (
+            {displayCheckboxes.length > 0 && (
               <div className="mt-3 space-y-2 pl-1">
-                {extra.checkboxes.map((cb, i) => renderExtraComponent(cb, i, fieldKey))}
+                {displayCheckboxes.map((cb, i) => renderExtraComponent(cb, i, fieldKey))}
               </div>
             )}
           </div>
         );
+      }
 
       case "UPLOAD":
         return (
@@ -1470,7 +1556,7 @@ if (!hasRequiredSubmissions) {
   const title = roadmap?.name || "Jump Start";
   const duration = roadmap?.duration || "";
   const description = roadmap?.description || roadmap?.roadMapDetails || "";
-  const extras: ExtraComponent[] = roadmap?.extras || [];
+  const extras = templateExtras;
   const phaseTag = typeof roadmap?.phase === "string" ? roadmap.phase.trim() : "";
 
   const heroCoverSrc =
