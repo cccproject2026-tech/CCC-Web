@@ -1,67 +1,67 @@
-import api from "./apiClient";
+import axiosInstance from "./config/axios-instance";
 import { getNotification } from "./notification.service";
 
 export const getPastorMedia = async () => {
-  return api.get("/home/media");
+  return axiosInstance.get("/home/media");
 };
 
 export const getUserAppointments = (userId: string) => {
-  return api.get(`/appointments/user/${userId}`);
+  return axiosInstance.get(`/appointments/user/${userId}`);
 };
 
 // export const getSingleUser = (userId: string) => {
 //   return api.get(`/users/${userId}`);
 // };
 export const getSingleUser = (userId: string) => {
-  return api.get(`/users/${userId}`, {
+  return axiosInstance.get(`/users/${userId}`, {
     params: { t: Date.now() },
   });
 };
 export const getUpcomingAppointments = (userId: string) => {
-  return api.get(`/appointments/upcoming`, {
+  return axiosInstance.get(`/appointments/upcoming`, {
     params: { userId }
   });
 };
 
 export const getMentors = () => {
-  return api.get("/home/mentors");
+  return axiosInstance.get("/home/mentors");
 };
 
 export const scheduleAppointment = (payload: any) => {
-  return api.post("/appointments", payload);
+  return axiosInstance.post("/appointments", payload);
 };
 
 export const rescheduleAppointment = (appointmentId: string, data: any) => {
-  return api.patch(`/appointments/${appointmentId}/reschedule`, data);
+  return axiosInstance.patch(`/appointments/${appointmentId}/reschedule`, data);
 };
 
 export const updateAppointment = (appointmentId: string, data: any) => {
-  return api.patch(`/appointments/${appointmentId}`, data);
+  return axiosInstance.patch(`/appointments/${appointmentId}`, data);
 };
 
 export const cancelAppointment = (appointmentId: string) => {
-  return api.patch(`/appointments/${appointmentId}/cancel`);
+  return axiosInstance.patch(`/appointments/${appointmentId}/cancel`);
 };
 
 /** Same as director — uses axios `/api-proxy` in the browser (avoids CORS / wrong base URL). */
 export const getNotifications = (userId: string) => getNotification(userId);
 
 export const updateUser = (userId: string, payload: any) => {
-  return api.patch(`/users/${userId}`, payload);
+  return axiosInstance.patch(`/users/${userId}`, payload);
 };
 
 export const updateInterestByEmail = (email: string, payload: any) => {
-  return api.patch(`/interests/by-email/${email}`, payload);
+  return axiosInstance.patch(`/interests/by-email/${email}`, payload);
 };
 
 export const uploadDocument = (userId: string, file: File) => {
   const formData = new FormData();
   formData.append("file", file);
-  return api.post(`/users/${userId}/documents`, formData, {
+  return axiosInstance.post(`/users/${userId}/documents`, formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
 };
 
 export const getUserDocuments = (userId: string) => {
-  return api.get(`/users/${userId}/documents`);
+  return axiosInstance.get(`/users/${userId}/documents`);
 };
