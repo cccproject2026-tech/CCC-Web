@@ -121,21 +121,21 @@ export default function NotificationPopup({
   return (
     <div
       ref={popupRef}
-      className="absolute top-[60px] right-10 w-[420px] max-h-[600px] bg-white rounded-xl shadow-2xl overflow-hidden z-50 animate-slide-down"
+      className="absolute right-6 top-[68px] z-50 w-[430px] overflow-hidden rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.98)_0%,rgba(6,36,62,0.98)_100%)] text-white shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl animate-slide-down"
     >
       {/* Header */}
-      <div className="bg-gradient-to-r from-[#2E3B8E] to-[#4A5FB8] px-6 py-4 flex justify-between items-center">
-        <h3 className="text-white font-semibold text-[17px]">Notifications</h3>
+      <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
+        <h3 className="text-xl font-semibold text-white">Notifications</h3>
         <a
           href={viewAllHref}
-          className="text-white text-[13px] hover:underline"
+          className="text-sm font-medium text-[#8ec5eb] transition hover:text-white"
         >
           View All
         </a>
       </div>
 
       {/* Notification List */}
-      <div className="max-h-[500px] overflow-y-auto">
+      <div className="max-h-[520px] space-y-3 overflow-y-auto p-3">
         {loading && (
           <div className="flex items-center justify-center gap-2 px-6 py-12 text-sm text-gray-500">
             <i className="fa-solid fa-spinner fa-spin" />
@@ -193,7 +193,7 @@ export default function NotificationPopup({
       router.push(notification.link);
     }
   }}
-  className={`border-b border-gray-100 px-6 py-4 hover:bg-gray-50 transition relative ${
+  className={`relative rounded-2xl border border-white/10 bg-white/[0.06] p-4 transition hover:bg-white/[0.1] ${
     notification.link ? "cursor-pointer" : "cursor-default"
   }`}
 >
@@ -201,7 +201,7 @@ export default function NotificationPopup({
             <div className="flex gap-4">
               {/* Icon */}
               <div className="flex-shrink-0 mt-1">
-                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
                   <i
                     className={`${notification.icon} ${notification.iconColor}`}
                   ></i>
@@ -210,7 +210,7 @@ export default function NotificationPopup({
 
               {/* Content */}
               <div className="flex-1">
-                <h4 className="text-[13px] font-semibold text-gray-900 mb-1">
+                <h4 className="mb-1 text-sm font-semibold text-white">
                   {notification.title}
                 </h4>
 
@@ -228,7 +228,7 @@ export default function NotificationPopup({
                 )}
 
                 {notification.subtitle && (
-                  <p className="text-[12px] text-gray-600 mb-1">
+                  <p className="mb-1 text-xs leading-5 text-[#cde2f2]">
                     {notification.subtitle}
                   </p>
                 )}
