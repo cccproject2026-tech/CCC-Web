@@ -317,6 +317,7 @@ export default function DirectorRoadmapFormPage() {
     | "digital_signature"
   >("text");
   const [fieldDraft, setFieldDraft] = useState<Record<string, any>>({});
+  const [fieldModalError, setFieldModalError] = useState<string | null>(null);
 
   const heroTitle = useMemo(() => {
     if (!isEditMode) return "Roadmap";
@@ -537,6 +538,7 @@ export default function DirectorRoadmapFormPage() {
     } else {
       setFieldDraft({ type });
     }
+    setFieldModalError(null);
     setFieldModalOpen(true);
   };
 
@@ -545,9 +547,54 @@ export default function DirectorRoadmapFormPage() {
     setFieldParentSectionId(null);
     setEditingFieldId(null);
     setFieldDraft({});
+    setFieldModalError(null);
+  };
+
+  const validateFieldDraft = (): string | null => {
+    switch (fieldType) {
+      case "text":
+      case "textarea":
+        if (!String(fieldDraft.label ?? "").trim()) return "Label is required.";
+        return null;
+      case "upload":
+        if (!String(fieldDraft.buttonLabel ?? "").trim()) return "Button label is required.";
+        return null;
+      case "datepicker":
+        if (!String(fieldDraft.label ?? "").trim()) return "Label is required.";
+        return null;
+      case "assessment":
+        if (!String(fieldDraft.assessmentId ?? "").trim()) return "Please select an assessment.";
+        return null;
+      case "checkbox_item":
+        if (!String(fieldDraft.name ?? "").trim()) return "Name is required.";
+        if (fieldDraft.haveButton && !String(fieldDraft.buttonName ?? "").trim()) {
+          return "Button name is required when \"Have button\" is enabled.";
+        }
+        return null;
+      case "text_display":
+        if (!String(fieldDraft.name ?? "").trim()) return "Text is required.";
+        return null;
+      case "digital_signature":
+        if (!String(fieldDraft.fieldName ?? "").trim()) return "Field name is required.";
+        if (!String(fieldDraft.placeholderText ?? "").trim()) return "Placeholder is required.";
+        return null;
+      case "section":
+        if (!String(fieldDraft.name ?? "").trim()) return "Section name is required.";
+        if (fieldDraft.showDuplicateButton && !String(fieldDraft.buttonName ?? "").trim()) {
+          return "Button name is required when section button is enabled.";
+        }
+        return null;
+      default:
+        return null;
+    }
   };
 
   const saveFieldDraft = () => {
+    const validationError = validateFieldDraft();
+    if (validationError) {
+      setFieldModalError(validationError);
+      return;
+    }
     const id = editingFieldId || `field_${Date.now()}`;
     const next = { id, ...fieldDraft, type: fieldType, ...(fieldParentSectionId ? { parentSectionId: fieldParentSectionId } : {}) };
     setCustomFields((prev) => {
@@ -600,14 +647,12 @@ export default function DirectorRoadmapFormPage() {
         if (cancelled) return;
         setParent(doc);
 
-        /** Mobile parity: new flow should carry values from create step into form page. */
+        /** New nested template: start with empty verbiage/description so directors fill them here (ignore URL carry-over). */
         if (!isEditMode) {
           const fromUrlTitle = safeDecodeURIComponent(roadmapData.name.trim());
-          const fromUrlSubheading = safeDecodeURIComponent(roadmapData.subheading.trim());
-          const fromUrlLong = safeDecodeURIComponent(roadmapData.longDescription.trim());
           setNestedItemTitle(fromUrlTitle);
-          setChurchVerbiage(fromUrlSubheading);
-          setDescriptionVerbiage(fromUrlLong || fromUrlSubheading);
+          setChurchVerbiage("");
+          setDescriptionVerbiage("");
           setCustomFields([]);
           if (roadmapData.bannerImage?.trim()) {
             setBannerPreview(roadmapData.bannerImage.trim());
@@ -654,14 +699,12 @@ export default function DirectorRoadmapFormPage() {
         setNestedItemTitle(
           safeString(nTitle) || safeDecodeURIComponent(roadmapData.name.trim()),
         );
-        const fromUrl = safeString(roadmapData.subheading);
-        const fromUrlDesc = safeString(roadmapData.longDescription);
         const rmd =
           roadmapDetailText((nested as { roadMapDetails?: unknown } | null)?.roadMapDetails) ||
           roadmapDetailText((nested as { road_map_details?: unknown } | null)?.road_map_details);
         const ddesc = roadmapDetailText((nested as { description?: unknown } | null)?.description);
-        setChurchVerbiage(rmd || fromUrl);
-        setDescriptionVerbiage(ddesc || fromUrlDesc || rmd || fromUrl);
+        setChurchVerbiage(rmd || "");
+        setDescriptionVerbiage(ddesc || "");
         setCustomFields(transformExtrasToFields(((nested as any)?.extras || []) as any[]));
 
         // Mobile parity for banner: prefer param bannerImage; fall back to nested.imageUrl.
@@ -895,9 +938,6 @@ export default function DirectorRoadmapFormPage() {
                   <label className={directorLabelClass}>
                     Roadmap Verbiage {!viewOnly ? <span className="text-red-300">*</span> : null}
                   </label>
-                  <p className="mb-2 text-xs text-white/50">
-                    Subheading on the step card; often a short one-liner. Required.
-                  </p>
                   <input
                     type="text"
                     value={churchVerbiage}
@@ -912,7 +952,6 @@ export default function DirectorRoadmapFormPage() {
                   <label className={directorLabelClass}>
                     Description {!viewOnly ? <span className="text-red-300">*</span> : null}
                   </label>
-                  <p className="mb-2 text-xs text-white/50">Longer description for this step. Required.</p>
                   <textarea
                     value={descriptionVerbiage}
                     readOnly={viewOnly}
@@ -1061,7 +1100,7 @@ export default function DirectorRoadmapFormPage() {
                       disabled={submitting}
                       className={`${directorBtnPrimary} border border-white/25 px-8 disabled:opacity-60`}
                     >
-                      {submitting ? "Saving…" : "Save Changes"}
+                      {submitting ? "Creating…" : "Create"}
                     </button>
                   </div>
                 ) : null}
@@ -1081,9 +1120,6 @@ export default function DirectorRoadmapFormPage() {
                   <h3 className="text-lg font-semibold text-white">
                     {editingFieldId ? "Edit field" : "Add field"}
                   </h3>
-                  <p className="mt-1 text-xs text-white/60">
-                    Mobile parity field builder (saved into `extras`).
-                  </p>
                 </div>
                 <button
                   type="button"
@@ -1094,6 +1130,12 @@ export default function DirectorRoadmapFormPage() {
                 </button>
               </div>
 
+              {fieldModalError ? (
+                <div className="mb-4 rounded-lg border border-red-400/40 bg-red-500/15 px-3 py-2 text-sm text-red-100">
+                  {fieldModalError}
+                </div>
+              ) : null}
+
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {(fieldType === "text" || fieldType === "textarea") ? (
                   <>
@@ -1101,7 +1143,10 @@ export default function DirectorRoadmapFormPage() {
                       <label className="mb-1.5 block text-xs font-medium text-white/70">Label</label>
                       <input
                         value={fieldDraft.label ?? ""}
-                        onChange={(e) => setFieldDraft((p) => ({ ...p, label: e.target.value }))}
+                        onChange={(e) => {
+                          setFieldDraft((p) => ({ ...p, label: e.target.value }));
+                          if (fieldModalError) setFieldModalError(null);
+                        }}
                         className={directorInputClass}
                       />
                     </div>
@@ -1109,7 +1154,10 @@ export default function DirectorRoadmapFormPage() {
                       <label className="mb-1.5 block text-xs font-medium text-white/70">Placeholder (optional)</label>
                       <input
                         value={fieldDraft.placeholder ?? ""}
-                        onChange={(e) => setFieldDraft((p) => ({ ...p, placeholder: e.target.value }))}
+                        onChange={(e) => {
+                          setFieldDraft((p) => ({ ...p, placeholder: e.target.value }));
+                          if (fieldModalError) setFieldModalError(null);
+                        }}
                         className={directorInputClass}
                       />
                     </div>
@@ -1121,7 +1169,10 @@ export default function DirectorRoadmapFormPage() {
                     <label className="mb-1.5 block text-xs font-medium text-white/70">Button label</label>
                     <input
                       value={fieldDraft.buttonLabel ?? ""}
-                      onChange={(e) => setFieldDraft((p) => ({ ...p, buttonLabel: e.target.value }))}
+                      onChange={(e) => {
+                        setFieldDraft((p) => ({ ...p, buttonLabel: e.target.value }));
+                        if (fieldModalError) setFieldModalError(null);
+                      }}
                       className={directorInputClass}
                     />
                   </div>
@@ -1133,7 +1184,10 @@ export default function DirectorRoadmapFormPage() {
                       <label className="mb-1.5 block text-xs font-medium text-white/70">Label</label>
                       <input
                         value={fieldDraft.label ?? ""}
-                        onChange={(e) => setFieldDraft((p) => ({ ...p, label: e.target.value }))}
+                        onChange={(e) => {
+                          setFieldDraft((p) => ({ ...p, label: e.target.value }));
+                          if (fieldModalError) setFieldModalError(null);
+                        }}
                         className={directorInputClass}
                       />
                     </div>
@@ -1188,6 +1242,7 @@ export default function DirectorRoadmapFormPage() {
                           const id = e.target.value;
                           const hit = assessments.find((a) => a.id === id);
                           setFieldDraft((p) => ({ ...p, assessmentId: id, selectedAssessment: hit?.name || "" }));
+                          if (fieldModalError) setFieldModalError(null);
                         }}
                         className={directorInputClass}
                       >
@@ -1228,7 +1283,10 @@ export default function DirectorRoadmapFormPage() {
                       <label className="mb-1.5 block text-xs font-medium text-white/70">Name</label>
                       <input
                         value={fieldDraft.name ?? ""}
-                        onChange={(e) => setFieldDraft((p) => ({ ...p, name: e.target.value }))}
+                        onChange={(e) => {
+                          setFieldDraft((p) => ({ ...p, name: e.target.value }));
+                          if (fieldModalError) setFieldModalError(null);
+                        }}
                         className={directorInputClass}
                       />
                     </div>
@@ -1261,7 +1319,10 @@ export default function DirectorRoadmapFormPage() {
                     <label className="mb-1.5 block text-xs font-medium text-white/70">Text</label>
                     <textarea
                       value={fieldDraft.name ?? ""}
-                      onChange={(e) => setFieldDraft((p) => ({ ...p, name: e.target.value }))}
+                      onChange={(e) => {
+                        setFieldDraft((p) => ({ ...p, name: e.target.value }));
+                        if (fieldModalError) setFieldModalError(null);
+                      }}
                       rows={4}
                       className={`${directorInputClass} min-h-[110px] resize-y`}
                     />
@@ -1274,7 +1335,10 @@ export default function DirectorRoadmapFormPage() {
                       <label className="mb-1.5 block text-xs font-medium text-white/70">Field name</label>
                       <input
                         value={fieldDraft.fieldName ?? ""}
-                        onChange={(e) => setFieldDraft((p) => ({ ...p, fieldName: e.target.value }))}
+                        onChange={(e) => {
+                          setFieldDraft((p) => ({ ...p, fieldName: e.target.value }));
+                          if (fieldModalError) setFieldModalError(null);
+                        }}
                         className={directorInputClass}
                       />
                     </div>
@@ -1282,7 +1346,10 @@ export default function DirectorRoadmapFormPage() {
                       <label className="mb-1.5 block text-xs font-medium text-white/70">Placeholder</label>
                       <input
                         value={fieldDraft.placeholderText ?? ""}
-                        onChange={(e) => setFieldDraft((p) => ({ ...p, placeholderText: e.target.value }))}
+                        onChange={(e) => {
+                          setFieldDraft((p) => ({ ...p, placeholderText: e.target.value }));
+                          if (fieldModalError) setFieldModalError(null);
+                        }}
                         className={directorInputClass}
                       />
                     </div>
@@ -1323,7 +1390,10 @@ export default function DirectorRoadmapFormPage() {
                       <label className="mb-1.5 block text-xs font-medium text-white/70">Section name</label>
                       <input
                         value={fieldDraft.name ?? ""}
-                        onChange={(e) => setFieldDraft((p) => ({ ...p, name: e.target.value }))}
+                        onChange={(e) => {
+                          setFieldDraft((p) => ({ ...p, name: e.target.value }));
+                          if (fieldModalError) setFieldModalError(null);
+                        }}
                         className={directorInputClass}
                       />
                     </div>

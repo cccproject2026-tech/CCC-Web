@@ -742,7 +742,7 @@ function CreateRoadmapStepOnePage() {
                   : "Creating…"
                 : isEditMode
                   ? "Save changes"
-                  : "Create"}
+                  : "Next"}
             </button>
           </div>
         </div>
