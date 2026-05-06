@@ -547,7 +547,7 @@ useEffect(() => {
     };
     try {
       const ts = Date.now();
-      const [mRes, pRes, fmRes] = await Promise.all([
+      const [mRes, pRes, fmRes] = await Promise.allSettled([
         apiGetAllUsers({
           role: "mentor",
           roleMatch: "mixed",
@@ -576,9 +576,17 @@ useEffect(() => {
 // }),
       ]);
       if (req !== networkMapRequestId.current) return;
-      const { users: mu } = parseMentorUsersListResponse(mRes);
-      const { users: pu } = parseMentorUsersListResponse(pRes);
-      const { users: fmu } = parseMentorUsersListResponse(fmRes);
+      // const { users: mu } = parseMentorUsersListResponse(mRes);
+      // const { users: pu } = parseMentorUsersListResponse(pRes);
+      // const { users: fmu } = parseMentorUsersListResponse(fmRes);
+      const { users: mu } =
+  mRes.status === "fulfilled" ? parseMentorUsersListResponse(mRes.value) : { users: [] };
+
+const { users: pu } =
+  pRes.status === "fulfilled" ? parseMentorUsersListResponse(pRes.value) : { users: [] };
+
+const { users: fmu } =
+  fmRes.status === "fulfilled" ? parseMentorUsersListResponse(fmRes.value) : { users: [] };
       const mentors = mu.map((u, i) => mapUserToPin(u, "mentor", i));
       const pastors = pu.map((u, i) => mapUserToPin(u, "pastor", i));
       const fieldMentors = fmu.map((u, i) => mapUserToPin(u, "field-mentor", i));

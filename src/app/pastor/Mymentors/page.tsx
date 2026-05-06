@@ -8,6 +8,7 @@ import {
   apiCreateAppointment,
 } from "@/app/Services/api";
 import { getPastorUserId } from "@/app/utils/pastor-auth";
+import PastorScheduleDrawer from "@/app/Components/pastor/PastorScheduleDrawer";
 import Image from "next/image";
 import PastorHeader from "@/app/Components/PastorHeader";
 import MentorBg from "@/app/Assets/mentor-bg.png";
@@ -23,9 +24,15 @@ type Mentor = {
   role: string;
   email: string;
   profileInfo?: string;
+   profilePicture?: string;
 };
 
 const mentorImages = [Mentor1, Mentor2, Mentor3];
+function getMentorImage(mentor: Mentor, fallback: any) {
+  return mentor.profilePicture && mentor.profilePicture.trim()
+    ? mentor.profilePicture
+    : fallback;
+}
 
 /** Backend may return a raw array, { data: [] }, { data: { users } }, or rows with nested `mentor`. */
 function extractAssignedMentorsPayload(body: unknown): unknown[] {
@@ -66,6 +73,7 @@ function mapRowToMentor(row: unknown): Mentor | null {
     role: String(u.role ?? "Mentor"),
     email: String(u.email ?? "").trim(),
     profileInfo: bio,
+     profilePicture: String(u.profilePicture ?? u.avatar ?? u.image ?? ""),
   };
 }
 
@@ -85,6 +93,7 @@ function normalizeMentorDetail(raw: Record<string, unknown>, fallback: Mentor): 
     role: String(raw.role ?? fallback.role),
     email: String(raw.email ?? fallback.email),
     profileInfo,
+    profilePicture: String(raw.profilePicture ?? raw.avatar ?? raw.image ?? fallback.profilePicture ?? ""),
   };
 }
 
@@ -276,6 +285,10 @@ export default function Mymentors() {
   const [searchText, setSearchText] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [pastorUserId, setPastorUserId] = useState("");
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  const [scheduleDrawerOpen, setScheduleDrawerOpen] = useState(false);
+const [mentorToSchedule, setMentorToSchedule] = useState<Mentor | null>(null);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -388,13 +401,13 @@ export default function Mymentors() {
         style={{ backgroundImage: `url(${MentorBg.src})` }}
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.12),transparent_38%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]"></div>
-        <div className="relative z-10">
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
+        <div className="relative z-10 flex h-full max-w-3xl flex-col justify-center text-left">
+          {/* <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
             <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
             Leadership Support Network
-          </p>
-          <h1 className="mt-3 text-3xl font-semibold md:text-4xl">My Mentors</h1>
-          <p className="mt-2 max-w-xl text-sm text-[#d9ebf8] md:text-base">
+          </p> */}
+          <h1 className="text-3xl font-semibold md:text-5xl">My Mentors</h1>
+          <p className="mt-4 max-w-2xl text-sm text-[#d9ebf8] md:text-lg">
             Connect, learn, and schedule personalized sessions with your assigned mentors.
           </p>
         </div>
@@ -437,7 +450,8 @@ export default function Mymentors() {
           {/* AVATAR ROW */}
           <div className="flex items-center gap-6 overflow-x-auto pb-6">
             {filteredMentors.map((mentor, i) => {
-              const img = mentorImages[i % mentorImages.length];
+              // const img = mentorImages[i % mentorImages.length];
+              const img = getMentorImage(mentor, mentorImages[i % mentorImages.length]);
 
               return (
                 <div
@@ -446,10 +460,13 @@ export default function Mymentors() {
                 >
                   <div className="w-[72px] h-[72px] p-[2px] rounded-full bg-[linear-gradient(145deg,#8ec5eb,#9c7cff)]">
                     <Image
-                      src={img}
-                      alt={mentor.firstName}
-                      className="rounded-full w-full h-full object-cover border border-[#062946]"
-                    />
+  src={img}
+  alt={mentor.firstName}
+  unoptimized={typeof img === "string"}
+  width={72}
+  height={72}
+  className="rounded-full w-full h-full object-cover border border-[#062946]"
+/>
                   </div>
                   <p className="text-xs text-white mt-2 whitespace-nowrap">
                     {mentor.firstName}
@@ -472,7 +489,8 @@ export default function Mymentors() {
             }`}
           >
             {filteredMentors.map((mentor, i) => {
-              const img = mentorImages[i % mentorImages.length];
+              // const img = mentorImages[i % mentorImages.length];
+              const img = getMentorImage(mentor, mentorImages[i % mentorImages.length]);
 
               return isListView ? (
                 /* -----------------------------------------
@@ -483,12 +501,14 @@ export default function Mymentors() {
                   onClick={() => void fetchMentorDetail(mentor)}
                   className="cursor-pointer bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] border border-white/15 rounded-xl p-4 shadow flex items-center gap-4 hover:shadow-lg hover:border-[#8ec5eb66] transition"
                 >
-                  <Image
-                    src={img}
-                    alt=""
-                    className="w-[65px] h-[65px] rounded-lg object-cover"
-                  />
-
+                 <Image
+  src={img}
+  alt=""
+  unoptimized={typeof img === "string"}
+  width={65}
+  height={65}
+  className="w-[65px] h-[65px] rounded-lg object-cover"
+/>
                   <div className="flex-1">
                     <h4 className="font-semibold text-white">
                       {mentor.firstName} {mentor.lastName}
@@ -505,9 +525,19 @@ export default function Mymentors() {
                     <i className="fa-solid fa-phone"></i>
                     <i className="fa-brands fa-whatsapp"></i>
 
-                    <button className="w-7 h-7 border border-white/35 rounded flex items-center justify-center hover:bg-white/15 hover:text-white">
+                    {/* <button className="w-7 h-7 border border-white/35 rounded flex items-center justify-center hover:bg-white/15 hover:text-white">
                       <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
-                    </button>
+                    </button> */}
+         <button
+  type="button"
+  onClick={(e) => {
+    e.stopPropagation();
+    window.location.href = `/pastor/mentor-profile/${encodeURIComponent(mentor._id)}`;
+  }}
+  className="w-8 h-8 border border-white/35 rounded flex items-center justify-center hover:bg-white/15 hover:text-white transition"
+>
+  <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+</button>
                   </div>
                 </div>
               ) : (
@@ -516,15 +546,50 @@ export default function Mymentors() {
                 ------------------------------------------- */
                 <div
                   key={mentor._id}
-                  onClick={() => void fetchMentorDetail(mentor)}
-                  className="cursor-pointer bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] border border-white/15 rounded-xl shadow hover:shadow-lg hover:-translate-y-0.5 hover:border-[#8ec5eb66] transition-all duration-300 flex flex-col"
+    onClick={(e) => {
+  e.stopPropagation();
+  void fetchMentorDetail(mentor);
+}}
+                  className="relative cursor-pointer bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] border border-white/15 rounded-xl shadow hover:shadow-lg hover:-translate-y-0.5 hover:border-[#8ec5eb66] transition-all duration-300 flex flex-col"
                 >
-                  <div className="w-full h-[170px] overflow-hidden rounded-t-xl">
-                    <Image
-                      src={img}
-                      alt=""
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="absolute right-3 top-3 z-20">
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      setOpenMenuId(openMenuId === mentor._id ? null : mentor._id);
+    }}
+    className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/25 bg-[#062946]/70 text-white transition hover:bg-white/15"
+  >
+    <i className="fa-solid fa-ellipsis-vertical" />
+  </button>
+
+  {openMenuId === mentor._id && (
+    <div className="absolute right-0 mt-2 w-44 rounded-xl border border-white/15 bg-[#082f4d] p-2 shadow-xl">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpenMenuId(null);
+          setMentorToSchedule(mentor);
+setScheduleDrawerOpen(true);
+        }}
+        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-white hover:bg-white/10"
+      >
+        <i className="fa-regular fa-calendar text-[#8ec5eb]" />
+        Schedule Meeting
+      </button>
+    </div>
+  )}
+</div>
+                 <div className="relative w-full h-[170px] overflow-hidden rounded-t-xl">
+                  <Image
+  src={img}
+  alt=""
+  unoptimized={typeof img === "string"}
+  fill
+  className="object-cover"
+/>
                   </div>
 
                   <div className="p-4 flex flex-col justify-between min-h-[160px]">
@@ -542,10 +607,21 @@ export default function Mymentors() {
 
                     <div className="flex justify-between items-center mt-4">
                       <div className="flex gap-4 text-[#8ec5eb] text-sm">
-                        <i className="fa-regular fa-envelope"></i>
+                        {/* <i className="fa-regular fa-envelope"></i>
                         <i className="fa-regular fa-comment"></i>
                         <i className="fa-solid fa-phone"></i>
-                        <i className="fa-brands fa-whatsapp"></i>
+                        <i className="fa-brands fa-whatsapp"></i> */}
+                        <a
+  href={mentor.email ? `mailto:${mentor.email}` : undefined}
+  onClick={(e) => e.stopPropagation()}
+  className="hover:text-white"
+>
+  <i className="fa-regular fa-envelope"></i>
+</a>
+
+<i className="fa-regular fa-comment opacity-40 cursor-not-allowed"></i>
+<i className="fa-solid fa-phone opacity-40 cursor-not-allowed"></i>
+<i className="fa-brands fa-whatsapp opacity-40 cursor-not-allowed"></i>
                       </div>
 
                       <button className="w-8 h-8 border border-white/35 rounded flex items-center justify-center hover:bg-white/15 hover:text-white transition">
@@ -578,7 +654,8 @@ export default function Mymentors() {
           <div className="p-5">
             <div className="flex flex-col items-center gap-4 mb-6">
               <Image
-                src={Mentor1}
+  src={getMentorImage(selectedMentor, Mentor1)}
+  unoptimized={typeof getMentorImage(selectedMentor, Mentor1) === "string"}
                 alt="profile"
                 width={120}
                 height={120}
@@ -608,13 +685,23 @@ export default function Mymentors() {
             />
 
             {/* SCHEDULER */}
-            <Scheduler
+            {/* <Scheduler
               mentorId={selectedMentor._id}
               pastorUserId={pastorUserId}
-            />
+            /> */}
           </div>
         </div>
       )}
+      <PastorScheduleDrawer
+  open={scheduleDrawerOpen}
+  onClose={() => setScheduleDrawerOpen(false)}
+  mentor={mentorToSchedule}
+  pastorUserId={pastorUserId}
+  onScheduled={() => {
+    setScheduleDrawerOpen(false);
+    showToast("Appointment scheduled successfully.");
+  }}
+/>
       {toastMessage && (
         <div className="fixed left-1/2 top-20 z-[70] -translate-x-1/2 rounded-lg border border-white/20 bg-[#0a3558] px-4 py-3 text-sm text-white shadow-[0_12px_28px_rgba(2,20,38,0.45)]">
           {toastMessage}
