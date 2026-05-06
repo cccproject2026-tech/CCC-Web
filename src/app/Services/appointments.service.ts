@@ -14,7 +14,7 @@ import type {
 export const apiGetAppointments = (params?: GetAppointmentsParams) =>
   axiosInstance.get<{ success: boolean; data: AppointmentResponse[] }>(
     "/appointments/upcoming",
-    { params },
+    { params, timeout: 30_000 },
   );
 
 // Convenience: today's upcoming scheduled appointments
