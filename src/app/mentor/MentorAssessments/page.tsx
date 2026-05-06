@@ -457,6 +457,9 @@ export default function MentorAssessments() {
               const assessmentId = String(assessment?._id ?? assessment?.id ?? flat.assessmentId ?? "");
               if (!assessmentId) return null;
               const progressRow = statusByAssessmentId.get(assessmentId);
+              const appointmentId = String(
+                (item as any)?.appointmentId ?? assessment?.appointmentId ?? "",
+              ).trim();
               return {
                 ...assessment,
                 _id: assessmentId,
@@ -464,6 +467,7 @@ export default function MentorAssessments() {
                 _mentorAssignmentStatus: progressRow?.status || "not_started",
                 _mentorAssignmentId: flat.assignmentId ?? progressRow?.assignmentId,
                 _mentorDueDate: flat.dueDate,
+                _mentorAppointmentId: appointmentId || undefined,
                 menteeAssigned: countMenteesAssigned(assessment),
               };
             })
@@ -954,6 +958,58 @@ export default function MentorAssessments() {
                           : "border border-white/10"
                       }`}
                     >
+                      {selectedMenteeId && mode !== "select" && (
+                        <div className="options-menu-container absolute right-4 top-4 z-20">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const cardId = getAssessmentId(assessment);
+                              setShowOptionsMenu((prev) => (prev === cardId ? null : cardId));
+                            }}
+                            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-[#062946]/85 text-white transition hover:bg-white/15"
+                            aria-label="Assessment options"
+                          >
+                            <i className="fa-solid fa-ellipsis-vertical" />
+                          </button>
+
+                          {showOptionsMenu === getAssessmentId(assessment) && (
+                            <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-white/15 bg-[#0a3558] shadow-2xl">
+                              <button
+                                type="button"
+                                disabled={!assessment._mentorAppointmentId}
+                                onClick={() => {
+                                  setShowOptionsMenu(null);
+                                  if (!assessment._mentorAppointmentId) return;
+                                  router.push(`/mentor/MentorSchedule/${encodeURIComponent(assessment._mentorAppointmentId)}`);
+                                }}
+                                className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-white/40 disabled:hover:bg-transparent"
+                              >
+                                <i className="fa-regular fa-calendar-check text-[#8ec5eb]" />
+                                Linked Appointment
+                              </button>
+
+                              {(assessment._mentorAssignmentStatus === "submitted" ||
+                                assessment._mentorAssignmentStatus === "completed") && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowOptionsMenu(null);
+                                      router.push(
+                                        `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
+                                      );
+                                    }}
+                                    className="flex w-full items-center gap-2 border-t border-white/10 px-4 py-3 text-left text-sm text-white transition hover:bg-white/10"
+                                  >
+                                    <i className="fa-regular fa-clipboard text-[#8ec5eb]" />
+                                    CDP Flow
+                                  </button>
+                                )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {mode === "select" && (
                         <div className="absolute left-4 top-4 z-10">
                           <input
@@ -1006,7 +1062,7 @@ export default function MentorAssessments() {
                                       type="button"
                                       onClick={() =>
                                         router.push(
-                                          `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}`,
+                                          `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}`,
                                         )
                                       }
                                       className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
@@ -1020,7 +1076,7 @@ export default function MentorAssessments() {
                                       type="button"
                                       onClick={() =>
                                         router.push(
-                                          `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}&editRecommendation=1`,
+                                          `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
                                         )
                                       }
                                       className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
@@ -1031,7 +1087,7 @@ export default function MentorAssessments() {
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    router.push(`/director/assessments/${assessment.id}?viewUser=${selectedMenteeId}`)
+                                    router.push(`/mentor/MentorAssessments/${assessment.id}?viewUser=${selectedMenteeId}`)
                                   }
                                   className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
                                 >
@@ -1061,7 +1117,7 @@ export default function MentorAssessments() {
                                 </div>
                                 <button
                                   type="button"
-                                  onClick={() => router.push(`/director/assessments/${assessment.id}`)}
+                                  onClick={() => router.push(`/mentor/MentorAssessments/${assessment._id}`)}
                                   className="shrink-0 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-6 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
                                 >
                                   View / Edit
