@@ -83,29 +83,120 @@ function mapRowToMentor(row: unknown): Mentor | null {
   };
 }
 
+// function normalizeMentorDetail(raw: Record<string, unknown>, fallback: Mentor): Mentor {
+//   const id = String(raw._id ?? raw.id ?? fallback._id);
+//   const interest = raw.interest as Record<string, unknown> | undefined;
+//   const profileInfo =
+//     (typeof raw.bio === "string" && raw.bio) ||
+//     (typeof raw.profileInfo === "string" && raw.profileInfo) ||
+//     (interest && typeof interest.comments === "string" ? interest.comments : "") ||
+//     fallback.profileInfo ||
+//     "";
+//   return {
+//     _id: id,
+//     firstName: String(raw.firstName ?? fallback.firstName),
+//     lastName: String(raw.lastName ?? fallback.lastName),
+//     role: String(raw.role ?? fallback.role),
+//     email: String(raw.email ?? fallback.email),
+//     profileInfo,
+//     profilePicture: String(raw.profilePicture ?? raw.avatar ?? raw.image ?? fallback.profilePicture ?? ""),
+//     phone: String(raw.phone ?? fallback.phone ?? ""),
+// phoneNumber: String(raw.phoneNumber ?? fallback.phoneNumber ?? ""),
+// city: String(raw.city ?? fallback.city ?? ""),
+// state: String(raw.state ?? fallback.state ?? ""),
+// country: String(raw.country ?? fallback.country ?? ""),
+// churchName: String(raw.churchName ?? fallback.churchName ?? ""),
+//   };
+// }
+
 function normalizeMentorDetail(raw: Record<string, unknown>, fallback: Mentor): Mentor {
   const id = String(raw._id ?? raw.id ?? fallback._id);
+
   const interest = raw.interest as Record<string, unknown> | undefined;
+  const churchDetailsList = Array.isArray(interest?.churchDetails)
+  ? (interest.churchDetails as Record<string, unknown>[])
+  : [];
+
+const primaryChurch = churchDetailsList[0];
+  const contact = raw.contact as Record<string, unknown> | undefined;
+  const church = raw.church as Record<string, unknown> | undefined;
+  const churchDetails = raw.churchDetails as Record<string, unknown> | undefined;
+  const address = raw.address as Record<string, unknown> | undefined;
+
   const profileInfo =
     (typeof raw.bio === "string" && raw.bio) ||
     (typeof raw.profileInfo === "string" && raw.profileInfo) ||
     (interest && typeof interest.comments === "string" ? interest.comments : "") ||
     fallback.profileInfo ||
     "";
+
   return {
     _id: id,
     firstName: String(raw.firstName ?? fallback.firstName),
     lastName: String(raw.lastName ?? fallback.lastName),
     role: String(raw.role ?? fallback.role),
-    email: String(raw.email ?? fallback.email),
+    email: String(raw.email ?? contact?.email ?? fallback.email),
     profileInfo,
-    profilePicture: String(raw.profilePicture ?? raw.avatar ?? raw.image ?? fallback.profilePicture ?? ""),
-    phone: String(raw.phone ?? fallback.phone ?? ""),
-phoneNumber: String(raw.phoneNumber ?? fallback.phoneNumber ?? ""),
-city: String(raw.city ?? fallback.city ?? ""),
-state: String(raw.state ?? fallback.state ?? ""),
-country: String(raw.country ?? fallback.country ?? ""),
-churchName: String(raw.churchName ?? fallback.churchName ?? ""),
+    profilePicture: String(
+      raw.profilePicture ?? raw.avatar ?? raw.image ?? fallback.profilePicture ?? "",
+    ),
+    phone: String(
+      raw.phone ??
+        raw.mobile ??
+        raw.mobileNumber ??
+        raw.contactNumber ??
+        contact?.phone ??
+        contact?.mobile ??
+        fallback.phone ??
+        "",
+    ),
+   phoneNumber: String(
+  raw.phoneNumber ??
+    interest?.phoneNumber ??
+    raw.mobileNumber ??
+    raw.contactNumber ??
+    contact?.phoneNumber ??
+    contact?.mobileNumber ??
+    fallback.phoneNumber ??
+    "",
+),
+
+churchName: String(
+  raw.churchName ??
+    primaryChurch?.churchName ??
+    church?.name ??
+    churchDetails?.churchName ??
+    churchDetails?.name ??
+    fallback.churchName ??
+    "",
+),
+
+city: String(
+  raw.city ??
+    primaryChurch?.city ??
+    address?.city ??
+    churchDetails?.city ??
+    fallback.city ??
+    "",
+),
+
+state: String(
+  raw.state ??
+    primaryChurch?.state ??
+    address?.state ??
+    churchDetails?.state ??
+    fallback.state ??
+    "",
+),
+
+country: String(
+  raw.country ??
+    primaryChurch?.country ??
+    address?.country ??
+    churchDetails?.country ??
+    fallback.country ??
+    "",
+),
   };
 }
 
