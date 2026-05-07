@@ -2,12 +2,21 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import HeroBg from "@/app/Assets/assignments-bg.png";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
-import { apiGetAssessmentById, parseAssessmentDetailPayload } from "@/app/Services/assessment.service";
+import {
+  apiGetAssessmentById,
+  apiGetAssignedAssessments,
+  flattenAssignedAssessmentRow,
+  parseAssignedAssessmentsListBody,
+  parseAssessmentDetailPayload,
+} from "@/app/Services/assessment.service";
+import { apiGetAppointments } from "@/app/Services/appointments.service";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
+import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import type { AssessmentResponse } from "@/app/Services/types/assessment.types";
 
 const glassPanel =
@@ -17,14 +26,39 @@ function isHttpUrl(u?: string): boolean {
   return !!u && (u.startsWith("http://") || u.startsWith("https://"));
 }
 
+function getChoiceLabel(choice: unknown, index: number): string {
+  if (choice == null) return `Option ${index + 1}`;
+  if (typeof choice === "string") return choice;
+  if (typeof choice === "object") {
+    const row = choice as Record<string, unknown>;
+    const text =
+      row.label ??
+      row.text ??
+      row.value ??
+      row.name ??
+      row.title;
+    if (text != null && String(text).trim()) return String(text).trim();
+  }
+  return `Option ${index + 1}`;
+}
+
 export default function MentorAssessmentDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = typeof params?.id === "string" ? params.id : Array.isArray(params?.id) ? params.id[0] : "";
+  const viewUserId = (searchParams.get("viewUser") || "").trim();
 
   const [assessment, setAssessment] = useState<AssessmentResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [menteeMeta, setMenteeMeta] = useState<{
+    status: string;
+    dueDate?: string;
+    appointmentId?: string;
+    meetingDate?: string;
+    meetingStatus?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -44,6 +78,58 @@ export default function MentorAssessmentDetailPage() {
         if (!cancelled) {
           setAssessment(data);
           if (!data) setError("Assessment not found");
+        }
+
+        if (viewUserId) {
+          try {
+            const [assignedRes, progressRes, appointmentsRes] = await Promise.all([
+              apiGetAssignedAssessments(viewUserId),
+              apiGetUserProgress(viewUserId),
+              apiGetAppointments({ userId: viewUserId, futureOnly: false } as any),
+            ]);
+            const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
+            const flat = assignedRows.map((r) => flattenAssignedAssessmentRow(r)).find((r) => {
+              if (!r) return false;
+              const aid = String(r.assessmentId ?? (r.assessment as any)?._id ?? (r.assessment as any)?.id ?? "");
+              return aid === id;
+            });
+
+            const progressRows = Array.isArray(unwrapProgressData(progressRes)?.assessments)
+              ? unwrapProgressData(progressRes)?.assessments
+              : [];
+            const progress = progressRows?.find(
+              (p: any) => String(p?.assessmentId ?? p?.assessment?._id ?? p?.assessment?.id ?? "") === id,
+            );
+
+            const appointmentId = String(
+              (flat as any)?.appointmentId ?? ((flat as any)?.assessment as any)?.appointmentId ?? "",
+            ).trim();
+            const appointmentsBody: any = appointmentsRes?.data;
+            const appointmentsList: any[] = Array.isArray(appointmentsBody)
+              ? appointmentsBody
+              : Array.isArray(appointmentsBody?.data)
+                ? appointmentsBody.data
+                : Array.isArray(appointmentsBody?.data?.data)
+                  ? appointmentsBody.data.data
+                  : [];
+            const appt = appointmentId
+              ? appointmentsList.find((a: any) => String(a?._id ?? a?.id ?? "") === appointmentId)
+              : null;
+
+            if (!cancelled) {
+              setMenteeMeta({
+                status: String(progress?.status ?? "not_started"),
+                dueDate: (flat as any)?.dueDate,
+                appointmentId: appointmentId || undefined,
+                meetingDate: appt?.meetingDate,
+                meetingStatus: String(appt?.status ?? ""),
+              });
+            }
+          } catch {
+            if (!cancelled) setMenteeMeta(null);
+          }
+        } else if (!cancelled) {
+          setMenteeMeta(null);
         }
       } catch (err: unknown) {
         if (!cancelled) {
@@ -66,6 +152,10 @@ export default function MentorAssessmentDetailPage() {
 
   const bannerUrl = assessment?.bannerImage;
   const hasBanner = isHttpUrl(bannerUrl);
+  const sectionCount = Array.isArray(assessment?.sections) ? assessment.sections.length : 0;
+  const layerCount = Array.isArray(assessment?.sections)
+    ? assessment.sections.reduce((sum, sec) => sum + (Array.isArray(sec.layers) ? sec.layers.length : 0), 0)
+    : 0;
 
   return (
     <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
@@ -139,9 +229,33 @@ export default function MentorAssessmentDetailPage() {
                     {assessment.type ? (
                       <p className="mt-3 text-xs uppercase tracking-wide text-[#8ec5eb]">Type: {assessment.type}</p>
                     ) : null}
+                    <div className="mt-4 grid grid-cols-1 gap-2 text-xs text-[#d9ebf8] sm:grid-cols-3">
+                      <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                        <span className="text-white/70">Sections:</span> <span className="font-semibold text-white">{sectionCount}</span>
+                      </div>
+                      <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                        <span className="text-white/70">Questions:</span> <span className="font-semibold text-white">{layerCount}</span>
+                      </div>
+                      <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                        <span className="text-white/70">Status:</span>{" "}
+                        <span className="font-semibold text-white">{menteeMeta?.status || "Draft"}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
+
+              {viewUserId && (
+                <div className={`p-6 sm:p-8 ${glassPanel}`}>
+                  <h3 className="mb-4 text-lg font-semibold text-white">Mentee Assignment Details</h3>
+                  <div className="grid grid-cols-1 gap-3 text-sm text-[#cde2f2] sm:grid-cols-2">
+                    <p><span className="font-medium text-white">Due date:</span> {menteeMeta?.dueDate ? new Date(menteeMeta.dueDate).toLocaleDateString() : "N/A"}</p>
+                    <p><span className="font-medium text-white">Meeting:</span> {menteeMeta?.meetingDate ? new Date(menteeMeta.meetingDate).toLocaleString() : "Not scheduled"}</p>
+                    <p><span className="font-medium text-white">Meeting status:</span> {menteeMeta?.meetingStatus || "N/A"}</p>
+                    <p><span className="font-medium text-white">Assessment status:</span> {menteeMeta?.status || "N/A"}</p>
+                  </div>
+                </div>
+              )}
 
               {assessment.instructions && assessment.instructions.length > 0 ? (
                 <div className={`p-6 sm:p-8 ${glassPanel}`}>
@@ -190,19 +304,51 @@ export default function MentorAssessmentDetailPage() {
                           <p className="mt-2 text-sm text-[#cde2f2]">{sec.description}</p>
                         ) : null}
                         {sec.layers?.length ? (
-                          <ul className="mt-3 space-y-2 text-sm text-[#8ec5eb]">
+                          <ul className="mt-4 space-y-4">
                             {sec.layers.map((layer, li) => (
-                              <li key={layer._id ?? li}>
-                                <span className="text-white/90">
+                              <li key={layer._id ?? li} className="rounded-lg border border-white/10 bg-[#041f35]/40 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+                                  Question {li + 1}
+                                </p>
+                                <p className="mt-1 text-sm font-medium text-white">
                                   {(layer as { question?: string; title?: string }).question ??
                                     (layer as { title?: string }).title ??
-                                    ""}
-                                </span>
+                                    "Untitled question"}
+                                </p>
                                 {layer.choices?.length ? (
-                                  <span className="text-[#cde2f2]">
-                                    {" "}
-                                    ({layer.choices.length} choice{layer.choices.length === 1 ? "" : "s"})
-                                  </span>
+                                  <div className="mt-3">
+                                    <p className="mb-2 text-xs uppercase tracking-wide text-white/65">Options</p>
+                                    <ul className="space-y-1.5">
+                                      {layer.choices.map((choice, ci) => (
+                                        <li
+                                          key={`${layer._id ?? li}-choice-${ci}`}
+                                          className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-[#d9ebf8]"
+                                        >
+                                          {getChoiceLabel(choice, ci)}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                ) : (
+                                  <p className="mt-3 text-sm text-white/55">No options defined for this question.</p>
+                                )}
+                                {Array.isArray((layer as { recommendations?: unknown[] }).recommendations) &&
+                                (layer as { recommendations?: unknown[] }).recommendations!.length > 0 ? (
+                                  <div className="mt-3">
+                                    <p className="mb-2 text-xs uppercase tracking-wide text-white/65">
+                                      Customized Development Plan
+                                    </p>
+                                    <ul className="space-y-1.5">
+                                      {(layer as { recommendations: unknown[] }).recommendations.map((rec, ri) => (
+                                        <li
+                                          key={`${layer._id ?? li}-rec-${ri}`}
+                                          className="rounded-md border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 px-3 py-2 text-sm text-[#cde2f2]"
+                                        >
+                                          {String(rec || "").trim() || `Level ${ri + 1}`}
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </div>
                                 ) : null}
                               </li>
                             ))}

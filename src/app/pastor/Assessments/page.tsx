@@ -27,6 +27,8 @@ import { getCookie } from "@/app/utils/cookies";
 import { resolveApiMediaUrl } from "@/app/utils/image";
 import {
   apiGetAssignedAssessments,
+  apiGetUserAnswers,
+  apiGetSectionRecommendations,
   parseAssignedAssessmentsListBody,
   flattenAssignedAssessmentRow,
 } from "@/app/Services/assessment.service";
@@ -84,7 +86,60 @@ type Row = {
     platform: string;
     notes?: string;
   };
+  hasCdp?: boolean;
 };
+
+function hasCdpInRecommendationsPayload(body: unknown): boolean {
+  const walk = (node: unknown, parentSent = false): boolean => {
+    if (!node) return false;
+    if (Array.isArray(node)) return node.some((item) => walk(item, parentSent));
+    if (typeof node !== "object") return false;
+
+    const row = node as Record<string, unknown>;
+    const sentRaw = row.sent ?? row.isSent ?? row.status;
+    const isSent =
+      parentSent ||
+      sentRaw === true ||
+      String(sentRaw ?? "")
+        .trim()
+        .toLowerCase() === "sent";
+
+    const msg = String(row.message ?? row.text ?? row.cdp ?? row.mentorCdp ?? "").trim();
+    const recItems = Array.isArray(row.recommendations)
+      ? row.recommendations.filter((x) => String(x ?? "").trim() !== "")
+      : [];
+    const hasContent = msg.length > 0 || recItems.length > 0;
+    if (isSent && hasContent) return true;
+
+    return (
+      walk(row.data, isSent) ||
+      walk(row.sections, isSent) ||
+      walk(row.recommendations, isSent) ||
+      walk(row.layers, isSent)
+    );
+  };
+
+  return walk(body, false);
+}
+
+function hasCdpInAnswerPayload(body: unknown): boolean {
+  const root = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+  return sections.some((section: any) => {
+    const sectionRecs = Array.isArray(section?.recommendations)
+      ? section.recommendations.some((x: unknown) => String(x ?? "").trim() !== "")
+      : false;
+    const layerRecs = Array.isArray(section?.layers)
+      ? section.layers.some((layer: any) =>
+          Array.isArray(layer?.recommendations)
+            ? layer.recommendations.some((x: unknown) => String(x ?? "").trim() !== "")
+            : false,
+        )
+      : false;
+    return sectionRecs || layerRecs;
+  });
+}
 
 function isDueNowOrPast(dueDateRaw?: string): boolean {
   if (!dueDateRaw) return false;
@@ -117,12 +172,13 @@ function readSessionUserId(): string | null {
 export default function PastorAssessments() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [showOptionsMenu, setShowOptionsMenu] = useState<string | null>(null);
+  const [failedCardImageIds, setFailedCardImageIds] = useState<Record<string, true>>({});
   const [activeTab, setActiveTab] = useState<(typeof ASSESSMENT_TABS)[number]>("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [assessments, setAssessments] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [sessionUserId] = useState<string | null>(() => readSessionUserId());
-  const [selectedMeeting, setSelectedMeeting] = useState<Row["meeting"] | null>(null);
 
   useLayoutEffect(() => {
     const t = assessmentTabFromSearchParam(searchParams.get("tab"));
@@ -222,10 +278,29 @@ const dueDate =
 
 const imgUrl = resolveApiMediaUrl(rawBanner);
 
-const linkedMeeting = appointmentsList.find((appointment: any) => {
-  const notes = String(appointment?.notes ?? "");
-  return notes.includes(`assessmentId=${aid}`);
-});
+const appointmentId = String(
+  rawFlat.appointmentId ?? rawItem.appointmentId ?? rawFlat.assessment?.appointmentId ?? "",
+).trim();
+
+const linkedMeeting =
+  (appointmentId
+    ? appointmentsList.find((appointment: any) => String(appointment?._id ?? appointment?.id ?? "") === appointmentId)
+    : null) ||
+  appointmentsList.find((appointment: any) => {
+    const notes = String(appointment?.notes ?? "");
+    return notes.includes(`assessmentId=${aid}`);
+  });
+
+const [answersRes, recRes] = await Promise.allSettled([
+  apiGetUserAnswers(aid, sessionUserId),
+  apiGetSectionRecommendations(aid, sessionUserId),
+]);
+
+const hasCdpFromAnswers =
+  answersRes.status === "fulfilled" ? hasCdpInAnswerPayload(answersRes.value.data) : false;
+const hasCdpFromRecommendations =
+  recRes.status === "fulfilled" ? hasCdpInRecommendationsPayload(recRes.value.data) : false;
+const hasCdp = hasCdpFromAnswers || hasCdpFromRecommendations;
 
 const meeting = linkedMeeting
   ? {
@@ -299,6 +374,7 @@ return {
   return undefined;
 })(),
 meeting,
+hasCdp,
             };
           }),
         )).filter((r): r is NonNullable<typeof r> => r != null);
@@ -339,6 +415,21 @@ meeting,
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, [sessionUserId, loadAssessments]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest(".options-menu-container")) {
+        setShowOptionsMenu(null);
+      }
+    };
+    if (showOptionsMenu !== null) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showOptionsMenu]);
 
   const filtered = assessments.filter((a) => {
     const q = searchTerm.toLowerCase();
@@ -436,8 +527,65 @@ meeting,
   return (
     <div
       key={item.id}
-      className={`${pastorGlassCard} md:flex-row`}
+      className={`relative ${pastorGlassCard} md:flex-row`}
     >
+                  <div className="options-menu-container absolute right-4 top-4 z-20">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowOptionsMenu((prev) => (prev === item.id ? null : item.id))
+                      }
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-white/70 transition hover:bg-white/10"
+                      aria-label="Assessment options"
+                    >
+                      <i className="fa-solid fa-ellipsis-vertical" />
+                    </button>
+                    {showOptionsMenu === item.id && (
+                      <div className="absolute right-0 z-30 mt-2 w-52 overflow-hidden rounded-lg border border-white/15 bg-[#041f35]/98 py-2 shadow-xl backdrop-blur-md">
+                        <button
+                          type="button"
+                          disabled={!item.meeting?.id}
+                          onClick={() => {
+                            setShowOptionsMenu(null);
+                            if (!item.meeting?.id) return;
+                            router.push(`/pastor/appointments/${encodeURIComponent(item.meeting.id)}`);
+                          }}
+                          className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-white/90 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-white/40 disabled:hover:bg-transparent"
+                        >
+                          <i className="fa-regular fa-calendar-check text-[#8ec5eb]" />
+                          View Meeting Details
+                        </button>
+                        {(item.status === "Submitted" || item.status === "Completed") && (
+                          <button
+                            type="button"
+                            disabled={false}
+                            onClick={() => {
+                              setShowOptionsMenu(null);
+                              if (item.hasCdp) {
+                                router.push(
+                                  `/pastor/assessmentRecommendations?assessmentId=${encodeURIComponent(item.id)}`,
+                                );
+                                return;
+                              }
+                              const q = new URLSearchParams({
+                                assessmentId: item.id,
+                                meetingId: item.meeting?.id || "",
+                                meetingDate: item.meeting?.meetingDate || "",
+                                mentorName: item.meeting?.mentorName || "",
+                                platform: item.meeting?.platform || "",
+                                cdpStatus: "pending",
+                              });
+                              router.push(`/pastor/Assessments/guidelines?${q.toString()}`);
+                            }}
+                            className="flex w-full items-center gap-2 border-t border-white/10 px-4 py-2 text-left text-sm text-white/90 transition hover:bg-white/10"
+                          >
+                            <i className="fa-regular fa-clipboard text-[#8ec5eb]" />
+                            {item.hasCdp ? "View CDP" : "Waiting for response"}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   {/* <div className="relative m-4 h-[180px] w-full flex-shrink-0 md:m-5 md:h-[200px] md:w-[200px]">
                     {item.imgUrl ? (
                       <Image
@@ -461,13 +609,18 @@ meeting,
 
                   <div className="m-4 flex w-full flex-shrink-0 flex-col gap-3 md:m-5 md:w-[200px]">
   <div className="relative h-[180px] w-full md:h-[200px]">
-    {item.imgUrl ? (
+    {item.imgUrl && !failedCardImageIds[item.id] ? (
       <Image
         src={item.imgUrl}
         alt=""
         width={200}
         height={200}
         className="h-full w-full rounded-lg object-cover"
+        onError={() =>
+          setFailedCardImageIds((prev) =>
+            prev[item.id] ? prev : { ...prev, [item.id]: true },
+          )
+        }
         unoptimized
       />
     ) : (
@@ -672,9 +825,14 @@ meeting,
   }
 
   if (item.status === "Completed" && hasMeeting) {
-    router.push(
-      `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(item.id)}`
-    );
+    const q = new URLSearchParams({
+      assessmentId: item.id,
+      meetingId: item.meeting?.id || "",
+      meetingDate: item.meeting?.meetingDate || "",
+      mentorName: item.meeting?.mentorName || "",
+      platform: item.meeting?.platform || "",
+    });
+    router.push(`/pastor/Assessments/guidelines?${q.toString()}`);
     return;
   }
 
@@ -685,34 +843,6 @@ meeting,
   {primaryButtonText}
 </button>
   </div>
-
-  {item.meeting?.id && (
-    <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
-      <div className="min-w-0">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8ec5eb]">
-          Meeting fixed on
-        </p>
-
-        <p className="mt-1 truncate text-xs font-semibold text-white md:text-sm">
-          {item.meeting.meetingDate || "N/A"}
-        </p>
-      </div>
-
-      <button
-        type="button"
-        onClick={() =>
-          router.push(
-            `/pastor/Appointments/${encodeURIComponent(item.meeting!.id)}`
-          )
-        }
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb] transition hover:bg-[#8ec5eb]/25 hover:text-white"
-        title="View meeting"
-        aria-label="View meeting"
-      >
-        <i className="fa-solid fa-arrow-right" />
-      </button>
-    </div>
-  )}
 </div>
                   </div>
                 </div>
@@ -727,47 +857,6 @@ meeting,
 } */}
       </main>
 
-      {selectedMeeting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-[#062946] p-6 text-white shadow-2xl">
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Meeting Details</h3>
-
-              <button
-                type="button"
-                onClick={() => setSelectedMeeting(null)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 hover:bg-white/15"
-              >
-                <i className="fa-solid fa-xmark" />
-              </button>
-            </div>
-
-            <div className="space-y-3 text-sm text-[#d9ebf8]">
-              <p>
-                <span className="font-semibold text-white">Mentor:</span>{" "}
-                {selectedMeeting.mentorName}
-              </p>
-
-              <p>
-                <span className="font-semibold text-white">Date & Time:</span>{" "}
-                {selectedMeeting.meetingDate}
-              </p>
-
-              <p>
-                <span className="font-semibold text-white">Platform:</span>{" "}
-                <span className="capitalize">{selectedMeeting.platform}</span>
-              </p>
-
-              {selectedMeeting.notes && (
-                <p>
-                  <span className="font-semibold text-white">Notes:</span>{" "}
-                  {selectedMeeting.notes}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

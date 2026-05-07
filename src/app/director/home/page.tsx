@@ -30,6 +30,7 @@ import {
   apiGetAppointments,
   apiGetAllInterests,
   apiGetMentors,
+  apiGetFieldMentors,
   apiGetPastors,
   apiCreateUser,
   apiGetUserById,
@@ -273,6 +274,101 @@ const directorExploreCards = [
     route: "/director/revitalization-roadmap",
   },
 ];
+function getPersonProfilePicture(person: any): string {
+  const raw =
+    person?.profilePicture ||
+    person?.profileImage ||
+    person?.image ||
+    person?.avatar ||
+    person?.user?.profilePicture ||
+    person?.assignedUser?.profilePicture;
+
+  if (typeof raw !== "string" || !raw.trim()) return "";
+
+  return resolveApiMediaUrl(raw.trim()) ?? raw.trim();
+}
+
+// function QuickLinkAvatar({
+//   person,
+//   icon = "fa-solid fa-user",
+// }: {
+//   person: any;
+//   icon?: string;
+// }) {
+//   const [failed, setFailed] = useState(false);
+//   const src = getPersonProfilePicture(person);
+
+//   if (src && !failed) {
+//     return (
+//       <Image
+//         src={src}
+//         alt="Profile"
+//         width={64}
+//         height={64}
+//         unoptimized={isRemoteImageSrc(src)}
+//         onError={() => setFailed(true)}
+//         className="h-11 w-11rounded-full border border-white/15 object-cover"
+//       />
+//     );
+//   }
+
+//   return (
+//     <div className="flex h-11 w-11shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#8ec5eb]/15">
+//       <i className={`${icon} text-xl text-[#8ec5eb]`} />
+//     </div>
+//   );
+// }
+function QuickLinkAvatar({
+  person,
+  icon = "fa-solid fa-user",
+}: {
+  person: any;
+  icon?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  const src = getPersonProfilePicture(person);
+
+  if (src && !failed) {
+    return (
+      <Image
+        src={src}
+        alt="Profile"
+        width={44}
+        height={44}
+        unoptimized={isRemoteImageSrc(src)}
+        onError={() => setFailed(true)}
+        className="h-11 w-11 shrink-0 rounded-full border border-white/15 object-cover"
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#8ec5eb]/15">
+      <i className={`${icon} text-xl text-[#8ec5eb]`} />
+    </div>
+  );
+}
+async function hydrateUsersWithProfilePictures(users: any[]) {
+  return Promise.all(
+    users.map(async (user) => {
+      const id = String(user?._id ?? user?.id ?? "");
+
+      if (!id || user?.profilePicture) return user;
+
+      try {
+        const res = await apiGetUserById(id);
+        const fullUser = readUserPayload(res);
+
+        return {
+          ...user,
+          profilePicture: fullUser?.profilePicture ?? user?.profilePicture,
+        };
+      } catch {
+        return user;
+      }
+    })
+  );
+}
 
 export default function DirectorHome() {
   const router = useRouter();
@@ -369,11 +465,13 @@ useEffect(() => {
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [completedPastorsCount, setCompletedPastorsCount] = useState<number | null>(null);
   const [networkMapPeople, setNetworkMapPeople] = useState<
-    { id: string; name: string; img: string | typeof Mentor1; kind: "mentor" | "pastor" }[]
+    // { id: string; name: string; img: string | typeof Mentor1; kind: "mentor" | "pastor" }[]
+    { id: string; name: string; img: string | typeof Mentor1; kind: "mentor" | "pastor" | "field-mentor" }[]
   >([]);
   const [networkMapLoading, setNetworkMapLoading] = useState(true);
   const [networkMapRefreshing, setNetworkMapRefreshing] = useState(false);
   const [mapSearch, setMapSearch] = useState("");
+ const [mapRoleFilter, setMapRoleFilter] = useState<"all" | "mentor" | "pastor" | "field-mentor">("all");
   const [debouncedMapSearch, setDebouncedMapSearch] = useState("");
   const [addUserLoading, setAddUserLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -428,9 +526,15 @@ useEffect(() => {
     const pool = [Mentor1, Mentor2, Mentor3];
     const mapUserToPin = (
       u: Record<string, unknown>,
-      kind: "mentor" | "pastor",
+     kind: "mentor" | "pastor" | "field-mentor",
       i: number,
-    ): { id: string; name: string; img: string | typeof Mentor1; kind: "mentor" | "pastor" } => {
+    // ): { id: string; name: string; img: string | typeof Mentor1; kind: "mentor" | "pastor" } => {
+    ): {
+  id: string;
+  name: string;
+  img: string | typeof Mentor1;
+  kind: "mentor" | "pastor" | "field-mentor";
+} => {
       const id = String(u._id ?? u.id ?? `${kind}-${i}`);
       const fn = String(u.firstName ?? "");
       const ln = String(u.lastName ?? "");
@@ -443,7 +547,7 @@ useEffect(() => {
     };
     try {
       const ts = Date.now();
-      const [mRes, pRes] = await Promise.all([
+      const [mRes, pRes, fmRes] = await Promise.allSettled([
         apiGetAllUsers({
           role: "mentor",
           roleMatch: "mixed",
@@ -458,18 +562,48 @@ useEffect(() => {
           limit: 40,
           t: ts,
         }),
+        apiGetFieldMentors({
+  page: 1,
+  limit: 40,
+  t: ts,
+}),
+//         apiGetAllUsers({
+//   role: "field-mentor",
+//   roleMatch: "mixed",
+//   page: 1,
+//   limit: 40,
+//   t: ts,
+// }),
       ]);
       if (req !== networkMapRequestId.current) return;
-      const { users: mu } = parseMentorUsersListResponse(mRes);
-      const { users: pu } = parseMentorUsersListResponse(pRes);
+      // const { users: mu } = parseMentorUsersListResponse(mRes);
+      // const { users: pu } = parseMentorUsersListResponse(pRes);
+      // const { users: fmu } = parseMentorUsersListResponse(fmRes);
+      const { users: mu } =
+  mRes.status === "fulfilled" ? parseMentorUsersListResponse(mRes.value) : { users: [] };
+
+const { users: pu } =
+  pRes.status === "fulfilled" ? parseMentorUsersListResponse(pRes.value) : { users: [] };
+
+const { users: fmu } =
+  fmRes.status === "fulfilled" ? parseMentorUsersListResponse(fmRes.value) : { users: [] };
       const mentors = mu.map((u, i) => mapUserToPin(u, "mentor", i));
       const pastors = pu.map((u, i) => mapUserToPin(u, "pastor", i));
+      const fieldMentors = fmu.map((u, i) => mapUserToPin(u, "field-mentor", i));
       const interleaved: typeof mentors = [];
-      const maxL = Math.max(mentors.length, pastors.length);
-      for (let i = 0; i < maxL; i++) {
-        if (i < mentors.length) interleaved.push(mentors[i]);
-        if (i < pastors.length) interleaved.push(pastors[i]);
-      }
+      // const maxL = Math.max(mentors.length, pastors.length);
+      // for (let i = 0; i < maxL; i++) {
+      //   if (i < mentors.length) interleaved.push(mentors[i]);
+      //   if (i < pastors.length) interleaved.push(pastors[i]);
+      // }
+      const maxL = Math.max(mentors.length, pastors.length, fieldMentors.length);
+      // const maxL = Math.max(mentors.length, pastors.length);
+
+for (let i = 0; i < maxL; i++) {
+  if (i < pastors.length) interleaved.push(pastors[i]);
+  if (i < mentors.length) interleaved.push(mentors[i]);
+  if (i < fieldMentors.length) interleaved.push(fieldMentors[i]);
+}
       setNetworkMapPeople(interleaved);
     } catch (e) {
       console.error(e);
@@ -484,13 +618,13 @@ useEffect(() => {
       }
     }
   }, []);
-
-  // useEffect(() => {
-  //   const silent = networkMapFirstLoadDone.current;
-  //   networkMapFirstLoadDone.current = true;
-  //   void loadNetworkMap(silent);
-  // }, [resolvedUserId, loadNetworkMap]);
-
+//compls
+  useEffect(() => {
+    const silent = networkMapFirstLoadDone.current;
+    networkMapFirstLoadDone.current = true;
+    void loadNetworkMap(silent);
+  }, [resolvedUserId, loadNetworkMap]);
+//compls
   useEffect(() => {
     let onVisible: () => void;
     // Defer so the first paint does not fire `visibilitychange` at the same time as the
@@ -508,7 +642,7 @@ useEffect(() => {
       if (onVisible) document.removeEventListener("visibilitychange", onVisible);
     };
   }, [loadNetworkMap]);
-
+//compls
   useEffect(() => {
     const id = window.setInterval(() => {
       void loadNetworkMap(true);
@@ -552,7 +686,14 @@ useEffect(() => {
   const fetchMentors = useCallback(async () => {
     try {
       setMentorsLoading(true);
-      const response = await apiGetMentors({ limit: 4, roleMatch: "mixed" });
+      // const response = await apiGetMentors({ limit: 4, roleMatch: "mixed" });
+      const response = await apiGetAllUsers({
+  role: "mentor",
+  roleMatch: "mixed",
+  page: 1,
+  limit: 4,
+  t: Date.now(),
+});
       setMentors(readUsersPage(response).users);
     } catch (error) {
       console.error('Error fetching mentors:', error);
@@ -565,7 +706,14 @@ useEffect(() => {
   const fetchPastors = useCallback(async () => {
     try {
       setPastorsLoading(true);
-      const response = await apiGetPastors({ limit: 4, roleMatch: "mixed" });
+      // const response = await apiGetPastors({ limit: 4, roleMatch: "mixed" });
+      const response = await apiGetAllUsers({
+  role: "pastor",
+  roleMatch: "mixed",
+  page: 1,
+  limit: 4,
+  t: Date.now(),
+});
       setPastors(readUsersPage(response).users);
     } catch (error) {
       console.error('Error fetching pastors:', error);
@@ -583,8 +731,12 @@ useEffect(() => {
         // apiGetTodaysAppointments(uid || undefined),
         apiGetAppointments({ futureOnly: false, status: "scheduled" }),
         apiGetAllInterests({ status: 'new' }),
-        apiGetMentors({ limit: 4, roleMatch: "mixed" }),
-        apiGetPastors({ limit: 4, roleMatch: "mixed" }),
+        
+        // apiGetMentors({ limit: 4, roleMatch: "mixed" }),
+        // apiGetPastors({ limit: 4, roleMatch: "mixed" }),
+        apiGetAllUsers({ role: "mentor", roleMatch: "mixed", page: 1, limit: 4, t: Date.now() }),
+apiGetAllUsers({ role: "pastor", roleMatch: "mixed", page: 1, limit: 4, t: Date.now() }),
+        
         apiGetDirectorOverview({
           period: "yearly",
           year: new Date().getFullYear(),
@@ -593,6 +745,7 @@ useEffect(() => {
         uid ? apiGetUserById(uid) : Promise.resolve(null),
         apiGetAllUsers({ role: "pastor", hasCompleted: true, limit: 1 }),
         apiGetOverallProgress(["mentor", "pastor"]),
+      
       ]);
 
       // Handle appointments (envelope shapes vary — same as schedule / mentor pages)
@@ -647,9 +800,12 @@ setAppointmentsLoading(false);
       // setInterestsLoading(false);
 
       // Handle interests
-if (results[1].status === "fulfilled") {
-  const intRes = results[1].value;
-  const body: any = intRes?.data;
+// if (results[1].status === "fulfilled") {
+if (results[1].status === "fulfilled" && results[1].value) {
+  // const intRes = results[1].value;
+  // const body: any = intRes?.data;
+  const intRes: any = results[1].value;
+const body: any = intRes?.data;
   const raw: any = body?.data;
 
   const list: Interest[] = Array.isArray(raw)
@@ -670,7 +826,8 @@ if (results[1].status === "fulfilled") {
 
   setInterests(newOnly);
 } else {
-  console.error("Error fetching interests:", results[1].reason);
+  // console.error("Error fetching interests:", results[1].reason);
+  console.error("Error fetching interests:", (results[1] as any).reason);
   setInterests([]);
 }
 setInterestsLoading(false);
@@ -701,10 +858,14 @@ setInterestsLoading(false);
       }
 
       let progressRows: UserOverallProgress[] = [];
-      if (results[7].status === "fulfilled") {
-        progressRows = unwrapOverallProgressList(results[7].value);
+      // if (results[7].status === "fulfilled") {
+      if (results[7].status === "fulfilled" && results[7].value) {
+        // progressRows = unwrapOverallProgressList(results[7].value);
+        const progressRes: any = results[7].value;
+progressRows = unwrapOverallProgressList(progressRes);
       } else {
-        console.warn("Error fetching overall progress (mentor/pastor):", results[7].reason);
+        // console.warn("Error fetching overall progress (mentor/pastor):", results[7].reason);
+        console.warn("Error fetching overall progress (mentor/pastor):", (results[7] as any).reason);
       }
 
       // Director overview may include a `users` list not present on `/overview/all`
@@ -741,8 +902,11 @@ setInterestsLoading(false);
       }
 
       // Completed-course count (pastors marked completed)
-      if (results[6].status === 'fulfilled') {
-        const body = results[6].value.data?.data;
+      // if (results[6].status === 'fulfilled') {
+      if (results[6].status === "fulfilled" && results[6].value) {
+        // const body = results[6].value.data?.data;
+        const completedRes: any = results[6].value;
+const body = completedRes?.data?.data;
         const total =
           typeof body?.total === 'number'
             ? body.total
@@ -751,7 +915,8 @@ setInterestsLoading(false);
               : 0;
         setCompletedPastorsCount(total);
       } else {
-        console.error('Error fetching completed pastors count:', results[6].reason);
+        // console.error('Error fetching completed pastors count:', results[6].reason);
+        console.error("Error fetching completed pastors count:", (results[6] as any).reason);
         setCompletedPastorsCount(null);
       }
     };
@@ -779,14 +944,27 @@ setInterestsLoading(false);
     }));
   }, [directorOverview?.monthlyData, chartRangeId, currentTime]);
 
+  // const filteredNetworkMapPeople = useMemo(() => {
+  //   if (!debouncedMapSearch) return networkMapPeople;
+  //   return networkMapPeople.filter(
+  //     (p) =>
+  //       p.name.toLowerCase().includes(debouncedMapSearch) ||
+  //       p.id.toLowerCase().includes(debouncedMapSearch),
+  //   );
+  // }, [networkMapPeople, debouncedMapSearch]);
   const filteredNetworkMapPeople = useMemo(() => {
-    if (!debouncedMapSearch) return networkMapPeople;
-    return networkMapPeople.filter(
-      (p) =>
-        p.name.toLowerCase().includes(debouncedMapSearch) ||
-        p.id.toLowerCase().includes(debouncedMapSearch),
-    );
-  }, [networkMapPeople, debouncedMapSearch]);
+  return networkMapPeople.filter((p) => {
+    const matchesSearch =
+      !debouncedMapSearch ||
+      p.name.toLowerCase().includes(debouncedMapSearch) ||
+      p.id.toLowerCase().includes(debouncedMapSearch);
+
+    const matchesRole =
+      mapRoleFilter === "all" || p.kind === mapRoleFilter;
+
+    return matchesSearch && matchesRole;
+  });
+}, [networkMapPeople, debouncedMapSearch, mapRoleFilter]);
 
   const networkMapMarkers: MapMarker[] = useMemo(() => {
     const list = filteredNetworkMapPeople.slice(0, MAX_NETWORK_MAP_MARKERS);
@@ -943,8 +1121,15 @@ setLastName("");
         ? mentorsData.users
         : [];
 
-    setQuickAssignPastors(pastorsList);
-    setQuickAssignMentors(mentorsList);
+    // setQuickAssignPastors(pastorsList);
+    // setQuickAssignMentors(mentorsList);
+    const [hydratedPastors, hydratedMentors] = await Promise.all([
+  hydrateUsersWithProfilePictures(pastorsList),
+  hydrateUsersWithProfilePictures(mentorsList),
+]);
+
+setQuickAssignPastors(hydratedPastors);
+setQuickAssignMentors(hydratedMentors);
   } catch (error) {
     console.error("Failed to load pastors/mentors", error);
     alert("Could not load pastors and mentors.");
@@ -1070,7 +1255,8 @@ const openPastorsRoadmapModal = async () => {
         ? data.users
         : [];
 
-    setRoadmapPastors(pastorsList);
+    // setRoadmapPastors(pastorsList);
+    setRoadmapPastors(await hydrateUsersWithProfilePictures(pastorsList));
   } catch (error) {
     console.error("Failed to load pastors for roadmap", error);
     setRoadmapPastors([]);
@@ -1160,7 +1346,8 @@ setMappingMentorSearch("");
         ? data.users
         : [];
 
-    setMappingMentors(mentorsList);
+    // setMappingMentors(mentorsList);
+    setMappingMentors(await hydrateUsersWithProfilePictures(mentorsList));
   } catch (error) {
     console.error("Failed to load mentors", error);
     setMappingMentors([]);
@@ -1211,7 +1398,8 @@ setCdpPastorSearch("");
         ? data.users
         : [];
 
-    setCdpPastors(pastorsList);
+    // setCdpPastors(pastorsList);
+    setCdpPastors(await hydrateUsersWithProfilePictures(pastorsList));
   } catch (error) {
     console.error("Failed to load pastors for CDP", error);
     setCdpPastors([]);
@@ -1237,6 +1425,7 @@ const loadCdpAssessmentsForPastor = async (pastor: any) => {
 
     const res = await apiGetAssignedAssessments(pastorId);
     const rows = parseAssignedAssessmentsListBody(res.data);
+    
 
     const completedWithCdp = rows
       .map((item: any) => {
@@ -1277,12 +1466,25 @@ const assessment: any = flat.assessment ?? {};
           Boolean(item?.recommendation) ||
           Boolean(item?.recommendations);
 
-        const isCompleted =
-          status === "completed" ||
-          status === "reviewed" ||
-          status === "submitted";
+        // const isCompleted =
+        //   status === "completed" ||
+        //   status === "reviewed" ||
+        //   status === "submitted";
+        const hasRecommendations =
+  Array.isArray(assessment?.sections) &&
+  assessment.sections.some((section: any) =>
+    Array.isArray(section?.recommendations) &&
+    section.recommendations.length > 0
+  );
 
-        if (!assessmentId || !isCompleted || !hasCdp) return null;
+const isCompleted =
+  status === "completed" ||
+  status === "reviewed" ||
+  status === "submitted" ||
+  hasRecommendations;
+
+        // if (!assessmentId || !isCompleted || !hasCdp) return null;
+        if (!assessmentId || !isCompleted) return null;
 
         return {
           id: assessmentId,
@@ -1522,13 +1724,13 @@ const filteredMappingMentors = mappingMentors.filter((mentor) => {
         No appointments scheduled for today.
       </div>
     ) : (
-      <div className="space-y-4">
+      <div className="h-[455px] space-y-4 overflow-y-auto pr-3 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-white/5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#8ec5eb]/35 hover:[&::-webkit-scrollbar-thumb]:bg-[#8ec5eb]/55">
         {/* {appointments.slice(0, 2).map((appointment) => {
           const { platformIcon, mentorName, mentorRole, meetingTime } =
             formatAppointment(appointment);
 
           return ( */}
-          {appointments.slice(0, 2).map((appointment) => {
+          {appointments.map((appointment) => {
             const appointmentId = appointmentEntityId(appointment);
   const { platformIcon, meetingTime } = formatAppointment(appointment);
 
@@ -1607,12 +1809,42 @@ const filteredMappingMentors = mappingMentors.filter((mentor) => {
                     </span>
                   </div>
 
-                  <p className="mt-4 text-[11px] text-white/55">
+                  {/* <p className="mt-4 text-[11px] text-white/55">
                     Mode:{" "}
                     <span className="capitalize text-[#cde2f2]">
                       {appointment.platform}
                     </span>
-                  </p>
+                  </p> */}
+                  {(() => {
+  const meetingLink =
+    (appointment as any).meetingLink ||
+    (appointment as any).meetingUrl ||
+    (appointment as any).zoomLink ||
+    (appointment as any).joinUrl ||
+    (appointment as any).details?.meetingLink ||
+    (appointment as any).details?.meetingUrl ||
+    (appointment as any).details?.zoomLink ||
+    "";
+
+  return (
+    <p className="mt-4 text-[11px] text-white/55">
+      Mode:{" "}
+      {meetingLink ? (
+        <button
+          type="button"
+          onClick={() => window.open(meetingLink, "_blank", "noopener,noreferrer")}
+          className="capitalize text-[#8ec5eb] underline underline-offset-2 hover:text-[#b8ddf5]"
+        >
+          {appointment.platform || "Join meeting"}
+        </button>
+      ) : (
+        <span className="capitalize text-[#cde2f2]">
+          {appointment.platform || "—"}
+        </span>
+      )}
+    </p>
+  );
+})()}
 
                   {/* <div className="mt-2 flex gap-4 text-sm text-white/70">
                     <i className="fa-solid fa-phone" />
@@ -1982,16 +2214,16 @@ const filteredMappingMentors = mappingMentors.filter((mentor) => {
       <section className="mt-6 grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
       
        <div className={`p-5 sm:p-6 ${directorGlassCard}`}>
-          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
+         <div className="grid grid-cols-1 items-center gap-6 lg:grid-cols-[0.75fr_1.25fr] lg:gap-8">
             {/* Left side */}
-            <div className="text-white">
-              <h2 className="text-2xl sm:text-3xl md:text-[32px] font-bold mb-3">
-                Add User
-              </h2>
-              <p className="text-white/90">
-                Add new pastors and mentors to the platform
-              </p>
-            </div>
+            <div className="flex h-full flex-col justify-center text-white lg:max-w-[260px]">
+  <h2 className="mb-2 text-2xl font-bold sm:text-[28px]">
+    Add User
+  </h2>
+  <p className="text-sm leading-relaxed text-white/75">
+    Add pastors and mentors.
+  </p>
+</div>
 
             {/* Right side - Form */}
             <form onSubmit={handleAddUser} className="space-y-4">
@@ -2007,7 +2239,7 @@ const filteredMappingMentors = mappingMentors.filter((mentor) => {
       value={firstName}
       onChange={(e) => setFirstName(e.target.value)}
       required
-      className="w-full px-4 py-3 rounded-md bg-white/10 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
+      className="w-full rounded-md border border-white/30 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-sm placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
     />
   </div>
 
@@ -2021,7 +2253,7 @@ const filteredMappingMentors = mappingMentors.filter((mentor) => {
       value={lastName}
       onChange={(e) => setLastName(e.target.value)}
       required
-      className="w-full px-4 py-3 rounded-md bg-white/10 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
+     className="w-full rounded-md border border-white/30 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-sm placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
     />
   </div>
 </div>
@@ -2036,7 +2268,7 @@ const filteredMappingMentors = mappingMentors.filter((mentor) => {
                   value={userForm.email}
                   onChange={(e) => setUserForm({ ...userForm, email: e.target.value })}
                   required
-                  className="w-full px-4 py-3 rounded-md bg-white/10 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
+                 className="w-full rounded-md border border-white/30 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-sm placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/50"
                 />
               </div>
 
@@ -2046,7 +2278,7 @@ const filteredMappingMentors = mappingMentors.filter((mentor) => {
                   value={userForm.role}
                   onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
                   required
-                  className="w-full px-4 py-3 rounded-md bg-white/10 border border-white/30 text-white focus:outline-none focus:ring-2 focus:ring-white/50"
+                 className="w-full rounded-md border border-white/30 bg-white/10 px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/50"
                 >
                   <option className="text-black" value="">Select Title</option>
                   <option className="text-black" value="pastor">Pastor</option>
@@ -2510,40 +2742,81 @@ if (item.title === "Customized Development Plan") {
 
       {/* Map */}
       <section className="py-16">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <h2 className="text-[22px] font-semibold text-white">Network map</h2>
-            <button
-              type="button"
-              onClick={() => void loadNetworkMap(true)}
-              disabled={networkMapLoading || networkMapRefreshing}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-[#8ec5eb] transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
-              title="Refresh mentor and pastor data from the server"
-              aria-label="Refresh network map data"
-            >
-              <i
-                className={`fa-solid fa-rotate ${networkMapRefreshing ? "animate-spin" : ""}`}
-                aria-hidden
-              />
-            </button>
-          </div>
-          <div className="flex w-full max-w-sm flex-col gap-2 sm:max-w-xs">
-            <input
-              type="search"
-              value={mapSearch}
-              onChange={(e) => setMapSearch(e.target.value)}
-              placeholder="Filter by name…"
-              className="w-full rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm text-white placeholder:text-white/50 outline-none focus:ring-2 focus:ring-[#8ec5eb]/40"
-              aria-label="Filter people on the network map"
-            />
-            <p className="text-[11px] text-white/45">
-              <span className="font-medium text-[#8ec5eb]">Blue</span> = mentor ·{" "}
-              <span className="font-medium text-[#5ee0d0]">teal</span> = pastor. Avatar pins are
-              placed on the Bay Area overview until your API provides GPS per profile.
-            </p>
-          </div>
-        </div>
+       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+  <div className="flex flex-wrap items-center gap-3">
+    <h2 className="text-[22px] font-semibold text-white">Network map</h2>
 
+    <button
+      type="button"
+      onClick={() => void loadNetworkMap(true)}
+      disabled={networkMapLoading || networkMapRefreshing}
+      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-[#8ec5eb] transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+      title="Refresh map"
+    >
+      <i className={`fa-solid fa-rotate ${networkMapRefreshing ? "animate-spin" : ""}`} />
+    </button>
+  </div>
+
+  <div className="flex w-full max-w-2xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+    <div className="flex flex-wrap items-center gap-4 text-xs text-white/55">
+      <button
+        type="button"
+        onClick={() => setMapRoleFilter((prev) => (prev === "pastor" ? "all" : "pastor"))}
+        className={`inline-flex items-center gap-2 transition ${
+          mapRoleFilter === "pastor" ? "text-white" : "text-white/55 hover:text-white/80"
+        }`}
+      >
+        <span
+  className={`h-3 w-3 rounded-full ring-2 ring-[#8ec5eb]/90 ${
+    mapRoleFilter === "pastor" ? "bg-[#8ec5eb]" : "bg-transparent"
+  }`}
+/>
+        Pastor
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setMapRoleFilter((prev) => (prev === "mentor" ? "all" : "mentor"))}
+        className={`inline-flex items-center gap-2 transition ${
+          mapRoleFilter === "mentor" ? "text-white" : "text-white/55 hover:text-white/80"
+        }`}
+      >
+        <span
+  className={`h-3 w-3 rounded-full ring-2 ring-[#ef4444]/90 ${
+    mapRoleFilter === "mentor" ? "bg-[#ef4444]" : "bg-transparent"
+  }`}
+/>
+        Mentor
+      </button>
+
+      <button
+        type="button"
+        onClick={() =>
+          setMapRoleFilter((prev) => (prev === "field-mentor" ? "all" : "field-mentor"))
+        }
+        className={`inline-flex items-center gap-2 transition ${
+          mapRoleFilter === "field-mentor" ? "text-white" : "text-white/55 hover:text-white/80"
+        }`}
+      >
+        <span
+  className={`h-3 w-3 rounded-full ring-2 ring-[#f59e0b]/90 ${
+    mapRoleFilter === "field-mentor" ? "bg-[#f59e0b]" : "bg-transparent"
+  }`}
+/>
+        Field Mentor
+      </button>
+    </div>
+
+    <input
+      type="search"
+      value={mapSearch}
+      onChange={(e) => setMapSearch(e.target.value)}
+      placeholder="Filter by name..."
+      className="w-full rounded-md border border-white/20 bg-white/10 px-4 py-2 text-sm text-white placeholder:text-white/50 outline-none focus:ring-2 focus:ring-[#8ec5eb]/40 sm:max-w-xs"
+      aria-label="Filter people on the network map"
+    />
+  </div>
+</div>
         {networkMapLoading ? (
           <div
             className="flex h-[420px] w-full items-center justify-center rounded-2xl border border-white/10 bg-[#041f35]/50 md:h-[480px]"
@@ -2571,19 +2844,19 @@ if (item.title === "Customized Development Plan") {
             />
           </div>
         )}
-        <p className="mt-3 text-center text-xs text-white/50">
+        {/* <p className="mt-3 text-center text-xs text-white/50">
           Live data: refetches when you return to this tab, every 5 minutes, and when you press refresh.
           Showing up to {MAX_NETWORK_MAP_MARKERS} people. For GPS-accurate pins, add coordinates in your
           API.
-        </p>
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-4 text-xs text-white/55">
+        </p> */}
+        {/* <div className="mt-2 flex flex-wrap items-center justify-center gap-4 text-xs text-white/55">
           <span>
             <span className="inline-block h-2.5 w-2.5 rounded-full ring-2 ring-[#8ec5eb]/90" /> Mentor
           </span>
           <span>
             <span className="inline-block h-2.5 w-2.5 rounded-full ring-2 ring-[#5ee0d0]/90" /> Pastor
           </span>
-        </div>
+        </div> */}
       </section>
            {showQuickAssignModal && (
   <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b18]/75 px-4 backdrop-blur-md">
@@ -2604,17 +2877,34 @@ if (item.title === "Customized Development Plan") {
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setShowQuickAssignModal(false);
-            setSelectedQuickPastorId("");
-            setSelectedQuickMentorId("");
-          }}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
-        >
-          <i className="fa-solid fa-xmark" />
-        </button>
+       <div className="flex items-center gap-3">
+  {selectedQuickPastorId && (
+    <button
+      type="button"
+      onClick={() => {
+        setSelectedQuickPastorId("");
+        setSelectedQuickMentorId("");
+      }}
+      className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+      aria-label="Back to pastors"
+    >
+      <i className="fa-solid fa-arrow-left" />
+    </button>
+  )}
+
+  <button
+    type="button"
+    onClick={() => {
+      setShowQuickAssignModal(false);
+      setSelectedQuickPastorId("");
+      setSelectedQuickMentorId("");
+    }}
+    className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+    aria-label="Close"
+  >
+    <i className="fa-solid fa-xmark" />
+  </button>
+</div>
       </div>
 
       {quickAssignLoading ? (
@@ -2668,9 +2958,10 @@ if (item.title === "Customized Development Plan") {
                         }}
                         className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 text-left shadow-sm transition hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
                       >
-                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                        {/* <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
                           <i className="fa-solid fa-user" />
-                        </span>
+                        </span> */}
+                        <QuickLinkAvatar person={pastor} icon="fa-solid fa-user" />
 
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-white">
@@ -2692,7 +2983,7 @@ if (item.title === "Customized Development Plan") {
             </>
           ) : (
             <>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              {/* <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8ec5eb]">
                     Selected Pastor
@@ -2712,7 +3003,7 @@ if (item.title === "Customized Development Plan") {
                 >
                   Change Pastor
                 </button>
-              </div>
+              </div> */}
 
               {/* <h4 className="mb-4 text-sm font-semibold text-[#8ec5eb]">
                 Select Mentor
@@ -2767,9 +3058,10 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                             : "border-white/10 bg-[#132a42]/80 hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
                         }`}
                       >
-                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                        {/* <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
                           <i className="fa-solid fa-user-tie" />
-                        </span>
+                        </span> */}
+                        <QuickLinkAvatar person={mentor} icon="fa-solid fa-user-tie" />
 
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-white">
@@ -2927,9 +3219,10 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                     }}
                    className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 text-left shadow-sm transition hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
                   >
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                    {/* <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
                       <i className="fa-solid fa-user" />
-                    </span>
+                    </span> */}
+                    <QuickLinkAvatar person={pastor} icon="fa-solid fa-user" />
 
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-white">
@@ -3131,17 +3424,34 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setShowMentorMenteeModal(false);
-            setSelectedMappingMentorId("");
-            setMappingMentees([]);
-          }}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
-        >
-          <i className="fa-solid fa-xmark" />
-        </button>
+     <div className="flex items-center gap-3">
+  {selectedMappingMentorId && (
+    <button
+      type="button"
+      onClick={() => {
+        setSelectedMappingMentorId("");
+        setMappingMentees([]);
+      }}
+      className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+      aria-label="Back to mentors"
+    >
+      <i className="fa-solid fa-arrow-left" />
+    </button>
+  )}
+
+  <button
+    type="button"
+    onClick={() => {
+      setShowMentorMenteeModal(false);
+      setSelectedMappingMentorId("");
+      setMappingMentees([]);
+    }}
+    className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+    aria-label="Close"
+  >
+    <i className="fa-solid fa-xmark" />
+  </button>
+</div>
       </div>
 
       {mappingLoading ? (
@@ -3196,9 +3506,10 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                         }}
                         className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 text-left shadow-sm transition hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
                       >
-                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                        {/* <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
                           <i className="fa-solid fa-user-tie" />
-                        </span>
+                        </span> */}
+                        <QuickLinkAvatar person={mentor} icon="fa-solid fa-user-tie" />
 
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-white">
@@ -3230,7 +3541,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                   </h4>
                 </div>
 
-                <button
+                {/* <button
                   type="button"
                   onClick={() => {
                     setSelectedMappingMentorId("");
@@ -3239,7 +3550,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                   className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
                 >
                   Change Mentor
-                </button>
+                </button> */}
               </div>
 
               {mappingMenteesLoading ? (
@@ -3264,9 +3575,10 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                         key={menteeId}
                         className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 shadow-sm"
                       >
-                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                        {/* <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
                           <i className="fa-solid fa-user" />
-                        </span>
+                        </span> */}
+                        <QuickLinkAvatar person={mentee} icon="fa-solid fa-user" />
 
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-white">
@@ -3307,18 +3619,36 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            setShowCdpModal(false);
-            setSelectedCdpPastorId("");
-            setSelectedCdpPastorName("");
-            setCdpAssessments([]);
-          }}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
-        >
-          <i className="fa-solid fa-xmark" />
-        </button>
+       <div className="flex items-center gap-3">
+  {selectedCdpPastorId && (
+    <button
+      type="button"
+      onClick={() => {
+        setSelectedCdpPastorId("");
+        setSelectedCdpPastorName("");
+        setCdpAssessments([]);
+      }}
+      className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+      aria-label="Back to pastors"
+    >
+      <i className="fa-solid fa-arrow-left" />
+    </button>
+  )}
+
+  <button
+    type="button"
+    onClick={() => {
+      setShowCdpModal(false);
+      setSelectedCdpPastorId("");
+      setSelectedCdpPastorName("");
+      setCdpAssessments([]);
+    }}
+    className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+    aria-label="Close"
+  >
+    <i className="fa-solid fa-xmark" />
+  </button>
+</div>
       </div>
 
       {cdpPastorsLoading ? (
@@ -3370,9 +3700,10 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                         onClick={() => void loadCdpAssessmentsForPastor(pastor)}
                         className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 text-left shadow-sm transition hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
                       >
-                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                        {/* <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
                           <i className="fa-solid fa-user" />
-                        </span>
+                        </span> */}
+                        <QuickLinkAvatar person={pastor} icon="fa-solid fa-user" />
 
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-semibold text-white">
@@ -3404,7 +3735,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                   </h4>
                 </div>
 
-                <button
+                {/* <button
                   type="button"
                   onClick={() => {
                     setSelectedCdpPastorId("");
@@ -3414,7 +3745,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                   className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
                 >
                   Change Pastor
-                </button>
+                </button> */}
               </div>
 
               {cdpAssessmentsLoading ? (

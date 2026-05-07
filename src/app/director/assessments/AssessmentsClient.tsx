@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import DirectorHero from "../DirectorHero";
@@ -33,6 +33,7 @@ import {
 } from "@/app/Services/assessment.service";
 import { apiGetAllUsers } from "@/app/Services/users.service";
 import { apiAssignAssessment, apiGetUserProgress } from "@/app/Services/progress.service";
+import { apiGetAppointments } from "@/app/Services/appointments.service";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { emitPastorAssignmentsChanged } from "@/app/utils/progress-sync";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
@@ -66,6 +67,9 @@ type AssessmentCardRow = {
   createdOn?: string;
   createdBy?: string;
   pastorsAssigned?: number;
+  appointmentId?: string;
+  meetingDateLabel?: string;
+  meetingActive?: boolean;
 };
 
 function toDateInputValue(value?: string): string {
@@ -100,6 +104,29 @@ function formatCreatedDate(value?: string): string | null {
   });
 }
 
+function formatMeetingDateTime(value?: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function isMeetingStillActive(meetingDate: unknown, status: unknown): boolean {
+  const s = String(status || "").toLowerCase();
+  if (s === "completed" || s === "cancelled" || s === "missed") return false;
+  if (typeof meetingDate !== "string" || !meetingDate.trim()) return true;
+  const when = new Date(meetingDate).getTime();
+  if (Number.isNaN(when)) return true;
+  return when >= Date.now();
+}
+
 function countPastorsAssigned(item: any): number {
   // If the backend provides pastorsAssigned directly, use it
   if (typeof item.pastorsAssigned === "number") {
@@ -125,6 +152,18 @@ function normalizeAssessmentStatus(raw: unknown): "not_started" | "submitted" | 
   if (s === "submitted") return "submitted";
   if (s === "completed" || s === "reviewed") return "completed";
   return "not_started";
+}
+
+function extractAssessmentIdFromProgressRow(row: any): string {
+  const direct = row?.assessmentId;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+  if (direct && typeof direct === "object") {
+    const nested = String((direct as { _id?: string; id?: string })._id ?? (direct as { _id?: string; id?: string }).id ?? "").trim();
+    if (nested) return nested;
+  }
+  const nested = String(row?.assessment?._id ?? row?.assessment?.id ?? "").trim();
+  if (nested) return nested;
+  return "";
 }
 
 function assessmentStatusLabel(status: AssessmentCardRow["progressStatus"]): string {
@@ -171,6 +210,7 @@ function AssessmentsPageContent() {
   const [featuredLoading, setFeaturedLoading] = useState(false);
   const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(assignUserFromQuery);
   const [assignDueDate, setAssignDueDate] = useState("");
+  const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name_asc" | "name_desc">("newest");
   const lastAssignBootstrap = useRef<string | null>(null);
 
   useEffect(() => {
@@ -231,19 +271,34 @@ function AssessmentsPageContent() {
 
         if (selectedMenteeId) {
           try {
-            const [assignedRes, progRes] = await Promise.all([
+            const [assignedRes, progRes, appointmentsRes] = await Promise.all([
               apiGetAssignedAssessments(selectedMenteeId),
               apiGetUserProgress(selectedMenteeId),
+              apiGetAppointments({ userId: selectedMenteeId, futureOnly: false } as any),
             ]);
             const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
             const pr = unwrapProgressData(progRes);
             const rows = pr?.assessments ?? [];
-            const byAssessmentId = new Map<string, "not_started" | "submitted" | "completed">();
-            for (const row of rows) {
-              const typedRow = row as { assessmentId?: string; status?: string };
-              const aid = typedRow.assessmentId;
-              if (aid != null && String(aid).trim() !== "") {
-                byAssessmentId.set(String(aid).trim(), normalizeAssessmentStatus(typedRow.status));
+            const appointmentsBody: any = appointmentsRes?.data;
+            const appointmentsList: any[] = Array.isArray(appointmentsBody)
+              ? appointmentsBody
+              : Array.isArray(appointmentsBody?.data)
+                ? appointmentsBody.data
+                : Array.isArray(appointmentsBody?.data?.data)
+                  ? appointmentsBody.data.data
+                  : [];
+            const appointmentById = new Map<string, any>();
+            const appointmentsByAssessmentId = new Map<string, any[]>();
+            for (const appt of appointmentsList) {
+              const id = String(appt?._id ?? appt?.id ?? "").trim();
+              if (id) appointmentById.set(id, appt);
+              const notes = String(appt?.notes ?? "");
+              const m = notes.match(/assessmentId=([^|\s]+)/i);
+              const linkedAssessmentId = String(m?.[1] || "").trim();
+              if (linkedAssessmentId) {
+                const prev = appointmentsByAssessmentId.get(linkedAssessmentId) || [];
+                prev.push(appt);
+                appointmentsByAssessmentId.set(linkedAssessmentId, prev);
               }
             }
             const assigned = assignedRows
@@ -261,12 +316,35 @@ function AssessmentsPageContent() {
                   createdAt?: string;
                   createdBy?: string;
                   pastorsAssigned?: number;
+                  appointmentId?: string;
                 };
 
                 const raw = detailObj.bannerImage;
                 const image =
                   (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
                 const assessmentId = String(detailObj._id ?? detailObj.id ?? flat.assessmentId);
+                const assignmentId = String(flat.assignmentId ?? "").trim();
+                const appointmentId = String((item as any)?.appointmentId ?? detailObj?.appointmentId ?? "").trim();
+                const apptFromId = appointmentId ? appointmentById.get(appointmentId) : null;
+                const apptFromAssessment = (appointmentsByAssessmentId.get(assessmentId) || [])
+                  .slice()
+                  .sort((a, b) => {
+                    const ta = new Date(String(a?.meetingDate ?? 0)).getTime();
+                    const tb = new Date(String(b?.meetingDate ?? 0)).getTime();
+                    return tb - ta;
+                  })[0];
+                const appt = apptFromId || apptFromAssessment || null;
+                const resolvedAppointmentRaw = appt?._id ?? appt?.id ?? appointmentId ?? "";
+                const resolvedAppointmentId = String(resolvedAppointmentRaw).trim();
+                const progressRow = rows.find((p: any) => {
+                  const rowAssessmentId = extractAssessmentIdFromProgressRow(p);
+                  const rowAssignmentId = String(p?.assignmentId ?? "").trim();
+                  return (
+                    (rowAssessmentId && rowAssessmentId === assessmentId) ||
+                    (assignmentId && rowAssignmentId && rowAssignmentId === assignmentId)
+                  );
+                });
+                const progressStatus = normalizeAssessmentStatus(progressRow?.status);
 
                 return {
                   id: assessmentId,
@@ -274,11 +352,16 @@ function AssessmentsPageContent() {
                   description: String(detailObj.description || ""),
                   image,
                   type: detailObj.type,
-                  progressStatus: byAssessmentId.get(assessmentId) || "not_started",
+                  progressStatus,
                   dueDate: flat.dueDate,
                   createdOn: detailObj.createdAt,
                   createdBy: detailObj.createdBy,
                   pastorsAssigned: countPastorsAssigned(flat.assessment),
+                  appointmentId: resolvedAppointmentId || undefined,
+                  meetingDateLabel: formatMeetingDateTime(appt?.meetingDate) || undefined,
+                  meetingActive: resolvedAppointmentId
+                    ? isMeetingStillActive(appt?.meetingDate, appt?.status)
+                    : false,
                 } satisfies AssessmentCardRow;
               })
               .filter((item): item is NonNullable<typeof item> => item != null);
@@ -510,11 +593,37 @@ function AssessmentsPageContent() {
     }
   };
 
-  const filteredAssessments = assessments.filter((assessment) =>
-    String(assessment.title ?? "")
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase())
-  );
+  const filteredAssessments = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    const filtered = assessments.filter((assessment) =>
+      String(assessment.title ?? "").toLowerCase().includes(q),
+    );
+    const list = [...filtered];
+    if (sortBy === "name_asc") {
+      return list.sort((a, b) => String(a.title ?? "").localeCompare(String(b.title ?? "")));
+    }
+    if (sortBy === "name_desc") {
+      return list.sort((a, b) => String(b.title ?? "").localeCompare(String(a.title ?? "")));
+    }
+    if (sortBy === "oldest") {
+      return list.sort(
+        (a, b) =>
+          new Date(String(a.createdOn ?? 0)).getTime() - new Date(String(b.createdOn ?? 0)).getTime(),
+      );
+    }
+    return list.sort(
+      (a, b) =>
+        new Date(String(b.createdOn ?? 0)).getTime() - new Date(String(a.createdOn ?? 0)).getTime(),
+    );
+  }, [assessments, searchQuery, sortBy]);
+
+  const filteredFeaturedItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return featuredItems;
+    return featuredItems.filter((item) =>
+      String(item?.name || "").toLowerCase().includes(q),
+    );
+  }, [featuredItems, searchQuery]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -602,26 +711,39 @@ function AssessmentsPageContent() {
               )}
             </div> */}
             <div className="flex flex-wrap gap-3">
-  {!isSelectionMode && (
-    <>
-      <button type="button" onClick={handleSelectMode} className={directorBtnSecondary}>
-        <i className="fa-solid fa-check-square"></i>
-        Select
-      </button>
-      <button
-        type="button"
-        onClick={() => router.push("/director/assessments/create")}
-        className={directorBtnPrimary}
-      >
-        <i className="fa-solid fa-plus"></i>
-        Add
-      </button>
-    </>
-  )}
-</div>
+              {!isSelectionMode && (
+                <>
+                  <select
+                    value={sortBy}
+                    onChange={(e) =>
+                      setSortBy(e.target.value as "newest" | "oldest" | "name_asc" | "name_desc")
+                    }
+                    className="h-[42px] min-w-[170px] rounded-lg border border-white/20 bg-white/10 px-3 text-sm font-medium text-white outline-none transition focus:border-[#8ec5eb]/55 focus:ring-2 focus:ring-[#8ec5eb]/30 [&>option]:bg-[#062946] [&>option]:text-white"
+                    aria-label="Sort assessments"
+                  >
+                    <option value="newest">Newest</option>
+                    <option value="oldest">Oldest</option>
+                    <option value="name_asc">Name A-Z</option>
+                    <option value="name_desc">Name Z-A</option>
+                  </select>
+                  <button type="button" onClick={handleSelectMode} className={directorBtnSecondary}>
+                    <i className="fa-solid fa-check-square"></i>
+                    Select
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push("/director/assessments/create")}
+                    className={directorBtnPrimary}
+                  >
+                    <i className="fa-solid fa-plus"></i>
+                    Add
+                  </button>
+                </>
+              )}
+            </div>
           </DirectorFilterSection>
 
-          {!featuredLoading && featuredItems.length > 0 && (
+          {!featuredLoading && filteredFeaturedItems.length > 0 && (
             <div className={`mb-6 ${mentorFilterPanel}`}>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm text-[#cde2f2]">
@@ -640,7 +762,7 @@ function AssessmentsPageContent() {
                 )}
               </div>
               <FeaturedAvatars
-                items={featuredItems}
+                items={filteredFeaturedItems}
                 showDivider={false}
                 className="mb-0"
                 selectedId={selectedMenteeId}
@@ -681,40 +803,40 @@ function AssessmentsPageContent() {
                 </button>
               </div> */}
               <div className="flex gap-2">
-  <button
-    type="button"
-    onClick={() => {
-      if (selectedAssessments.length === 0) {
-        setToast("Select at least one assessment first.");
-        setTimeout(() => setToast(null), 3500);
-        return;
-      }
-      setShowAssignModal(true);
-    }}
-    disabled={selectedAssessments.length === 0}
-    className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/20 px-4 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
-  >
-    <i className="fa-solid fa-user-plus text-xs"></i>
-    Assign
-  </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedAssessments.length === 0) {
+                      setToast("Select at least one assessment first.");
+                      setTimeout(() => setToast(null), 3500);
+                      return;
+                    }
+                    setShowAssignModal(true);
+                  }}
+                  disabled={selectedAssessments.length === 0}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/20 px-4 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <i className="fa-solid fa-user-plus text-xs"></i>
+                  Assign
+                </button>
 
-  <button
-    type="button"
-    onClick={() => setShowDeleteModal(true)}
-    disabled={selectedAssessments.length === 0}
-    className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-400/40 bg-red-500/20 text-red-200 hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-  >
-    <i className="fa-solid fa-trash"></i>
-  </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteModal(true)}
+                  disabled={selectedAssessments.length === 0}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-400/40 bg-red-500/20 text-red-200 hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <i className="fa-solid fa-trash"></i>
+                </button>
 
-  <button
-    type="button"
-    onClick={handleCancelSelection}
-    className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white hover:bg-white/15"
-  >
-    <i className="fa-solid fa-xmark"></i>
-  </button>
-</div>
+                <button
+                  type="button"
+                  onClick={handleCancelSelection}
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white hover:bg-white/15"
+                >
+                  <i className="fa-solid fa-xmark"></i>
+                </button>
+              </div>
             </div>
           )}
 
@@ -730,9 +852,8 @@ function AssessmentsPageContent() {
               {filteredAssessments.map((assessment) => (
                 <div
                   key={assessment.id}
-                  className={`relative ${directorListCardRadius} transition-all ${directorGlassCard} ${
-                    selectedAssessments.includes(assessment.id) ? "bg-[#f59e0b]/15 border-transparent" : "border border-white/10"
-                  }`}
+                  className={`relative ${directorListCardRadius} transition-all ${directorGlassCard} ${selectedAssessments.includes(assessment.id) ? "bg-[#f59e0b]/15 border-transparent" : "border border-white/10"
+                    }`}
                 >
                   {isSelectionMode && (
                     <div className="absolute left-4 top-4 z-10">
@@ -745,7 +866,7 @@ function AssessmentsPageContent() {
                     </div>
                   )}
 
-                  {!isSelectionMode && !selectedMenteeId && (
+                  {!isSelectionMode && (
                     <div className="options-menu-container absolute right-4 top-4 z-[60]">
                       <button
                         type="button"
@@ -760,41 +881,72 @@ function AssessmentsPageContent() {
                       </button>
                       {showOptionsMenu === assessment.id && (
                         <div className="absolute right-0 z-[200] mt-2 w-48 animate-slide-down rounded-lg border border-white/15 bg-[#041f35]/98 py-2 shadow-xl backdrop-blur-md">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedAssessments([assessment.id]);
-                              setShowAssignModal(true);
-                              setShowOptionsMenu(null);
-                            }}
-                            className="flex w-full items-center gap-3 px-4 py-2 text-left text-white/90 hover:bg-white/10"
-                          >
-                            <i className="fa-solid fa-user-plus text-[#8ec5eb]"></i>
-                            Assign to
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowOptionsMenu(null);
-                              router.push(`/director/assessments/${assessment.id}`);
-                            }}
-                            className="flex w-full items-center gap-3 px-4 py-2 text-left text-white/90 hover:bg-white/10"
-                          >
-                            <i className="fa-solid fa-pen text-[#8ec5eb]"></i>
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedAssessments([assessment.id]);
-                              setShowDeleteModal(true);
-                              setShowOptionsMenu(null);
-                            }}
-                            className="flex w-full items-center gap-3 px-4 py-2 text-left text-red-300 hover:bg-red-500/10"
-                          >
-                            <i className="fa-solid fa-trash"></i>
-                            Delete
-                          </button>
+                          {selectedMenteeId ? (
+                            <>
+                              <button
+                                type="button"
+                                disabled={!assessment.appointmentId || !assessment.meetingActive}
+                                onClick={() => {
+                                  setShowOptionsMenu(null);
+                                  if (!assessment.appointmentId || !assessment.meetingActive) return;
+                                  router.push(`/director/schedule/${encodeURIComponent(assessment.appointmentId)}`);
+                                }}
+                                className="flex w-full items-center gap-3 px-4 py-2 text-left text-white/90 hover:bg-white/10 disabled:cursor-not-allowed disabled:text-white/40 disabled:hover:bg-transparent"
+                              >
+                                <i className="fa-regular fa-calendar-check text-[#8ec5eb]" />
+                                View Meeting
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowOptionsMenu(null);
+                                  router.push(`/director/assessments/${assessment.id}?viewUser=${selectedMenteeId}`);
+                                }}
+                                className="flex w-full items-center gap-3 border-t border-white/10 px-4 py-2 text-left text-white/90 hover:bg-white/10"
+                              >
+                                <i className="fa-regular fa-eye text-[#8ec5eb]" />
+                                View Details
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedAssessments([assessment.id]);
+                                  setShowAssignModal(true);
+                                  setShowOptionsMenu(null);
+                                }}
+                                className="flex w-full items-center gap-3 px-4 py-2 text-left text-white/90 hover:bg-white/10"
+                              >
+                                <i className="fa-solid fa-user-plus text-[#8ec5eb]"></i>
+                                Assign to
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowOptionsMenu(null);
+                                  router.push(`/director/assessments/${assessment.id}`);
+                                }}
+                                className="flex w-full items-center gap-3 px-4 py-2 text-left text-white/90 hover:bg-white/10"
+                              >
+                                <i className="fa-solid fa-pen text-[#8ec5eb]"></i>
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedAssessments([assessment.id]);
+                                  setShowDeleteModal(true);
+                                  setShowOptionsMenu(null);
+                                }}
+                                className="flex w-full items-center gap-3 px-4 py-2 text-left text-red-300 hover:bg-red-500/10"
+                              >
+                                <i className="fa-solid fa-trash"></i>
+                                Delete
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -814,6 +966,12 @@ function AssessmentsPageContent() {
                             (assessment.image.startsWith("blob:") || isRemoteImageSrc(assessment.image))
                           }
                         />
+                        {selectedMenteeId && (
+                          <div className="absolute bottom-1.5 left-1.5 inline-flex max-w-[120px] items-center gap-1 truncate rounded-md bg-[#fff6d8] px-1.5 py-[2px] text-[10px] font-semibold text-[#d38a00]">
+                            <i className="fa-regular fa-calendar text-[10px]" />
+                            Due: {formatDueDate(assessment.dueDate) || "N/A"}
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex flex-1 flex-col justify-between">
@@ -837,32 +995,34 @@ function AssessmentsPageContent() {
                           <div className="ml-auto flex items-center gap-2">
                             {(assessment.progressStatus === "submitted" ||
                               assessment.progressStatus === "completed") && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  router.push(
-                                    `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}`,
-                                  )
-                                }
-                                className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
-                              >
-                                View Result
-                              </button>
-                            )}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    router.push(
+                                      `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}`,
+                                    )
+                                  }
+                                  className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                                >
+                                  View Result
+                                </button>
+                              )}
+                            {/* CDP flow intentionally disabled for Director for now.
+                                Keep this block commented to restore quickly when needed.
                             {(assessment.progressStatus === "submitted" ||
                               assessment.progressStatus === "completed") && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  router.push(
-                                    `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}&editRecommendation=1`,
-                                  )
-                                }
-                                className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
-                              >
-                                Edit Recommendation
-                              </button>
-                            )}
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    router.push(
+                                      `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}&editRecommendation=1`,
+                                    )
+                                  }
+                                  className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+                                >
+                                  Send CDP
+                                </button>
+                              )} */}
                             <button
                               type="button"
                               onClick={() =>

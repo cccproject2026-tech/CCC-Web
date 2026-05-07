@@ -8,7 +8,12 @@ import MentorHeader from "@/app/Components/MentorHeader";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
 import { apiGetNotes } from "@/app/Services/api";
-import { createNoteBestEffort, normalizeNotesList } from "@/app/Services/notes.service";
+// import { createNoteBestEffort, normalizeNotesList } from "@/app/Services/notes.service";
+import {
+  createNoteBestEffort,
+  deleteNoteSafe,
+  normalizeNotesList,
+} from "@/app/Services/notes.service";
 import type { Note } from "@/app/Services/types/users.types";
 import {
   formatNoteTimestamp,
@@ -59,6 +64,8 @@ export default function NotesPageContent({ variant }: { variant: NotesVariant })
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveOk, setSaveOk] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
 
   const { userId, displayName } = useNotesSession(variant);
   const notesStorageKey = `notes:${variant}:${userId ?? "guest"}`;
@@ -596,7 +603,32 @@ const handleSave = async () => {
       : "mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-10";
 
   const MainTag = variant === "director" ? "div" : "main";
+const toggleNoteSelection = (noteId: string) => {
+  setSelectedNoteIds((prev) =>
+    prev.includes(noteId)
+      ? prev.filter((id) => id !== noteId)
+      : [...prev, noteId]
+  );
+};
 
+const handleDeleteSelectedNotes = async () => {
+  if (!userId || selectedNoteIds.length === 0) return;
+
+  try {
+    await Promise.all(
+      selectedNoteIds.map((noteId) => deleteNoteSafe(userId, noteId))
+    );
+
+    setNotes((prev) =>
+      prev.filter((note: any) => !selectedNoteIds.includes(String(note._id || note.id)))
+    );
+
+    setSelectedNoteIds([]);
+    setSelectMode(false);
+  } catch (error) {
+    console.error("Failed to delete selected notes:", error);
+  }
+};
   return (
     <div
       className={
@@ -739,9 +771,34 @@ const handleSave = async () => {
 
               {tab === "previous" && (
                 <div className={`p-5 sm:p-6 ${glassPanel}`}>
-                  <p className="mb-1 text-xs font-semibold uppercase tracking-[0.2em] text-[#8ec5eb]">
-                    Your notes
-                  </p>
+                 <div className="mb-5 flex items-center justify-between">
+  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#8ec5eb]">
+    Your notes
+  </p>
+
+  <div className="flex items-center gap-2">
+    {selectMode && selectedNoteIds.length > 0 && (
+      <button
+        type="button"
+        onClick={handleDeleteSelectedNotes}
+        className="rounded-lg border border-red-300/40 bg-red-500/15 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/25"
+      >
+        Delete {selectedNoteIds.length}
+      </button>
+    )}
+
+    <button
+      type="button"
+      onClick={() => {
+        setSelectMode((prev) => !prev);
+        setSelectedNoteIds([]);
+      }}
+      className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-[#cde2f2] hover:bg-white/15"
+    >
+      {selectMode ? "Cancel" : "Select"}
+    </button>
+  </div>
+</div>
                   {loading && <p className="text-sm text-[#cde2f2]">Loading notes…</p>}
                   {!loading && listError && <p className="text-sm text-[#ffb2b2]">{listError}</p>}
                   {!loading && !listError && notes.length === 0 && (
@@ -770,23 +827,43 @@ const handleSave = async () => {
 if (isDeletedNote(String(n._id))) return null;
   return (
     <li key={n._id}>
-      <Link
-        // href={`${basePath}/${n._id}`}
-         href={{
-      pathname: `${basePath}/${n._id}`,
-      query: { note: JSON.stringify(n) },
-    }}
-        className="flex items-center gap-3 rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 transition hover:border-[#8ec5eb]/35 hover:bg-white/10"
+  <div className="flex items-center gap-3 rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 transition hover:border-[#8ec5eb]/35 hover:bg-white/10">
+    {selectMode && (
+      <button
+        type="button"
+        onClick={() => toggleNoteSelection(String(n._id))}
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
+          selectedNoteIds.includes(String(n._id))
+            ? "border-[#8ec5eb] bg-[#8ec5eb]"
+            : "border-white/30 bg-white/5"
+        }`}
       >
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold text-white">{notePreviewTitle(n)}</p>
-          <p className="mt-0.5 text-xs text-[#b7d2e6]">
-            {formatNoteTimestamp(n.createdAt)}
-          </p>
-        </div>
+        {selectedNoteIds.includes(String(n._id)) && (
+          <i className="fa-solid fa-check text-[10px] text-[#062946]" />
+        )}
+      </button>
+    )}
+
+    <Link
+      href={{
+        pathname: `${basePath}/${n._id}`,
+        query: { note: JSON.stringify(n) },
+      }}
+      className="flex min-w-0 flex-1 items-center gap-3"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="truncate font-semibold text-white">{notePreviewTitle(n)}</p>
+        <p className="mt-0.5 text-xs text-[#b7d2e6]">
+          {formatNoteTimestamp(n.createdAt)}
+        </p>
+      </div>
+
+      {!selectMode && (
         <i className="fa-solid fa-chevron-right shrink-0 text-[#8ec5eb]/80" />
-      </Link>
-    </li>
+      )}
+    </Link>
+  </div>
+</li>
   );
 })}
                     </ul>
@@ -797,7 +874,7 @@ if (isDeletedNote(String(n._id))) return null;
           )}
         </MainTag>
 
-        {variant === "pastor" ? <PastorFooter /> : null}
+        {/* {variant === "pastor" ? <PastorFooter /> : null} */}
       </div>
     </div>
   );

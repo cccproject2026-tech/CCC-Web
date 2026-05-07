@@ -9,6 +9,8 @@ import {
   subscribePastorAssignmentsBroadcast,
   subscribeProgressUpdated,
 } from "@/app/utils/progress-sync";
+
+import { getPastorUserId } from "@/app/utils/pastor-auth";
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/hero-bg.png";
 import UserProfile from "../../Assets/user-profile.png";
@@ -220,6 +222,9 @@ useEffect(() => {
   const [focusModalOpen, setFocusModalOpen] = useState(false);
   const [focusModalSectionId, setFocusModalSectionId] = useState<string | null>(null);
   const [focusModalTitle, setFocusModalTitle] = useState<string | undefined>(undefined);
+  const [showAssignedMentorModal, setShowAssignedMentorModal] = useState(false);
+const [assignedMentor, setAssignedMentor] = useState<any>(null);
+const [assignedMentorLoading, setAssignedMentorLoading] = useState(false);
 
   const mentorNameById = useMemo(() => {
     const m = new Map<string, string>();
@@ -511,7 +516,34 @@ useEffect(() => {
   const greetingHour = new Date().getHours();
   const greeting =
     greetingHour < 12 ? "Good Morning" : greetingHour < 17 ? "Good Afternoon" : "Good Evening";
+const openAssignedMentorModal = async () => {
+  try {
+    setShowAssignedMentorModal(true);
+    setAssignedMentorLoading(true);
 
+  const pastorId = getPastorUserId();
+
+if (!pastorId) {
+  setAssignedMentor(null);
+  return;
+}
+
+const res = await apiGetAssignedUsers(pastorId);
+    const assignedUsers = Array.isArray(res?.data?.data) ? res.data.data : [];
+
+    const mentor =
+      assignedUsers.find((user: any) =>
+        String(user?.role || user?.assignedUser?.role || "").toLowerCase().includes("mentor")
+      ) || assignedUsers[0];
+
+   setAssignedMentor((mentor as any)?.assignedUser || mentor || null);
+  } catch (error) {
+    console.error("Failed to load assigned mentor", error);
+    setAssignedMentor(null);
+  } finally {
+    setAssignedMentorLoading(false);
+  }
+};
   return (
     <div className={pastorPageRoot}>
       {/* <PastorHeader showFullHeader={true} /> */}
@@ -826,14 +858,14 @@ Development
                   <i className="fa-regular fa-circle-question text-[#8ec5eb]" />
                   Help
                 </Link>
-                <Link
-                  href={FOCUS_HREF.myMentors}
-                  prefetch
-                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium backdrop-blur-sm transition hover:bg-white/15"
-                >
-                  <i className="fa-solid fa-phone text-[#8ec5eb]" />
-                  Call Mentor
-                </Link>
+               <button
+  type="button"
+  onClick={openAssignedMentorModal}
+  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium backdrop-blur-sm transition hover:bg-white/15"
+>
+  <i className="fa-solid fa-phone text-[#8ec5eb]" />
+  Call Mentor
+</button>
               </div>
             </div>
           </section>
@@ -877,7 +909,62 @@ Development
           )}
         </div>
       </main>
+{showAssignedMentorModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+    <div className="w-full max-w-md rounded-3xl border border-white/15 bg-[#083b5c] p-6 text-white shadow-2xl">
+      <div className="mb-5 flex items-center justify-between">
+        <h3 className="text-xl font-semibold">Assigned Mentor</h3>
+        <button
+          type="button"
+          onClick={() => setShowAssignedMentorModal(false)}
+          className="text-2xl text-white/70 hover:text-white"
+        >
+          ×
+        </button>
+      </div>
 
+      {assignedMentorLoading ? (
+        <p className="text-sm text-white/60">Loading mentor...</p>
+      ) : assignedMentor ? (
+        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+          <h4 className="text-lg font-semibold">
+            {`${assignedMentor?.firstName ?? ""} ${assignedMentor?.lastName ?? ""}`.trim() ||
+              assignedMentor?.email ||
+              "Mentor"}
+          </h4>
+
+          <p className="text-sm capitalize text-[#8ec5eb]">
+            {assignedMentor?.role || "mentor"}
+          </p>
+
+          <p className="mt-3 text-sm text-white/75">
+            {assignedMentor?.email || "No email available"}
+          </p>
+
+          <p className="mt-1 text-sm text-white/75">
+            {assignedMentor?.phoneNumber || assignedMentor?.phone || "No phone available"}
+          </p>
+
+          <div className="mt-5 flex gap-5 text-xl text-[#8ec5eb]">
+            {assignedMentor?.email && (
+              <a href={`mailto:${assignedMentor.email}`}>
+                <i className="fa-regular fa-envelope" />
+              </a>
+            )}
+
+            {(assignedMentor?.phoneNumber || assignedMentor?.phone) && (
+              <a href={`tel:${assignedMentor.phoneNumber || assignedMentor.phone}`}>
+                <i className="fa-solid fa-phone" />
+              </a>
+            )}
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-white/60">No assigned mentor found.</p>
+      )}
+    </div>
+  </div>
+)}
       <DashboardFocusModal
         open={focusModalOpen}
         onClose={() => setFocusModalOpen(false)}

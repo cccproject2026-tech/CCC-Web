@@ -13,6 +13,7 @@ import {
   apiSubmitSectionAnswers,
 } from "@/app/Services/assessment.service";
 import { apiGetRoadmapsByUser, apiTriggerJumpstartComplete } from "@/app/Services/api";
+import { apiUpdateAssessmentProgress } from "@/app/Services/progress.service";
 import { getCookie } from "@/app/utils/cookies";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { apiCreateAppointment } from "@/app/Services/appointments.service";
@@ -432,6 +433,8 @@ function PastorSurveyCMAContent() {
   const [showMentorSidebar, setShowMentorSidebar] = useState(false);
   const [mentorStep, setMentorStep] = useState(1);
   const [showFinalPopup, setShowFinalPopup] = useState(false);
+  const [showMeetingDetails, setShowMeetingDetails] = useState(false);
+  const [scheduledAppointmentId, setScheduledAppointmentId] = useState<string>("");
   const [toast, setToast] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   /** Mentor Customized Development Plan (CDP) text per layer — from answers doc + GET recommendations. */
@@ -785,13 +788,32 @@ const confirmClearResponses = () => {
         throw new Error("Appointment API returned unsuccessful response");
       }
 
+      if (assessmentId) {
+        try {
+          await apiUpdateAssessmentProgress({
+            userId: uid,
+            assessmentId,
+            status: "completed",
+            completedSections: Array.isArray(sections) ? sections.length : undefined,
+          });
+        } catch (progressErr) {
+          console.error("Failed to mark assessment as completed after meeting", progressErr);
+          setToast("Meeting scheduled, but failed to mark assessment as completed. Please refresh.");
+          setTimeout(() => setToast(null), 5000);
+        }
+      }
+
+      const raw = createRes.data as any;
+      const appointmentId = String(
+        raw?.data?._id ??
+        raw?.data?.id ??
+        raw?._id ??
+        raw?.id ??
+        "",
+      ).trim();
+      setScheduledAppointmentId(appointmentId);
+      setShowMeetingDetails(false);
       setShowFinalPopup(true);
-      setTimeout(() => {
-        setShowFinalPopup(false);
-        setShowMentorSidebar(false);
-        setShowSchedulePrompt(false);
-        router.push("/pastor/Assessments");
-      }, 2500);
     } catch (err) {
       console.error("Failed to schedule appointment", err);
       const msg = isAxiosError(err) ? (err.response?.data?.message ?? "Failed to schedule appointment") : "Failed to schedule appointment";
@@ -1094,13 +1116,7 @@ const confirmClearResponses = () => {
               On completion of the PMP and CMA assessment tools please schedule
               a meeting with your mentor.
             </p>
-            <div className="flex items-center justify-center gap-3">
-              {/* <button
-                onClick={() => { setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
-                className="rounded-xl border border-white/30 px-6 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-              >
-                Skip
-              </button> */}
+            <div className="flex items-center justify-center">
               <button
                 onClick={handleScheduleMeeting}
                 className="rounded-xl bg-[#8ec5eb] px-8 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
@@ -1410,9 +1426,29 @@ const confirmClearResponses = () => {
               <i className="fa-solid fa-circle-check text-[#7be495] text-2xl"></i>
               <p className="font-medium">New Appointment has been Scheduled</p>
             </div>
+            <div className="mb-4 flex items-center justify-center gap-3">
+              <button
+                onClick={() => setShowMeetingDetails((prev) => !prev)}
+                className="rounded-xl border border-white/30 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
+              >
+                {showMeetingDetails ? "Hide Meeting Details" : "Meeting Details"}
+              </button>
+            </div>
+            {showMeetingDetails && (
+              <div className="mb-4 rounded-xl border border-white/20 bg-white/10 p-4 text-left text-sm text-[#d8ecfa]">
+                <p><span className="font-semibold text-white">Mentor:</span> {mentors.find((m) => (m._id || m.id) === selectedMentor)?.name || `${mentors.find((m) => (m._id || m.id) === selectedMentor)?.firstName || ""} ${mentors.find((m) => (m._id || m.id) === selectedMentor)?.lastName || ""}`.trim() || "Selected Mentor"}</p>
+                <p><span className="font-semibold text-white">Date:</span> {selectedDate || "N/A"}</p>
+                <p><span className="font-semibold text-white">Time:</span> {selectedTime || "N/A"}</p>
+                <p><span className="font-semibold text-white">Platform:</span> Zoom</p>
+                {scheduledAppointmentId && (
+                  <p><span className="font-semibold text-white">Appointment ID:</span> {scheduledAppointmentId}</p>
+                )}
+              </div>
+            )}
             <button
               onClick={() => {
                 setShowFinalPopup(false);
+                setShowMeetingDetails(false);
                 setShowMentorSidebar(false);
                 setShowSchedulePrompt(false);
                 router.push("/pastor/Assessments");

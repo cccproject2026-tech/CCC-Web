@@ -686,15 +686,17 @@ export default function DirectorAssessmentResultPage() {
               </aside>
 
               <section className="space-y-5">
+                {/* CDP send action intentionally disabled for Director for now.
+                    Keep this block commented to restore quickly when needed.
                 <div className="flex justify-end">
                   <button
                     type="button"
                     onClick={openRecommendationEditor}
                     className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
                   >
-                    Edit Recommendation
+                    Send CDP
                   </button>
-                </div>
+                </div> */}
                 {(sections[activeSection]?.layers || []).map((layer: any, layerIndex: number) => {
                   const layerId = resolveLayerKey(layer, activeSection, layerIndex);
                   return (
@@ -733,6 +735,8 @@ export default function DirectorAssessmentResultPage() {
                         })}
                       </div>
 
+                      {/* CDP display intentionally disabled for Director for now.
+                          Keep this block commented to restore quickly when needed.
                       {(() => {
                         const cdp = String(
                           mentorLayerCdp[layerId] ||
@@ -749,7 +753,7 @@ export default function DirectorAssessmentResultPage() {
                             <p className="whitespace-pre-line text-sm leading-relaxed text-[#d9ebf8]">{cdp}</p>
                           </div>
                         );
-                      })()}
+                      })()} */}
                     </div>
                   );
                 })}
@@ -788,6 +792,8 @@ export default function DirectorAssessmentResultPage() {
         </div>
       </section>
 
+      {/* CDP editor modal intentionally disabled for Director for now.
+          Keep this block commented to restore quickly when needed.
       {recommendationOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
           <button
@@ -862,7 +868,7 @@ export default function DirectorAssessmentResultPage() {
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       {toast && (
         <div className="fixed right-6 top-6 z-[130] animate-fade-in">
