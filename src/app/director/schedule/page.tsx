@@ -223,6 +223,7 @@ function DirectorScheduleContent() {
       if (!target) return;
       if (!target.closest('[data-appointment-menu-root="true"]')) {
         setShowMenu(null);
+        setShowHistoryMenu(null);
       }
     };
     document.addEventListener("mousedown", onMouseDown);
@@ -908,9 +909,11 @@ function DirectorScheduleContent() {
                     return (
                       <div
                         key={apptKey}
+                        className={`${directorGlassCard} relative overflow-hidden border border-white/15 bg-[linear-gradient(180deg,rgba(10,53,88,0.9)_0%,rgba(6,41,70,0.92)_100%)] shadow-[0_16px_40px_rgba(0,0,0,0.25)] flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showHistoryMenu === apptKey ? "z-[60]" : ""}`}
+                        style={showHistoryMenu === apptKey ? { overflow: "visible" } : undefined}
                       >
-                        <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-6">
-                          <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
+                        <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 bg-white/[0.03] py-5 sm:w-[132px] sm:border-b-0 sm:border-r sm:py-7">
+                          <div className="flex h-[82px] w-[82px] items-center justify-center rounded-2xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 shadow-inner">
                             {/* <Image
                               src={appt.platform === "gmeet" || appt.platform === "google-meet" ? MeetIcon : DuoIcon}
                               alt={appt.platform}
@@ -925,7 +928,7 @@ function DirectorScheduleContent() {
                         </div>
                         <div className="relative min-w-0 flex-1 px-4 py-4 sm:px-5">
                           <div className="absolute right-4 top-4 z-10 sm:right-5">
-                            <div className="relative">
+                            <div className="relative" data-appointment-menu-root="true">
                               <button
                                 type="button"
                                 onClick={() => setShowHistoryMenu(showHistoryMenu === apptKey ? null : apptKey)}
@@ -948,7 +951,7 @@ function DirectorScheduleContent() {
                               )}
                             </div>
                           </div>
-                          <div className="mb-2 flex items-center gap-3">
+                          <div className="mb-3 flex items-center gap-3">
                             <Image
                               src={mentor?.profilePicture || UserProfile}
                               alt={mentorName}
@@ -958,6 +961,7 @@ function DirectorScheduleContent() {
                               className="rounded-full border border-white/20"
                             />
                             <div>
+                              <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Mentor</p>
                               <h4 className="pr-10 text-sm font-semibold text-white">
                                 {mentorId ? (
                                   <Link href={`/director/mentors/profile/${encodeURIComponent(mentorId)}`} className="hover:text-[#8ec5eb]">
@@ -968,7 +972,7 @@ function DirectorScheduleContent() {
                               <p className="text-[12px] text-[#cde2f2]/90">{mentorRole}</p>
                             </div>
                           </div>
-                          <div className="mb-2 flex items-center gap-3">
+                          <div className="mb-3 flex items-center gap-3">
                             <Image
                               src={mentee?.profilePicture || UserProfile}
                               alt={menteeName}
@@ -978,6 +982,7 @@ function DirectorScheduleContent() {
                               className="rounded-full border border-white/20"
                             />
                             <div>
+                              <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Pastor</p>
                               <h4 className="text-sm font-semibold text-white">
                                 {menteeId ? (
                                   <Link href={`/director/mentees/profile/${encodeURIComponent(menteeId)}`} className="hover:text-[#8ec5eb]">
@@ -988,16 +993,16 @@ function DirectorScheduleContent() {
                               <p className="text-[12px] text-[#cde2f2]/90">{menteeRole}</p>
                             </div>
                           </div>
-                          <div className="mb-2 flex flex-wrap gap-2">
-                            <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
+                          <div className="mb-1 flex flex-wrap gap-2">
+                            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] text-[#e7f4ff]">
                               <i className="fa-regular fa-calendar text-[#8ec5eb]" />
                               {md.toLocaleDateString()}
                             </span>
-                            <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
+                            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] text-[#e7f4ff]">
                               <i className="fa-regular fa-clock text-[#8ec5eb]" />
                               {md.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
                             </span>
-                            <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] capitalize text-[#d9ebf8]">
+                            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] capitalize text-[#e7f4ff]">
                               {appt.platform}
                             </span>
                           </div>
@@ -1122,11 +1127,11 @@ function DirectorScheduleContent() {
                     return (
                       <div
                         key={apptKey}
-                        className={`${directorGlassCard} relative flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showMenu === index ? "z-[60]" : ""}`}
+                        className={`${directorGlassCard} relative overflow-hidden border border-white/15 bg-[linear-gradient(180deg,rgba(10,53,88,0.9)_0%,rgba(6,41,70,0.92)_100%)] shadow-[0_16px_40px_rgba(0,0,0,0.25)] flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showMenu === index ? "z-[60]" : ""}`}
                         style={showMenu === index ? { overflow: "visible" } : undefined}
                       >
-                        <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-6">
-                          <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
+                        <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 bg-white/[0.03] py-5 sm:w-[132px] sm:border-b-0 sm:border-r sm:py-7">
+                          <div className="flex h-[82px] w-[82px] items-center justify-center rounded-2xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 shadow-inner">
                             {/* <Image
                               src={appt.platform === "gmeet" || appt.platform === "google-meet" ? MeetIcon : DuoIcon}
                               alt={appt.platform}
@@ -1180,7 +1185,7 @@ function DirectorScheduleContent() {
                               )}
                             </div>
                           </div>
-                          <div className="mb-2 flex items-center gap-3">
+                          <div className="mb-3 flex items-center gap-3">
                             <Image
                               src={mentor?.profilePicture || UserProfile}
                               alt={mentorName}
@@ -1190,6 +1195,7 @@ function DirectorScheduleContent() {
                               className="rounded-full border border-white/20"
                             />
                             <div>
+                              <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Mentor</p>
                               <h4 className="pr-10 text-sm font-semibold text-white">
                                 {mentorId ? (
                                   <Link href={`/director/mentors/profile/${encodeURIComponent(mentorId)}`} className="hover:text-[#8ec5eb]">
@@ -1200,7 +1206,7 @@ function DirectorScheduleContent() {
                               <p className="text-[12px] text-[#cde2f2]/90">{mentorRole}</p>
                             </div>
                           </div>
-                          <div className="mb-2 flex items-center gap-3">
+                          <div className="mb-3 flex items-center gap-3">
                             <Image
                               src={mentee?.profilePicture || UserProfile}
                               alt={menteeName}
@@ -1210,6 +1216,7 @@ function DirectorScheduleContent() {
                               className="rounded-full border border-white/20"
                             />
                             <div>
+                              <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Pastor</p>
                               <h4 className="text-sm font-semibold text-white">
                                 {menteeId ? (
                                   <Link href={`/director/mentees/profile/${encodeURIComponent(menteeId)}`} className="hover:text-[#8ec5eb]">
@@ -1220,16 +1227,16 @@ function DirectorScheduleContent() {
                               <p className="text-[12px] text-[#cde2f2]/90">{menteeRole}</p>
                             </div>
                           </div>
-                          <div className="mb-2 flex flex-wrap gap-2">
-                            <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
+                          <div className="mb-1 flex flex-wrap gap-2">
+                            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] text-[#e7f4ff]">
                               <i className="fa-regular fa-calendar text-[#8ec5eb]" />
                               {md.toLocaleDateString()}
                             </span>
-                            <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] text-[#d9ebf8]">
+                            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] text-[#e7f4ff]">
                               <i className="fa-regular fa-clock text-[#8ec5eb]" />
                               {md.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
                             </span>
-                            <span className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-3 py-1 text-[12px] capitalize text-[#d9ebf8]">
+                            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] capitalize text-[#e7f4ff]">
                               {appt.platform}
                             </span>
                           </div>

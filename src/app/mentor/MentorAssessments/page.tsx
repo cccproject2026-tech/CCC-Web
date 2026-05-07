@@ -25,10 +25,13 @@ import {
 } from "@/app/Services/assessment.service";
 import { apiAssignAssessment, apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
+import { apiGetAppointments } from "@/app/Services/appointments.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import MentorModal from "@/app/Components/mentor/MentorModal";
 import MentorSearchBar from "@/app/Components/mentor/MentorSearchBar";
+import SearchBar from "@/app/Components/SearchBar";
+import { directorGlassCard, directorListCardRadius } from "@/app/director/directorUi";
 import {
   mentorBodyText,
   mentorEmptyPanel,
@@ -108,6 +111,29 @@ function formatDueDate(value: unknown): string | null {
     day: "numeric",
     year: "numeric",
   });
+}
+
+function formatMeetingDateTime(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+function isMeetingStillActive(meetingDate: unknown, status: unknown): boolean {
+  const s = String(status || "").toLowerCase();
+  if (s === "completed" || s === "cancelled" || s === "missed") return false;
+  if (typeof meetingDate !== "string" || !meetingDate.trim()) return true;
+  const when = new Date(meetingDate).getTime();
+  if (Number.isNaN(when)) return true;
+  return when >= Date.now();
 }
 
 function formatCreatedDate(value?: string): string | null {
@@ -383,15 +409,17 @@ function countMenteesAssigned(item: any): number {
 
 export default function MentorAssessments() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [mode, setMode] = useState<"normal" | "select">("normal");
+  const [sortBy, setSortBy] = useState<"latest" | "oldest" | "name_asc" | "name_desc">("latest");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
   const [showOptionsMenu, setShowOptionsMenu] = useState<string | null>(null);
   const [showDropdown, setShowDropdown] = useState<string | null>(null);
   const [showAssignDrawer, setShowAssignDrawer] = useState(false);
-  const [assignAssessmentId, setAssignAssessmentId] = useState<string | null>(null);
+  const [assignAssessmentIds, setAssignAssessmentIds] = useState<string[]>([]);
   const [assignUsers, setAssignUsers] = useState<any[]>([]);
   const [assignLoading, setAssignLoading] = useState(false);
   const [assignSearch, setAssignSearch] = useState("");
@@ -410,6 +438,17 @@ export default function MentorAssessments() {
   const [recommendationRows, setRecommendationRows] = useState<RecommendationRow[]>([]);
   const [recommendationAssessmentId, setRecommendationAssessmentId] = useState<string | null>(null);
   const [recommendationAssessmentTitle, setRecommendationAssessmentTitle] = useState("Assessment");
+  const [failedBannerImageIds, setFailedBannerImageIds] = useState<Record<string, true>>({});
+  const [deepLinkHandled, setDeepLinkHandled] = useState(false);
+
+  const deepLinkMenteeId = (searchParams.get("menteeId") || "").trim();
+  const deepLinkAssessmentId = (searchParams.get("assessmentId") || "").trim();
+  const deepLinkOpenRecommendation = searchParams.get("openRecommendation") === "1";
+
+  useEffect(() => {
+    if (!deepLinkMenteeId) return;
+    setSelectedMenteeId((prev) => (prev === deepLinkMenteeId ? prev : deepLinkMenteeId));
+  }, [deepLinkMenteeId]);
 
   const [formTitle, setFormTitle] = useState("");
   const [formDesc, setFormDesc] = useState("");
@@ -422,15 +461,38 @@ export default function MentorAssessments() {
       try {
         setLoading(true);
         if (selectedMenteeId) {
-          const [assignedRes, progressRes] = await Promise.all([
+          const [assignedRes, progressRes, appointmentsRes] = await Promise.all([
             apiGetAssignedAssessments(selectedMenteeId),
             apiGetUserProgress(selectedMenteeId),
+            apiGetAppointments({ userId: selectedMenteeId, futureOnly: false } as any),
           ]);
           const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
           const progressData = unwrapProgressData(progressRes);
           const assessmentProgress = Array.isArray(progressData?.assessments)
             ? progressData.assessments
             : [];
+          const appointmentsBody: any = appointmentsRes?.data;
+          const appointmentsList: any[] = Array.isArray(appointmentsBody)
+            ? appointmentsBody
+            : Array.isArray(appointmentsBody?.data)
+              ? appointmentsBody.data
+              : Array.isArray(appointmentsBody?.data?.data)
+                ? appointmentsBody.data.data
+                : [];
+          const appointmentById = new Map<string, any>();
+          const appointmentsByAssessmentId = new Map<string, any[]>();
+          for (const appt of appointmentsList) {
+            const id = String(appt?._id ?? appt?.id ?? "").trim();
+            if (id) appointmentById.set(id, appt);
+            const notes = String(appt?.notes ?? "");
+            const m = notes.match(/assessmentId=([^|\s]+)/i);
+            const linkedAssessmentId = String(m?.[1] || "").trim();
+            if (linkedAssessmentId) {
+              const prev = appointmentsByAssessmentId.get(linkedAssessmentId) || [];
+              prev.push(appt);
+              appointmentsByAssessmentId.set(linkedAssessmentId, prev);
+            }
+          }
 
           const idStatusRows = assessmentProgress
             .map((p: any) => ({
@@ -460,14 +522,36 @@ export default function MentorAssessments() {
               const appointmentId = String(
                 (item as any)?.appointmentId ?? assessment?.appointmentId ?? "",
               ).trim();
+              const apptFromId = appointmentId ? appointmentById.get(appointmentId) : null;
+              const apptFromAssessment = (appointmentsByAssessmentId.get(assessmentId) || [])
+                .slice()
+                .sort((a, b) => {
+                  const ta = new Date(String(a?.meetingDate ?? 0)).getTime();
+                  const tb = new Date(String(b?.meetingDate ?? 0)).getTime();
+                  return tb - ta;
+                })[0];
+              const appt = apptFromId || apptFromAssessment || null;
+              let resolvedAppointmentId = "";
+              if (appt?._id != null) resolvedAppointmentId = String(appt._id).trim();
+              else if (appt?.id != null) resolvedAppointmentId = String(appt.id).trim();
+              else resolvedAppointmentId = String(appointmentId || "").trim();
+              // Keep assignment status exactly as provided by backend progress API.
+              // Do not locally downgrade completed -> submitted based on meeting checks.
+              const normalizedStatus = progressRow?.status || "not_started";
               return {
                 ...assessment,
                 _id: assessmentId,
                 id: assessmentId,
-                _mentorAssignmentStatus: progressRow?.status || "not_started",
+                _mentorAssignmentStatus: normalizedStatus,
                 _mentorAssignmentId: flat.assignmentId ?? progressRow?.assignmentId,
                 _mentorDueDate: flat.dueDate,
-                _mentorAppointmentId: appointmentId || undefined,
+                _mentorAppointmentId: resolvedAppointmentId || undefined,
+                _mentorMeetingDate: appt?.meetingDate,
+                _mentorMeetingDateLabel: formatMeetingDateTime(appt?.meetingDate),
+                _mentorMeetingStatus: String(appt?.status ?? ""),
+                _mentorMeetingActive: resolvedAppointmentId
+                  ? isMeetingStillActive(appt?.meetingDate, appt?.status)
+                  : false,
                 menteeAssigned: countMenteesAssigned(assessment),
               };
             })
@@ -544,7 +628,7 @@ export default function MentorAssessments() {
       setAssignSearch("");
       setAssignDueDate("");
       setSelectedAssignUserIds([]);
-      setAssignAssessmentId(null);
+      setAssignAssessmentIds([]);
       return;
     }
 
@@ -605,8 +689,34 @@ export default function MentorAssessments() {
     );
   };
 
+  const toggleSelectMode = () => {
+    setMode((prev) => {
+      if (prev === "select") {
+        setSelectedIds([]);
+        return "normal";
+      }
+      return "select";
+    });
+  };
+
+  const openAssignDrawerForSelection = () => {
+    if (selectedIds.length === 0) {
+      setToastMsg("Select at least one assessment to assign.");
+      setTimeout(() => setToastMsg(""), 3000);
+      return;
+    }
+    setAssignAssessmentIds(selectedIds);
+    setShowAssignDrawer(true);
+  };
+
+  const selectAllAssessments = () => {
+    if (filtered.length === 0) return;
+    setMode("select");
+    setSelectedIds(filtered.map(getAssessmentId).filter(Boolean));
+  };
+
   const handleAssignSubmit = async () => {
-    if (!assignAssessmentId || selectedAssignUserIds.length === 0) {
+    if (assignAssessmentIds.length === 0 || selectedAssignUserIds.length === 0) {
       setToastMsg("Select at least one pastor to assign.");
       setTimeout(() => setToastMsg(""), 3000);
       return;
@@ -615,7 +725,7 @@ export default function MentorAssessments() {
       setAssignSubmitting(true);
       await apiAssignAssessment({
         userIds: selectedAssignUserIds,
-        assessmentIds: [assignAssessmentId],
+        assessmentIds: assignAssessmentIds,
         dueDate: assignDueDate ? new Date(`${assignDueDate}T23:59:59`).toISOString() : undefined,
       });
       setShowAssignDrawer(false);
@@ -631,7 +741,49 @@ export default function MentorAssessments() {
     }
   };
 
-  const filtered = assessments;
+  const filtered = useMemo(() => {
+    const list = [...assessments];
+    if (sortBy === "name_asc") {
+      return list.sort((a, b) => String(a?.name || "").localeCompare(String(b?.name || "")));
+    }
+    if (sortBy === "name_desc") {
+      return list.sort((a, b) => String(b?.name || "").localeCompare(String(a?.name || "")));
+    }
+    if (sortBy === "oldest") {
+      return list.sort(
+        (a, b) =>
+          new Date(String(a?.createdOn ?? a?.createdAt ?? 0)).getTime() -
+          new Date(String(b?.createdOn ?? b?.createdAt ?? 0)).getTime(),
+      );
+    }
+    return list.sort(
+      (a, b) =>
+        new Date(String(b?.createdOn ?? b?.createdAt ?? 0)).getTime() -
+        new Date(String(a?.createdOn ?? a?.createdAt ?? 0)).getTime(),
+    );
+  }, [assessments, sortBy]);
+
+  const filteredFeaturedItems = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return featuredItems;
+    const matched = featuredItems.filter((item) =>
+      String(item?.name || "").toLowerCase().includes(q),
+    );
+    if (!selectedMenteeId) return matched;
+    const selected = featuredItems.find((item) => String(item.id) === String(selectedMenteeId));
+    if (!selected) return matched;
+    return matched.some((item) => String(item.id) === String(selected.id))
+      ? matched
+      : [selected, ...matched];
+  }, [featuredItems, searchTerm, selectedMenteeId]);
+
+  const getCardImageSrc = (assessment: any): string | typeof Thumb1 => {
+    const assessmentId = getAssessmentId(assessment);
+    if (assessmentId && failedBannerImageIds[assessmentId]) return Thumb1;
+    const src = assessment?.image;
+    if (typeof src === "string" && src.trim()) return src;
+    return Thumb1;
+  };
 
   const selectedMenteeName = useMemo(() => {
     const row = featuredItems.find((item) => String(item.id) === String(selectedMenteeId || ""));
@@ -699,6 +851,25 @@ export default function MentorAssessments() {
       setRecommendationLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!deepLinkOpenRecommendation || !deepLinkAssessmentId || !selectedMenteeId || loading || deepLinkHandled) {
+      return;
+    }
+    if (deepLinkMenteeId && selectedMenteeId !== deepLinkMenteeId) return;
+    const assessment = assessments.find((a: any) => getAssessmentId(a) === deepLinkAssessmentId);
+    if (!assessment) return;
+    setDeepLinkHandled(true);
+    void openRecommendationEditor(assessment);
+  }, [
+    deepLinkOpenRecommendation,
+    deepLinkAssessmentId,
+    selectedMenteeId,
+    loading,
+    deepLinkHandled,
+    deepLinkMenteeId,
+    assessments,
+  ]);
 
   const handleSendRecommendations = async () => {
     if (!selectedMenteeId || !recommendationAssessmentId) return;
@@ -850,43 +1021,58 @@ export default function MentorAssessments() {
         <div className="mx-auto max-w-7xl space-y-6">
           {!showForm ? (
             <>
-              <div className={mentorFilterPanel}>
+              <div className={`mb-6 ${mentorFilterPanel}`}>
                 <div className="flex flex-col items-stretch justify-between gap-4 md:flex-row md:items-center">
-                  <MentorSearchBar
-                    value={searchTerm}
-                    onChange={setSearchTerm}
-                    placeholder="Search assessments..."
-                    aria-label="Search assessments"
-                    className="w-full md:max-w-md"
-                  />
+                  <div className="relative w-full flex-1 md:max-w-md">
+                    <SearchBar
+                      value={searchTerm}
+                      onChange={setSearchTerm}
+                      placeholder="Search assessments…"
+                      variant="dark"
+                      className="w-full"
+                    />
+                  </div>
 
                   <div className="flex flex-wrap gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setMode(mode === "select" ? "normal" : "select")}
-                      className={`rounded-xl border px-5 py-2.5 text-sm font-medium transition ${mode === "select"
-                        ? "border-[#8ec5eb] bg-[#8ec5eb]/20 text-white"
-                        : "border-white/20 bg-white/10 text-[#cde2f2] hover:bg-white/15"
-                        }`}
-                    >
-                      <i className="fa-regular fa-pen-to-square mr-2" />
-                      {mode === "select" ? "Cancel" : "Select"}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => router.push("/mentor/MentorAssessments/create")}
-                      className="flex items-center gap-2 rounded-xl border border-white/20 bg-[#8ec5eb]/90 px-6 py-2.5 text-sm font-semibold text-[#062946] shadow-md transition hover:bg-[#8ec5eb]"
-                    >
-                      <i className="fa-solid fa-plus" />
-                      Add
-                    </button>
+                    {mode !== "select" && (
+                      <>
+                        <select
+                          value={sortBy}
+                          onChange={(e) =>
+                            setSortBy(e.target.value as "latest" | "oldest" | "name_asc" | "name_desc")
+                          }
+                          className="h-[42px] min-w-[170px] rounded-lg border border-white/20 bg-white/10 px-3 text-sm font-medium text-white outline-none transition focus:border-[#8ec5eb]/55 focus:ring-2 focus:ring-[#8ec5eb]/30 [&>option]:bg-[#062946] [&>option]:text-white"
+                          aria-label="Sort assessments"
+                        >
+                          <option value="latest">Newest</option>
+                          <option value="oldest">Oldest</option>
+                          <option value="name_asc">Name A-Z</option>
+                          <option value="name_desc">Name Z-A</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={toggleSelectMode}
+                          className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 font-semibold text-white transition hover:bg-white/15"
+                        >
+                          <i className="fa-solid fa-check-square" />
+                          Select
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => router.push("/mentor/MentorAssessments/create")}
+                          className="inline-flex items-center gap-2 rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/20 px-4 py-2 font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                        >
+                          <i className="fa-solid fa-plus" />
+                          Add
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {!featuredLoading && featuredItems.length > 0 && (
-                <div className={mentorFilterPanel}>
+              {!featuredLoading && filteredFeaturedItems.length > 0 && (
+                <div className={`mb-6 ${mentorFilterPanel}`}>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                     <p className="text-sm text-[#cde2f2]">
                       {selectedMenteeId
@@ -904,37 +1090,51 @@ export default function MentorAssessments() {
                     )}
                   </div>
                   <FeaturedAvatars
-                    items={featuredItems}
+                    items={filteredFeaturedItems}
                     showDivider={false}
                     className="mb-0"
+                    selectedId={selectedMenteeId}
                     onItemClick={(item) => setSelectedMenteeId(String(item.id))}
                   />
                 </div>
               )}
 
               {mode === "select" && (
-                <div
-                  className={`${mentorFilterPanel} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}
-                >
-                  <p className="text-sm text-[#cde2f2]">
-                    Selected: <span className="font-semibold text-white">{selectedIds.length}</span>
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3">
+                <div className={`${mentorFilterPanel} flex flex-wrap items-center justify-between gap-4 p-5`}>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <span className="font-semibold text-white">{selectedIds.length} selected</span>
                     <button
                       type="button"
-                      onClick={() =>
-                        setSelectedIds(filtered.map(getAssessmentId).filter(Boolean))
-                      }
-                      className="rounded-xl border border-white/25 bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/15"
+                      onClick={selectAllAssessments}
+                      className="rounded-lg border border-white/20 bg-white/10 px-4 py-2 font-semibold text-white transition hover:bg-white/15"
                     >
-                      Select all
+                      Select All
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={openAssignDrawerForSelection}
+                      disabled={selectedIds.length === 0}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/20 px-4 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <i className="fa-solid fa-user-plus text-xs" />
+                      Assign
                     </button>
                     <button
                       type="button"
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="flex items-center gap-2 rounded-xl border border-red-400/40 bg-red-500/20 px-4 py-2 text-sm font-medium text-red-100 hover:bg-red-500/30"
+                      disabled={selectedIds.length === 0}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-400/40 bg-red-500/20 text-red-200 transition hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      <i className="fa-solid fa-trash" /> Delete
+                      <i className="fa-solid fa-trash" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={toggleSelectMode}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+                    >
+                      <i className="fa-solid fa-xmark" />
                     </button>
                   </div>
                 </div>
@@ -952,14 +1152,13 @@ export default function MentorAssessments() {
                   {filtered.map((assessment: any, idx: number) => (
                     <div
                       key={getAssessmentId(assessment) || `assessment-${idx}`}
-                      className={`relative rounded-xl transition-all ${mentorGlassCardRoadmap} ${
-                        selectedIds.includes(getAssessmentId(assessment))
+                      className={`relative ${directorListCardRadius} transition-all ${directorGlassCard} ${selectedIds.includes(getAssessmentId(assessment))
                           ? "bg-[#f59e0b]/15 border-transparent"
                           : "border border-white/10"
-                      }`}
+                        }`}
                     >
-                      {selectedMenteeId && mode !== "select" && (
-                        <div className="options-menu-container absolute right-4 top-4 z-20">
+                      {mode !== "select" && (
+                        <div className="options-menu-container absolute right-4 top-4 z-[60]">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -967,44 +1166,97 @@ export default function MentorAssessments() {
                               const cardId = getAssessmentId(assessment);
                               setShowOptionsMenu((prev) => (prev === cardId ? null : cardId));
                             }}
-                            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-[#062946]/85 text-white transition hover:bg-white/15"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/70 hover:bg-white/10"
                             aria-label="Assessment options"
                           >
                             <i className="fa-solid fa-ellipsis-vertical" />
                           </button>
 
                           {showOptionsMenu === getAssessmentId(assessment) && (
-                            <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-white/15 bg-[#0a3558] shadow-2xl">
-                              <button
-                                type="button"
-                                disabled={!assessment._mentorAppointmentId}
-                                onClick={() => {
-                                  setShowOptionsMenu(null);
-                                  if (!assessment._mentorAppointmentId) return;
-                                  router.push(`/mentor/MentorSchedule/${encodeURIComponent(assessment._mentorAppointmentId)}`);
-                                }}
-                                className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-white/40 disabled:hover:bg-transparent"
-                              >
-                                <i className="fa-regular fa-calendar-check text-[#8ec5eb]" />
-                                Linked Appointment
-                              </button>
+                            <div className="absolute right-0 z-[200] mt-2 w-52 animate-slide-down overflow-hidden rounded-lg border border-white/15 bg-[#041f35]/98 py-2 shadow-xl backdrop-blur-md">
+                              {selectedMenteeId ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={!assessment._mentorAppointmentId || !assessment._mentorMeetingActive}
+                                    onClick={() => {
+                                      setShowOptionsMenu(null);
+                                      if (!assessment._mentorAppointmentId || !assessment._mentorMeetingActive) return;
+                                      router.push(`/mentor/MentorSchedule/${encodeURIComponent(assessment._mentorAppointmentId)}`);
+                                    }}
+                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-white/90 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-white/40 disabled:hover:bg-transparent"
+                                  >
+                                    <i className="fa-regular fa-calendar-check text-[#8ec5eb]" />
+                                    <span className="flex flex-col">
+                                      <span>View Meeting</span>
+                                      <span className="text-[11px] text-white/65">
+                                        {assessment._mentorMeetingDateLabel || "No meeting details"}
+                                      </span>
+                                    </span>
+                                  </button>
 
-                              {(assessment._mentorAssignmentStatus === "submitted" ||
-                                assessment._mentorAssignmentStatus === "completed") && (
+                                  {(assessment._mentorAssignmentStatus === "submitted" ||
+                                    assessment._mentorAssignmentStatus === "completed") && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowOptionsMenu(null);
+                                          router.push(
+                                            `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
+                                          );
+                                        }}
+                                        className="flex w-full items-center gap-2 border-t border-white/10 px-4 py-2 text-left text-sm text-white/90 transition hover:bg-white/10"
+                                      >
+                                        <i className="fa-regular fa-clipboard text-[#8ec5eb]" />
+                                        View CDP
+                                      </button>
+                                    )}
+                                </>
+                              ) : (
+                                <>
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      const id = getAssessmentId(assessment);
+                                      if (!id) return;
+                                      setAssignAssessmentIds([id]);
+                                      setShowAssignDrawer(true);
                                       setShowOptionsMenu(null);
-                                      router.push(
-                                        `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
-                                      );
                                     }}
-                                    className="flex w-full items-center gap-2 border-t border-white/10 px-4 py-3 text-left text-sm text-white transition hover:bg-white/10"
+                                    className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-white/90 transition hover:bg-white/10"
                                   >
-                                    <i className="fa-regular fa-clipboard text-[#8ec5eb]" />
-                                    CDP Flow
+                                    <i className="fa-solid fa-user-plus text-[#8ec5eb]" />
+                                    Assign to
                                   </button>
-                                )}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const id = getAssessmentId(assessment);
+                                      if (!id) return;
+                                      setShowOptionsMenu(null);
+                                      router.push(`/mentor/MentorAssessments/${id}/edit`);
+                                    }}
+                                    className="flex w-full items-center gap-2 border-t border-white/10 px-4 py-2 text-left text-sm text-white/90 transition hover:bg-white/10"
+                                  >
+                                    <i className="fa-solid fa-pen text-[#8ec5eb]" />
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const id = getAssessmentId(assessment);
+                                      if (!id) return;
+                                      setSelectedIds([id]);
+                                      setShowDeleteConfirm(true);
+                                      setShowOptionsMenu(null);
+                                    }}
+                                    className="flex w-full items-center gap-2 border-t border-white/10 px-4 py-2 text-left text-sm text-red-300 transition hover:bg-red-500/10"
+                                  >
+                                    <i className="fa-solid fa-trash" />
+                                    Delete
+                                  </button>
+                                </>
+                              )}
                             </div>
                           )}
                         </div>
@@ -1025,16 +1277,34 @@ export default function MentorAssessments() {
                         {/* Row 1: Image + Title + Description */}
                         <div className="flex gap-4 p-6 pb-4">
                           <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
+                            {(() => {
+                              const cardImageSrc = getCardImageSrc(assessment);
+                              const assessmentId = getAssessmentId(assessment);
+                              return (
                             <Image
-                              src={assessment.image || Thumb1}
+                              src={cardImageSrc}
                               alt={assessment.name || "Assessment"}
                               fill
                               className="object-cover"
+                              onError={() => {
+                                if (!assessmentId) return;
+                                setFailedBannerImageIds((prev) =>
+                                  prev[assessmentId] ? prev : { ...prev, [assessmentId]: true },
+                                );
+                              }}
                               unoptimized={
-                                typeof assessment.image === "string" &&
-                                (assessment.image.startsWith("blob:") || isRemoteImageSrc(assessment.image))
+                                typeof cardImageSrc === "string" &&
+                                (cardImageSrc.startsWith("blob:") || isRemoteImageSrc(cardImageSrc))
                               }
                             />
+                              );
+                            })()}
+                            {selectedMenteeId && (
+                              <div className="absolute bottom-1.5 left-1.5 inline-flex max-w-[120px] items-center gap-1 truncate rounded-md bg-[#fff6d8] px-1.5 py-[2px] text-[10px] font-semibold text-[#d38a00]">
+                                <i className="fa-regular fa-calendar text-[10px]" />
+                                Due: {formatDueDate(assessment._mentorDueDate) || "N/A"}
+                              </div>
+                            )}
                           </div>
 
                           <div className="flex flex-1 flex-col justify-between">
@@ -1081,7 +1351,7 @@ export default function MentorAssessments() {
                                       }
                                       className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
                                     >
-                                      Edit Recommendation
+                                      Send CDP
                                     </button>
                                   )}
                                 <button
@@ -1326,7 +1596,9 @@ export default function MentorAssessments() {
             <div className={`mx-4 mt-4 border-b border-white/10 px-6 py-5 ${mentorGlassCardFrost}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-lg font-semibold text-white">Assign assessment</h3>
+                  <h3 className="text-lg font-semibold text-white">
+                    Assign assessment{assignAssessmentIds.length === 1 ? "" : "s"}
+                  </h3>
                   <p className="mt-1 text-xs text-[#cde2f2]/80">Choose pastors (mentees) to receive this survey.</p>
                 </div>
                 <button

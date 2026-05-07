@@ -12,6 +12,7 @@ import {
   unwrapAppointmentsAxiosData,
 } from "@/app/Services/appointment-utils";
 import {
+  apiGetAppointments,
   apiGetUserSchedule,
   apiGenerateTranscriptSummary,
 } from "@/app/Services/appointments.service";
@@ -108,8 +109,31 @@ export default function PastorAppointmentDetailPage() {
         }
         if (!userId) throw new Error("User ID not found");
 
-        const res = await apiGetUserSchedule(userId);
-        const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
+        const [scheduleRes, appointmentsRes, allAppointmentsRes] = await Promise.allSettled([
+          apiGetUserSchedule(userId),
+          apiGetAppointments({ userId, futureOnly: false } as any),
+          apiGetAppointments({ futureOnly: false } as any),
+        ]);
+        const scheduleList =
+          scheduleRes.status === "fulfilled"
+            ? (unwrapAppointmentsAxiosData(scheduleRes.value) as AppointmentResponse[])
+            : [];
+        const appointmentsList =
+          appointmentsRes.status === "fulfilled"
+            ? (unwrapAppointmentsAxiosData(appointmentsRes.value) as AppointmentResponse[])
+            : [];
+        const allAppointmentsList =
+          allAppointmentsRes.status === "fulfilled"
+            ? (unwrapAppointmentsAxiosData(allAppointmentsRes.value) as AppointmentResponse[])
+            : [];
+
+        const byId = new Map<string, AppointmentResponse>();
+        [...scheduleList, ...appointmentsList, ...allAppointmentsList].forEach((item) => {
+          const id = appointmentEntityId(item) || String((item as any)?._id ?? (item as any)?.id ?? "").trim();
+          if (!id) return;
+          if (!byId.has(id)) byId.set(id, item);
+        });
+        const list = Array.from(byId.values());
 
         const found =
           list.find((a) => appointmentEntityId(a) === apptId) ??

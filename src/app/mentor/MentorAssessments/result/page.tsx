@@ -6,15 +6,40 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import headerBg from "@/app/Assets/CMA-hero-bg.png";
 import MentorHeader from "@/app/Components/MentorHeader";
 import {
+  apiGetAssessmentRecommendationRules,
   apiGetAssessmentById,
   apiGetUserAnswers,
   apiGetSectionRecommendations,
+  apiSendSectionRecommendations,
   parseAssessmentDetailPayload,
   extractSurveySectionsForCma,
 } from "@/app/Services/assessment.service";
+import { getStoredRecommendationsForPastorAssessment, upsertStoredRecommendation } from "@/app/utils/assessment-recommendations";
 
 type CdpMap = Record<string, string>;
 type AnswersMap = Record<string, string>;
+type RecommendationRow = {
+  sectionId: string;
+  sectionTitle: string;
+  message: string;
+  score?: number;
+};
+type RecommendationRule = {
+  level?: number | string;
+  items?: string[];
+};
+type RuleLayer = {
+  _id?: string;
+  title?: string;
+  recommendations?: string[];
+};
+type RuleSection = {
+  _id?: string;
+  title?: string;
+  name?: string;
+  recommendations?: RecommendationRule[];
+  layers?: RuleLayer[];
+};
 
 function normalizeSectionsForCmaUi(raw: unknown[]): any[] {
   return raw.map((sec: any) => ({
@@ -237,9 +262,21 @@ function buildAnswerMapFromSections(templateSections: any[], answerSections: any
         userAnswers[uiLayerId] = String(
           matchingChoice?._id ?? matchingChoice?.id ?? matchingChoice?.value ?? matchingChoice?.label,
         );
-      } else if (hasNumericIndex && selectedAsIndex >= 0 && selectedAsIndex < choices.length) {
-        const byIndex = choices[selectedAsIndex];
+      } else if (hasNumericIndex) {
+        // Backend can send selectedChoice as 1-based ("1","2",...) or 0-based.
+        const oneBasedIndex = selectedAsIndex - 1;
+        const zeroBasedIndex = selectedAsIndex;
+        const byIndex =
+          oneBasedIndex >= 0 && oneBasedIndex < choices.length
+            ? choices[oneBasedIndex]
+            : zeroBasedIndex >= 0 && zeroBasedIndex < choices.length
+              ? choices[zeroBasedIndex]
+              : null;
+        if (byIndex) {
         userAnswers[uiLayerId] = String(byIndex?._id ?? byIndex?.id ?? byIndex?.value ?? byIndex?.label ?? selected);
+        } else {
+          userAnswers[uiLayerId] = selected;
+        }
       } else {
         userAnswers[uiLayerId] = selected;
       }
@@ -249,11 +286,168 @@ function buildAnswerMapFromSections(templateSections: any[], answerSections: any
   return userAnswers;
 }
 
+function extractRulesPayload(body: unknown): RuleSection[] {
+  if (Array.isArray(body)) return body as RuleSection[];
+  if (!body || typeof body !== "object") return [];
+  const o = body as Record<string, unknown>;
+  if (Array.isArray(o.data)) return o.data as RuleSection[];
+  if (o.data && typeof o.data === "object") {
+    const d = o.data as Record<string, unknown>;
+    if (Array.isArray(d.data)) return d.data as RuleSection[];
+    if (Array.isArray(d.sections)) return d.sections as RuleSection[];
+    if (Array.isArray(d.items)) return d.items as RuleSection[];
+  }
+  if (Array.isArray(o.sections)) return o.sections as RuleSection[];
+  if (Array.isArray(o.items)) return o.items as RuleSection[];
+  return [];
+}
+
+function normalizeText(value: unknown): string {
+  return String(value || "").trim().toLowerCase();
+}
+
+function findRuleSection(
+  ruleSections: RuleSection[],
+  sectionId: string,
+  sectionTitle: string,
+  sectionIndex: number,
+): RuleSection | undefined {
+  const byId = ruleSections.find((rs) => String(rs?._id || "") === sectionId);
+  if (byId) return byId;
+  const normalizedTitle = normalizeText(sectionTitle);
+  if (normalizedTitle) {
+    const byTitle = ruleSections.find((rs) => normalizeText(rs?.title || rs?.name) === normalizedTitle);
+    if (byTitle) return byTitle;
+  }
+  return ruleSections[sectionIndex];
+}
+
+function buildSectionRuleText(section: RuleSection | undefined): string {
+  if (!section) return "";
+  const lines: string[] = [];
+  const sectionRules = Array.isArray(section.recommendations) ? section.recommendations : [];
+  sectionRules.forEach((rule, ruleIdx) => {
+    const levelLabel = `Level ${String(rule.level ?? ruleIdx + 1)}`;
+    const items = Array.isArray(rule.items) ? rule.items.filter((x) => String(x || "").trim() !== "") : [];
+    if (items.length > 0) {
+      lines.push(`${levelLabel}:`);
+      items.forEach((item) => lines.push(`- ${item}`));
+    }
+  });
+  const layers = Array.isArray(section.layers) ? section.layers : [];
+  layers.forEach((layer, layerIdx) => {
+    const layerTitle = layer.title || `Layer ${layerIdx + 1}`;
+    const items = Array.isArray(layer.recommendations)
+      ? layer.recommendations.filter((x) => String(x || "").trim() !== "")
+      : [];
+    if (items.length > 0) {
+      lines.push(`${layerTitle}:`);
+      items.forEach((item) => lines.push(`- ${item}`));
+    }
+  });
+  return lines.join("\n").trim();
+}
+
+function buildSectionExistingText(section: any): string {
+  if (!section || typeof section !== "object") return "";
+  const lines: string[] = [];
+  const sectionRules = Array.isArray(section.recommendations) ? section.recommendations : [];
+  sectionRules.forEach((rule: any, idx: number) => {
+    const levelLabel = `Level ${String(rule?.level ?? idx + 1)}`;
+    const items = Array.isArray(rule?.items)
+      ? rule.items.filter((x: unknown) => String(x || "").trim() !== "")
+      : [];
+    if (items.length > 0) {
+      lines.push(`${levelLabel}:`);
+      items.forEach((item: unknown) => lines.push(`- ${String(item)}`));
+    } else if (rule?.message && String(rule.message).trim()) {
+      lines.push(`${levelLabel}:`);
+      lines.push(`- ${String(rule.message).trim()}`);
+    }
+  });
+  const layers = Array.isArray(section.layers) ? section.layers : [];
+  layers.forEach((layer: any, idx: number) => {
+    const layerRecs = Array.isArray(layer?.recommendations)
+      ? layer.recommendations.filter((x: unknown) => String(x || "").trim() !== "")
+      : [];
+    if (layerRecs.length > 0) {
+      const layerTitle = String(layer?.title || `Layer ${idx + 1}`);
+      lines.push(`${layerTitle}:`);
+      layerRecs.forEach((item: unknown) => lines.push(`- ${String(item)}`));
+    }
+  });
+  return lines.join("\n").trim();
+}
+
+function buildLayerTextForScore(section: RuleSection | undefined, score: number | undefined): string {
+  if (!section || score === undefined || score === null) return "";
+  const sectionRules = Array.isArray(section.recommendations) ? section.recommendations : [];
+  const matchingRule = sectionRules.find((r) => {
+    const rLevel = typeof r.level === "number" ? r.level : Number(r.level);
+    return !isNaN(rLevel) && rLevel === score;
+  });
+  if (matchingRule) {
+    const items = Array.isArray(matchingRule.items)
+      ? matchingRule.items.filter((x) => String(x || "").trim() !== "")
+      : [];
+    if (items.length > 0) return items.map((item) => `- ${item}`).join("\n");
+  }
+  const layers = Array.isArray(section.layers) ? section.layers : [];
+  const layerIndex = score - 1;
+  if (layerIndex >= 0 && layerIndex < layers.length) {
+    const layer = layers[layerIndex];
+    const items = Array.isArray(layer.recommendations)
+      ? layer.recommendations.filter((x) => String(x || "").trim() !== "")
+      : [];
+    if (items.length > 0) {
+      const lines: string[] = [];
+      if (layer.title) lines.push(`${layer.title}:`);
+      items.forEach((item) => lines.push(`- ${item}`));
+      return lines.join("\n");
+    }
+  }
+  return "";
+}
+
+function parseRecommendationItemsFromText(message: string): string[] {
+  return message
+    .split("\n")
+    .map((line) => line.replace(/^\s*[-*]\s*/, "").trim())
+    .filter((line) => line !== "" && !/^level\s+\d+\s*:$/i.test(line) && !/^layer\s+\d+\s*:$/i.test(line));
+}
+
+function extractUserAnswerSections(body: unknown): Array<{ sectionId: string; sectionScore?: number; recommendations: string[] }> {
+  const root = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+  return sections.map((s: any) => ({
+    sectionId: String(s?.sectionId ?? ""),
+    sectionScore: typeof s?.sectionScore === "number" ? s.sectionScore : undefined,
+    recommendations: Array.isArray(s?.recommendations)
+      ? s.recommendations.filter((x: unknown) => String(x || "").trim() !== "").map((x: unknown) => String(x))
+      : [],
+  }));
+}
+
+function extractRecommendationPreview(body: unknown): Array<{ sectionId: string; score?: number; recommendations: string[] }> {
+  const root = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const data = root.data;
+  const list = Array.isArray(data) ? data : Array.isArray(root) ? (root as unknown[]) : [];
+  return list.map((row: any) => ({
+    sectionId: String(row?.sectionId ?? ""),
+    score: typeof row?.score === "number" ? row.score : undefined,
+    recommendations: Array.isArray(row?.recommendations)
+      ? row.recommendations.filter((x: unknown) => String(x || "").trim() !== "").map((x: unknown) => String(x))
+      : [],
+  }));
+}
+
 export default function MentorAssessmentResultPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const assessmentId = (searchParams.get("assessmentId") || "").trim();
   const userId = (searchParams.get("userId") || "").trim();
+  const editRecommendation = (searchParams.get("editRecommendation") || "").trim() === "1";
 
   const [loading, setLoading] = useState(true);
   const [sections, setSections] = useState<any[]>([]);
@@ -262,6 +456,12 @@ export default function MentorAssessmentResultPage() {
   const [answers, setAnswers] = useState<AnswersMap>({});
   const [mentorLayerCdp, setMentorLayerCdp] = useState<CdpMap>({});
   const [hasRecommendations, setHasRecommendations] = useState(false);
+  const [recommendationOpen, setRecommendationOpen] = useState(false);
+  const [recommendationLoading, setRecommendationLoading] = useState(false);
+  const [recommendationSubmitting, setRecommendationSubmitting] = useState(false);
+  const [recommendationRows, setRecommendationRows] = useState<RecommendationRow[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
+  const [didAutoOpenRecommendation, setDidAutoOpenRecommendation] = useState(false);
 
   useEffect(() => {
     if (!assessmentId || !userId) {
@@ -342,6 +542,117 @@ export default function MentorAssessmentResultPage() {
     };
   }, [assessmentId, userId]);
 
+  const openRecommendationEditor = async () => {
+    if (!assessmentId || !userId) return;
+    try {
+      setRecommendationLoading(true);
+      const [detailRes, rulesRes, userAnswersRes, previewRes] = await Promise.allSettled([
+        apiGetAssessmentById(assessmentId),
+        apiGetAssessmentRecommendationRules(assessmentId),
+        apiGetUserAnswers(assessmentId, userId),
+        apiGetSectionRecommendations(assessmentId, userId),
+      ]);
+
+      const detail = detailRes.status === "fulfilled" ? parseAssessmentDetailPayload(detailRes.value.data) : null;
+      const ruleSections = rulesRes.status === "fulfilled" ? extractRulesPayload(rulesRes.value.data) : [];
+      const answerSections = userAnswersRes.status === "fulfilled" ? extractUserAnswerSections(userAnswersRes.value.data) : [];
+      const previewSections = previewRes.status === "fulfilled" ? extractRecommendationPreview(previewRes.value.data) : [];
+      const rawSections = Array.isArray(detail?.sections) ? detail.sections : [];
+      const stored = getStoredRecommendationsForPastorAssessment(userId, assessmentId);
+
+      const rows: RecommendationRow[] = rawSections.map((section: any, idx: number) => {
+        const sectionId = String(section?._id || `section_${idx}`);
+        const sectionTitle = String(section?.name || section?.title || `Section ${idx + 1}`);
+        const existing = stored.find((s) => s.sectionId === sectionId);
+        const matchedRulesSection = findRuleSection(ruleSections, sectionId, sectionTitle, idx);
+        const rulesText = buildSectionRuleText(matchedRulesSection);
+        const existingFromAssessment = buildSectionExistingText(section);
+        const answerSection = answerSections.find((s) => s.sectionId === sectionId);
+        const answerText = (answerSection?.recommendations || []).join("\n");
+        const previewSection = previewSections.find((s) => s.sectionId === sectionId);
+        const previewText = (previewSection?.recommendations || []).join("\n");
+        const currentScore = answerSection?.sectionScore ?? previewSection?.score;
+        const layerText = buildLayerTextForScore(matchedRulesSection, currentScore);
+        return {
+          sectionId,
+          sectionTitle,
+          score: currentScore,
+          message: existing?.message || answerText || previewText || layerText || existingFromAssessment || rulesText,
+        };
+      });
+
+      setRecommendationRows(rows);
+      setRecommendationOpen(true);
+    } catch (err) {
+      console.error("Failed to load recommendation editor", err);
+      setToast("Unable to load recommendations editor");
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setRecommendationLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!editRecommendation || didAutoOpenRecommendation) return;
+    if (!assessmentId || !userId || loading) return;
+    setDidAutoOpenRecommendation(true);
+    void openRecommendationEditor();
+  }, [editRecommendation, didAutoOpenRecommendation, assessmentId, userId, loading]);
+
+  const handleSendRecommendations = async () => {
+    if (!assessmentId || !userId) return;
+    const now = new Date().toISOString();
+    const payloadRows = recommendationRows
+      .map((row) => ({ ...row, parsedItems: parseRecommendationItemsFromText(row.message) }))
+      .filter((row) => row.parsedItems.length > 0);
+    if (payloadRows.length === 0) {
+      setToast("Add at least one recommendation to send");
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
+    try {
+      setRecommendationSubmitting(true);
+      payloadRows.forEach((row) => {
+        upsertStoredRecommendation({
+          pastorId: userId,
+          assessmentId,
+          sectionId: row.sectionId,
+          sectionTitle: row.sectionTitle,
+          message: row.message.trim(),
+          sent: true,
+          sentAt: now,
+          updatedAt: now,
+        });
+      });
+
+      const sendResults = await Promise.allSettled(
+        payloadRows.map((row) =>
+          apiSendSectionRecommendations(assessmentId, {
+            userId,
+            sectionId: row.sectionId,
+            recommendations: row.parsedItems,
+          }),
+        ),
+      );
+      const failed = sendResults.filter((r) => r.status === "rejected").length;
+      const succeeded = sendResults.length - failed;
+      if (failed === sendResults.length) throw new Error("All recommendation requests failed");
+      setToast(
+        failed > 0
+          ? `Sent ${succeeded} recommendation section(s); ${failed} failed`
+          : "Recommendations sent successfully",
+      );
+      setRecommendationOpen(false);
+      setTimeout(() => setToast(null), 3000);
+    } catch (err) {
+      console.error(err);
+      setToast("Failed to send recommendations");
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setRecommendationSubmitting(false);
+    }
+  };
+
   const selectedCount = useMemo(() => Object.keys(answers).length, [answers]);
 
   return (
@@ -358,17 +669,6 @@ export default function MentorAssessmentResultPage() {
             <h1 className="text-xl font-bold sm:text-2xl md:text-3xl">{assessmentTitle}</h1>
             <p className="mt-2 text-sm text-[#d9ebf8]">Mentor view of mentee submitted answers.</p>
           </div>
-          {hasRecommendations && (
-            <button
-              type="button"
-              onClick={() => {
-                router.push(`/mentor/MentorAssessments?tab=submitted&menteeId=${userId}`);
-              }}
-              className="mt-2 shrink-0 rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30 sm:text-sm whitespace-nowrap"
-            >
-              Send CDP
-            </button>
-          )}
         </div>
       </header>
 
@@ -411,6 +711,15 @@ export default function MentorAssessmentResultPage() {
             </aside>
 
             <section className="min-w-0 flex-1">
+              <div className="mb-5 flex justify-end">
+                <button
+                  type="button"
+                  onClick={openRecommendationEditor}
+                  className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                >
+                  Send CDP
+                </button>
+              </div>
               <div className="space-y-5">
                 {(sections[activeSection]?.layers || []).map((layer: any, layerIndex: number) => {
                   const layerId = resolveLayerKey(layer, activeSection, layerIndex);
@@ -507,6 +816,91 @@ export default function MentorAssessmentResultPage() {
           </div>
         )}
       </main>
+
+      {recommendationOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
+          <button
+            type="button"
+            aria-label="Close"
+            className="absolute inset-0 bg-transparent"
+            onClick={() => setRecommendationOpen(false)}
+          />
+          <div className="relative z-10 w-full max-w-3xl rounded-2xl border border-white/15 bg-[#062946] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Edit and send recommendations</h3>
+                <p className="mt-1 text-xs text-white/75">{assessmentTitle}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRecommendationOpen(false)}
+                className="text-[#8ec5eb] hover:text-white"
+                aria-label="Close"
+              >
+                <i className="fa-solid fa-xmark text-xl" />
+              </button>
+            </div>
+
+            <div className="max-h-[60vh] space-y-4 overflow-y-auto p-6">
+              {recommendationLoading ? (
+                <p className="text-sm text-white/75">Loading recommendations editor…</p>
+              ) : recommendationRows.length === 0 ? (
+                <p className="text-sm text-white/75">No sections found for this assessment.</p>
+              ) : (
+                recommendationRows.map((row, idx) => (
+                  <div key={row.sectionId || idx} className="rounded-xl border border-white/15 bg-white/5 p-4">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-[#8ec5eb]">{row.sectionTitle}</p>
+                      {typeof row.score === "number" && (
+                        <span className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-[11px] text-white/80">
+                          Score: {row.score}
+                        </span>
+                      )}
+                    </div>
+                    <textarea
+                      rows={4}
+                      value={row.message}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setRecommendationRows((prev) => prev.map((item, i) => (i === idx ? { ...item, message: value } : item)));
+                      }}
+                      placeholder="Write recommendation for this section"
+                      className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/45 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-white/10 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setRecommendationOpen(false)}
+                className="rounded-lg border border-white/25 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={recommendationSubmitting || recommendationLoading}
+                onClick={handleSendRecommendations}
+                className="rounded-lg bg-[#8ec5eb]/90 px-5 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#8ec5eb] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {recommendationSubmitting ? "Sending..." : "Send to mentee"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed right-6 top-6 z-[130] animate-fade-in">
+          <div className="flex items-center gap-3 rounded-xl border border-white/20 bg-[#0a3558] px-4 py-3 text-white shadow-lg">
+            <i className="fa-solid fa-circle-check text-[#8ec5eb]" />
+            <span className="text-sm font-semibold">{toast}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

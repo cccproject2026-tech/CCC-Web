@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
@@ -56,48 +56,39 @@ export default function SurveyRecommendationDownload() {
   const [assessmentName, setAssessmentName] = useState("Assessment");
   const [sections, setSections] = useState<DownloadSection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloading, setDownloading] = useState(false);
+  const pdfContentRef = useRef<HTMLDivElement | null>(null);
 
-  const handleDownload = () => {
-    if (sections.length === 0) return;
+  const handleDownload = async () => {
+    if (sections.length === 0 || !pdfContentRef.current || downloading) return;
 
-    const exportedOn = new Date();
-    const lines: string[] = [
-      "Customized Development Plans (CDP)",
-      `Pastor: ${pastor.name}`,
-      `Assessment: ${assessmentName}`,
-      `Exported On: ${exportedOn.toLocaleString()}`,
-      "",
-    ];
-
-    sections.forEach((section, index) => {
-      lines.push(`Section ${index + 1}: ${section.sectionTitle}`);
-      lines.push(section.message || "-");
-      if (section.sentAt) {
-        lines.push(`Sent on: ${new Date(section.sentAt).toLocaleString()}`);
-      }
-      lines.push("");
-    });
+    const safeName = assessmentName
+      .trim()
+      .replace(/[^a-z0-9\-\s_]/gi, "")
+      .replace(/\s+/g, "-")
+      .toLowerCase();
+    const filename = `${safeName || "assessment"}-cdp.pdf`;
 
     try {
-      const blob = new Blob([lines.join("\n")], {
-        type: "text/plain;charset=utf-8",
-      });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      const safeName = assessmentName
-        .trim()
-        .replace(/[^a-z0-9\-\s_]/gi, "")
-        .replace(/\s+/g, "-")
-        .toLowerCase();
+      setDownloading(true);
+      const html2pdfModule = await import("html2pdf.js");
+      const html2pdf = (html2pdfModule.default || html2pdfModule) as any;
 
-      link.href = url;
-      link.download = `${safeName || "assessment"}-cdp.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      await html2pdf()
+        .set({
+          margin: [12, 12, 12, 12],
+          filename,
+          image: { type: "jpeg", quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+          jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          pagebreak: { mode: ["css", "legacy"] },
+        })
+        .from(pdfContentRef.current)
+        .save();
     } catch {
       window.print();
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -177,15 +168,18 @@ export default function SurveyRecommendationDownload() {
         <button
           type="button"
           onClick={handleDownload}
-          disabled={loading || sections.length === 0}
+          disabled={loading || sections.length === 0 || downloading}
           className="rounded-xl bg-[#8ec5eb] px-5 py-2 text-sm font-semibold text-[#062946] shadow-[0_12px_30px_rgba(2,20,38,0.35)] transition hover:bg-[#a9d5f2]"
         >
-          <i className="fa-solid fa-download mr-2" /> Download
+          <i className="fa-solid fa-download mr-2" /> {downloading ? "Downloading..." : "Download PDF"}
         </button>
       </div>
 
       <main className="flex flex-1 justify-center py-10 print:py-0">
-        <div className="w-[92%] max-w-[850px] rounded-lg border border-[#E5E7EB] bg-white px-6 py-8 text-[#0B1C58] shadow-md md:px-10 print:w-full print:max-w-none print:rounded-none print:border-0 print:shadow-none">
+        <div
+          ref={pdfContentRef}
+          className="w-[92%] max-w-[850px] rounded-lg border border-[#E5E7EB] bg-white px-6 py-8 text-[#0B1C58] shadow-md md:px-10 print:w-full print:max-w-none print:rounded-none print:border-0 print:shadow-none"
+        >
           <div className="mb-8 flex items-start justify-between">
             <Image src={Logo} alt="CCC Logo" width={240} height={60} className="object-contain" />
             <h3 className="text-[16px] font-semibold text-[#103C8C]">{pastor.name}</h3>
