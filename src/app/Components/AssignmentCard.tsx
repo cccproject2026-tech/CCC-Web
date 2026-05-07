@@ -140,7 +140,7 @@ export default function AssignmentCard({
                 : "border border-gray-100 bg-white"
             }`}
           >
-            <button
+            {/* <button
               onClick={() => {
                 onOptionsClick(id);
                 setShowMenu(false);
@@ -155,7 +155,7 @@ export default function AssignmentCard({
                 className={`fa-solid fa-paperclip w-[18px] ${isGlass ? "text-[#8ec5eb]" : "text-blue-500"}`}
               ></i>
               <span>Assign to</span>
-            </button>
+            </button> */}
             <button
               onClick={() => {
                 setShowMenu(false);
