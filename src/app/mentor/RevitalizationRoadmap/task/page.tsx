@@ -16,6 +16,7 @@ import {
   apiAddComment,
   apiGetQueries,
   apiReplyToQuery,
+  apiDeleteQueryReply,
 } from "@/app/Services/roadmaps.service";
 import { apiGetUserById } from "@/app/Services/users.service";
 import MentorHeader from "@/app/Components/MentorHeader";
@@ -118,6 +119,10 @@ function TaskPageContent() {
 
   const [queryAnswers, setQueryAnswers] = useState<Record<string, string>>({});
   const [queryTab, setQueryTab] = useState<"Pending" | "Answered">("Pending");
+
+  const [mentorReplyDraft, setMentorReplyDraft] = useState("");
+  const [editingMentorReplyId, setEditingMentorReplyId] = useState<string | null>(null);
+  const [replyActionQueryId, setReplyActionQueryId] = useState<string | null>(null);
 
   const [user, setUser] = useState<{ firstName?: string; lastName?: string } | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
@@ -318,6 +323,54 @@ function TaskPageContent() {
     setQueryAnswers((prev) => ({ ...prev, [qid]: value }));
   };
 
+  const cancelMentorReplyEdit = () => {
+    setEditingMentorReplyId(null);
+    setMentorReplyDraft("");
+  };
+
+  const beginMentorReplyEdit = (repliedAnswer: string, queryId: string) => {
+    setEditingMentorReplyId(queryId);
+    setMentorReplyDraft(String(repliedAnswer ?? ""));
+  };
+
+  const handleSaveMentorReplyEdit = async (queryId: string) => {
+    const text = mentorReplyDraft.trim();
+    if (!text || !roadmapId) return;
+    const mentorId = getMentorUserId();
+    if (!mentorId) return;
+    setReplyActionQueryId(queryId);
+    try {
+      await apiReplyToQuery(roadmapId, queryId, {
+        repliedAnswer: text,
+        repliedMentorId: mentorId,
+      });
+      cancelMentorReplyEdit();
+      await fetchQueries();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setReplyActionQueryId(null);
+    }
+  };
+
+  const handleDeleteMentorReply = async (queryId: string) => {
+    if (!roadmapId) return;
+    const mentorId = getMentorUserId();
+    if (!mentorId) return;
+    const ok = typeof window !== "undefined" ? window.confirm("Remove your reply from this query?") : false;
+    if (!ok) return;
+    setReplyActionQueryId(queryId);
+    try {
+      await apiDeleteQueryReply(roadmapId, queryId, mentorId);
+      cancelMentorReplyEdit();
+      await fetchQueries();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setReplyActionQueryId(null);
+    }
+  };
+
   const pastorHomeHref = userId
     ? `/mentor/RevitalizationRoadmap/home?userId=${encodeURIComponent(userId)}`
     : "/mentor/RevitalizationRoadmap";
@@ -365,7 +418,6 @@ function TaskPageContent() {
         title={task ? taskTitle : "Task"}
         subtitle="Read this pastor&apos;s submitted responses, add comments, and reply to queries."
         image={HeroBg}
-        pill="Leadership Support Network"
         breadcrumbItems={[
           { label: "Revitalization Roadmap", href: "/mentor/RevitalizationRoadmap" },
           ...(userId ? [{ label: userName, href: pastorHomeHref }] : []),
@@ -697,7 +749,9 @@ function TaskPageContent() {
                           No {queryTab === "Pending" ? "pending" : "answered"} queries.
                         </p>
                       ) : null}
-                      {queries.map((query) => {
+                      {(() => {
+                        const loggedInMentorId = getMentorUserId() ?? "";
+                        return queries.map((query) => {
                         const q = query as {
                           _id: string;
                           actualQueryText?: string;
@@ -706,6 +760,7 @@ function TaskPageContent() {
                           repliedAnswer?: string;
                           repliedDate?: string;
                           repliedMentorId?: {
+                            _id?: string;
                             firstName?: string;
                             lastName?: string;
                             profilePicture?: string;
@@ -713,6 +768,16 @@ function TaskPageContent() {
                           };
                         };
                         const isAnswered = q.status === "answered" || Boolean(q.repliedAnswer?.trim());
+
+                        const replierId = q.repliedMentorId?._id
+                          ? String(q.repliedMentorId._id)
+                          : "";
+                        const canManageMentorReply = Boolean(
+                          loggedInMentorId &&
+                            replierId &&
+                            loggedInMentorId.trim() !== "" &&
+                            loggedInMentorId === replierId,
+                        );
 
                         return (
                           <div key={q._id} className="border-b border-white/12 pb-8 last:border-0 last:pb-0">
@@ -778,21 +843,81 @@ function TaskPageContent() {
                                     />
                                   )}
                                   <div className="min-w-0 flex-1">
-                                    <h4 className="text-sm font-semibold text-white">
-                                      {q.repliedMentorId
-                                        ? `${q.repliedMentorId.firstName ?? ""} ${q.repliedMentorId.lastName ?? ""}`.trim() ||
-                                          "Mentor"
-                                        : "Mentor"}
-                                    </h4>
-                                    {q.repliedDate ? (
-                                      <p className="mb-2 text-xs text-[#cde2f2]/75">{formatDate(q.repliedDate)}</p>
-                                    ) : null}
+                                    <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+                                      <div>
+                                        <h4 className="text-sm font-semibold text-white">
+                                          {q.repliedMentorId
+                                            ? `${q.repliedMentorId.firstName ?? ""} ${q.repliedMentorId.lastName ?? ""}`.trim() ||
+                                              "Mentor"
+                                            : "Mentor"}
+                                        </h4>
+                                        {q.repliedDate ? (
+                                          <p className="mt-1 text-xs text-[#cde2f2]/75">{formatDate(q.repliedDate)}</p>
+                                        ) : null}
+                                      </div>
+                                      {canManageMentorReply && queryTab === "Answered" ? (
+                                        <div className="flex flex-wrap gap-2">
+                                          {editingMentorReplyId === q._id ? (
+                                            <>
+                                              <button
+                                                type="button"
+                                                onClick={() => void handleSaveMentorReplyEdit(q._id)}
+                                                disabled={
+                                                  Boolean(replyActionQueryId) || !mentorReplyDraft.trim()
+                                                }
+                                                className="rounded-lg border border-white/15 bg-[#8ec5eb] px-3 py-1.5 text-[11px] font-semibold text-[#062946] disabled:opacity-50"
+                                              >
+                                                {replyActionQueryId === q._id ? "Saving…" : "Save"}
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={cancelMentorReplyEdit}
+                                                disabled={Boolean(replyActionQueryId)}
+                                                className="rounded-lg border border-white/15 px-3 py-1.5 text-[11px] font-semibold text-[#cde2f2] hover:bg-white/10 disabled:opacity-50"
+                                              >
+                                                Cancel
+                                              </button>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  beginMentorReplyEdit(String(q.repliedAnswer ?? ""), q._id)
+                                                }
+                                                disabled={Boolean(replyActionQueryId)}
+                                                className="rounded-lg border border-white/15 px-3 py-1.5 text-[11px] font-semibold text-[#cde2f2] hover:bg-white/10 disabled:opacity-50"
+                                              >
+                                                Edit
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={() => void handleDeleteMentorReply(q._id)}
+                                                disabled={Boolean(replyActionQueryId)}
+                                                className="rounded-lg border border-red-400/35 bg-red-500/15 px-3 py-1.5 text-[11px] font-semibold text-red-100 hover:bg-red-500/25 disabled:opacity-50"
+                                              >
+                                                Delete
+                                              </button>
+                                            </>
+                                          )}
+                                        </div>
+                                      ) : null}
+                                    </div>
                                     {q.repliedMentorId?.role ? (
                                       <p className="mb-2 text-xs capitalize text-[#cde2f2]/70">
                                         {q.repliedMentorId.role}
                                       </p>
                                     ) : null}
-                                    <p className="text-sm leading-relaxed text-[#cde2f2]">{q.repliedAnswer}</p>
+                                    {editingMentorReplyId === q._id ? (
+                                      <textarea
+                                        value={mentorReplyDraft}
+                                        onChange={(e) => setMentorReplyDraft(e.target.value)}
+                                        rows={4}
+                                        className="mt-1 w-full resize-none rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm leading-relaxed text-[#cde2f2] placeholder:text-[#cde2f2]/40 focus:border-[#8ec5eb]/50 focus:outline-none"
+                                      />
+                                    ) : (
+                                      <p className="text-sm leading-relaxed text-[#cde2f2]">{q.repliedAnswer}</p>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -804,7 +929,8 @@ function TaskPageContent() {
 
                           </div>
                         );
-                      })}
+                      });
+                      })()}
                     </div>
                   </div>
                 )}

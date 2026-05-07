@@ -215,6 +215,12 @@ export interface ReplyQueryPayload {
   repliedMentorId: string;
 }
 
+/** PATCH pastor-owned query text while still pending — backend parity with mobile/API. */
+export interface UpdatePastorQueryPayload {
+  userId: string;
+  actualQueryText: string;
+}
+
 export interface QueryItem {
   _id: string;
   actualQueryText: string;

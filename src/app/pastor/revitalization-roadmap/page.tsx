@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import SearchBar from "@/app/Components/SearchBar";
-import DirectorHero from "@/app/director/DirectorHero";
+import { pastorMainGradient } from "@/app/Components/pastor/pastor-theme";
 import {
   directorBtnPrimary,
   directorGlassCard,
@@ -15,7 +15,7 @@ import {
   directorSpinner,
 } from "@/app/director/directorUi";
 import { DirectorFilterSection } from "@/app/director/ui";
-import HeroBg from "@/app/Assets/roadmap-bg.png";
+import MentorBannerBg from "@/app/Assets/mentor-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { getPastorUserId } from "@/app/utils/pastor-auth";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
@@ -25,10 +25,14 @@ import {
   type RoadmapAssignmentUi,
 } from "@/app/Services/roadmap-assignments";
 import { subscribeProgressUpdated } from "@/app/utils/progress-sync";
-import {
-  PastorRoadmapDashboardBody,
-  pastorRoadmapDashboardPageRoot,
-} from "../pastor-roadmap-dashboard-shell";
+
+/** Same root + hero as `/pastor/Mymentors` (no `PastorRoadmapDashboardBody` #0A1128 backdrop). */
+const PASTOR_MY_MENTORS_STYLE_ROOT =
+  "relative flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white";
+
+/** Hero overlay — matches My Mentors banner. */
+const MY_MENTORS_HERO_OVERLAY =
+  "absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.12),transparent_38%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]";
 
 type TabKey = "All" | "Due" | "In Progress" | "Not Started" | "Completed";
 type UiStatus = "Not Started" | "In-progress" | "Due" | "Completed";
@@ -293,14 +297,16 @@ export default function RevitalizationRoadmap() {
 
   if (loading) {
     return (
-      <div className={pastorRoadmapDashboardPageRoot}>
+      <div className={PASTOR_MY_MENTORS_STYLE_ROOT}>
         <PastorHeader showFullHeader={true} />
-        <PastorRoadmapDashboardBody>
-          <div className="flex min-h-[70vh] flex-1 flex-col items-center justify-center">
+        <main
+          className={`${pastorMainGradient} flex min-h-[70vh] w-full flex-1 flex-col overflow-x-hidden px-6 py-10 md:px-16`}
+        >
+          <div className="flex flex-1 flex-col items-center justify-center">
             <div className={directorSpinner} />
             <p className="text-sm text-white/75">Loading your roadmap…</p>
           </div>
-        </PastorRoadmapDashboardBody>
+        </main>
       </div>
     );
   }
@@ -309,10 +315,12 @@ export default function RevitalizationRoadmap() {
     const showLogin =
       /sign in|log in|session|not found/i.test(error) && !/Unable to fetch/i.test(error);
     return (
-      <div className={pastorRoadmapDashboardPageRoot}>
+      <div className={PASTOR_MY_MENTORS_STYLE_ROOT}>
         <PastorHeader showFullHeader={true} />
-        <PastorRoadmapDashboardBody>
-          <div className="flex min-h-[70vh] flex-1 items-center justify-center px-4">
+        <main
+          className={`${pastorMainGradient} flex min-h-[70vh] w-full flex-1 flex-col overflow-x-hidden px-6 py-10 md:px-16`}
+        >
+          <div className="flex flex-1 items-center justify-center">
             <div className={`${directorGlassCard} max-w-xl p-6 text-center`}>
               <p className="text-red-100">{error}</p>
               {showLogin && (
@@ -330,28 +338,47 @@ export default function RevitalizationRoadmap() {
               </button>
             </div>
           </div>
-        </PastorRoadmapDashboardBody>
+        </main>
       </div>
     );
   }
 
   return (
-    <div className={pastorRoadmapDashboardPageRoot}>
+    <div className={PASTOR_MY_MENTORS_STYLE_ROOT}>
       <PastorHeader showFullHeader={true} />
 
-      <PastorRoadmapDashboardBody>
-        <DirectorHero
-          title="Revitalization Roadmap"
-          subtitle="Follow your phase-by-phase roadmap and track active milestones."
-          image={HeroBg}
-          titleAlign="start"
-          tightenMobileLayout
-          breadcrumbItems={[{ label: "Home", href: "/pastor/home" }, { label: "Revitalization Roadmap" }]}
-          className="!rounded-2xl md:!rounded-3xl"
-        />
+      <section
+        className="relative flex h-[260px] w-full flex-col bg-cover bg-center text-white md:h-[320px]"
+        style={{ backgroundImage: `url(${MentorBannerBg.src})` }}
+      >
+        <div className={`${MY_MENTORS_HERO_OVERLAY} pointer-events-none`} aria-hidden />
 
-        <main className="flex min-h-0 w-full min-w-0 flex-1 overflow-x-hidden pb-8 sm:pb-12">
-          <div className={`${directorPageContainer} w-full min-w-0 max-w-7xl px-3 sm:px-6 lg:px-8`}>
+        <div className="relative z-10 flex h-full min-h-0 w-full flex-1 flex-col px-6 pb-10 pt-6 md:px-16 md:pb-12 md:pt-8">
+          <nav className="text-[13px] text-white/75">
+            <Link href="/pastor/home" className="transition hover:text-white">
+              Home
+            </Link>
+            <span className="mx-2 font-normal text-white/45">&gt;</span>
+            <span className="font-semibold text-white">Revitalization Roadmap</span>
+          </nav>
+
+          <div className="flex min-h-0 flex-1 flex-col justify-end">
+            <div className="max-w-3xl text-left">
+              <h1 className="text-3xl font-semibold tracking-tight text-white drop-shadow-sm md:text-5xl">
+                Revitalization Roadmap
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-snug text-[#d9ebf8] drop-shadow-sm md:mt-4 md:text-lg md:leading-normal">
+                Follow your phase-by-phase roadmap and track active milestones.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <main
+        className={`${pastorMainGradient} flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-x-hidden px-6 pb-10 pt-10 md:px-16 sm:pb-12`}
+      >
+        <div className={`${directorPageContainer} w-full min-w-0`}>
               <DirectorFilterSection bare className="!mb-5 !p-3 sm:!mb-6 sm:!p-6">
                 <div className="flex flex-col gap-3 sm:gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
                   <div className="min-w-0 w-full lg:max-w-[min(100%,28rem)] lg:flex-1">
@@ -475,10 +502,8 @@ export default function RevitalizationRoadmap() {
                   })}
                 </div>
               )}
-          </div>
-        </main>
-      </PastorRoadmapDashboardBody>
-
+        </div>
+      </main>
     </div>
   );
 }

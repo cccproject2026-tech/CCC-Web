@@ -45,6 +45,12 @@ export default function RoadmapHomeCard({
   const [selectedDate, setSelectedDate] = useState("");
   const isMentor = variant === "mentor";
 
+  const hasRenderableImage =
+    img != null &&
+    (typeof img === "string"
+      ? img.trim().length > 0
+      : typeof img === "object" && img !== null && "src" in img);
+
   const getStatusColor = () => {
     if (isMentor) {
       switch (status) {
@@ -81,6 +87,8 @@ export default function RoadmapHomeCard({
 
   const imgUnoptimized =
     typeof img === "string" && (img.startsWith("http://") || img.startsWith("https://"));
+
+  const showViewButton = Boolean(onViewClick && (isMentor || status !== "Completed"));
 
   const handleCardClick = () => {
     if (onCardClick) {
@@ -237,8 +245,7 @@ export default function RoadmapHomeCard({
                 </p>
                 <p className={`text-[14px] ${isMentor ? "text-white" : "text-black"}`}>{completionTime}</p>
               </div>
-              {/* Only show View button if not completed */}
-              {status !== "Completed" && (
+              {showViewButton && (
                 <button
                   type="button"
                   onClick={handleViewButtonClick}
