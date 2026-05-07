@@ -93,6 +93,25 @@ function formatDueDate(value?: string): string | null {
   });
 }
 
+function pickAssignedDueDate(rawItem: any, flat: any): string | undefined {
+  const candidates = [
+    flat?.dueDate,
+    flat?.deadline,
+    flat?.endDate,
+    flat?.assignedDueDate,
+    rawItem?.dueDate,
+    rawItem?.deadline,
+    rawItem?.endDate,
+    rawItem?.assignedDueDate,
+    rawItem?.assignment?.dueDate,
+    rawItem?.assignment?.deadline,
+  ];
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return undefined;
+}
+
 function formatCreatedDate(value?: string): string | null {
   if (!value) return null;
   const date = new Date(value);
@@ -345,6 +364,7 @@ function AssessmentsPageContent() {
                   );
                 });
                 const progressStatus = normalizeAssessmentStatus(progressRow?.status);
+                const resolvedDueDate = pickAssignedDueDate(item, flat);
 
                 return {
                   id: assessmentId,
@@ -353,7 +373,7 @@ function AssessmentsPageContent() {
                   image,
                   type: detailObj.type,
                   progressStatus,
-                  dueDate: flat.dueDate,
+                  dueDate: resolvedDueDate,
                   createdOn: detailObj.createdAt,
                   createdBy: detailObj.createdBy,
                   pastorsAssigned: countPastorsAssigned(flat.assessment),
@@ -751,15 +771,24 @@ function AssessmentsPageContent() {
                     ? "Showing assigned assessments for selected pastor"
                     : "Showing all assessments"}
                 </p>
-                {selectedMenteeId && (
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setSelectedMenteeId(null)}
-                    className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/15"
+                    onClick={() => router.push("/director/mentees")}
+                    className="rounded-lg border border-[#8ec5eb]/35 bg-[#8ec5eb]/12 px-3 py-1.5 text-xs font-semibold text-[#d8ecfa] transition hover:bg-[#8ec5eb]/20"
                   >
-                    Clear filter
+                    Show all
                   </button>
-                )}
+                  {selectedMenteeId && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedMenteeId(null)}
+                      className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/15"
+                    >
+                      Clear filter
+                    </button>
+                  )}
+                </div>
               </div>
               <FeaturedAvatars
                 items={filteredFeaturedItems}

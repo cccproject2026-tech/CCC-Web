@@ -113,6 +113,25 @@ function formatDueDate(value: unknown): string | null {
   });
 }
 
+function pickAssignedDueDate(rawItem: any, flat: any): string | undefined {
+  const candidates = [
+    flat?.dueDate,
+    flat?.deadline,
+    flat?.endDate,
+    flat?.assignedDueDate,
+    rawItem?.dueDate,
+    rawItem?.deadline,
+    rawItem?.endDate,
+    rawItem?.assignedDueDate,
+    rawItem?.assignment?.dueDate,
+    rawItem?.assignment?.deadline,
+  ];
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return undefined;
+}
+
 function formatMeetingDateTime(value: unknown): string | null {
   if (typeof value !== "string" || !value.trim()) return null;
   const date = new Date(value);
@@ -538,13 +557,14 @@ export default function MentorAssessments() {
               // Keep assignment status exactly as provided by backend progress API.
               // Do not locally downgrade completed -> submitted based on meeting checks.
               const normalizedStatus = progressRow?.status || "not_started";
+              const resolvedDueDate = pickAssignedDueDate(item, flat);
               return {
                 ...assessment,
                 _id: assessmentId,
                 id: assessmentId,
                 _mentorAssignmentStatus: normalizedStatus,
                 _mentorAssignmentId: flat.assignmentId ?? progressRow?.assignmentId,
-                _mentorDueDate: flat.dueDate,
+                _mentorDueDate: resolvedDueDate,
                 _mentorAppointmentId: resolvedAppointmentId || undefined,
                 _mentorMeetingDate: appt?.meetingDate,
                 _mentorMeetingDateLabel: formatMeetingDateTime(appt?.meetingDate),
@@ -1079,6 +1099,14 @@ export default function MentorAssessments() {
                         ? "Showing assigned assessments for selected mentee"
                         : "Showing all assessments"}
                     </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => router.push("/mentor/MenteesDetailed")}
+                      className="rounded-lg border border-[#8ec5eb]/35 bg-[#8ec5eb]/12 px-3 py-1.5 text-xs font-semibold text-[#d8ecfa] transition hover:bg-[#8ec5eb]/20"
+                    >
+                      View all
+                    </button>
                     {selectedMenteeId && (
                       <button
                         type="button"
@@ -1088,6 +1116,7 @@ export default function MentorAssessments() {
                         Clear filter
                       </button>
                     )}
+                  </div>
                   </div>
                   <FeaturedAvatars
                     items={filteredFeaturedItems}
