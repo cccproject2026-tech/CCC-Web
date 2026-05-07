@@ -25,6 +25,12 @@ type Mentor = {
   email: string;
   profileInfo?: string;
    profilePicture?: string;
+   phone?: string;
+phoneNumber?: string;
+city?: string;
+state?: string;
+country?: string;
+churchName?: string;
 };
 
 const mentorImages = [Mentor1, Mentor2, Mentor3];
@@ -77,23 +83,120 @@ function mapRowToMentor(row: unknown): Mentor | null {
   };
 }
 
+// function normalizeMentorDetail(raw: Record<string, unknown>, fallback: Mentor): Mentor {
+//   const id = String(raw._id ?? raw.id ?? fallback._id);
+//   const interest = raw.interest as Record<string, unknown> | undefined;
+//   const profileInfo =
+//     (typeof raw.bio === "string" && raw.bio) ||
+//     (typeof raw.profileInfo === "string" && raw.profileInfo) ||
+//     (interest && typeof interest.comments === "string" ? interest.comments : "") ||
+//     fallback.profileInfo ||
+//     "";
+//   return {
+//     _id: id,
+//     firstName: String(raw.firstName ?? fallback.firstName),
+//     lastName: String(raw.lastName ?? fallback.lastName),
+//     role: String(raw.role ?? fallback.role),
+//     email: String(raw.email ?? fallback.email),
+//     profileInfo,
+//     profilePicture: String(raw.profilePicture ?? raw.avatar ?? raw.image ?? fallback.profilePicture ?? ""),
+//     phone: String(raw.phone ?? fallback.phone ?? ""),
+// phoneNumber: String(raw.phoneNumber ?? fallback.phoneNumber ?? ""),
+// city: String(raw.city ?? fallback.city ?? ""),
+// state: String(raw.state ?? fallback.state ?? ""),
+// country: String(raw.country ?? fallback.country ?? ""),
+// churchName: String(raw.churchName ?? fallback.churchName ?? ""),
+//   };
+// }
+
 function normalizeMentorDetail(raw: Record<string, unknown>, fallback: Mentor): Mentor {
   const id = String(raw._id ?? raw.id ?? fallback._id);
+
   const interest = raw.interest as Record<string, unknown> | undefined;
+  const churchDetailsList = Array.isArray(interest?.churchDetails)
+  ? (interest.churchDetails as Record<string, unknown>[])
+  : [];
+
+const primaryChurch = churchDetailsList[0];
+  const contact = raw.contact as Record<string, unknown> | undefined;
+  const church = raw.church as Record<string, unknown> | undefined;
+  const churchDetails = raw.churchDetails as Record<string, unknown> | undefined;
+  const address = raw.address as Record<string, unknown> | undefined;
+
   const profileInfo =
     (typeof raw.bio === "string" && raw.bio) ||
     (typeof raw.profileInfo === "string" && raw.profileInfo) ||
     (interest && typeof interest.comments === "string" ? interest.comments : "") ||
     fallback.profileInfo ||
     "";
+
   return {
     _id: id,
     firstName: String(raw.firstName ?? fallback.firstName),
     lastName: String(raw.lastName ?? fallback.lastName),
     role: String(raw.role ?? fallback.role),
-    email: String(raw.email ?? fallback.email),
+    email: String(raw.email ?? contact?.email ?? fallback.email),
     profileInfo,
-    profilePicture: String(raw.profilePicture ?? raw.avatar ?? raw.image ?? fallback.profilePicture ?? ""),
+    profilePicture: String(
+      raw.profilePicture ?? raw.avatar ?? raw.image ?? fallback.profilePicture ?? "",
+    ),
+    phone: String(
+      raw.phone ??
+        raw.mobile ??
+        raw.mobileNumber ??
+        raw.contactNumber ??
+        contact?.phone ??
+        contact?.mobile ??
+        fallback.phone ??
+        "",
+    ),
+   phoneNumber: String(
+  raw.phoneNumber ??
+    interest?.phoneNumber ??
+    raw.mobileNumber ??
+    raw.contactNumber ??
+    contact?.phoneNumber ??
+    contact?.mobileNumber ??
+    fallback.phoneNumber ??
+    "",
+),
+
+churchName: String(
+  raw.churchName ??
+    primaryChurch?.churchName ??
+    church?.name ??
+    churchDetails?.churchName ??
+    churchDetails?.name ??
+    fallback.churchName ??
+    "",
+),
+
+city: String(
+  raw.city ??
+    primaryChurch?.city ??
+    address?.city ??
+    churchDetails?.city ??
+    fallback.city ??
+    "",
+),
+
+state: String(
+  raw.state ??
+    primaryChurch?.state ??
+    address?.state ??
+    churchDetails?.state ??
+    fallback.state ??
+    "",
+),
+
+country: String(
+  raw.country ??
+    primaryChurch?.country ??
+    address?.country ??
+    churchDetails?.country ??
+    fallback.country ??
+    "",
+),
   };
 }
 
@@ -273,6 +376,15 @@ function Scheduler({
     </div>
   );
 }
+function NoImageBox({ className = "" }: { className?: string }) {
+  return (
+    <div
+      className={`flex items-center justify-center bg-[linear-gradient(145deg,#17496d,#0b2f4d)] text-[10px] font-bold uppercase tracking-[0.18em] text-white/55 ${className}`}
+    >
+      NO IMAGE
+    </div>
+  );
+}
 
 /* ----------------------------------------------------
     MAIN PAGE COMPONENT
@@ -340,12 +452,21 @@ const [mentorToSchedule, setMentorToSchedule] = useState<Mentor | null>(null);
   /** Prefer GET /users/:id (works for newly assigned mentors); fall back to /home/mentor/:email; then list row. */
   const fetchMentorDetail = async (m: Mentor) => {
     try {
+      // const res = await apiGetUserById(m._id);
+      // const raw = res.data?.data as Record<string, unknown> | undefined;
+      // if (raw && typeof raw === "object" && (raw._id || raw.id)) {
+      //   setSelectedMentor(normalizeMentorDetail(raw, m));
+      //   return;
+      // }
       const res = await apiGetUserById(m._id);
-      const raw = res.data?.data as Record<string, unknown> | undefined;
-      if (raw && typeof raw === "object" && (raw._id || raw.id)) {
-        setSelectedMentor(normalizeMentorDetail(raw, m));
-        return;
-      }
+const raw = res.data?.data;
+
+console.log("MENTOR DETAIL RAW:", raw);
+
+if (raw && typeof raw === "object" && ("_id" in raw || "id" in raw)) {
+  setSelectedMentor(normalizeMentorDetail(Object(raw) as Record<string, unknown>, m));
+  return;
+}
     } catch {
       /* try email route */
     }
@@ -458,19 +579,24 @@ const [mentorToSchedule, setMentorToSchedule] = useState<Mentor | null>(null);
                   key={mentor._id}
                   className="flex flex-col items-center shrink-0"
                 >
-                  <div className="w-[72px] h-[72px] p-[2px] rounded-full bg-[linear-gradient(145deg,#8ec5eb,#9c7cff)]">
-                    <Image
-  src={img}
-  alt={mentor.firstName}
-  unoptimized={typeof img === "string"}
-  width={72}
-  height={72}
-  className="rounded-full w-full h-full object-cover border border-[#062946]"
-/>
-                  </div>
-                  <p className="text-xs text-white mt-2 whitespace-nowrap">
-                    {mentor.firstName}
-                  </p>
+             <div className="w-[72px] h-[72px] p-[2px] rounded-full bg-[linear-gradient(145deg,#8ec5eb,#9c7cff)]">
+  {mentor.profilePicture?.trim() ? (
+    <Image
+      src={mentor.profilePicture}
+      alt={mentor.firstName}
+      unoptimized
+      width={72}
+      height={72}
+      className="h-full w-full rounded-full border border-[#062946] object-cover"
+    />
+  ) : (
+    <NoImageBox className="h-full w-full rounded-full border border-[#062946]" />
+  )}
+</div>
+
+<p className="text-xs text-white mt-2 whitespace-nowrap">
+  {mentor.firstName}
+</p>
                 </div>
               );
             })}
@@ -514,9 +640,9 @@ const [mentorToSchedule, setMentorToSchedule] = useState<Mentor | null>(null);
                       {mentor.firstName} {mentor.lastName}
                     </h4>
                     <p className="text-sm text-[#b7d2e6]">{mentor.role}</p>
-                    <p className="text-xs text-[#cde2f2] mt-1">
+                    {/* <p className="text-xs text-[#cde2f2] mt-1">
                       Sub text area write something here.
-                    </p>
+                    </p> */}
                   </div>
 
                   <div className="flex gap-4 text-[#8ec5eb] text-sm">
@@ -582,15 +708,19 @@ setScheduleDrawerOpen(true);
     </div>
   )}
 </div>
-                 <div className="relative w-full h-[170px] overflow-hidden rounded-t-xl">
-                  <Image
-  src={img}
-  alt=""
-  unoptimized={typeof img === "string"}
-  fill
-  className="object-cover"
-/>
-                  </div>
+                <div className="relative w-full h-[170px] overflow-hidden rounded-t-xl">
+  {mentor.profilePicture?.trim() ? (
+    <Image
+      src={mentor.profilePicture}
+      alt={`${mentor.firstName} ${mentor.lastName}`}
+      unoptimized
+      fill
+      className="object-cover"
+    />
+  ) : (
+    <NoImageBox className="h-full w-full" />
+  )}
+</div>
 
                   <div className="p-4 flex flex-col justify-between min-h-[160px]">
                     <h4 className="font-semibold text-white">
@@ -599,11 +729,11 @@ setScheduleDrawerOpen(true);
 
                     <p className="text-sm text-[#b7d2e6]">{mentor.role}</p>
 
-                    <p className="text-xs text-[#cde2f2] mt-2">
+                    {/* <p className="text-xs text-[#cde2f2] mt-2">
                       Sub text area write something here.
                       <br />
                       That you can read more
-                    </p>
+                    </p> */}
 
                     <div className="flex justify-between items-center mt-4">
                       <div className="flex gap-4 text-[#8ec5eb] text-sm">
@@ -653,14 +783,18 @@ setScheduleDrawerOpen(true);
 
           <div className="p-5">
             <div className="flex flex-col items-center gap-4 mb-6">
-              <Image
-  src={getMentorImage(selectedMentor, Mentor1)}
-  unoptimized={typeof getMentorImage(selectedMentor, Mentor1) === "string"}
-                alt="profile"
-                width={120}
-                height={120}
-                className="rounded-lg"
-              />
+          {selectedMentor.profilePicture?.trim() ? (
+  <Image
+    src={selectedMentor.profilePicture}
+    unoptimized
+    alt="profile"
+    width={120}
+    height={120}
+    className="h-[120px] w-[120px] rounded-lg object-cover"
+  />
+) : (
+  <NoImageBox className="h-[120px] w-[120px] rounded-lg" />
+)}
 
               <div className="text-center">
                 <h4 className="text-xl font-semibold text-white">
@@ -669,6 +803,29 @@ setScheduleDrawerOpen(true);
                 <p className="text-[#cde2f2] capitalize">
                   {selectedMentor.role}
                 </p>
+                <div className="mt-4 w-full space-y-2 rounded-xl border border-white/15 bg-white/5 p-4 text-left text-sm text-[#d9ebf8]">
+  <p>
+    <span className="font-semibold text-white">Email:</span>{" "}
+    {selectedMentor.email || "Not available"}
+  </p>
+
+  <p>
+    <span className="font-semibold text-white">Phone:</span>{" "}
+    {selectedMentor.phoneNumber || selectedMentor.phone || "Not available"}
+  </p>
+
+  <p>
+    <span className="font-semibold text-white">Church:</span>{" "}
+    {selectedMentor.churchName || "Not available"}
+  </p>
+
+  <p>
+    <span className="font-semibold text-white">Location:</span>{" "}
+    {[selectedMentor.city, selectedMentor.state, selectedMentor.country]
+      .filter(Boolean)
+      .join(", ") || "Not available"}
+  </p>
+</div>
               </div>
             </div>
 
@@ -679,7 +836,7 @@ setScheduleDrawerOpen(true);
 
             <textarea
               className="w-full border border-white/25 bg-white/10 rounded-md p-3 text-sm text-white"
-              rows={4}
+              rows={3}
               value={selectedMentor.profileInfo || ""}
               readOnly
             />

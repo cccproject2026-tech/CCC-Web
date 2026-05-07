@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import PastorHeader from "@/app/Components/PastorHeader";import { getCookie } from "@/app/utils/cookies";
+import PastorHeader from "@/app/Components/PastorHeader";
+import { getCookie } from "@/app/utils/cookies";
 import { apiGetUserById } from "@/app/Services/api";
 import { useRouter } from "next/navigation";
 
@@ -61,16 +62,16 @@ export default function PastorCertificatesPage() {
 
       <main className="flex-1 px-4 py-10 md:px-8 lg:px-16">
         <div className="mx-auto max-w-6xl rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-6 shadow-[0_20px_50px_rgba(2,20,38,0.35)] md:p-8">
-          <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
+          {/* <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
             <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
             Leadership Support Network
-          </p>
+          </p> */}
           <h1 className="mt-3 text-2xl font-semibold md:text-3xl">Certificates</h1>
           <p className="mt-2 text-sm text-[#cde2f2]">
             Track and download your awarded certificates here.
           </p>
 
-          <div className="mt-5 rounded-xl border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 p-4">
+          {/* <div className="mt-5 rounded-xl border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 p-4">
             <h2 className="text-lg font-semibold text-white">Field Mentor Status</h2>
             <p className="mt-1 text-sm text-[#d9ebf8]">
               {fieldMentorState === "field_mentor" && "You are currently a Field Mentor."}
@@ -86,7 +87,7 @@ export default function PastorCertificatesPage() {
                 Continue as Field Mentor
               </button>
             )}
-          </div>
+          </div> */}
 
           <div className="mt-6 rounded-xl border border-white/15 bg-white/5 p-4">
             {loading && <p className="text-sm text-[#cde2f2]">Loading certificates...</p>}
@@ -108,6 +109,7 @@ export default function PastorCertificatesPage() {
             )}
           </div>
         </div>
-      </main>    </div>
+      </main>
+    </div>
   );
 }

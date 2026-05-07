@@ -259,15 +259,22 @@ const directorQuickLinks = [
     icon: "fa-solid fa-clipboard-list",
     route: "/director/revitalization-roadmap",
   },
+ 
 ];
 
 const directorExploreCards = [
   {
-    title: "Mentees",
-    desc: "Schedule and manage appointments with ease for personalized guidance.",
-    icon: "fa-regular fa-calendar-check",
-    route: "/director/mentees",
+    title: "Revitalization Roadmap",
+    desc: "Plan and execute regional development roadmaps efficiently.",
+    icon: "fa-solid fa-pen-clip",
+    route: "/director/revitalization-roadmap",
   },
+{
+  title: "Assessments",
+  desc: "Create, manage, and review assessments across your network.",
+  icon: "fa-regular fa-clipboard",
+  route: "/director/assessments",
+},
   {
     title: "Track Progress",
     desc: "Track growth and celebrate milestones across your network.",
@@ -280,12 +287,7 @@ const directorExploreCards = [
     icon: "fa-regular fa-clipboard",
     route: "/director/schedule",
   },
-  {
-    title: "Revitalization Roadmap",
-    desc: "Plan and execute regional development roadmaps efficiently.",
-    icon: "fa-solid fa-pen-clip",
-    route: "/director/revitalization-roadmap",
-  },
+  
 ];
 function getPersonProfilePicture(person: any): string {
   const raw =
@@ -747,8 +749,8 @@ for (let i = 0; i < maxL; i++) {
         
         // apiGetMentors({ limit: 4, roleMatch: "mixed" }),
         // apiGetPastors({ limit: 4, roleMatch: "mixed" }),
-        apiGetAllUsers({ role: "mentor", roleMatch: "mixed", page: 1, limit: 4, t: Date.now() }),
-apiGetAllUsers({ role: "pastor", roleMatch: "mixed", page: 1, limit: 4, t: Date.now() }),
+      apiGetAllUsers({ role: "mentor", roleMatch: "mixed", page: 1, limit: 20, t: Date.now() }),
+apiGetAllUsers({ role: "pastor", roleMatch: "mixed", page: 1, limit: 20, t: Date.now() }),
         
         apiGetDirectorOverview({
           period: "yearly",
@@ -2342,6 +2344,7 @@ const filteredMappingMentors = mappingMentors.filter((mentor) => {
           type="button"
           // onClick={() => router.push(item.route)}
   onClick={() => {
+
   if (item.title === "Assign Mentors") {
     void openQuickAssignMentors();
     return;
@@ -2422,14 +2425,17 @@ if (item.title === "Customized Development Plan") {
           ) : currentData.length === 0 ? (
             <div className="py-8 text-center text-white/55">No data available</div>
           ) : (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6">
+            // <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6">
+<div className="flex w-full max-w-full gap-6 overflow-x-auto overflow-y-hidden pb-5 pr-4 [scrollbar-width:thin] [scrollbar-color:#8ec5eb55_transparent] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-white/5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#8ec5eb]/40">
               {currentData.map((person) => {
                 const personId = (person as any).id || person._id;
                 const menteeCount = person.assignedId?.length || person.menteeCount || 0;
                 const isMentor = activeTab === "mentors";
+                // return (
+                //   <MentorCard
                 return (
-                  <MentorCard
-                    key={personId}
+ <div key={personId} className="w-[300px]  shrink-0">
+  <MentorCard
                     variant="glass"
                     image={person?.profilePicture ? person.profilePicture : Mentor1}
                     name={`${person.firstName} ${person.lastName}`}
@@ -2442,7 +2448,8 @@ if (item.title === "Customized Development Plan") {
                         ? router.push(`/director/mentors/profile/${personId}`)
                         : router.push(`/director/mentees/profile/${personId}`)
                     }
-                  />
+                 />
+  </div>
                 );
               })}
             </div>

@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiGetInterestByEmail } from "@/app/Services/api";
+import { apiGetInterestByEmail, apiGetUserById } from "@/app/Services/api";
 import PastorHeader from "@/app/Components/PastorHeader";
 import Book from "@/app/Assets/book.png";
 
@@ -86,6 +86,7 @@ const [trackError, setTrackError] = useState<string | null>(null);
 
     const res = await apiGetInterestByEmail(email);
     const application = res.data?.data;
+   
 
     if (!application) {
       setTrackError("No application found for this email.");
@@ -98,6 +99,29 @@ const [trackError, setTrackError] = useState<string | null>(null);
       setTrackError("Email and last name do not match.");
       return;
     }
+    const userId = String(
+  (application as any)?.userId ??
+    (application as any)?.user?._id ??
+    (application as any)?.user?.id ??
+    ""
+);
+
+if (userId) {
+  const userRes = await apiGetUserById(userId);
+  const userData = (userRes as any)?.data?.data ?? (userRes as any)?.data;
+  console.log("TRACK USER DATA:", userData);
+
+  const alreadyHasPassword =
+  Boolean(userData?.password) ||
+  Boolean(userData?.hasPassword) ||
+  Boolean(userData?.isPasswordSet) ||
+  Boolean(userData?.passwordCreated) ||
+  userData?.isEmailVerified === true;
+  if (alreadyHasPassword) {
+    setTrackError("This account is already set up. Please login instead.");
+    return;
+  }
+}
 
     // router.push(`/pastor/Thankyou?email=${encodeURIComponent(email)}`);
     router.push(`/pastor/Processing?email=${encodeURIComponent(email)}`);

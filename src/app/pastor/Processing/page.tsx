@@ -297,12 +297,12 @@ const [showStatusText, setShowStatusText] = useState(false);
                   >
                     {statusLoading ? "Checking..." : "Check Status"}
                   </button> */}
-                  <Link
+                  {/* <Link
                     href="/pastor/Thankyou"
                     className="text-center text-sm font-medium text-[#8ec5eb] underline-offset-4 hover:underline sm:text-left"
                   >
                     Thank you page
-                  </Link>
+                  </Link> */}
                 </div>
               </div>
             </div>

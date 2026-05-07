@@ -305,31 +305,30 @@ setNotificationList(newestFirst);
 
               {/* Notification Dropdown */}
               {showNotifications && (
-                <div className="absolute -right-8 mt-4 w-[450px] bg-white rounded-2xl shadow-lg border border-gray-100">
+                <div className="absolute -right-8 mt-4 w-[450px] overflow-hidden rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.98)_0%,rgba(6,36,62,0.98)_100%)] text-white shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
                   {/* Pointer */}
-                  <div className="absolute -top-2 right-8 w-4 h-4 bg-white rotate-45 border-t border-l border-gray-100"></div>
+                 <div className="absolute -top-2 right-8 h-4 w-4 rotate-45 border-l border-t border-white/15 bg-[#0c3a5f]" />
 
                   {/* Header */}
-                  <div className="px-5 py-3 border-b border-gray-200 flex justify-between items-center">
-                    <h2 className="font-semibold text-[17px] text-black">
+<div className="relative z-10 flex items-center justify-between border-b border-white/10 px-5 py-4">                    <h2 className="font-semibold text-[17px] text-white">
                       Notifications
                     </h2>
                     <a
                       href="/mentor/Notifications"
-                      className="text-[#0f4a76] text-[14px] font-medium hover:underline"
+                      className="text-[#8ec5eb] text-[14px] font-medium hover:text-white"
                     >
                       View All
                     </a>
                   </div>
 
                   {/* Notifications List */}
-                  <div className="p-2 space-y-2">
+                  <div className="relative z-10 max-h-[520px] space-y-3 overflow-y-auto p-3 pr-2">
                     {/* {notificationList.slice(0, 4).map((note, i) => (
                       <div
                         key={i}
                         className="flex items-start justify-between bg-[#F5F7FA] rounded-xl p-3"
                       > */}
-                      {notificationList.slice(0, 4).map((note) => {
+                      {notificationList.map((note) => {
   const p = mapNotificationItemToPopup(note);
 
   return (
@@ -343,25 +342,25 @@ setNotificationList(newestFirst);
           router.push(p.link);
         }
       }}
-      className={`flex items-start justify-between bg-[#F5F7FA] rounded-xl p-3 transition hover:bg-[#eef2f6] ${
-        p.link ? "cursor-pointer" : ""
-      }`}
+      className={`flex items-start justify-between rounded-2xl border border-white/10 bg-white/[0.06] p-4 transition hover:bg-white/[0.1] ${
+  p.link ? "cursor-pointer" : ""
+}`}
     >
                         <div className="flex items-start gap-3 w-full">
                           <Clipboard size={20} className="text-[#2679FF]" />
                           <div className="flex flex-col w-full">
                             <div className="flex justify-between">
-                              <h3 className="font-semibold text-[14px] text-[#000000]">
+                              <h3 className="font-semibold text-[14px] text-white">
                                 {/* {note.name || "Notification"} */}
                                 {p.title}
                               </h3>
                               <div className="w-[8px] h-[8px] rounded-full bg-[#FFD700] mt-[2px]"></div>
                             </div>
-                            <p className="text-[#7A7A7A] text-[13px] leading-snug">
+                            <p className="text-[#cde2f2] text-[13px] leading-snug">
                               {/* {note.details || note.description || ""} */}
                               {p.subtitle || ""}
                             </p>
-                            <p className="text-[#9A9A9A] text-[12px] text-right mt-1">
+                            <p className="text-white/50 text-[12px] text-right mt-1">
                               {/* {note?.createdAt ? new Date(note.createdAt).toLocaleString() : ""} */}
                               {p.time}
                             </p>
