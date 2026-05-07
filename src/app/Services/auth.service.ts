@@ -22,69 +22,44 @@ function isStructuredApi404(error: AxiosError): boolean {
   return false;
 }
 
-// POST login (supports multiple backend route variants)
+// POST login via one consistent API route (through browser proxy when available)
 export const apiLogin = async (email: string, password: string) => {
   const payload = { email, password };
-  const directLoginUrl = "https://app.wisdomtooth.tech/api/v1/auth/login";
-  const baseCandidates = [
-    process.env.NEXT_PUBLIC_API_BASE_URL,
-    process.env.NEXT_PUBLIC_BACKEND_URL,
-    "https://api.wisdomtooth.tech",
-    "https://api.wisdomtooth.tech/api",
-    "https://app.wisdomtooth.tech",
-    "https://app.wisdomtooth.tech/api",
-  ].filter(Boolean) as string[];
+  const browserUrl = `${BROWSER_API_BASE}/auth/login`;
+  const fallbackApiBase = (
+    process.env.NEXT_PUBLIC_API_BASE_URL ||
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    "https://app.wisdomtooth.tech/api/v1"
+  ).replace(/\/+$/, "");
+  const fallbackUrl = `${fallbackApiBase}/auth/login`;
 
-  const loginPaths = [
-    "/auth/login",
-    "/login",
-    "/users/login",
-    "/auth/sign-in",
-    "/api/auth/login",
-    "/api/login",
-  ];
-
-  const requestUrls = Array.from(
-    new Set([
-      // Browser: same-origin proxy (see next.config rewrites) — avoids CORS on direct HTTPS calls
-      ...(typeof window !== "undefined" ? [`${BROWSER_API_BASE}/auth/login`] : []),
-      directLoginUrl,
-      ...loginPaths,
-      ...baseCandidates.flatMap((base) =>
-        loginPaths.map((path) => `${base.replace(/\/+$/, "")}${path}`),
-      ),
-    ]),
-  );
-
-  let lastError: unknown = null;
-
-  for (const url of requestUrls) {
+  // Primary path: same-origin proxy rewrite
+  if (typeof window !== "undefined") {
     try {
       return await axios.post<{ success: boolean; data: LoginResponse; message?: string }>(
-        url,
+        browserUrl,
         payload,
         {
           timeout: 10000,
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
         },
       );
     } catch (error) {
       const axiosError = error as AxiosError;
-      lastError = error;
-      // If endpoint doesn't exist, try next path. For other errors, stop immediately.
-      if (axiosError.response?.status !== 404) {
-        throw error;
-      }
-      // Backend may use 404 + JSON for auth failures (e.g. user not found) — do not retry other URLs.
-      if (isStructuredApi404(axiosError)) {
-        throw error;
-      }
+      // If backend returns structured 404 (domain error), do not retry with another host.
+      if (isStructuredApi404(axiosError)) throw error;
     }
   }
 
-  throw lastError;
+  // Fallback for SSR or when proxy route is unavailable.
+  return axios.post<{ success: boolean; data: LoginResponse; message?: string }>(
+    fallbackUrl,
+    payload,
+    {
+      timeout: 10000,
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 };
 
 // POST /auth/send-otp (public — no Bearer; matches mobile onboarding)
