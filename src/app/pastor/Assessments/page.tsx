@@ -12,7 +12,6 @@ import {
   pastorEmptyPanel,
   pastorEyebrowDot,
   pastorEyebrowPill,
-  pastorGlassCard,
   pastorHeroOverlay,
   pastorMainGradient,
   pastorPageRoot,
@@ -20,9 +19,10 @@ import {
   pastorRoadmapDescription,
   pastorSpinner,
 } from "@/app/Components/pastor/pastor-theme";
+import { directorGlassCard } from "@/app/director/directorUi";
 import HeroBg from "@/app/Assets/assignments-bg.png";
+import FallbackAssessmentBanner from "@/app/Assets/thumb1.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import { getCookie } from "@/app/utils/cookies";
 import { resolveApiMediaUrl } from "@/app/utils/image";
 import {
@@ -39,7 +39,7 @@ import {
   subscribeProgressUpdated,
 } from "@/app/utils/progress-sync";
 
-const ASSESSMENT_TABS = ["All", "Due", "Not Started", "Completed", "Submitted"] as const;
+const ASSESSMENT_TABS = ["All", "Due", "Not Started", "Completed"] as const;
 
 function assessmentTabFromSearchParam(
   raw: string | null,
@@ -85,9 +85,16 @@ type Row = {
     meetingDate: string;
     platform: string;
     notes?: string;
+    meetingLink?: string;
   };
   hasCdp?: boolean;
 };
+
+function extractFirstHttpUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const match = value.match(/https?:\/\/[^\s)]+/i);
+  return match?.[0];
+}
 
 function hasCdpInRecommendationsPayload(body: unknown): boolean {
   const walk = (node: unknown, parentSent = false): boolean => {
@@ -193,28 +200,37 @@ export default function PastorAssessments() {
       }
       if (!opts?.silent) setLoading(true);
       try {
-        // const [assessmentRes, progressRes] = await Promise.all([
-        //   apiGetAssignedAssessments(sessionUserId),
-        //   apiGetUserProgress(sessionUserId),
-        // ]);
-        const [assessmentRes, progressRes, appointmentsRes] = await Promise.all([
-  apiGetAssignedAssessments(sessionUserId),
-  apiGetUserProgress(sessionUserId),
-  apiGetAppointments({ userId: sessionUserId, futureOnly: false } as any),
-]);
+        const [assessmentRes, progressRes, appointmentsRes] = await Promise.allSettled([
+          apiGetAssignedAssessments(sessionUserId),
+          apiGetUserProgress(sessionUserId),
+          apiGetAppointments({ userId: sessionUserId, futureOnly: false } as any),
+        ]);
 
-        const list = parseAssignedAssessmentsListBody(assessmentRes.data);
+        if (assessmentRes.status !== "fulfilled") {
+          throw assessmentRes.reason;
+        }
 
-        const progressData = unwrapProgressData(progressRes);
+        const list = parseAssignedAssessmentsListBody(assessmentRes.value.data);
+
+        if (progressRes.status === "rejected") {
+          console.warn("Progress request failed; using defaults", progressRes.reason);
+        }
+        if (appointmentsRes.status === "rejected") {
+          console.warn("Appointments request failed; continuing without meeting data", appointmentsRes.reason);
+        }
+
+        const progressData =
+          progressRes.status === "fulfilled" ? unwrapProgressData(progressRes.value) : null;
         const assessmentProgress = progressData?.assessments || [];
-const appointmentsBody: any = appointmentsRes?.data;
-const appointmentsList: any[] = Array.isArray(appointmentsBody)
-  ? appointmentsBody
-  : Array.isArray(appointmentsBody?.data)
-    ? appointmentsBody.data
-    : Array.isArray(appointmentsBody?.data?.data)
-      ? appointmentsBody.data.data
-      : [];
+        const appointmentsBody: any =
+          appointmentsRes.status === "fulfilled" ? appointmentsRes.value?.data : null;
+        const appointmentsList: any[] = Array.isArray(appointmentsBody)
+          ? appointmentsBody
+          : Array.isArray(appointmentsBody?.data)
+            ? appointmentsBody.data
+            : Array.isArray(appointmentsBody?.data?.data)
+              ? appointmentsBody.data.data
+              : [];
         const mapped = (await Promise.all(
           list.map(async (item) => {
             const flat = flattenAssignedAssessmentRow(item);
@@ -324,6 +340,11 @@ const meeting = linkedMeeting
   : "N/A",
       platform: linkedMeeting.platform || "N/A",
       notes: linkedMeeting.notes,
+      meetingLink:
+        (typeof linkedMeeting.meetingLink === "string" && linkedMeeting.meetingLink) ||
+        (typeof linkedMeeting.meetingUrl === "string" && linkedMeeting.meetingUrl) ||
+        (typeof linkedMeeting.zoomLink === "string" && linkedMeeting.zoomLink) ||
+        extractFirstHttpUrl(linkedMeeting.notes),
     }
   : undefined;
 
@@ -518,16 +539,13 @@ hasCdp,
                 {filtered.map((item) => {
   const hasMeeting = Boolean(item.meeting?.id);
 
-  const displayStatus =
-    item.status === "Completed" && !hasMeeting ? "Submitted" : item.status;
-
-  const primaryButtonText =
-    item.status === "Completed" && !hasMeeting ? "Schedule Meeting" : item.button;
+  const displayStatus = item.status;
+  const primaryButtonText = item.button;
 
   return (
     <div
       key={item.id}
-      className={`relative ${pastorGlassCard} md:flex-row`}
+      className={`relative flex overflow-hidden rounded-2xl border border-white/12 ${directorGlassCard} md:flex-row`}
     >
                   <div className="options-menu-container absolute right-4 top-4 z-20">
                     <button
@@ -607,25 +625,20 @@ hasCdp,
                     ) : null}
                   </div> */}
 
-                  <div className="m-4 flex w-full flex-shrink-0 flex-col gap-3 md:m-5 md:w-[200px]">
-  <div className="relative h-[180px] w-full md:h-[200px]">
-    {item.imgUrl && !failedCardImageIds[item.id] ? (
-      <Image
-        src={item.imgUrl}
-        alt=""
-        width={200}
-        height={200}
-        className="h-full w-full rounded-lg object-cover"
-        onError={() =>
-          setFailedCardImageIds((prev) =>
-            prev[item.id] ? prev : { ...prev, [item.id]: true },
-          )
-        }
-        unoptimized
-      />
-    ) : (
-      <ApiImagePlaceholder className="h-full w-full rounded-lg" />
-    )}
+                  <div className="m-3 flex w-full flex-shrink-0 flex-col gap-1.5 md:m-3 md:w-[150px]">
+  <div className="relative h-[115px] w-full overflow-hidden rounded-lg md:h-[135px]">
+    <Image
+      src={item.imgUrl && !failedCardImageIds[item.id] ? item.imgUrl : FallbackAssessmentBanner}
+      alt={item.title || "Assessment banner"}
+      fill
+      sizes="(max-width: 768px) 100vw, 200px"
+      className="object-cover"
+      onError={() => {
+        if (!item.imgUrl) return;
+        setFailedCardImageIds((prev) => (prev[item.id] ? prev : { ...prev, [item.id]: true }));
+      }}
+      unoptimized
+    />
 
     {(item.status === "Due" || item.status === "Not Started") && item.dueDate ? (
       <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-md bg-[#fff6d8] px-2 py-[3px] text-xs font-semibold text-[#d38a00]">
@@ -659,23 +672,23 @@ hasCdp,
 </div>
 </div>
 
-                  <div className="flex flex-1 flex-col justify-between p-4 md:p-5">
-                    <div className="border-b border-white/10 pb-4">
-                      <h3 className="mb-1 text-[15px] font-semibold leading-tight text-white md:text-[17px]">
+                  <div className="flex flex-1 flex-col justify-between p-3">
+                    <div className="border-b border-white/12 pb-2.5">
+                      <h3 className="mb-1 text-[14px] font-semibold leading-tight text-white md:text-[16px]">
                         {item.title}
                       </h3>
-                      <p className={`mb-3 ${pastorRoadmapDescription}`}>{item.desc}</p>
+                      <p className={`mb-2 ${pastorRoadmapDescription} ${item.meeting?.id ? "line-clamp-2" : ""}`}>
+                        {item.desc}
+                      </p>
 
-                      <div className="mb-3 flex items-center gap-2">
+                      <div className="mb-2 flex items-center gap-2">
                         <span className="text-xs font-medium text-[#d9ebf8]">Status</span>
                         {/* <span
                           className={`rounded px-2 py-[2px] text-xs font-medium ${getStatusColor(item.status)}`}
                         >
                           {item.status}
                         </span> */}
-                        <span
-  className={`rounded px-2 py-[2px] text-xs font-medium ${getStatusColor(displayStatus)}`}
->
+                        <span className={`w-fit rounded-md border px-3 py-1 text-xs font-semibold ${getStatusColor(displayStatus)}`}>
   {displayStatus}
 </span>
                       </div>
@@ -696,6 +709,36 @@ hasCdp,
 
                       {item.status === "Submitted" && (
                         <p className="mb-2 text-xs text-[#d9ebf8]">Submitted on : {item.submittedAt ?? item.dueDate}</p>
+                      )}
+
+                      {item.meeting?.id && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            router.push(`/pastor/appointments/${encodeURIComponent(item.meeting!.id)}`)
+                          }
+                          className="mt-2 w-full rounded-xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-2 text-left transition hover:bg-[#8ec5eb]/15"
+                        >
+                          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[#d9ebf8]">
+                            <span className="font-semibold text-white">Meeting</span>
+                            <span>{item.meeting.meetingDate || "N/A"}</span>
+                            <span className="text-white/30">|</span>
+                            <span>{item.meeting.platform || "N/A"}</span>
+                          </div>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                            {item.meeting.meetingLink && (
+                              <a
+                                href={item.meeting.meetingLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="rounded-lg border border-[#8ec5eb]/45 bg-transparent px-2.5 py-1 text-[11px] font-semibold text-[#8ec5eb] transition hover:bg-[#8ec5eb]/15"
+                              >
+                                Join link
+                              </a>
+                            )}
+                          </div>
+                        </button>
                       )}
 
                       {/* {item.status === "Completed" && (
@@ -817,13 +860,6 @@ hasCdp,
   //   router.push(getAssessmentPrimaryHref(item.id, item.status));
   // }}
   onClick={() => {
-  if (item.status === "Completed" && !hasMeeting) {
-    router.push(
-      `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(item.id)}&readOnly=1&scheduleMeeting=1`
-    );
-    return;
-  }
-
   if (item.status === "Completed" && hasMeeting) {
     const q = new URLSearchParams({
       assessmentId: item.id,

@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { isAxiosError } from "axios";
 import { setCookie, getCookie } from "@/app/utils/cookies";
 import Image from "next/image";
 import { isRemoteImageSrc } from "@/app/utils/image";
@@ -85,6 +86,18 @@ function parseUserCookie(): {
   } catch {
     return null;
   }
+}
+
+function isTransientServiceError(error: unknown): boolean {
+  return isAxiosError(error) && (error.response?.status === 503 || error.code === "ECONNABORTED");
+}
+
+function logApiFailure(label: string, error: unknown): void {
+  if (isTransientServiceError(error)) {
+    console.warn(`${label} temporarily unavailable (503/timeout).`);
+    return;
+  }
+  console.error(label, error);
 }
 
 function readArrayFromApiBody(res: { data: unknown } | null | undefined): unknown[] {
@@ -729,7 +742,7 @@ for (let i = 0; i < maxL; i++) {
 
       const results = await Promise.allSettled([
         // apiGetTodaysAppointments(uid || undefined),
-        apiGetAppointments({ futureOnly: false, status: "scheduled" }),
+        apiGetAppointments({ futureOnly: true, status: "scheduled" }),
         apiGetAllInterests({ status: 'new' }),
         
         // apiGetMentors({ limit: 4, roleMatch: "mixed" }),
@@ -778,7 +791,11 @@ apiGetAllUsers({ role: "pastor", roleMatch: "mixed", page: 1, limit: 4, t: Date.
 
   setAppointments(todaysAppointments);
 } else {
-  console.error("Error fetching appointments:", results[0].reason);
+  if (isTransientServiceError(results[0].reason)) {
+    console.warn("Appointments service temporarily unavailable (503/timeout).");
+  } else {
+    console.error("Error fetching appointments:", results[0].reason);
+  }
   setAppointments([]);
 }
 setAppointmentsLoading(false);
@@ -826,8 +843,7 @@ const body: any = intRes?.data;
 
   setInterests(newOnly);
 } else {
-  // console.error("Error fetching interests:", results[1].reason);
-  console.error("Error fetching interests:", (results[1] as any).reason);
+  logApiFailure("Error fetching interests:", (results[1] as any).reason);
   setInterests([]);
 }
 setInterestsLoading(false);
@@ -836,7 +852,7 @@ setInterestsLoading(false);
       if (results[2].status === "fulfilled") {
         setMentors(readUsersPage(results[2].value).users);
       } else {
-        console.error("Error fetching mentors:", results[2].reason);
+        logApiFailure("Error fetching mentors:", results[2].reason);
         setMentors([]);
       }
       setMentorsLoading(false);
@@ -844,7 +860,7 @@ setInterestsLoading(false);
       if (results[3].status === "fulfilled") {
         setPastors(readUsersPage(results[3].value).users);
       } else {
-        console.error("Error fetching pastors:", results[3].reason);
+        logApiFailure("Error fetching pastors:", results[3].reason);
         setPastors([]);
       }
       setPastorsLoading(false);
@@ -854,7 +870,7 @@ setInterestsLoading(false);
       if (results[4].status === "fulfilled") {
         overviewFromApi = unwrapDirectorOverview(results[4].value);
       } else {
-        console.error("Error fetching director overview:", results[4].reason);
+        logApiFailure("Error fetching director overview:", results[4].reason);
       }
 
       let progressRows: UserOverallProgress[] = [];
@@ -897,7 +913,7 @@ progressRows = unwrapOverallProgressList(progressRes);
           setCookie("userId", uid);
         }
       } else if (results[5].status === "rejected") {
-        console.error("Error fetching user details:", results[5].reason);
+        logApiFailure("Error fetching user details:", results[5].reason);
         setUser(null);
       }
 
@@ -915,8 +931,7 @@ const body = completedRes?.data?.data;
               : 0;
         setCompletedPastorsCount(total);
       } else {
-        // console.error('Error fetching completed pastors count:', results[6].reason);
-        console.error("Error fetching completed pastors count:", (results[6] as any).reason);
+        logApiFailure("Error fetching completed pastors count:", (results[6] as any).reason);
         setCompletedPastorsCount(null);
       }
     };

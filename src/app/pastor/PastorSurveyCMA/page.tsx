@@ -1104,14 +1104,7 @@ const confirmClearResponses = () => {
 
       {showSchedulePrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
-          <div className="relative mx-4 w-full max-w-[480px] rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#062946_100%)] px-8 py-8 text-center text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)] sm:px-10">
-            <button
-              onClick={() => { setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
-              className="absolute right-4 top-4 text-white/60 transition hover:text-white"
-              aria-label="Close"
-            >
-              <i className="fa-solid fa-xmark text-lg" />
-            </button>
+          <div className="mx-4 w-full max-w-[480px] rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#062946_100%)] px-8 py-8 text-center text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)] sm:px-10">
             <p className="font-semibold text-lg mb-4">
               On completion of the PMP and CMA assessment tools please schedule
               a meeting with your mentor.
@@ -1146,26 +1139,8 @@ const confirmClearResponses = () => {
                     <div className="mb-6 flex items-start justify-between gap-4">
   <div>
     <h2 className="text-xl font-semibold">Choose Mentor for the Meeting</h2>
-
-    <button
-      type="button"
-      onClick={() => setShowMentorSidebar(false)}
-      className="mt-2 text-sm font-semibold text-[#8ec5eb] transition hover:text-[#b8ddf5]"
-    >
-      View responses
-    </button>
   </div>
-
-  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
-                      className="text-white/60 transition hover:text-white"
-                      aria-label="Close"
-                    >
-                      <i className="fa-solid fa-xmark text-lg" />
-                    </button>
-                  </div>
-                </div>
+</div>
                 {mentors.length === 0 ? (
                   <p className="text-[#cbe6f9]">No mentors assigned.</p>
                 ) : (
@@ -1214,21 +1189,6 @@ const confirmClearResponses = () => {
               <>
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-xl font-semibold">Schedule a Meeting</h2>
-                  <div className="flex items-center gap-2">
-                    {/* <button
-                      onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
-                      className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-[#d8ecfa] transition hover:bg-white/10"
-                    >
-                      Close
-                    </button> */}
-                    <button
-                      onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
-                      className="text-white/60 transition hover:text-white"
-                      aria-label="Close"
-                    >
-                      <i className="fa-solid fa-xmark text-lg" />
-                    </button>
-                  </div>
                 </div>
                 {selectedMentor && (
                   <p className="mb-6 text-sm text-[#cbe6f9]">
@@ -1409,19 +1369,7 @@ const confirmClearResponses = () => {
 
       {showFinalPopup && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
-          <div className="relative mx-4 w-full max-w-[420px] rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-8 py-8 text-center text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)]">
-            <button
-              onClick={() => {
-                setShowFinalPopup(false);
-                setShowMentorSidebar(false);
-                setShowSchedulePrompt(false);
-                router.push("/pastor/Assessments");
-              }}
-              className="absolute right-4 top-4 text-white/60 transition hover:text-white"
-              aria-label="Close"
-            >
-              <i className="fa-solid fa-xmark text-lg" />
-            </button>
+          <div className="mx-4 w-full max-w-[420px] rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-8 py-8 text-center text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)]">
             <div className="flex items-center justify-center gap-3 mb-4">
               <i className="fa-solid fa-circle-check text-[#7be495] text-2xl"></i>
               <p className="font-medium">New Appointment has been Scheduled</p>

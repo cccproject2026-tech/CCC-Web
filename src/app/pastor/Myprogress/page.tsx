@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { isAxiosError } from "axios";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 import PastorHeader from "@/app/Components/PastorHeader";
@@ -21,10 +22,66 @@ import {
 import { getCookie } from "@/app/utils/cookies";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
-import { apiGetAssessmentById, apiGetUserAnswers, parseAssessmentDetailPayload } from "@/app/Services/assessment.service";
+import {
+  apiGetAssignedAssessments,
+  flattenAssignedAssessmentRow,
+  parseAssignedAssessmentsListBody,
+} from "@/app/Services/assessment.service";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { subscribeProgressUpdated } from "@/app/utils/progress-sync";
 import { pastorRoadmapDescriptionLineClamp2 } from "@/app/Components/pastor/pastor-theme";
+
+function pickSubmittedAtFromProgressAssessment(a: any): string | null {
+  const candidates = [
+    a?.submittedOn,
+    a?.submittedAt,
+    a?.updatedAt,
+    a?.completedAt,
+    a?.assessmentCompletedAt,
+    a?.completionDate,
+  ];
+  for (const raw of candidates) {
+    if (typeof raw === "string" && raw.trim()) return raw;
+  }
+  return null;
+}
+
+function pickAssignedDueDate(raw: any): string | null {
+  const candidates = [
+    raw?.dueDate,
+    raw?.deadline,
+    raw?.endDate,
+    raw?.assignedDueDate,
+    raw?.assignment?.dueDate,
+    raw?.assignment?.deadline,
+  ];
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return null;
+}
+
+async function mapWithConcurrencyLimit<T, R>(
+  items: T[],
+  limit: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  if (items.length === 0) return [];
+  const safeLimit = Math.max(1, Math.min(limit, items.length));
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+
+  const workers = Array.from({ length: safeLimit }, async () => {
+    while (true) {
+      const index = cursor++;
+      if (index >= items.length) break;
+      results[index] = await mapper(items[index], index);
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
+}
 
 export default function PastorMyProgressPage() {
   const router = useRouter();
@@ -135,42 +192,53 @@ export default function PastorMyProgressPage() {
   }, [progress]);
 
   useEffect(() => {
-    if (!progress?.assessments?.length) return;
+    if (!userId) return;
     const hydrateAssessments = async () => {
       try {
-        const results = await Promise.allSettled(
-          progress.assessments.map(async (a: any) => {
-            const res = await apiGetAssessmentById(a.assessmentId);
-            const assessment = parseAssessmentDetailPayload(res.data);
-            
-            // Fetch answers to get the submission date
-            let submittedOnRaw = null;
-            if (a.status === "completed" && userId) {
-              try {
-                const answersRes = await apiGetUserAnswers(a.assessmentId, userId);
-                submittedOnRaw = answersRes.data?.data?.updatedAt || null;
-              } catch (err) {
-                console.error("Failed to fetch assessment answers", err);
-              }
-            }
-            
+        const assignedRes = await apiGetAssignedAssessments(userId);
+        const assignedList = parseAssignedAssessmentsListBody(assignedRes.data);
+        const progressAssessments = Array.isArray(progress?.assessments) ? progress.assessments : [];
+
+        const hydrated = assignedList
+          .map((item: any) => {
+            const flat = flattenAssignedAssessmentRow(item);
+            if (!flat) return null;
+            const assessmentId = String(flat.assessmentId || "").trim();
+            if (!assessmentId) return null;
+
+            const progressRow = progressAssessments.find(
+              (p: { assessmentId?: string; assignmentId?: string }) =>
+                String(p?.assessmentId ?? "") === assessmentId ||
+                (flat.assignmentId && p?.assignmentId && String(p.assignmentId) === String(flat.assignmentId)),
+            );
+            const detail = flat.assessment as Record<string, unknown>;
+            const status = (progressRow?.status ?? "not_started") as string;
+            const submittedOnRaw = pickSubmittedAtFromProgressAssessment(progressRow);
+            const dueDate = pickAssignedDueDate(item) ?? flat.dueDate ?? null;
+
             return {
-              ...a,
-              title: assessment?.name,
-              description: assessment?.description,
-              bannerImage: assessment?.bannerImage,
-              type: assessment?.type,
-              totalSections: assessment?.sections?.length || 0,
-              dueDate: a.dueDate,
-              status: a.status,
+              ...flat,
+              assessmentId,
+              title: (detail?.name as string) || (detail?.title as string) || "Assessment",
+              description: (detail?.description as string) || "",
+              bannerImage: (detail?.bannerImage as string) || (detail?.imageUrl as string) || null,
+              type: (detail?.type as string) || undefined,
+              totalSections: Array.isArray(detail?.sections) ? detail.sections.length : 0,
+              dueDate,
+              status,
               submittedOnRaw,
             };
-          }),
-        );
-        const valid = results.filter((r) => r.status === "fulfilled").map((r: any) => r.value);
-        setAssessments(valid);
+          })
+          .filter(Boolean);
+
+        setAssessments(hydrated as any[]);
       } catch (err) {
-        console.error("Failed to load assessments", err);
+        if (isAxiosError(err) && err.response?.status === 503) {
+          console.warn("Assigned assessments temporarily unavailable (503)");
+        } else {
+          console.error("Failed to load assigned assessments", err);
+        }
+        setAssessments([]);
       }
     };
     hydrateAssessments();
