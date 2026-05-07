@@ -27,3 +27,13 @@ export function resolveApiMediaUrl(url: unknown): string | null {
   if (s.startsWith("/")) return `${origin}${s}`;
   return `${origin}/${s}`;
 }
+
+/** Returns a loadable image URL for roadmap cards, or `null` when no image is set. */
+export function resolveRoadmapCardImageUrl(raw: unknown): string | null {
+  if (raw == null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+  if (s.startsWith("data:") || s.startsWith("blob:")) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  return resolveApiMediaUrl(s);
+}

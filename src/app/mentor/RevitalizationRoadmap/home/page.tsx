@@ -11,6 +11,7 @@ import MentorHeader from "@/app/Components/MentorHeader";
 import DirectorHero from "@/app/director/DirectorHero";
 import { mentorPageRoot, mentorRoadmapHubMain, mentorSpinner } from "@/app/Components/mentor/mentor-theme";
 import { verifyMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
+import { resolveRoadmapCardImageUrl } from "@/app/utils/image";
 
 function RevitalizationRoadmapHomeContent() {
   const router = useRouter();
@@ -125,10 +126,6 @@ function RevitalizationRoadmapHomeContent() {
     return { completed, total: Math.max(total, completed, 1) };
   };
 
-  function isHttpUrl(u?: string): boolean {
-    return !!u && (u.startsWith("http://") || u.startsWith("https://"));
-  }
-
   const filteredRoadmaps = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return roadmaps;
@@ -202,7 +199,6 @@ function RevitalizationRoadmapHomeContent() {
         title="Pastor roadmaps"
         subtitle="Review assigned roadmaps and open jump-start or phase flows for this pastor."
         image={HeroBg}
-        pill="Leadership Support Network"
         breadcrumbItems={[
           { label: "Revitalization Roadmap", href: "/mentor/RevitalizationRoadmap" },
           { label: userName },
@@ -310,7 +306,7 @@ function RevitalizationRoadmapHomeContent() {
                 const rid = String(roadmap._id ?? roadmap.id ?? "");
                 const { completed, total } = roadmapTaskCounts(roadmap);
                 const cardStatus = roadmapCardStatus(roadmap);
-                const img = isHttpUrl(roadmap.imageUrl) ? roadmap.imageUrl : HeroBg.src;
+                const img = resolveRoadmapCardImageUrl(roadmap.imageUrl);
                 return (
                   <RoadmapHomeCard
                     key={rid || roadmap.name}

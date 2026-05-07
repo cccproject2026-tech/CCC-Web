@@ -21,10 +21,7 @@ import DirectorHero from "@/app/director/DirectorHero";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { mergeProgressOntoRoadmaps, unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { verifyMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
-
-function isHttpUrl(u?: string): boolean {
-  return !!u && (u.startsWith("http://") || u.startsWith("https://"));
-}
+import { resolveRoadmapCardImageUrl } from "@/app/utils/image";
 
 function formatStatus(status: string): "Not Started" | "In-progress" | "Completed" | "Over Due" {
   const s = String(status || "")
@@ -241,7 +238,6 @@ function PhasePageContent() {
         title={phaseName}
         subtitle="Open a task to review details and continue supporting this pastor along this phase."
         image={HeroBg}
-        pill="Leadership Support Network"
         breadcrumbItems={[
           { label: "Revitalization Roadmap", href: "/mentor/RevitalizationRoadmap" },
           ...(userId ? [{ label: userName, href: pastorHomeHref }] : []),
@@ -297,9 +293,7 @@ function PhasePageContent() {
             {roadmapId &&
               filteredTasks.map((task) => {
                 const tid = String(task._id ?? task.id ?? "");
-                const img = isHttpUrl(task.imageUrl as string | undefined)
-                  ? (task.imageUrl as string)
-                  : HeroBg.src;
+                const img = resolveRoadmapCardImageUrl(task.imageUrl);
                 const cardStatus = taskCardStatus(task);
                 const { completed, total } = taskCounts(task);
                 const duration = task.duration != null ? `Months ${task.duration}` : "—";

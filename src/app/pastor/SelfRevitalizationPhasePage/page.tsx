@@ -313,7 +313,6 @@ function SelfRevitalizationContent() {
   const heroSubtitle =
     subtitle ||
     (roadmap?.duration ? `Completion time ${roadmap.duration}` : "Browse tasks and continue your revitalization journey.");
-  const heroPill = phaseBadgeText || "Leadership Support Network";
 
   return (
     <div className={pastorRoadmapDashboardPageRoot}>
@@ -324,7 +323,7 @@ function SelfRevitalizationContent() {
           title={title}
           subtitle={heroSubtitle}
           image={HeroBg}
-          pill={heroPill}
+          pill={phaseBadgeText || undefined}
           breadcrumbItems={[
             { label: "Home", href: "/pastor/home" },
             { label: "Revitalization Roadmap", href: "/pastor/revitalization-roadmap" },

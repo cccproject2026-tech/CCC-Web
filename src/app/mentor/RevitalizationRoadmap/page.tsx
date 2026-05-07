@@ -177,7 +177,6 @@ export default function RevitalizationRoadmapPage() {
       <MentorHeader showFullHeader={true} />
 
       <DirectorHero
-        pill="Leadership Support Network"
         title="Revitalization Roadmap"
         subtitle="Open a pastor&apos;s assigned roadmaps or browse templates from the library."
         image={RoadmapHero}

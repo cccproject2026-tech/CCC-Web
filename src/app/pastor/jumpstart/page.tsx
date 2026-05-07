@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense, type DragEvent } from "react";
 import Image from "next/image";
 import { isAxiosError } from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -7,6 +7,7 @@ import PastorHeader from "@/app/Components/PastorHeader";
 import DirectorHero from "@/app/director/DirectorHero";
 import {
   directorBtnPrimary,
+  directorBtnSecondary,
   directorGlassCard,
   directorPageContainer,
   directorSpinner,
@@ -34,6 +35,8 @@ import {
   apiTriggerJumpstartComplete,
   apiUpdateNestedRoadmapItem,
   apiUpdateRoadmap,
+  apiUpdatePastorQuery,
+  apiDeletePastorQuery,
 } from "@/app/Services/api";
 import {
   deriveTaskStatusForList,
@@ -130,6 +133,71 @@ interface ExtraComponent {
   sections?: ExtraComponent[];
 }
 
+/** Director / API may send mixed-case or legacy type strings; jumpstart switch is strict. */
+function normalizeExtraType(raw: unknown): ExtraComponent["type"] {
+  const t = String(raw ?? "").trim();
+  if (!t) return "TEXT_FIELD";
+  const u = t.toUpperCase().replace(/\s+/g, "_");
+  const aliases: Record<string, ExtraComponent["type"]> = {
+    TEXTFIELD: "TEXT_FIELD",
+    TEXTAREA: "TEXT_AREA",
+    DATEPICKER: "DATE_PICKER",
+    TEXTDISPLAY: "TEXT_DISPLAY",
+    CHECKBOX_ITEM: "CHECKBOX",
+    UPLOADER: "UPLOAD",
+    DIGITAL_SIGNATURE: "SIGNATURE",
+    SIGNATURE_FIELD: "SIGNATURE",
+  };
+  const next = aliases[u] ?? (u as ExtraComponent["type"]);
+  const legal: ExtraComponent["type"][] = [
+    "TEXT_DISPLAY",
+    "TEXT_AREA",
+    "TEXT_FIELD",
+    "DATE_PICKER",
+    "UPLOAD",
+    "CHECKBOX",
+    "ASSESSMENT",
+    "SECTION",
+    "SIGNATURE",
+  ];
+  return legal.includes(next) ? next : "TEXT_FIELD";
+}
+
+function normalizeExtraTree(extra: ExtraComponent): ExtraComponent {
+  const type = normalizeExtraType((extra as { type?: unknown }).type);
+  const out: ExtraComponent = { ...extra, type };
+  if (Array.isArray(extra.checkboxes) && extra.checkboxes.length > 0) {
+    out.checkboxes = extra.checkboxes.map((c) =>
+      normalizeExtraTree({
+        ...(c as ExtraComponent),
+        type:
+          ((c as { type?: unknown }).type != null ? (c as { type?: unknown }).type : "CHECKBOX") as ExtraComponent["type"],
+      } as ExtraComponent),
+    );
+  }
+  if (Array.isArray(extra.sections) && extra.sections.length > 0)
+    out.sections = extra.sections.map((s) => normalizeExtraTree(s));
+  return out;
+}
+
+function findExtraByFieldName(items: ExtraComponent[] | undefined, name: string): ExtraComponent | undefined {
+  if (!items?.length) return undefined;
+  for (const e of items) {
+    if (e.name === name) return e;
+    const inSections = findExtraByFieldName(e.sections, name);
+    if (inSections) return inSections;
+  }
+  return undefined;
+}
+
+const UPLOAD_FIELD_ACCEPT =
+  ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+const UPLOAD_HINT_LINE =
+  "Supported file types: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, PNG, JPG · Max file size: 25 MB";
+
+const MAX_PASTOR_UPLOAD_BYTES = 25 * 1024 * 1024;
+
 function JumpStartContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -150,7 +218,7 @@ function JumpStartContent() {
   const [roadmapLoadError, setRoadmapLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<Record<string, any>>({});
-  const [uploadedFiles, setUploadedFiles] = useState<Record<string, File>>({});
+  const [pendingUploadFiles, setPendingUploadFiles] = useState<Record<string, File[]>>({});
   const [savedUploadDocs, setSavedUploadDocs] = useState<
     Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]>
   >({});
@@ -173,6 +241,9 @@ function JumpStartContent() {
   const [newQueryText, setNewQueryText] = useState("");
   const [querySubmitting, setQuerySubmitting] = useState(false);
   const [querySuccess, setQuerySuccess] = useState(false);
+  const [pastorEditingQueryId, setPastorEditingQueryId] = useState<string | null>(null);
+  const [pastorEditingQueryText, setPastorEditingQueryText] = useState("");
+  const [queryActionLoadingId, setQueryActionLoadingId] = useState<string | null>(null);
 
   // Signature drawing state
   const [signatureModalOpen, setSignatureModalOpen] = useState(false);
@@ -187,6 +258,13 @@ function JumpStartContent() {
   const [progressData, setProgressData] = useState<ProgressResponse | null>(null);
   /** When PATCH succeeds but GET /progress lags or nested rows disagree, still show Completed. */
   const [statusUiOverride, setStatusUiOverride] = useState<RoadmapAssignmentUi["status"] | null>(null);
+
+  /** Director “Insert field” extras: normalize types and keep nested SECTION trees intact. */
+  const templateExtras = useMemo((): ExtraComponent[] => {
+    const raw = roadmap?.extras;
+    if (!Array.isArray(raw)) return [];
+    return raw.map((e) => normalizeExtraTree(e as ExtraComponent));
+  }, [roadmap?.extras]);
 
   /** Same as mobile `DynamicFormTask` — POST JUMPSTART_COMPLETE before first extras save. */
   const jumpstartTriggeredRef = useRef(false);
@@ -300,12 +378,17 @@ function JumpStartContent() {
   // Mobile parity: defaults only from the task definition itself.
   const buildDefaultFormDataFromTemplate = useCallback((): Record<string, any> => {
     const init: Record<string, any> = {};
-    const extras = (roadmap?.extras as ExtraComponent[] | undefined) ?? [];
-    extras.forEach((extra) => {
-      if (extra?.date) init[extra.name] = extra.date;
-    });
+    const walk = (list: ExtraComponent[]) => {
+      for (const extra of list) {
+        if (extra.type === "DATE_PICKER" && typeof extra.date === "string" && extra.date.trim()) {
+          init[extra.name] = extra.date.trim().slice(0, 10);
+        }
+        if (Array.isArray(extra.sections) && extra.sections.length > 0) walk(extra.sections);
+      }
+    };
+    walk(templateExtras);
     return init;
-  }, [roadmap?.extras]);
+  }, [templateExtras]);
 
 // Prevent roadmap completion when a required signature field is still empty.
   const hasRequiredSignature = useMemo(() => {
@@ -334,8 +417,8 @@ function JumpStartContent() {
     return true;
   };
 
-  return checkExtras(roadmap?.extras as ExtraComponent[] | undefined, "extra");
-}, [roadmap?.extras, formData]);
+  return checkExtras(templateExtras, "extra");
+}, [templateExtras, formData]);
 // Prevent roadmap completion when a required upload field has no uploaded or saved file.
 const hasRequiredUploads = useMemo(() => {
   const checkExtras = (
@@ -348,9 +431,12 @@ const hasRequiredUploads = useMemo(() => {
       const fieldKey = extra.name;
 
       if (extra.type === "UPLOAD") {
-        const hasUploadedFile = !!uploadedFiles[fieldKey];
+        const hasPending = (pendingUploadFiles[fieldKey]?.length ?? 0) > 0;
+        const hasUploadedFile = hasPending;
         const hasSavedUpload =
-          formData[fieldKey] === true || formData[fieldKey] === "true";
+          formData[fieldKey] === true ||
+          formData[fieldKey] === "true" ||
+          (savedUploadDocs[fieldKey]?.length ?? 0) > 0;
 
         if (!hasUploadedFile && !hasSavedUpload) return false;
       }
@@ -367,8 +453,8 @@ const hasRequiredUploads = useMemo(() => {
     return true;
   };
 
-  return checkExtras(roadmap?.extras as ExtraComponent[] | undefined, "extra");
-}, [roadmap?.extras, uploadedFiles, formData]);
+  return checkExtras(templateExtras, "extra");
+}, [templateExtras, pendingUploadFiles, formData]);
 
 // Prevent roadmap completion until required task submissions such as text fields,
 // text areas, and checkboxes are completed.
@@ -407,8 +493,8 @@ const hasRequiredSubmissions = useMemo(() => {
     return true;
   };
 
-  return checkExtras(roadmap?.extras as ExtraComponent[] | undefined, "extra");
-}, [roadmap?.extras, formData]);
+  return checkExtras(templateExtras, "extra");
+}, [templateExtras, formData]);
 
   useEffect(() => {
     if (!nestedItemId) return;
@@ -682,8 +768,32 @@ const hasRequiredSubmissions = useMemo(() => {
     return null;
   };
 
-  const handleFileUpload = async (key: string, file: File) => {
-    setUploadedFiles((prev) => ({ ...prev, [key]: file }));
+  const queuePendingUploads = (fieldKey: string, fileList: FileList | File[] | null) => {
+    if (!fileList) return;
+    const list = [...(Array.isArray(fileList) ? fileList : Array.from(fileList))].filter(Boolean);
+    if (!list.length) return;
+    const valid = list.filter((f) => {
+      if (f.size <= MAX_PASTOR_UPLOAD_BYTES) return true;
+      setSaveFeedback(`"${f.name}" is over 25 MB and was skipped.`);
+      setTimeout(() => setSaveFeedback(null), 5000);
+      return false;
+    });
+    if (!valid.length) return;
+    setPendingUploadFiles((prev) => ({
+      ...prev,
+      [fieldKey]: [...(prev[fieldKey] ?? []), ...valid],
+    }));
+  };
+
+  const removeQueuedUpload = (fieldKey: string, index: number) => {
+    setPendingUploadFiles((prev) => {
+      const row = [...(prev[fieldKey] ?? [])];
+      row.splice(index, 1);
+      const next = { ...prev };
+      if (row.length) next[fieldKey] = row;
+      else delete next[fieldKey];
+      return next;
+    });
   };
 
   const getAssessmentIdFromExtra = (extra: ExtraComponent): string | null => {
@@ -726,24 +836,20 @@ const hasRequiredSubmissions = useMemo(() => {
         nestedItemId,
         extrasExist,
         formKeys: Object.keys(formData || {}),
-        uploadKeys: Object.keys(uploadedFiles || {}),
+        uploadKeys: Object.keys(pendingUploadFiles || {}).filter((k) => (pendingUploadFiles[k]?.length ?? 0) > 0),
       });
       await ensureJumpstartTriggered();
       const mergedForm: Record<string, any> = { ...formData };
       // Mobile parity: only UPLOAD extras become boolean flags.
       // Do NOT overwrite SIGNATURE dataUrl with `true` (that breaks persistence + hydration).
-      Object.keys(uploadedFiles).forEach((k) => {
-        const extraDef = (roadmap?.extras as ExtraComponent[] | undefined)?.find(
-          (e) => e.name === k,
-        );
-        if (extraDef?.type === "UPLOAD") mergedForm[k] = true;
+      Object.keys(pendingUploadFiles).forEach((k) => {
+        const extraDef = findExtraByFieldName(templateExtras, k);
+        if (extraDef?.type === "UPLOAD" && (pendingUploadFiles[k]?.length ?? 0) > 0) mergedForm[k] = true;
       });
 
       // Mobile parity: build extrasArray from Object.entries(formData), no name transforms.
       const getExtraType = (fieldName: string, value: any): string => {
-        const extraDef = (roadmap?.extras as ExtraComponent[] | undefined)?.find(
-          (e) => e.name === fieldName,
-        );
+        const extraDef = findExtraByFieldName(templateExtras, fieldName);
         if (extraDef) return extraDef.type;
 
         if (typeof value === "boolean") return "CHECKBOX";
@@ -821,9 +927,10 @@ const hasRequiredSubmissions = useMemo(() => {
       }
       // Mark save time so the extras loader can retry without wiping UI fields.
       lastExtrasSaveAtRef.current = Date.now();
-      for (const [key, file] of Object.entries(uploadedFiles)) {
-        await apiUploadExtrasDocuments(roadmapId, userId, [file], scopedNestedId, key);
+      for (const [key, files] of Object.entries(pendingUploadFiles)) {
+        if (files?.length) await apiUploadExtrasDocuments(roadmapId, userId, files, scopedNestedId, key);
       }
+      setPendingUploadFiles({});
       // Refresh server uploads so the UI shows "uploaded" after reload.
       try {
         const resDocs = await apiGetExtrasDocuments(roadmapId, userId, scopedNestedId);
@@ -1051,6 +1158,55 @@ if (!hasRequiredSubmissions) {
     }
   };
 
+  const cancelPastorQueryEdit = () => {
+    setPastorEditingQueryId(null);
+    setPastorEditingQueryText("");
+  };
+
+  const beginPastorQueryEdit = (q: QueryItem) => {
+    setPastorEditingQueryId(q._id);
+    setPastorEditingQueryText(String(q.actualQueryText ?? ""));
+  };
+
+  const handleSavePastorQueryEdit = async (queryId: string) => {
+    if (!roadmapId || !userId) return;
+    const text = pastorEditingQueryText.trim();
+    if (!text) return;
+    setQueryActionLoadingId(queryId);
+    try {
+      await apiUpdatePastorQuery(roadmapId, queryId, { userId, actualQueryText: text });
+      cancelPastorQueryEdit();
+      await fetchQueries(undefined, false);
+      await fetchQueries("pending", false);
+    } catch (err) {
+      console.error("Update query error:", err);
+      setCompleteFeedback(axiosMessage(err) || "Could not update query.");
+      setTimeout(() => setCompleteFeedback(null), 5000);
+    } finally {
+      setQueryActionLoadingId(null);
+    }
+  };
+
+  const handleDeletePastorQuery = async (queryId: string) => {
+    if (!roadmapId || !userId) return;
+    const ok = typeof window !== "undefined" ? window.confirm("Remove this query?") : false;
+    if (!ok) return;
+    setQueryActionLoadingId(queryId);
+    try {
+      await apiDeletePastorQuery(roadmapId, queryId, userId);
+      cancelPastorQueryEdit();
+      await fetchQueries(undefined, false);
+      await fetchQueries("pending", false);
+      await fetchQueries("answered", false);
+    } catch (err) {
+      console.error("Delete query error:", err);
+      setCompleteFeedback(axiosMessage(err) || "Could not remove query.");
+      setTimeout(() => setCompleteFeedback(null), 5000);
+    } finally {
+      setQueryActionLoadingId(null);
+    }
+  };
+
   // Signature drawing functions
   const openSignatureModal = (fieldKey: string) => {
     setActiveSignatureField(fieldKey);
@@ -1153,7 +1309,7 @@ if (!hasRequiredSubmissions) {
     canvas.toBlob(async (blob) => {
       if (!blob) return;
       const file = new File([blob], `signature_${Date.now()}.png`, { type: "image/png" });
-      await handleFileUpload(activeSignatureField, file);
+      queuePendingUploads(activeSignatureField, [file]);
       setSignatureModalOpen(false);
       setActiveSignatureField(null);
       setSignaturePreview(null);
@@ -1203,10 +1359,30 @@ if (!hasRequiredSubmissions) {
           </div>
         );
 
-      case "DATE_PICKER":
+      case "DATE_PICKER": {
+        const allowPastorSelect =
+          Array.isArray(extra.checkboxes) &&
+          extra.checkboxes.some((cb) => String((cb as ExtraComponent)?.name ?? "") === "Allow pastor to select Date");
+        const defaultDate =
+          typeof extra.date === "string" && extra.date.trim() ? extra.date.trim().slice(0, 10) : "";
+        const value = String(formData[fieldKey] ?? defaultDate ?? "");
+        const metaNames = new Set(["Allow pastor to select Date", "Show date on info card"]);
+        const displayCheckboxes =
+          extra.checkboxes?.filter((cb) => !metaNames.has(String((cb as ExtraComponent)?.name ?? ""))) ?? [];
+
         return (
           <div key={`${fieldKey}_${index}`} className="mb-5">
             <h4 className="text-sm font-semibold text-white mb-2">{extra.name}</h4>
+            {allowPastorSelect ? (
+              <input
+                type="date"
+                value={value.slice(0, 10)}
+                onChange={(e) => handleInputChange(fieldKey, e.target.value)}
+                className="mb-3 w-full max-w-xs rounded-md border border-[#5A8DCB] bg-white/5 px-3 py-2 text-sm text-white [color-scheme:dark]"
+              />
+            ) : defaultDate ? (
+              <p className="mb-3 text-sm text-white/85">{formatDate(defaultDate)}</p>
+            ) : null}
             {extra.buttonName ? (
               <button
                 type="button"
@@ -1215,86 +1391,107 @@ if (!hasRequiredSubmissions) {
                 {extra.buttonName}
               </button>
             ) : null}
-            {extra.checkboxes && extra.checkboxes.length > 0 && (
+            {displayCheckboxes.length > 0 && (
               <div className="mt-3 space-y-2 pl-1">
-                {extra.checkboxes.map((cb, i) => renderExtraComponent(cb, i, fieldKey))}
+                {displayCheckboxes.map((cb, i) => renderExtraComponent(cb, i, fieldKey))}
               </div>
             )}
           </div>
         );
+      }
 
-      case "UPLOAD":
+      case "UPLOAD": {
+        const pending = pendingUploadFiles[fieldKey] ?? [];
+        const saved = savedUploadDocs[fieldKey] ?? [];
+        const inputId = `upload-${fieldKey.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+
+        const onDropUpload = (e: DragEvent<HTMLDivElement>) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.dataTransfer?.files?.length) queuePendingUploads(fieldKey, e.dataTransfer.files);
+          e.dataTransfer.clearData();
+        };
+
         return (
-          <div key={`${fieldKey}_${index}`} className="mb-5">
-            <h4 className="text-sm font-semibold text-white mb-2">{extra.name}</h4>
-            {uploadedFiles[fieldKey] ? (
-              <div className="bg-white/10 border border-[#5A8DCB] rounded-lg p-3 flex items-center gap-3">
-                <i className="fa-solid fa-file text-blue-300"></i>
-                <span className="text-sm text-white">{uploadedFiles[fieldKey].name}</span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setUploadedFiles((prev) => {
-                      const n = { ...prev };
-                      delete n[fieldKey];
-                      return n;
-                    })
-                  }
-                  className="ml-auto text-white/50 hover:text-white text-xs"
-                >
-                  <i className="fa-solid fa-xmark"></i>
-                </button>
-              </div>
-            ) : (savedUploadDocs[fieldKey]?.length ? (
-              <div className="bg-white/10 border border-[#5A8DCB] rounded-lg p-3">
-                <div className="flex items-center gap-2">
+          <div key={`${fieldKey}_${index}`} className="mb-6">
+            <h4 className="mb-2 text-sm font-semibold text-white">{extra.name}</h4>
+
+            {saved.length > 0 ? (
+              <div className="mb-4 rounded-lg border border-[#5A8DCB]/40 bg-white/10 p-3">
+                <div className="mb-2 flex items-center gap-2">
                   <i className="fa-solid fa-cloud-check text-emerald-300" />
-                  <span className="text-sm text-white font-semibold">Uploaded</span>
+                  <span className="text-sm font-semibold text-white">Previously uploaded</span>
                 </div>
-                <div className="mt-2 space-y-1">
-                  {savedUploadDocs[fieldKey].slice(0, 3).map((f) => (
-                    <div key={f.fileUrl} className="text-xs text-white/80 truncate">
+                <ul className="mb-2 max-h-32 space-y-1 overflow-auto text-xs text-white/85">
+                  {saved.map((f) => (
+                    <li key={`${f.fileUrl}-${f.fileName}`} className="truncate">
                       {f.fileName}
-                    </div>
+                    </li>
                   ))}
-                  {savedUploadDocs[fieldKey].length > 3 ? (
-                    <div className="text-xs text-white/60">
-                      +{savedUploadDocs[fieldKey].length - 3} more
-                    </div>
-                  ) : null}
-                </div>
-                <div className="mt-3 border-t border-white/10 pt-3">
-                  <input
-                    type="file"
-                    onChange={(e) =>
-                      e.target.files?.[0] && handleFileUpload(fieldKey, e.target.files[0])
-                    }
-                    className="hidden"
-                    id={`upload-${fieldKey}`}
-                  />
-                  <label htmlFor={`upload-${fieldKey}`} className="cursor-pointer text-sm text-[#aed6f1] hover:text-white">
-                    Replace upload
-                  </label>
-                </div>
+                </ul>
               </div>
-            ) : (
-              <div className="border-2 border-dashed border-[#5A8DCB] rounded-lg p-5 text-center">
-                <input
-                  type="file"
-                  onChange={(e) =>
-                    e.target.files?.[0] && handleFileUpload(fieldKey, e.target.files[0])
-                  }
-                  className="hidden"
-                  id={`upload-${fieldKey}`}
-                />
-                <label htmlFor={`upload-${fieldKey}`} className="cursor-pointer">
-                  <i className="fa-solid fa-cloud-arrow-up text-white/50 text-2xl mb-2 block"></i>
-                  <span className="text-sm text-white/70">Click to upload file</span>
-                </label>
+            ) : null}
+
+            {pending.length > 0 ? (
+              <div className="mb-4 space-y-2">
+                <p className="text-xs font-medium text-white/70">Ready to upload</p>
+                <ul className="space-y-2">
+                  {pending.map((f, i) => (
+                    <li
+                      key={`${f.name}-${f.size}-${i}`}
+                      className="flex items-center gap-2 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+                    >
+                      <i className="fa-solid fa-file text-blue-300" />
+                      <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeQueuedUpload(fieldKey, i)}
+                        className="shrink-0 text-white/50 hover:text-white"
+                        aria-label={`Remove ${f.name}`}
+                      >
+                        <i className="fa-solid fa-xmark" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            ))}
+            ) : null}
+
+            <div
+              className={`rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${
+                pending.length || saved.length
+                  ? "border-[#5A8DCB]/55 bg-white/[0.04]"
+                  : "border-white/25 bg-white/[0.03]"
+              }`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDrop={onDropUpload}
+            >
+              <input
+                type="file"
+                multiple
+                accept={UPLOAD_FIELD_ACCEPT}
+                onChange={(e) => {
+                  if (e.target.files?.length) queuePendingUploads(fieldKey, e.target.files);
+                  e.target.value = "";
+                }}
+                className="hidden"
+                id={inputId}
+              />
+              <label htmlFor={inputId} className="cursor-pointer">
+                <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#103C8C]/90 text-xl text-white shadow-md">
+                  <i className="fa-solid fa-cloud-arrow-up" />
+                </span>
+                <span className="block text-sm font-medium text-white">Click to upload files</span>
+                <span className="mt-2 block text-xs text-white/55">or drag and drop your files here</span>
+              </label>
+            </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-white/45">{UPLOAD_HINT_LINE}</p>
           </div>
         );
+      }
 
       case "CHECKBOX":
         return (
@@ -1459,7 +1656,7 @@ if (!hasRequiredSubmissions) {
           <div className="flex min-h-[60vh] flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
             <p className="max-w-md text-amber-100/95">{roadmapLoadError || "Task not found."}</p>
             <a href="/pastor/revitalization-roadmap" className={`${directorBtnPrimary} inline-flex no-underline`}>
-              Back to Revitalization Roadmap
+              Back
             </a>
           </div>
         </PastorRoadmapDashboardBody>
@@ -1470,7 +1667,7 @@ if (!hasRequiredSubmissions) {
   const title = roadmap?.name || "Jump Start";
   const duration = roadmap?.duration || "";
   const description = roadmap?.description || roadmap?.roadMapDetails || "";
-  const extras: ExtraComponent[] = roadmap?.extras || [];
+  const extras = templateExtras;
   const phaseTag = typeof roadmap?.phase === "string" ? roadmap.phase.trim() : "";
 
   const heroCoverSrc =
@@ -1502,7 +1699,6 @@ if (!hasRequiredSubmissions) {
           subtitle={heroSubtitle}
           detail={phaseTag ? phaseTag : undefined}
           image={heroCoverSrc}
-          pill="Leadership Support Network"
           breadcrumbItems={[
             { label: "Home", href: "/pastor/home" },
             { label: "Revitalization Roadmap", href: "/pastor/revitalization-roadmap" },
@@ -1584,16 +1780,20 @@ if (!hasRequiredSubmissions) {
 
                 {extras.length > 0 && (
                   <div className="mb-6 rounded-lg border border-white/20 bg-white/10 p-5">
-                    <h3 className="text-sm font-semibold text-white mb-4">
+                    <h3 className="mb-4 flex items-center gap-3 text-sm font-semibold text-white">
+                      <span
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/90"
+                        aria-hidden
+                      >
+                        <i className="fa-regular fa-clipboard text-[15px]" />
+                      </span>
                       {roadmap?.type === "single" ? "Form" : "Tasks"}
                     </h3>
-                    <div>
-                      {extras.map((extra, i) => renderExtraComponent(extra, i, "extra"))}
-                    </div>
+                    <div>{extras.map((extra, i) => renderExtraComponent(extra, i, "extra"))}</div>
                   </div>
                 )}
 
-                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mt-8 flex flex-col gap-4 border-t border-white/10 pt-6">
                   <div className="min-h-[1.25rem] text-sm">
                     {saveSuccess && (
                       <span className="inline-flex items-center gap-1 text-emerald-300">
@@ -1601,9 +1801,7 @@ if (!hasRequiredSubmissions) {
                       </span>
                     )}
                     {!saveSuccess && saveFeedback && (
-                      <span className="inline-flex items-center gap-1 text-amber-200">
-                        {saveFeedback}
-                      </span>
+                      <span className="inline-flex items-center gap-1 text-amber-200">{saveFeedback}</span>
                     )}
                     {completeFeedback && (
                       <span
@@ -1618,30 +1816,40 @@ if (!hasRequiredSubmissions) {
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-wrap justify-end gap-3">
+
+                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <button
                       type="button"
-                      onClick={handleSave}
-                      disabled={saving || !roadmapId || !userId}
-                      className="rounded-md border border-white/30 bg-white/10 px-6 py-2 text-sm font-semibold text-white shadow transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+                      onClick={() => router.push("/pastor/revitalization-roadmap")}
+                      className={`${directorBtnSecondary} w-full justify-center sm:w-auto`}
                     >
-                      {saving ? "Updating…" : "Update"}
+                      Back
                     </button>
-                    {listAlignedStatus !== "Completed" ? (
+                    <div className="flex flex-wrap justify-end gap-3">
                       <button
                         type="button"
-                        onClick={handleMarkComplete}
-                        disabled={
-                          completeLoading ||
-                          !hasRequiredSignature ||
-                          !hasRequiredUploads ||
-                          !hasRequiredSubmissions
-                        }
-                        className="rounded-md bg-white px-6 py-2 text-sm font-semibold text-[#0f4a76] shadow transition hover:bg-[#e7f1fa] disabled:cursor-not-allowed disabled:opacity-60"
+                        onClick={handleSave}
+                        disabled={saving || !roadmapId || !userId}
+                        className="rounded-md border border-white/30 bg-white/10 px-6 py-2 text-sm font-semibold text-white shadow transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {completeLoading ? "Submitting…" : "Submit"}
+                        {saving ? "Saving…" : "Save and continue"}
                       </button>
-                    ) : null}
+                      {listAlignedStatus !== "Completed" ? (
+                        <button
+                          type="button"
+                          onClick={handleMarkComplete}
+                          disabled={
+                            completeLoading ||
+                            !hasRequiredSignature ||
+                            !hasRequiredUploads ||
+                            !hasRequiredSubmissions
+                          }
+                          className="rounded-md bg-white px-6 py-2 text-sm font-semibold text-[#0f4a76] shadow transition hover:bg-[#e7f1fa] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {completeLoading ? "Submitting…" : "Submit"}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </>
@@ -1798,14 +2006,66 @@ if (!hasRequiredSubmissions) {
                                 alt={sessionDisplayName || "You"}
                                 className="w-8 h-8 rounded-full object-cover"
                               />
-                              <div>
-                                <h4 className="font-semibold text-sm">
-                                  {sessionDisplayName || "You"}
-                                </h4>
-                                <p className="text-xs text-white/70 mb-1">
-                                  {formatDate(q.createdDate)}
-                                </p>
-                                <p className="text-sm text-white/90">{q.actualQueryText}</p>
+                              <div className="min-w-0">
+                                <h4 className="font-semibold text-sm">{sessionDisplayName || "You"}</h4>
+                                <p className="mb-1 text-xs text-white/70">{formatDate(q.createdDate)}</p>
+                                {pastorEditingQueryId === q._id ? (
+                                  <textarea
+                                    value={pastorEditingQueryText}
+                                    onChange={(e) => setPastorEditingQueryText(e.target.value)}
+                                    maxLength={250}
+                                    rows={3}
+                                    className="mt-1 w-full resize-none rounded-md border border-[#7FB6EA] bg-transparent p-3 text-sm text-white focus:outline-none focus:ring-1 focus:ring-[#00B3FF]"
+                                  />
+                                ) : (
+                                  <p className="text-sm text-white/90">{q.actualQueryText}</p>
+                                )}
+                                {queryTab === "Pending" && q.status !== "answered" && (
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {pastorEditingQueryId === q._id ? (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => void handleSavePastorQueryEdit(q._id)}
+                                          disabled={
+                                            Boolean(queryActionLoadingId) ||
+                                            !pastorEditingQueryText.trim()
+                                          }
+                                          className="rounded-md border border-white/25 bg-white px-4 py-1.5 text-xs font-semibold text-[#0f4a76] hover:bg-[#e7f1fa] disabled:opacity-50"
+                                        >
+                                          {queryActionLoadingId === q._id ? "Saving…" : "Save"}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={cancelPastorQueryEdit}
+                                          disabled={Boolean(queryActionLoadingId)}
+                                          className="rounded-md border border-white/20 bg-transparent px-4 py-1.5 text-xs font-semibold text-[#d9ebf8] hover:bg-white/10 disabled:opacity-50"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => beginPastorQueryEdit(q)}
+                                          disabled={Boolean(queryActionLoadingId)}
+                                          className="rounded-md border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-semibold text-white hover:bg-white/15 disabled:opacity-50"
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => void handleDeletePastorQuery(q._id)}
+                                          disabled={Boolean(queryActionLoadingId)}
+                                          className="rounded-md border border-red-400/40 bg-red-500/15 px-4 py-1.5 text-xs font-semibold text-red-100 hover:bg-red-500/25 disabled:opacity-50"
+                                        >
+                                          {queryActionLoadingId === q._id ? "…" : "Delete"}
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
 

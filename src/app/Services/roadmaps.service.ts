@@ -7,6 +7,7 @@ import type {
   AddCommentPayload,
   CreateQueryPayload,
   ReplyQueryPayload,
+  UpdatePastorQueryPayload,
   CreateExtrasPayload,
   UpdateExtrasPayload,
 } from "./types/roadmaps.types";
@@ -36,6 +37,7 @@ export type {
   PopulatedUser,
   CreateQueryPayload,
   ReplyQueryPayload,
+  UpdatePastorQueryPayload,
   QueryItem,
   QueriesThread,
   CreateExtrasPayload,
@@ -331,6 +333,23 @@ export const apiGetQueries = (roadMapId: string, userId: string, status?: string
 // PATCH /roadmaps/:roadMapId/queries/:queryItemId/reply  body: { repliedAnswer, repliedMentorId }
 export const apiReplyToQuery = (roadMapId: string, queryItemId: string, payload: ReplyQueryPayload) =>
   axiosInstance.patch(`/roadmaps/${roadMapId}/queries/${queryItemId}/reply`, payload);
+
+// PATCH /roadmaps/:roadMapId/queries/:queryItemId  body: { userId, actualQueryText }
+export const apiUpdatePastorQuery = (
+  roadMapId: string,
+  queryItemId: string,
+  payload: UpdatePastorQueryPayload,
+) => axiosInstance.patch(`/roadmaps/${roadMapId}/queries/${queryItemId}`, payload);
+
+// DELETE /roadmaps/:roadMapId/queries/:queryItemId?userId=
+export const apiDeletePastorQuery = (roadMapId: string, queryItemId: string, userId: string) =>
+  axiosInstance.delete(`/roadmaps/${roadMapId}/queries/${queryItemId}`, { params: { userId } });
+
+// DELETE /roadmaps/:roadMapId/queries/:queryItemId/reply?repliedMentorId=
+export const apiDeleteQueryReply = (roadMapId: string, queryItemId: string, repliedMentorId: string) =>
+  axiosInstance.delete(`/roadmaps/${roadMapId}/queries/${queryItemId}/reply`, {
+    params: { repliedMentorId },
+  });
 
 // ─── Extras ──────────────────────────────────────────────────────────────────
 
