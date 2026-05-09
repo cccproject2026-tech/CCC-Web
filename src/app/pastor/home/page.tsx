@@ -795,7 +795,11 @@ Development
 
   <div className="flex items-center gap-3">
     <img
-  src={pastorProfilePicture || UserProfile.src}
+  // src={pastorProfilePicture || UserProfile.src}
+  src={
+  pastorProfilePicture ||
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(pastorName || "User")}&background=173653&color=ffffff`
+}
   alt={pastorName}
   className="h-11 w-11 rounded-full border-2 border-white/30 object-cover"
 />

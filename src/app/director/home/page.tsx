@@ -19,6 +19,7 @@ import HeroBg from "../../Assets/hero-bg.png";
 import Book from "../../Assets/book.png";
 import DuoIcon from "../../Assets/duo.png";
 import MeetIcon from "../../Assets/meet.png";
+import ZoomIcon from "../../Assets/zoom.png";
 import UserProfile from "../../Assets/user-profile.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
@@ -255,6 +256,11 @@ const directorQuickLinks = [
     route: "/director/pastor-assignments",
   },
   {
+  title: "Assign Mentee",
+  icon: "fa-solid fa-user-check",
+  action: "assignMentee",
+},
+  {
     title: "Customized Development Plan",
     icon: "fa-solid fa-clipboard-list",
     route: "/director/revitalization-roadmap",
@@ -440,11 +446,26 @@ const [selectedCdpPastorId, setSelectedCdpPastorId] = useState("");
 const [selectedCdpPastorName, setSelectedCdpPastorName] = useState("");
 const [cdpPastorSearch, setCdpPastorSearch] = useState("");
 
+const [showAssignMenteeModal, setShowAssignMenteeModal] = useState(false);
+const [assignMenteeMentors, setAssignMenteeMentors] = useState<any[]>([]);
+const [assignMenteePastors, setAssignMenteePastors] = useState<any[]>([]);
+const [assignMenteeLoading, setAssignMenteeLoading] = useState(false);
+const [assignMenteeSaving, setAssignMenteeSaving] = useState(false);
+const [selectedAssignMentorId, setSelectedAssignMentorId] = useState("");
+const [selectedAssignPastorId, setSelectedAssignPastorId] = useState("");
+const [assignMenteeMentorSearch, setAssignMenteeMentorSearch] = useState("");
+const [assignMenteePastorSearch, setAssignMenteePastorSearch] = useState("");
+const [assignMenteeToast, setAssignMenteeToast] = useState<{
+  message: string;
+  type: "success" | "error";
+} | null>(null);
+
 const hasOpenQuickLinkModal =
   showQuickAssignModal ||
   showPastorRoadmapModal ||
   showMonthlyAppointmentsModal ||
   showMentorMenteeModal ||
+  showAssignMenteeModal ||
   showCdpModal;
 
 useEffect(() => {
@@ -1077,8 +1098,12 @@ setLastName("");
 
   const formatAppointment = useCallback((appointment: Appointment) => {
     const p = (appointment.platform || "").toLowerCase();
-    const platformIcon =
-      p === "gmeet" || p === "google-meet" || p.includes("google") ? MeetIcon : DuoIcon;
+ const platformIcon =
+  p === "zoom" || p.includes("zoom")
+    ? ZoomIcon
+    : p === "gmeet" || p === "google-meet" || p.includes("google")
+      ? MeetIcon
+      : DuoIcon;
     const mentorName = appointment.mentor
       ? `${appointment.mentor.firstName || ''} ${appointment.mentor.lastName || ''}`.trim()
       : 'Mentor';
@@ -1152,6 +1177,99 @@ setQuickAssignMentors(hydratedMentors);
     alert("Could not load pastors and mentors.");
   } finally {
     setQuickAssignLoading(false);
+  }
+};
+
+const openAssignMenteeModal = async () => {
+  try {
+    setShowAssignMenteeModal(true);
+    setAssignMenteeLoading(true);
+    setSelectedAssignMentorId("");
+    setSelectedAssignPastorId("");
+    setAssignMenteeMentorSearch("");
+    setAssignMenteePastorSearch("");
+
+    const [mentorsRes, pastorsRes] = await Promise.all([
+      apiGetAllUsers({
+        role: "mentor",
+        roleMatch: "mixed",
+        page: 1,
+        limit: 100,
+        t: Date.now(),
+      }),
+      apiGetAllUsers({
+        role: "pastor",
+        roleMatch: "mixed",
+        page: 1,
+        limit: 100,
+        t: Date.now(),
+      }),
+    ]);
+
+    const mentorsData: any = mentorsRes?.data?.data;
+    const pastorsData: any = pastorsRes?.data?.data;
+
+    const mentorsList = Array.isArray(mentorsData)
+      ? mentorsData
+      : Array.isArray(mentorsData?.users)
+        ? mentorsData.users
+        : [];
+
+    const pastorsList = Array.isArray(pastorsData)
+      ? pastorsData
+      : Array.isArray(pastorsData?.users)
+        ? pastorsData.users
+        : [];
+
+    const [hydratedMentors, hydratedPastors] = await Promise.all([
+      hydrateUsersWithProfilePictures(mentorsList),
+      hydrateUsersWithProfilePictures(pastorsList),
+    ]);
+
+    setAssignMenteeMentors(hydratedMentors);
+    setAssignMenteePastors(hydratedPastors);
+  } catch (error) {
+    console.error("Failed to load mentors and mentees", error);
+    alert("Could not load mentors and mentees.");
+  } finally {
+    setAssignMenteeLoading(false);
+  }
+};
+
+const handleAssignMentee = async () => {
+  if (!selectedAssignMentorId || !selectedAssignPastorId) {
+    setAssignMenteeToast({
+      message: "Please select one mentor and one mentee.",
+      type: "error",
+    });
+    setTimeout(() => setAssignMenteeToast(null), 3000);
+    return;
+  }
+
+  try {
+    setAssignMenteeSaving(true);
+
+    await apiAssignUsers(selectedAssignMentorId, [selectedAssignPastorId]);
+
+    setShowAssignMenteeModal(false);
+    setSelectedAssignMentorId("");
+    setSelectedAssignPastorId("");
+
+    setAssignMenteeToast({
+      message: "Mentee assigned successfully.",
+      type: "success",
+    });
+    setTimeout(() => setAssignMenteeToast(null), 3500);
+  } catch (error) {
+    console.error("Failed to assign mentee", error);
+
+    setAssignMenteeToast({
+      message: "Failed to assign mentee. Please try again.",
+      type: "error",
+    });
+    setTimeout(() => setAssignMenteeToast(null), 3500);
+  } finally {
+    setAssignMenteeSaving(false);
   }
 };
 
@@ -1584,6 +1702,42 @@ const filteredMappingMentors = mappingMentors.filter((mentor) => {
 
   return fullName.includes(search) || email.includes(search);
 });
+const filteredAssignMenteeMentors = assignMenteeMentors.filter((mentor) => {
+  const fullName = `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`
+    .trim()
+    .toLowerCase();
+
+  const email = String(mentor?.email ?? "").toLowerCase();
+  const search = assignMenteeMentorSearch.trim().toLowerCase();
+
+  if (!search) return true;
+
+  return fullName.includes(search) || email.includes(search);
+});
+
+const filteredAssignMenteePastors = assignMenteePastors.filter((pastor) => {
+  const fullName = `${pastor?.firstName ?? ""} ${pastor?.lastName ?? ""}`
+    .trim()
+    .toLowerCase();
+
+  const email = String(pastor?.email ?? "").toLowerCase();
+  const search = assignMenteePastorSearch.trim().toLowerCase();
+
+  if (!search) return true;
+
+  return fullName.includes(search) || email.includes(search);
+});
+
+const selectedAssignMentor = assignMenteeMentors.find(
+  (mentor) => String(mentor._id ?? mentor.id ?? "") === selectedAssignMentorId
+);
+
+const selectedAssignMentorName =
+  `${selectedAssignMentor?.firstName ?? ""} ${selectedAssignMentor?.lastName ?? ""}`.trim() ||
+  selectedAssignMentor?.email ||
+  "Selected mentor";
+
+
   return (
     <div className={directorPageRoot}>
       {/* Hero — mentor / pastor glass + image */}
@@ -1815,10 +1969,16 @@ const filteredMappingMentors = mappingMentors.filter((mentor) => {
 </p>
 
                   <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-                    <span className="rounded-lg border border-emerald-400/25 bg-emerald-500/10 px-2 py-1 text-emerald-100">
+                    {/* <span className="rounded-lg border border-emerald-400/25 bg-emerald-500/10 px-2 py-1 text-emerald-100">
                       <i className="fa-solid fa-circle mr-1 text-[7px]" />
                       In discussion
-                    </span>
+                    </span> */}
+                    <span className="rounded-lg border border-emerald-400/25 bg-emerald-500/10 px-2 py-1 text-emerald-100">
+  <i className="fa-solid fa-circle mr-1 text-[7px]" />
+  {appointment.status
+    ? appointment.status.charAt(0).toUpperCase() + appointment.status.slice(1)
+    : "Scheduled"}
+</span>
 
                     <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-white/80">
                       <i className="fa-regular fa-clock mr-1 text-[#8ec5eb]" />
@@ -2343,10 +2503,43 @@ const filteredMappingMentors = mappingMentors.filter((mentor) => {
           key={item.title}
           type="button"
           // onClick={() => router.push(item.route)}
-  onClick={() => {
+//   onClick={() => {
 
+//   if (item.title === "Assign Mentors") {
+//     void openQuickAssignMentors();
+//     return;
+//   }
+
+//   if (item.title === "Pastors Roadmap") {
+//     void openPastorsRoadmapModal();
+//     return;
+//   }
+//     if (item.title === "Monthly Appointments") {
+//     void openMonthlyAppointmentsModal();
+//     return;
+//   }
+// if (item.title === "Mentor-Mentee Mapping") {
+//   void openMentorMenteeMappingModal();
+//   return;
+// }
+// if (item.title === "Customized Development Plan") {
+//   void openCdpModal();
+//   return;
+// }
+// if ((link as any).action === "assignMentee") {
+//   openAssignMenteeModal();
+//   return;
+// }
+//   router.push(item.route);
+// }}
+onClick={() => {
   if (item.title === "Assign Mentors") {
     void openQuickAssignMentors();
+    return;
+  }
+
+  if (item.title === "Assign Mentee") {
+    void openAssignMenteeModal();
     return;
   }
 
@@ -2354,19 +2547,27 @@ const filteredMappingMentors = mappingMentors.filter((mentor) => {
     void openPastorsRoadmapModal();
     return;
   }
-    if (item.title === "Monthly Appointments") {
+
+  if (item.title === "Monthly Appointments") {
     void openMonthlyAppointmentsModal();
     return;
   }
-if (item.title === "Mentor-Mentee Mapping") {
-  void openMentorMenteeMappingModal();
-  return;
+
+  if (item.title === "Mentor-Mentee Mapping") {
+    void openMentorMenteeMappingModal();
+    return;
+  }
+
+  if (item.title === "Customized Development Plan") {
+    void openCdpModal();
+    return;
+  }
+
+ const route = (item as { route?: string }).route;
+
+if (route) {
+  router.push(route);
 }
-if (item.title === "Customized Development Plan") {
-  void openCdpModal();
-  return;
-}
-  router.push(item.route);
 }}
           className="group flex min-h-[120px] flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-5 text-center transition hover:border-[#8ec5eb]/35 hover:bg-[#8ec5eb]/10"
         >
@@ -2442,7 +2643,8 @@ if (item.title === "Customized Development Plan") {
                     role={person.role}
                     menteeCount={menteeCount}
                     email={getUserListEmail(person as Record<string, unknown>) ?? person.email}
-                    phoneNumber={person.phoneNumber}
+                    // phoneNumber={person.phoneNumber}
+                    phoneNumber=""
                     onViewDetails={() =>
                       isMentor
                         ? router.push(`/director/mentors/profile/${personId}`)
@@ -3816,6 +4018,270 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
           )}
         </div>
       )}
+    </div>
+  </div>
+)}
+{showAssignMenteeModal && (
+  <div
+    className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-8 backdrop-blur-sm"
+    onClick={() => {
+      setShowAssignMenteeModal(false);
+      setSelectedAssignMentorId("");
+      setSelectedAssignPastorId("");
+    }}
+  >
+    <div
+      className="w-full max-w-3xl overflow-hidden rounded-3xl border border-white/15 bg-[#07172a] shadow-2xl"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4">
+        <div>
+          <h3 className="text-lg font-semibold text-white">
+            {selectedAssignMentorId ? "Assign Mentee" : "Select Mentor"}
+          </h3>
+          <p className="mt-1 text-sm text-white/60">
+            {selectedAssignMentorId
+              ? `Choose a mentee to assign to ${selectedAssignMentorName}.`
+              : "Select a mentor first, then assign a mentee."}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {selectedAssignMentorId && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedAssignMentorId("");
+                setSelectedAssignPastorId("");
+              }}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+              aria-label="Back to mentors"
+            >
+              <i className="fa-solid fa-arrow-left" />
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowAssignMenteeModal(false);
+              setSelectedAssignMentorId("");
+              setSelectedAssignPastorId("");
+            }}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+            aria-label="Close"
+          >
+            <i className="fa-solid fa-xmark" />
+          </button>
+        </div>
+      </div>
+
+      {assignMenteeLoading ? (
+        <div className="flex min-h-[300px] items-center justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[#8ec5eb]" />
+        </div>
+      ) : (
+        <div className="max-h-[65vh] overflow-y-auto bg-[#07172a]/30 p-6">
+          {!selectedAssignMentorId ? (
+            <>
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h4 className="text-sm font-semibold text-[#8ec5eb]">
+                  Mentors
+                </h4>
+
+                <div className="relative w-full sm:w-[260px]">
+                  <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/45" />
+                  <input
+                    type="text"
+                    value={assignMenteeMentorSearch}
+                    onChange={(e) => setAssignMenteeMentorSearch(e.target.value)}
+                    placeholder="Search mentor"
+                    className="h-10 w-full rounded-xl border border-white/15 bg-white/10 pl-9 pr-3 text-sm font-medium text-white outline-none transition placeholder:text-white/45 focus:border-[#8ec5eb]/60 focus:bg-white/[0.13]"
+                  />
+                </div>
+              </div>
+
+              {filteredAssignMenteeMentors.length === 0 ? (
+                <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/60">
+                  No mentors found.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {filteredAssignMenteeMentors.map((mentor) => {
+                    const mentorId = String(mentor._id ?? mentor.id ?? "");
+                    const mentorName =
+                      `${mentor.firstName ?? ""} ${mentor.lastName ?? ""}`.trim() ||
+                      mentor.email ||
+                      "Unnamed mentor";
+
+                    return (
+                      <button
+                        key={mentorId}
+                        type="button"
+                        onClick={() => {
+                          setSelectedAssignMentorId(mentorId);
+                          setSelectedAssignPastorId("");
+                        }}
+                        className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 text-left shadow-sm transition hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
+                      >
+                        <QuickLinkAvatar person={mentor} icon="fa-solid fa-user" />
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-white">
+                            {mentorName}
+                          </span>
+                          <span className="block truncate text-xs text-white/55">
+                            {mentor.email ?? "Mentor"}
+                          </span>
+                        </span>
+
+                        <span className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-3 py-1.5 text-xs font-semibold text-white">
+                          Select mentor
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8ec5eb]">
+                    Selected Mentor
+                  </p>
+                  <h4 className="mt-1 text-base font-semibold text-white">
+                    {selectedAssignMentorName}
+                  </h4>
+                </div>
+
+                <div className="relative w-full sm:w-[260px]">
+                  <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs text-white/45" />
+                  <input
+                    type="text"
+                    value={assignMenteePastorSearch}
+                    onChange={(e) => setAssignMenteePastorSearch(e.target.value)}
+                    placeholder="Search mentee"
+                    className="h-10 w-full rounded-xl border border-white/15 bg-white/10 pl-9 pr-3 text-sm font-medium text-white outline-none transition placeholder:text-white/45 focus:border-[#8ec5eb]/60 focus:bg-white/[0.13]"
+                  />
+                </div>
+              </div>
+
+              {filteredAssignMenteePastors.length === 0 ? (
+                <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/60">
+                  No mentees found.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {filteredAssignMenteePastors.map((pastor) => {
+                    const pastorId = String(pastor._id ?? pastor.id ?? "");
+                    const pastorName =
+                      `${pastor.firstName ?? ""} ${pastor.lastName ?? ""}`.trim() ||
+                      pastor.email ||
+                      "Unnamed mentee";
+
+                    const isSelected = selectedAssignPastorId === pastorId;
+
+                    return (
+                      <button
+                        key={pastorId}
+                        type="button"
+                        onClick={() => setSelectedAssignPastorId(pastorId)}
+                        className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-4 text-left shadow-sm transition ${
+                          isSelected
+                            ? "border-[#8ec5eb]/70 bg-[#8ec5eb]/15"
+                            : "border-white/10 bg-[#132a42]/80 hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
+                        }`}
+                      >
+                        <QuickLinkAvatar person={pastor} icon="fa-solid fa-user" />
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-white">
+                            {pastorName}
+                          </span>
+                          <span className="block truncate text-xs text-white/55">
+                            {pastor.email ?? "Mentee"}
+                          </span>
+                        </span>
+
+                        <span className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-3 py-1.5 text-xs font-semibold text-white">
+                          {isSelected ? "Selected" : "Select"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {selectedAssignMentorId && (
+        <div className="flex items-center justify-end gap-3 border-t border-white/10 bg-white/[0.03] px-6 py-4">
+          <button
+            type="button"
+            onClick={() => {
+              setShowAssignMenteeModal(false);
+              setSelectedAssignMentorId("");
+              setSelectedAssignPastorId("");
+            }}
+            className="rounded-xl border border-white/15 px-5 py-2.5 text-sm font-semibold text-white/75 transition hover:bg-white/10"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            disabled={!selectedAssignPastorId || assignMenteeSaving}
+            onClick={handleAssignMentee}
+            className="rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-[#062946] transition hover:bg-white/90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {assignMenteeSaving ? "Assigning..." : "Assign Mentee"}
+          </button>
+        </div>
+      )}
+    </div>
+  </div>
+)}
+
+{assignMenteeToast && (
+  <div className="fixed right-6 top-24 z-[70] w-[320px] rounded-2xl border border-white/15 bg-[#07172a] p-4 shadow-2xl backdrop-blur-xl">
+    <div className="flex items-start gap-3">
+      <div
+        className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
+          assignMenteeToast.type === "success"
+            ? "bg-emerald-500/15 text-emerald-300"
+            : "bg-red-500/15 text-red-300"
+        }`}
+      >
+        <i
+          className={`fa-solid ${
+            assignMenteeToast.type === "success"
+              ? "fa-check"
+              : "fa-triangle-exclamation"
+          }`}
+        />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-white">
+          {assignMenteeToast.type === "success" ? "Done" : "Action needed"}
+        </p>
+        <p className="mt-1 text-sm text-white/65">
+          {assignMenteeToast.message}
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setAssignMenteeToast(null)}
+        className="text-white/45 transition hover:text-white"
+        aria-label="Close notification"
+      >
+        <i className="fa-solid fa-xmark" />
+      </button>
     </div>
   </div>
 )}

@@ -648,14 +648,25 @@ console.log("FRESH USER AFTER SAVE:", freshRes.data?.data?.lastName);
   className="mx-auto mb-4 h-[104px] w-[104px] rounded-full border-2 border-[#8ec5eb]/55 object-cover shadow-[0_10px_24px_rgba(2,20,38,0.35)]"
 /> */}
 <div className="relative mx-auto mb-4 h-[104px] w-[104px] overflow-hidden rounded-full border-2 border-[#8ec5eb]/55 bg-white/10 shadow-[0_10px_24px_rgba(2,20,38,0.35)]">
-  <Image
+  {/* <Image
     src={profile?.profilePicture || form?.profilePicture || ProfilePic}
     alt="Pastor profile"
     width={104}
     height={104}
     unoptimized
     className="h-full w-full rounded-full object-cover"
-  />
+  /> */}
+  <img
+  src={
+    profile?.profilePicture ||
+    form?.profilePicture ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      `${profile?.firstName || form?.firstName || ""} ${profile?.lastName || form?.lastName || ""}`.trim() || "User"
+    )}&background=173653&color=ffffff`
+  }
+  alt="Pastor profile"
+  className="h-full w-full rounded-full object-cover"
+/>
 
   <button
     type="button"

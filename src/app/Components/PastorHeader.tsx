@@ -618,12 +618,23 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
                   className="rounded-full border border-white/40"
                 /> */}
 
-                <Image
+                {/* <Image
   src={profile?.profilePicture || UserProfile}
   alt="User"
   width={30}
   height={30}
   unoptimized
+  className="h-[30px] w-[30px] rounded-full border border-white/40 object-cover"
+/> */}
+<img
+  src={
+    profile?.profilePicture
+      ? resolveApiMediaUrl(profile.profilePicture) || profile.profilePicture
+      : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+          `${profile?.firstName || ""} ${profile?.lastName || ""}`.trim() || "User"
+        )}&background=173653&color=ffffff`
+  }
+  alt="User"
   className="h-[30px] w-[30px] rounded-full border border-white/40 object-cover"
 />
               </button>
