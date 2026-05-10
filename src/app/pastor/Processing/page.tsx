@@ -326,10 +326,10 @@ const handlePasswordSetSuccess = () => {
                   </Link> */}
                   <div className="mt-8">
   <Link
-    href="/pastor/login"
+    href="/"
     className="inline-flex items-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#0b2d4f] transition hover:scale-105"
   >
-    Back to Login
+    Back
   </Link>
 </div>
                 </div>

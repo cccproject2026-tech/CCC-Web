@@ -25,10 +25,12 @@ interface ProfileData {
   lastName: string;
   phone: string;
   email: string;
+  profilePicture: string;
   profileInfo: string;
   title: string;
   yearsInMinistry: string;
   conference: string;
+  
 }
 
 export default function DirectorProfilePage() {
@@ -45,6 +47,7 @@ export default function DirectorProfilePage() {
     lastName: "",
     phone: "",
     email: "",
+    profilePicture: "",
     profileInfo: "",
     title: "",
     yearsInMinistry: "",
@@ -85,6 +88,7 @@ export default function DirectorProfilePage() {
           title: user.title ?? "",
           yearsInMinistry: user.yearsInMinistry ?? "",
           conference: user.conference ?? "",
+          profilePicture: user.profilePicture ?? "",
         });
 
         // 2️⃣ Fetch interest using email
@@ -198,7 +202,9 @@ export default function DirectorProfilePage() {
     }
   };
 
-
+const initials =
+  `${profile.firstName?.[0] || ""}${profile.lastName?.[0] || ""}`.toUpperCase() ||
+  "AD";
   return (
     <div className={directorPageRoot}>
       <div className="flex-1 py-10">
@@ -210,13 +216,19 @@ export default function DirectorProfilePage() {
               {/* Profile Photo */}
               <div className="flex flex-col items-center mb-6">
                 <div className="relative">
-                  <Image
-                    src={UserProfile}
-                    alt="Profile"
-                    width={120}
-                    height={120}
-                    className="rounded-full border-4 border-gray-100"
-                  />
+      {profile.profilePicture ? (
+  <Image
+    src={profile.profilePicture}
+    alt="Profile"
+    width={120}
+    height={120}
+    className="h-[120px] w-[120px] rounded-full border-4 border-gray-100 object-cover"
+  />
+) : (
+  <div className="flex h-[120px] w-[120px] items-center justify-center rounded-full border-4 border-gray-100 bg-[#173653] text-4xl font-bold text-white">
+    {initials}
+  </div>
+)}
                   <button className="absolute bottom-0 right-0 w-8 h-8 bg-[#2E3B8E] rounded-full flex items-center justify-center border-2 border-white">
                     <i className="fa-solid fa-camera text-white text-xs"></i>
                   </button>

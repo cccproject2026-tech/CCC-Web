@@ -4157,7 +4157,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                         </span>
 
                         <span className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-3 py-1.5 text-xs font-semibold text-white">
-                          Select mentor
+                          Assign
                         </span>
                       </button>
                     );
