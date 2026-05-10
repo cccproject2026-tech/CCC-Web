@@ -474,7 +474,7 @@ const currentDate = new Date().toLocaleDateString("en-US", {
               </div>
             </div>
             <Link
-              href="/mentor/profile"
+              href="/mentor/help"
               prefetch
               className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-white/15 sm:self-center"
             >
@@ -513,7 +513,7 @@ const currentDate = new Date().toLocaleDateString("en-US", {
         </section>
 
         {/* Map — mobile: ~410px MapView; web placeholder, no pastor/mentee search strip */}
-        <section className="mt-3 pb-2">
+        {/* <section className="mt-3 pb-2">
           <div
             className={`overflow-hidden rounded-2xl border border-white/10 ${mentorGlassCardFrost}`}
             style={{ minHeight: 410 }}
@@ -522,7 +522,57 @@ const currentDate = new Date().toLocaleDateString("en-US", {
               <Image src={MapImg} alt="" fill className="object-cover" />
             </div>
           </div>
-        </section>
+        </section> */}
+        {/* Map — assigned mentees shown on preset positions */}
+<section className="mt-3 pb-2">
+  <div
+    className={`overflow-hidden rounded-2xl border border-white/10 ${mentorGlassCardFrost}`}
+    style={{ minHeight: 410 }}
+  >
+    <div className="relative h-[410px] w-full">
+      <Image src={MapImg} alt="Assigned mentees map" fill className="object-cover" />
+
+      {mentees.slice(0, 8).map((mentee, index) => {
+       const pins = [
+  { left: "18%", top: "36%" },
+  { left: "36%", top: "36%" },
+  { left: "54%", top: "36%" },
+  { left: "72%", top: "36%" },
+  { left: "24%", top: "62%" },
+  { left: "42%", top: "62%" },
+  { left: "60%", top: "62%" },
+  { left: "78%", top: "62%" },
+];
+
+const pin = pins[index];
+
+        const name =
+          `${mentee.firstName ?? ""} ${mentee.lastName ?? ""}`.trim() ||
+          mentee.name ||
+          "Mentee";
+
+        return (
+          <button
+            key={mentee._id ?? mentee.id ?? index}
+            type="button"
+            onClick={() => router.push("/mentor/MenteesDetailed")}
+            className="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+            style={pin}
+            title={name}
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-white bg-[#0f4a76] text-white shadow-lg">
+              <i className="fa-solid fa-location-dot text-[#8ec5eb]" />
+            </span>
+
+            <span className="mt-1 max-w-[110px] truncate rounded-full bg-[#062946]/90 px-2.5 py-1 text-[11px] font-semibold text-white shadow">
+              {name}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  </div>
+</section>
       </main>
 
       <nav

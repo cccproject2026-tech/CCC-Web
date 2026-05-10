@@ -396,8 +396,8 @@ function Page() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#1d538d] to-[#1d538d] text-white">
-      <AppHero
+    <div className="min-h-screen bg-[#061a2f] text-white">
+      {/* <AppHero
         title="Edit Micro Grant Form"
         backgroundImageUrl={MentorBg.src}
         breadcrumbItems={[
@@ -405,10 +405,36 @@ function Page() {
           { label: "Micro Grant", href: "/director/micro-grant" },
           { label: "Edit Form" },
         ]}
-      />
+      /> */}
+      <section className="border-b border-white/10 bg-[linear-gradient(135deg,#08233d_0%,#0b3153_55%,#123d66_100%)] px-6 py-8 md:px-12 lg:px-20">
+  <div className="mx-auto max-w-7xl">
+    <button
+      type="button"
+      onClick={() => window.history.back()}
+      className="mb-6 inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15"
+    >
+      <i className="fa-solid fa-arrow-left text-xs" />
+      Back
+    </button>
+
+    <p className="mb-2 text-sm text-[#8ec5eb]">
+      Micro Grant / Edit Form
+    </p>
+
+    <h1 className="text-3xl font-bold text-white">
+      Edit Micro Grant Form
+    </h1>
+
+    <p className="mt-3 max-w-2xl text-sm text-white/70">
+      Update the micro grant form title, description, reporting procedure,
+      sections, and fields.
+    </p>
+  </div>
+</section>
 
       <div className="px-6 py-10 lg:px-16">
-        <div className="mx-auto max-w-6xl rounded-2xl bg-white p-6 text-black shadow-xl">
+        {/* <div className="mx-auto max-w-6xl rounded-2xl bg-white p-6 text-black shadow-xl"> */}
+        <div className="mx-auto max-w-7xl rounded-3xl border border-white/10 bg-white/[0.05] p-6 text-white shadow-2xl backdrop-blur-xl">
           <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="flex-1">
               <label className="mb-2 block text-sm font-semibold">Form Title</label>
@@ -416,7 +442,7 @@ function Page() {
                 type="text"
                 value={formData.title}
                 onChange={(e) => updateTopLevel("title", e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#1d538d]"
+                className="w-full rounded-xl border border-white/10 bg-[#102b43] px-4 py-3 text-white outline-none transition focus:border-[#8ec5eb]"
                 placeholder="Enter form title"
               />
             </div>
@@ -425,7 +451,7 @@ function Page() {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="rounded-lg bg-[#1d538d] px-6 py-3 font-semibold text-white disabled:opacity-60"
+              className="rounded-xl bg-[#8ec5eb] px-6 py-3 font-bold text-[#062946] transition hover:bg-[#b8def6] disabled:opacity-60"
             >
               {saving ? "Saving..." : "Save Form"}
             </button>
@@ -437,7 +463,7 @@ function Page() {
               value={formData.description || ""}
               onChange={(e) => updateTopLevel("description", e.target.value)}
               rows={3}
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#1d538d]"
+              className="w-full rounded-xl border border-white/10 bg-[#102b43] px-4 py-3 text-white outline-none transition focus:border-[#8ec5eb]"
               placeholder="Enter form description"
             />
           </div>
@@ -448,7 +474,7 @@ function Page() {
               value={formData.reportingProcedure || ""}
               onChange={(e) => updateTopLevel("reportingProcedure", e.target.value)}
               rows={3}
-              className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#1d538d]"
+              className="w-full rounded-xl border border-white/10 bg-[#102b43] px-4 py-3 text-white outline-none transition focus:border-[#8ec5eb]"
               placeholder="Enter reporting procedure"
             />
           </div>
@@ -469,17 +495,17 @@ function Page() {
             {(formData.sections || []).map((section, sectionIndex) => (
               <div
                 key={section._id || sectionIndex}
-                className="rounded-2xl border border-gray-200 p-5"
+                className="rounded-3xl border border-white/10 bg-white/[0.04] p-6"
               >
                 <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <h2 className="text-xl font-bold text-[#1d538d]">
+                  <h2 className="text-xl font-bold text-[#8ec5eb]">
                     Section {sectionIndex + 1}
                   </h2>
 
                   <button
                     type="button"
                     onClick={() => removeSection(sectionIndex)}
-                    className="rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600"
+                    className="rounded-xl border border-red-400/25 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-100 hover:bg-red-500/20"
                   >
                     Remove Section
                   </button>
@@ -493,7 +519,7 @@ function Page() {
                     onChange={(e) =>
                       updateSection(sectionIndex, "section_title", e.target.value)
                     }
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#1d538d]"
+                    className="w-full rounded-xl border border-white/10 bg-[#102b43] px-4 py-3 text-white outline-none transition focus:border-[#8ec5eb]"
                     placeholder="Enter section title"
                   />
                 </div>
@@ -506,7 +532,7 @@ function Page() {
                       updateSection(sectionIndex, "section_intro", e.target.value)
                     }
                     rows={3}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#1d538d]"
+                    className="w-full rounded-xl border border-white/10 bg-[#102b43] px-4 py-3 text-white outline-none transition focus:border-[#8ec5eb]"
                     placeholder="Enter section intro"
                   />
                 </div>
@@ -515,7 +541,7 @@ function Page() {
                   {(section.fields || []).map((field, fieldIndex) => (
                     <div
                       key={field._id || fieldIndex}
-                      className="rounded-xl border border-gray-200 bg-gray-50 p-4"
+                      className="rounded-2xl border border-white/10 bg-[#0f2740] p-5"
                     >
                       <div className="mb-4 flex items-center justify-between">
                         <h3 className="text-base font-semibold">
@@ -525,7 +551,7 @@ function Page() {
                         <button
                           type="button"
                           onClick={() => removeField(sectionIndex, fieldIndex)}
-                          className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-semibold text-red-600"
+                          className="rounded-xl border border-red-400/25 bg-red-500/10 px-3 py-1.5 text-sm font-semibold text-red-100 hover:bg-red-500/20"
                         >
                           Remove Field
                         </button>
@@ -540,7 +566,7 @@ function Page() {
                             onChange={(e) =>
                               updateField(sectionIndex, fieldIndex, "label", e.target.value)
                             }
-                            className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#1d538d]"
+                            className="w-full rounded-xl border border-white/10 bg-[#102b43] px-4 py-3 text-white outline-none transition focus:border-[#8ec5eb]"
                             placeholder="Enter field label"
                           />
                         </div>
@@ -552,10 +578,10 @@ function Page() {
                             onChange={(e) =>
                               updateField(sectionIndex, fieldIndex, "type", e.target.value)
                             }
-                            className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#1d538d]"
+                            className="w-full rounded-xl border border-white/10 bg-[#102b43] px-4 py-3 text-white outline-none transition focus:border-[#8ec5eb]"
                           >
                             {fieldTypes.map((type) => (
-                              <option key={type} value={type}>
+                              <option key={type} value={type} className="bg-[#102b43] text-white">
                                 {type}
                               </option>
                             ))}
@@ -570,7 +596,7 @@ function Page() {
                               updateField(sectionIndex, fieldIndex, "description", e.target.value)
                             }
                             rows={2}
-                            className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#1d538d]"
+                            className="w-full rounded-xl border border-white/10 bg-[#102b43] px-4 py-3 text-white outline-none transition focus:border-[#8ec5eb]"
                             placeholder="Enter field description"
                           />
                         </div>
@@ -583,7 +609,7 @@ function Page() {
                             onChange={(e) =>
                               updateField(sectionIndex, fieldIndex, "placeholder", e.target.value)
                             }
-                            className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#1d538d]"
+                            className="w-full rounded-xl border border-white/10 bg-[#102b43] px-4 py-3 text-white outline-none transition focus:border-[#8ec5eb]"
                             placeholder="Enter placeholder"
                           />
                         </div>
@@ -596,7 +622,7 @@ function Page() {
                             onChange={(e) =>
                               handleOptionsChange(sectionIndex, fieldIndex, e.target.value)
                             }
-                            className="w-full rounded-lg border border-gray-300 px-4 py-3 outline-none focus:border-[#1d538d]"
+                            className="w-full rounded-xl border border-white/10 bg-[#102b43] px-4 py-3 text-white outline-none transition focus:border-[#8ec5eb]"
                             placeholder="Comma separated options"
                           />
                         </div>
@@ -623,7 +649,7 @@ function Page() {
                   <button
                     type="button"
                     onClick={() => addField(sectionIndex)}
-                    className="rounded-lg border border-[#1d538d] px-4 py-2 text-sm font-semibold text-[#1d538d]"
+                    className="rounded-xl border border-white/15 bg-white/[0.05] px-4 py-2 text-sm font-semibold text-white hover:bg-white/[0.08]"
                   >
                     Add Field
                   </button>
@@ -636,7 +662,7 @@ function Page() {
             <button
               type="button"
               onClick={addSection}
-              className="rounded-lg border border-[#1d538d] px-5 py-3 font-semibold text-[#1d538d]"
+              className="rounded-xl border border-white/15 bg-white/[0.05] px-5 py-3 font-semibold text-white hover:bg-white/[0.08]"
             >
               Add Section
             </button>
@@ -645,7 +671,7 @@ function Page() {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="rounded-lg bg-[#1d538d] px-5 py-3 font-semibold text-white disabled:opacity-60"
+              className="rounded-xl bg-[#8ec5eb] px-5 py-3 font-bold text-[#062946] transition hover:bg-[#b8def6] disabled:opacity-60"
             >
               {saving ? "Saving..." : "Save Form"}
             </button>
