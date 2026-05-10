@@ -217,6 +217,8 @@ function MentorScheduleContent() {
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [maxBookingsPerDay, setMaxBookingsPerDay] = useState(5);
   const [meetingDuration, setMeetingDuration] = useState(60);
+  /** Backend `advanceNotice` is in hours (see AvailabilityPayload). */
+  const [advanceNoticeHours, setAdvanceNoticeHours] = useState(2);
   const [slotValidationError, setSlotValidationError] = useState<string | null>(null);
 
   const year = currentDate.getFullYear();
@@ -732,10 +734,10 @@ function MentorScheduleContent() {
     if (!mentorId || enabled.length === 0) return [];
 
     const baseMeta = {
-      meetingDuration: 60,
+      meetingDuration,
       bufferTime: 15,
-      advanceNotice: 2,
-      maxBookingsPerDay: 5,
+      advanceNotice: advanceNoticeHours,
+      maxBookingsPerDay,
     };
 
     const dated = enabled.map((d) => ({
@@ -747,7 +749,9 @@ function MentorScheduleContent() {
 
     variants.push({
       mentorId,
-      meetingDuration: 60,
+      meetingDuration,
+      advanceNotice: advanceNoticeHours,
+      maxBookingsPerDay,
       weeklySlots: dated.map(({ date, uiSlots }) => ({
         date,
         slots: uiSlots.map((s: any) => ({
@@ -800,7 +804,9 @@ function MentorScheduleContent() {
 
     variants.push({
       mentorId,
-      meetingDuration: 60,
+      meetingDuration,
+      advanceNotice: advanceNoticeHours,
+      maxBookingsPerDay,
       availability: dated.map(({ date, uiSlots }) => ({
         date,
         slots: uiSlots.map((s: any) => ({
@@ -915,6 +921,11 @@ function MentorScheduleContent() {
     // Overlap check against target availability owner
     const proposedIso = toIsoFromDateAndSlot(meetingDate, selectedSlot);
     const proposedMs = new Date(proposedIso).getTime();
+    if (meetingDate === new Date().toISOString().split("T")[0] && proposedMs <= Date.now()) {
+      setToastMessage("For today, please choose a time after the current time.");
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
     const busyRes = await apiGetAppointments({
       mentorId: targetMentorId,
       futureOnly: true,
@@ -1574,8 +1585,20 @@ function MentorScheduleContent() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-[#cde2f2]">Min. Notice</label>
-                    <select className={mentorSelectDark}><option>2 Days</option><option>1 Day</option></select>
+                    <label className="mb-1 block text-xs text-[#cde2f2]">Min. notice (hours)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={168}
+                      step={1}
+                      value={advanceNoticeHours}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        if (!Number.isFinite(n)) return;
+                        setAdvanceNoticeHours(Math.max(1, Math.min(168, Math.floor(n))));
+                      }}
+                      className={mentorSelectDark}
+                    />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs text-[#cde2f2]">Preferred Mode</label>
@@ -1624,6 +1647,17 @@ function MentorScheduleContent() {
                                 type="button"
                                 aria-label={`Delete slot ${i + 1}`}
                                 onClick={async () => {
+                                  if (!slot?._id) {
+                                    // Unsaved slot: remove from UI only.
+                                    setAvailability((prev) =>
+                                      prev.map((d) =>
+                                        d.day === selectedAvailabilityDay
+                                          ? { ...d, slots: (d.slots || []).filter((_: any, idx: number) => idx !== i) }
+                                          : d,
+                                      ),
+                                    );
+                                    return;
+                                  }
                                   if (!mentorId) return;
                                   const dateStr = resolveAvailabilityRowDate(selectedDayData);
                                   try {
@@ -1858,6 +1892,15 @@ function MentorScheduleContent() {
                       // Check against scheduled appointments on this date
                       const slotDateStr = selectedDayData ? resolveAvailabilityRowDate(selectedDayData) : null;
                       if (slotDateStr) {
+                        const now = new Date();
+                        const todayYmd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+                        if (slotDateStr === todayYmd) {
+                          const nowMins = now.getHours() * 60 + now.getMinutes();
+                          if (startMins <= nowMins) {
+                            setSlotValidationError("For today, start time must be after the current time.");
+                            return;
+                          }
+                        }
                         const conflictingAppt = appointments.find((a) => {
                           if (!String(a.meetingDate).startsWith(slotDateStr)) return false;
                           if (["cancelled", "canceled"].includes((a.status || "").toLowerCase())) return false;

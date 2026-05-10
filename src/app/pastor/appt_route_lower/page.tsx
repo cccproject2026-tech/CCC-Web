@@ -2,7 +2,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import Link from "next/link";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorSearchBar from "@/app/Components/pastor/PastorSearchBar";
 import AvailabilityCalendar from "@/app/Components/AvailabilityCalendar";
@@ -276,10 +275,6 @@ export default function PastorAppointmentsPage() {
 
   return ZoomIcon;
 };
-const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Mentor") =>
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(
-    `${firstName || ""} ${lastName || ""}`.trim() || fallback
-  )}&background=173653&color=ffffff`;
 
   const formatDate = (dateString) => {
     const d = new Date(dateString);
@@ -847,35 +842,23 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
                       className={`relative flex flex-col items-start gap-5 p-4 md:flex-row md:items-center md:p-5 ${pastorGlassCard} ${menuOpenId === appointmentEntityId(appt) ? "z-[60]" : ""}`}
                       style={menuOpenId === appointmentEntityId(appt) ? { overflow: "visible" } : undefined}
                     >
-                      {/* Icon — link to meeting details */}
-                      <Link
-                        href={`/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt))}`}
-                        className="flex h-[80px] w-[80px] shrink-0 cursor-pointer items-center justify-center rounded-xl bg-white/90 transition hover:bg-white md:h-[100px] md:w-[100px]"
-                        aria-label="View meeting details"
-                      >
-                        <Image src={icon} alt={String(appt.platform ?? "Meeting mode")} className="w-[45px] md:w-[55px]" />
-                      </Link>
+                      {/* Icon */}
+                      <div className="flex h-[80px] w-[80px] items-center justify-center rounded-xl bg-white/90 md:h-[100px] md:w-[100px]">
+                        <Image src={icon} alt="mode" className="w-[45px] md:w-[55px]" />
+                      </div>
 
                       {/* Details */}
                       <div className="flex-1">
 
                         {/* Mentor Row */}
                         <div className="flex items-center gap-3 mb-2">
-                          {/* <Image
+                          <Image
                             src={mentor?.profilePicture || UserProfile}
                             width={32}
                             height={32}
                             alt="mentor"
                             className="rounded-full"
-                          /> */}
-                          <img
-  src={
-    mentor?.profilePicture ||
-    getInitialsAvatar(mentor?.firstName, mentor?.lastName)
-  }
-  alt="mentor"
-  className="h-8 w-8 rounded-full object-cover"
-/>
+                          />
                           <div>
                             <h4 className="text-sm font-semibold text-white">
                               {mentor?.firstName} {mentor?.lastName}
@@ -897,20 +880,10 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
                           </div>
                         </div>
 
-                        {/* Mode — tap platform to open meeting details */}
+                        {/* Mode */}
                         <p className="mb-3 text-[11px] text-[#d9ebf8]">
-                          Mode:{" "}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              router.push(
-                                `/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt))}`,
-                              )
-                            }
-                            className="!cursor-pointer border-0 bg-transparent p-0 font-semibold text-[#8ec5eb] underline underline-offset-2 hover:text-white"
-                          >
-                            {String(appt.platform ?? "")}
-                          </button>
+                          Mode:
+                          <span className="font-semibold text-[#8ec5eb]"> {String(appt.platform ?? "")}</span>
                         </p>
 
                         {/* Actions row */}
@@ -1100,31 +1073,19 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
                         )}
                       </div>
 
-                      <Link
-                        href={`/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt))}`}
-                        className="flex h-[100px] w-[100px] shrink-0 cursor-pointer items-center justify-center rounded-xl bg-white/95 transition hover:bg-white md:h-[140px] md:w-[140px]"
-                        aria-label="View meeting details"
-                      >
+                      <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-white/95 md:h-[140px] md:w-[140px]">
                         <Image src={icon} alt={String(mode)} className="h-[50px] w-[50px] md:h-[60px] md:w-[60px]" />
-                      </Link>
+                      </div>
 
                       <div className="flex w-full flex-col text-white">
                         <div className="mb-3 flex items-center gap-3">
-                          {/* <Image
+                          <Image
                             src={mentor?.profilePicture || UserProfile}
                             alt="Mentor"
                             width={32}
                             height={32}
                             className="rounded-full border border-white/30 md:h-9 md:w-9"
-                          /> */}
-                          <img
-  src={
-    mentor?.profilePicture ||
-    getInitialsAvatar(mentor?.firstName, mentor?.lastName)
-  }
-  alt="Mentor"
-  className="h-8 w-8 rounded-full border border-white/30 object-cover md:h-9 md:w-9"
-/>
+                          />
                           <div>
                             <h4 className="text-sm font-semibold">
                               {mentor?.firstName} {mentor?.lastName}
@@ -1149,17 +1110,9 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
                           <div>
                             <p className="mb-2 text-xs text-[#d9ebf8]">
                               Mode:{" "}
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  router.push(
-                                    `/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt))}`,
-                                  )
-                                }
-                                className="!cursor-pointer border-0 bg-transparent p-0 font-medium text-[#8ec5eb] underline underline-offset-2 hover:text-white"
-                              >
+                              <span className="font-medium text-[#8ec5eb] underline underline-offset-2">
                                 {mode}
-                              </button>
+                              </span>
                             </p>
 
                             <div className="flex gap-4 text-sm text-[#cde2f2]">
@@ -1211,31 +1164,19 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
                           </div>
                         )}
                       </div>
-                      <Link
-                        href={`/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt as any))}`}
-                        className="flex h-[100px] w-[100px] shrink-0 cursor-pointer items-center justify-center rounded-xl bg-white/95 transition hover:bg-white md:h-[140px] md:w-[140px]"
-                        aria-label="View meeting details"
-                      >
+                      <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-white/95 md:h-[140px] md:w-[140px]">
                         <Image src={icon} alt={String(mode)} className="h-[50px] w-[50px] md:h-[60px] md:w-[60px]" />
-                      </Link>
+                      </div>
 
                       <div className="flex w-full flex-col text-white">
                         <div className="mb-3 flex items-center gap-3">
-                          {/* <Image
+                          <Image
                             src={mentor?.profilePicture || UserProfile}
                             alt="Mentor"
                             width={32}
                             height={32}
                             className="rounded-full border border-white/30 md:h-9 md:w-9"
-                          /> */}
-                          <img
-  src={
-    mentor?.profilePicture ||
-    getInitialsAvatar(mentor?.firstName, mentor?.lastName)
-  }
-  alt="Mentor"
-  className="h-8 w-8 rounded-full border border-white/30 object-cover md:h-9 md:w-9"
-/>
+                          />
                           <div>
                             <h4 className="text-sm font-semibold">
                               {mentor?.firstName} {mentor?.lastName}
@@ -1258,17 +1199,9 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
 
                         <p className="mb-2 text-xs text-[#d9ebf8]">
                           Mode:{" "}
-                          <button
-                            type="button"
-                            onClick={() =>
-                              router.push(
-                                `/pastor/appointments/${encodeURIComponent(appointmentEntityId(appt as any))}`,
-                              )
-                            }
-                            className="!cursor-pointer border-0 bg-transparent p-0 font-medium text-[#8ec5eb] underline underline-offset-2 hover:text-white"
-                          >
+                          <span className="font-medium text-[#8ec5eb] underline underline-offset-2">
                             {mode}
-                          </button>
+                          </span>
                         </p>
                       </div>
                     </div>
@@ -1465,32 +1398,13 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
                             }`}
                         >
                           <div className="flex items-center gap-3">
-                            {/* <Image
+                            <Image
                               src={UserProfile}
                               alt=""
                               width={32}
                               height={32}
                               className="rounded-full ring-2 ring-white/10"
-                            /> */}
-                            <img
-src={
-  String((m as any)?.profilePicture || "").trim() ||
-  getInitialsAvatar(
-    (m as any)?.firstName,
-    (m as any)?.lastName
-  )
-}
-alt={
-  [
-    (m as any)?.firstName,
-    (m as any)?.lastName,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .trim() || "Mentor"
-}
-className="h-8 w-8 rounded-full object-cover ring-2 ring-white/10"
-/>
+                            />
                             <div>
                               <p className="text-sm font-medium text-white">
                                 {[m.firstName, m.lastName].filter(Boolean).join(" ").trim() ||

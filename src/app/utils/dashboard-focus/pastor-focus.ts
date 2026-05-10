@@ -300,7 +300,7 @@ export async function loadPastorFocusSections(input: PastorFocusInput): Promise<
         title: "Upcoming meeting",
         description: `Meeting starts ${formatDateTime(md)}.`,
         meta: `${scheduler} • ${withWhom} • Within ${UPCOMING_MEETING_WINDOW_HOURS} hours`,
-        href: "/pastor/Appointments",
+        href: "/pastor/appointments",
       };
     });
 
@@ -322,7 +322,7 @@ export async function loadPastorFocusSections(input: PastorFocusInput): Promise<
         title: "Upcoming meeting this month",
         description: `Meeting starts ${formatDateTime(md)}.`,
         meta: `${scheduler} • ${withWhom} • This month`,
-        href: "/pastor/Appointments",
+        href: "/pastor/appointments",
       };
     });
 

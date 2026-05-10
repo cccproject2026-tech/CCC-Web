@@ -65,8 +65,17 @@ const nextConfig: NextConfig = {
         source: "/api-proxy/:path*",
         destination: resolveApiProxyRewriteDestination(),
       },
-      /** Case-only aliases — avoids 404 when nav/bookmarks use lowercase (routes use PascalCase folders). */
-      { source: "/pastor/appointments", destination: "/pastor/Appointments" },
+      /**
+       * Public URL is `/pastor/appointments`. The app route folder is currently `appt_route_lower`
+       * (see `src/app/pastor/appt_route_lower`). Rewrites must target that segment or requests 404.
+       * When you rename that folder to `appointments` in git, set destination to `/pastor/appointments`
+       * and remove these two lines (no-op rewrite).
+       */
+      { source: "/pastor/appointments", destination: "/pastor/appt_route_lower" },
+      {
+        source: "/pastor/appointments/:path*",
+        destination: "/pastor/appt_route_lower/:path*",
+      },
       { source: "/pastor/assessments", destination: "/pastor/Assessments" },
       { source: "/pastor/assessments/:path*", destination: "/pastor/Assessments/:path*" },
     ];

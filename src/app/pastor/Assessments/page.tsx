@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorSearchBar from "@/app/Components/pastor/PastorSearchBar";
@@ -712,18 +713,31 @@ hasCdp,
                       )}
 
                       {item.meeting?.id && (
-                        <button
-                          type="button"
+                        <div
+                          role="button"
+                          tabIndex={0}
                           onClick={() =>
                             router.push(`/pastor/appointments/${encodeURIComponent(item.meeting!.id)}`)
                           }
-                          className="mt-2 w-full rounded-xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-2 text-left transition hover:bg-[#8ec5eb]/15"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              router.push(`/pastor/appointments/${encodeURIComponent(item.meeting!.id)}`);
+                            }
+                          }}
+                          className="mt-2 w-full cursor-pointer rounded-xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-2 text-left transition hover:bg-[#8ec5eb]/15"
                         >
                           <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[#d9ebf8]">
                             <span className="font-semibold text-white">Meeting</span>
                             <span>{item.meeting.meetingDate || "N/A"}</span>
                             <span className="text-white/30">|</span>
-                            <span>{item.meeting.platform || "N/A"}</span>
+                            <Link
+                              href={`/pastor/appointments/${encodeURIComponent(item.meeting!.id)}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="cursor-pointer font-semibold text-[#8ec5eb] underline underline-offset-2 hover:text-white"
+                            >
+                              {item.meeting.platform || "N/A"}
+                            </Link>
                           </div>
                           <div className="mt-1.5 flex flex-wrap items-center gap-2">
                             {item.meeting.meetingLink && (
@@ -732,13 +746,13 @@ hasCdp,
                                 target="_blank"
                                 rel="noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="rounded-lg border border-[#8ec5eb]/45 bg-transparent px-2.5 py-1 text-[11px] font-semibold text-[#8ec5eb] transition hover:bg-[#8ec5eb]/15"
+                                className="cursor-pointer rounded-lg border border-[#8ec5eb]/45 bg-transparent px-2.5 py-1 text-[11px] font-semibold text-[#8ec5eb] transition hover:bg-[#8ec5eb]/15"
                               >
                                 Join link
                               </a>
                             )}
                           </div>
-                        </button>
+                        </div>
                       )}
 
                       {/* {item.status === "Completed" && (
@@ -818,7 +832,7 @@ hasCdp,
           type="button"
           onClick={() =>
             router.push(
-               `/pastor/Appointments/${encodeURIComponent(item.meeting!.id)}`
+               `/pastor/appointments/${encodeURIComponent(item.meeting!.id)}`
             )
           }
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb] transition hover:bg-[#8ec5eb]/25 hover:text-white"

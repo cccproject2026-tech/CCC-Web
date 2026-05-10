@@ -188,6 +188,8 @@ function DirectorScheduleContent() {
   const [newSlot, setNewSlot] = useState<any>(null);
   const [slotError, setSlotError] = useState<string | null>(null);
   const [maxBookingsPerDay, setMaxBookingsPerDay] = useState(5);
+  /** Backend `advanceNotice` is in hours (see AvailabilityPayload). */
+  const [advanceNoticeHours, setAdvanceNoticeHours] = useState(2);
 
   // schedule drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -246,7 +248,7 @@ function DirectorScheduleContent() {
     setLoading(true);
     (async () => {
       try {
-        const res = await apiGetAppointments({ futureOnly: false, status: "scheduled" });
+        const res = await apiGetAppointments({ futureOnly: false });
         const list = unwrapAppointmentsAxiosData(res);
         const sorted = [...list].sort(
           (a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
@@ -540,6 +542,7 @@ function DirectorScheduleContent() {
   const todayKey = new Date().toISOString().split("T")[0];
   const selectedDayAppointments = appointments
     .filter((a) => a.meetingDate.startsWith(selectedAppointmentDate))
+    .filter((a) => !["cancelled", "canceled"].includes((a.status || "").toLowerCase()))
     .filter((a) => selectedAppointmentDate !== todayKey || new Date(a.meetingDate).getTime() >= Date.now())
     .sort((a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime());
   const appointmentHistory = appointments
@@ -632,6 +635,8 @@ function DirectorScheduleContent() {
     const body = {
       mentorId: directorId,
       meetingDuration: 60,
+      advanceNotice: advanceNoticeHours,
+      maxBookingsPerDay,
       weeklySlots: dated.map(({ date, uiSlots }) => ({
         date,
         slots: uiSlots.map((s: any) => ({
@@ -660,17 +665,22 @@ function DirectorScheduleContent() {
       return;
     }
     if (!meetingDate || !selectedSlot) { showToast("Please select date and time"); return; }
+    const scheduledIso = parseSlotStartToIso(meetingDate, selectedSlot.replace(/\u2013/g, "-"));
+    if (meetingDate === new Date().toISOString().split("T")[0] && new Date(scheduledIso).getTime() <= Date.now()) {
+      showToast("For today, please choose a time after the current time.");
+      return;
+    }
     if (isScheduling) return;
     setIsScheduling(true);
     try {
       await apiCreateAppointment({
         userId: selectedRecipient._id || selectedRecipient.id,
         mentorId: directorId,
-        meetingDate: parseSlotStartToIso(meetingDate, selectedSlot.replace(/\u2013/g, "-")),
+        meetingDate: scheduledIso,
         platform: uiMeetingModeToPlatform(selectedPlatform),
         notes: "Scheduled by director",
       });
-      const refresh = await apiGetAppointments({ futureOnly: false, status: "scheduled" });
+      const refresh = await apiGetAppointments({ futureOnly: false });
       setAppointments(unwrapAppointmentsAxiosData(refresh).sort(
         (a: any, b: any) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
       ));
@@ -795,7 +805,7 @@ function DirectorScheduleContent() {
         startPeriod,
         platform: reschedulePlatform as any,
       });
-      const refresh = await apiGetAppointments({ futureOnly: false, status: "scheduled" });
+      const refresh = await apiGetAppointments({ futureOnly: false });
       const list = unwrapAppointmentsAxiosData(refresh).sort(
         (a: any, b: any) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
       );
@@ -1022,9 +1032,9 @@ function DirectorScheduleContent() {
                               <i className="fa-regular fa-clock text-[#8ec5eb]" />
                               {md.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
                             </span>
-                            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] capitalize text-[#e7f4ff]">
+                            {/* <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] capitalize text-[#e7f4ff]">
                               {appt.platform}
-                            </span>
+                            </span> */}
                           </div>
                         </div>
                       </div>
@@ -1272,9 +1282,9 @@ function DirectorScheduleContent() {
                               <i className="fa-regular fa-clock text-[#8ec5eb]" />
                               {md.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
                             </span>
-                            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] capitalize text-[#e7f4ff]">
+                            {/* <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] capitalize text-[#e7f4ff]">
                               {appt.platform}
-                            </span>
+                            </span> */}
                           </div>
                         </div>
                       </div>
@@ -1353,8 +1363,21 @@ function DirectorScheduleContent() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-[#cde2f2]">Min. Notice</label>
-                    <select className={directorSelectDark}><option>2 Days</option><option>1 Day</option></select>
+                    <label className="mb-1 block text-xs text-[#cde2f2]">Min. notice (hours)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={168}
+                      step={1}
+                      value={advanceNoticeHours}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        if (!Number.isFinite(n)) return
+                        ;
+                        setAdvanceNoticeHours(Math.max(1, Math.min(168, Math.floor(n))));
+                      }}
+                      className={directorSelectDark}
+                    />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs text-[#cde2f2]">Preferred Mode</label>
@@ -1389,6 +1412,17 @@ function DirectorScheduleContent() {
                               type="button"
                               aria-label={`Delete slot ${i + 1}`}
                               onClick={async () => {
+                                if (!slot?._id) {
+                                  // Unsaved slot: remove only from local UI state, no API call.
+                                  setAvailability((prev) =>
+                                    prev.map((d) =>
+                                      d.day === selectedAvailabilityDay
+                                        ? { ...d, slots: (d.slots || []).filter((_: any, idx: number) => idx !== i) }
+                                        : d,
+                                    ),
+                                  );
+                                  return;
+                                }
                                 if (!directorId) return;
                                 const dateStr = resolveAvailabilityRowDate(selectedDayData);
                                 try {
@@ -1532,6 +1566,15 @@ function DirectorScheduleContent() {
                       const selectedDayAvail = availability.find((d) => d.day === selectedAvailabilityDay);
                       const slotDateStr = selectedDayAvail ? resolveAvailabilityRowDate(selectedDayAvail) : null;
                       if (slotDateStr) {
+                        const now = new Date();
+                        const todayYmd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+                        if (slotDateStr === todayYmd) {
+                          const nowMins = now.getHours() * 60 + now.getMinutes();
+                          if (newStart <= nowMins) {
+                            setSlotError("For today, start time must be after the current time.");
+                            return;
+                          }
+                        }
                         const conflictingAppt = appointments.find((a) => {
                           if (!a.meetingDate.startsWith(slotDateStr)) return false;
                           if (["cancelled", "canceled"].includes((a.status || "").toLowerCase())) return false;

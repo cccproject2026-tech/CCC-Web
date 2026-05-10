@@ -32,7 +32,7 @@ export default function PastorFooter() {
             <li><Link href="/pastor/revitalization-roadmap" className="hover:text-white">Revitalization Roadmap</Link></li>
             <li><Link href="/pastor/Assessments" className="hover:text-white">Assessments</Link></li>
             <li><Link href="/pastor/Myprogress" className="hover:text-white">Progress</Link></li>
-            <li><Link href="/pastor/Appointments" className="hover:text-white">Appointments</Link></li>
+            <li><Link href="/pastor/appointments" className="hover:text-white">Appointments</Link></li>
           </ul>
         </div>
 
