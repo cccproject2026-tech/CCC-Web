@@ -56,7 +56,11 @@ function labelPerson(p: string | PersonInfo | undefined, fallback: string): stri
   const n = `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim();
   return n || p.email || fallback;
 }
-
+function getInitialsAvatar(firstName?: string, lastName?: string, fallback = "User") {
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    `${firstName || ""} ${lastName || ""}`.trim() || fallback
+  )}&background=173653&color=ffffff`;
+}
 function isTodayDate(iso: string) {
   const d = new Date(iso);
   const t = new Date();
@@ -952,14 +956,22 @@ function DirectorScheduleContent() {
                             </div>
                           </div>
                           <div className="mb-3 flex items-center gap-3">
-                            <Image
+                            {/* <Image
                               src={mentor?.profilePicture || UserProfile}
                               alt={mentorName}
                               width={36}
                               height={36}
                               unoptimized={mentor?.profilePicture ? isRemoteImageSrc(mentor.profilePicture) : false}
                               className="rounded-full border border-white/20"
-                            />
+                            /> */}
+                            <img
+  src={
+    String((mentor as any)?.profilePicture || "").trim() ||
+    getInitialsAvatar((mentor as any)?.firstName, (mentor as any)?.lastName, "Mentor")
+  }
+  alt={mentorName}
+  className="h-9 w-9 rounded-full border border-white/20 object-cover"
+/>
                             <div>
                               <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Mentor</p>
                               <h4 className="pr-10 text-sm font-semibold text-white">
@@ -973,14 +985,22 @@ function DirectorScheduleContent() {
                             </div>
                           </div>
                           <div className="mb-3 flex items-center gap-3">
-                            <Image
+                            {/* <Image
                               src={mentee?.profilePicture || UserProfile}
                               alt={menteeName}
                               width={36}
                               height={36}
                               unoptimized={mentee?.profilePicture ? isRemoteImageSrc(mentee.profilePicture) : false}
                               className="rounded-full border border-white/20"
-                            />
+                            /> */}
+                            <img
+  src={
+    String((mentee as any)?.profilePicture || "").trim() ||
+    getInitialsAvatar((mentee as any)?.firstName, (mentee as any)?.lastName, "Pastor")
+  }
+  alt={menteeName}
+  className="h-9 w-9 rounded-full border border-white/20 object-cover"
+/>
                             <div>
                               <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Pastor</p>
                               <h4 className="text-sm font-semibold text-white">
@@ -1186,14 +1206,22 @@ function DirectorScheduleContent() {
                             </div>
                           </div>
                           <div className="mb-3 flex items-center gap-3">
-                            <Image
+                            {/* <Image
                               src={mentor?.profilePicture || UserProfile}
                               alt={mentorName}
                               width={36}
                               height={36}
                               unoptimized={mentor?.profilePicture ? isRemoteImageSrc(mentor.profilePicture) : false}
                               className="rounded-full border border-white/20"
-                            />
+                            /> */}
+                            <img
+  src={
+    String((mentor as any)?.profilePicture || "").trim() ||
+    getInitialsAvatar((mentor as any)?.firstName, (mentor as any)?.lastName, "Mentor")
+  }
+  alt={mentorName}
+  className="h-9 w-9 rounded-full border border-white/20 object-cover"
+/>
                             <div>
                               <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Mentor</p>
                               <h4 className="pr-10 text-sm font-semibold text-white">
@@ -1207,14 +1235,22 @@ function DirectorScheduleContent() {
                             </div>
                           </div>
                           <div className="mb-3 flex items-center gap-3">
-                            <Image
+                            {/* <Image
                               src={mentee?.profilePicture || UserProfile}
                               alt={menteeName}
                               width={36}
                               height={36}
                               unoptimized={mentee?.profilePicture ? isRemoteImageSrc(mentee.profilePicture) : false}
                               className="rounded-full border border-white/20"
-                            />
+                            /> */}
+                            <img
+  src={
+    String((mentee as any)?.profilePicture || "").trim() ||
+    getInitialsAvatar((mentee as any)?.firstName, (mentee as any)?.lastName, "Pastor")
+  }
+  alt={menteeName}
+  className="h-9 w-9 rounded-full border border-white/20 object-cover"
+/>
                             <div>
                               <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Pastor</p>
                               <h4 className="text-sm font-semibold text-white">
@@ -1621,14 +1657,22 @@ function DirectorScheduleContent() {
                           }`}
                       >
                         <div className="flex min-w-0 items-center gap-3">
-                          <Image
+                          {/* <Image
                             src={person.profilePicture || UserProfile}
                             alt=""
                             width={36}
                             height={36}
                             unoptimized={person.profilePicture ? isRemoteImageSrc(person.profilePicture) : false}
                             className="shrink-0 rounded-full border border-white/20"
-                          />
+                          /> */}
+                          <img
+  src={
+    String(person?.profilePicture || "").trim() ||
+    getInitialsAvatar(person?.firstName, person?.lastName, scheduleRecipientType)
+  }
+  alt={`${person?.firstName || ""} ${person?.lastName || ""}`.trim() || scheduleRecipientType}
+  className="h-9 w-9 shrink-0 rounded-full border border-white/20 object-cover"
+/>
                           <div className="flex min-w-0 flex-col">
                             <span className="truncate text-sm font-medium text-white">
                               {person.firstName} {person.lastName}

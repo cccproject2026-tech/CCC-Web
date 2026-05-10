@@ -26,7 +26,12 @@ function apiErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-export default function SetPasswordInlinePanel() {
+// export default function SetPasswordInlinePanel() {
+export default function SetPasswordInlinePanel({
+  onSuccess,
+}: {
+  onSuccess?: () => void;
+}) {
   const router = useRouter();
 
   const [step, setStep] = useState<Step>(1);
@@ -135,6 +140,7 @@ export default function SetPasswordInlinePanel() {
       }
 
       setShowSuccess(true);
+      onSuccess?.();
     } catch (err) {
       console.error(err);
       setError(apiErrorMessage(err, "Something went wrong. Please try again later."));

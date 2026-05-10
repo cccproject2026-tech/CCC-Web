@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/hero-bg.png";
 import { apiGetInterestByEmail } from "@/app/Services/interests.service";
@@ -18,6 +18,7 @@ function normStatus(s: string | undefined | null): string {
 
 function ProcessingPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const emailFromUrl = searchParams.get("email") ?? "";
 
   const [interest, setInterest] = useState<Interest | null>(null);
@@ -112,6 +113,25 @@ const [showStatusText, setShowStatusText] = useState(false);
       : isRejected
         ? "Rejected"
         : "Waiting for Approval";
+
+        const interestRole = String(
+           (interest as any)?.title ||
+  (interest as any)?.interestFor ||
+  (interest as any)?.type ||
+  (interest as any)?.role ||
+  (interest as any)?.userType ||
+  ""
+).toLowerCase();
+
+const loginPath = interestRole.includes("mentor")
+  ? "/mentor/login"
+  : "/pastor/login";
+
+const handlePasswordSetSuccess = () => {
+  setTimeout(() => {
+    router.push(loginPath);
+  }, 1200);
+};
 
   // const handleCheckStatus = async () => {
   //   const email = emailFromUrl || getCookie("interestEmail");
@@ -263,7 +283,8 @@ const [showStatusText, setShowStatusText] = useState(false);
                     <>
                       <p>You’re approved to continue. Complete your account setup by creating your password.</p>
                       <div className="mt-6">
-                        <SetPasswordInlinePanel />
+                        {/* <SetPasswordInlinePanel /> */}
+                        <SetPasswordInlinePanel onSuccess={handlePasswordSetSuccess} />
                       </div>
                     </>
                   ) : isRejected ? (

@@ -173,7 +173,7 @@ setNotificationList(newestFirst);
     { icon: <Award size={18} />, label: "Certificates", path: "/mentor/certificates" },
     { icon: <Clipboard size={18} />, label: "Mentorship Sessions", path: "/mentor/mentoring-session" },
     // { icon: <File size={18} />, label: "Assignments", path: "/mentor/assignments" },
-    { icon: <Trophy size={18} />, label: "Micro Grand", path: "/mentor/micro-grant" },
+    { icon: <Trophy size={18} />, label: "Micro Grant", path: "/mentor/micro-grant" },
     { icon: <FolderOpen size={18} />, label: "Documents", path: "/mentor/documents" },
     {
       icon: <Settings size={18} />,
@@ -403,14 +403,25 @@ setNotificationList(newestFirst);
                   className="rounded-full border border-white/40"
                 /> */}
                 <div className="h-[30px] w-[30px] overflow-hidden rounded-full border border-white/40 bg-white/10">
-  <Image
+  {/* <Image
     src={user?.profilePicture || UserProfile}
     alt={user ? `${user.firstName} profile` : "User profile"}
     width={30}
     height={30}
     className="h-full w-full rounded-full object-cover"
     unoptimized={typeof user?.profilePicture === "string" && user.profilePicture.startsWith("http")}
-  />
+  /> */}
+  <img
+  src={
+    user?.profilePicture
+      ? user.profilePicture
+      : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+          `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || "Mentor"
+        )}&background=173653&color=ffffff`
+  }
+  alt={user ? `${user.firstName} profile` : "User profile"}
+  className="h-full w-full rounded-full object-cover"
+/>
 </div>
               </button>
 

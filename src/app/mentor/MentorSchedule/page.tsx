@@ -118,6 +118,15 @@ function getPlatformIcon(platform?: string) {
 
   return ZoomIcon;
 }
+
+const getInitialsAvatar = (
+  firstName?: string,
+  lastName?: string,
+  fallback = "User"
+) =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    `${firstName || ""} ${lastName || ""}`.trim() || fallback
+  )}&background=173653&color=ffffff`;
 /**
  * Given a mentor's own ID and an appointment, returns the OTHER party (pastor/director).
  * The API is queried with mentorId so `appt.mentor` could be populated with the logged-in
@@ -1240,6 +1249,7 @@ function MentorScheduleContent() {
                       : "Unknown";
                     const rawRole = otherPerson?.role ?? "pastor";
                     const displayRole = rawRole.charAt(0).toUpperCase() + rawRole.slice(1).toLowerCase();
+                    const otherPersonProfile = otherPerson as any;
 
                     return (
                       <div
@@ -1259,13 +1269,25 @@ function MentorScheduleContent() {
 
                         <div className="min-w-0 flex-1 px-0 pt-4 sm:px-5 sm:pt-0">
                           <div className="mb-2 flex items-center gap-3">
-                            <Image
+                            {/* <Image
                               src={otherPerson?.profilePicture || UserProfile}
                               alt="User"
                               width={36}
                               height={36}
                               className="rounded-full border border-white/20"
-                            />
+                            /> */}
+                            <img
+  src={
+    String(otherPersonProfile?.profilePicture || "").trim() ||
+    getInitialsAvatar(
+      otherPersonProfile?.firstName,
+      otherPersonProfile?.lastName,
+      displayRole
+    )
+  }
+  alt={displayName}
+  className="h-9 w-9 rounded-full border border-white/20 object-cover"
+/>
 
                             <div>
                               <h4 className="text-sm font-semibold text-white">
@@ -1392,6 +1414,7 @@ function MentorScheduleContent() {
                       : "Unknown";
                     const rawRole = otherPerson?.role ?? "pastor";
                     const displayRole = rawRole.charAt(0).toUpperCase() + rawRole.slice(1).toLowerCase();
+                    const otherPersonProfile = otherPerson as any;
                     return (
                       <div key={apptKey} className={`${mentorGlassCardRoadmap} relative items-stretch gap-0 p-4 sm:items-center sm:p-5`}>
                         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-0">
@@ -1406,13 +1429,25 @@ function MentorScheduleContent() {
                         </div>
                         <div className="min-w-0 flex-1 px-0 pt-4 sm:px-5 sm:pt-0">
                           <div className="mb-2 flex items-center gap-3">
-                            <Image
+                            {/* <Image
                               src={otherPerson?.profilePicture || UserProfile}
                               alt="User"
                               width={36}
                               height={36}
                               className="rounded-full border border-white/20"
-                            />
+                            /> */}
+                            <img
+  src={
+    String(otherPersonProfile?.profilePicture || "").trim() ||
+    getInitialsAvatar(
+      otherPersonProfile?.firstName,
+      otherPersonProfile?.lastName,
+      displayRole
+    )
+  }
+  alt={displayName}
+  className="h-9 w-9 rounded-full border border-white/20 object-cover"
+/>
                             <div>
                               <h4 className="text-sm font-semibold text-white">{displayName}</h4>
                               <p className="text-[12px] text-[#cde2f2]/90">{displayRole}</p>
@@ -1955,13 +1990,21 @@ function MentorScheduleContent() {
                           }`}
                       >
                         <div className="flex min-w-0 items-center gap-3">
-                          <Image
+                          {/* <Image
                             src={person.profilePicture || UserProfile}
                             alt=""
                             width={36}
                             height={36}
                             className="shrink-0 rounded-full border border-white/20"
-                          />
+                          /> */}
+                          <img
+  src={
+    String(person?.profilePicture || "").trim() ||
+    getInitialsAvatar(person?.firstName, person?.lastName, scheduleRecipientType)
+  }
+  alt={`${person?.firstName || ""} ${person?.lastName || ""}`.trim() || scheduleRecipientType}
+  className="h-9 w-9 shrink-0 rounded-full border border-white/20 object-cover"
+/>
                           <div className="flex min-w-0 flex-col">
                             <span className="truncate text-sm font-medium text-white">
                               {person.firstName} {person.lastName}

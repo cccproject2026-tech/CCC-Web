@@ -357,14 +357,24 @@ setIsEditing(false);
 </div> */}
 
 <div className="relative mx-auto mb-3 h-[100px] w-[100px] overflow-hidden rounded-full border border-white/20 bg-white/10">
-  <Image
+  {/* <Image
     src={(profile.profilePicture as string) || ProfilePic}
     alt="Mentor profile"
     width={100}
     height={100}
     className="h-full w-full rounded-full object-cover"
     unoptimized={typeof profile.profilePicture === "string" && profile.profilePicture.startsWith("http")}
-  />
+  /> */}
+  <img
+  src={
+    (profile.profilePicture as string) ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      `${String(profile.firstName ?? "")} ${String(profile.lastName ?? "")}`.trim() || "Mentor"
+    )}&background=173653&color=ffffff`
+  }
+  alt="Mentor profile"
+  className="h-full w-full rounded-full object-cover"
+/>
 
   <button
     type="button"

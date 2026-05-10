@@ -37,7 +37,11 @@ interface CourseUser {
   invitationDate?: string;
   response?: "Accepted" | "Waiting" | "Not Interested";
 }
-
+function getInitialsAvatar(name: string, fallback = "User") {
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    name || fallback
+  )}&background=173653&color=ffffff`;
+}
 export default function CourseCompletedPage() {
   const [users, setUsers] = useState<CourseUser[]>([]);
   const [loading, setLoading] = useState(false);
@@ -73,7 +77,10 @@ export default function CourseCompletedPage() {
             return {
               id: u.id ?? u._id,
               name: `${u.firstName} ${u.lastName}`,
-              img: u.profilePicture || [Mentor1, Mentor2, Mentor3][i % 3],
+              // img: u.profilePicture || [Mentor1, Mentor2, Mentor3][i % 3],
+              img:
+  String(u.profilePicture || "").trim() ||
+  getInitialsAvatar(`${u.firstName || ""} ${u.lastName || ""}`.trim(), "Pastor"),
               createdAt: u.createdAt,
               status,
               invitationDate: u.fieldMentorInvitation?.invitedAt

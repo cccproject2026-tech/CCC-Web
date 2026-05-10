@@ -46,6 +46,17 @@ function churchLabel(app: MicroGrantApplicationResponse): string {
     "Not provided"
   );
 }
+function applicantProfileImage(app: MicroGrantApplicationResponse): string {
+  const u = app.userId as any;
+
+  if (u && typeof u === "object" && u.profilePicture) {
+    return String(u.profilePicture);
+  }
+
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    applicantDisplayName(app) || "User"
+  )}&background=173653&color=ffffff`;
+}
 
 const TAB_LABELS = ["All", "New", "Pending", "Accepted"] as const;
 type MentorMgTab = (typeof TAB_LABELS)[number];
@@ -166,7 +177,8 @@ export default function MentorMicroGrantPage() {
                 return (
                   <MicroGrantCard
                     key={app._id}
-                    image={UserProfile}
+                    // image={UserProfile}
+                    image={applicantProfileImage(app)}
                     name={applicantDisplayName(app)}
                     role={churchLabel(app)}
                     date={app.createdAt ? new Date(app.createdAt).toLocaleDateString() : "—"}

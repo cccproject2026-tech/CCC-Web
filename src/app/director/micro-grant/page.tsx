@@ -38,6 +38,18 @@ function churchLabel(app: MicroGrantApplicationResponse): string {
   );
 }
 
+function applicantProfileImage(app: MicroGrantApplicationResponse): string {
+  const user = app.userId as any;
+
+  if (user && typeof user === "object" && user.profilePicture) {
+    return String(user.profilePicture);
+  }
+
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    applicantDisplayName(app) || "User"
+  )}&background=173653&color=ffffff`;
+}
+
 const Page: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("new");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -180,7 +192,8 @@ const Page: React.FC = () => {
     <MicroGrantCard
       key={app._id}
       variant="directorGlass"
-      image={UserProfile}
+      // image={UserProfile}
+      image={applicantProfileImage(app)}
       name={user?.email || "Unknown"}
       role={churchLabel(app) ? `Church: ${churchLabel(app)}` : "Church: Not provided"}
       date={app.createdAt ? new Date(app.createdAt).toLocaleDateString() : "—"}

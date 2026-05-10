@@ -308,6 +308,11 @@ function getPersonProfilePicture(person: any): string {
 
   return resolveApiMediaUrl(raw.trim()) ?? raw.trim();
 }
+function getInitialsAvatar(firstName?: string, lastName?: string, fallback = "User") {
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    `${firstName || ""} ${lastName || ""}`.trim() || fallback
+  )}&background=173653&color=ffffff`;
+}
 
 // function QuickLinkAvatar({
 //   person,
@@ -579,7 +584,8 @@ useEffect(() => {
       if (typeof raw === "string" && raw.trim()) {
         return { id, name, img: (resolveApiMediaUrl(raw) ?? raw) as string, kind };
       }
-      return { id, name, img: pool[i % pool.length], kind };
+      // return { id, name, img: pool[i % pool.length], kind };
+      return { id, name, img: getInitialsAvatar(fn, ln, kind === "pastor" ? "Pastor" : "Mentor"), kind };
     };
     try {
       const ts = Date.now();
@@ -1784,13 +1790,24 @@ const selectedAssignMentorName =
               </div>
             </button> */}
             <div className="mt-4 flex w-full max-w-sm items-center gap-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-left backdrop-blur-md lg:mt-0 lg:w-auto">
-  <Image
+  {/* <Image
     src={UserProfile}
     alt=""
     width={48}
     height={48}
     className="rounded-full border-2 border-white/30"
-  />
+  /> */}
+  <Image
+  src={
+    getPersonProfilePicture(user) ||
+    getInitialsAvatar(user?.firstName, user?.lastName, "Director")
+  }
+  alt=""
+  width={48}
+  height={48}
+  unoptimized
+  className="rounded-full border-2 border-white/30 object-cover"
+/>
   <div className="min-w-0 flex-1">
     <p className="text-sm font-semibold text-white">{displayName}</p>
   </div>
@@ -2638,7 +2655,11 @@ if (route) {
  <div key={personId} className="w-[300px]  shrink-0">
   <MentorCard
                     variant="glass"
-                    image={person?.profilePicture ? person.profilePicture : Mentor1}
+                    // image={person?.profilePicture ? person.profilePicture : Mentor1}
+                    image={
+  getPersonProfilePicture(person) ||
+  getInitialsAvatar(person?.firstName, person?.lastName, activeTab === "mentors" ? "Mentor" : "Pastor")
+}
                     name={`${person.firstName} ${person.lastName}`}
                     role={person.role}
                     menteeCount={menteeCount}

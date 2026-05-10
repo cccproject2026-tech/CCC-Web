@@ -114,6 +114,11 @@ function firstDefinedString(...vals) {
   }
   return "";
 }
+function getInitialsAvatar(firstName, lastName, fallback = "User") {
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    `${firstName || ""} ${lastName || ""}`.trim() || fallback
+  )}&background=173653&color=ffffff`;
+}
 
 /** Pull ISO-ish created timestamp from roadmap list/detail payloads. */
 function extractRoadmapCreatedAtRaw(item) {
@@ -897,8 +902,11 @@ export default function RevitalizationRoadmapPage() {
                   ) : (
                     pastorProgressList.map((p, idx) => {
                       const pid = extractUserIdFromOverallProgressRow(p) || String(idx);
-                      const defaultImages = [Mentor1, Mentor2, Mentor3];
-                      const img = p.profilePicture || defaultImages[idx % defaultImages.length];
+                      // const defaultImages = [Mentor1, Mentor2, Mentor3];
+                      // const img = p.profilePicture || defaultImages[idx % defaultImages.length];
+                      const img =
+  String(p.profilePicture || "").trim() ||
+  getInitialsAvatar(p.firstName, p.lastName, "Pastor");
                       const name = `${p.firstName || ""} ${p.lastName || ""}`.trim() || "Pastor";
                       const selected = filterPastorId === pid;
                       return (
@@ -978,8 +986,10 @@ export default function RevitalizationRoadmapPage() {
                     const thumb =
                       typeof imgRaw === "string" ? resolveApiMediaUrl(imgRaw) || imgRaw : imgRaw || Card1;
                     const created = parseDate(roadmap.createdAt);
+                    // const creatorPic = roadmap.createdByAvatar;
+                    // const creatorFallback = Mentor1;
                     const creatorPic = roadmap.createdByAvatar;
-                    const creatorFallback = Mentor1;
+const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director");
                     return (
                       <div
                         key={roadmap.id}
@@ -1093,7 +1103,8 @@ export default function RevitalizationRoadmapPage() {
                               <span className="flex items-center gap-2 pl-5 text-[13px] text-white/90">
                                 <span className="relative inline-block h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-white/20">
                                   <Image
-                                    src={creatorPic || creatorFallback}
+                                    // src={creatorPic || creatorFallback}
+                                    src={creatorPic || creatorInitials}
                                     alt=""
                                     fill
                                     className="object-cover"

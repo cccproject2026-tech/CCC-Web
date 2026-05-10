@@ -275,6 +275,10 @@ export default function PastorAppointmentsPage() {
 
   return ZoomIcon;
 };
+const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Mentor") =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    `${firstName || ""} ${lastName || ""}`.trim() || fallback
+  )}&background=173653&color=ffffff`;
 
   const formatDate = (dateString) => {
     const d = new Date(dateString);
@@ -852,13 +856,21 @@ export default function PastorAppointmentsPage() {
 
                         {/* Mentor Row */}
                         <div className="flex items-center gap-3 mb-2">
-                          <Image
+                          {/* <Image
                             src={mentor?.profilePicture || UserProfile}
                             width={32}
                             height={32}
                             alt="mentor"
                             className="rounded-full"
-                          />
+                          /> */}
+                          <img
+  src={
+    mentor?.profilePicture ||
+    getInitialsAvatar(mentor?.firstName, mentor?.lastName)
+  }
+  alt="mentor"
+  className="h-8 w-8 rounded-full object-cover"
+/>
                           <div>
                             <h4 className="text-sm font-semibold text-white">
                               {mentor?.firstName} {mentor?.lastName}
@@ -1079,13 +1091,21 @@ export default function PastorAppointmentsPage() {
 
                       <div className="flex w-full flex-col text-white">
                         <div className="mb-3 flex items-center gap-3">
-                          <Image
+                          {/* <Image
                             src={mentor?.profilePicture || UserProfile}
                             alt="Mentor"
                             width={32}
                             height={32}
                             className="rounded-full border border-white/30 md:h-9 md:w-9"
-                          />
+                          /> */}
+                          <img
+  src={
+    mentor?.profilePicture ||
+    getInitialsAvatar(mentor?.firstName, mentor?.lastName)
+  }
+  alt="Mentor"
+  className="h-8 w-8 rounded-full border border-white/30 object-cover md:h-9 md:w-9"
+/>
                           <div>
                             <h4 className="text-sm font-semibold">
                               {mentor?.firstName} {mentor?.lastName}
@@ -1170,13 +1190,21 @@ export default function PastorAppointmentsPage() {
 
                       <div className="flex w-full flex-col text-white">
                         <div className="mb-3 flex items-center gap-3">
-                          <Image
+                          {/* <Image
                             src={mentor?.profilePicture || UserProfile}
                             alt="Mentor"
                             width={32}
                             height={32}
                             className="rounded-full border border-white/30 md:h-9 md:w-9"
-                          />
+                          /> */}
+                          <img
+  src={
+    mentor?.profilePicture ||
+    getInitialsAvatar(mentor?.firstName, mentor?.lastName)
+  }
+  alt="Mentor"
+  className="h-8 w-8 rounded-full border border-white/30 object-cover md:h-9 md:w-9"
+/>
                           <div>
                             <h4 className="text-sm font-semibold">
                               {mentor?.firstName} {mentor?.lastName}
@@ -1398,13 +1426,32 @@ export default function PastorAppointmentsPage() {
                             }`}
                         >
                           <div className="flex items-center gap-3">
-                            <Image
+                            {/* <Image
                               src={UserProfile}
                               alt=""
                               width={32}
                               height={32}
                               className="rounded-full ring-2 ring-white/10"
-                            />
+                            /> */}
+                            <img
+src={
+  String((m as any)?.profilePicture || "").trim() ||
+  getInitialsAvatar(
+    (m as any)?.firstName,
+    (m as any)?.lastName
+  )
+}
+alt={
+  [
+    (m as any)?.firstName,
+    (m as any)?.lastName,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim() || "Mentor"
+}
+className="h-8 w-8 rounded-full object-cover ring-2 ring-white/10"
+/>
                             <div>
                               <p className="text-sm font-medium text-white">
                                 {[m.firstName, m.lastName].filter(Boolean).join(" ").trim() ||

@@ -53,7 +53,7 @@ type AssignUserRow = {
   id: string;
   name: string;
   role?: string;
-  avatar: string | typeof Mentor1;
+  avatar: string;
 };
 
 type AssessmentCardRow = {
@@ -196,13 +196,29 @@ function assessmentStatusChipClass(status: AssessmentCardRow["progressStatus"]):
   if (status === "submitted") return "border-amber-300/35 bg-amber-500/20 text-amber-100";
   return "border-white/20 bg-white/10 text-[#cde2f2]";
 }
+function getInitialsAvatar(name: string, fallback = "User") {
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    name || fallback
+  )}&background=173653&color=ffffff`;
+}
+// const mapUserToAssignUser = (user: any): AssignUserRow => ({
+//   id: String(user.id ?? user._id ?? ""),
+//   name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "User",
+//   role: user.role,
+//   avatar: user.profilePicture || Mentor1,
+// });
+const mapUserToAssignUser = (user: any): AssignUserRow => {
+  const name = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "User";
 
-const mapUserToAssignUser = (user: any): AssignUserRow => ({
-  id: String(user.id ?? user._id ?? ""),
-  name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "User",
-  role: user.role,
-  avatar: user.profilePicture || Mentor1,
-});
+  return {
+    id: String(user.id ?? user._id ?? ""),
+    name,
+    role: user.role,
+    avatar:
+      String(user.profilePicture || "").trim() ||
+      getInitialsAvatar(name, "Pastor"),
+  };
+};
 
 function AssessmentsPageContent() {
   const router = useRouter();

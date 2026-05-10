@@ -34,6 +34,10 @@ function numFromApi(v: unknown): number {
   if (typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))) return Number(v);
   return 0;
 }
+const getInitialsAvatar = (name: string) =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    name || "User"
+  )}&background=173653&color=ffffff`;
 
 export default function TrackProgressPage() {
   const [filter, setFilter] = useState<"All" | "In-Progress" | "Completed">("All");
@@ -83,7 +87,10 @@ export default function TrackProgressPage() {
               id,
               name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Pastor",
               desc: u.profileInfo || "Assigned pastor",
-              img: u.profilePicture || PastorImg,
+              // img: u.profilePicture || PastorImg,
+              img:
+  u.profilePicture ||
+  getInitialsAvatar(`${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()),
               progress: Math.min(100, Math.max(0, numFromApi(row?.overallProgress ?? row?.overall_progress))),
               roadmapDone: numFromApi(row?.completedRoadmaps ?? row?.completed_roadmaps),
               roadmapTotal: numFromApi(row?.totalRoadmaps ?? row?.total_roadmaps),
@@ -209,6 +216,7 @@ export default function TrackProgressPage() {
                       height={120}
                       unoptimized={isRemoteImageSrc(pastor.img)}
                       className="h-[88px] w-[88px] rounded-xl border border-white/20 object-cover sm:h-[120px] sm:w-[120px]"
+                      // className="h-[88px] w-[88px] rounded-full border border-white/20 object-cover sm:h-[120px] sm:w-[120px]" use if want rounded image
                     />
                   </div>
 

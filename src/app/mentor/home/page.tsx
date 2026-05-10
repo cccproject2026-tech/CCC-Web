@@ -386,14 +386,24 @@ const currentDate = new Date().toLocaleDateString("en-US", {
         className="mt-4 flex w-full max-w-sm items-center gap-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-left backdrop-blur-md transition hover:bg-white/15 lg:mt-0 lg:w-auto"
       > */}
       <div className="mt-4 flex w-full max-w-sm items-center gap-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-left backdrop-blur-md lg:mt-0 lg:w-auto">
-        <Image
+        {/* <Image
           src={UserProfile}
           alt=""
           width={48}
           height={48}
           className="rounded-full border-2 border-white/30"
-        />
-
+        /> */}
+<img
+  src={
+    mentorUser?.profilePicture
+      ? mentorUser.profilePicture
+      : `https://ui-avatars.com/api/?name=${encodeURIComponent(
+          mentorName || "Mentor"
+        )}&background=173653&color=ffffff`
+  }
+  alt={mentorName}
+  className="h-12 w-12 rounded-full border-2 border-white/30 object-cover"
+/>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-white">
             {welcomeLine}

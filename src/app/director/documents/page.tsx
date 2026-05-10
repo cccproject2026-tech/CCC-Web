@@ -1,136 +1,34 @@
-// "use client";
-
-// import { useEffect, useState } from "react";
-// import "@fortawesome/fontawesome-free/css/all.min.css";
-// import MentorHeader from "@/app/Components/MentorHeader";
-// import { getCookie } from "@/app/utils/cookies";
-// import { apiGetDocuments } from "@/app/Services/api";
-// import {
-//   mentorBodyText,
-//   mentorGlassCardFrost,
-//   mentorMainGradient,
-//   mentorPageRoot,
-//   mentorSpinner,
-// } from "@/app/Components/mentor/mentor-theme";
-
-// export default function MentorDocumentsPage() {
-//   const [loading, setLoading] = useState(true);
-//   const [documents, setDocuments] = useState<any[]>([]);
-//   const [error, setError] = useState<string | null>(null);
-
-//   useEffect(() => {
-//     const fetchDocuments = async () => {
-//       try {
-//         setLoading(true);
-//         setError(null);
-
-//         const stored = getCookie("mentor");
-//         const user = stored ? JSON.parse(stored) : null;
-//         const userId = user?.id || user?._id;
-//         if (!userId) {
-//           setError("Mentor session not found. Please login again.");
-//           return;
-//         }
-
-//         const res = await apiGetDocuments(userId);
-//         setDocuments(Array.isArray(res.data?.data) ? res.data.data : []);
-//       } catch (err) {
-//         console.error("Failed to fetch documents:", err);
-//         setError("Unable to load documents from API.");
-//       } finally {
-//         setLoading(false);
-//       }
-//     };
-
-//     fetchDocuments();
-//   }, []);
-
-//   return (
-//     <div className={mentorPageRoot}>
-//       <MentorHeader showFullHeader={true} />
-
-//       <main className={`${mentorMainGradient} flex-1 px-4 py-10 md:px-8 lg:px-16`}>
-//         <div className={`mx-auto max-w-6xl p-6 md:p-8 ${mentorGlassCardFrost}`}>
-//           <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
-//             <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
-//             Leadership Support Network
-//           </p>
-
-//           <h1 className="mt-3 text-2xl font-semibold md:text-3xl">Documents</h1>
-//           <p className={`mt-2 ${mentorBodyText}`}>
-//             Manage and review your uploaded ministry documents.
-//           </p>
-
-//           <div className="mt-6 rounded-xl border border-white/15 bg-white/5 p-4">
-//             {loading && (
-//               <div className="flex flex-col items-center gap-3 py-6">
-//                 <div className={mentorSpinner} />
-//                 <p className={`text-sm ${mentorBodyText}`}>Loading documents…</p>
-//               </div>
-//             )}
-//             {!loading && error && (
-//               <p className="text-sm text-[#ffb2b2]">{error}</p>
-//             )}
-//             {!loading && !error && documents.length === 0 && (
-//               <p className={`text-sm ${mentorBodyText}`}>No documents uploaded yet.</p>
-//             )}
-
-//             {!loading && !error && documents.length > 0 && (
-//               <div className="space-y-2">
-//                 {documents.map((doc: any, index: number) => (
-//                   <a
-//                     key={doc.fileUrl || index}
-//                     href={doc.fileUrl}
-//                     target="_blank"
-//                     rel="noopener noreferrer"
-//                     className="flex items-center justify-between rounded-lg border border-white/15 bg-white/5 px-4 py-3 transition hover:bg-white/10"
-//                   >
-//                     <div>
-//                       <p className="text-sm font-semibold text-white">
-//                         {doc.fileName || "Document"}
-//                       </p>
-//                       <p className="text-xs text-[#cde2f2]">
-//                         {doc.uploadedAt
-//                           ? new Date(doc.uploadedAt).toLocaleDateString()
-//                           : "Uploaded"}
-//                       </p>
-//                     </div>
-//                     <i className="fa-solid fa-arrow-up-right-from-square text-[#8ec5eb]" />
-//                   </a>
-//                 ))}
-//               </div>
-//             )}
-//           </div>
-//         </div>
-//       </main>
-//     </div>
-//   );
-// }
-
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import MentorHeader from "@/app/Components/MentorHeader";
-import { getCookie } from "@/app/utils/cookies";
-import { apiDeleteDocument, apiGetDocuments } from "@/app/Services/api";
-import { apiGetAssignedUsers } from "@/app/Services/users.service";
+import AppHeader from "@/app/Components/Header/AppHeader";
+import { apiDeleteDocument, apiGetAllUsers, apiGetDocuments } from "@/app/Services/api";
 import {
-  mentorBodyText,
-  mentorGlassCardFrost,
-  mentorMainGradient,
-  mentorPageRoot,
-  mentorSpinner,
-} from "@/app/Components/mentor/mentor-theme";
+  directorGlassCard,
+  directorPageContainer,
+  directorPageRoot,
+  directorSpinner,
+} from "../directorUi";
 
-export default function MentorDocumentsPage() {
+type DocumentTab = "my" | "mentees" | "mentors";
+function unwrapUsers(res: any): any[] {
+  const data = res?.data?.data;
+
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.users)) return data.users;
+  if (Array.isArray(data?.data?.users)) return data.data.users;
+  if (Array.isArray(data?.rows)) return data.rows;
+
+  return [];
+}
+export default function DirectorDocumentsPage() {
+  const [activeTab, setActiveTab] = useState<DocumentTab>("my");
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<any[]>([]);
   const [menteeDocuments, setMenteeDocuments] = useState<any[]>([]);
-const [activeTab, setActiveTab] = useState<"my" | "mentee">("my");
+  const [mentorDocuments, setMentorDocuments] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [userId, setUserId] = useState("");
   const [searchText, setSearchText] = useState("");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest">("newest");
   const [selectMode, setSelectMode] = useState(false);
@@ -143,53 +41,90 @@ const [activeTab, setActiveTab] = useState<"my" | "mentee">("my");
         setLoading(true);
         setError(null);
 
-        const stored = getCookie("mentor");
-        const user = stored ? JSON.parse(stored) : null;
-        const uid = user?.id || user?._id;
+        const userId =
+          document.cookie
+            .split("; ")
+            .find((row) => row.startsWith("userId="))
+            ?.split("=")[1] || "";
 
-        if (!uid) {
-          setError("Mentor session not found. Please login again.");
-          return;
+        if (userId) {
+          const ownRes = await apiGetDocuments(userId);
+          setDocuments(Array.isArray(ownRes.data?.data) ? ownRes.data.data : []);
         }
 
-        setUserId(uid);
+        // const [pastorsRes, mentorsRes] = await Promise.all([
+        //   apiGetAllUsers({ role: "pastor", roleMatch: "mixed", limit: 9999 }),
+        //   apiGetAllUsers({ role: "mentor", roleMatch: "mixed", limit: 9999 }),
+        // ]);
+        const [pastorsRes, mentorsRes, fieldMentorsRes] = await Promise.all([
+  apiGetAllUsers({ role: "pastor", roleMatch: "mixed", page: 1, limit: 9999 }),
+  apiGetAllUsers({ role: "mentor", roleMatch: "mixed", page: 1, limit: 9999 }),
+  apiGetAllUsers({ role: "field-mentor", roleMatch: "mixed", page: 1, limit: 9999 }),
+]);
 
-        const res = await apiGetDocuments(uid);
-        setDocuments(Array.isArray(res.data?.data) ? res.data.data : []);
-        const assignedRes = await apiGetAssignedUsers(uid);
-const assignedUsers = Array.isArray(assignedRes?.data?.data)
-  ? assignedRes.data.data
-  : [];
+        // const pastors = Array.isArray(pastorsRes.data?.data?.users)
+        //   ? pastorsRes.data.data.users
+        //   : [];
 
-const docsByMentees = await Promise.all(
-  assignedUsers.map(async (mentee: any) => {
-    const menteeId = String(mentee?._id ?? mentee?.id ?? "");
-    if (!menteeId) return [];
+        // const mentors = Array.isArray(mentorsRes.data?.data?.users)
+        //   ? mentorsRes.data.data.users
+        //   : [];
+     const pastors = unwrapUsers(pastorsRes);
+const mentors = [...unwrapUsers(mentorsRes), ...unwrapUsers(fieldMentorsRes)];
 
-    try {
-      const docRes = await apiGetDocuments(menteeId);
-      const docs = Array.isArray(docRes.data?.data) ? docRes.data.data : [];
+        const pastorDocs = await Promise.all(
+          pastors.map(async (pastor: any) => {
+            const id = String(pastor?._id ?? pastor?.id ?? "");
+            if (!id) return [];
 
-      const uploadedBy =
-        `${mentee?.firstName ?? ""} ${mentee?.lastName ?? ""}`.trim() ||
-        mentee?.email ||
-        "Mentee";
+            try {
+              const res = await apiGetDocuments(id);
+              const list = Array.isArray(res.data?.data) ? res.data.data : [];
+              const uploadedBy =
+                `${pastor?.firstName ?? ""} ${pastor?.lastName ?? ""}`.trim() ||
+                pastor?.email ||
+                "Mentee";
 
-      return docs.map((doc: any) => ({
-        ...doc,
-        uploadedBy,
-        ownerId: menteeId,
-      }));
-    } catch {
-      return [];
-    }
-  }),
-);
+              return list.map((doc: any) => ({
+                ...doc,
+                uploadedBy,
+                ownerId: id,
+              }));
+            } catch {
+              return [];
+            }
+          }),
+        );
 
-setMenteeDocuments(docsByMentees.flat());
+        const mentorDocs = await Promise.all(
+          mentors.map(async (mentor: any) => {
+            const id = String(mentor?._id ?? mentor?.id ?? "");
+            if (!id) return [];
+
+            try {
+              const res = await apiGetDocuments(id);
+              const list = Array.isArray(res.data?.data) ? res.data.data : [];
+              const uploadedBy =
+                `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.trim() ||
+                mentor?.email ||
+                "Mentor";
+
+              return list.map((doc: any) => ({
+                ...doc,
+                uploadedBy,
+                ownerId: id,
+              }));
+            } catch {
+              return [];
+            }
+          }),
+        );
+
+        setMenteeDocuments(pastorDocs.flat());
+        setMentorDocuments(mentorDocs.flat());
       } catch (err) {
-        console.error("Failed to fetch documents:", err);
-        setError("Unable to load documents from API.");
+        console.error("Failed to fetch director documents:", err);
+        setError("Unable to load documents.");
       } finally {
         setLoading(false);
       }
@@ -198,45 +133,33 @@ setMenteeDocuments(docsByMentees.flat());
     fetchDocuments();
   }, []);
 
-//   const filteredDocuments = useMemo(() => {
-//     const q = searchText.trim().toLowerCase();
+  const currentDocuments = useMemo(() => {
+    if (activeTab === "mentees") return menteeDocuments;
+    if (activeTab === "mentors") return mentorDocuments;
+    return documents;
+  }, [activeTab, documents, menteeDocuments, mentorDocuments]);
 
-//     // return [...documents]
-//     const source = activeTab === "my" ? documents : menteeDocuments;
+  const filteredDocuments = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
 
-// return [...source]
-//       .filter((doc) =>
-//         q ? String(doc.fileName || "").toLowerCase().includes(q) : true,
-//       )
-//       .sort((a, b) => {
-//         const aTime = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
-//         const bTime = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
+    return [...currentDocuments]
+      .filter((doc) => {
+        if (!q) return true;
 
-//         return sortOrder === "newest" ? bTime - aTime : aTime - bTime;
-//       });
-//   }, [documents, searchText, sortOrder]);
-const filteredDocuments = useMemo(() => {
-  const q = searchText.trim().toLowerCase();
-  const source = activeTab === "my" ? documents : menteeDocuments;
+        const fileName = String(doc.fileName || "").toLowerCase();
+        const uploadedBy = String(doc.uploadedBy || "").toLowerCase();
 
-  return [...source]
-   .filter((doc) => {
-  if (!q) return true;
+        return fileName.includes(q) || uploadedBy.includes(q);
+      })
+      .sort((a, b) => {
+        const aTime = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
+        const bTime = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
 
-  const fileName = String(doc.fileName || "").toLowerCase();
-  const uploadedBy = String(doc.uploadedBy || "").toLowerCase();
+        return sortOrder === "newest" ? bTime - aTime : aTime - bTime;
+      });
+  }, [currentDocuments, searchText, sortOrder]);
 
-  return fileName.includes(q) || uploadedBy.includes(q);
-})
-    .sort((a, b) => {
-      const aTime = a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0;
-      const bTime = b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0;
-
-      return sortOrder === "newest" ? bTime - aTime : aTime - bTime;
-    });
-}, [documents, menteeDocuments, activeTab, searchText, sortOrder]);
-
-  const selectedDocs = documents.filter((doc) =>
+  const selectedDocs = currentDocuments.filter((doc) =>
     selectedUrls.includes(doc.fileUrl),
   );
 
@@ -258,10 +181,9 @@ const filteredDocuments = useMemo(() => {
 
     const response = await fetch(doc.fileUrl);
     const blob = await response.blob();
-
     const blobUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
 
+    const link = document.createElement("a");
     link.href = blobUrl;
     link.download = doc.fileName || "document";
     document.body.appendChild(link);
@@ -273,13 +195,17 @@ const filteredDocuments = useMemo(() => {
 
   const handleDeleteDocument = async (doc: any) => {
     try {
-      if (!userId || !doc?.fileUrl) return;
+      if (!doc?.ownerId || !doc?.fileUrl) return;
 
-      await apiDeleteDocument(userId, doc.fileUrl);
+      await apiDeleteDocument(doc.ownerId, doc.fileUrl);
 
-      setDocuments((prev) =>
-        prev.filter((item) => item.fileUrl !== doc.fileUrl),
-      );
+      if (activeTab === "mentees") {
+        setMenteeDocuments((prev) => prev.filter((item) => item.fileUrl !== doc.fileUrl));
+      } else if (activeTab === "mentors") {
+        setMentorDocuments((prev) => prev.filter((item) => item.fileUrl !== doc.fileUrl));
+      } else {
+        setDocuments((prev) => prev.filter((item) => item.fileUrl !== doc.fileUrl));
+      }
 
       setSelectedUrls((prev) => prev.filter((url) => url !== doc.fileUrl));
       setOpenMenuKey(null);
@@ -325,53 +251,45 @@ const filteredDocuments = useMemo(() => {
     alert("Selected document links copied.");
   };
 
+  const showUploadedBy = activeTab !== "my";
+
   return (
-    <div className={mentorPageRoot}>
-      <MentorHeader showFullHeader={true} />
+    <div className={directorPageRoot}>
+      {/* <AppHeader showFullHeader={true} /> */}
 
-      <main className={`${mentorMainGradient} flex-1 px-4 py-10 md:px-8 lg:px-16`}>
-        <div className={`mx-auto max-w-6xl p-6 md:p-8 ${mentorGlassCardFrost}`}>
-          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold md:text-4xl">Documents</h1>
-              <p className={`mt-2 ${mentorBodyText}`}>
-                Manage and review your uploaded ministry documents.
-              </p>
-            </div>
+      <main className="flex-1 px-4 py-10 md:px-8 lg:px-16">
+        <div className={`mx-auto max-w-6xl p-6 md:p-8 ${directorGlassCard}`}>
+          <div>
+            <h1 className="text-3xl font-semibold text-white md:text-4xl">Documents</h1>
+            <p className="mt-2 text-sm text-[#cde2f2]">
+              Manage and review uploaded ministry documents.
+            </p>
           </div>
-          <div className="mt-8 grid grid-cols-2 overflow-hidden rounded-xl border border-white/15 bg-white/5">
-  <button
-    type="button"
-    onClick={() => {
-      setActiveTab("my");
-      setSelectedUrls([]);
-      setSelectMode(false);
-    }}
-    className={`px-4 py-3 text-sm font-semibold transition ${
-      activeTab === "my"
-        ? "bg-[#0b63ce] text-white"
-        : "text-[#cde2f2] hover:bg-white/10"
-    }`}
-  >
-    My Documents
-  </button>
 
-  <button
-    type="button"
-    onClick={() => {
-      setActiveTab("mentee");
-      setSelectedUrls([]);
-      setSelectMode(false);
-    }}
-    className={`px-4 py-3 text-sm font-semibold transition ${
-      activeTab === "mentee"
-        ? "bg-[#0b63ce] text-white"
-        : "text-[#cde2f2] hover:bg-white/10"
-    }`}
-  >
-    Mentee Documents
-  </button>
-</div>
+          <div className="mt-8 grid grid-cols-3 overflow-hidden rounded-xl border border-white/15 bg-white/5">
+            {[
+              { id: "my", label: "My Documents" },
+              { id: "mentees", label: "Mentee Documents" },
+              { id: "mentors", label: "Mentor Documents" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setActiveTab(tab.id as DocumentTab);
+                  setSelectedUrls([]);
+                  setSelectMode(false);
+                }}
+                className={`px-4 py-3 text-sm font-semibold transition ${
+                  activeTab === tab.id
+                    ? "bg-[#0b63ce] text-white"
+                    : "text-[#cde2f2] hover:bg-white/10"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
           <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex w-full max-w-xl items-center rounded-xl border border-white/15 bg-white/5 px-4 py-3">
@@ -381,10 +299,10 @@ const filteredDocuments = useMemo(() => {
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 placeholder={
-  activeTab === "mentee"
-    ? "Search documents or mentee name..."
-    : "Search documents..."
-}
+                  showUploadedBy
+                    ? "Search documents or uploaded by..."
+                    : "Search documents..."
+                }
                 className="w-full bg-transparent text-sm text-white outline-none placeholder:text-[#cde2f2]"
               />
             </div>
@@ -435,8 +353,8 @@ const filteredDocuments = useMemo(() => {
           <div className="mt-6 overflow-hidden rounded-2xl border border-white/15">
             {loading && (
               <div className="flex flex-col items-center gap-3 py-10">
-                <div className={mentorSpinner} />
-                <p className={`text-sm ${mentorBodyText}`}>Loading documents…</p>
+                <div className={directorSpinner} />
+                <p className="text-sm text-[#cde2f2]">Loading documents…</p>
               </div>
             )}
 
@@ -445,21 +363,22 @@ const filteredDocuments = useMemo(() => {
             )}
 
             {!loading && !error && filteredDocuments.length === 0 && (
-              <p className={`p-5 text-sm ${mentorBodyText}`}>No documents uploaded yet.</p>
+              <p className="p-5 text-sm text-[#cde2f2]">No documents uploaded yet.</p>
             )}
 
             {!loading && !error && filteredDocuments.length > 0 && (
               <div>
-                {/* <div className="grid grid-cols-[1.5fr_0.6fr_0.8fr_0.4fr] border-b border-white/15 px-5 py-4 text-xs font-bold uppercase tracking-wide text-[#cde2f2]"> */}
-          <div className={`grid ${
-  activeTab === "mentee"
-    ? "grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
-    : "grid-cols-[2fr_0.7fr_1fr_0.5fr]"
-} items-center gap-4 border-b border-white/15 px-5 py-4 text-xs font-bold uppercase tracking-wide text-[#cde2f2]`}>
+                <div
+                  className={`grid ${
+                    showUploadedBy
+                      ? "grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
+                      : "grid-cols-[2fr_0.7fr_1fr_0.5fr]"
+                  } items-center gap-4 border-b border-white/15 px-5 py-4 text-xs font-bold uppercase tracking-wide text-[#cde2f2]`}
+                >
                   <p>Document Name</p>
                   <p>Type</p>
                   <p>Date Uploaded</p>
-                  {activeTab === "mentee" && <p>Uploaded By</p>}
+                  {showUploadedBy && <p>Uploaded By</p>}
                   <p className="text-right">Actions</p>
                 </div>
 
@@ -475,10 +394,10 @@ const filteredDocuments = useMemo(() => {
                     <div
                       key={key}
                       className={`grid ${
-  activeTab === "mentee"
-    ? "grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
-    : "grid-cols-[2fr_0.7fr_1fr_0.5fr]"
-} items-center gap-4 border-b border-white/10 px-5 py-5 last:border-b-0`}
+                        showUploadedBy
+                          ? "grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
+                          : "grid-cols-[2fr_0.7fr_1fr_0.5fr]"
+                      } items-center gap-4 border-b border-white/10 px-5 py-5 last:border-b-0`}
                     >
                       <div className="flex items-center gap-4">
                         {selectMode && (
@@ -514,11 +433,13 @@ const filteredDocuments = useMemo(() => {
                             })
                           : "Uploaded"}
                       </p>
-{activeTab === "mentee" && (
-  <p className="text-sm font-semibold text-[#cde2f2]">
-    {doc.uploadedBy || "Mentee"}
-  </p>
-)}
+
+                      {showUploadedBy && (
+                        <p className="text-sm font-semibold text-[#cde2f2]">
+                          {doc.uploadedBy || "User"}
+                        </p>
+                      )}
+
                       <div className="relative flex items-center justify-end gap-4 text-[#8ec5eb]">
                         <button
                           type="button"

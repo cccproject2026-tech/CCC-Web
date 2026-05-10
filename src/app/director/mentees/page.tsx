@@ -107,7 +107,11 @@ function labelForSortKey(k: MenteeSortKey): string {
   }
 }
 
-const IMAGE_POOL = [Mentor1, Mentor2, Mentor3];
+// const IMAGE_POOL = [Mentor1, Mentor2, Mentor3];
+const getInitialsAvatar = (name: string) =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    name || "User"
+  )}&background=173653&color=ffffff`;
 
 const PAGE_SIZE = 10;
 const FEATURED_THUMB_LIMIT = 6;
@@ -155,12 +159,22 @@ function getUserListPhone(user: any): string | undefined {
   return undefined;
 }
 
-function profileImageForUser(user: any, index: number) {
+// function profileImageForUser(user: any, index: number) {
+//   const raw = user.profilePicture;
+//   if (typeof raw === "string" && raw.trim()) {
+//     return resolveApiMediaUrl(raw) ?? raw;
+//   }
+//   return IMAGE_POOL[index % IMAGE_POOL.length];
+// }
+function profileImageForUser(user: any) {
   const raw = user.profilePicture;
   if (typeof raw === "string" && raw.trim()) {
     return resolveApiMediaUrl(raw) ?? raw;
   }
-  return IMAGE_POOL[index % IMAGE_POOL.length];
+
+  return getInitialsAvatar(
+    `${user?.firstName || ""} ${user?.lastName || ""}`.trim()
+  );
 }
 
 function buildMenteeListParams(
@@ -190,7 +204,8 @@ const mapUserToMentee = (user: any, index: number): Mentee => ({
   name: `${user.firstName} ${user.lastName}`,
   role: user.role,
   description: `${user.role} enrolled in mentoring program`,
-  img: profileImageForUser(user, index),
+  // img: profileImageForUser(user, index),
+  img: profileImageForUser(user),
   status: user.hasCompleted
     ? "completed"
     : user.status === "pending"

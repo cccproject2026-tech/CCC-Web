@@ -108,15 +108,24 @@ function assignedIdsForMentor(user: any): string[] {
     ),
   ];
 }
-
+const getInitialsAvatar = (name: string) =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(
+    name || "Mentor"
+  )}&background=173653&color=ffffff`;
 // Helper function to convert User to Mentor (index = stable fallback avatar)
 const convertUserToMentor = (user: any, index: number): Mentor => {
   const defaultImages = [Mentor1, Mentor2, Mentor3];
-  const rawPic = user?.profilePicture;
-  const img =
-    typeof rawPic === "string" && rawPic.trim()
-      ? (resolveApiMediaUrl(rawPic) ?? rawPic)
-      : defaultImages[index % defaultImages.length];
+  // const rawPic = user?.profilePicture;
+  // const img =
+  //   typeof rawPic === "string" && rawPic.trim()
+  //     ? (resolveApiMediaUrl(rawPic) ?? rawPic)
+  //     : defaultImages[index % defaultImages.length];
+  const name = `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
+const rawPic = user?.profilePicture;
+const img =
+  typeof rawPic === "string" && rawPic.trim()
+    ? (resolveApiMediaUrl(rawPic) ?? rawPic)
+    : getInitialsAvatar(name);
   const nAssigned = readListAssignedCount(user);
   const menteeWord = nAssigned === 1 ? "mentee" : "mentees";
 

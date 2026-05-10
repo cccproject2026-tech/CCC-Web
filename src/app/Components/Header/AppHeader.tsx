@@ -401,13 +401,18 @@ const list: any[] = Array.isArray(raw)
                   <p className="text-white/80">Good Morning</p>
                   <p className="text-white font-medium">Admin</p>
                 </div>
-                <Image
+                {/* <Image
                   src={UserProfile}
                   alt="User"
                   width={30}
                   height={30}
                   className="rounded-full border border-white/40"
-                />
+                /> */}
+                <img
+  src={`https://ui-avatars.com/api/?name=${encodeURIComponent("Admin")}&background=173653&color=ffffff`}
+  alt="User"
+  className="h-[30px] w-[30px] rounded-full border border-white/40 object-cover"
+/>
               </button>
 
               {/* Mobile Menu Button */}
@@ -563,7 +568,8 @@ const list: any[] = Array.isArray(raw)
       <ProfileDropdown
         isOpen={showProfileDropdown}
         onClose={() => setShowProfileDropdown(false)}
-        onDocumentsClick={() => setShowDocuments(true)}
+        // onDocumentsClick={() => setShowDocuments(true)}
+        onDocumentsClick={() => router.push("/director/documents")}
         onSettingsClick={() => setShowSettingsModal(true)}
       />
 
