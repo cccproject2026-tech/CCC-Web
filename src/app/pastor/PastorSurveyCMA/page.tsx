@@ -406,12 +406,15 @@ function PastorSurveyCMAContent() {
     searchParams.get("viewOnly") === "1" ||
     searchParams.get("viewOnly") === "true" ||
     searchParams.get("mode") === "review";
+  /** Explicit retake: editable survey even if user previously submitted (guidelines / list). */
+  const retakeMode = searchParams.get("retake") === "1";
   /** Pastor viewing their own submitted survey (guidelines "View response") — not mentor review */
   const readOnlySelf =
-    searchParams.get("readOnly") === "1" || searchParams.get("readOnly") === "true";
+    !retakeMode &&
+    (searchParams.get("readOnly") === "1" || searchParams.get("readOnly") === "true");
 
-    const shouldOpenScheduleMeeting =
-  searchParams.get("scheduleMeeting") === "1" && readOnlySelf;
+  const shouldOpenScheduleMeeting =
+    searchParams.get("scheduleMeeting") === "1" && readOnlySelf;
   const mentorReviewMode = viewOnlyParam && !!reviewUserId;
   const selfReadOnlyMode = readOnlySelf && !mentorReviewMode;
   const uiReadOnly = mentorReviewMode || selfReadOnlyMode;
@@ -429,7 +432,6 @@ function PastorSurveyCMAContent() {
 
   // ✅ Added new state for submit & schedule popup flow
   const [showSubmitPopup, setShowSubmitPopup] = useState(false);
-  const [showSchedulePrompt, setShowSchedulePrompt] = useState(false);
   const [showMentorSidebar, setShowMentorSidebar] = useState(false);
   const [mentorStep, setMentorStep] = useState(1);
   const [showFinalPopup, setShowFinalPopup] = useState(false);
@@ -478,60 +480,66 @@ function PastorSurveyCMAContent() {
         }
 
         const cdpMap: Record<string, string> = {};
+        const skipAnswerHydration = retakeMode && !mentorReviewMode;
 
         if (answersUserId) {
-          try {
-            const answersRes = await apiGetUserAnswers(assessmentId, answersUserId);
-            const body = answersRes.data as Record<string, unknown>;
-            const inner = (body?.data as Record<string, unknown>) || body;
-            const sectionsData = inner?.sections as unknown;
-            if (Array.isArray(sectionsData)) {
-              const userAnswers: Record<string, string> = {};
-              let hasRecs = false;
-              
-              sectionsData.forEach((section: any, sectionIndex: number) => {
-                // Check if this section has recommendations
-                if (Array.isArray(section?.recommendations) && section.recommendations.length > 0) {
-                  hasRecs = true;
-                }
-                
-                section.layers?.forEach((layer: any, layerIndex: number) => {
-                  const layerId = resolveLayerKey(layer, sectionIndex, layerIndex);
-                  const sel =
-                    layer.selectedChoice ??
-                    (Array.isArray(layer.selectedValues) ? layer.selectedValues[0] : undefined);
-                  if (sel != null && String(sel) !== "") {
-                    userAnswers[layerId] = String(sel);
-                  }
-                  const cdp = extractMentorCdpText(layer as Record<string, unknown>);
-                  if (cdp) {
-                    cdpMap[layerId] = cdp;
-                    const id = layer.layerId ?? layer._id;
-                    if (id != null) cdpMap[String(id)] = cdp;
-                  }
-                });
-              });
-              setAnswers(userAnswers);
-              setHasRecommendationsInAnswer(hasRecs);
-            }
-          } catch (err) {
-            const status = isAxiosError(err) ? err.response?.status : undefined;
-            if (status === 404) {
-              setAnswers({});
-            } else {
-              console.error("Failed to fetch user answers", err);
-            }
-          }
+          if (skipAnswerHydration) {
+            setAnswers({});
+            setHasRecommendationsInAnswer(false);
+            setMentorLayerCdp({});
+          } else {
+            try {
+              const answersRes = await apiGetUserAnswers(assessmentId, answersUserId);
+              const body = answersRes.data as Record<string, unknown>;
+              const inner = (body?.data as Record<string, unknown>) || body;
+              const sectionsData = inner?.sections as unknown;
+              if (Array.isArray(sectionsData)) {
+                const userAnswers: Record<string, string> = {};
+                let hasRecs = false;
 
-          try {
-            const recData = await fetchMentorRecommendationsPayload(assessmentId, answersUserId);
-            if (recData != null) {
-              Object.assign(cdpMap, parseRecommendationsCdpPayload(recData));
+                sectionsData.forEach((section: any, sectionIndex: number) => {
+                  if (Array.isArray(section?.recommendations) && section.recommendations.length > 0) {
+                    hasRecs = true;
+                  }
+
+                  section.layers?.forEach((layer: any, layerIndex: number) => {
+                    const layerId = resolveLayerKey(layer, sectionIndex, layerIndex);
+                    const sel =
+                      layer.selectedChoice ??
+                      (Array.isArray(layer.selectedValues) ? layer.selectedValues[0] : undefined);
+                    if (sel != null && String(sel) !== "") {
+                      userAnswers[layerId] = String(sel);
+                    }
+                    const cdp = extractMentorCdpText(layer as Record<string, unknown>);
+                    if (cdp) {
+                      cdpMap[layerId] = cdp;
+                      const id = layer.layerId ?? layer._id;
+                      if (id != null) cdpMap[String(id)] = cdp;
+                    }
+                  });
+                });
+                setAnswers(userAnswers);
+                setHasRecommendationsInAnswer(hasRecs);
+              }
+            } catch (err) {
+              const status = isAxiosError(err) ? err.response?.status : undefined;
+              if (status === 404) {
+                setAnswers({});
+              } else {
+                console.error("Failed to fetch user answers", err);
+              }
             }
-          } catch {
-            /* optional */
+
+            try {
+              const recData = await fetchMentorRecommendationsPayload(assessmentId, answersUserId);
+              if (recData != null) {
+                Object.assign(cdpMap, parseRecommendationsCdpPayload(recData));
+              }
+            } catch {
+              /* optional */
+            }
+            setMentorLayerCdp(cdpMap);
           }
-          setMentorLayerCdp(cdpMap);
         } else {
           setMentorLayerCdp({});
           if (!mentorReviewMode) {
@@ -550,7 +558,11 @@ function PastorSurveyCMAContent() {
     };
 
     fetchData();
-  }, [assessmentId, viewOnlyParam, reviewUserId]);
+  }, [assessmentId, viewOnlyParam, reviewUserId, retakeMode]);
+
+  useEffect(() => {
+    if (retakeMode) setActiveSection(0);
+  }, [retakeMode, assessmentId]);
 
   useEffect(() => {
   if (!shouldOpenScheduleMeeting) return;
@@ -692,11 +704,25 @@ const confirmClearResponses = () => {
       return;
     }
 
+    const uidAfter = resolveCookieUserId() ?? "";
+    if (assessmentId && uidAfter) {
+      try {
+        await apiUpdateAssessmentProgress({
+          userId: uidAfter,
+          assessmentId,
+          status: "submitted",
+          completedSections: Array.isArray(sections) ? sections.length : undefined,
+        });
+      } catch (progressErr) {
+        console.error("Failed to persist submitted status after survey submit", progressErr);
+      }
+    }
+
     setShowSubmitPopup(true);
     setTimeout(() => {
       setShowSubmitPopup(false);
-      setShowSchedulePrompt(true);
-    }, 2500);
+      router.push("/pastor/Assessments");
+    }, 1800);
   };
 
   const submitAllSectionAnswers = async () => {
@@ -735,16 +761,6 @@ const confirmClearResponses = () => {
     });
   };
 
-  const handleScheduleMeeting = () => {
-    setShowSchedulePrompt(false);
-    setShowMentorSidebar(true);
-    setMentorStep(1);
-    setSelectedMentor("");
-    setAvailability([]);
-    setSelectedDate("");
-    setSelectedTime("");
-    setAvailableTimes([]);
-  };
   const handleFinalSchedule = async () => {
     if (!selectedDate || !selectedTime || !selectedMentor) {
       setToast("Please select date, time, and mentor");
@@ -915,21 +931,20 @@ const confirmClearResponses = () => {
                   to provide the best support and guidance.
                 </p>
                 
-                {selfReadOnlyMode && assessmentId ? (
+                {selfReadOnlyMode && assessmentId && canShowPastorCdp ? (
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3 shrink-0">
-                    {canShowPastorCdp && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          router.push(
-                            `/pastor/assessmentRecommendations?assessmentId=${encodeURIComponent(String(assessmentId || ""))}`,
-                          )
-                        }
-                        className="rounded-lg border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15 whitespace-nowrap"
-                      >
-                        View Customized Development Plans (CDP)
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        router.push(
+                          `/pastor/assessmentRecommendations?assessmentId=${encodeURIComponent(String(assessmentId || ""))}`,
+                        )
+                      }
+                      className="rounded-lg border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15 whitespace-nowrap"
+                    >
+                      View Customized Development Plans (CDP)
+                    </button>
+                    {/* Retake Survey — commented out per product request; restore if needed.
                     <button
                       type="button"
                       onClick={() =>
@@ -941,6 +956,7 @@ const confirmClearResponses = () => {
                     >
                       Retake Survey
                     </button>
+                    */}
                   </div>
                 ) : null}
               </div>
@@ -1102,45 +1118,27 @@ const confirmClearResponses = () => {
         </div>
       )}
 
-      {showSchedulePrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-[480px] rounded-2xl border border-[#8ec5eb]/30 bg-[linear-gradient(180deg,#0f4a76_0%,#062946_100%)] px-8 py-8 text-center text-white shadow-[0_20px_60px_rgba(2,20,38,0.55)] sm:px-10">
-            <p className="font-semibold text-lg mb-4">
-              On completion of the PMP and CMA assessment tools please schedule
-              a meeting with your mentor.
-            </p>
-            <div className="flex items-center justify-center">
-              <button
-                onClick={handleScheduleMeeting}
-                className="rounded-xl bg-[#8ec5eb] px-8 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
-              >
-                Schedule Meeting
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {showMentorSidebar && (
         <div className="fixed inset-0 z-50 flex justify-end bg-[rgba(2,16,30,0.72)] backdrop-blur-sm">
           <div className="h-full w-full max-w-[480px] overflow-y-auto border-l border-white/15 bg-[linear-gradient(180deg,#062946_0%,#041f35_100%)] p-6 text-white shadow-[-20px_0_50px_rgba(2,20,38,0.55)] sm:p-8">
             {mentorStep === 1 ? (
               <>
-                {/* <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-semibold">Choose Mentor for the Meeting</h2>
-                  <div className="flex items-center gap-2"> */}
-                    {/* <button
-                      onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
-                      className="rounded-lg border border-white/20 px-3 py-1 text-xs font-semibold text-[#d8ecfa] transition hover:bg-white/10"
-                    >
-                      Close
-                    </button> */}
-
-                    <div className="mb-6 flex items-start justify-between gap-4">
-  <div>
-    <h2 className="text-xl font-semibold">Choose Mentor for the Meeting</h2>
-  </div>
-</div>
+                <div className="mb-6 flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-semibold">Choose Mentor for the Meeting</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMentorSidebar(false);
+                      router.push("/pastor/Assessments");
+                    }}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/5 text-[#d8ecfa] transition hover:bg-white/10 hover:text-white"
+                    aria-label="Close mentor chooser"
+                  >
+                    <i className="fa-solid fa-xmark" />
+                  </button>
+                </div>
                 {mentors.length === 0 ? (
                   <p className="text-[#cbe6f9]">No mentors assigned.</p>
                 ) : (
@@ -1171,7 +1169,7 @@ const confirmClearResponses = () => {
                 )}
                 <div className="flex justify-between gap-3">
                   {/* <button
-                    onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
+                    onClick={() => { setShowMentorSidebar(false); router.push("/pastor/Assessments"); }}
                     className="rounded-xl border border-white/30 px-5 py-2 text-sm font-semibold text-[#d8ecfa] transition hover:bg-white/10"
                   >
                     Skip
@@ -1187,8 +1185,19 @@ const confirmClearResponses = () => {
               </>
             ) : (
               <>
-                <div className="flex items-center justify-between mb-6">
+                <div className="mb-6 flex items-center justify-between">
                   <h2 className="text-xl font-semibold">Schedule a Meeting</h2>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowMentorSidebar(false);
+                      router.push("/pastor/Assessments");
+                    }}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/5 text-[#d8ecfa] transition hover:bg-white/10 hover:text-white"
+                    aria-label="Close schedule drawer"
+                  >
+                    <i className="fa-solid fa-xmark" />
+                  </button>
                 </div>
                 {selectedMentor && (
                   <p className="mb-6 text-sm text-[#cbe6f9]">
@@ -1335,7 +1344,7 @@ const confirmClearResponses = () => {
                     Back
                   </button>
                   <button
-                    onClick={() => { setShowMentorSidebar(false); setShowSchedulePrompt(false); router.push("/pastor/Assessments"); }}
+                    onClick={() => { setShowMentorSidebar(false); router.push("/pastor/Assessments"); }}
                     className="flex-1 rounded-xl border border-white/30 px-5 py-2 text-[#d8ecfa] transition hover:bg-white/10"
                   >
                     Skip
@@ -1398,7 +1407,6 @@ const confirmClearResponses = () => {
                 setShowFinalPopup(false);
                 setShowMeetingDetails(false);
                 setShowMentorSidebar(false);
-                setShowSchedulePrompt(false);
                 router.push("/pastor/Assessments");
               }}
               className="w-full rounded-xl bg-[#8ec5eb] px-6 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"

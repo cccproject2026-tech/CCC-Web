@@ -124,6 +124,10 @@ interface ExtraComponent {
     | "SIGNATURE";
   name: string;
   assessmentId?: string;
+  /** Populated assessment doc from API (fallback for id). */
+  assessment?: unknown;
+  /** Director form may store selected assessment object. */
+  selectedAssessment?: unknown;
   navigateTo?: string;
   placeHolder?: string;
   buttonName?: string;
@@ -163,6 +167,34 @@ function normalizeExtraType(raw: unknown): ExtraComponent["type"] {
   return legal.includes(next) ? next : "TEXT_FIELD";
 }
 
+/**
+ * Roadmap `extras` type ASSESSMENT may send:
+ * - `assessmentId` (string)
+ * - populated `assessment: { _id, id }`
+ * - `selectedAssessment` from director builder
+ */
+function resolveAssessmentIdFromExtraShape(extra: ExtraComponent): string | null {
+  const raw = extra as Record<string, unknown>;
+  const direct = extra.assessmentId ?? raw.assessmentId;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+
+  const pickId = (obj: unknown): string | null => {
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
+    const o = obj as Record<string, unknown>;
+    const id = o._id ?? o.id ?? o.assessmentId;
+    if (id != null && String(id).trim()) return String(id).trim();
+    return null;
+  };
+
+  const fromAssessment = pickId(raw.assessment) ?? pickId(extra.assessment);
+  if (fromAssessment) return fromAssessment;
+
+  const fromSelected = pickId(raw.selectedAssessment) ?? pickId(extra.selectedAssessment);
+  if (fromSelected) return fromSelected;
+
+  return null;
+}
+
 function normalizeExtraTree(extra: ExtraComponent): ExtraComponent {
   const type = normalizeExtraType((extra as { type?: unknown }).type);
   const out: ExtraComponent = { ...extra, type };
@@ -177,6 +209,10 @@ function normalizeExtraTree(extra: ExtraComponent): ExtraComponent {
   }
   if (Array.isArray(extra.sections) && extra.sections.length > 0)
     out.sections = extra.sections.map((s) => normalizeExtraTree(s));
+  if (out.type === "ASSESSMENT") {
+    const id = resolveAssessmentIdFromExtraShape(out);
+    if (id) return { ...out, assessmentId: id };
+  }
   return out;
 }
 
@@ -797,9 +833,8 @@ const hasRequiredSubmissions = useMemo(() => {
   };
 
   const getAssessmentIdFromExtra = (extra: ExtraComponent): string | null => {
-    if (extra.assessmentId && String(extra.assessmentId).trim()) {
-      return String(extra.assessmentId).trim();
-    }
+    const fromShape = resolveAssessmentIdFromExtraShape(extra);
+    if (fromShape) return fromShape;
     const fromNav = String(extra.navigateTo || "");
     if (!fromNav) return null;
     const q = /[?&]assessmentId=([^&]+)/i.exec(fromNav);

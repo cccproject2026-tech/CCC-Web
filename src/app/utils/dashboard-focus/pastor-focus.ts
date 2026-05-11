@@ -1,7 +1,8 @@
 import { apiGetComments, apiGetQueries } from "@/app/Services/roadmaps.service";
 import type { DashboardFocusItem, DashboardFocusSection } from "./types";
 
-const UPCOMING_MEETING_WINDOW_HOURS = 24;
+const NEXT_APPOINTMENTS_WINDOW_DAYS = 7;
+const MAX_WEEKLY_MEETING_ITEMS = 20;
 const UPCOMING_DUE_WINDOW_DAYS = 7;
 const MAX_ITEMS_PER_SECTION = 3;
 
@@ -52,19 +53,15 @@ const toTimestamp = (value?: string | null) => {
   return Number.isNaN(timestamp) ? Number.POSITIVE_INFINITY : timestamp;
 };
 
-const isWithinHours = (value: string | undefined, hours: number) => {
-  const timestamp = toTimestamp(value);
-  const now = Date.now();
-  return timestamp >= now && timestamp <= now + hours * 60 * 60 * 1000;
-};
-
-const isUpcomingInCurrentMonth = (value: string | undefined) => {
+/** Meetings from now (with 1 min grace) through end of the 7th calendar day — matches pastor Appointments “Next appointments” tab. */
+const isMeetingWithinNextWeek = (value: string | undefined) => {
   const timestamp = toTimestamp(value);
   if (!Number.isFinite(timestamp)) return false;
-  const now = new Date();
-  const target = new Date(timestamp);
-  if (target.getTime() < now.getTime()) return false;
-  return target.getFullYear() === now.getFullYear() && target.getMonth() === now.getMonth();
+  const now = Date.now();
+  const end = new Date(now);
+  end.setDate(end.getDate() + NEXT_APPOINTMENTS_WINDOW_DAYS);
+  end.setHours(23, 59, 59, 999);
+  return timestamp >= now - 60_000 && timestamp <= end.getTime();
 };
 
 const isWithinDays = (value: string | undefined, days: number) => {
@@ -195,6 +192,17 @@ function getWithWhomLabel(appointment: Record<string, unknown>, mentorNameById?:
   return "With Mentor";
 }
 
+function meetingListTitle(appointment: Record<string, unknown>): string {
+  const m = appointment.mentor as { firstName?: string; lastName?: string } | undefined;
+  const name = m ? `${m.firstName ?? ""} ${m.lastName ?? ""}`.trim() : "";
+  return name ? `Meeting with ${name}` : "Mentor meeting";
+}
+
+function appointmentDetailHref(appointment: Record<string, unknown>): string {
+  const id = String(appointment._id ?? appointment.id ?? "").trim();
+  return id ? `/pastor/appointments/${encodeURIComponent(id)}` : "/pastor/appointments";
+}
+
 function unwrapCommentsFromThread(res: { data?: unknown }): RoadmapComment[] {
   const axiosBody = res.data as { data?: unknown } | undefined;
   const thread = axiosBody?.data ?? axiosBody;
@@ -284,45 +292,23 @@ export async function loadPastorFocusSections(input: PastorFocusInput): Promise<
       };
     });
 
-  const meetingItems: DashboardFocusItem[] = apptRecords
+  const weeklyMeetingItems: DashboardFocusItem[] = apptRecords
     .filter((appointment) => {
       const md = appointmentMeetingDate(appointment);
-      return md && isWithinHours(md, UPCOMING_MEETING_WINDOW_HOURS);
+      return Boolean(md) && isMeetingWithinNextWeek(md);
     })
     .sort((a, b) => toTimestamp(appointmentMeetingDate(a)) - toTimestamp(appointmentMeetingDate(b)))
-    .slice(0, MAX_ITEMS_PER_SECTION)
+    .slice(0, MAX_WEEKLY_MEETING_ITEMS)
     .map((appointment) => {
       const md = appointmentMeetingDate(appointment);
       const scheduler = getSchedulerLabel(appointment, pastorUserId, mentorNameById);
       const withWhom = getWithWhomLabel(appointment, mentorNameById);
       return {
         id: `meeting-${String(appointment.id ?? appointment._id ?? md)}`,
-        title: "Upcoming meeting",
-        description: `Meeting starts ${formatDateTime(md)}.`,
-        meta: `${scheduler} • ${withWhom} • Within ${UPCOMING_MEETING_WINDOW_HOURS} hours`,
-        href: "/pastor/Appointments",
-      };
-    });
-
-  const monthlyMeetingItems: DashboardFocusItem[] = apptRecords
-    .filter((appointment) => {
-      const md = appointmentMeetingDate(appointment);
-      if (!md) return false;
-      const in24 = isWithinHours(md, UPCOMING_MEETING_WINDOW_HOURS);
-      return !in24 && isUpcomingInCurrentMonth(md);
-    })
-    .sort((a, b) => toTimestamp(appointmentMeetingDate(a)) - toTimestamp(appointmentMeetingDate(b)))
-    .slice(0, MAX_ITEMS_PER_SECTION)
-    .map((appointment) => {
-      const md = appointmentMeetingDate(appointment);
-      const scheduler = getSchedulerLabel(appointment, pastorUserId, mentorNameById);
-      const withWhom = getWithWhomLabel(appointment, mentorNameById);
-      return {
-        id: `meeting-month-${String(appointment.id ?? appointment._id ?? md)}`,
-        title: "Upcoming meeting this month",
-        description: `Meeting starts ${formatDateTime(md)}.`,
-        meta: `${scheduler} • ${withWhom} • This month`,
-        href: "/pastor/Appointments",
+        title: meetingListTitle(appointment),
+        description: `Starts ${formatDateTime(md)}.`,
+        meta: `${scheduler} • ${withWhom} • Next ${NEXT_APPOINTMENTS_WINDOW_DAYS} days`,
+        href: appointmentDetailHref(appointment),
       };
     });
 
@@ -418,15 +404,9 @@ export async function loadPastorFocusSections(input: PastorFocusInput): Promise<
     },
     {
       id: "meetings",
-      title: `Upcoming meetings within ${UPCOMING_MEETING_WINDOW_HOURS} hours`,
-      emptyMessage: "No meetings are coming up in the next 24 hours.",
-      items: meetingItems,
-    },
-    {
-      id: "meetings-month",
-      title: "Upcoming meetings this month",
-      emptyMessage: "No more meetings are scheduled for this month.",
-      items: monthlyMeetingItems,
+      title: `Next appointments (next ${NEXT_APPOINTMENTS_WINDOW_DAYS} days)`,
+      emptyMessage: `No meetings scheduled in the next ${NEXT_APPOINTMENTS_WINDOW_DAYS} days.`,
+      items: weeklyMeetingItems,
     },
     {
       id: "assessments",

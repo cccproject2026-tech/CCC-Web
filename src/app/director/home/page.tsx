@@ -2003,43 +2003,6 @@ const selectedAssignMentorName =
                     </span>
                   </div>
 
-                  {/* <p className="mt-4 text-[11px] text-white/55">
-                    Mode:{" "}
-                    <span className="capitalize text-[#cde2f2]">
-                      {appointment.platform}
-                    </span>
-                  </p> */}
-                  {(() => {
-  const meetingLink =
-    (appointment as any).meetingLink ||
-    (appointment as any).meetingUrl ||
-    (appointment as any).zoomLink ||
-    (appointment as any).joinUrl ||
-    (appointment as any).details?.meetingLink ||
-    (appointment as any).details?.meetingUrl ||
-    (appointment as any).details?.zoomLink ||
-    "";
-
-  return (
-    <p className="mt-4 text-[11px] text-white/55">
-      Mode:{" "}
-      {meetingLink ? (
-        <button
-          type="button"
-          onClick={() => window.open(meetingLink, "_blank", "noopener,noreferrer")}
-          className="capitalize text-[#8ec5eb] underline underline-offset-2 hover:text-[#b8ddf5]"
-        >
-          {appointment.platform || "Join meeting"}
-        </button>
-      ) : (
-        <span className="capitalize text-[#cde2f2]">
-          {appointment.platform || "—"}
-        </span>
-      )}
-    </p>
-  );
-})()}
-
                   {/* <div className="mt-2 flex gap-4 text-sm text-white/70">
                     <i className="fa-solid fa-phone" />
                     <i className="fa-regular fa-comment" />
@@ -2308,12 +2271,6 @@ const selectedAssignMentorName =
 
                     <div className="flex flex-col items-center justify-between gap-3 sm:flex-row sm:items-end">
                       <div>
-                        <p className="text-xs text-white/55">
-                          Mode:{" "}
-                          <span className="text-[#b8d4ff] underline underline-offset-2 capitalize">
-                            {appointment.platform}
-                          </span>
-                        </p>
                         <div className="mt-2 flex gap-4 text-sm text-white/80">
                           <i className="fa-solid fa-phone" />
                           <i className="fa-regular fa-comment" />
@@ -3619,9 +3576,6 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                             {timeText}
                           </span>
 
-                          <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 capitalize text-white/80">
-                            Mode: {appointment.platform || "—"}
-                          </span>
                         </div>
                       </div>
 

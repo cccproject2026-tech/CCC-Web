@@ -35,6 +35,13 @@ function PreSurveyInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const assessmentId = searchParams.get("assessmentId")?.trim() || "";
+  const retake = searchParams.get("retake") === "1";
+
+  const toCmaSurveyHref = () => {
+    const q = new URLSearchParams({ assessmentId });
+    if (retake) q.set("retake", "1");
+    return `/pastor/PastorSurveyCMA?${q.toString()}`;
+  };
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -103,9 +110,7 @@ function PreSurveyInner() {
           answer: answers[q.id] ?? "",
         })),
       });
-      router.push(
-        `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(assessmentId)}&scheduleMeeting=1`,
-      );
+      router.push(toCmaSurveyHref());
     } catch (e) {
       console.error(e);
       let msg = "Could not submit pre-survey. Try again.";
@@ -153,11 +158,7 @@ function PreSurveyInner() {
         <p className="mt-8 text-[#cde2f2]">No pre-survey questions for this assessment.</p>
         <button
           type="button"
-          onClick={() =>
-            router.push(
-              `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(assessmentId)}&scheduleMeeting=1`,
-            )
-          }
+          onClick={() => router.push(toCmaSurveyHref())}
           className="mt-6 rounded-lg bg-white px-6 py-2 text-sm font-semibold text-[#0f4a76]"
         >
           Continue to survey

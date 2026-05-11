@@ -554,9 +554,11 @@ export default function MentorAssessments() {
               if (appt?._id != null) resolvedAppointmentId = String(appt._id).trim();
               else if (appt?.id != null) resolvedAppointmentId = String(appt.id).trim();
               else resolvedAppointmentId = String(appointmentId || "").trim();
-              // Keep assignment status exactly as provided by backend progress API.
-              // Do not locally downgrade completed -> submitted based on meeting checks.
-              const normalizedStatus = progressRow?.status || "not_started";
+              // For mentee-filtered cards: status is based on meeting scheduling state.
+              // - no meeting details yet => submitted
+              // - meeting details available => completed
+              const hasMeetingDetails = !!(resolvedAppointmentId || appt?.meetingDate);
+              const normalizedStatus: MentorAssessmentStatus = hasMeetingDetails ? "completed" : "submitted";
               const resolvedDueDate = pickAssignedDueDate(item, flat);
               return {
                 ...assessment,
@@ -1047,7 +1049,7 @@ export default function MentorAssessments() {
                     <SearchBar
                       value={searchTerm}
                       onChange={setSearchTerm}
-                      placeholder="Search assessments…"
+                      placeholder="Search assessments or pastors…"
                       variant="dark"
                       className="w-full"
                     />
@@ -1090,43 +1092,6 @@ export default function MentorAssessments() {
                   </div>
                 </div>
               </div>
-
-              {!featuredLoading && filteredFeaturedItems.length > 0 && (
-                <div className={`mb-6 ${mentorFilterPanel}`}>
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm text-[#cde2f2]">
-                      {selectedMenteeId
-                        ? "Showing assigned assessments for selected mentee"
-                        : "Showing all assessments"}
-                    </p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => router.push("/mentor/MenteesDetailed")}
-                      className="rounded-lg border border-[#8ec5eb]/35 bg-[#8ec5eb]/12 px-3 py-1.5 text-xs font-semibold text-[#d8ecfa] transition hover:bg-[#8ec5eb]/20"
-                    >
-                      View all
-                    </button>
-                    {selectedMenteeId && (
-                      <button
-                        type="button"
-                        onClick={() => setSelectedMenteeId(null)}
-                        className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/15"
-                      >
-                        Clear filter
-                      </button>
-                    )}
-                  </div>
-                  </div>
-                  <FeaturedAvatars
-                    items={filteredFeaturedItems}
-                    showDivider={false}
-                    className="mb-0"
-                    selectedId={selectedMenteeId}
-                    onItemClick={(item) => setSelectedMenteeId(String(item.id))}
-                  />
-                </div>
-              )}
 
               {mode === "select" && (
                 <div className={`${mentorFilterPanel} flex flex-wrap items-center justify-between gap-4 p-5`}>
@@ -1176,7 +1141,45 @@ export default function MentorAssessments() {
                     <p className="font-semibold text-white">Loading assessments…</p>
                   </div>
                 </div>
-              ) : filtered.length > 0 ? (
+              ) : (
+                <>
+                  {!featuredLoading && filteredFeaturedItems.length > 0 && (
+                    <div className={`mb-6 ${mentorFilterPanel} px-4 py-3 sm:px-5`}>
+                      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm leading-snug text-[#cde2f2]/90">
+                            Select a mentee below to view their assigned assessments.
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end">
+                          {selectedMenteeId && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedMenteeId(null)}
+                              className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/15"
+                            >
+                              Clear filter
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <FeaturedAvatars
+                        items={filteredFeaturedItems}
+                        showDivider={false}
+                        className="mb-0"
+                        sizePx={72}
+                        gapClass="gap-6 sm:gap-8"
+                        selectedId={selectedMenteeId}
+                        onItemClick={(item) => setSelectedMenteeId(String(item.id))}
+                      />
+                    </div>
+                  )}
+                  <div className="mb-4">
+                    <h2 className="text-lg font-semibold text-white sm:text-xl">
+                      {selectedMenteeId ? `${selectedMenteeName}'s Assessment` : "All Assessments"}
+                    </h2>
+                  </div>
+                  {filtered.length > 0 ? (
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   {filtered.map((assessment: any, idx: number) => (
                     <div
@@ -1383,7 +1386,7 @@ export default function MentorAssessments() {
                                       Send CDP
                                     </button>
                                   )}
-                                <button
+                                {/* <button
                                   type="button"
                                   onClick={() =>
                                     router.push(`/mentor/MentorAssessments/${assessment.id}?viewUser=${selectedMenteeId}`)
@@ -1391,7 +1394,7 @@ export default function MentorAssessments() {
                                   className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
                                 >
                                   View
-                                </button>
+                                </button> */}
                               </div>
                             </div>
                           </div>
@@ -1429,7 +1432,7 @@ export default function MentorAssessments() {
                     </div>
                   ))}
                 </div>
-              ) : (
+                  ) : (
                 <div className={`mx-auto max-w-md px-8 py-14 text-center ${mentorGlassCardRoadmap} rounded-xl border border-white/10`}>
                   <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/10">
                     <i className="fa-regular fa-folder-open text-2xl text-[#8ec5eb]" />
@@ -1445,6 +1448,8 @@ export default function MentorAssessments() {
                       : "Try another search or create an assessment with Add."}
                   </p>
                 </div>
+                  )}
+                </>
               )}
             </>
           ) : (

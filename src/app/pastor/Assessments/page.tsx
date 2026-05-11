@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorSearchBar from "@/app/Components/pastor/PastorSearchBar";
@@ -157,11 +158,34 @@ function isDueNowOrPast(dueDateRaw?: string): boolean {
   return Date.now() > due.getTime();
 }
 
-function getAssessmentPrimaryHref(assessmentId: string, status: Row["status"]): string {
-  if (status === "Completed" || status === "Submitted") {
-    return `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(assessmentId)}&readOnly=1`;
+/** Primary CTA: submitted or completed → guidelines (hub with meeting context when available); else → guidelines to start. */
+function getAssessmentPrimaryDestination(item: Row): string {
+  const assessmentId = item.id;
+  if (item.status === "Submitted") {
+    const q = new URLSearchParams({ assessmentId });
+    if (item.meeting?.id) {
+      q.set("meetingId", item.meeting.id);
+      if (item.meeting.meetingDate) q.set("meetingDate", item.meeting.meetingDate);
+      if (item.meeting.mentorName) q.set("mentorName", item.meeting.mentorName);
+      if (item.meeting.platform) q.set("platform", item.meeting.platform);
+    }
+    return `/pastor/Assessments/guidelines?${q.toString()}`;
+  }
+  if (item.status === "Completed") {
+    const q = new URLSearchParams({ assessmentId });
+    if (item.meeting?.id) {
+      q.set("meetingId", item.meeting.id);
+      if (item.meeting.meetingDate) q.set("meetingDate", item.meeting.meetingDate);
+      if (item.meeting.mentorName) q.set("mentorName", item.meeting.mentorName);
+      if (item.meeting.platform) q.set("platform", item.meeting.platform);
+    }
+    return `/pastor/Assessments/guidelines?${q.toString()}`;
   }
   return `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(assessmentId)}`;
+}
+
+function getPastorScheduleMeetingHref(assessmentId: string): string {
+  return `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(assessmentId)}&readOnly=1&scheduleMeeting=1`;
 }
 
 function readSessionUserId(): string | null {
@@ -261,20 +285,6 @@ const dueDate =
             );
 
             const ps = String(progress?.status || "").toLowerCase().replace(/\s+/g, "_");
-            let status: Row["status"] = "Not Started";
-            if (ps === "completed" || ps === "reviewed") {
-              status = "Completed";
-            } else if (ps === "submitted") {
-              status = "Submitted";
-            } else if (
-              ps === "in_progress" ||
-              ps === "inprogress" ||
-              ps === "due"
-            ) {
-              status = "Due";
-            } else if (isDueNowOrPast(dueDate)) {
-              status = "Due";
-            }
 
             const a = assessment as Record<string, unknown>;
             // const rawBanner =
@@ -307,6 +317,22 @@ const linkedMeeting =
     return notes.includes(`assessmentId=${aid}`);
   });
 
+const linkedMeetingId = linkedMeeting
+  ? String(linkedMeeting._id ?? linkedMeeting.id ?? "").trim()
+  : "";
+const hasScheduledMeeting = Boolean(linkedMeetingId);
+
+let status: Row["status"] = "Not Started";
+if (ps === "completed" || ps === "reviewed") {
+  status = hasScheduledMeeting ? "Completed" : "Submitted";
+} else if (ps === "submitted") {
+  status = "Submitted";
+} else if (ps === "in_progress" || ps === "inprogress" || ps === "due") {
+  status = "Due";
+} else if (isDueNowOrPast(dueDate)) {
+  status = "Due";
+}
+
 const [answersRes, recRes] = await Promise.allSettled([
   apiGetUserAnswers(aid, sessionUserId),
   apiGetSectionRecommendations(aid, sessionUserId),
@@ -318,35 +344,33 @@ const hasCdpFromRecommendations =
   recRes.status === "fulfilled" ? hasCdpInRecommendationsPayload(recRes.value.data) : false;
 const hasCdp = hasCdpFromAnswers || hasCdpFromRecommendations;
 
-const meeting = linkedMeeting
-  ? {
-      id: String(linkedMeeting._id ?? linkedMeeting.id ?? ""),
-      mentorName:
-        `${linkedMeeting?.mentor?.firstName ?? ""} ${linkedMeeting?.mentor?.lastName ?? ""}`.trim() ||
-        linkedMeeting?.mentor?.email ||
-        "Mentor",
-      // meetingDate: linkedMeeting.meetingDate
-      //   ? new Date(linkedMeeting.meetingDate).toLocaleString()
-      //   : "N/A",
-      meetingDate: linkedMeeting.meetingDate
-  ? new Date(linkedMeeting.meetingDate).toLocaleString("en-US", {
-      month: "short",
-      day: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    })
-  : "N/A",
-      platform: linkedMeeting.platform || "N/A",
-      notes: linkedMeeting.notes,
-      meetingLink:
-        (typeof linkedMeeting.meetingLink === "string" && linkedMeeting.meetingLink) ||
-        (typeof linkedMeeting.meetingUrl === "string" && linkedMeeting.meetingUrl) ||
-        (typeof linkedMeeting.zoomLink === "string" && linkedMeeting.zoomLink) ||
-        extractFirstHttpUrl(linkedMeeting.notes),
-    }
-  : undefined;
+const meeting =
+  linkedMeeting && linkedMeetingId
+    ? {
+        id: linkedMeetingId,
+        mentorName:
+          `${linkedMeeting?.mentor?.firstName ?? ""} ${linkedMeeting?.mentor?.lastName ?? ""}`.trim() ||
+          linkedMeeting?.mentor?.email ||
+          "Mentor",
+        meetingDate: linkedMeeting.meetingDate
+          ? new Date(linkedMeeting.meetingDate).toLocaleString("en-US", {
+              month: "short",
+              day: "2-digit",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true,
+            })
+          : "N/A",
+        platform: linkedMeeting.platform || "N/A",
+        notes: linkedMeeting.notes,
+        meetingLink:
+          (typeof linkedMeeting.meetingLink === "string" && linkedMeeting.meetingLink) ||
+          (typeof linkedMeeting.meetingUrl === "string" && linkedMeeting.meetingUrl) ||
+          (typeof linkedMeeting.zoomLink === "string" && linkedMeeting.zoomLink) ||
+          extractFirstHttpUrl(linkedMeeting.notes),
+      }
+    : undefined;
 
 return {
   id: aid,
@@ -356,16 +380,16 @@ return {
               dueDate: dueDate ? new Date(dueDate).toLocaleDateString() : "",
               submittedAt: updatedAt ? new Date(updatedAt).toLocaleDateString() : undefined,
               completedAt:
-                status === "Completed" && updatedAt
+                status === "Completed" && hasScheduledMeeting && updatedAt
                   ? new Date(updatedAt).toLocaleDateString()
                   : undefined,
               imgUrl,
               button:
                 status === "Completed"
-                  ? "View Results"
+                  ? "View results"
                   : status === "Submitted"
                     ? "View submission"
-                    : "Start Now",
+                    : "Start now",
               createdOn: typeof a.createdAt === "string" ? new Date(a.createdAt).toLocaleDateString() : undefined,
               // createdBy: (typeof a.createdBy === "string" ? a.createdBy : undefined) || "Admin",
               createdBy: (() => {
@@ -560,6 +584,19 @@ hasCdp,
                     </button>
                     {showOptionsMenu === item.id && (
                       <div className="absolute right-0 z-30 mt-2 w-52 overflow-hidden rounded-lg border border-white/15 bg-[#041f35]/98 py-2 shadow-xl backdrop-blur-md">
+                        {!item.meeting?.id && item.status === "Submitted" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowOptionsMenu(null);
+                              router.push(getPastorScheduleMeetingHref(item.id));
+                            }}
+                            className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-white/90 transition hover:bg-white/10"
+                          >
+                            <i className="fa-regular fa-calendar-plus text-[#8ec5eb]" />
+                            Schedule meeting
+                          </button>
+                        )}
                         <button
                           type="button"
                           disabled={!item.meeting?.id}
@@ -571,7 +608,7 @@ hasCdp,
                           className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-white/90 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-white/40 disabled:hover:bg-transparent"
                         >
                           <i className="fa-regular fa-calendar-check text-[#8ec5eb]" />
-                          View Meeting Details
+                          View meeting details
                         </button>
                         {(item.status === "Submitted" || item.status === "Completed") && (
                           <button
@@ -640,36 +677,13 @@ hasCdp,
       unoptimized
     />
 
-    {(item.status === "Due" || item.status === "Not Started") && item.dueDate ? (
+    {item.dueDate ? (
       <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-md bg-[#fff6d8] px-2 py-[3px] text-xs font-semibold text-[#d38a00]">
         <i className="fa-regular fa-calendar text-xs" />
         Due: {item.dueDate}
       </div>
     ) : null}
   </div>
-{/* 
-  <div className="space-y-1 rounded-xl border border-white/10 bg-white/[0.04] p-3 text-xs text-[#d9ebf8]">
-    <p>
-      <span className="font-medium text-white">Assigned by :</span>{" "}
-      {item.createdBy || "N/A"}
-    </p>
-
-    <p>
-      <span className="font-medium text-white">Due date :</span>{" "}
-      {item.dueDate || "N/A"}
-    </p>
-
-    <p>
-      <span className="font-medium text-white">Completed on :</span>{" "}
-      {item.completedAt ?? item.submittedAt ?? ""}
-    </p>
-  </div> */}
-  <div className="text-xs text-[#d9ebf8]">
-  <p>
-    <span className="font-medium text-white">Completed on :</span>{" "}
-    {item.completedAt ?? item.submittedAt ?? "N/A"}
-  </p>
-</div>
 </div>
 
                   <div className="flex flex-1 flex-col justify-between p-3">
@@ -707,23 +721,48 @@ hasCdp,
                         <p className="mb-2 text-xs text-[#d9ebf8]">Due on : {item.dueDate}</p>
                       )} */}
 
-                      {item.status === "Submitted" && (
-                        <p className="mb-2 text-xs text-[#d9ebf8]">Submitted on : {item.submittedAt ?? item.dueDate}</p>
+                      {item.status === "Submitted" && !item.meeting?.id && (
+                        <div className="mb-3">
+                          <p className="mb-2 text-xs text-amber-100/90">
+                            A mentor meeting is required. Schedule one when you are ready.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => router.push(getPastorScheduleMeetingHref(item.id))}
+                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30 sm:w-auto"
+                          >
+                            <i className="fa-regular fa-calendar-plus" />
+                            Schedule meeting
+                          </button>
+                        </div>
                       )}
 
                       {item.meeting?.id && (
-                        <button
-                          type="button"
+                        <div
+                          role="link"
+                          tabIndex={0}
                           onClick={() =>
                             router.push(`/pastor/appointments/${encodeURIComponent(item.meeting!.id)}`)
                           }
-                          className="mt-2 w-full rounded-xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-2 text-left transition hover:bg-[#8ec5eb]/15"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              router.push(`/pastor/appointments/${encodeURIComponent(item.meeting!.id)}`);
+                            }
+                          }}
+                          className="mt-2 w-full cursor-pointer rounded-xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-2 text-left transition hover:bg-[#8ec5eb]/15"
                         >
                           <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[#d9ebf8]">
-                            <span className="font-semibold text-white">Meeting</span>
+                            <span className="font-semibold text-white">Meeting (tap for details)</span>
                             <span>{item.meeting.meetingDate || "N/A"}</span>
                             <span className="text-white/30">|</span>
-                            <span>{item.meeting.platform || "N/A"}</span>
+                            <Link
+                              href={`/pastor/appointments/${encodeURIComponent(item.meeting!.id)}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="cursor-pointer font-semibold text-[#8ec5eb] underline underline-offset-2 hover:text-white"
+                            >
+                              {item.meeting.platform || "N/A"}
+                            </Link>
                           </div>
                           <div className="mt-1.5 flex flex-wrap items-center gap-2">
                             {item.meeting.meetingLink && (
@@ -732,13 +771,13 @@ hasCdp,
                                 target="_blank"
                                 rel="noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="rounded-lg border border-[#8ec5eb]/45 bg-transparent px-2.5 py-1 text-[11px] font-semibold text-[#8ec5eb] transition hover:bg-[#8ec5eb]/15"
+                                className="cursor-pointer rounded-lg border border-[#8ec5eb]/45 bg-transparent px-2.5 py-1 text-[11px] font-semibold text-[#8ec5eb] transition hover:bg-[#8ec5eb]/15"
                               >
                                 Join link
                               </a>
                             )}
                           </div>
-                        </button>
+                        </div>
                       )}
 
                       {/* {item.status === "Completed" && (
@@ -763,7 +802,7 @@ hasCdp,
                       </div>
                       <button
                         type="button"
-                        onClick={() => router.push(getAssessmentPrimaryHref(item.id, item.status))}
+                        onClick={() => router.push(getAssessmentPrimaryDestination(item))}
                         className={`${pastorPrimaryCta} shrink-0 px-4 text-xs md:px-5 md:text-sm`}
                       >
                         {item.button}
@@ -772,7 +811,7 @@ hasCdp,
                     {/* <div className="mt-4 flex justify-end">
   <button
     type="button"
-    onClick={() => router.push(getAssessmentPrimaryHref(item.id, item.status))}
+    onClick={() => router.push(getAssessmentPrimaryDestination(item))}
     className={`${pastorPrimaryCta} shrink-0 px-4 text-xs md:px-5 md:text-sm`}
   >
     {item.button}
@@ -796,7 +835,7 @@ hasCdp,
 
   <button
     type="button"
-    onClick={() => router.push(getAssessmentPrimaryHref(item.id, item.status))}
+    onClick={() => router.push(getAssessmentPrimaryDestination(item))}
     className={`${pastorPrimaryCta} shrink-0 px-4 text-xs md:px-5 md:text-sm`}
   >
     {item.button}
@@ -818,7 +857,7 @@ hasCdp,
           type="button"
           onClick={() =>
             router.push(
-               `/pastor/Appointments/${encodeURIComponent(item.meeting!.id)}`
+               `/pastor/appointments/${encodeURIComponent(item.meeting!.id)}`
             )
           }
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb] transition hover:bg-[#8ec5eb]/25 hover:text-white"
@@ -832,7 +871,7 @@ hasCdp,
 
   <button
     type="button"
-    onClick={() => router.push(getAssessmentPrimaryHref(item.id, item.status))}
+    onClick={() => router.push(getAssessmentPrimaryDestination(item))}
     className={`${pastorPrimaryCta} shrink-0 px-4 text-xs md:px-5 md:text-sm`}
   >
     {item.button}
@@ -842,38 +881,16 @@ hasCdp,
   <div className="flex justify-end">
     {/* <button
       type="button"
-      onClick={() => router.push(getAssessmentPrimaryHref(item.id, item.status))}
+      onClick={() => router.push(getAssessmentPrimaryDestination(item))}
       className={`${pastorPrimaryCta} shrink-0 whitespace-nowrap px-4 text-xs md:px-5 md:text-sm`}
     >
       {item.button}
     </button> */}
     <button
   type="button"
-  // onClick={() => {
-  //   if (item.status === "Completed" && !hasMeeting) {
-  //     router.push(
-  //       `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(item.id)}&readOnly=1&scheduleMeeting=1`
-  //     );
-  //     return;
-  //   }
-
-  //   router.push(getAssessmentPrimaryHref(item.id, item.status));
-  // }}
   onClick={() => {
-  if (item.status === "Completed" && hasMeeting) {
-    const q = new URLSearchParams({
-      assessmentId: item.id,
-      meetingId: item.meeting?.id || "",
-      meetingDate: item.meeting?.meetingDate || "",
-      mentorName: item.meeting?.mentorName || "",
-      platform: item.meeting?.platform || "",
-    });
-    router.push(`/pastor/Assessments/guidelines?${q.toString()}`);
-    return;
-  }
-
-  router.push(getAssessmentPrimaryHref(item.id, item.status));
-}}
+    router.push(getAssessmentPrimaryDestination(item));
+  }}
   className={`${pastorPrimaryCta} shrink-0 whitespace-nowrap px-4 text-xs md:px-5 md:text-sm`}
 >
   {primaryButtonText}

@@ -379,7 +379,8 @@ function AssessmentsPageContent() {
                     (assignmentId && rowAssignmentId && rowAssignmentId === assignmentId)
                   );
                 });
-                const progressStatus = normalizeAssessmentStatus(progressRow?.status);
+                const hasMeetingDetails = !!(resolvedAppointmentId || appt?.meetingDate);
+                const progressStatus = hasMeetingDetails ? "completed" : "submitted";
                 const resolvedDueDate = pickAssignedDueDate(item, flat);
 
                 return {
@@ -661,6 +662,11 @@ function AssessmentsPageContent() {
     );
   }, [featuredItems, searchQuery]);
 
+  const selectedPastorName = useMemo(() => {
+    const row = featuredItems.find((item) => String(item.id) === String(selectedMenteeId || ""));
+    return row?.name || "Pastor";
+  }, [featuredItems, selectedMenteeId]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -701,7 +707,7 @@ function AssessmentsPageContent() {
               <SearchBar
                 value={searchQuery}
                 onChange={setSearchQuery}
-                placeholder="Search assessments…"
+                placeholder="Search assessments or pastors…"
                 variant="dark"
                 className="w-full"
               />
@@ -779,43 +785,6 @@ function AssessmentsPageContent() {
             </div>
           </DirectorFilterSection>
 
-          {!featuredLoading && filteredFeaturedItems.length > 0 && (
-            <div className={`mb-6 ${mentorFilterPanel}`}>
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm text-[#cde2f2]">
-                  {selectedMenteeId
-                    ? "Showing assigned assessments for selected pastor"
-                    : "Showing all assessments"}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => router.push("/director/mentees")}
-                    className="rounded-lg border border-[#8ec5eb]/35 bg-[#8ec5eb]/12 px-3 py-1.5 text-xs font-semibold text-[#d8ecfa] transition hover:bg-[#8ec5eb]/20"
-                  >
-                    Show all
-                  </button>
-                  {selectedMenteeId && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedMenteeId(null)}
-                      className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/15"
-                    >
-                      Clear filter
-                    </button>
-                  )}
-                </div>
-              </div>
-              <FeaturedAvatars
-                items={filteredFeaturedItems}
-                showDivider={false}
-                className="mb-0"
-                selectedId={selectedMenteeId}
-                onItemClick={(item) => setSelectedMenteeId(String(item.id))}
-              />
-            </div>
-          )}
-
           {isSelectionMode && (
             <div className={`mb-6 flex flex-wrap items-center justify-between gap-4 p-5 ${directorGlassCard}`}>
               <div className="flex flex-wrap items-center gap-4">
@@ -892,7 +861,44 @@ function AssessmentsPageContent() {
                 <p className="font-semibold text-white">Loading assessments…</p>
               </div>
             </div>
-          ) : filteredAssessments.length > 0 ? (
+          ) : (
+            <>
+              {!featuredLoading && filteredFeaturedItems.length > 0 && (
+                <div className={`mb-6 ${mentorFilterPanel} px-4 py-4 sm:px-5`}>
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm leading-snug text-[#cde2f2]/90">
+                        Select a pastor below to view their assigned assessments.
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center justify-start gap-2 sm:justify-end">
+                      {selectedMenteeId && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedMenteeId(null)}
+                          className="rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-white/15"
+                        >
+                          Clear filter
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <FeaturedAvatars
+                    items={filteredFeaturedItems}
+                    showDivider={false}
+                    className="mb-0"
+                    gapClass="gap-6 sm:gap-8"
+                    selectedId={selectedMenteeId}
+                    onItemClick={(item) => setSelectedMenteeId(String(item.id))}
+                  />
+                </div>
+              )}
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold text-white sm:text-xl">
+                  {selectedMenteeId ? `${selectedPastorName}'s Assessment` : "All Assessments"}
+                </h2>
+              </div>
+              {filteredAssessments.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {filteredAssessments.map((assessment) => (
                 <div
@@ -1068,7 +1074,7 @@ function AssessmentsPageContent() {
                                   Send CDP
                                 </button>
                               )} */}
-                            <button
+                            {/* <button
                               type="button"
                               onClick={() =>
                                 router.push(`/director/assessments/${assessment.id}?viewUser=${selectedMenteeId}`)
@@ -1076,7 +1082,7 @@ function AssessmentsPageContent() {
                               className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
                             >
                               View
-                            </button>
+                            </button> */}
                           </div>
                         </div>
                       </div>
@@ -1112,7 +1118,7 @@ function AssessmentsPageContent() {
                 </div>
               ))}
             </div>
-          ) : (
+              ) : (
             <div className={`mx-auto max-w-md px-8 py-14 text-center ${directorGlassCard}`}>
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/10">
                 <i className="fa-regular fa-folder-open text-2xl text-[#8ec5eb]" />
@@ -1128,6 +1134,8 @@ function AssessmentsPageContent() {
                   : "Try another search or create an assessment with Add."}
               </p>
             </div>
+              )}
+            </>
           )}
         </div>
       </section>

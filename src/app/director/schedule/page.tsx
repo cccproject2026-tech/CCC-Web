@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -55,6 +55,42 @@ function labelPerson(p: string | PersonInfo | undefined, fallback: string): stri
   if (typeof p === "string") return fallback;
   const n = `${p.firstName ?? ""} ${p.lastName ?? ""}`.trim();
   return n || p.email || fallback;
+}
+
+function resolvePersonId(ref: string | PersonInfo | undefined | null): string {
+  if (ref == null) return "";
+  if (typeof ref === "string") return ref.trim();
+  return String(ref._id || "").trim();
+}
+
+function normalizeIdentityText(value: string | undefined | null): string {
+  return String(value || "").trim().toLowerCase();
+}
+
+function appointmentUserIdString(a: AppointmentResponse): string {
+  return resolvePersonId(a.user as PersonInfo) || resolvePersonId(a.userId as string | PersonInfo);
+}
+
+function appointmentMentorIdString(a: AppointmentResponse): string {
+  return resolvePersonId(a.mentor as PersonInfo) || resolvePersonId(a.mentorId as string | PersonInfo);
+}
+
+function asPerson(ref: string | PersonInfo | undefined | null): PersonInfo | undefined {
+  if (!ref || typeof ref === "string") return undefined;
+  return ref;
+}
+
+function appointmentNotCancelled(a: AppointmentResponse): boolean {
+  return !["cancelled", "canceled"].includes((a.status || "").toLowerCase());
+}
+
+function localYmdFromMs(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function localYmdToday(): string {
+  return localYmdFromMs(Date.now());
 }
 function getInitialsAvatar(firstName?: string, lastName?: string, fallback = "User") {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(
@@ -149,17 +185,23 @@ function DirectorScheduleContent() {
   const [activeTab, setActiveTab] = useState<"Appointments" | "Availability" | "Schedule" | "Appointment History">(
     () => tabFromParam(searchParams.get("tab")) ?? "Appointments",
   );
-  const [historyPage, setHistoryPage] = useState(1);
+  const [historyMyPage, setHistoryMyPage] = useState(1);
+  const [historyHostedPage, setHistoryHostedPage] = useState(1);
 
   // director identity
   const [directorId, setDirectorId] = useState<string | null>(null);
+  const [directorIdentity, setDirectorIdentity] = useState<{
+    firstName: string;
+    lastName: string;
+    email: string;
+  }>({ firstName: "", lastName: "", email: "" });
   const router = useRouter();
 
   // shared state
   const [appointments, setAppointments] = useState<AppointmentResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [showMenu, setShowMenu] = useState<number | null>(null);
+  const [showMenu, setShowMenu] = useState<string | null>(null);
   const [showHistoryMenu, setShowHistoryMenu] = useState<string | null>(null);
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [rescheduleTarget, setRescheduleTarget] = useState<AppointmentResponse | null>(null);
@@ -177,7 +219,8 @@ function DirectorScheduleContent() {
 
   // calendar (Appointments tab)
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedAppointmentDate, setSelectedAppointmentDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [selectedAppointmentDate, setSelectedAppointmentDate] = useState(() => localYmdToday());
+  const [selectedDateView, setSelectedDateView] = useState<"my" | "other">("my");
 
   // availability state
   const [availability, setAvailability] = useState<any[]>([]);
@@ -188,6 +231,8 @@ function DirectorScheduleContent() {
   const [newSlot, setNewSlot] = useState<any>(null);
   const [slotError, setSlotError] = useState<string | null>(null);
   const [maxBookingsPerDay, setMaxBookingsPerDay] = useState(5);
+  /** Backend `advanceNotice` is in hours (see AvailabilityPayload). */
+  const [advanceNoticeHours, setAdvanceNoticeHours] = useState(2);
 
   // schedule drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -217,7 +262,29 @@ function DirectorScheduleContent() {
   // ── Resolve director ID from cookie ──────────────────────────────────────────
   useEffect(() => {
     const uid = getCookie("userId") as string | undefined;
-    if (uid) setDirectorId(String(uid));
+    const rawUser = getCookie("user");
+    let cookieId = "";
+    try {
+      if (rawUser) {
+        const parsed = JSON.parse(rawUser) as {
+          _id?: string;
+          id?: string;
+          firstName?: string;
+          lastName?: string;
+          email?: string;
+        };
+        cookieId = String(parsed._id || parsed.id || "").trim();
+        setDirectorIdentity({
+          firstName: String(parsed.firstName || "").trim(),
+          lastName: String(parsed.lastName || "").trim(),
+          email: String(parsed.email || "").trim(),
+        });
+      }
+    } catch {
+      // Ignore malformed user cookie.
+    }
+    const resolvedDirectorId = cookieId || String(uid || "").trim();
+    if (resolvedDirectorId) setDirectorId(resolvedDirectorId);
   }, []);
 
   // ── Close action menu on outside click ───────────────────────────────────────
@@ -246,7 +313,7 @@ function DirectorScheduleContent() {
     setLoading(true);
     (async () => {
       try {
-        const res = await apiGetAppointments({ futureOnly: false, status: "scheduled" });
+        const res = await apiGetAppointments({ futureOnly: false });
         const list = unwrapAppointmentsAxiosData(res);
         const sorted = [...list].sort(
           (a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
@@ -537,24 +604,103 @@ function DirectorScheduleContent() {
     const d = new Date(appt.meetingDate);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
-  const todayKey = new Date().toISOString().split("T")[0];
-  const selectedDayAppointments = appointments
-    .filter((a) => a.meetingDate.startsWith(selectedAppointmentDate))
-    .filter((a) => selectedAppointmentDate !== todayKey || new Date(a.meetingDate).getTime() >= Date.now())
-    .sort((a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime());
-  const appointmentHistory = appointments
-    .filter((a) => new Date(a.meetingDate).getTime() < Date.now())
-    .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
+  const todayLocalYmd = localYmdToday();
+
+  const selectedDateMyAppointments = useMemo(() => {
+    if (!directorId) return [];
+    const normalizedDirectorName = normalizeIdentityText(
+      `${directorIdentity.firstName} ${directorIdentity.lastName}`.trim(),
+    );
+    const normalizedDirectorEmail = normalizeIdentityText(directorIdentity.email);
+    return appointments
+      .filter((a) => {
+        if (!appointmentNotCancelled(a)) return false;
+        if (new Date(a.meetingDate).toISOString().slice(0, 10) !== selectedAppointmentDate) return false;
+        const userPerson = asPerson(a.user) ?? asPerson(a.userId as string | PersonInfo);
+        const mentorPerson = asPerson(a.mentor) ?? asPerson(a.mentorId as string | PersonInfo);
+
+        const matchesById =
+          appointmentUserIdString(a) === directorId || appointmentMentorIdString(a) === directorId;
+        if (matchesById) return true;
+
+        const matchesByEmail =
+          !!normalizedDirectorEmail &&
+          [userPerson?.email, mentorPerson?.email].some(
+            (email) => normalizeIdentityText(email) === normalizedDirectorEmail,
+          );
+        if (matchesByEmail) return true;
+
+        const nameMatches = (person: PersonInfo | undefined): boolean => {
+          if (!person || !normalizedDirectorName) return false;
+          const personName = normalizeIdentityText(`${person.firstName || ""} ${person.lastName || ""}`.trim());
+          return !!personName && personName === normalizedDirectorName;
+        };
+
+        return nameMatches(userPerson) || nameMatches(mentorPerson);
+      })
+      .sort((a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime());
+  }, [appointments, directorId, directorIdentity, selectedAppointmentDate]);
+
+  const selectedDateOtherAppointments = useMemo(() => {
+    if (!directorId) return [];
+    const myIds = new Set(
+      selectedDateMyAppointments.map((a) => appointmentEntityId(a) || `${a.meetingDate}-${appointmentUserIdString(a)}-${appointmentMentorIdString(a)}`),
+    );
+    return appointments
+      .filter((a) => {
+        if (!appointmentNotCancelled(a)) return false;
+        if (new Date(a.meetingDate).toISOString().slice(0, 10) !== selectedAppointmentDate) return false;
+        const apptId = appointmentEntityId(a) || `${a.meetingDate}-${appointmentUserIdString(a)}-${appointmentMentorIdString(a)}`;
+        return !myIds.has(apptId);
+      })
+      .sort((a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime());
+  }, [appointments, directorId, selectedAppointmentDate, selectedDateMyAppointments]);
+
+  const myAppointmentHistory = useMemo(() => {
+    if (!directorId) return [];
+    const nowMs = Date.now();
+    return appointments
+      .filter((a) => {
+        const t = new Date(a.meetingDate).getTime();
+        if (Number.isNaN(t) || t >= nowMs) return false;
+        return appointmentUserIdString(a) === directorId;
+      })
+      .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
+  }, [appointments, directorId]);
+
+  const hostedAppointmentHistory = useMemo(() => {
+    if (!directorId) return [];
+    const nowMs = Date.now();
+    return appointments
+      .filter((a) => {
+        const t = new Date(a.meetingDate).getTime();
+        if (Number.isNaN(t) || t >= nowMs) return false;
+        const uid = appointmentUserIdString(a);
+        const mid = appointmentMentorIdString(a);
+        return mid === directorId && uid !== directorId;
+      })
+      .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
+  }, [appointments, directorId]);
+
   const historyPageSize = 10;
-  const totalHistoryPages = Math.max(1, Math.ceil(appointmentHistory.length / historyPageSize));
-  const pagedAppointmentHistory = appointmentHistory.slice(
-    (historyPage - 1) * historyPageSize,
-    historyPage * historyPageSize,
+  const totalMyHistoryPages = Math.max(1, Math.ceil(myAppointmentHistory.length / historyPageSize));
+  const totalHostedHistoryPages = Math.max(1, Math.ceil(hostedAppointmentHistory.length / historyPageSize));
+  const pagedMyHistory = myAppointmentHistory.slice(
+    (historyMyPage - 1) * historyPageSize,
+    historyMyPage * historyPageSize,
+  );
+  const pagedHostedHistory = hostedAppointmentHistory.slice(
+    (historyHostedPage - 1) * historyPageSize,
+    historyHostedPage * historyPageSize,
   );
 
   useEffect(() => {
-    setHistoryPage((prev) => Math.min(prev, totalHistoryPages));
-  }, [totalHistoryPages]);
+    setHistoryMyPage((prev) => Math.min(prev, totalMyHistoryPages));
+  }, [totalMyHistoryPages]);
+
+  useEffect(() => {
+    setHistoryHostedPage((prev) => Math.min(prev, totalHostedHistoryPages));
+  }, [totalHostedHistoryPages]);
 
   // ── Fetch availability for reschedule calendar (mentor only) ───────────────────
   useEffect(() => {
@@ -632,6 +778,8 @@ function DirectorScheduleContent() {
     const body = {
       mentorId: directorId,
       meetingDuration: 60,
+      advanceNotice: advanceNoticeHours,
+      maxBookingsPerDay,
       weeklySlots: dated.map(({ date, uiSlots }) => ({
         date,
         slots: uiSlots.map((s: any) => ({
@@ -660,17 +808,22 @@ function DirectorScheduleContent() {
       return;
     }
     if (!meetingDate || !selectedSlot) { showToast("Please select date and time"); return; }
+    const scheduledIso = parseSlotStartToIso(meetingDate, selectedSlot.replace(/\u2013/g, "-"));
+    if (meetingDate === new Date().toISOString().split("T")[0] && new Date(scheduledIso).getTime() <= Date.now()) {
+      showToast("For today, please choose a time after the current time.");
+      return;
+    }
     if (isScheduling) return;
     setIsScheduling(true);
     try {
       await apiCreateAppointment({
         userId: selectedRecipient._id || selectedRecipient.id,
         mentorId: directorId,
-        meetingDate: parseSlotStartToIso(meetingDate, selectedSlot.replace(/\u2013/g, "-")),
+        meetingDate: scheduledIso,
         platform: uiMeetingModeToPlatform(selectedPlatform),
         notes: "Scheduled by director",
       });
-      const refresh = await apiGetAppointments({ futureOnly: false, status: "scheduled" });
+      const refresh = await apiGetAppointments({ futureOnly: false });
       setAppointments(unwrapAppointmentsAxiosData(refresh).sort(
         (a: any, b: any) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
       ));
@@ -795,7 +948,7 @@ function DirectorScheduleContent() {
         startPeriod,
         platform: reschedulePlatform as any,
       });
-      const refresh = await apiGetAppointments({ futureOnly: false, status: "scheduled" });
+      const refresh = await apiGetAppointments({ futureOnly: false });
       const list = unwrapAppointmentsAxiosData(refresh).sort(
         (a: any, b: any) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
       );
@@ -813,6 +966,236 @@ function DirectorScheduleContent() {
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const renderHistoryAppointmentCard = (appt: AppointmentResponse, index: number, listPage: number, keyPrefix: string) => {
+    const md = new Date(appt.meetingDate);
+    const apptKey = appointmentEntityId(appt) || `${keyPrefix}-${listPage}-${index}`;
+    const mentor = appt.mentor ?? (typeof appt.mentorId === "object" ? appt.mentorId : undefined);
+    const mentee = appt.user ?? (typeof appt.userId === "object" ? appt.userId : undefined);
+    const mentorName = labelPerson(mentor, "Unknown");
+    const menteeName = labelPerson(mentee, "Unknown");
+    const mentorRole = mentor?.role ? mentor.role.charAt(0).toUpperCase() + mentor.role.slice(1).toLowerCase() : "Mentor";
+    const menteeRole = mentee?.role ? mentee.role.charAt(0).toUpperCase() + mentee.role.slice(1).toLowerCase() : "Pastor";
+    const mentorId = typeof appt.mentorId === "string" ? appt.mentorId : appt.mentorId?._id ?? appt.mentor?._id;
+    const menteeId = typeof appt.userId === "string" ? appt.userId : appt.userId?._id ?? appt.user?._id;
+
+    return (
+      <div
+        className={`${directorGlassCard} relative overflow-hidden border border-white/15 bg-[linear-gradient(180deg,rgba(10,53,88,0.9)_0%,rgba(6,41,70,0.92)_100%)] shadow-[0_16px_40px_rgba(0,0,0,0.25)] flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showHistoryMenu === apptKey ? "z-[60]" : ""}`}
+        style={showHistoryMenu === apptKey ? { overflow: "visible" } : undefined}
+      >
+        <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 bg-white/[0.03] py-5 sm:w-[132px] sm:border-b-0 sm:border-r sm:py-7">
+          <div className="flex h-[82px] w-[82px] items-center justify-center rounded-2xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 shadow-inner">
+            <Image src={getPlatformIcon(appt.platform)} alt={appt.platform || "Meeting platform"} className="h-10 w-10" />
+          </div>
+        </div>
+        <div className="relative min-w-0 flex-1 px-4 py-4 sm:px-5">
+          <div className="absolute right-4 top-4 z-10 sm:right-5">
+            <div className="relative" data-appointment-menu-root="true">
+              <button
+                type="button"
+                onClick={() => setShowHistoryMenu(showHistoryMenu === apptKey ? null : apptKey)}
+                className="rounded-lg px-3 py-1 text-[#8ec5eb] transition hover:bg-white/10 hover:text-white"
+                aria-label="Appointment actions"
+              >
+                <i className="fa-solid fa-ellipsis-vertical" />
+              </button>
+              {showHistoryMenu === apptKey && (
+                <div className="absolute right-0 top-9 z-[100] w-[200px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                  <button
+                    type="button"
+                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                    onClick={() => {
+                      router.push(`/director/schedule/${encodeURIComponent(apptKey)}`);
+                      setShowHistoryMenu(null);
+                    }}
+                  >
+                    <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" />
+                    View Details
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="mb-3 flex items-center gap-3">
+            <img
+              src={
+                String((mentor as any)?.profilePicture || "").trim() ||
+                getInitialsAvatar((mentor as any)?.firstName, (mentor as any)?.lastName, "Mentor")
+              }
+              alt={mentorName}
+              className="h-9 w-9 rounded-full border border-white/20 object-cover"
+            />
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Mentor</p>
+              <h4 className="pr-10 text-sm font-semibold text-white">
+                {mentorId ? (
+                  <Link href={`/director/mentors/profile/${encodeURIComponent(String(mentorId))}`} className="hover:text-[#8ec5eb]">
+                    {mentorName}
+                  </Link>
+                ) : (
+                  mentorName
+                )}
+              </h4>
+              <p className="text-[12px] text-[#cde2f2]/90">{mentorRole}</p>
+            </div>
+          </div>
+          <div className="mb-3 flex items-center gap-3">
+            <img
+              src={
+                String((mentee as any)?.profilePicture || "").trim() ||
+                getInitialsAvatar((mentee as any)?.firstName, (mentee as any)?.lastName, "Pastor")
+              }
+              alt={menteeName}
+              className="h-9 w-9 rounded-full border border-white/20 object-cover"
+            />
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Pastor</p>
+              <h4 className="text-sm font-semibold text-white">
+                {menteeId ? (
+                  <Link href={`/director/mentees/profile/${encodeURIComponent(String(menteeId))}`} className="hover:text-[#8ec5eb]">
+                    {menteeName}
+                  </Link>
+                ) : (
+                  menteeName
+                )}
+              </h4>
+              <p className="text-[12px] text-[#cde2f2]/90">{menteeRole}</p>
+            </div>
+          </div>
+          <div className="mb-1 flex flex-wrap gap-2">
+            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] text-[#e7f4ff]">
+              <i className="fa-regular fa-calendar text-[#8ec5eb]" />
+              {md.toLocaleDateString()}
+            </span>
+            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] text-[#e7f4ff]">
+              <i className="fa-regular fa-clock text-[#8ec5eb]" />
+              {md.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderActiveAppointmentCard = (appt: AppointmentResponse) => {
+    const apptKey = appointmentEntityId(appt) || "";
+    const md = new Date(appt.meetingDate);
+    const mentor = appt.mentor ?? (typeof appt.mentorId === "object" ? appt.mentorId : undefined);
+    const mentee = appt.user ?? (typeof appt.userId === "object" ? appt.userId : undefined);
+    const mentorName = labelPerson(mentor, "Unknown");
+    const menteeName = labelPerson(mentee, "Unknown");
+    const mentorRole = mentor?.role ? mentor.role.charAt(0).toUpperCase() + mentor.role.slice(1).toLowerCase() : "Mentor";
+    const menteeRole = mentee?.role ? mentee.role.charAt(0).toUpperCase() + mentee.role.slice(1).toLowerCase() : "Pastor";
+    const mentorId = typeof appt.mentorId === "string" ? appt.mentorId : appt.mentorId?._id ?? appt.mentor?._id;
+    const menteeId = typeof appt.userId === "string" ? appt.userId : appt.userId?._id ?? appt.user?._id;
+
+    return (
+      <div
+        className={`${directorGlassCard} relative overflow-hidden border border-white/15 bg-[linear-gradient(180deg,rgba(10,53,88,0.9)_0%,rgba(6,41,70,0.92)_100%)] shadow-[0_16px_40px_rgba(0,0,0,0.25)] flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showMenu === apptKey ? "z-[60]" : ""}`}
+        style={showMenu === apptKey ? { overflow: "visible" } : undefined}
+      >
+        <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 bg-white/[0.03] py-5 sm:w-[132px] sm:border-b-0 sm:border-r sm:py-7">
+          <div className="flex h-[82px] w-[82px] items-center justify-center rounded-2xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 shadow-inner">
+            <Image src={getPlatformIcon(appt.platform)} alt={appt.platform || "Meeting platform"} className="h-10 w-10" />
+          </div>
+        </div>
+        <div className="relative min-w-0 flex-1 px-4 py-4 sm:px-5">
+          <div className="absolute right-4 top-4 z-10 sm:right-5">
+            <div className="relative" data-appointment-menu-root="true">
+              <button
+                type="button"
+                onClick={() => setShowMenu(showMenu === apptKey ? null : apptKey)}
+                className="rounded-lg px-3 py-1 text-[#8ec5eb] transition hover:bg-white/10 hover:text-white"
+                aria-label="Appointment actions"
+              >
+                <i className="fa-solid fa-ellipsis-vertical" />
+              </button>
+              {showMenu === apptKey && (
+                <div className="absolute right-0 top-9 z-[100] w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                  <button
+                    type="button"
+                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                    onClick={() => {
+                      router.push(`/director/schedule/${encodeURIComponent(apptKey)}`);
+                      setShowMenu(null);
+                    }}
+                  >
+                    <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" />
+                    View Details
+                  </button>
+                  <button type="button" className="w-full px-4 py-2.5 text-left transition hover:bg-white/10" onClick={() => openRescheduleModal(appt)}>
+                    <i className="fa-regular fa-calendar mr-2 text-[#8ec5eb]" />
+                    Reschedule meeting
+                  </button>
+                  <button type="button" className="w-full px-4 py-2.5 text-left transition hover:bg-white/10" onClick={() => handleCancelAppointment(appt)}>
+                    <i className="fa-regular fa-circle-xmark mr-2 text-red-300" />
+                    Cancel meeting
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="mb-3 flex items-center gap-3">
+            <img
+              src={
+                String((mentor as any)?.profilePicture || "").trim() ||
+                getInitialsAvatar((mentor as any)?.firstName, (mentor as any)?.lastName, "Mentor")
+              }
+              alt={mentorName}
+              className="h-9 w-9 rounded-full border border-white/20 object-cover"
+            />
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Mentor</p>
+              <h4 className="pr-10 text-sm font-semibold text-white">
+                {mentorId ? (
+                  <Link href={`/director/mentors/profile/${encodeURIComponent(String(mentorId))}`} className="hover:text-[#8ec5eb]">
+                    {mentorName}
+                  </Link>
+                ) : (
+                  mentorName
+                )}
+              </h4>
+              <p className="text-[12px] text-[#cde2f2]/90">{mentorRole}</p>
+            </div>
+          </div>
+          <div className="mb-3 flex items-center gap-3">
+            <img
+              src={
+                String((mentee as any)?.profilePicture || "").trim() ||
+                getInitialsAvatar((mentee as any)?.firstName, (mentee as any)?.lastName, "Pastor")
+              }
+              alt={menteeName}
+              className="h-9 w-9 rounded-full border border-white/20 object-cover"
+            />
+            <div>
+              <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Pastor</p>
+              <h4 className="text-sm font-semibold text-white">
+                {menteeId ? (
+                  <Link href={`/director/mentees/profile/${encodeURIComponent(String(menteeId))}`} className="hover:text-[#8ec5eb]">
+                    {menteeName}
+                  </Link>
+                ) : (
+                  menteeName
+                )}
+              </h4>
+              <p className="text-[12px] text-[#cde2f2]/90">{menteeRole}</p>
+            </div>
+          </div>
+          <div className="mb-1 flex flex-wrap gap-2">
+            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] text-[#e7f4ff]">
+              <i className="fa-regular fa-calendar text-[#8ec5eb]" />
+              {md.toLocaleDateString()}
+            </span>
+            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] text-[#e7f4ff]">
+              <i className="fa-regular fa-clock text-[#8ec5eb]" />
+              {md.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // ── Filtered recipients for schedule drawer ───────────────────────────────────
@@ -859,13 +1242,18 @@ function DirectorScheduleContent() {
                   aria-selected={activeTab === tab}
                   onClick={() => {
                     setActiveTab(tab);
-                    if (tab === "Appointment History") setHistoryPage(1);
+                    setShowMenu(null);
+                    setShowHistoryMenu(null);
+                    if (tab === "Appointment History") {
+                      setHistoryMyPage(1);
+                      setHistoryHostedPage(1);
+                    }
                     if (tab === "Schedule") { setIsDrawerOpen(true); setDrawerStep(1); }
                     else setIsDrawerOpen(false);
                   }}
                   className={`relative h-8 rounded-md px-5 text-sm font-semibold transition-all ${activeTab === tab
-                      ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/35"
-                      : "bg-transparent text-white/70 hover:text-white"
+                    ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/35"
+                    : "bg-transparent text-white/70 hover:text-white"
                     }`}
                 >
                   {tab}
@@ -886,173 +1274,93 @@ function DirectorScheduleContent() {
               APPOINTMENT HISTORY TAB
           ══════════════════════════════════════════════ */}
           {!loading && activeTab === "Appointment History" && (
-            <div className="flex flex-col gap-5">
-              <h3 className="text-[15px] font-semibold text-white">
-                Appointment history — {appointmentHistory.length} meeting{appointmentHistory.length === 1 ? "" : "s"}
-              </h3>
-              {appointmentHistory.length === 0 ? (
-                <div className={`${directorGlassCard} flex items-center justify-center p-8`}>
-                  <p className="text-sm text-white/60">No past meetings yet.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                  {pagedAppointmentHistory.map((appt, index) => {
-                    const md = new Date(appt.meetingDate);
-                    const apptKey = appointmentEntityId(appt) || `history-${historyPage}-${index}`;
-                    const mentor = appt.mentor ?? (typeof appt.mentorId === "object" ? appt.mentorId : undefined);
-                    const mentee = appt.user ?? (typeof appt.userId === "object" ? appt.userId : undefined);
-                    const mentorName = labelPerson(mentor, "Unknown");
-                    const menteeName = labelPerson(mentee, "Unknown");
-                    const mentorRole = mentor?.role ? (mentor.role.charAt(0).toUpperCase() + mentor.role.slice(1).toLowerCase()) : "Mentor";
-                    const menteeRole = mentee?.role ? (mentee.role.charAt(0).toUpperCase() + mentee.role.slice(1).toLowerCase()) : "Pastor";
-                    const mentorId =
-                      typeof appt.mentorId === "string" ? appt.mentorId : appt.mentorId?._id ?? appt.mentor?._id;
-                    const menteeId =
-                      typeof appt.userId === "string" ? appt.userId : appt.userId?._id ?? appt.user?._id;
+            <div className="flex flex-col gap-10">
+              <div>
+                <h3 className="text-[15px] font-semibold text-white">
+                  My appointment history — {myAppointmentHistory.length} meeting{myAppointmentHistory.length === 1 ? "" : "s"}
+                </h3>
+                <p className="mt-1 text-xs text-[#cde2f2]/80">Past meetings where you were the attendee (for example, sessions with your mentor).</p>
+                {myAppointmentHistory.length === 0 ? (
+                  <div className={`${directorGlassCard} mt-3 flex items-center justify-center p-8`}>
+                    <p className="text-sm text-white/60">No past meetings in this category yet.</p>
+                  </div>
+                ) : (
+                  <div className="mt-4 grid grid-cols-1 gap-5 xl:grid-cols-2">
+                    {pagedMyHistory.map((appt, index) => (
+                      <Fragment key={appointmentEntityId(appt) || `my-${historyMyPage}-${index}`}>
+                        {renderHistoryAppointmentCard(appt, index, historyMyPage, "my")}
+                      </Fragment>
+                    ))}
+                  </div>
+                )}
+                {myAppointmentHistory.length > 0 && (
+                  <div className="mt-4 flex items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      disabled={historyMyPage === 1}
+                      onClick={() => setHistoryMyPage((p) => Math.max(1, p - 1))}
+                      className={`${directorBtnSecondary} px-3 py-1.5 text-xs ${historyMyPage === 1 ? "cursor-not-allowed opacity-60" : ""}`}
+                    >
+                      Previous
+                    </button>
+                    <p className="text-xs text-[#cde2f2]">
+                      Page {historyMyPage} of {totalMyHistoryPages}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={historyMyPage >= totalMyHistoryPages}
+                      onClick={() => setHistoryMyPage((p) => Math.min(totalMyHistoryPages, p + 1))}
+                      className={`${directorBtnSecondary} px-3 py-1.5 text-xs ${historyMyPage >= totalMyHistoryPages ? "cursor-not-allowed opacity-60" : ""}`}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
 
-                    return (
-                      <div
-                        key={apptKey}
-                        className={`${directorGlassCard} relative overflow-hidden border border-white/15 bg-[linear-gradient(180deg,rgba(10,53,88,0.9)_0%,rgba(6,41,70,0.92)_100%)] shadow-[0_16px_40px_rgba(0,0,0,0.25)] flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showHistoryMenu === apptKey ? "z-[60]" : ""}`}
-                        style={showHistoryMenu === apptKey ? { overflow: "visible" } : undefined}
-                      >
-                        <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 bg-white/[0.03] py-5 sm:w-[132px] sm:border-b-0 sm:border-r sm:py-7">
-                          <div className="flex h-[82px] w-[82px] items-center justify-center rounded-2xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 shadow-inner">
-                            {/* <Image
-                              src={appt.platform === "gmeet" || appt.platform === "google-meet" ? MeetIcon : DuoIcon}
-                              alt={appt.platform}
-                              className="h-10 w-10"
-                            /> */}
-                            <Image
-                              src={getPlatformIcon(appt.platform)}
-                              alt={appt.platform || "Meeting platform"}
-                              className="h-10 w-10"
-                            />
-                          </div>
-                        </div>
-                        <div className="relative min-w-0 flex-1 px-4 py-4 sm:px-5">
-                          <div className="absolute right-4 top-4 z-10 sm:right-5">
-                            <div className="relative" data-appointment-menu-root="true">
-                              <button
-                                type="button"
-                                onClick={() => setShowHistoryMenu(showHistoryMenu === apptKey ? null : apptKey)}
-                                className="rounded-lg px-3 py-1 text-[#8ec5eb] transition hover:bg-white/10 hover:text-white"
-                                aria-label="Appointment actions"
-                              >
-                                <i className="fa-solid fa-ellipsis-vertical" />
-                              </button>
-                              {showHistoryMenu === apptKey && (
-                                <div className="absolute right-0 top-9 z-[100] w-[200px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
-                                  <button
-                                    type="button"
-                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
-                                    onClick={() => { router.push(`/director/schedule/${encodeURIComponent(apptKey)}`); setShowHistoryMenu(null); }}
-                                  >
-                                    <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" />
-                                    View Details
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="mb-3 flex items-center gap-3">
-                            {/* <Image
-                              src={mentor?.profilePicture || UserProfile}
-                              alt={mentorName}
-                              width={36}
-                              height={36}
-                              unoptimized={mentor?.profilePicture ? isRemoteImageSrc(mentor.profilePicture) : false}
-                              className="rounded-full border border-white/20"
-                            /> */}
-                            <img
-  src={
-    String((mentor as any)?.profilePicture || "").trim() ||
-    getInitialsAvatar((mentor as any)?.firstName, (mentor as any)?.lastName, "Mentor")
-  }
-  alt={mentorName}
-  className="h-9 w-9 rounded-full border border-white/20 object-cover"
-/>
-                            <div>
-                              <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Mentor</p>
-                              <h4 className="pr-10 text-sm font-semibold text-white">
-                                {mentorId ? (
-                                  <Link href={`/director/mentors/profile/${encodeURIComponent(mentorId)}`} className="hover:text-[#8ec5eb]">
-                                    {mentorName}
-                                  </Link>
-                                ) : mentorName}
-                              </h4>
-                              <p className="text-[12px] text-[#cde2f2]/90">{mentorRole}</p>
-                            </div>
-                          </div>
-                          <div className="mb-3 flex items-center gap-3">
-                            {/* <Image
-                              src={mentee?.profilePicture || UserProfile}
-                              alt={menteeName}
-                              width={36}
-                              height={36}
-                              unoptimized={mentee?.profilePicture ? isRemoteImageSrc(mentee.profilePicture) : false}
-                              className="rounded-full border border-white/20"
-                            /> */}
-                            <img
-  src={
-    String((mentee as any)?.profilePicture || "").trim() ||
-    getInitialsAvatar((mentee as any)?.firstName, (mentee as any)?.lastName, "Pastor")
-  }
-  alt={menteeName}
-  className="h-9 w-9 rounded-full border border-white/20 object-cover"
-/>
-                            <div>
-                              <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Pastor</p>
-                              <h4 className="text-sm font-semibold text-white">
-                                {menteeId ? (
-                                  <Link href={`/director/mentees/profile/${encodeURIComponent(menteeId)}`} className="hover:text-[#8ec5eb]">
-                                    {menteeName}
-                                  </Link>
-                                ) : menteeName}
-                              </h4>
-                              <p className="text-[12px] text-[#cde2f2]/90">{menteeRole}</p>
-                            </div>
-                          </div>
-                          <div className="mb-1 flex flex-wrap gap-2">
-                            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] text-[#e7f4ff]">
-                              <i className="fa-regular fa-calendar text-[#8ec5eb]" />
-                              {md.toLocaleDateString()}
-                            </span>
-                            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] text-[#e7f4ff]">
-                              <i className="fa-regular fa-clock text-[#8ec5eb]" />
-                              {md.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
-                            </span>
-                            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] capitalize text-[#e7f4ff]">
-                              {appt.platform}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-              {appointmentHistory.length > 0 && (
-                <div className="flex items-center justify-end gap-3">
-                  <button
-                    type="button"
-                    disabled={historyPage === 1}
-                    onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
-                    className={`${directorBtnSecondary} px-3 py-1.5 text-xs ${historyPage === 1 ? "cursor-not-allowed opacity-60" : ""}`}
-                  >
-                    Previous
-                  </button>
-                  <p className="text-xs text-[#cde2f2]">Page {historyPage} of {totalHistoryPages}</p>
-                  <button
-                    type="button"
-                    disabled={historyPage >= totalHistoryPages}
-                    onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
-                    className={`${directorBtnSecondary} px-3 py-1.5 text-xs ${historyPage >= totalHistoryPages ? "cursor-not-allowed opacity-60" : ""}`}
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
+              <div className="border-t border-white/10 pt-8">
+                <h3 className="text-[15px] font-semibold text-white">
+                  Pastor &amp; mentor meetings you hosted — {hostedAppointmentHistory.length} meeting
+                  {hostedAppointmentHistory.length === 1 ? "" : "s"}
+                </h3>
+                <p className="mt-1 text-xs text-[#cde2f2]/80">Past meetings where you were the host (mentor) for a pastor or mentor.</p>
+                {hostedAppointmentHistory.length === 0 ? (
+                  <div className={`${directorGlassCard} mt-3 flex items-center justify-center p-8`}>
+                    <p className="text-sm text-white/60">No past hosted meetings yet.</p>
+                  </div>
+                ) : (
+                  <div className="mt-4 grid grid-cols-1 gap-5 xl:grid-cols-2">
+                    {pagedHostedHistory.map((appt, index) => (
+                      <Fragment key={appointmentEntityId(appt) || `hosted-${historyHostedPage}-${index}`}>
+                        {renderHistoryAppointmentCard(appt, index, historyHostedPage, "hosted")}
+                      </Fragment>
+                    ))}
+                  </div>
+                )}
+                {hostedAppointmentHistory.length > 0 && (
+                  <div className="mt-4 flex items-center justify-end gap-3">
+                    <button
+                      type="button"
+                      disabled={historyHostedPage === 1}
+                      onClick={() => setHistoryHostedPage((p) => Math.max(1, p - 1))}
+                      className={`${directorBtnSecondary} px-3 py-1.5 text-xs ${historyHostedPage === 1 ? "cursor-not-allowed opacity-60" : ""}`}
+                    >
+                      Previous
+                    </button>
+                    <p className="text-xs text-[#cde2f2]">
+                      Page {historyHostedPage} of {totalHostedHistoryPages}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={historyHostedPage >= totalHostedHistoryPages}
+                      onClick={() => setHistoryHostedPage((p) => Math.min(totalHostedHistoryPages, p + 1))}
+                      className={`${directorBtnSecondary} px-3 py-1.5 text-xs ${historyHostedPage >= totalHostedHistoryPages ? "cursor-not-allowed opacity-60" : ""}`}
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1108,8 +1416,8 @@ function DirectorScheduleContent() {
                           key={index}
                           onClick={() => !isPast && setSelectedAppointmentDate(dateStr)}
                           className={`rounded-md py-1 transition ${isPast ? "opacity-40 cursor-not-allowed pointer-events-none" : "cursor-pointer"} ${isSelected || isT
-                              ? "bg-[#8ec5eb]/35 font-semibold text-white ring-1 ring-[#8ec5eb]/50"
-                              : "text-[#d9ebf8] hover:bg-white/10"
+                            ? "bg-[#8ec5eb]/35 font-semibold text-white ring-1 ring-[#8ec5eb]/50"
+                            : "text-[#d9ebf8] hover:bg-white/10"
                             } ${hasAppointment && !isPast ? "ring-1 ring-amber-300/60" : ""}`}
                         >
                           {day}
@@ -1118,169 +1426,76 @@ function DirectorScheduleContent() {
                     })}
                   </div>
                 </div>
+                <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-[#cde2f2]/85">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-3 w-3 rounded-sm bg-[#8ec5eb]/35 ring-1 ring-[#8ec5eb]/50" />
+                    Selected date
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-3 w-3 rounded-sm ring-1 ring-amber-300/80" />
+                    Existing appointments
+                  </div>
+                </div>
               </div>
 
-              {/* Right: Today's appointments */}
-              <div>
-                <h3 className="mb-4 text-[15px] font-semibold text-white">
-                  {selectedAppointmentDate === todayKey ? "Today" : new Date(`${selectedAppointmentDate}T12:00:00`).toLocaleDateString()} — {selectedDayAppointments.length} appointment{selectedDayAppointments.length === 1 ? "" : "s"}
-                </h3>
-                <div className="flex flex-col gap-5">
-                  {selectedDayAppointments.length === 0 && (
-                    <div className={`${directorGlassCard} flex items-center justify-center p-8`}>
-                      <p className="text-sm text-white/60">No meetings scheduled for this day.</p>
-                    </div>
-                  )}
-                  {selectedDayAppointments.map((appt, index) => {
-                    const md = new Date(appt.meetingDate);
-                    const apptKey = appointmentEntityId(appt) || String(index);
-                    const mentor = appt.mentor ?? (typeof appt.mentorId === "object" ? appt.mentorId : undefined);
-                    const mentee = appt.user ?? (typeof appt.userId === "object" ? appt.userId : undefined);
-                    const mentorName = labelPerson(mentor, "Unknown");
-                    const menteeName = labelPerson(mentee, "Unknown");
-                    const mentorRole = mentor?.role ? (mentor.role.charAt(0).toUpperCase() + mentor.role.slice(1).toLowerCase()) : "Mentor";
-                    const menteeRole = mentee?.role ? (mentee.role.charAt(0).toUpperCase() + mentee.role.slice(1).toLowerCase()) : "Pastor";
-                    const mentorId =
-                      typeof appt.mentorId === "string" ? appt.mentorId : appt.mentorId?._id ?? appt.mentor?._id;
-                    const menteeId =
-                      typeof appt.userId === "string" ? appt.userId : appt.userId?._id ?? appt.user?._id;
-                    return (
-                      <div
-                        key={apptKey}
-                        className={`${directorGlassCard} relative overflow-hidden border border-white/15 bg-[linear-gradient(180deg,rgba(10,53,88,0.9)_0%,rgba(6,41,70,0.92)_100%)] shadow-[0_16px_40px_rgba(0,0,0,0.25)] flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showMenu === index ? "z-[60]" : ""}`}
-                        style={showMenu === index ? { overflow: "visible" } : undefined}
-                      >
-                        <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 bg-white/[0.03] py-5 sm:w-[132px] sm:border-b-0 sm:border-r sm:py-7">
-                          <div className="flex h-[82px] w-[82px] items-center justify-center rounded-2xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 shadow-inner">
-                            {/* <Image
-                              src={appt.platform === "gmeet" || appt.platform === "google-meet" ? MeetIcon : DuoIcon}
-                              alt={appt.platform}
-                              className="h-10 w-10"
-                            /> */}
-                            <Image
-                              src={getPlatformIcon(appt.platform)}
-                              alt={appt.platform || "Meeting platform"}
-                              className="h-10 w-10"
-                            />
-                          </div>
-                        </div>
-                        <div className="relative min-w-0 flex-1 px-4 py-4 sm:px-5">
-                          <div className="absolute right-4 top-4 z-10 sm:right-5">
-                            <div className="relative" data-appointment-menu-root="true">
-                              <button
-                                type="button"
-                                onClick={() => setShowMenu(showMenu === index ? null : index)}
-                                className="rounded-lg px-3 py-1 text-[#8ec5eb] transition hover:bg-white/10 hover:text-white"
-                                aria-label="Appointment actions"
-                              >
-                                <i className="fa-solid fa-ellipsis-vertical" />
-                              </button>
-                              {showMenu === index && (
-                                <div className="absolute right-0 top-9 z-[100] w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
-                                  <button
-                                    type="button"
-                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
-                                    onClick={() => { router.push(`/director/schedule/${encodeURIComponent(apptKey)}`); setShowMenu(null); }}
-                                  >
-                                    <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" />
-                                    View Details
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
-                                    onClick={() => openRescheduleModal(appt)}
-                                  >
-                                    <i className="fa-regular fa-calendar mr-2 text-[#8ec5eb]" />
-                                    Reschedule meeting
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
-                                    onClick={() => handleCancelAppointment(appt)}
-                                  >
-                                    <i className="fa-regular fa-circle-xmark mr-2 text-red-300" />
-                                    Cancel meeting
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                          <div className="mb-3 flex items-center gap-3">
-                            {/* <Image
-                              src={mentor?.profilePicture || UserProfile}
-                              alt={mentorName}
-                              width={36}
-                              height={36}
-                              unoptimized={mentor?.profilePicture ? isRemoteImageSrc(mentor.profilePicture) : false}
-                              className="rounded-full border border-white/20"
-                            /> */}
-                            <img
-  src={
-    String((mentor as any)?.profilePicture || "").trim() ||
-    getInitialsAvatar((mentor as any)?.firstName, (mentor as any)?.lastName, "Mentor")
-  }
-  alt={mentorName}
-  className="h-9 w-9 rounded-full border border-white/20 object-cover"
-/>
-                            <div>
-                              <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Mentor</p>
-                              <h4 className="pr-10 text-sm font-semibold text-white">
-                                {mentorId ? (
-                                  <Link href={`/director/mentors/profile/${encodeURIComponent(mentorId)}`} className="hover:text-[#8ec5eb]">
-                                    {mentorName}
-                                  </Link>
-                                ) : mentorName}
-                              </h4>
-                              <p className="text-[12px] text-[#cde2f2]/90">{mentorRole}</p>
-                            </div>
-                          </div>
-                          <div className="mb-3 flex items-center gap-3">
-                            {/* <Image
-                              src={mentee?.profilePicture || UserProfile}
-                              alt={menteeName}
-                              width={36}
-                              height={36}
-                              unoptimized={mentee?.profilePicture ? isRemoteImageSrc(mentee.profilePicture) : false}
-                              className="rounded-full border border-white/20"
-                            /> */}
-                            <img
-  src={
-    String((mentee as any)?.profilePicture || "").trim() ||
-    getInitialsAvatar((mentee as any)?.firstName, (mentee as any)?.lastName, "Pastor")
-  }
-  alt={menteeName}
-  className="h-9 w-9 rounded-full border border-white/20 object-cover"
-/>
-                            <div>
-                              <p className="text-[11px] uppercase tracking-wide text-[#8ec5eb]/85">Pastor</p>
-                              <h4 className="text-sm font-semibold text-white">
-                                {menteeId ? (
-                                  <Link href={`/director/mentees/profile/${encodeURIComponent(menteeId)}`} className="hover:text-[#8ec5eb]">
-                                    {menteeName}
-                                  </Link>
-                                ) : menteeName}
-                              </h4>
-                              <p className="text-[12px] text-[#cde2f2]/90">{menteeRole}</p>
-                            </div>
-                          </div>
-                          <div className="mb-1 flex flex-wrap gap-2">
-                            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] text-[#e7f4ff]">
-                              <i className="fa-regular fa-calendar text-[#8ec5eb]" />
-                              {md.toLocaleDateString()}
-                            </span>
-                            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] text-[#e7f4ff]">
-                              <i className="fa-regular fa-clock text-[#8ec5eb]" />
-                              {md.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
-                            </span>
-                            <span className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-[12px] capitalize text-[#e7f4ff]">
-                              {appt.platform}
-                            </span>
-                          </div>
-                        </div>
+              {/* Right: split lists — today, my upcoming, hosted upcoming, selected other day */}
+              <div className="flex max-h-[calc(100vh-220px)] flex-col gap-8 overflow-y-auto pr-1">
+                <section>
+                  <h3 className="mb-2 text-[15px] font-semibold text-white">
+                    {selectedAppointmentDate === todayLocalYmd
+                      ? "Today"
+                      : new Date(`${selectedAppointmentDate}T12:00:00`).toLocaleDateString(undefined, {
+                        weekday: "long",
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                  </h3>
+                  <div className="mb-3 inline-flex rounded-xl border border-white/15 bg-white/5 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDateView("my")}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${selectedDateView === "my"
+                        ? "bg-[#8ec5eb]/30 text-white"
+                        : "text-[#cde2f2]/85 hover:bg-white/10"
+                        }`}
+                    >
+                      My Appointments
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedDateView("other")}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${selectedDateView === "other"
+                        ? "bg-[#8ec5eb]/30 text-white"
+                        : "text-[#cde2f2]/85 hover:bg-white/10"
+                        }`}
+                    >
+                      Other Appointments
+                    </button>
+                  </div>
+                  <div className="flex flex-col gap-4">
+                    {(selectedDateView === "my" ? selectedDateMyAppointments : selectedDateOtherAppointments).length === 0 ? (
+                      <div className={`${directorGlassCard} flex flex-col items-center justify-center gap-3 p-6 text-center`}>
+                        <p className="text-base font-medium text-white/70">
+                          {selectedDateView === "my"
+                            ? "No meetings scheduled for you on this date."
+                            : "No other meetings scheduled on this date."}
+                        </p>
+                        {selectedDateView === "my" && (
+                          <p className="text-sm leading-relaxed text-[#cde2f2]/90">
+                            Tip: Use the Schedule tab to book a meeting, and update your Availability settings so others can reserve time slots.
+                          </p>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
+                    ) : (
+                      (selectedDateView === "my" ? selectedDateMyAppointments : selectedDateOtherAppointments).map((appt) => (
+                        <Fragment key={appointmentEntityId(appt) || `${selectedDateView}-selected-date-${appt.meetingDate}`}>
+                          {renderActiveAppointmentCard(appt)}
+                        </Fragment>
+                      ))
+                    )}
+                  </div>
+                </section>
               </div>
             </div>
           )}
@@ -1294,6 +1509,9 @@ function DirectorScheduleContent() {
               {/* Left: Weekly calendar + settings */}
               <div className={`${directorGlassCard} p-5 text-white sm:p-6`}>
                 <h3 className="mb-5 text-[15px] font-medium">My weekly availability</h3>
+                <p className="mb-4 text-sm leading-relaxed text-[#cde2f2]/85">
+                  Tip: Select a day, add slots, then save so pastors and directors can book meetings in your available hours.
+                </p>
                 <div className="mb-6 rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-5 text-center shadow-inner">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <button
@@ -1321,8 +1539,8 @@ function DirectorScheduleContent() {
                           key={date.toISOString()}
                           onClick={() => !isPast && setSelectedAvailabilityDay(dayIndex)}
                           className={`rounded-md py-2 text-center transition ${isPast
-                              ? "opacity-40 cursor-not-allowed pointer-events-none"
-                              : "cursor-pointer"
+                            ? "opacity-40 cursor-not-allowed pointer-events-none"
+                            : "cursor-pointer"
                             } ${isSelected
                               ? "bg-[#8ec5eb]/30 font-semibold text-white ring-1 ring-[#8ec5eb]/55"
                               : "text-[#d9ebf8] hover:bg-white/10"
@@ -1353,8 +1571,21 @@ function DirectorScheduleContent() {
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs text-[#cde2f2]">Min. Notice</label>
-                    <select className={directorSelectDark}><option>2 Days</option><option>1 Day</option></select>
+                    <label className="mb-1 block text-xs text-[#cde2f2]">Min. notice (hours)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={168}
+                      step={1}
+                      value={advanceNoticeHours}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        if (!Number.isFinite(n)) return
+                          ;
+                        setAdvanceNoticeHours(Math.max(1, Math.min(168, Math.floor(n))));
+                      }}
+                      className={directorSelectDark}
+                    />
                   </div>
                   <div>
                     <label className="mb-1 block text-xs text-[#cde2f2]">Preferred Mode</label>
@@ -1370,7 +1601,11 @@ function DirectorScheduleContent() {
                 <h3 className="mb-3 text-[15px] font-medium">Available hours</h3>
                 {!selectedDayData ? (
                   <div className={`${directorGlassCard} flex items-center justify-center p-8`}>
-                    <p className="text-sm text-white/60">Select a date from the weekly calendar to edit that day.</p>
+                    <p className="text-sm text-white/60">
+                      Select a date from the weekly calendar to edit that day.
+                      <br />
+                      Tip: Add one or more time slots and click Save Availability.
+                    </p>
                   </div>
                 ) : (
                   <div className={`${directorGlassCard} p-4 sm:p-5`}>
@@ -1389,6 +1624,17 @@ function DirectorScheduleContent() {
                               type="button"
                               aria-label={`Delete slot ${i + 1}`}
                               onClick={async () => {
+                                if (!slot?._id) {
+                                  // Unsaved slot: remove only from local UI state, no API call.
+                                  setAvailability((prev) =>
+                                    prev.map((d) =>
+                                      d.day === selectedAvailabilityDay
+                                        ? { ...d, slots: (d.slots || []).filter((_: any, idx: number) => idx !== i) }
+                                        : d,
+                                    ),
+                                  );
+                                  return;
+                                }
                                 if (!directorId) return;
                                 const dateStr = resolveAvailabilityRowDate(selectedDayData);
                                 try {
@@ -1532,6 +1778,15 @@ function DirectorScheduleContent() {
                       const selectedDayAvail = availability.find((d) => d.day === selectedAvailabilityDay);
                       const slotDateStr = selectedDayAvail ? resolveAvailabilityRowDate(selectedDayAvail) : null;
                       if (slotDateStr) {
+                        const now = new Date();
+                        const todayYmd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+                        if (slotDateStr === todayYmd) {
+                          const nowMins = now.getHours() * 60 + now.getMinutes();
+                          if (newStart <= nowMins) {
+                            setSlotError("For today, start time must be after the current time.");
+                            return;
+                          }
+                        }
                         const conflictingAppt = appointments.find((a) => {
                           if (!a.meetingDate.startsWith(slotDateStr)) return false;
                           if (["cancelled", "canceled"].includes((a.status || "").toLowerCase())) return false;
@@ -1622,8 +1877,8 @@ function DirectorScheduleContent() {
                       type="button"
                       onClick={() => { setScheduleRecipientType(type); setSelectedRecipient(null); }}
                       className={`rounded-lg px-4 py-2 text-sm font-medium capitalize transition ${scheduleRecipientType === type
-                          ? "bg-white/15 text-white ring-1 ring-[#8ec5eb]/40"
-                          : "border border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
+                        ? "bg-white/15 text-white ring-1 ring-[#8ec5eb]/40"
+                        : "border border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
                         }`}
                     >
                       {type}
@@ -1652,8 +1907,8 @@ function DirectorScheduleContent() {
                         key={personId}
                         onClick={() => setSelectedRecipient(person)}
                         className={`flex w-full items-center justify-between gap-4 rounded-xl border px-4 py-3 text-left transition ${isSelected
-                            ? "border-[#8ec5eb]/45 bg-[#8ec5eb]/15"
-                            : "border-white/15 bg-white/5 hover:border-white/25 hover:bg-white/10"
+                          ? "border-[#8ec5eb]/45 bg-[#8ec5eb]/15"
+                          : "border-white/15 bg-white/5 hover:border-white/25 hover:bg-white/10"
                           }`}
                       >
                         <div className="flex min-w-0 items-center gap-3">
@@ -1666,13 +1921,13 @@ function DirectorScheduleContent() {
                             className="shrink-0 rounded-full border border-white/20"
                           /> */}
                           <img
-  src={
-    String(person?.profilePicture || "").trim() ||
-    getInitialsAvatar(person?.firstName, person?.lastName, scheduleRecipientType)
-  }
-  alt={`${person?.firstName || ""} ${person?.lastName || ""}`.trim() || scheduleRecipientType}
-  className="h-9 w-9 shrink-0 rounded-full border border-white/20 object-cover"
-/>
+                            src={
+                              String(person?.profilePicture || "").trim() ||
+                              getInitialsAvatar(person?.firstName, person?.lastName, scheduleRecipientType)
+                            }
+                            alt={`${person?.firstName || ""} ${person?.lastName || ""}`.trim() || scheduleRecipientType}
+                            className="h-9 w-9 shrink-0 rounded-full border border-white/20 object-cover"
+                          />
                           <div className="flex min-w-0 flex-col">
                             <span className="truncate text-sm font-medium text-white">
                               {person.firstName} {person.lastName}
@@ -1830,8 +2085,8 @@ function DirectorScheduleContent() {
                               type="button"
                               onClick={() => setSelectedSlot(label)}
                               className={`rounded-lg border px-3 py-2 text-sm transition ${selectedSlot === label
-                                  ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20 text-white"
-                                  : "border-white/15 bg-white/5 text-[#d9ebf8] hover:bg-white/10"
+                                ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20 text-white"
+                                : "border-white/15 bg-white/5 text-[#d9ebf8] hover:bg-white/10"
                                 }`}
                             >
                               {label}
@@ -1969,8 +2224,8 @@ function DirectorScheduleContent() {
                             key={idx}
                             onClick={() => setRescheduleSelectedSlot(item.iso)}
                             className={`px-3 py-2 rounded-xl border text-sm transition ${rescheduleSelectedSlot === item.iso
-                                ? "bg-blue-600 text-white font-semibold border-blue-500"
-                                : "border-white/20 bg-white/10 text-white hover:bg-white/20"
+                              ? "bg-blue-600 text-white font-semibold border-blue-500"
+                              : "border-white/20 bg-white/10 text-white hover:bg-white/20"
                               }`}
                           >
                             {item.label}

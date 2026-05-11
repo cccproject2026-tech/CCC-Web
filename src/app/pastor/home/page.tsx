@@ -328,7 +328,7 @@ const [assignedMentorLoading, setAssignedMentorLoading] = useState(false);
   const displayedPastorFocusSections = useMemo(() => {
     if (!focusModalSectionId) return pastorFocusSections;
     if (focusModalSectionId === "meetings") {
-      return pastorFocusSections.filter((s) => s.id === "meetings" || s.id === "meetings-month");
+      return pastorFocusSections.filter((s) => s.id === "meetings");
     }
     return pastorFocusSections.filter((s) => s.id === focusModalSectionId);
   }, [focusModalSectionId, pastorFocusSections]);
@@ -1035,7 +1035,7 @@ Development
         footer={
           focusModalSectionId === "meetings" ? (
             <Link
-              href="/pastor/Appointments"
+              href="/pastor/appointments"
               prefetch
               onClick={() => setFocusModalOpen(false)}
               className="block w-full rounded-xl bg-[#8ec5eb] py-3 text-center text-sm font-semibold text-[#062946] transition hover:bg-[#b8ddf5]"
