@@ -255,31 +255,31 @@ export default function PastorAppointmentsPage() {
   //   return DuoIcon;
   // };
   const getModeIcon = (mode?: string) => {
-  const m = String(mode || "").toLowerCase().trim();
+    const m = String(mode || "").toLowerCase().trim();
 
-  if (m.includes("zoom")) return ZoomIcon;
+    if (m.includes("zoom")) return ZoomIcon;
 
-  if (
-    m.includes("google meet") ||
-    m.includes("gmeet") ||
-    m.includes("google") ||
-    m.includes("meet")
-  ) {
-    return MeetIcon;
-  }
+    if (
+      m.includes("google meet") ||
+      m.includes("gmeet") ||
+      m.includes("google") ||
+      m.includes("meet")
+    ) {
+      return MeetIcon;
+    }
 
-  if (m.includes("team")) return TeamsIcon;
+    if (m.includes("team")) return TeamsIcon;
 
-  if (m.includes("phone") || m.includes("call")) return PhoneIcon;
+    if (m.includes("phone") || m.includes("call")) return PhoneIcon;
 
-  if (m.includes("duo")) return DuoIcon;
+    if (m.includes("duo")) return DuoIcon;
 
-  return ZoomIcon;
-};
-const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Mentor") =>
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(
-    `${firstName || ""} ${lastName || ""}`.trim() || fallback
-  )}&background=173653&color=ffffff`;
+    return ZoomIcon;
+  };
+  const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Mentor") =>
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+      `${firstName || ""} ${lastName || ""}`.trim() || fallback
+    )}&background=173653&color=ffffff`;
 
   const formatDate = (dateString) => {
     const d = new Date(dateString);
@@ -807,6 +807,16 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
                     );
                   })}
                 </div>
+                <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-[#cde2f2]/85">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-3 w-3 rounded-sm bg-[#00B3FF] ring-1 ring-[#00B3FF]/60" />
+                    Blue highlight: selected date
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-3 w-3 rounded-sm ring-1 ring-amber-300/80" />
+                    Yellow border: existing appointments
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -818,11 +828,17 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
                   : `${new Date(`${selectedCalendarYmd}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })} — ${filteredAppointmentsForSelectedDate.length} appointment${filteredAppointmentsForSelectedDate.length === 1 ? "" : "s"}`
                 }
               </h3>
-
               <div className="flex flex-col gap-4 md:gap-6">
 
                 {filteredAppointmentsForSelectedDate.length === 0 && (
-                  <p className="text-sm text-[#cde2f2]/90">No appointments on this date.</p>
+                  <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4 text-center">
+                    <p className="text-sm text-[#cde2f2]/90">No appointments on this date.</p>
+                    <p className="mt-2 text-xs leading-relaxed text-[#cde2f2]/75">
+                      {selectedCalendarYmd === todayYmd
+                        ? "Tip: You do not have any appointments scheduled for today. Click New meeting to create a session with a director or pastor, then choose a suitable date, available time slot, and meeting option to confirm the booking."
+                        : "Tip: No appointments are scheduled for this date. Open New meeting to book with your mentor, or select another day on the calendar to check existing and upcoming sessions."}
+                    </p>
+                  </div>
                 )}
 
                 {filteredAppointmentsForSelectedDate.map((appt) => {
@@ -869,13 +885,13 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
                             className="rounded-full"
                           /> */}
                           <img
-  src={
-    mentor?.profilePicture ||
-    getInitialsAvatar(mentor?.firstName, mentor?.lastName)
-  }
-  alt="mentor"
-  className="h-8 w-8 rounded-full object-cover"
-/>
+                            src={
+                              mentor?.profilePicture ||
+                              getInitialsAvatar(mentor?.firstName, mentor?.lastName)
+                            }
+                            alt="mentor"
+                            className="h-8 w-8 rounded-full object-cover"
+                          />
                           <div>
                             <h4 className="text-sm font-semibold text-white">
                               {mentor?.firstName} {mentor?.lastName}
@@ -1001,8 +1017,8 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
                 type="button"
                 onClick={() => setAppointmentsTab("next")}
                 className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${appointmentsTab === "next"
-                    ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
-                    : "border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
+                  ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
+                  : "border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
                   }`}
               >
                 Next appointments
@@ -1011,8 +1027,8 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
                 type="button"
                 onClick={() => setAppointmentsTab("history")}
                 className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${appointmentsTab === "history"
-                    ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
-                    : "border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
+                  ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
+                  : "border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
                   }`}
               >
                 Appointment history
@@ -1022,7 +1038,12 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
             {appointmentsTab === "next" ? (
               <div className="grid grid-cols-1 gap-6 md:gap-10 lg:grid-cols-2">
                 {filteredUpcoming.length === 0 && (
-                  <p className="text-sm text-[#cde2f2]/90">No upcoming appointments.</p>
+                  <div className="rounded-xl border border-white/15 bg-white/[0.04] p-4 text-center">
+                    <p className="text-sm text-[#cde2f2]/90">No upcoming appointments.</p>
+                    <p className="mt-2 text-xs leading-relaxed text-[#cde2f2]/75">
+                      Tip: Use New meeting to book your next session and pick an available date and time.
+                    </p>
+                  </div>
                 )}
 
                 {filteredUpcoming.map((appt) => {
@@ -1118,13 +1139,13 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
                             className="rounded-full border border-white/30 md:h-9 md:w-9"
                           /> */}
                           <img
-  src={
-    mentor?.profilePicture ||
-    getInitialsAvatar(mentor?.firstName, mentor?.lastName)
-  }
-  alt="Mentor"
-  className="h-8 w-8 rounded-full border border-white/30 object-cover md:h-9 md:w-9"
-/>
+                            src={
+                              mentor?.profilePicture ||
+                              getInitialsAvatar(mentor?.firstName, mentor?.lastName)
+                            }
+                            alt="Mentor"
+                            className="h-8 w-8 rounded-full border border-white/30 object-cover md:h-9 md:w-9"
+                          />
                           <div>
                             <h4 className="text-sm font-semibold">
                               {mentor?.firstName} {mentor?.lastName}
@@ -1229,13 +1250,13 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
                             className="rounded-full border border-white/30 md:h-9 md:w-9"
                           /> */}
                           <img
-  src={
-    mentor?.profilePicture ||
-    getInitialsAvatar(mentor?.firstName, mentor?.lastName)
-  }
-  alt="Mentor"
-  className="h-8 w-8 rounded-full border border-white/30 object-cover md:h-9 md:w-9"
-/>
+                            src={
+                              mentor?.profilePicture ||
+                              getInitialsAvatar(mentor?.firstName, mentor?.lastName)
+                            }
+                            alt="Mentor"
+                            className="h-8 w-8 rounded-full border border-white/30 object-cover md:h-9 md:w-9"
+                          />
                           <div>
                             <h4 className="text-sm font-semibold">
                               {mentor?.firstName} {mentor?.lastName}
@@ -1269,11 +1290,11 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
                           >
                             {mode}
                           </button>
-                        </p>
-                      </div>
+                                              </p>
+                                            </div>
                     </div>
-                  );
-                })}
+                                          );
+                                        })}
               </div>
             )}
           </section>
@@ -1281,389 +1302,399 @@ const getInitialsAvatar = (firstName?: string, lastName?: string, fallback = "Me
       </main>
 
       {/* RESCHEDULE POPUP */}
-      {showReschedule && (
+                       (
         <div className="fixed inset-0 bg-[#041f35]/70 backdrop-blur-sm z-50">
-          {/* Right Drawer */}
-          <div className="absolute top-0 right-0 w-[440px] h-full bg-[linear-gradient(180deg,rgba(10,52,88,0.97)_0%,rgba(4,28,48,0.99)_100%)] border-l border-[#8ec5eb]/30 shadow-[-20px_0_48px_rgba(2,12,28,0.65)] animate-slide-left flex flex-col text-white">
-
-            {/* Header */}
-            <div className="flex justify-between items-center px-6 py-5 border-b border-white/15">
+                      er */}
+                        absolute top-0 right-0 w-[440px] h-full bg-[linear-gradient(180deg,rgba(10,52,88,0.97)_0%,rgba(4,28,48,0.99)_100%)] border-l border-[#8ec5eb]/30 shadow-[-20px_0_48px_rgba(2,12,28,0.65)] animate-slide-left flex flex-col text-white">
+                          
+                          
+                        ="flex justify-between items-center px-6 py-5 border-b border-white/15">
               <div>
-                <h2 className="text-[18px] font-semibold flex items-center gap-2 text-white">
-                  <i className="fa-regular fa-calendar text-[#8ec5eb]"></i>
-                  Reschedule Meeting
-                </h2>
-                {(appointmentToEdit?.mentor?.firstName || appointmentToEdit?.mentor?.lastName) && (
+                        ame="text-[18px] font-semibold flex items-center gap-2 text-white">
+                          me="fa-regular fa-calendar text-[#8ec5eb]"></i>
+                           Meeting
+                        
+                      tmentToEdit?.mentor?.firstName || appointmentToEdit?.mentor?.lastName) && (
                   <p className="mt-1 text-sm text-[#8ec5eb] font-medium pl-6">
-                    {[appointmentToEdit?.mentor?.firstName, appointmentToEdit?.mentor?.lastName].filter(Boolean).join(" ")}
-                  </p>
-                )}
-              </div>
-              <button onClick={() => setShowReschedule(false)} className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[#d9ebf8] hover:bg-white/20 transition">
-                <i className="fa-solid fa-xmark text-sm"></i>
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-6 py-6">
-              {/* DATE PICKER */}
-              <p className="text-sm mb-2 font-medium text-[#d9ebf8]">Mentor Availability</p>
-
-              <AvailabilityCalendar
-                mentorId={String(appointmentToEdit?.mentor?.id || appointmentToEdit?.mentor?._id || "")}
+                      pointmentToEdit?.mentor?.firstName, appointmentToEdit?.mentor?.lastName].filter(Boolean).join(" ")}
+                        
+                        
+                          
+                          k={() => setShowReschedule(false)} className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[#d9ebf8] hover:bg-white/20 transition">
+                            fa-solid fa-xmark text-sm"></i>
+                              
+                            
+                          
+                          flex-1 overflow-y-auto px-6 py-6">
+                        KER */}
+                          text-sm mb-2 font-medium text-[#d9ebf8]">Mentor Availability</p>
+                        
+                      ityCalendar
+                    Id={String(appointmentToEdit?.mentor?.id || appointmentToEdit?.mentor?._id || "")}
                 currentMonth={rescheduleMonth}
-                currentYear={rescheduleYear}
+            rrentYear={rescheduleYear}
                 selectedDate={rescheduleDay}
-                onDateSelect={setRescheduleDay}
+          onDateSelect={setRescheduleDay}
                 onPrevMonth={handleReschedulePrevMonth}
-                onNextMonth={handleRescheduleNextMonth}
-                availabilitySlots={rescheduleMonthlySlots}
-                isLoading={rescheduleAvailabilityLoading}
+            onNextMonth={handleRescheduleNextMonth}
+            availabilitySlots={rescheduleMonthlySlots}
+                 isLoading={rescheduleAvailabilityLoading}
               />
-
-              {/* TIME PICKER */}
-              <p className="text-sm mt-5 mb-2 font-medium text-[#d9ebf8]">Select a Time</p>
-
-              {rescheduleAvailableTimes.length > 0 ? (
+     
+   
+           {/* TIME PICKER */}
+            <p className="text-sm mt-5 mb-2 font-medium text-[#d9ebf8]">Select a Time</p>
+        
+            {rescheduleAvailableTimes.length > 0 ? (
                 <div className="grid grid-cols-2 gap-3">
-                  {rescheduleAvailableTimes.map((slot: any) => (
-                    <button
-                      key={slot}
-                      onClick={() => setRescheduleTime(slot)}
-                      className={`px-3 py-2 rounded-xl border text-sm transition ${rescheduleTime === slot
-                          ? "bg-blue-600 text-white font-semibold border-blue-500"
-                          : "border-white/20 bg-white/10 text-white hover:bg-white/20"
-                        }`}
-                    >
-                      {slot}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-[#cde2f2]/70 mb-4">No available time slots for the selected date. Please choose a different day.</p>
-              )}
-
-              {/* MODE PICKER */}
-              <p className="text-sm mt-5 mb-2 font-medium text-[#d9ebf8]">Meeting Option</p>
-              <select
-                className="w-full rounded-xl border border-white/20 bg-[#062946] px-3 py-2.5 text-sm text-white outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30 [&>option]:bg-[#062946] [&>option]:text-white"
-                value={rescheduleMode}
-                onChange={(e) => setRescheduleMode(e.target.value)}
-              >
-                <option value="">Preferred meeting option</option>
-                {/* <option value="Duo">Duo</option>
-                <option value="Google Meet">Google Meet</option> */}
-                <option value="Zoom">Zoom</option>
-              </select>
-            </div>
-
-            {/* FOOTER */}
-            <div className="border-t border-white/15 px-6 py-4 flex justify-between gap-3">
-              <button
-                className="px-5 py-2 rounded-lg border border-white/25 bg-white/10 text-sm font-semibold text-white transition hover:bg-white/15"
-                onClick={() => setShowReschedule(false)}
-              >
-                Cancel
-              </button>
-
-              <button
-                className="px-6 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold transition hover:bg-blue-700"
-                onClick={handleReschedule}
-              >
-                Reschedule
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* SUCCESS POPUP */}
-      {rescheduleSuccess && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/20 z-50">
-          <div className="bg-white px-8 py-4 rounded-full shadow-lg flex items-center gap-3">
-            <i className="fa-solid fa-check text-green-600 text-xl"></i>
-            <span className="text-[#0B1C58] font-medium">
-              The Appointment has been Rescheduled
-            </span>
-          </div>
-        </div>
-      )}
-
-
-      {/* ✅ New Meeting — glass drawer (pastor module palette) */}
-      {drawerOpen && (
-        <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-labelledby="new-meeting-drawer-title">
-          <button
-            type="button"
-            className="absolute inset-0 bg-[#041f35]/70 backdrop-blur-sm"
-            aria-label="Close panel"
-            onClick={() => setDrawerOpen(false)}
-          />
-          <div className="relative ml-auto flex h-full w-full max-w-[440px] flex-col border-l border-[#8ec5eb]/30 bg-[linear-gradient(180deg,rgba(10,52,88,0.97)_0%,rgba(4,28,48,0.99)_100%)] shadow-[-20px_0_48px_rgba(2,12,28,0.65)] animate-slide-left">
-            <div className="flex items-start justify-between gap-3 border-b border-white/15 px-6 py-5">
-              <div>
-                <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-[#8ec5eb]/90">
-                  New meeting
-                </p>
-                <h2 id="new-meeting-drawer-title" className="flex items-center gap-2 text-lg font-semibold text-white">
-                  {drawerStep === "mentor" ? (
-                    <>Choose a mentor</>
-                  ) : (
-                    <>
-                      <i className="fa-regular fa-calendar text-[#8ec5eb]" aria-hidden />
-                      Schedule
-                    </>
-                  )}
-                </h2>
-                <p className="mt-1 text-xs text-[#cde2f2]/90">
-                  {drawerStep === "mentor"
-                    ? "Select who you would like to meet with."
-                    : "Pick a date, time, and platform."}
-                </p>
+                {rescheduleAvailableTimes.map((slot: any) => (
+                  <button
+                    key={slot}
+                    onClick={() => setRescheduleTime(slot)}
+                    className={`px-3 py-2 rounded-xl border text-sm transition ${rescheduleTime === slot
+                        ? "bg-blue-600 text-white font-semibold border-blue-500"
+                        : "border-white/20 bg-white/10 text-white hover:bg-white/20"
+                      }`}
+                  >
+                    {slot}
+                  </button>
+                ))}
               </div>
+            ) : (
+              <p className="text-xs text-[#cde2f2]/70 mb-4">
+                No available time slots for the selected date. Please choose a different day.
+                <br />
+                Tip: Try another date or meeting option to find open slots.
+              </p>
+            )}
+          
+              {/* MODE PICKER */}
+            <p className="text-sm mt-5 mb-2 font-medium text-[#d9ebf8]">Meeting Option</p>
+            <select
+              className="w-full rounded-xl border border-white/20 bg-[#062946] px-3 py-2.5 text-sm text-white outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30 [&>option]:bg-[#062946] [&>option]:text-white"
+                value={rescheduleMode}
+              onChange={(e) => setRescheduleMode(e.target.value)}
+              
+              <option value="">Preferred meeting option</option>
+              {/* <option value="Duo">Duo</option>
+              <option value="Google Meet">Google Meet</option> */}
+              <option value="Zoom">Zoom</option>
+              select>
+              v>
+              
+              FOOTER */}
+            iv className="border-t border-white/15 px-6 py-4 flex justify-between gap-3">
               <button
-                type="button"
-                onClick={() => setDrawerOpen(false)}
-                className="shrink-0 rounded-lg p-2 text-[#d9ebf8] transition hover:bg-white/10 hover:text-white"
-                aria-label="Close"
+              className="px-5 py-2 rounded-lg border border-white/25 bg-white/10 text-sm font-semibold text-white transition hover:bg-white/15"
+              onClick={() => setShowReschedule(false)}
               >
+              Cancel
+              button>
+                
+                  n
+                    ame="px-6 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold transition hover:bg-blue-700"
+                    k={handleReschedule}
+                    
+                      
+                      
+                      
+                  
+                    
+                  
+                
+              S POPUP */}
+            uleSuccess && (
+              ssName="fixed inset-0 flex items-center justify-center bg-black/20 z-50">
+             className="bg-white px-8 py-4 rounded-full shadow-lg flex items-center gap-3">
+            <i className="fa-solid fa-check text-green-600 text-xl"></i>
+            pan className="text-[#0B1C58] font-medium">
+            The Appointment has been Rescheduled
+            span>
+              
+              
+              
+            
+              
+              Meeting — glass drawer (pastor module palette) */}
+      {drawerOpen && (
+              ssName="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-labelledby="new-meeting-drawer-title">
+            ton
+          type="button"
+            className="absolute inset-0 bg-[#041f35]/70 backdrop-blur-sm"
+          aria-label="Close panel"
+          onClick={() => setDrawerOpen(false)}
+            
+              lassName="relative ml-auto flex h-full w-full max-w-[440px] flex-col border-l border-[#8ec5eb]/30 bg-[linear-gradient(180deg,rgba(10,52,88,0.97)_0%,rgba(4,28,48,0.99)_100%)] shadow-[-20px_0_48px_rgba(2,12,28,0.65)] animate-slide-left">
+               className="flex items-start justify-between gap-3 border-b border-white/15 px-6 py-5">
+            <div>
+              <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-[#8ec5eb]/90">
+                New meeting
+                </p>
+              <h2 id="new-meeting-drawer-title" className="flex items-center gap-2 text-lg font-semibold text-white">
+                {drawerStep === "mentor" ? (
+                  <>Choose a mentor</>
+                ) : (
+                  <>
+                    <i className="fa-regular fa-calendar text-[#8ec5eb]" aria-hidden />
+                    Schedule
+                  </>
+                )}
+     
+           </h2>
+                <p className="mt-1 text-xs text-[#cde2f2]/90">
+              {drawerS tep === "mentor"
+   
+                 ? "Select who you would like to meet with."
+                  : "Pick a date, time, and platform."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(false)}
+              className="shrink-0 rounded-lg p-2 text-[#d9ebf8] transition hover:bg-white/10 hover:text-white"
+              aria-label="Close"
+     
+         >
                 <i className="fa-solid fa-xmark text-lg" />
               </button>
-            </div>
+        </div>  
 
-            <div className="flex-1 overflow-y-auto px-6 py-6">
-              {drawerStep === "mentor" ? (
-                <>
-                  <div className="mb-4 max-w-none">
-                    <PastorSearchBar
-                      value={search}
-                      onChange={setSearch}
-                      placeholder="Search mentors"
-                      aria-label="Search mentors"
-                      className="max-w-none"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    {filteredMentors.map((m) => {
-                      const mid = m.id || m._id;
-                      const selected = (selectedMentor?.id || selectedMentor?._id) === mid;
-                      return (
-                        <div
-                          key={mid}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => setSelectedMentor(m)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              setSelectedMentor(m);
-                            }
-                          }}
-                          className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 transition ${selected
-                            ? "border-[#8ec5eb]/60 bg-white/10 shadow-[0_0_0_1px_rgba(142,197,235,0.25)]"
-                            : "border-white/15 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.07]"
-                            }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            {/* <Image
-                              src={UserProfile}
-                              alt=""
+  
+    
+          <div className="flex-1 overflow-y-auto px-6 py-6">
+            {drawerStep === "mentor" ? (
+              <>
+                <div className="mb-4 max-w-none">
+                  <PastorSearchBar
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Search mentors"
+                    aria-label="Search mentors"
+                    className="max-w-none"
+                  />
+                </div>
+              
+                <div className="space-y-2">
+                  {filteredMentors.map((m) => {
+                    const mid = m.id || m._id;
+                    const selected = (selectedMentor?.id || selectedMentor?._id) === mid;
+                    return (
+                      <div
+                        key={mid}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedMentor(m)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedMentor(m);
+                          }
+                        }}
+                        className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 transition ${selected
+                          ? "border-[#8ec5eb]/60 bg-white/10 shadow-[0_0_0_1px_rgba(142,197,235,0.25)]"
+                          : "border-white/15 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.07]"
+                          }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          {/* <Image
+                            src={UserProfile}
+                            alt=""
                               width={32}
-                              height={32}
-                              className="rounded-full ring-2 ring-white/10"
-                            /> */}
-                            <img
-src={
-  String((m as any)?.profilePicture || "").trim() ||
-  getInitialsAvatar(
-    (m as any)?.firstName,
-    (m as any)?.lastName
-  )
-}
-alt={
+                            height={32}
+                            className="rounded-full ring-2 ring-white/10"
+                          /> */}
+                          <img
+                  
+                    rofilePicture || "").trim() ||
+                    
+                    ame,
+                    me
+                    
+                  
+                
   [
-    (m as any)?.firstName,
-    (m as any)?.lastName,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .trim() || "Mentor"
-}
-className="h-8 w-8 rounded-full object-cover ring-2 ring-white/10"
-/>
-                            <div>
-                              <p className="text-sm font-medium text-white">
-                                {[m.firstName, m.lastName].filter(Boolean).join(" ").trim() ||
-                                  String((m as { name?: string }).name ?? "Mentor")}
-                              </p>
-                              <p className="text-xs capitalize text-[#cde2f2]/80">
-                                {String(m.role ?? "mentor").replace(/-/g, " ")}
-                              </p>
-                            </div>
+                rstName,
+                  Name,
+                    
+                    
+                    
+                      
+                        
+                        -full object-cover ring-2 ring-white/10"
+                        
+                          <div>
+                            <p className="text-sm font-medium text-white">
+                              {[m.firstName, m.lastName].filter(Boolean).join(" ").trim() ||
+                                String((m as { name?: string }).name ?? "Mentor")}
+                            </p>
+                            <p className="text-xs capitalize text-[#cde2f2]/80">
+                              {String(m.role ?? "mentor").replace(/-/g, " ")}
+                            </p>
                           </div>
-                          <span
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${selected ? "border-[#8ec5eb] bg-[#8ec5eb]" : "border-white/35"
-                              }`}
-                            aria-hidden
+                          div>
+                          pan
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${selected ? "border-[#8ec5eb] bg-[#8ec5eb]" : "border-white/35"
+                            }`}
+                          aria-hidden
                           >
                             {selected ? <i className="fa-solid fa-check text-[10px] text-[#062946]" /> : null}
                           </span>
                         </div>
                       );
                     })}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <label className={pastorFieldLabel} htmlFor="new-meeting-date">
-                    Mentor Availability
-                  </label>
-                  <AvailabilityCalendar
-                    mentorId={String(selectedMentor?.id || selectedMentor?._id || "")}
-                    currentMonth={currentMonth}
-                    currentYear={currentYear}
-                    selectedDate={selectedDate}
-                    onDateSelect={setSelectedDate}
-                    onPrevMonth={handlePrevMonth}
-                    onNextMonth={handleNextMonth}
-                    availabilitySlots={monthlyAvailabilitySlots}
-                    isLoading={availabilityLoading}
-                  />
-
-                  <label className={pastorFieldLabel} htmlFor="time-slot" style={{ marginTop: "1.5rem" }}>
-                    Select a time
-                    <span className="ml-1 font-normal text-[#cde2f2]">
-                      ({new Date(currentYear, currentMonth, selectedDate).toLocaleDateString()})
-                    </span>
-                  </label>
-                  {availabilityLoading ? (
-                    <div className="mb-4 flex items-center justify-center py-6">
-                      <div className="flex items-center gap-2 text-xs text-[#cde2f2]">
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-[#8ec5eb]" />
-                        Loading available times…
-                      </div>
-                    </div>
-                  ) : availableTimesForBooking.length === 0 ? (
-                    <p className="mb-4 text-xs text-[#cde2f2]/85">
-                      No open slots on this date. Please try another day.
-                    </p>
-                  ) : (
-                    <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3">
-                      {availableTimesForBooking.map((t: any) => (
-                        <button
-                          key={t}
+                          
+                                            </>
+                                          ) : (
+                                            <>
+                                              <label className={pastorFieldLabel} htmlFor="new-meeting-date">
+                                                Mentor Availability
+                                              </label>
+                                              <AvailabilityCalendar
+                                                mentorId={String(selectedMentor?.id || selectedMentor?._id || "")}
+                                                currentMonth={currentMonth}
+                                                currentYear={currentYear}
+                                                selectedDate={selectedDate}
+                                                onDateSelect={setSelectedDate}
+                                                onPrevMonth={handlePrevMonth}
+                                                onNextMonth={handleNextMonth}
+                                                availabilitySlots={monthlyAvailabilitySlots}
+                                                isLoading={availabilityLoading}
+                                              />
+                          
+                          abel className={pastorFieldLabel} htmlFor="time-slot" style={{ marginTop: "1.5rem" }}>
+                            lect a time
+                            pan className="ml-1 font-normal text-[#cde2f2]">
+                            ({new Date(currentYear, currentMonth, selectedDate).toLocaleDateString()})
+                              an>
+                                
+                                ilityLoading ? (
+                                lassName="mb-4 flex items-center justify-center py-6">
+                                 className="flex items-center gap-2 text-xs text-[#cde2f2]">
+                                pan className="h-2 w-2 animate-pulse rounded-full bg-[#8ec5eb]" />
+                                  ing available times…
+                                    
+                                    
+                                  bleTimesForBooking.length === 0 ? (
+                                ssName="mb-4 text-xs text-[#cde2f2]/85">
+                                pen slots on this date. Please try another day.
+                                  
+                                  
+                                  ssName="mb-4 grid grid-cols-2 gap-2 sm:gap-3">
+                              vailableTimesForBooking.map((t: any) => (
+                                utton
+                                  y={t}
                           type="button"
                           onClick={() => setSelectedTime(t)}
                           className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${selectedTime === t
                             ? "border-[#8ec5eb] bg-[#8ec5eb]/25 text-white shadow-[0_0_0_1px_rgba(142,197,235,0.35)]"
                             : "border-[#8ec5eb]/30 bg-[#8ec5eb]/10 text-white hover:border-[#8ec5eb]/55 hover:bg-[#8ec5eb]/20"
                             }`}
-                        >
-                          {t}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <label className={pastorFieldLabel} htmlFor="new-meeting-platform">
-                    Platform
-                  </label>
-                  <select
-                    id="new-meeting-platform"
-                    value={schedulePlatform}
-                    onChange={(e) => setSchedulePlatform(e.target.value)}
-                    className={`${pastorDarkSelect} mb-2 text-white`}
-                  >
-                    <option value="Zoom" className="bg-[#062946] text-white">
-                      Zoom
-                    </option>
-                    {/* <option value="Google Meet" className="bg-[#062946] text-white">
-                      Google Meet
-                    </option>
-                    <option value="Microsoft Teams" className="bg-[#062946] text-white">
-                      Microsoft Teams
-                    </option>
-                    <option value="Phone call" className="bg-[#062946] text-white">
-                      Phone call
-                    </option> */}
-                  </select>
-                </>
-              )}
-            </div>
-
-            <div className="flex justify-between gap-3 border-t border-white/15 px-6 py-4">
-              <button
-                type="button"
-                onClick={() =>
-                  drawerStep === "mentor" ? setDrawerOpen(false) : setDrawerStep("mentor")
-                }
-                className="text-sm font-medium text-[#8ec5eb] transition hover:text-white"
-              >
-                {drawerStep === "mentor" ? "Cancel" : "Back"}
-              </button>
-
-              {drawerStep === "mentor" ? (
-                <button
-                  type="button"
-                  onClick={() => setDrawerStep("schedule")}
-                  className={pastorPrimaryCta}
-                >
-                  Next
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleSchedule}
-                  disabled={isScheduling}
+                                  
+                                                              {t}
+                                                            </button>
+                                                          ))}
+                                                        </div>
+                                                      )}
+                                      
+                                                      <label className={pastorFieldLabel} htmlFor="new-meeting-platform">
+                                                        Platform
+                                                      </label>
+                                                      <select
+                                                        id="new-meeting-platform"
+                                                        value={schedulePlatform}
+                                                        onChange={(e) => setSchedulePlatform(e.target.value)}
+                                                        className={`${pastorDarkSelect} mb-2 text-white`}
+                                                      >
+                                                        <option value="Zoom" className="bg-[#062946] text-white">
+                                                          Zoom
+                                                      </option>
+                                  ion value="Google Meet" className="bg-[#062946] text-white">
+                                    eet
+                                      
+                                        "Microsoft Teams" className="bg-[#062946] text-white">
+                                    t Teams
+                                    
+                                      e="Phone call" className="bg-[#062946] text-white">
+                                    ll
+                                  > */}
+                                >
+                                
+                                  
+                                    
+                                  
+                                ="flex justify-between gap-3 border-t border-white/15 px-6 py-4">
+                                  
+                                on"
+                              {() =>
+                            erStep === "mentor" ? setDrawerOpen(false) : setDrawerStep("mentor")
+                          
+                        assName="text-sm font-medium text-[#8ec5eb] transition hover:text-white"
+                      
+                      {drawerStep === "mentor" ? "Cancel" : "Back"}
+                  button>
+                    
+                      rStep === "mentor" ? (
+                    utton
+                    type="button"
+                      Click={() => setDrawerStep("schedule")}
+                      assName={pastorPrimaryCta}
+                      
+                      xt
+                      tton>
+                      
+                      ton
+                      pe="button"
+                      Click={handleSchedule}
+                    disabled={isScheduling}
                   className={`${pastorPrimaryCta} ${isScheduling ? "opacity-70 cursor-not-allowed" : ""}`}
-                >
-                  {isScheduling ? (
-                    <span className="flex items-center gap-2">
-                      <i className="fa-solid fa-spinner fa-spin"></i>
-                      Scheduling...
-                    </span>
-                  ) : (
-                    "Schedule"
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-lg shadow-lg px-10 py-6 flex items-center gap-3 text-[#0B1C58] font-medium text-[15px] animate-fade-in">
-            <i className="fa-solid fa-check text-green-600 text-xl"></i>
-            New Appointment has been Scheduled
-          </div>
-        </div>
-      )}
-
-      {/* CANCEL CONFIRMATION POPUP */}
-      {showCancelConfirm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-xl w-[420px] p-6 shadow-lg text-center">
-
-            <p className="text-[#0B1C58] font-semibold text-lg mb-6 leading-snug">
-              Are you sure want to <br /> Cancel the Appointment ?
-            </p>
-
+                    
+                      sScheduling ? (
+                      <span className="flex items-center gap-2">
+                        <i className="fa-solid fa-spinner fa-spin"></i>
+                        Scheduling...
+                      </span>
+                    ) : (
+                      "Schedule"
+                        
+                          >
+                          
+                        
+                      
+                    
+                      
+                        
+                      (
+                    Name="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+                      Name="bg-white rounded-lg shadow-lg px-10 py-6 flex items-center gap-3 text-[#0B1C58] font-medium text-[15px] animate-fade-in">
+                        me="fa-solid fa-check text-green-600 text-xl"></i>
+                          ent has been Scheduled
+                            
+                            
+                            
+                            
+                              N POPUP */}
+                              (
+                              d inset-0 bg-black/40 z-50 flex items-center justify-center">
+                          ="bg-white rounded-xl w-[420px] p-6 shadow-lg text-center">
+                            
+                          ="text-[#0B1C58] font-semibold text-lg mb-6 leading-snug">
+                        sure want to <br /> Cancel the Appointment ?
+                      
+                    
             <div className="flex justify-center gap-4 mt-4">
-              <button
-                className="px-6 py-2 border border-gray-300 rounded-lg text-[#0B1C58] font-medium hover:bg-gray-100"
-                onClick={() => setShowCancelConfirm(false)}
-              >
-                No
-              </button>
-
-              <button
-                className="px-6 py-2 bg-[#103C8C] text-white rounded-lg font-medium hover:bg-[#0A2F70]"
-                onClick={handleCancelAppointment}
-
-              >
-                Yes
+                    ton
+                      sName="px-6 py-2 border border-gray-300 rounded-lg text-[#0B1C58] font-medium hover:bg-gray-100"
+                    Click={() => setShowCancelConfirm(false)}
+                    
+                      
+                      on>
+                      
+                      n
+                    assName="px-6 py-2 bg-[#103C8C] text-white rounded-lg font-medium hover:bg-[#0A2F70]"
+                      ick={handleCancelAppointment}
+                        
+                      
+                      
               </button>
             </div>
           </div>
@@ -1672,113 +1703,116 @@ className="h-8 w-8 rounded-full object-cover ring-2 ring-white/10"
 
       {/* SUCCESS — APPOINTMENT CANCELED */}
       {showCancelSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-          <div className="bg-white px-10 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-fade-in">
+                    Name="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
+                  lassName="bg-white px-10 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-fade-in">
 
-            <i className="fa-solid fa-check text-green-600 text-2xl"></i>
+                <i className="fa-solid fa-check text-green-600 text-2xl"></i>
 
-            <span className="text-[#0B1C58] font-medium text-[15px]">
-              Appointment has been Canceled
-            </span>
-          </div>
-        </div>
-      )}
-
-      {showChangeMode && (
-        <div className="fixed inset-0 z-[90] bg-[#041f35]/70 backdrop-blur-sm flex items-center justify-center">
-
-          <div className="w-[420px] rounded-2xl border border-[#8ec5eb]/25 bg-[linear-gradient(180deg,rgba(10,52,88,0.97)_0%,rgba(4,28,48,0.99)_100%)] shadow-2xl p-6 animate-fade-in text-white">
-
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[16px] font-semibold text-white flex items-center gap-2">
-                <i className="fa-regular fa-pen-to-square text-[#8ec5eb]"></i>
-                Choose your meeting option
-              </h2>
-              <button
-                onClick={() => setShowChangeMode(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[#d9ebf8] hover:bg-white/20 transition"
-              >
-                <i className="fa-solid fa-xmark text-sm"></i>
-              </button>
-            </div>
-
-            {/* Divider */}
-            <hr className="mb-4 border-white/15" />
-
-            {/* OPTIONS */}
-            <div className="space-y-3 text-[14px] text-[#d9ebf8]">
-
-              {[
-                "Zoom",
-                // "Google Meet",
-                // "Teams",
-                // "Whatsapp",
-                // "Phone call",
-              ].map((mode) => (
+                <span className="text-[#0B1C58] font-medium text-[15px]">
+                  Appointment has been Canceled
+                    an>
+                    
+                      
+                    
+                     
+                   ngeMode && (
+       
+             ssName="fixed inset-0 z-[90] bg-[#041f35]/70 backdrop-blur-sm flex items-center justify-center">
+                  
+    <div className="w-[420px] rounded -2xl border border-[#8ec5eb]/25 bg-[linear-gradient(180deg,rgba(10,52,88,0.97)_0%,rgba(4,28,48,0.99)_100%)] shadow-2xl p-6 animate-fade-in text-white">
+ 
+             
+    Head e r */}  
+        lassName="flex items-center justify-between mb-4">  
+                      className="text-[16px] font-semibold text-white flex items-center gap-2">
+                       className="fa-regular fa-pen-to-square text-[#8ec5eb]"></i>
+                    Choose your meeting option
+                      >
+                    utton
+                    onClick={() => setShowChangeMode(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[#d9ebf8] hover:bg-white/20 transition"
+                      
+                       className="fa-solid fa-xmark text-sm"></i>
+                      tton>
+                      
+                    
+                      vider */}
+                        sName="mb-4 border-white/15" />
+                          
+                          S */}
+                        ssName="space-y-3 text-[14px] text-[#d9ebf8]">
+                      
+                        
+                      oom",
+                    // "Google Meet",
+                    // "Teams",
+                    // "Whatsapp",
+                    // "Phone call",
+                ].map((mode) => (
                 <label key={mode} className="flex items-center gap-3 cursor-pointer hover:text-white transition">
-                  <input
-                    type="radio"
-                    name="meetingMode"
-                    checked={selectedMode === mode}
-                    onChange={() => setSelectedMode(mode)}
-                    className="w-4 h-4 accent-[#8ec5eb]"
-                  />
-                  <span>{mode}</span>
-                </label>
-              ))}
+  ut  
+  type="radio"
+    name="meetingMode"
+      checke
+d={selectedMode === mode}
+onCha n ge={() => setSelectedMode(mode)}
+assName="w-4 h-4 accent-[#8ec5eb]"
+  
+pan>{m o de}</span>  
+label>
 
-            </div>
-
-            {/* FOOTER BUTTONS */}
+  
+                </div>
+            
+                {/* FOOTER BUTTONS */}
             <div className="flex justify-end gap-3 mt-6">
-
-              <button
-                onClick={() => setShowChangeMode(false)}
-                className="px-5 py-2 rounded-lg border border-white/25 bg-white/10 text-sm font-semibold text-white transition hover:bg-white/15"
-              >
-                Cancel
-              </button>
-
-              <button
-                onClick={handleChangeMode}
-                className="px-6 py-2 rounded-lg bg-[#8ec5eb] text-[#041f35] text-sm font-semibold transition hover:bg-[#a8d4f0]"
-              >
-                Save
-              </button>
-
-            </div>
-          </div>
-
-        </div>
-      )}
-
-      {modeSuccess && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20">
+                
+      <button
+        onClick={() => setShowChangeMode(false)}
+        e="px-5 py-2 rounded-lg border border-white/25 bg-white/10 text-sm font-semibold text-white transition hover:bg-white/15"
+        
+        el
+        on>
+        
+      ton
+      Click={handleChangeMode}
+    className="px-6 py-2 rounded-lg bg-[#8ec5eb] text-[#041f35] text-sm font-semibold transition hover:bg-[#a8d4f0]"
+  >
+                    Save
+                    b utton>
+        
+  v> 
+       v> 
+    
+  
+    
+    
+  cess && (
+    ssName="fixed inset-0 z-[100] flex items-center justify-center bg-black/20">
           <div className="bg-white px-10 py-4 rounded-xl shadow-lg flex items-center gap-3 animate-fade-in">
-            <i className="fa-solid fa-check text-green-600 text-2xl"></i>
-            <span className="text-[#0B1C58] font-medium text-[15px]">
-              Meeting Mode has been Changed to {selectedMode}
-            </span>
-          </div>
-        </div>
+lassName="fa-solid fa-check text-green-600 text-2xl"></i>
+    pan className="text-[#0B1C58] font-medium text-[15px]">
+      eting Mode has been Changed to {selectedMode}
+      an>
+    v>
+      
       )}
 
-      {toastMessage ? (
-        <div
-          className="fixed bottom-6 right-4 z-[60] max-w-md rounded-2xl border border-white/20 bg-[#0a3558]/95 px-5 py-4 shadow-2xl backdrop-blur-md sm:right-8"
-          role="status"
-        >
-          <div className="flex items-start gap-3">
-            <i className="fa-solid fa-circle-info mt-0.5 text-lg text-[#8ec5eb]" aria-hidden />
-            <p className="text-[15px] font-medium leading-snug text-white">{toastMessage}</p>
-          </div>
-        </div>
-      ) : null}
+          ssage ? (
+                
+ame="fixed bottom-6 right-4 z-[60] max-w-md rounded-2xl border border-white/20 bg-[#0a3558]/95 px-5 py-4 shadow-2xl backdrop-blur-md sm:right-8"
+="status"
 
-
-
-
-    </div>
-  );
-}
+ className="flex items-start gap-3">
+        <i className="fa-solid fa-circle-info mt-0.5 text-lg text-[#8ec5eb]" aria-hidden />
+        <p className="text-[15px] font-medium leading-snug text-white">{toastMessage}</p>
+      </div>
+        v>
+        
+          
+        
+              
+                    
+                    
+  
+      

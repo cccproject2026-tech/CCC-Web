@@ -328,7 +328,7 @@ const [assignedMentorLoading, setAssignedMentorLoading] = useState(false);
   const displayedPastorFocusSections = useMemo(() => {
     if (!focusModalSectionId) return pastorFocusSections;
     if (focusModalSectionId === "meetings") {
-      return pastorFocusSections.filter((s) => s.id === "meetings" || s.id === "meetings-month");
+      return pastorFocusSections.filter((s) => s.id === "meetings");
     }
     return pastorFocusSections.filter((s) => s.id === focusModalSectionId);
   }, [focusModalSectionId, pastorFocusSections]);

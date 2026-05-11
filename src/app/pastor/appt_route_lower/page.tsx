@@ -254,27 +254,27 @@ export default function PastorAppointmentsPage() {
   //   return DuoIcon;
   // };
   const getModeIcon = (mode?: string) => {
-  const m = String(mode || "").toLowerCase().trim();
+    const m = String(mode || "").toLowerCase().trim();
 
-  if (m.includes("zoom")) return ZoomIcon;
+    if (m.includes("zoom")) return ZoomIcon;
 
-  if (
-    m.includes("google meet") ||
-    m.includes("gmeet") ||
-    m.includes("google") ||
-    m.includes("meet")
-  ) {
-    return MeetIcon;
-  }
+    if (
+      m.includes("google meet") ||
+      m.includes("gmeet") ||
+      m.includes("google") ||
+      m.includes("meet")
+    ) {
+      return MeetIcon;
+    }
 
-  if (m.includes("team")) return TeamsIcon;
+    if (m.includes("team")) return TeamsIcon;
 
-  if (m.includes("phone") || m.includes("call")) return PhoneIcon;
+    if (m.includes("phone") || m.includes("call")) return PhoneIcon;
 
-  if (m.includes("duo")) return DuoIcon;
+    if (m.includes("duo")) return DuoIcon;
 
-  return ZoomIcon;
-};
+    return ZoomIcon;
+  };
 
   const formatDate = (dateString) => {
     const d = new Date(dateString);
@@ -637,7 +637,20 @@ export default function PastorAppointmentsPage() {
     return meetingDateLocalYmd(String(a.meetingDate)) === selectedCalendarYmd;
   });
 
-  const filteredUpcoming = upcomingAppointments as Record<string, unknown>[];
+  /** Next appointments tab: only meetings from now through end of the 7th calendar day (weekly window). */
+  const filteredUpcoming = useMemo(() => {
+    const nowMs = Date.now();
+    const weekEnd = new Date(nowMs);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    weekEnd.setHours(23, 59, 59, 999);
+    const weekEndMs = weekEnd.getTime();
+    return (upcomingAppointments as Record<string, unknown>[]).filter((a) => {
+      if (!a?.meetingDate) return false;
+      const t = new Date(String(a.meetingDate)).getTime();
+      if (Number.isNaN(t)) return false;
+      return t >= nowMs - 60_000 && t <= weekEndMs;
+    });
+  }, [upcomingAppointments]);
 
   const filteredHistory = useMemo(() => {
     const nowMs = Date.now();
@@ -974,8 +987,8 @@ export default function PastorAppointmentsPage() {
                 type="button"
                 onClick={() => setAppointmentsTab("next")}
                 className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${appointmentsTab === "next"
-                    ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
-                    : "border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
+                  ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
+                  : "border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
                   }`}
               >
                 Next appointments
@@ -984,8 +997,8 @@ export default function PastorAppointmentsPage() {
                 type="button"
                 onClick={() => setAppointmentsTab("history")}
                 className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${appointmentsTab === "history"
-                    ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
-                    : "border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
+                  ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
+                  : "border-white/20 bg-white/5 text-[#cde2f2] hover:bg-white/10"
                   }`}
               >
                 Appointment history
@@ -993,9 +1006,13 @@ export default function PastorAppointmentsPage() {
             </div>
 
             {appointmentsTab === "next" ? (
-              <div className="grid grid-cols-1 gap-6 md:gap-10 lg:grid-cols-2">
+              <div>
+                <p className="mb-4 text-xs text-[#cde2f2]/75">
+                  Showing scheduled meetings in the next 7 days. Further-out meetings stay on your calendar above.
+                </p>
+                <div className="grid grid-cols-1 gap-6 md:gap-10 lg:grid-cols-2">
                 {filteredUpcoming.length === 0 && (
-                  <p className="text-sm text-[#cde2f2]/90">No upcoming appointments.</p>
+                  <p className="text-sm text-[#cde2f2]/90">No appointments scheduled in the next 7 days.</p>
                 )}
 
                 {filteredUpcoming.map((appt) => {
@@ -1126,6 +1143,7 @@ export default function PastorAppointmentsPage() {
                     </div>
                   );
                 })}
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-6 md:gap-10 lg:grid-cols-2">
@@ -1263,8 +1281,8 @@ export default function PastorAppointmentsPage() {
                       key={slot}
                       onClick={() => setRescheduleTime(slot)}
                       className={`px-3 py-2 rounded-xl border text-sm transition ${rescheduleTime === slot
-                          ? "bg-blue-600 text-white font-semibold border-blue-500"
-                          : "border-white/20 bg-white/10 text-white hover:bg-white/20"
+                        ? "bg-blue-600 text-white font-semibold border-blue-500"
+                        : "border-white/20 bg-white/10 text-white hover:bg-white/20"
                         }`}
                     >
                       {slot}

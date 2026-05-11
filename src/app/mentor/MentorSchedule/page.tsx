@@ -1235,6 +1235,16 @@ function MentorScheduleContent() {
                     })}
                   </div>
                 </div>
+                <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-[#cde2f2]/85">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-3 w-3 rounded-sm bg-[#8ec5eb]/35 ring-1 ring-[#8ec5eb]/50" />
+                    Selected date
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block h-3 w-3 rounded-sm ring-1 ring-amber-300/80" />
+                    Existing appointments
+                  </div>
+                </div>
               </div>
 
               <div>
@@ -1247,8 +1257,11 @@ function MentorScheduleContent() {
 
                 <div className="flex flex-col gap-5">
                   {selectedDayAppointments.length === 0 ? (
-                    <div className={mentorEmptyPanel}>
-                      <p className={mentorBodyText}>No meetings scheduled for this day.</p>
+                    <div className={`${mentorEmptyPanel} text-center`}>
+                      <p className="text-base font-medium text-white/75">No meetings scheduled for this day.</p>
+                      <p className="mt-2 text-sm leading-relaxed text-[#cde2f2]/90">
+                        Tip: Use the Schedule tab to book meetings with pastor and director users, and keep your Availability settings updated.
+                      </p>
                     </div>
                   ) : null}
                   {selectedDayAppointments.map((appt, index) => {
@@ -1288,17 +1301,17 @@ function MentorScheduleContent() {
                               className="rounded-full border border-white/20"
                             /> */}
                             <img
-  src={
-    String(otherPersonProfile?.profilePicture || "").trim() ||
-    getInitialsAvatar(
-      otherPersonProfile?.firstName,
-      otherPersonProfile?.lastName,
-      displayRole
-    )
-  }
-  alt={displayName}
-  className="h-9 w-9 rounded-full border border-white/20 object-cover"
-/>
+                              src={
+                                String(otherPersonProfile?.profilePicture || "").trim() ||
+                                getInitialsAvatar(
+                                  otherPersonProfile?.firstName,
+                                  otherPersonProfile?.lastName,
+                                  displayRole
+                                )
+                              }
+                              alt={displayName}
+                              className="h-9 w-9 rounded-full border border-white/20 object-cover"
+                            />
 
                             <div>
                               <h4 className="text-sm font-semibold text-white">
@@ -1448,17 +1461,17 @@ function MentorScheduleContent() {
                               className="rounded-full border border-white/20"
                             /> */}
                             <img
-  src={
-    String(otherPersonProfile?.profilePicture || "").trim() ||
-    getInitialsAvatar(
-      otherPersonProfile?.firstName,
-      otherPersonProfile?.lastName,
-      displayRole
-    )
-  }
-  alt={displayName}
-  className="h-9 w-9 rounded-full border border-white/20 object-cover"
-/>
+                              src={
+                                String(otherPersonProfile?.profilePicture || "").trim() ||
+                                getInitialsAvatar(
+                                  otherPersonProfile?.firstName,
+                                  otherPersonProfile?.lastName,
+                                  displayRole
+                                )
+                              }
+                              alt={displayName}
+                              className="h-9 w-9 rounded-full border border-white/20 object-cover"
+                            />
                             <div>
                               <h4 className="text-sm font-semibold text-white">{displayName}</h4>
                               <p className="text-[12px] text-[#cde2f2]/90">{displayRole}</p>
@@ -1518,6 +1531,9 @@ function MentorScheduleContent() {
               {/* Left: Weekly calendar + settings */}
               <div className={`${mentorGlassCardFrost} p-5 text-white sm:p-6`}>
                 <h3 className="mb-5 text-[15px] font-medium">My weekly availability</h3>
+                <p className="mb-4 text-sm leading-relaxed text-[#cde2f2]/85">
+                  Tip: Select a day, add slots, then save so pastor and director users can book meetings in your available hours.
+                </p>
                 <div className="mb-6 rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-5 text-center shadow-inner">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <button
@@ -1545,8 +1561,8 @@ function MentorScheduleContent() {
                           key={date.toISOString()}
                           onClick={() => !isPast && setSelectedAvailabilityDay(dayIndex)}
                           className={`rounded-md py-2 text-center transition ${isPast
-                              ? "opacity-40 cursor-not-allowed pointer-events-none"
-                              : "cursor-pointer"
+                            ? "opacity-40 cursor-not-allowed pointer-events-none"
+                            : "cursor-pointer"
                             } ${isSelected
                               ? "bg-[#8ec5eb]/30 font-semibold text-white ring-1 ring-[#8ec5eb]/55"
                               : "text-[#d9ebf8] hover:bg-white/10"
@@ -1613,7 +1629,11 @@ function MentorScheduleContent() {
                 <h3 className="mb-3 text-[15px] font-medium">Available hours</h3>
                 {!selectedDayData ? (
                   <div className={mentorEmptyPanel}>
-                    <p className={mentorBodyText}>Select a day from the weekly calendar to edit availability.</p>
+                    <p className={mentorBodyText}>
+                      Select a day from the weekly calendar to edit availability.
+                      <br />
+                      Tip: Add one or more time slots and click Save Availability.
+                    </p>
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-white/15 bg-white/[0.04] p-4 sm:p-5 flex flex-col max-h-[500px]">
@@ -2041,13 +2061,13 @@ function MentorScheduleContent() {
                             className="shrink-0 rounded-full border border-white/20"
                           /> */}
                           <img
-  src={
-    String(person?.profilePicture || "").trim() ||
-    getInitialsAvatar(person?.firstName, person?.lastName, scheduleRecipientType)
-  }
-  alt={`${person?.firstName || ""} ${person?.lastName || ""}`.trim() || scheduleRecipientType}
-  className="h-9 w-9 shrink-0 rounded-full border border-white/20 object-cover"
-/>
+                            src={
+                              String(person?.profilePicture || "").trim() ||
+                              getInitialsAvatar(person?.firstName, person?.lastName, scheduleRecipientType)
+                            }
+                            alt={`${person?.firstName || ""} ${person?.lastName || ""}`.trim() || scheduleRecipientType}
+                            className="h-9 w-9 shrink-0 rounded-full border border-white/20 object-cover"
+                          />
                           <div className="flex min-w-0 flex-col">
                             <span className="truncate text-sm font-medium text-white">
                               {person.firstName} {person.lastName}
@@ -2276,8 +2296,8 @@ function MentorScheduleContent() {
                               key={idx}
                               onClick={() => setRescheduleSelectedSlot(isoString)}
                               className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition ${rescheduleSelectedSlot === isoString
-                                  ? "bg-blue-600 text-white border-blue-500"
-                                  : "border-white/20 text-white hover:bg-white/10"
+                                ? "bg-blue-600 text-white border-blue-500"
+                                : "border-white/20 text-white hover:bg-white/10"
                                 }`}
                             >
                               {timeLabel}
@@ -2397,8 +2417,8 @@ function MentorScheduleContent() {
                               key={idx}
                               onClick={() => setRescheduleDateTime(isoString)}
                               className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition ${rescheduleDateTime === isoString
-                                  ? "bg-blue-600 text-white border-blue-500"
-                                  : "border-white/20 text-white hover:bg-white/10"
+                                ? "bg-blue-600 text-white border-blue-500"
+                                : "border-white/20 text-white hover:bg-white/10"
                                 }`}
                             >
                               {timeLabel}
