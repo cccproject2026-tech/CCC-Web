@@ -180,8 +180,8 @@ export default function PastorAssessments() {
       </section>
 
       {/* MAIN */}
-      <main className="flex-1 bg-[#254487] pt-8 pb-20 px-10 md:px-20">
-        <div className="max-w-7xl mx-auto">
+      <main className="flex-1 bg-[#254487] px-0 pt-8 pb-20">
+        <div className="w-full">
           {/* Search + Filters + Add */}
           <div className="flex flex-col lg:flex-row items-center gap-4 lg:gap-6 justify-between">
             {/* Search */}

@@ -112,7 +112,7 @@ export default function MentorChangePasswordPage() {
     <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
-      <section className={`relative px-4 py-10 sm:px-8 lg:px-20 ${mentorMainGradient} flex-1`}>
+      <section className={`relative px-0 py-10 ${mentorMainGradient} flex-1`}>
         <div className="mx-auto w-full max-w-4xl">
           <button
             type="button"

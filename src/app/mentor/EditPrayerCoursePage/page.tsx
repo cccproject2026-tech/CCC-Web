@@ -2,7 +2,8 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import PastorHeader from "@/app/Components/PastorHeader";import HeroBg from "@/app/Assets/assignments-bg.png";
+import PastorHeader from "@/app/Components/PastorHeader";
+import HeroBg from "@/app/Assets/assignments-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 
@@ -138,7 +139,7 @@ export default function EditPrayerCoursePage() {
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-[#09256F]/70 via-[#0E2F8A]/40 to-[#133A9E]/90" />
-        <div className="relative z-10 px-10 md:px-20 pb-8">
+        <div className="relative z-10 px-0 pb-8">
           <h1 className="text-white text-[34px] font-semibold tracking-tight">
             Courses
           </h1>
@@ -147,7 +148,7 @@ export default function EditPrayerCoursePage() {
 
       {/* FORM */}
       <main className="flex-1 bg-[#254487] pb-24">
-        <div className="max-w-5xl mx-auto px-10 md:px-20 pt-10">
+        <div className="mx-auto w-full max-w-5xl px-0 pt-10">
           <h2 className="text-white text-[20px] font-semibold mb-6">Create – Courses</h2>
 
           <form onSubmit={handleSubmit} className="space-y-6">

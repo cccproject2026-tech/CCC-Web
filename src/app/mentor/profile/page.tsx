@@ -326,7 +326,7 @@ setIsEditing(false);
       <MentorHeader showFullHeader />
 
       <section
-        className="relative flex min-h-[180px] flex-col justify-center bg-cover bg-center px-4 py-10 text-white md:px-20"
+        className="relative flex min-h-[180px] flex-col justify-center bg-cover bg-center px-0 py-10 text-white"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className={mentorHeroOverlay} />
@@ -339,8 +339,8 @@ setIsEditing(false);
         </div>
       </section>
 
-      <main className={`${mentorMainGradient} flex-1 px-4 pb-16 pt-8 md:px-16 lg:px-20`}>
-        <div className="mx-auto flex max-w-7xl flex-col gap-8 md:flex-row">
+      <main className={`${mentorMainGradient} flex-1 px-0 pb-16 pt-8`}>
+        <div className="flex w-full flex-col gap-8 md:flex-row">
           <div
             className={`${mentorGlassCardFrost} flex h-auto w-full flex-shrink-0 flex-col p-6 text-center md:sticky md:top-24 md:w-[300px] md:self-start`}
           >

@@ -329,7 +329,7 @@ export default function CMA() {
     <div className="min-h-screen flex flex-col bg-[#0E3B75]">
       {/* HERO */}
       <header
-        className="relative h-[220px] flex items-end px-10 md:px-16 pb-8 text-white bg-cover bg-center"
+        className="relative h-[220px] flex items-end px-0 pb-8 text-white bg-cover bg-center"
         style={{ backgroundImage: `url(${headerBg.src})` }}
       >
         <div className="absolute inset-0 bg-black/35" />
@@ -344,7 +344,7 @@ export default function CMA() {
       </header>
 
       {/* BODY */}
-      <main className="flex px-10 md:px-16 py-8 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971]">
+      <main className="flex px-0 py-8 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971]">
         <div className="flex gap-8">
           {/* LEFT – Section rail */}
           <aside className="w-[320px] shrink-0">

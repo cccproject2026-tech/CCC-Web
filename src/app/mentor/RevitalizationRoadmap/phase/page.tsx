@@ -19,7 +19,14 @@ import { apiGetUserById } from "@/app/Services/users.service";
 import MentorHeader from "@/app/Components/MentorHeader";
 import DirectorHero from "@/app/director/DirectorHero";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
-import { mergeProgressOntoRoadmaps, unwrapProgressData } from "@/app/Services/roadmap-assignments";
+import {
+  findNestedProgressForTask,
+  mergeProgressOntoRoadmaps,
+  normalizeRoadmapId,
+  resolveNestedTemplateItemId,
+  unwrapNestedRoadmapsArray,
+  unwrapProgressData,
+} from "@/app/Services/roadmap-assignments";
 import { verifyMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
 import { resolveRoadmapCardImageUrl } from "@/app/utils/image";
 
@@ -115,56 +122,47 @@ function PhasePageContent() {
         const progress = progressRes ? unwrapProgressData(progressRes) : null;
         const merged = roadmap ? mergeProgressOntoRoadmaps([roadmap as any], progress)[0] : null;
 
-        setPhase((merged ?? roadmap) as Record<string, unknown> | null);
-        let nested = (merged ?? roadmap)?.roadmaps;
-        
-        // Manually enrich nested tasks with progress data from the original progress response
-        if (Array.isArray(nested) && progress) {
-          const roadmapId = String(roadmap?._id ?? roadmap?.id ?? "");
-          const roadmapProgress = (progress as any)?.roadmaps?.find((rp: any) => 
-            String(rp.roadMapId ?? rp.roadMapid ?? "") === roadmapId
-          );
-          
-          if (roadmapProgress?.nestedRoadmaps?.length > 0) {
-            nested = (nested as Record<string, unknown>[]).map((task) => {
-              const taskId = String(task._id ?? task.id ?? "");
-              const nestedProg = roadmapProgress.nestedRoadmaps.find((np: any) => 
-                String(np.nestedRoadmapId ?? np.nestedRoadmapid ?? "") === taskId
-              );
-              if (nestedProg) {
-                const completed = nestedProg.completedSteps ?? 0;
-                const total = nestedProg.totalSteps ?? 0;
-                // Only compute status from steps if total > 0
-                let computedStatus = nestedProg.status || "not_started";
-                if (total > 0) {
-                  if (completed >= total) {
-                    computedStatus = "completed";
-                  } else if (completed > 0) {
-                    computedStatus = "in_progress";
-                  } else {
-                    computedStatus = "not_started";
-                  }
-                }
-                return {
-                  ...task,
-                  progress: {
-                    status: computedStatus,
-                    completedSteps: completed,
-                    totalSteps: total,
-                  },
-                };
-              }
-              return task;
-            });
-          }
+        const phaseDoc = (merged ?? roadmap) as Record<string, unknown> | null;
+        setPhase(phaseDoc);
+
+        const parentRid = normalizeRoadmapId(
+          phaseDoc?._id ?? phaseDoc?.id ?? roadmap?._id ?? roadmap?.id ?? roadmapId,
+        );
+        let nestedList: Record<string, unknown>[] = phaseDoc
+          ? (unwrapNestedRoadmapsArray(phaseDoc as { roadmaps?: unknown }) as Record<string, unknown>[])
+          : [];
+
+        if (progress && parentRid && nestedList.length > 0) {
+          nestedList = nestedList.map((task) => {
+            const taskId = resolveNestedTemplateItemId(task);
+            if (!taskId) return task;
+            const np = findNestedProgressForTask(progress, parentRid, taskId);
+            if (!np) return task;
+            const completed = Number(np.completedSteps ?? 0);
+            const total = Number(np.totalSteps ?? 0);
+            let computedStatus = String(np.status ?? "not_started");
+            if (total > 0) {
+              if (completed >= total) computedStatus = "completed";
+              else if (completed > 0) computedStatus = "in_progress";
+              else computedStatus = "not_started";
+            }
+            return {
+              ...task,
+              progress: {
+                status: computedStatus,
+                completedSteps: completed,
+                totalSteps: total,
+              },
+            };
+          });
         }
-        
-        setTasks(Array.isArray(nested) ? (nested as Record<string, unknown>[]) : []);
+
+        setTasks(nestedList);
 
         console.debug("[mentor/phase] loaded phase", {
           userId,
           roadmapId,
-          tasks: Array.isArray(nested) ? (nested as unknown[]).length : 0,
+          tasks: nestedList.length,
           progressMerged: Boolean(progress),
         });
       } catch (err) {
@@ -200,7 +198,8 @@ function PhasePageContent() {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return tasks;
     return tasks.filter((t) => {
-      const blob = `${t.name ?? ""} ${t.description ?? ""}`.toLowerCase();
+      const blob =
+        `${t.name ?? ""} ${t.description ?? ""} ${(t as { roadMapDetails?: unknown }).roadMapDetails ?? ""}`.toLowerCase();
       return blob.includes(q);
     });
   }, [tasks, searchQuery]);
@@ -291,20 +290,23 @@ function PhasePageContent() {
               )}
 
             {roadmapId &&
-              filteredTasks.map((task) => {
-                const tid = String(task._id ?? task.id ?? "");
+              filteredTasks.map((task, idx) => {
+                const tid = resolveNestedTemplateItemId(task);
                 const img = resolveRoadmapCardImageUrl(task.imageUrl);
                 const cardStatus = taskCardStatus(task);
                 const { completed, total } = taskCounts(task);
                 const duration = task.duration != null ? `Months ${task.duration}` : "—";
+                const blurb =
+                  String(task.description ?? "").trim() ||
+                  String((task as { roadMapDetails?: unknown }).roadMapDetails ?? "").trim();
 
                 return (
                   <RoadmapHomeCard
-                    key={tid || String(task.name)}
+                    key={tid || `task-${idx}`}
                     variant="mentor"
                     img={img}
                     title={String(task.name ?? "Task")}
-                    description={String(task.description ?? "")}
+                    description={blurb}
                     status={cardStatus}
                     completionTime={duration}
                     showDateSelector={false}

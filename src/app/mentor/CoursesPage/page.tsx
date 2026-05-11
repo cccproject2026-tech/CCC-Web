@@ -126,8 +126,8 @@ export default function CoursesPage() {
       </section>
 
       {/* CONTENT WRAP */}
-      <main className="flex-1 bg-[#254487] pt-8 pb-20 px-10 md:px-20">
-        <div className="max-w-7xl mx-auto">
+      <main className="flex-1 bg-[#254487] px-0 pt-8 pb-20">
+        <div className="w-full">
 
           {/* Search + Actions */}
           <div className="flex flex-col md:flex-row items-center justify-between gap-5">

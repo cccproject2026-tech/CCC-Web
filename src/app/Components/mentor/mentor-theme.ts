@@ -14,7 +14,10 @@ export const mentorMainGradient =
 /** Revitalization Roadmap hub — no second gradient over dashboard RoleShell. */
 export const mentorRoadmapHubMain = "relative z-10 flex-1 bg-transparent";
 
-export const mentorContainer = "mx-auto w-full max-w-7xl px-4 py-8 sm:px-8 md:px-16 md:py-10";
+/**
+ * Vertical rhythm only — mentor `layout.tsx` uses no outer margin/padding; pages are full width unless they add their own inset.
+ */
+export const mentorContainer = "w-full py-8 sm:py-8 md:py-10";
 
 /** Hero overlay on roadmap-bg / hero images */
 export const mentorHeroOverlay =

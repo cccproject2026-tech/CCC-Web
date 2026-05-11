@@ -167,8 +167,8 @@ export default function SharedMediaPage() {
       />
 
       {/* Main Content */}
-      <main className="flex-1 px-6 md:px-12 lg:px-20 py-10">
-        <div className="max-w-7xl mx-auto">
+      <main className="flex-1 py-10">
+        <div className="w-full">
           {/* Tabs and Select Button */}
           <div className="flex items-center justify-between mb-6">
             {/* Tabs */}

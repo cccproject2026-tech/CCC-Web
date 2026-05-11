@@ -3,7 +3,6 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
 import Image from "next/image";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
@@ -32,13 +31,26 @@ import SearchBar from "@/app/Components/SearchBar";
 import AssignRoadmapModal from "@/app/Components/AssignRoadmapModal";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 
+/** Stable carousel id: real user id when API provides it (matches progress metrics), else strip index. */
+function pastorCarouselRowKey(row, carouselIndex) {
+  const id = extractUserIdFromOverallProgressRow(row);
+  if (id != null && String(id).trim() !== "") return String(id).trim();
+  return String(carouselIndex);
+}
+
 /** API may return `_id` as string, `id`, or Mongo `{ $oid }` — progress assign needs string ids. */
 function stringifyRoadmapId(raw) {
   if (raw == null) return "";
-  if (typeof raw === "object" && raw !== null && "$oid" in raw) {
-    return String(raw.$oid);
+  if (typeof raw === "object" && raw !== null) {
+    if ("$oid" in raw) return String(raw.$oid).trim();
+    const o = raw;
+    if (o._id != null) return stringifyRoadmapId(o._id);
+    if (o.id != null) return stringifyRoadmapId(o.id);
+    const s = String(raw).trim();
+    return s === "[object Object]" ? "" : s;
   }
-  return String(raw).trim();
+  const s = String(raw).trim();
+  return s === "[object Object]" ? "" : s;
 }
 
 /** Unwrap `roadmaps` as array or `{ items: [] }` (list API). */
@@ -90,6 +102,79 @@ function normLower(s) {
   return String(s || "")
     .trim()
     .toLowerCase();
+}
+
+/** Match overall-progress pastor row against search (name variants, email, nested `user`). */
+function pastorProgressRowMatchesQuery(row, qNorm) {
+  if (!qNorm || !row || typeof row !== "object") return false;
+  const r = row;
+  const u = r.user && typeof r.user === "object" ? r.user : null;
+  const parts = [
+    r.firstName,
+    r.first_name,
+    r.lastName,
+    r.last_name,
+    r.name,
+    r.fullName,
+    r.full_name,
+    r.displayName,
+    r.display_name,
+    typeof r.email === "string" ? r.email : "",
+    u?.firstName,
+    u?.lastName,
+    u?.first_name,
+    u?.last_name,
+    u?.name,
+    u?.fullName,
+    u?.full_name,
+    typeof u?.email === "string" ? u.email : "",
+  ];
+  const hay = normLower(parts.filter((x) => x != null && String(x).trim() !== "").join(" "));
+  if (!hay) return false;
+  if (hay.includes(qNorm)) return true;
+  const words = qNorm.split(/\s+/).filter(Boolean);
+  if (words.length > 1 && words.every((w) => hay.includes(w))) return true;
+  return false;
+}
+
+/** Display name for pastor overview row (first/last, nested user, or fallbacks). */
+function pastorRowDisplayName(p) {
+  if (!p || typeof p !== "object") return "Pastor";
+  const fn = String(p.firstName ?? p.first_name ?? "").trim();
+  const ln = String(p.lastName ?? p.last_name ?? "").trim();
+  const combined = `${fn} ${ln}`.trim();
+  if (combined) return combined;
+  const u = p.user && typeof p.user === "object" ? p.user : null;
+  if (u) {
+    const ufn = String(u.firstName ?? u.first_name ?? "").trim();
+    const uln = String(u.lastName ?? u.last_name ?? "").trim();
+    const uc = `${ufn} ${uln}`.trim();
+    if (uc) return uc;
+  }
+  const fallbacks = [
+    p.name,
+    p.fullName,
+    p.full_name,
+    p.displayName,
+    p.display_name,
+    u?.name,
+    u?.fullName,
+    u?.full_name,
+  ];
+  for (const x of fallbacks) {
+    if (typeof x === "string" && x.trim()) return x.trim();
+  }
+  return "Pastor";
+}
+
+/** Match roadmap card fields (title, description, creator) against search. */
+function roadmapRowMatchesTextQuery(row, qNorm) {
+  if (!qNorm) return true;
+  const hay = normLower(`${row.title ?? ""} ${row.description ?? ""} ${row.createdBy ?? ""}`);
+  if (hay.includes(qNorm)) return true;
+  const words = qNorm.split(/\s+/).filter(Boolean);
+  if (words.length > 1 && words.every((w) => hay.includes(w))) return true;
+  return false;
 }
 
 function parseDate(raw) {
@@ -241,10 +326,6 @@ const glassPopoverPanel =
 const glassTrigger =
   "inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-white/15";
 
-/** Gradient ring on carousel avatars (pink → purple → blue). */
-const pastorGradientRing =
-  "rounded-full bg-gradient-to-br from-pink-400 via-purple-500 to-blue-500 p-[3px]";
-
 function SortRadio({ checked, onSelect, label, className = "" }) {
   return (
     <button
@@ -336,7 +417,8 @@ export default function RevitalizationRoadmapPage() {
     try {
       setLoadingRoadmaps(true);
       setRoadmapFetchError("");
-      const res = await apiGetRoadmaps("all", debouncedSearch);
+      // Load full library; pastor names are filtered client-side (API `search` only matches roadmap fields).
+      const res = await apiGetRoadmaps("all", "");
       const list = unwrapRoadmapsList(res);
       const mapped = list
         .map((item) => {
@@ -376,7 +458,7 @@ export default function RevitalizationRoadmapPage() {
     } finally {
       setLoadingRoadmaps(false);
     }
-  }, [debouncedSearch]);
+  }, []);
 
   useEffect(() => {
     if (!isRoadmapHub) return;
@@ -464,6 +546,8 @@ export default function RevitalizationRoadmapPage() {
       const aggregate = {};
       const bump = (rid, userId, pct, status) => {
         if (!rid || !userId) return;
+        const uid = String(userId).trim();
+        if (!uid) return;
         const cur = aggregate[rid] || {
           assignedUserIds: new Set(),
           progressSum: 0,
@@ -471,7 +555,7 @@ export default function RevitalizationRoadmapPage() {
           statuses: [],
           sampleAvatarUrls: [],
         };
-        cur.assignedUserIds.add(userId);
+        cur.assignedUserIds.add(uid);
         if (typeof pct === "number" && !Number.isNaN(pct)) {
           cur.progressSum += Math.min(100, Math.max(0, pct));
           cur.progressN += 1;
@@ -661,16 +745,39 @@ export default function RevitalizationRoadmapPage() {
     return roadmapLibrary;
   }, [orderedIds, roadmapById, roadmapLibrary]);
 
+  /** Pastors shown in the carousel: all when search empty; otherwise name/email matches only. */
+  const pastorsForCarousel = useMemo(() => {
+    const qNorm = normLower(debouncedSearch);
+    if (!qNorm) return pastorProgressList;
+    return pastorProgressList.filter((p) => pastorProgressRowMatchesQuery(p, qNorm));
+  }, [debouncedSearch, pastorProgressList]);
+
   const filteredLibrary = useMemo(() => {
     let rows = [...orderedLibrary];
+
+    const qNorm = normLower(debouncedSearch);
+    const matchingPastorIds = new Set();
+    if (qNorm) {
+      for (const p of pastorProgressList) {
+        const pid = extractUserIdFromOverallProgressRow(p);
+        if (!pid) continue;
+        if (pastorProgressRowMatchesQuery(p, qNorm)) matchingPastorIds.add(pid);
+      }
+    }
 
     if (filterPastorId !== "all") {
       rows = rows.filter((r) => {
         const m = metricsByRoadmapId[r.id];
         const set = m?.assignedUserIds;
-        if (set && typeof set.has === "function") return set.has(filterPastorId);
+        if (set && typeof set.has === "function")
+          return set.has(filterPastorId) || set.has(String(filterPastorId));
         return false;
       });
+      if (qNorm && matchingPastorIds.size === 0) {
+        rows = rows.filter((r) => roadmapRowMatchesTextQuery(r, qNorm));
+      }
+    } else if (qNorm && matchingPastorIds.size === 0) {
+      rows = rows.filter((r) => roadmapRowMatchesTextQuery(r, qNorm));
     }
 
     if (!rearrangeMode) {
@@ -682,7 +789,22 @@ export default function RevitalizationRoadmapPage() {
     }
 
     return rows;
-  }, [orderedLibrary, filterPastorId, metricsByRoadmapId, sortCreated, rearrangeMode]);
+  }, [
+    orderedLibrary,
+    filterPastorId,
+    metricsByRoadmapId,
+    sortCreated,
+    rearrangeMode,
+    debouncedSearch,
+    pastorProgressList,
+  ]);
+
+  const selectedPastorHeading = useMemo(() => {
+    if (filterPastorId === "all") return "";
+    const fid = String(filterPastorId);
+    const hit = pastorsForCarousel.find((p, idx) => String(pastorCarouselRowKey(p, idx)) === fid);
+    return hit ? pastorRowDisplayName(hit) : "";
+  }, [filterPastorId, pastorsForCarousel]);
 
   const totalPages = Math.max(1, Math.ceil(filteredLibrary.length / PAGE_SIZE));
   const clampedPage = Math.min(Math.max(1, libraryPage), totalPages);
@@ -691,6 +813,13 @@ export default function RevitalizationRoadmapPage() {
   useEffect(() => {
     setLibraryPage(1);
   }, [searchQuery, debouncedSearch, filterPastorId, sortCreated]);
+
+  /** Clear pastor selection if they disappear from the filtered carousel (e.g. search changed). */
+  useEffect(() => {
+    if (filterPastorId === "all") return;
+    const visibleIds = new Set(pastorsForCarousel.map((p, idx) => String(pastorCarouselRowKey(p, idx))));
+    if (!visibleIds.has(String(filterPastorId))) setFilterPastorId("all");
+  }, [filterPastorId, pastorsForCarousel]);
 
   const scrollPastors = (delta) => {
     const el = pastorScrollRef.current;
@@ -823,7 +952,7 @@ export default function RevitalizationRoadmapPage() {
                 <SearchBar
                   value={searchQuery}
                   onChange={setSearchQuery}
-                  placeholder="Search roadmap..."
+                  placeholder="Search pastors or roadmap titles…"
                   variant="dark"
                   className="w-full"
                 />
@@ -866,14 +995,10 @@ export default function RevitalizationRoadmapPage() {
 
             <div className="mt-5 border-t border-white/10 pt-5" aria-hidden />
 
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-[15px] font-medium text-white/90">Select a pastor to view their roadmap.</p>
-              <Link
-                href="/director/mentees"
-                className="text-sm font-semibold text-[#3498DB] transition hover:text-[#85c1e9] hover:underline"
-              >
-                View All
-              </Link>
+            <div className="mb-4">
+              <p className="text-[15px] font-medium text-white/90">
+                Select a pastor below to view their assigned roadmap.
+              </p>
             </div>
 
             <div className="rounded-xl bg-[radial-gradient(ellipse_85%_85%_at_50%_36%,rgba(52,152,219,0.16),transparent_62%)] px-1 py-4 sm:px-2 sm:py-5">
@@ -894,46 +1019,68 @@ export default function RevitalizationRoadmapPage() {
                     <div className="flex min-h-[120px] flex-1 items-center justify-center py-4">
                       <div className={directorSpinner} />
                     </div>
+                  ) : pastorsForCarousel.length === 0 ? (
+                    <div className="flex min-h-[120px] flex-1 flex-col items-center justify-center gap-1 px-4 py-6 text-center text-sm text-white/60">
+                      <p>{normLower(debouncedSearch) ? "No pastors match your search." : "No pastors yet."}</p>
+                    </div>
                   ) : (
-                    pastorProgressList.map((p, idx) => {
-                      const pid = extractUserIdFromOverallProgressRow(p) || String(idx);
+                    pastorsForCarousel.map((p, idx) => {
+                      const pid = pastorCarouselRowKey(p, idx);
                       const defaultImages = [Mentor1, Mentor2, Mentor3];
                       const img = p.profilePicture || defaultImages[idx % defaultImages.length];
-                      const name = `${p.firstName || ""} ${p.lastName || ""}`.trim() || "Pastor";
-                      const selected = filterPastorId === pid;
+                      const name = pastorRowDisplayName(p);
+                      const selected = filterPastorId !== "all" && String(filterPastorId) === String(pid);
                       return (
                         <button
-                          key={pid}
+                          key={`${pid}-${idx}`}
                           type="button"
-                          onClick={() => setFilterPastorId((prev) => (prev === pid ? "all" : pid))}
-                          className={`group flex shrink-0 flex-col items-center px-1 py-0.5 text-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3498DB]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a1128] ${
-                            selected ? "opacity-100" : "opacity-[0.88] hover:opacity-100"
+                          onClick={() => setFilterPastorId((prev) => (String(prev) === String(pid) ? "all" : pid))}
+                          className={`group flex shrink-0 flex-col items-center px-2 py-1 text-center transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3498DB]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a1128] ${
+                            selected
+                              ? "opacity-100"
+                              : "opacity-[0.82] hover:opacity-100"
                           }`}
                           aria-pressed={selected}
                         >
-                          <div className="relative mb-2 h-[72px] w-[72px] sm:h-[88px] sm:w-[88px]">
+                          <div
+                            className={`relative mb-2 h-[72px] w-[72px] shrink-0 sm:h-[88px] sm:w-[88px] transition-transform duration-200 ease-out ${
+                              selected ? "z-[1] scale-[1.05]" : "scale-100"
+                            }`}
+                          >
                             <div
-                              className={`${pastorGradientRing} h-full w-full transition-shadow ${
+                              className={`box-border h-full w-full rounded-full transition-all duration-200 ${
                                 selected
-                                  ? "shadow-[0_0_0_2px_#0a1128,0_0_0_4px_#3498DB,0_0_18px_rgba(52,152,219,0.35)]"
-                                  : "shadow-none"
+                                  ? "bg-gradient-to-b from-[#5dade2] to-[#2874a6] p-[3px] shadow-[0_0_0_1px_rgba(255,255,255,0.2),0_8px_28px_rgba(52,152,219,0.42)]"
+                                  : "bg-white/[0.06] p-[2px] ring-1 ring-white/[0.14] hover:bg-white/[0.1] hover:ring-white/25"
                               }`}
                             >
-                              <div className="relative h-full w-full overflow-hidden rounded-full bg-[#041f35]">
+                              <div
+                                className={`relative h-full w-full min-h-0 overflow-hidden rounded-full bg-[#041f35] ${
+                                  selected ? "ring-2 ring-[#0a1128]/90" : "ring-1 ring-black/40"
+                                }`}
+                              >
                                 <Image
                                   src={img}
                                   alt=""
                                   fill
-                                  className="object-cover"
-                                  sizes="88px"
-                                  unoptimized={typeof img === "string" && isRemoteImageSrc(img)}
+                                  className={`object-cover transition-[filter,opacity] duration-200 ${
+                                    selected
+                                      ? "brightness-[1.02] saturate-[1.06]"
+                                      : "brightness-[0.96] saturate-[0.92]"
+                                  }`}
+                                  sizes="(max-width: 640px) 72px, 88px"
+                                  unoptimized={
+                                    typeof img === "string" && (img.startsWith("blob:") || isRemoteImageSrc(img))
+                                  }
                                 />
                               </div>
                             </div>
                           </div>
                           <span
-                            className={`max-w-[130px] truncate text-[13px] font-medium ${
-                              selected ? "text-white" : "text-white/85"
+                            className={`max-w-[130px] truncate text-[13px] transition-all duration-200 ${
+                              selected
+                                ? "font-semibold text-[#aed6f1] underline decoration-[#3498DB] decoration-2 underline-offset-4"
+                                : "font-medium text-white/65 group-hover:text-white/85"
                             }`}
                           >
                             {name}
@@ -953,6 +1100,16 @@ export default function RevitalizationRoadmapPage() {
                 </button>
               </div>
             </div>
+          </div>
+
+          <div className="mb-5 mt-2">
+            <h2 className="text-lg font-semibold tracking-tight text-white sm:text-xl">
+              {filterPastorId === "all"
+                ? "All roadmaps"
+                : selectedPastorHeading
+                  ? `${selectedPastorHeading}'s roadmap`
+                  : "Pastor's roadmap"}
+            </h2>
           </div>
 
           {loadingRoadmaps ? (

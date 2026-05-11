@@ -96,7 +96,7 @@ export default function ExpectedOutcomePage() {
   return (
     <div className="min-h-screen flex flex-col bg-white">
       {/* Main Content */}
-      <main className="flex-1 px-6 md:px-12 lg:px-20 py-10 bg-white">
+      <main className="flex-1 py-10 bg-white">
         <div className="max-w-5xl mx-auto">
           {/* Header Buttons */}
           <div className="flex justify-between items-center mb-8">

@@ -98,7 +98,7 @@ setItems(newestFirst);
       <MentorHeader showFullHeader={true} />
 
       <section
-        className="relative flex min-h-[180px] flex-col justify-center bg-cover bg-center px-4 py-10 text-white sm:min-h-[220px] md:px-20"
+        className="relative flex min-h-[180px] flex-col justify-center bg-cover bg-center px-0 py-10 text-white sm:min-h-[220px]"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className={mentorHeroOverlay} />
@@ -115,7 +115,7 @@ setItems(newestFirst);
         </div>
       </section>
 
-      <main className={`${mentorMainGradient} flex-1 px-4 pb-16 pt-8 md:px-16 lg:px-20`}>
+      <main className={`${mentorMainGradient} flex-1 px-0 pb-16 pt-8`}>
         <div className="mx-auto max-w-5xl">
           <div className={`${mentorGlassCardFrost} mb-6 p-5 sm:p-6`}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">

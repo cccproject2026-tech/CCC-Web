@@ -48,7 +48,7 @@ export default function CreateAndAssignPage() {
         <h1 className="relative z-10 text-4xl font-semibold">Assessments</h1>
       </section>
 
-      <main className="flex-1 bg-[#254487] px-10 md:px-20 pb-20">
+      <main className="flex-1 bg-[#254487] px-0 pb-20">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-white text-[20px] font-semibold mt-8 mb-6">
             Create – Assessments

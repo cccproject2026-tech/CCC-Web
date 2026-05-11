@@ -220,8 +220,8 @@ function PastorProgressPageContent() {
     <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
-      <header className="border-b border-[#8ec5eb]/25 bg-[#062946] px-4 py-5 sm:px-8 md:px-12">
-        <div className="mx-auto flex max-w-7xl flex-col items-center gap-4">
+      <header className="border-b border-[#8ec5eb]/25 bg-[#062946] px-0 py-5">
+        <div className="flex w-full flex-col items-center gap-4">
           <div className="flex w-full items-center gap-3">
             <Link
               href="/mentor/TrackProgress"
@@ -249,8 +249,8 @@ function PastorProgressPageContent() {
         </div>
       </header>
 
-      <main className={`relative z-10 flex-1 px-4 py-8 sm:px-8 md:px-16 md:py-10 ${mentorMainGradient}`}>
-        <div className="mx-auto max-w-7xl">
+      <main className={`relative z-10 flex-1 px-0 py-8 sm:py-8 md:py-10 ${mentorMainGradient}`}>
+        <div className="w-full">
           {!userId && (
             <p className={`mb-8 ${mentorWarningPanel}`}>
               Missing <code className="rounded bg-white/10 px-1">userId</code> in the URL. Open a pastor from Track
