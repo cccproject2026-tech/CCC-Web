@@ -10,7 +10,12 @@ import {
   type MentorshipSession,
 } from "@/app/Services/roadmaps.service";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
-import { apiGetMentorSchedule, apiGetUserSchedule } from "@/app/Services/appointments.service";
+import {
+  apiGetAppointmentById,
+  apiGetAppointments,
+  apiGetMentorSchedule,
+  apiGetUserSchedule,
+} from "@/app/Services/appointments.service";
 import { appointmentEntityId, unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
 import type { AppointmentResponse } from "@/app/Services/types/appointments.types";
 
@@ -125,10 +130,38 @@ export function useMentorSessionDetailQuery(sessionId: string, pastorIdFromQuery
         pastorId ? apiGetUserSchedule(pastorId) : Promise.resolve({ data: [] } as any),
       ]);
       const merged = [...unwrapAppointmentsAxiosData(mentorSched), ...unwrapAppointmentsAxiosData(pastorSched)] as AppointmentResponse[];
-      const appointment =
+      let appointment =
         merged.find((a) => appointmentEntityId(a) === apptId) ??
         merged.find((a) => String((a as any)?._id ?? (a as any)?.id ?? "") === apptId) ??
         null;
+
+      // Some schedule endpoints only return upcoming items; completed sessions may disappear from lists.
+      if (!appointment) {
+        try {
+          const res = await apiGetAppointmentById(apptId);
+          appointment = ((res.data as any)?.data ?? null) as AppointmentResponse | null;
+        } catch {
+          appointment = null;
+        }
+      }
+
+      // Backend deployments sometimes don't support GET /appointments/:id.
+      // As a fallback, ask the "upcoming" endpoint with futureOnly=false to get historical items too.
+      if (!appointment) {
+        try {
+          const [byMentor, byPastor] = await Promise.all([
+            apiGetAppointments({ mentorId, futureOnly: false }),
+            pastorId ? apiGetAppointments({ userId: pastorId, futureOnly: false }) : Promise.resolve({ data: [] } as any),
+          ]);
+          const list = [...unwrapAppointmentsAxiosData(byMentor), ...unwrapAppointmentsAxiosData(byPastor)] as AppointmentResponse[];
+          appointment =
+            list.find((a) => appointmentEntityId(a) === apptId) ??
+            list.find((a) => String((a as any)?._id ?? (a as any)?.id ?? "") === apptId) ??
+            null;
+        } catch {
+          appointment = null;
+        }
+      }
 
       return { session, sessionsForPastor: sessions, appointment, pastorId, mentorId };
     },
@@ -148,7 +181,30 @@ export function usePastorSessionDetailQuery(sessionId: string) {
       const session = sessions.find((s) => s.id === sessionId) ?? null;
       if (!session?.appointmentId) return { session, sessions, appointment: null };
       const all = unwrapAppointmentsAxiosData(sched) as AppointmentResponse[];
-      const appointment = all.find((a) => appointmentEntityId(a) === String(session.appointmentId)) ?? null;
+      const apptId = String(session.appointmentId);
+      let appointment = all.find((a) => appointmentEntityId(a) === apptId) ?? null;
+
+      if (!appointment) {
+        try {
+          const res = await apiGetAppointmentById(apptId);
+          appointment = ((res.data as any)?.data ?? null) as AppointmentResponse | null;
+        } catch {
+          appointment = null;
+        }
+      }
+
+      if (!appointment) {
+        try {
+          const res = await apiGetAppointments({ userId: pastorId, futureOnly: false });
+          const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
+          appointment =
+            list.find((a) => appointmentEntityId(a) === apptId) ??
+            list.find((a) => String((a as any)?._id ?? (a as any)?.id ?? "") === apptId) ??
+            null;
+        } catch {
+          appointment = null;
+        }
+      }
       return { session, sessions, appointment };
     },
   });

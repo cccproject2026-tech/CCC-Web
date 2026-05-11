@@ -41,6 +41,13 @@ export const apiGetMentorSchedule = (mentorId: string) =>
     `/appointments/mentor/${mentorId}`,
   );
 
+// GET /appointments/:id — appointment details (works even when not in "schedule" lists)
+export const apiGetAppointmentById = (id: string) =>
+  axiosInstance.get<{ success: boolean; data: AppointmentResponse }>(
+    `/appointments/${id}`,
+    { timeout: 30_000 },
+  );
+
 // POST /appointments
 export const apiCreateAppointment = (payload: CreateAppointmentPayload) =>
   axiosInstance.post<{ success: boolean; message?: string; data: AppointmentResponse }>(
