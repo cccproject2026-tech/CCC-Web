@@ -1097,7 +1097,7 @@ function MentorScheduleContent() {
       <MentorHeader showFullHeader={true} />
 
       <section
-        className="relative flex min-h-[200px] flex-col justify-center bg-cover bg-center px-4 py-10 text-white sm:min-h-[240px] md:px-20"
+        className="relative flex min-h-[200px] flex-col justify-center bg-cover bg-center px-0 py-10 text-white sm:min-h-[240px]"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className={mentorHeroOverlay} />
@@ -1110,8 +1110,8 @@ function MentorScheduleContent() {
         </div>
       </section>
 
-      <main className={`${mentorMainGradient} flex-1 px-4 pb-20 pt-8 md:px-16 lg:px-20`}>
-        <div className="mx-auto max-w-7xl">
+      <main className={`${mentorMainGradient} flex-1 px-0 pb-20 pt-8`}>
+        <div className="w-full">
           <div className={`${mentorFilterPanel} mb-8`}>
             <div className="flex flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-center">
               <MentorFilterTabGroup

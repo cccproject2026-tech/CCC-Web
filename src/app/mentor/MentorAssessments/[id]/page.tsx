@@ -162,7 +162,7 @@ export default function MentorAssessmentDetailPage() {
       <MentorHeader showFullHeader={true} />
 
       <section
-        className="relative overflow-hidden bg-cover bg-center px-4 pb-10 pt-4 sm:px-8 lg:px-20"
+        className="relative overflow-hidden bg-cover bg-center px-0 pb-10 pt-4"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.68)_0%,rgba(6,41,70,0.6)_50%,rgba(6,41,70,1)_100%)]" />
@@ -193,7 +193,7 @@ export default function MentorAssessmentDetailPage() {
         </div>
       </section>
 
-      <main className="flex-1 px-4 pb-16 sm:px-8 lg:px-20">
+      <main className="flex-1 px-0 pb-16">
         <div className="mx-auto w-full max-w-4xl space-y-6">
           {loading && (
             <div className={`p-8 text-center text-[#cde2f2] ${glassPanel}`}>Loading…</div>

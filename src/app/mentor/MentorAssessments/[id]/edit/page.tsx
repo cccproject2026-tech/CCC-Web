@@ -488,7 +488,7 @@ export default function MentorEditAssessmentPage() {
   return (
     <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
       <MentorHeader showFullHeader={true} />
-      <section className="relative flex-1 px-4 py-6 sm:px-6 md:px-12 lg:px-20">
+      <section className="relative flex-1 px-0 py-6">
         <div className="max-w-[1600px] mx-auto flex gap-6 h-full">
           {/* Left Sidebar - Sections */}
           <div className="w-80 flex-shrink-0 space-y-3">

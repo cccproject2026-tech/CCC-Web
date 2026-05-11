@@ -24,6 +24,10 @@ import DirectorHero from "@/app/director/DirectorHero";
 import { mentorPageRoot, mentorRoadmapHubMain, mentorSpinner } from "@/app/Components/mentor/mentor-theme";
 import { getMentorUserId } from "@/app/utils/mentor-auth";
 import { verifyMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
+import {
+  resolveNestedTemplateItemId,
+  unwrapNestedRoadmapsArray,
+} from "@/app/Services/roadmap-assignments";
 
 const glassPanel =
   "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.88)_0%,rgba(10,53,88,0.95)_100%)] shadow-md backdrop-blur-sm";
@@ -46,14 +50,18 @@ function extractRoadmapDocumentFromResponse(res: { data?: unknown }): Record<str
 }
 
 function findNestedTaskById(nodes: unknown[], id: string): Record<string, unknown> | null {
-  const target = String(id);
+  const target = String(id).trim();
+  if (!target) return null;
   for (const node of nodes) {
     if (!node || typeof node !== "object" || Array.isArray(node)) continue;
     const n = node as Record<string, unknown>;
-    if (String(n._id ?? n.id) === target) return n;
-    const children = n.roadmaps;
-    if (Array.isArray(children)) {
-      const found = findNestedTaskById(children as unknown[], id);
+    const nodeId = resolveNestedTemplateItemId(n);
+    if (nodeId === target || (!nodeId && String(n._id ?? n.id) === target)) {
+      return n;
+    }
+    const nested = unwrapNestedRoadmapsArray(n as { roadmaps?: unknown });
+    if (nested.length) {
+      const found = findNestedTaskById(nested as unknown[], id);
       if (found) return found;
     }
   }
@@ -86,6 +94,20 @@ function formatDate(iso?: string) {
   if (!iso) return "";
   try {
     return new Date(iso).toLocaleDateString();
+  } catch {
+    return String(iso);
+  }
+}
+
+/** Long form for mentor task header, e.g. "May 20, 2026". */
+function formatDueHeadingDate(iso?: string) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   } catch {
     return String(iso);
   }
@@ -212,8 +234,11 @@ function TaskPageContent() {
           /* fall back to embedded roadmaps tree */
         }
 
-        if (!taskDoc && phase?.roadmaps?.length) {
-          taskDoc = findNestedTaskById(phase.roadmaps as unknown[], taskId);
+        if (!taskDoc && phase) {
+          const phaseChildren = unwrapNestedRoadmapsArray(phase as { roadmaps?: unknown });
+          if (phaseChildren.length) {
+            taskDoc = findNestedTaskById(phaseChildren as unknown[], taskId);
+          }
         }
 
         if (cancelled) return;
@@ -387,7 +412,7 @@ function TaskPageContent() {
       : "Pastor";
 
   const taskTitle = String(task?.name ?? "Task");
-  const taskDescription = String(task?.description ?? "");
+  const taskDescription = String(task?.description ?? (task as { roadMapDetails?: unknown })?.roadMapDetails ?? "");
 
   if (loading) {
     return (
@@ -428,7 +453,7 @@ function TaskPageContent() {
       />
 
       <main className={`${mentorRoadmapHubMain} pb-12`}>
-        <div className="mx-auto w-full max-w-7xl">
+        <div className="w-full">
           {loadError && (
             <div className="mb-8 rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
               {loadError}
@@ -499,35 +524,80 @@ function TaskPageContent() {
               <div className="lg:col-span-3">
                 {activeTab === "pastorResponse" && (
                   <div className={`${glassPanel} p-6 sm:p-8`}>
-                    <h2 className="mb-2 text-lg font-semibold text-white sm:text-xl">Pastor response</h2>
-                    <p className="mb-6 text-sm text-[#cde2f2]">
-                      Answers and progress saved by {userName} for this task.
-                    </p>
+                    {(() => {
+                      const renderableExtras = pastorExtrasRows.filter(isRenderablePastorExtraRow);
+                      const pastorHasNoResponses = !extrasLoading && renderableExtras.length === 0;
+                      const dueRaw =
+                        task &&
+                        (task.endDate ??
+                          task.dueDate ??
+                          (task as Record<string, unknown>).due_date ??
+                          (task as Record<string, unknown>).end_date);
+                      const dueHeading =
+                        typeof dueRaw === "string" && dueRaw.trim()
+                          ? formatDueHeadingDate(dueRaw.trim())
+                          : null;
 
-                    {taskDescription.trim() ? (
-                      <details className="mb-6 rounded-xl border border-white/15 bg-white/[0.06] px-4 py-3">
-                        <summary className="cursor-pointer text-sm font-semibold text-[#d9ebf8]">
-                          Task instructions
-                        </summary>
-                        <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-[#cde2f2]">
-                          {taskDescription}
-                        </p>
-                      </details>
-                    ) : null}
+                      return (
+                        <>
+                          <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                            <h2 className="text-lg font-semibold text-white sm:text-xl">Pastor response</h2>
+                            {dueHeading ? (
+                              <div className="flex shrink-0 items-center gap-2 text-sm font-medium text-[#cde2f2]">
+                                <i className="fa-regular fa-calendar text-[#8ec5eb]" aria-hidden />
+                                <span>Due on {dueHeading}</span>
+                              </div>
+                            ) : null}
+                          </div>
 
-                    {extrasLoading ? (
-                      <div className="flex justify-center py-12">
-                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
-                      </div>
-                    ) : (
-                      <>
-                        {pastorExtrasRows.filter(isRenderablePastorExtraRow).length === 0 ? (
-                          <p className="rounded-xl border border-white/15 bg-white/5 px-4 py-8 text-center text-sm text-[#cde2f2]/90">
-                            No responses submitted for this task yet.
+                          <p className="mb-6 text-sm text-[#cde2f2]">
+                            {extrasLoading
+                              ? "Loading this pastor's responses…"
+                              : pastorHasNoResponses
+                                ? "The response will be seen soon after the pastor completes the task."
+                                : `Answers and progress saved by ${userName} for this task.`}
                           </p>
-                        ) : (
-                          <div className="space-y-1">
-                            {pastorExtrasRows.filter(isRenderablePastorExtraRow).map((item, idx) => {
+
+                          {taskDescription.trim() ? (
+                            <details className="group mb-6 rounded-xl border border-white/15 bg-white/[0.06] px-4 py-3 open:bg-white/[0.08]">
+                              <summary className="cursor-pointer list-none text-sm font-semibold text-[#d9ebf8] [&::-webkit-details-marker]:hidden">
+                                <span className="flex items-center gap-2">
+                                  <i
+                                    className="fa-solid fa-chevron-down text-xs text-[#8ec5eb] transition-transform group-open:rotate-180"
+                                    aria-hidden
+                                  />
+                                  Task instructions
+                                </span>
+                              </summary>
+                              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-[#cde2f2]">
+                                {taskDescription}
+                              </p>
+                            </details>
+                          ) : null}
+
+                          {extrasLoading ? (
+                            <div className="flex justify-center py-16">
+                              <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+                            </div>
+                          ) : pastorHasNoResponses ? (
+                            <div className="rounded-2xl border border-white/12 bg-[linear-gradient(180deg,rgba(24,90,130,0.35)_0%,rgba(9,52,86,0.5)_100%)] px-6 py-14 sm:px-10">
+                              <div className="mx-auto flex max-w-lg flex-col items-center text-center">
+                                <div className="relative mb-5 flex h-[72px] w-[72px] items-center justify-center rounded-full bg-white/12 ring-1 ring-white/15">
+                                  <i className="fa-regular fa-file-lines text-3xl text-[#e8f4fc]" aria-hidden />
+                                  <span className="absolute -bottom-0.5 -right-0.5 flex h-8 w-8 items-center justify-center rounded-full border border-white/25 bg-[#0b3a5c] shadow-md">
+                                    <i className="fa-regular fa-clock text-sm text-[#8ec5eb]" aria-hidden />
+                                  </span>
+                                </div>
+                                <h3 className="text-lg font-bold text-white sm:text-xl">Task not submitted yet</h3>
+                                <p className="mt-3 text-sm leading-relaxed text-[#cde2f2]/95">
+                                  The pastor hasn&apos;t submitted their responses for this task yet. Once submitted,
+                                  you will be able to review responses, add comments, and reply to queries.
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              {renderableExtras.map((item, idx) => {
                               const t = String(item.type ?? "").toUpperCase();
                               const label = String(item.name ?? item.key ?? `Item ${idx + 1}`);
                               const sig =
@@ -610,10 +680,11 @@ function TaskPageContent() {
                                 </div>
                               );
                             })}
-                          </div>
-                        )}
-                      </>
-                    )}
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
 

@@ -91,18 +91,18 @@ export default function MentorAssignmentsPage() {
       <MentorHeader showFullHeader={true} />
 
       <section
-        className="relative overflow-hidden bg-cover bg-top px-4 pb-10 pt-4 sm:px-8 lg:px-20"
+        className="relative overflow-hidden bg-cover bg-top px-0 pb-10 pt-4"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className={mentorHeroOverlay} />
-        <div className="relative z-10 mx-auto w-full max-w-7xl">
+        <div className="relative z-10 w-full">
           <h1 className="text-2xl font-semibold sm:text-3xl">Assignments</h1>
           <p className={`mt-2 ${mentorBodyText}`}>Roadmap tasks from your assigned program (API).</p>
         </div>
       </section>
 
-      <main className={`flex-1 px-4 pb-16 sm:px-8 lg:px-20 ${mentorMainGradient}`}>
-        <div className="mx-auto max-w-7xl">
+      <main className={`flex-1 px-0 pb-16 ${mentorMainGradient}`}>
+        <div className="w-full">
           {error && <p className={`mb-4 ${mentorWarningPanel}`}>{error}</p>}
 
           <div className={`${mentorFilterPanel} mb-8`}>

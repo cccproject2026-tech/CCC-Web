@@ -5,7 +5,10 @@ import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import { useSearchParams } from "next/navigation";
-import { fetchMergedRoadmapsForAssignedUser } from "@/app/Services/roadmap-assignments";
+import {
+  buildMentorRoadmapViewUrl,
+  fetchMergedRoadmapsForAssignedUser,
+} from "@/app/Services/roadmap-assignments";
 import { apiGetUserById } from "@/app/Services/users.service";
 import MentorHeader from "@/app/Components/MentorHeader";
 import DirectorHero from "@/app/director/DirectorHero";
@@ -137,21 +140,9 @@ function RevitalizationRoadmapHomeContent() {
 
   const handleViewClick = (roadmap: any) => {
     const uid = userId as string;
-    const rid = roadmap._id ?? roadmap.id;
-    if (!rid) return;
-
-    const type = String(roadmap.type ?? "").toLowerCase();
-    const isPhase =
-      type === "phase" ||
-      roadmap.haveNextedRoadMaps === true ||
-      (Array.isArray(roadmap.roadmaps) && roadmap.roadmaps.length > 0);
-
-    if (isPhase) {
-      router.push(`/mentor/RevitalizationRoadmap/phase?userId=${uid}&roadmapId=${rid}`);
-      return;
-    }
-
-    router.push(`/mentor/RevitalizationRoadmap/home/jump-start?userId=${uid}&roadmapId=${rid}`);
+    if (!uid) return;
+    const url = buildMentorRoadmapViewUrl(uid, roadmap);
+    if (url) router.push(url);
   };
 
   useEffect(() => {
@@ -207,7 +198,7 @@ function RevitalizationRoadmapHomeContent() {
       />
 
       <main className={`${mentorRoadmapHubMain} pb-12`}>
-        <div className="mx-auto w-full max-w-7xl">
+        <div className="w-full">
           <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="relative flex w-full max-w-md items-center rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 shadow-sm backdrop-blur">
               <i className="fa-solid fa-magnifying-glass mr-3 shrink-0 text-[#8ec5eb]" />

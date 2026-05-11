@@ -660,7 +660,7 @@ export default function MentorAssessmentResultPage() {
       <MentorHeader showFullHeader={true} />
 
       <header
-        className="relative flex min-h-[160px] items-center bg-cover bg-center bg-no-repeat px-4 py-8 text-white sm:px-8 md:px-16"
+        className="relative flex min-h-[160px] items-center bg-cover bg-center bg-no-repeat px-0 py-8 text-white"
         style={{ backgroundImage: `url(${headerBg.src})` }}
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.92)_100%)]" />
@@ -672,7 +672,7 @@ export default function MentorAssessmentResultPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-8 md:px-16">
+      <main className="w-full py-8 sm:py-8 md:py-10">
         {!assessmentId || !userId ? (
           <div className="rounded-2xl border border-white/15 bg-white/5 p-6 text-[#cde2f2]">
             Missing assessment or mentee information.

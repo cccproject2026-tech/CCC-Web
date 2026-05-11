@@ -146,8 +146,8 @@ function MentorProfileContent() {
 
 
       {/* MAIN CONTENT */}
-      <main className="px-4 md:px-10 py-8 flex justify-center">
-        <div className="flex flex-col md:flex-row gap-8 w-full max-w-7xl">
+      <main className="px-0 py-8 flex justify-center">
+        <div className="flex flex-col md:flex-row gap-8 w-full">
           {/* 🟦 LEFT PROFILE CARD */}
           <div className="bg-white rounded-xl shadow-md p-5 text-center w-full h-[400px] md:w-[280px] flex-shrink-0">
             <Image

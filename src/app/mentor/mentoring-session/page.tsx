@@ -50,7 +50,7 @@ export default function MentorMentoringSessionPage() {
 
             {/* HERO SECTION */}
             <section
-                className="relative overflow-hidden bg-cover bg-top px-4 pb-10 pt-4 sm:px-8 lg:px-20"
+                className="relative overflow-hidden bg-cover bg-top px-0 pb-10 pt-4"
                 style={{ backgroundImage: `url(${HeroBg.src})` }}
             >
                 <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.68)_0%,rgba(6,41,70,0.6)_50%,rgba(6,41,70,1)_100%)]" />
@@ -75,7 +75,7 @@ export default function MentorMentoringSessionPage() {
             </section>
 
             {/* MAIN SECTION - TWO PANEL LAYOUT */}
-            <main className="flex-1 px-4 md:px-20 py-10">
+            <main className="flex-1 px-0 py-10">
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
                         <div className="text-center">

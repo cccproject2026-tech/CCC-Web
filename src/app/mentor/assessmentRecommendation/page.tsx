@@ -256,7 +256,7 @@ export default function MentorAssessmentRecommendationsPage() {
       <MentorHeader showFullHeader />
 
       <section
-        className="relative bg-cover px-4 pb-10 pt-4 md:px-20"
+        className="relative bg-cover px-0 pb-10 pt-4"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-black/60" />
@@ -268,7 +268,7 @@ export default function MentorAssessmentRecommendationsPage() {
         </div>
       </section>
 
-      <main className="flex-1 px-4 py-10 md:px-20">
+      <main className="flex-1 px-0 py-10">
         <div className="mx-auto max-w-6xl space-y-6">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
             <label className="mb-2 block text-sm font-semibold text-[#8ec5eb]">Select Assessment</label>

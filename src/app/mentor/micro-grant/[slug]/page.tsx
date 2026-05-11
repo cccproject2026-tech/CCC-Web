@@ -173,7 +173,7 @@ export default function MentorMicroGrantDetailPage() {
         </div>
       </div>
 
-      <div className={`${mentorMainGradient} px-4 py-10 md:px-12 lg:px-20`}>
+      <div className={`${mentorMainGradient} px-0 py-10`}>
         <div className="mx-auto flex max-w-6xl flex-col gap-10 md:flex-row">
           <div className="flex flex-shrink-0 items-start space-x-4 md:w-1/3 lg:w-1/4">
             <div className="mt-2 flex flex-col items-center">

@@ -624,6 +624,20 @@ export function extractUserIdFromOverallProgressRow(
     );
     if (nested) return nested;
   }
+  const fromVariants = coerceProgressUserId(
+    row.userID ?? row.user_id ?? row.userid ?? row.memberId ?? row.member_id,
+  );
+  if (fromVariants) return fromVariants;
+
+  const nu = row.user;
+  if (nu && typeof nu === "object" && !Array.isArray(nu)) {
+    const userRec = nu as Record<string, unknown>;
+    const fromNestedUser = coerceProgressUserId(
+      userRec._id ?? userRec.id ?? userRec.userId ?? userRec.user_id,
+    );
+    if (fromNestedUser) return fromNestedUser;
+  }
+
   const fromId = coerceProgressUserId(row.id ?? row._id);
   if (fromId) return fromId;
   return undefined;

@@ -60,7 +60,7 @@ export default function PrayerAndVisitationStrategyPage() {
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className="absolute inset-0 bg-black/55" />
-        <div className="relative z-10 px-8 md:px-20 pb-6 md:pb-8 text-white">
+        <div className="relative z-10 px-0 pb-6 md:pb-8 text-white">
           {/* breadcrumb */}
           <nav className="text-[12px] opacity-80 mb-3">
             {breadcrumb.map((b, i) => (
@@ -88,7 +88,7 @@ export default function PrayerAndVisitationStrategyPage() {
 
       {/* CONTENT */}
       <main className="flex-1 bg-gradient-to-b from-[#1B5F9E] to-[#0D3971] pb-24">
-        <div className="max-w-7xl mx-auto px-8 md:px-20">
+        <div className="w-full">
           {/* Top actions */}
           <div className="flex items-center justify-end gap-3 pt-6 pb-5">
             {!isEditing ? (

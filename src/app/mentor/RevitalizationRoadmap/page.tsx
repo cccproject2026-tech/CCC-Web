@@ -27,7 +27,12 @@ import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetRoadmaps } from "@/app/Services/roadmaps.service";
-import { unwrapRoadmapsList, unwrapProgressData } from "@/app/Services/roadmap-assignments";
+import {
+  buildMentorRoadmapViewUrl,
+  fetchMergedRoadmapsForAssignedUser,
+  unwrapRoadmapsList,
+  unwrapProgressData,
+} from "@/app/Services/roadmap-assignments";
 import { getMentorUserId } from "@/app/utils/mentor-auth";
 
 function isHttpUrl(u?: string): boolean {
@@ -143,8 +148,22 @@ export default function RevitalizationRoadmapPage() {
     fetchRoadmaps();
   }, [activeTab]);
 
-  const handleUserClick = (userId: string) => {
-    router.push(`/mentor/RevitalizationRoadmap/home?userId=${userId}`);
+  const handleUserClick = async (clickedUserId: string) => {
+    try {
+      const list = await fetchMergedRoadmapsForAssignedUser(clickedUserId);
+      if (list.length === 1) {
+        const url = buildMentorRoadmapViewUrl(clickedUserId, list[0]);
+        if (url) {
+          router.push(url);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error("Failed to resolve mentor roadmap redirect", e);
+    }
+    router.push(
+      `/mentor/RevitalizationRoadmap/home?userId=${encodeURIComponent(clickedUserId)}`,
+    );
   };
 
   const filteredPastors = useMemo(() => {

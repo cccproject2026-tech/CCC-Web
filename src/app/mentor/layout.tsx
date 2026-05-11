@@ -9,7 +9,7 @@ export default function MentorLayout({
   return (
     <RoleShell variant="mentor">
       <MentorAuthGate>
-        <div className="relative z-10 mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col px-4 pb-10 pt-4 sm:px-6 sm:pb-12 lg:px-8 lg:pt-6">
+        <div className="relative z-10 m-0 flex min-h-0 w-full max-w-full flex-1 flex-col p-0">
           {children}
         </div>
       </MentorAuthGate>

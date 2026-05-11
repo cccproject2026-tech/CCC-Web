@@ -261,7 +261,7 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
       <MentorHeader showFullHeader={true} />
 
       <section
-        className="relative overflow-hidden bg-cover bg-top px-4 pb-10 pt-4 sm:px-8 lg:px-20"
+        className="relative overflow-hidden bg-cover bg-top px-0 pb-10 pt-4"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className={mentorHeroOverlay} />
@@ -274,8 +274,8 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
         </div>
       </section>
 
-      <main className={`${mentorMainGradient} flex-1 px-4 py-10 sm:px-8 md:px-20`}>
-        <div className="mx-auto max-w-7xl">
+      <main className={`${mentorMainGradient} flex-1 px-0 py-10`}>
+        <div className="w-full">
           {loadError ? (
             <div className={`mb-6 ${mentorWarningPanel}`}>{loadError}</div>
           ) : null}

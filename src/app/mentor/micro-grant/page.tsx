@@ -110,7 +110,7 @@ export default function MentorMicroGrantPage() {
       <MentorHeader showFullHeader={true} />
 
       <section
-        className="relative flex min-h-[200px] flex-col justify-end bg-cover bg-top px-4 pb-10 pt-10 sm:min-h-[240px] md:px-20"
+        className="relative flex min-h-[200px] flex-col justify-end bg-cover bg-top px-0 pb-10 pt-10 sm:min-h-[240px]"
         style={{ backgroundImage: `url(${MicroGrantBg.src})` }}
       >
         <div className={mentorHeroOverlay} />
@@ -123,8 +123,8 @@ export default function MentorMicroGrantPage() {
         </div>
       </section>
 
-      <main className={`${mentorMainGradient} flex-1 px-4 pb-16 pt-8 md:px-16 lg:px-20`}>
-        <div className="mx-auto max-w-7xl">
+      <main className={`${mentorMainGradient} flex-1 px-0 pb-16 pt-8`}>
+        <div className="w-full">
           <div className={`${mentorFilterPanel} mb-8`}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className={`${mentorSearchAbsoluteShell} lg:max-w-md`}>

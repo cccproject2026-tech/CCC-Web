@@ -103,6 +103,39 @@ export function resolveNestedTemplateItemId(item: unknown): string {
   );
 }
 
+/**
+ * Mentor revitalization: where to send the user when they open a pastor’s assigned roadmap.
+ * Phases with exactly one nested task go straight to the task screen; otherwise phase overview or jump-start.
+ */
+export function buildMentorRoadmapViewUrl(
+  userId: string,
+  roadmap: RoadMapResponse | Record<string, unknown>,
+): string | null {
+  const uid = String(userId ?? "").trim();
+  if (!uid) return null;
+  const r = roadmap as Record<string, unknown>;
+  const rid = normalizeRoadmapId(r._id ?? r.id);
+  if (!rid) return null;
+
+  const type = String(r.type ?? "").toLowerCase();
+  const nested = unwrapNestedRoadmapsArray(roadmap as { roadmaps?: unknown });
+  const isPhase =
+    type === "phase" || r.haveNextedRoadMaps === true || nested.length > 0;
+
+  if (!isPhase) {
+    return `/mentor/RevitalizationRoadmap/home/jump-start?userId=${encodeURIComponent(uid)}&roadmapId=${encodeURIComponent(rid)}`;
+  }
+
+  if (nested.length === 1) {
+    const taskId = resolveNestedTemplateItemId(nested[0]);
+    if (taskId) {
+      return `/mentor/RevitalizationRoadmap/task?userId=${encodeURIComponent(uid)}&roadmapId=${encodeURIComponent(rid)}&taskId=${encodeURIComponent(taskId)}`;
+    }
+  }
+
+  return `/mentor/RevitalizationRoadmap/phase?userId=${encodeURIComponent(uid)}&roadmapId=${encodeURIComponent(rid)}`;
+}
+
 /** Merge assignment-style row `{ roadmap, progress }` into a single object for list UIs. */
 export function normalizeUserRoadmapListItem(row: unknown): RoadMapResponse | null {
   if (!row || typeof row !== "object") return null;

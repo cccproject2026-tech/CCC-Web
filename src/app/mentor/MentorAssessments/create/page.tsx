@@ -357,7 +357,7 @@
 //         </div>
 //       </section>
 
-//       <section className="relative flex-1 px-4 pb-16 sm:px-8 lg:px-20">
+//       <section className="relative flex-1 px-0 pb-16">
 //         <div className="mx-auto max-w-[900px]">
 //           <div className={`mb-8 p-6 sm:p-8 ${glassPanel}`}>
 //             <h2 className="text-xl font-semibold text-white sm:text-2xl">Create – Assessment</h2>

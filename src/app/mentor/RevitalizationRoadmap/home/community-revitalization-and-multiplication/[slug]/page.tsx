@@ -270,8 +270,8 @@ export default function SelfRevitalizationDetailPage() {
       />
 
       {/* Main Content */}
-      <main className="flex-1 px-6 md:px-12 lg:px-20 py-10">
-        <div className="max-w-7xl mx-auto">
+      <main className="flex-1 py-10">
+        <div className="w-full">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* Left Column - Module Navigation */}
             <div className="lg:col-span-1">

@@ -297,7 +297,7 @@ const currentDate = new Date().toLocaleDateString("en-US", {
     <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
-      <main className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-4 pb-28 pt-4 sm:px-6 sm:pb-10 lg:px-8 lg:pt-6">
+      <main className="relative z-10 w-full flex-1 pb-28 pt-0 sm:pb-10">
         {/* Hero — CCC-Mobile: greeting on hero, compact welcome card, showClockDate false */}
         {/* <section
           className={`relative overflow-hidden rounded-3xl border border-white/10 ${mentorGlassCardFrost}`}
@@ -352,7 +352,7 @@ const currentDate = new Date().toLocaleDateString("en-US", {
         </section> */} 
         {/* Hero — director-style */}
 <section
-  className={`relative overflow-hidden rounded-3xl border border-white/10 ${mentorGlassCardFrost}`}
+  className={`relative m-0 overflow-hidden rounded-none border-0 sm:rounded-3xl sm:border sm:border-white/10 ${mentorGlassCardFrost}`}
 >
   <div className="relative h-[240px] sm:h-[300px] lg:h-[340px]">
     <Image
@@ -415,7 +415,7 @@ const currentDate = new Date().toLocaleDateString("en-US", {
 </section>
 
         {/* Things to Focus On */}
-        <section className="mt-3 sm:mt-4">
+        <section className="m-0">
           <div className={`p-4 sm:p-5 ${mentorGlassCardFrost}`}>
             <div className="mb-4">
               <div className="mb-2 flex items-center gap-2.5">
@@ -456,7 +456,7 @@ const currentDate = new Date().toLocaleDateString("en-US", {
         </section>
 
         {/* Need a Help? — mobile: Help → support/contact-information (web: profile as hub) */}
-        <section className="mt-3">
+        <section className="m-0">
           <div
             className={`flex flex-col gap-3 p-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-3 sm:py-2 ${mentorGlassCardFrost}`}
           >
@@ -485,7 +485,7 @@ const currentDate = new Date().toLocaleDateString("en-US", {
         </section>
 
         {/* Quick Links — same card pattern as mobile (title row + four tiles); no extra subtitle */}
-        <section className="mt-3">
+        <section className="m-0">
           <div className={`p-4 sm:p-5 ${mentorGlassCardFrost}`}>
             <div className="mb-4 flex items-center gap-2.5">
               <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10">
@@ -512,17 +512,6 @@ const currentDate = new Date().toLocaleDateString("en-US", {
           </div>
         </section>
 
-        {/* Map — mobile: ~410px MapView; web placeholder, no pastor/mentee search strip */}
-        {/* <section className="mt-3 pb-2">
-          <div
-            className={`overflow-hidden rounded-2xl border border-white/10 ${mentorGlassCardFrost}`}
-            style={{ minHeight: 410 }}
-          >
-            <div className="relative h-[410px] w-full">
-              <Image src={MapImg} alt="" fill className="object-cover" />
-            </div>
-          </div>
-        </section> */}
         {/* Map — assigned mentees shown on preset positions */}
 <section className="mt-3 pb-2">
   <div

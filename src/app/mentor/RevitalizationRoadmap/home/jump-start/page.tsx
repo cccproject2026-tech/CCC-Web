@@ -326,8 +326,8 @@ function JumpStartPageContent() {
       />
 
       {/* Main Content */}
-      <main className="flex-1 px-6 md:px-12 lg:px-20 py-10">
-        <div className="max-w-7xl mx-auto">
+      <main className="flex-1 py-10">
+        <div className="w-full">
           {accessError ? (
             <div className="mb-6 rounded-xl border border-amber-400/35 bg-amber-500/10 px-4 py-3 text-center text-sm text-amber-100">
               {accessError}

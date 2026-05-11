@@ -160,8 +160,8 @@ export default function SelfRevitalizationPhasePage() {
       />
 
       {/* Main Content */}
-      <main className="flex-1 px-6 md:px-12 lg:px-20 py-10">
-        <div className="max-w-7xl mx-auto">
+      <main className="flex-1 py-10">
+        <div className="w-full">
           {/* Search Bar and Filter Section */}
           <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
             <div className="relative flex-1 max-w-md">
