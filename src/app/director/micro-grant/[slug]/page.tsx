@@ -161,8 +161,9 @@ const router = useRouter();
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1d538d] to-[#1d538d]">
-      <MicroGrantDetailHero
+    // <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1d538d] to-[#1d538d]">
+     <div className="min-h-screen bg-[#061a2f] text-white">
+      {/* <MicroGrantDetailHero
         title={
           typeof data.application.formId === "object" && data.application.formId?.title
             ? data.application.formId.title
@@ -175,11 +176,60 @@ const router = useRouter();
           { label: data.user.email },
         ]}
         rightCard={rightCard}
-      />
+      /> */}
+      <section className="border-b border-white/10 bg-[linear-gradient(135deg,#08233d_0%,#0b3153_55%,#123d66_100%)] px-6 py-8 md:px-12 lg:px-20">
+  <div className="mx-auto flex max-w-7xl flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+    <div>
+      <p className="mb-2 text-sm text-[#8ec5eb]">
+        Micro Grant / {data.user.email}
+      </p>
 
-      <div className="bg-transparent py-10 px-6 md:px-16 lg:px-24 flex flex-col md:flex-row gap-10">
+      {/* <h1 className="text-3xl font-bold">
+        {typeof data.application.formId === "object" &&
+        data.application.formId?.title
+          ? data.application.formId.title
+          : "Micro Grant Application"}
+      </h1> */}
+      <h1 className="text-3xl font-bold">
+  Micro Grant Application
+</h1>
+
+      <p className="mt-3 max-w-2xl text-sm text-white/70">
+        Please keep in mind that the church applying for a grant must become a
+        partner with the CCC by signing a MOU.
+      </p>
+    </div>
+
+    <div className="w-full max-w-md rounded-3xl border border-white/10 bg-white/[0.06] p-5 backdrop-blur-xl">
+      <div className="flex items-start gap-4">
+        <img
+          src={`https://ui-avatars.com/api/?name=${encodeURIComponent(
+            data.user.email || "User"
+          )}&background=173653&color=ffffff`}
+          alt="Applicant"
+          className="h-16 w-16 rounded-full object-cover"
+        />
+
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-lg font-semibold">{data.user.email}</p>
+
+          <p className="mt-1 text-sm capitalize text-white/60">
+            {data.user.role || "Applicant"}
+          </p>
+
+          <p className="mt-3 text-xs text-white/50">
+            Submitted on{" "}
+            {new Date(data.application.createdAt).toLocaleDateString()}
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+      <div className="mx-auto flex max-w-7xl flex-col gap-10 px-6 py-10 md:flex-row md:px-12 lg:px-20">
         {/* ---------- LEFT STEPS (unchanged) ---------- */}
-        <div className="flex items-start space-x-4 flex-shrink-0 md:w-1/3 lg:w-1/4">
+        <div className="flex shrink-0 items-start space-x-4 md:w-1/3 lg:w-1/4">
           <div className="flex flex-col items-center mt-2">
             {[1, 2].map((step, i) => (
               <React.Fragment key={step}>
@@ -197,26 +247,42 @@ const router = useRouter();
           </div>
 
           <div className="space-y-4">
-            <div
+            {/* <div
               onClick={() => setActiveStep(1)}
               className={`cursor-pointer rounded-xl px-6 py-5 shadow-lg border ${activeStep === 1
                 ? "bg-[#194674] text-white border-[#2b5a8c]"
                 : "bg-gray-100 text-black border-gray-200"
                 }`}
-            >
+            > */}
+            <div
+  onClick={() => setActiveStep(1)}
+  className={`cursor-pointer rounded-2xl border px-6 py-5 shadow-lg transition ${
+    activeStep === 1
+      ? "border-[#8ec5eb]/40 bg-white/[0.08] text-white"
+      : "border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.07]"
+  }`}
+>
               <h3 className="text-xl font-semibold">Cover Sheet</h3>
               <p className="text-sm mt-1 opacity-80">
                 Please answer the questions succinctly following prompts
               </p>
             </div>
-
+{/* 
             <div
               onClick={() => setActiveStep(2)}
               className={`cursor-pointer rounded-xl px-6 py-5 shadow-md border ${activeStep === 2
                 ? "bg-[#194674] text-white border-[#2b5a8c]"
                 : "bg-gray-100 text-black border-gray-200"
                 }`}
-            >
+            > */}
+            <div
+  onClick={() => setActiveStep(2)}
+  className={`cursor-pointer rounded-2xl border px-6 py-5 shadow-lg transition ${
+    activeStep === 1
+      ? "border-[#8ec5eb]/40 bg-white/[0.08] text-white"
+      : "border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.07]"
+  }`}
+>
               <h3 className="font-semibold">Reporting Procedures</h3>
             </div>
           </div>
@@ -225,14 +291,15 @@ const router = useRouter();
         {/* ---------- RIGHT CONTENT (dynamic) ---------- */}
         <div className="flex-1">
           {activeStep === 1 ? (
-            <form className="bg-transparent text-white p-8 space-y-6">
+            <form className="space-y-5 rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-white shadow-xl sm:p-8">
               <p className="text-sm text-amber-200 text-right">
                 * Indicates required question
               </p>
 
               {Object.entries(answers).map(
                 ([label, value]) => (
-                  <div key={label}>
+                  // <div key={label}>
+                  <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                     <label className="block text-sm font-semibold mb-2">
                       {label} <span className="text-red-500">*</span>
                     </label>
@@ -240,7 +307,7 @@ const router = useRouter();
                       type="text"
                       value={value}
                       readOnly
-                      className="w-full border border-gray-300 rounded-md p-3 bg-gray-100 text-gray-800"
+                      className="mt-3 w-full rounded-xl border border-white/10 bg-[#102b43] p-4 text-white outline-none"
                     />
                   </div>
                 )
@@ -261,9 +328,9 @@ const router = useRouter();
                   supportingDocs.map((doc, idx) => (
                     <div
                       key={idx}
-                      className="bg-white rounded-lg p-4 flex justify-between items-center shadow-md mb-3"
+                      className="mb-3 flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.06] p-4 shadow-md"
                     >
-                      <span className="text-black font-semibold text-sm">
+                      <span className="text-sm font-semibold text-white">
                         {doc.name}
                       </span>
                       <a href={doc.url} target="_blank">
@@ -285,7 +352,7 @@ const router = useRouter();
               </div>
             </form>
           ) : (
-            <div className="bg-transparent text-white p-8 space-y-6">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-white shadow-xl sm:p-8">
               <p>⭐ Grant report required upon completion</p>
               <p>⭐ Unused funds must be returned</p>
 
@@ -319,7 +386,7 @@ const router = useRouter();
                 </div>
               </div> */}
 
-<div className="flex justify-between mt-8">
+{/* <div className="flex justify-between mt-8">
   <button
     type="button"
     onClick={() => setActiveStep(1)}
@@ -343,6 +410,39 @@ const router = useRouter();
       className="bg-[#1d538d] text-white px-6 py-2 rounded-lg"
     >
       ACCEPT
+    </button>
+  </div>
+</div> */}
+<div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  <button
+    type="button"
+    onClick={() => setActiveStep(1)}
+    className="rounded-xl border border-white/15 bg-white/10 px-6 py-2 text-sm font-semibold text-white hover:bg-white/15"
+  >
+    Back
+  </button>
+<button
+  type="button"
+  onClick={() => handleStatusChange(data.application._id, "pending")}
+  className="rounded-xl border border-amber-300/30 bg-amber-500/15 px-6 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-500/25"
+>
+  Move to Pending
+</button>
+  <div className="flex gap-3">
+    <button
+      type="button"
+      onClick={() => handleStatusChange(data.application._id, "rejected")}
+      className="rounded-xl border border-red-300/30 bg-red-500/15 px-6 py-2 text-sm font-semibold text-red-100 hover:bg-red-500/25"
+    >
+      Reject
+    </button>
+
+    <button
+      type="button"
+      onClick={() => handleStatusChange(data.application._id, "accepted")}
+      className="rounded-xl bg-[#8ec5eb] px-6 py-2 text-sm font-bold text-[#062946] hover:bg-[#b8def6]"
+    >
+      Accept
     </button>
   </div>
 </div>

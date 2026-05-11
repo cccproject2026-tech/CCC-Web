@@ -371,8 +371,10 @@ const mentors = [...unwrapUsers(mentorsRes), ...unwrapUsers(fieldMentorsRes)];
                 <div
                   className={`grid ${
                     showUploadedBy
-                      ? "grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
-                      : "grid-cols-[2fr_0.7fr_1fr_0.5fr]"
+                      // ? "grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
+                      // : "grid-cols-[2fr_0.7fr_1fr_0.5fr]"
+                      ? "grid-cols-[minmax(0,2fr)_0.6fr_0.9fr_1fr_0.5fr]"
+: "grid-cols-[minmax(0,2fr)_0.7fr_1fr_0.5fr]"
                   } items-center gap-4 border-b border-white/15 px-5 py-4 text-xs font-bold uppercase tracking-wide text-[#cde2f2]`}
                 >
                   <p>Document Name</p>
@@ -395,11 +397,13 @@ const mentors = [...unwrapUsers(mentorsRes), ...unwrapUsers(fieldMentorsRes)];
                       key={key}
                       className={`grid ${
                         showUploadedBy
-                          ? "grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
-                          : "grid-cols-[2fr_0.7fr_1fr_0.5fr]"
+                          // ? "grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
+                          // : "grid-cols-[2fr_0.7fr_1fr_0.5fr]"
+                          ? "grid-cols-[minmax(0,2fr)_0.6fr_0.9fr_1fr_0.5fr]"
+: "grid-cols-[minmax(0,2fr)_0.7fr_1fr_0.5fr]"
                       } items-center gap-4 border-b border-white/10 px-5 py-5 last:border-b-0`}
                     >
-                      <div className="flex items-center gap-4">
+                      <div className="flex min-w-0 items-center gap-4">
                         {selectMode && (
                           <input
                             type="checkbox"
@@ -416,7 +420,7 @@ const mentors = [...unwrapUsers(mentorsRes), ...unwrapUsers(fieldMentorsRes)];
                         <button
                           type="button"
                           onClick={() => handleViewDocument(doc)}
-                          className="max-w-[360px] whitespace-normal break-words text-left text-sm font-semibold text-white hover:text-[#8ec5eb]"
+                          className="min-w-0 max-w-full whitespace-normal break-words text-left text-sm font-semibold text-white hover:text-[#8ec5eb]"
                         >
                           {doc.fileName || "Document"}
                         </button>

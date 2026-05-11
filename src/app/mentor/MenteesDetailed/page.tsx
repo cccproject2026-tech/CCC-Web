@@ -92,23 +92,45 @@ const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
         const raw = res.data?.data;
         const menteeUsers = Array.isArray(raw) ? raw : [];
 
-        const mapped = menteeUsers.map((u: any, i: number) => ({
-          id: String(u.id ?? u._id ?? ""),
-          name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Mentee",
-          role: u.role ?? "",
-          desc: "Assigned mentee in mentoring program",
-          // img: u.profilePicture || IMAGE_POOL[i % IMAGE_POOL.length],
-          img: u.profilePicture || getInitialsAvatar(`${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()),
-          progress: 0,
-          createdAt: u.createdAt,
-          email: u.email,
-phoneNumber: u.phoneNumber,
-title: u.title,
-churchDetails: u.churchDetails,
-country: u.country,
-state: u.state,
-city: u.city,
-        }));
+//         const mapped = menteeUsers.map((u: any, i: number) => ({
+//           id: String(u.id ?? u._id ?? ""),
+//           name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Mentee",
+//           role: u.role ?? "",
+//           desc: "Assigned mentee in mentoring program",
+//           // img: u.profilePicture || IMAGE_POOL[i % IMAGE_POOL.length],
+//           img: u.profilePicture || getInitialsAvatar(`${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()),
+//           progress: 0,
+//           createdAt: u.createdAt,
+//           email: u.email,
+// phoneNumber: u.phoneNumber,
+// title: u.title,
+// churchDetails: u.churchDetails,
+// country: u.country,
+// state: u.state,
+// city: u.city,
+//         }));
+const mapped = menteeUsers.map((u: any, i: number) => {
+  console.log("RAW MENTEE USER:", u);
+
+  return {
+    id: String(u.id ?? u._id ?? ""),
+    name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Mentee",
+    role: u.role ?? "",
+    status: u.status,
+    desc: "Assigned mentee in mentoring program",
+    img: u.profilePicture || getInitialsAvatar(`${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()),
+    progress: 0,
+    createdAt: u.createdAt,
+    email: u.email,
+    phoneNumber: u.phoneNumber,
+    title: u.title,
+    churchDetails: u.churchDetails,
+    country: u.country,
+    state: u.state,
+    city: u.city,
+    interest: u.interest,
+  };
+});
 
         setMentees(mapped.filter((m) => m.id));
       } catch (err) {
@@ -616,12 +638,12 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
   <div className="space-y-3 text-sm">
     <p><span className="text-white/50">Email:</span> {selectedMentee.email || "—"}</p>
     <p><span className="text-white/50">Phone:</span> {selectedMentee.phoneNumber || "—"}</p>
-   <p>
+   {/* <p>
   <span className="text-white/50">Title:</span>{" "}
   {selectedMentee.title || selectedMentee.churchDetails?.[0]?.title || "—"}
-</p>
+</p> */}
 
-<p>
+{/* <p>
   <span className="text-white/50">Location:</span>{" "}
   {[
     selectedMentee.city || selectedMentee.churchDetails?.[0]?.city,
@@ -630,7 +652,9 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
   ]
     .filter(Boolean)
     .join(", ") || "—"}
-</p>
+</p> */}
+<p><span className="text-white/50">Role:</span> {selectedMentee.role || "—"}</p>
+<p><span className="text-white/50">Status:</span> {selectedMentee.status || "—"}</p>
   </div>
 </div>
       <div className="mt-6 rounded-2xl border border-white/15 bg-white/5 p-5">
