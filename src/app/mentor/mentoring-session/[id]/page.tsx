@@ -375,25 +375,6 @@ export default function MentorMentoringSessionDetailPage() {
               </div>
               
             </div>
-
-            <div className="flex flex-wrap gap-2 sm:justify-end">
-              <button
-                type="button"
-                onClick={() => void fetchTranscript(false)}
-                disabled={transcriptMutation.isPending}
-                className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-[#062946] hover:bg-white/90 disabled:opacity-60"
-              >
-                {transcriptMutation.isPending ? "Working…" : "Generate"}
-              </button>
-              <button
-                type="button"
-                onClick={() => void fetchTranscript(true)}
-                disabled={transcriptMutation.isPending}
-                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white/90 hover:bg-white/10 disabled:opacity-60"
-              >
-                Refresh
-              </button>
-            </div>
           </div>
 
           <div className="mt-5">
@@ -481,7 +462,7 @@ export default function MentorMentoringSessionDetailPage() {
                         ))
                       ) : (
                         <div className="text-sm text-white/60">
-                          No transcript available yet. If the session is completed, try Generate.
+                          No transcript available yet.
                         </div>
                       )}
                     </div>
@@ -591,11 +572,11 @@ export default function MentorMentoringSessionDetailPage() {
                       !tsData.summary.mentorGuidance?.length &&
                       !tsData.summary.actionItems?.length &&
                       !tsData.summary.followUp ? (
-                        <div className="text-sm text-white/60">Summary is being generated or temporarily unavailable. Try Refresh.</div>
+                        <div className="text-sm text-white/60">Summary is being generated or temporarily unavailable.</div>
                       ) : null}
                     </div>
                   ) : (
-                    <div className="text-sm text-white/60">No summary yet. If the session is completed, click Generate.</div>
+                    <div className="text-sm text-white/60">No summary yet.</div>
                   )}
                 </div>
               </div>
