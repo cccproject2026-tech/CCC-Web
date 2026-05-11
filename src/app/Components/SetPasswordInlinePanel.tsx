@@ -48,6 +48,9 @@ export default function SetPasswordInlinePanel({
   const [emailFromCookie, setEmailFromCookie] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
+  const [showPassword, setShowPassword] = useState(false);
+const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   useEffect(() => {
     const email = getCookie("interestEmail");
 
@@ -319,21 +322,39 @@ export default function SetPasswordInlinePanel({
               <label className="mb-1.5 block text-xs font-medium text-[#cde2f2]">
                 New password
               </label>
-              <input
+              {/* <input
                 type="password"
                 placeholder="Create password"
                 className={inputClass}
                 value={formData.password}
                 onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
                 autoComplete="new-password"
-              />
+              /> */}
+              <div className="relative">
+  <input
+    type={showPassword ? "text" : "password"}
+    placeholder="Create password"
+    className={`${inputClass} pr-12`}
+    value={formData.password}
+    onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
+    autoComplete="new-password"
+  />
+
+  <button
+    type="button"
+    onClick={() => setShowPassword((prev) => !prev)}
+    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
+  >
+    <i className={`fa-regular ${showPassword ? "fa-eye-slash" : "fa-eye"}`} />
+  </button>
+</div>
             </div>
 
             <div>
               <label className="mb-1.5 block text-xs font-medium text-[#cde2f2]">
                 Confirm password
               </label>
-              <input
+              {/* <input
                 type="password"
                 placeholder="Confirm password"
                 className={inputClass}
@@ -345,7 +366,30 @@ export default function SetPasswordInlinePanel({
                   }))
                 }
                 autoComplete="new-password"
-              />
+              /> */}
+              <div className="relative">
+  <input
+    type={showConfirmPassword ? "text" : "password"}
+    placeholder="Confirm password"
+    className={`${inputClass} pr-12`}
+    value={formData.confirmPassword}
+    onChange={(e) =>
+      setFormData((prev) => ({
+        ...prev,
+        confirmPassword: e.target.value,
+      }))
+    }
+    autoComplete="new-password"
+  />
+
+  <button
+    type="button"
+    onClick={() => setShowConfirmPassword((prev) => !prev)}
+    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/60 hover:text-white"
+  >
+    <i className={`fa-regular ${showConfirmPassword ? "fa-eye-slash" : "fa-eye"}`} />
+  </button>
+</div>
             </div>
 
             {error && (

@@ -110,7 +110,8 @@
 
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { uploadDocument } from "@/app/Services/pastor.service";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { getCookie } from "@/app/utils/cookies";
@@ -137,6 +138,9 @@ const [activeTab, setActiveTab] = useState<"my" | "mentee">("my");
   const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
   const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
 
+  const [uploading, setUploading] = useState(false);
+const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     const fetchDocuments = async () => {
       try {
@@ -154,8 +158,17 @@ const [activeTab, setActiveTab] = useState<"my" | "mentee">("my");
 
         setUserId(uid);
 
+        // const res = await apiGetDocuments(uid);
+        // setDocuments(Array.isArray(res.data?.data) ? res.data.data : []);
         const res = await apiGetDocuments(uid);
-        setDocuments(Array.isArray(res.data?.data) ? res.data.data : []);
+const myDocs = Array.isArray(res.data?.data) ? res.data.data : [];
+
+setDocuments(
+  myDocs.map((doc: any) => ({
+    ...doc,
+    ownerId: uid,
+  })),
+);
         const assignedRes = await apiGetAssignedUsers(uid);
 const assignedUsers = Array.isArray(assignedRes?.data?.data)
   ? assignedRes.data.data
@@ -247,7 +260,30 @@ const filteredDocuments = useMemo(() => {
         : [...prev, fileUrl],
     );
   };
+const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  e.target.value = "";
 
+  if (!file || !userId) return;
+
+  try {
+    setUploading(true);
+
+    const res = await uploadDocument(userId, file);
+    const uploaded = res.data?.data;
+
+    if (uploaded) {
+      // setDocuments((prev) => [uploaded, ...prev]);
+      setDocuments((prev) => [{ ...uploaded, ownerId: userId }, ...prev]);
+      setActiveTab("my");
+    }
+  } catch (err) {
+    console.error("Document upload failed:", err);
+    setError("Document upload failed.");
+  } finally {
+    setUploading(false);
+  }
+};
   const handleViewDocument = (doc: any) => {
     if (!doc?.fileUrl) return;
     window.open(doc.fileUrl, "_blank", "noopener,noreferrer");
@@ -271,23 +307,56 @@ const filteredDocuments = useMemo(() => {
     window.URL.revokeObjectURL(blobUrl);
   };
 
+  // const handleDeleteDocument = async (doc: any) => {
+  //   try {
+  //     if (!userId || !doc?.fileUrl) return;
+
+  //     await apiDeleteDocument(userId, doc.fileUrl);
+
+  //     setDocuments((prev) =>
+  //       prev.filter((item) => item.fileUrl !== doc.fileUrl),
+  //     );
+
+  //     setSelectedUrls((prev) => prev.filter((url) => url !== doc.fileUrl));
+  //     setOpenMenuKey(null);
+  //   } catch (error) {
+  //     console.error("Failed to delete document:", error);
+  //     alert("Failed to delete document.");
+  //   }
+  // };
   const handleDeleteDocument = async (doc: any) => {
-    try {
-      if (!userId || !doc?.fileUrl) return;
+  try {
+    const ownerId = doc.ownerId || userId;
 
-      await apiDeleteDocument(userId, doc.fileUrl);
+    if (!ownerId || !doc?.fileUrl) return;
+console.log("DELETE DOC DEBUG:", {
+  activeTab,
+  userId,
+  ownerId,
+  fileUrl: doc.fileUrl,
+  doc,
+});
 
+console.log("DELETE DOC DEBUG RAW DOC:", doc);
+    await apiDeleteDocument(ownerId, doc.fileUrl);
+
+    if (activeTab === "mentee") {
+      setMenteeDocuments((prev) =>
+        prev.filter((item) => item.fileUrl !== doc.fileUrl),
+      );
+    } else {
       setDocuments((prev) =>
         prev.filter((item) => item.fileUrl !== doc.fileUrl),
       );
-
-      setSelectedUrls((prev) => prev.filter((url) => url !== doc.fileUrl));
-      setOpenMenuKey(null);
-    } catch (error) {
-      console.error("Failed to delete document:", error);
-      alert("Failed to delete document.");
     }
-  };
+
+    setSelectedUrls((prev) => prev.filter((url) => url !== doc.fileUrl));
+    setOpenMenuKey(null);
+  } catch (error) {
+    console.error("Failed to delete document:", error);
+    alert("Failed to delete document.");
+  }
+};
 
   const handleShareDocument = async (doc: any) => {
     if (!doc?.fileUrl) return;
@@ -331,14 +400,40 @@ const filteredDocuments = useMemo(() => {
 
       <main className={`${mentorMainGradient} flex-1 px-4 py-10 md:px-8 lg:px-16`}>
         <div className={`mx-auto max-w-6xl p-6 md:p-8 ${mentorGlassCardFrost}`}>
-          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          {/* <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
             <div>
               <h1 className="text-3xl font-semibold md:text-4xl">Documents</h1>
               <p className={`mt-2 ${mentorBodyText}`}>
                 Manage and review your uploaded ministry documents.
               </p>
             </div>
-          </div>
+          </div> */}
+          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+  <div>
+    <h1 className="text-3xl font-semibold md:text-4xl">Documents</h1>
+    <p className={`mt-2 ${mentorBodyText}`}>
+      Manage and review your uploaded ministry documents.
+    </p>
+  </div>
+
+  <input
+    ref={fileInputRef}
+    type="file"
+    accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+    className="hidden"
+    onChange={handleUploadDocument}
+  />
+
+  <button
+    type="button"
+    onClick={() => fileInputRef.current?.click()}
+    disabled={uploading}
+    className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-[#062946] transition hover:bg-[#d9ebf8] disabled:cursor-not-allowed disabled:opacity-60"
+  >
+    <i className="fa-solid fa-upload" />
+    {uploading ? "Uploading..." : "Upload Document"}
+  </button>
+</div>
           <div className="mt-8 grid grid-cols-2 overflow-hidden rounded-xl border border-white/15 bg-white/5">
   <button
     type="button"

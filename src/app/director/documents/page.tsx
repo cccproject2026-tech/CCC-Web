@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { uploadDocument } from "@/app/Services/pastor.service";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import AppHeader from "@/app/Components/Header/AppHeader";
 import { apiDeleteDocument, apiGetAllUsers, apiGetDocuments } from "@/app/Services/api";
@@ -34,6 +35,9 @@ export default function DirectorDocumentsPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
   const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
+
+  const [uploading, setUploading] = useState(false);
+const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -170,7 +174,35 @@ const mentors = [...unwrapUsers(mentorsRes), ...unwrapUsers(fieldMentorsRes)];
         : [...prev, fileUrl],
     );
   };
+const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  e.target.value = "";
 
+  const userId =
+    document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("userId="))
+      ?.split("=")[1] || "";
+
+  if (!file || !userId) return;
+
+  try {
+    setUploading(true);
+
+    const res = await uploadDocument(userId, file);
+    const uploaded = res.data?.data;
+
+    if (uploaded) {
+      setDocuments((prev) => [uploaded, ...prev]);
+      setActiveTab("my");
+    }
+  } catch (err) {
+    console.error("Document upload failed:", err);
+    setError("Document upload failed.");
+  } finally {
+    setUploading(false);
+  }
+};
   const handleViewDocument = (doc: any) => {
     if (!doc?.fileUrl) return;
     window.open(doc.fileUrl, "_blank", "noopener,noreferrer");
@@ -259,12 +291,38 @@ const mentors = [...unwrapUsers(mentorsRes), ...unwrapUsers(fieldMentorsRes)];
 
       <main className="flex-1 px-4 py-10 md:px-8 lg:px-16">
         <div className={`mx-auto max-w-6xl p-6 md:p-8 ${directorGlassCard}`}>
-          <div>
+          {/* <div>
             <h1 className="text-3xl font-semibold text-white md:text-4xl">Documents</h1>
             <p className="mt-2 text-sm text-[#cde2f2]">
               Manage and review uploaded ministry documents.
             </p>
-          </div>
+          </div> */}
+          <div className="mb-8 flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+  <div>
+    <h1 className="text-3xl font-semibold text-white md:text-4xl">Documents</h1>
+    <p className="mt-2 text-sm text-[#cde2f2]">
+      Manage and review uploaded ministry documents.
+    </p>
+  </div>
+
+  <input
+    ref={fileInputRef}
+    type="file"
+    accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx"
+    className="hidden"
+    onChange={handleUploadDocument}
+  />
+
+  <button
+    type="button"
+    onClick={() => fileInputRef.current?.click()}
+    disabled={uploading}
+    className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-[#062946] transition hover:bg-[#d9ebf8] disabled:cursor-not-allowed disabled:opacity-60"
+  >
+    <i className="fa-solid fa-upload" />
+    {uploading ? "Uploading..." : "Upload Document"}
+  </button>
+</div>
 
           <div className="mt-8 grid grid-cols-3 overflow-hidden rounded-xl border border-white/15 bg-white/5">
             {[
