@@ -88,6 +88,7 @@ export default function DirectorPhaseListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const roadmapId = searchParams.get("roadmapId")?.trim() || "";
+  const pastorView = searchParams.get("pastorView") === "true";
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -340,14 +341,23 @@ export default function DirectorPhaseListPage() {
                         <i className="fa-regular fa-eye text-sm" aria-hidden />
                         View
                       </button>
-                      <button
+                      {/* <button
                         type="button"
                         onClick={() => openPhaseTaskPage(it.id)}
                         className={cardActionPrimary}
                       >
                         <i className="fa-solid fa-list-check text-sm" />
                         Edit tasks
-                      </button>
+                      </button> */}
+                      {!pastorView ? (
+  <button
+    type="button"
+    onClick={() => openPhaseTaskPage(it.id)}
+    className={cardActionPrimary}
+  >
+    <i className="fa-solid fa-list-check" /> Edit tasks
+  </button>
+) : null}
                       <button
                         type="button"
                         disabled={!it.id}

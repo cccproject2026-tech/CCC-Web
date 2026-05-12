@@ -258,6 +258,9 @@ function JumpStartContent() {
   const [savedUploadDocs, setSavedUploadDocs] = useState<
     Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]>
   >({});
+  const [uploadedNowDocs, setUploadedNowDocs] = useState<
+  Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]>
+>({});
   const [extrasExist, setExtrasExist] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -962,35 +965,51 @@ const hasRequiredSubmissions = useMemo(() => {
       }
       // Mark save time so the extras loader can retry without wiping UI fields.
       lastExtrasSaveAtRef.current = Date.now();
-      for (const [key, files] of Object.entries(pendingUploadFiles)) {
-        if (files?.length) await apiUploadExtrasDocuments(roadmapId, userId, files, scopedNestedId, key);
-      }
-      setPendingUploadFiles({});
+      // for (const [key, files] of Object.entries(pendingUploadFiles)) {
+      //   if (files?.length) await apiUploadExtrasDocuments(roadmapId, userId, files, scopedNestedId, key);
+      // }
+      // setPendingUploadFiles({});
+      const uploadedNowNames: Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]> = {};
+
+for (const [key, files] of Object.entries(pendingUploadFiles)) {
+  if (files?.length) {
+    await apiUploadExtrasDocuments(roadmapId, userId, files, scopedNestedId, key);
+
+    uploadedNowNames[key] = files.map((file) => ({
+      fileName: file.name,
+      fileUrl: "",
+      uploadBatchId: "local-now",
+    }));
+  }
+}
+
+setUploadedNowDocs(uploadedNowNames);
+setPendingUploadFiles({});
       // Refresh server uploads so the UI shows "uploaded" after reload.
-      try {
-        const resDocs = await apiGetExtrasDocuments(roadmapId, userId, scopedNestedId);
-        const list = (resDocs?.data?.data || resDocs?.data) as any[];
-        const batches = Array.isArray(list) ? list : [];
-        const byName: Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]> = {};
-        batches.forEach((b: any) => {
-          const name = String(b?.name ?? "").trim();
-          const batchId = String(b?.uploadBatchId ?? "").trim();
-          const files = Array.isArray(b?.files) ? b.files : [];
-          if (!name || !batchId || files.length === 0) return;
-          const mapped = files
-            .map((f: any) => ({
-              fileName: String(f?.fileName ?? "").trim(),
-              fileUrl: String(f?.fileUrl ?? "").trim(),
-              uploadBatchId: batchId,
-            }))
-            .filter((f: any) => f.fileName && f.fileUrl);
-          if (!mapped.length) return;
-          byName[name] = [...(byName[name] || []), ...mapped];
-        });
-        setSavedUploadDocs(byName);
-      } catch {
-        // ignore doc refresh failures; upload already succeeded
-      }
+      // try {
+      //   const resDocs = await apiGetExtrasDocuments(roadmapId, userId, scopedNestedId);
+      //   const list = (resDocs?.data?.data || resDocs?.data) as any[];
+      //   const batches = Array.isArray(list) ? list : [];
+      //   const byName: Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]> = {};
+      //   batches.forEach((b: any) => {
+      //     const name = String(b?.name ?? "").trim();
+      //     const batchId = String(b?.uploadBatchId ?? "").trim();
+      //     const files = Array.isArray(b?.files) ? b.files : [];
+      //     if (!name || !batchId || files.length === 0) return;
+      //     const mapped = files
+      //       .map((f: any) => ({
+      //         fileName: String(f?.fileName ?? "").trim(),
+      //         fileUrl: String(f?.fileUrl ?? "").trim(),
+      //         uploadBatchId: batchId,
+      //       }))
+      //       .filter((f: any) => f.fileName && f.fileUrl);
+      //     if (!mapped.length) return;
+      //     byName[name] = [...(byName[name] || []), ...mapped];
+      //   });
+      //   setSavedUploadDocs(byName);
+      // } catch {
+      //   // ignore doc refresh failures; upload already succeeded
+      // }
       await refetchRoadmap();
       await refetchProgressData();
       emitProgressUpdated(userId);
@@ -1438,6 +1457,7 @@ if (!hasRequiredSubmissions) {
       case "UPLOAD": {
         const pending = pendingUploadFiles[fieldKey] ?? [];
         const saved = savedUploadDocs[fieldKey] ?? [];
+        const uploadedNow = uploadedNowDocs[fieldKey] ?? [];
         const inputId = `upload-${fieldKey.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 
         const onDropUpload = (e: DragEvent<HTMLDivElement>) => {
@@ -1451,22 +1471,142 @@ if (!hasRequiredSubmissions) {
           <div key={`${fieldKey}_${index}`} className="mb-6">
             <h4 className="mb-2 text-sm font-semibold text-white">{extra.name}</h4>
 
-            {saved.length > 0 ? (
-              <div className="mb-4 rounded-lg border border-[#5A8DCB]/40 bg-white/10 p-3">
-                <div className="mb-2 flex items-center gap-2">
-                  <i className="fa-solid fa-cloud-check text-emerald-300" />
-                  <span className="text-sm font-semibold text-white">Previously uploaded</span>
-                </div>
-                <ul className="mb-2 max-h-32 space-y-1 overflow-auto text-xs text-white/85">
-                  {saved.map((f) => (
-                    <li key={`${f.fileUrl}-${f.fileName}`} className="truncate">
-                      {f.fileName}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
+           {saved.length > 0 ? (
+  <div className="mb-4 rounded-xl border border-[#5A8DCB]/40 bg-white/[0.06] p-4">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="flex items-center gap-4 border-b border-white/10 pb-4 md:border-b-0 md:border-r md:pb-0 md:pr-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/10 text-blue-300">
+          <i className="fa-regular fa-folder" />
+        </div>
 
+        <div>
+          <h5 className="text-sm font-semibold text-white">
+            Required reference files
+          </h5>
+          <p className="mt-1 text-xs leading-relaxed text-white/60">
+            Please check and review the reference files below before uploading your work.
+          </p>
+        </div>
+      </div>
+
+      <div className="min-w-0">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h5 className="text-sm font-semibold text-white">
+            Uploaded files
+          </h5>
+        </div>
+
+        <div className="max-h-[118px] space-y-2 overflow-y-auto pr-1">
+          {saved.map((f) => (
+            <div
+              key={`${f.fileUrl}-${f.fileName}`}
+              onClick={() => window.open(f.fileUrl, "_blank")}
+              className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white transition hover:bg-white/[0.08]"
+            >
+              <i className="fa-solid fa-file text-blue-300" />
+
+              <span className="min-w-0 flex-1 truncate">
+                {f.fileName}
+              </span>
+
+      <button
+  type="button"
+  onClick={async (e) => {
+    e.stopPropagation();
+
+    try {
+      const response = await fetch(f.fileUrl);
+      const blob = await response.blob();
+
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = f.fileName || "download";
+      document.body.appendChild(link);
+      link.click();
+
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      window.open(f.fileUrl, "_blank");
+    }
+  }}
+  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/10 text-blue-200 hover:bg-white/15"
+  title="Download"
+>
+  <i className="fa-solid fa-download" />
+</button>
+
+              <button
+                type="button"
+              onClick={async (e) => {
+  e.stopPropagation();
+
+  try {
+    if (navigator.share && f.fileUrl) {
+      await navigator.share({
+        title: f.fileName,
+        text: "Shared file",
+        url: f.fileUrl,
+      });
+      return;
+    }
+
+    await navigator.clipboard.writeText(f.fileUrl);
+    setSaveFeedback("File link copied.");
+  } catch {
+    setSaveFeedback("Could not share this file.");
+  }
+
+  setTimeout(() => setSaveFeedback(null), 2500);
+}}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/10 text-emerald-300 hover:bg-white/15"
+                title="Share"
+              >
+                <i className="fa-solid fa-share-nodes" />
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSaveFeedback("Delete API is not connected yet.");
+                  setTimeout(() => setSaveFeedback(null), 3000);
+                }}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/10 text-red-300 hover:bg-red-500/15"
+                title="Delete"
+              >
+                <i className="fa-solid fa-trash" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+) : null}
+
+{uploadedNow.length > 0 ? (
+  <div className="mb-4 rounded-lg border border-emerald-400/35 bg-emerald-500/10 p-3">
+    <p className="mb-2 text-xs font-semibold text-emerald-200">
+      Uploaded now
+    </p>
+
+    <ul className="space-y-2">
+      {uploadedNow.map((f) => (
+        <li
+          key={`${f.fileName}-${f.uploadBatchId}`}
+          className="flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+        >
+          <i className="fa-solid fa-circle-check text-emerald-300" />
+          <span className="min-w-0 flex-1 truncate">{f.fileName}</span>
+          <span className="text-xs text-emerald-200">Uploaded</span>
+        </li>
+      ))}
+    </ul>
+  </div>
+) : null}
             {pending.length > 0 ? (
               <div className="mb-4 space-y-2">
                 <p className="text-xs font-medium text-white/70">Ready to upload</p>

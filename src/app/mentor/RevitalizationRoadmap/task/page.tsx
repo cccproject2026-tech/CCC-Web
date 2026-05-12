@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, Suspense } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import { apiGetExtrasDocuments } from "@/app/Services/api";
 
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import UserProfile from "@/app/Assets/user-profile.png";
@@ -133,6 +134,9 @@ function TaskPageContent() {
   const [activeTab, setActiveTab] = useState<"pastorResponse" | "comments" | "queries">("pastorResponse");
 
   const [pastorExtrasRows, setPastorExtrasRows] = useState<Record<string, unknown>[]>([]);
+  const [pastorUploadDocs, setPastorUploadDocs] = useState<
+  Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]>
+>({});
   const [extrasLoading, setExtrasLoading] = useState(false);
 
   const [comments, setComments] = useState<Record<string, unknown>[]>([]);
@@ -301,6 +305,51 @@ function TaskPageContent() {
       cancelled = true;
     };
   }, [roadmapId, userId, taskId]);
+  useEffect(() => {
+  if (!roadmapId || !userId || !taskId) return;
+
+  let cancelled = false;
+
+  const loadPastorUploadDocs = async () => {
+    try {
+      const res = await apiGetExtrasDocuments(roadmapId, userId, taskId);
+      const list = (res?.data?.data || res?.data) as any[];
+      const batches = Array.isArray(list) ? list : [];
+
+      const byName: Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]> = {};
+
+      batches.forEach((b: any) => {
+        const name = String(b?.name ?? "").trim();
+        const batchId = String(b?.uploadBatchId ?? "").trim();
+        const files = Array.isArray(b?.files) ? b.files : [];
+
+        if (!name || !files.length) return;
+
+        const mapped = files
+          .map((f: any) => ({
+            fileName: String(f?.fileName ?? "").trim(),
+            fileUrl: String(f?.fileUrl ?? "").trim(),
+            uploadBatchId: batchId,
+          }))
+          .filter((f: any) => f.fileName && f.fileUrl);
+
+        if (mapped.length) {
+          byName[name] = [...(byName[name] || []), ...mapped];
+        }
+      });
+
+      if (!cancelled) setPastorUploadDocs(byName);
+    } catch {
+      if (!cancelled) setPastorUploadDocs({});
+    }
+  };
+
+  void loadPastorUploadDocs();
+
+  return () => {
+    cancelled = true;
+  };
+}, [roadmapId, userId, taskId]);
 
   const handleSendComment = async () => {
     if (!newComment.trim() || !roadmapId || !userId) return;
@@ -525,8 +574,61 @@ function TaskPageContent() {
                 {activeTab === "pastorResponse" && (
                   <div className={`${glassPanel} p-6 sm:p-8`}>
                     {(() => {
-                      const renderableExtras = pastorExtrasRows.filter(isRenderablePastorExtraRow);
-                      const pastorHasNoResponses = !extrasLoading && renderableExtras.length === 0;
+                      // const renderableExtras = pastorExtrasRows.filter(isRenderablePastorExtraRow);
+//                       const allRenderableExtras = pastorExtrasRows.filter(isRenderablePastorExtraRow);
+
+// const latestSubmitKey = allRenderableExtras
+//   .map((item) =>
+//     String(
+//       item.submissionId ??
+//         item.responseId ??
+//         item.submitId ??
+//         item.groupId ??
+//         item.createdAt ??
+//         item.updatedAt ??
+//         "",
+//     ),
+//   )
+//   .filter(Boolean)
+//   .at(-1);
+
+// const renderableExtras = latestSubmitKey
+//   ? allRenderableExtras.filter((item) => {
+//       const itemKey = String(
+//         item.submissionId ??
+//           item.responseId ??
+//           item.submitId ??
+//           item.groupId ??
+//           item.createdAt ??
+//           item.updatedAt ??
+//           "",
+//       );
+
+//       return itemKey === latestSubmitKey;
+//     })
+//   : allRenderableExtras;
+
+// const isUpdatedResponse = allRenderableExtras.length > renderableExtras.length;
+// const pastorHasNoResponses = !extrasLoading && renderableExtras.length === 0;
+const allRenderableExtras = pastorExtrasRows.filter(isRenderablePastorExtraRow);
+
+const latestExtrasMap = new Map<string, Record<string, unknown>>();
+
+allRenderableExtras.forEach((item) => {
+  const type = String(item.type ?? "").toUpperCase();
+  const label = String(item.name ?? item.key ?? "").trim().toLowerCase();
+
+  const key = `${type}__${label}`;
+
+  latestExtrasMap.set(key, item);
+});
+
+const renderableExtras = Array.from(latestExtrasMap.values());
+
+const isUpdatedResponse = allRenderableExtras.length > renderableExtras.length;
+
+const pastorHasNoResponses = !extrasLoading && renderableExtras.length === 0;
+                      
                       const dueRaw =
                         task &&
                         (task.endDate ??
@@ -541,7 +643,9 @@ function TaskPageContent() {
                       return (
                         <>
                           <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                            <h2 className="text-lg font-semibold text-white sm:text-xl">Pastor response</h2>
+                            <h2 className="text-lg font-semibold text-white sm:text-xl">
+  {isUpdatedResponse ? "Updated response" : "Pastor response"}
+</h2>
                             {dueHeading ? (
                               <div className="flex shrink-0 items-center gap-2 text-sm font-medium text-[#cde2f2]">
                                 <i className="fa-regular fa-calendar text-[#8ec5eb]" aria-hidden />
@@ -600,6 +704,7 @@ function TaskPageContent() {
                               {renderableExtras.map((item, idx) => {
                               const t = String(item.type ?? "").toUpperCase();
                               const label = String(item.name ?? item.key ?? `Item ${idx + 1}`);
+                              const uploadedFiles = pastorUploadDocs[label] ?? [];
                               const sig =
                                 item.signatureData !== undefined ? item.signatureData : undefined;
                               const val = item.value !== undefined ? item.value : sig;
@@ -630,7 +735,57 @@ function TaskPageContent() {
                                   </div>
                                 );
                               }
+if (t === "UPLOAD" && uploadedFiles.length > 0) {
+  return (
+    <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+        {label}
+      </p>
 
+      <div className="mt-3 space-y-2">
+        {uploadedFiles.map((file) => (
+          <div
+            key={`${file.fileUrl}-${file.fileName}`}
+            onClick={() => window.open(file.fileUrl, "_blank")}
+            className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-white hover:bg-white/[0.08]"
+          >
+            <i className="fa-solid fa-file text-blue-300" />
+            <span className="min-w-0 flex-1 truncate">{file.fileName}</span>
+
+            <button
+              type="button"
+              onClick={async (e) => {
+                e.stopPropagation();
+
+                try {
+                  const response = await fetch(file.fileUrl);
+                  const blob = await response.blob();
+
+                  const url = window.URL.createObjectURL(blob);
+                  const link = document.createElement("a");
+
+                  link.href = url;
+                  link.download = file.fileName || "download";
+                  document.body.appendChild(link);
+                  link.click();
+
+                  link.remove();
+                  window.URL.revokeObjectURL(url);
+                } catch {
+                  window.open(file.fileUrl, "_blank");
+                }
+              }}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/10 text-blue-200 hover:bg-white/15"
+              title="Download"
+            >
+              <i className="fa-solid fa-download" />
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
                               if (typeof val === "boolean") {
                                 return (
                                   <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">

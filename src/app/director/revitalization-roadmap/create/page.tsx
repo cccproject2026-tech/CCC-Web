@@ -299,6 +299,10 @@ function CreateRoadmapStepOnePage() {
       setBannerFileError("Please choose a PNG, JPG, or other image file.");
       return;
     }
+    if (file.size > 5 * 1024 * 1024) {
+  setBannerFileError("Image size must be less than 5MB.");
+  return;
+}
     setBannerFileError("");
     setBannerFile(file);
     const next = URL.createObjectURL(file);
@@ -576,12 +580,14 @@ function CreateRoadmapStepOnePage() {
 
             {type === "Phase" && !isEditMode ? (
               <div>
-                <label className="mb-2 block text-sm font-medium text-white/90">Division of Phase</label>
+                <label className="mb-2 block text-sm font-medium text-white/90">
+  Division of Phase <span className="text-white/45">(add required divisions)</span>
+</label>
                 <div className="flex flex-wrap items-end gap-3">
                   <input
                     value={newDivision}
                     onChange={(e) => setNewDivision(e.target.value)}
-                    placeholder="None"
+                    placeholder="Church,Pastor..."
                     className={`${directorInputClass} flex-1 min-w-[220px]`}
                   />
                   <button
@@ -715,7 +721,9 @@ function CreateRoadmapStepOnePage() {
                     <span className="text-center text-sm text-white/80">
                       {bannerDragOver ? "Drop image here" : "Or click here to choose a file"}
                     </span>
-                    <span className="mt-1 text-xs text-white/45">PNG, JPG — optional</span>
+                    <span className="mt-1 text-xs text-white/45">
+  PNG, JPG, JPEG, WebP — max 5MB
+</span>
                   </label>
                 )}
               </div>

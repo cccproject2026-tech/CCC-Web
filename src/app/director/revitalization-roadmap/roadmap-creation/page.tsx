@@ -837,23 +837,36 @@ export default function DirectorRoadmapCreationPage() {
             subtitle={heroSubtitle}
             image={heroImageSrc}
             compact={!showReferenceHero}
-            topRight={
-              showReferenceHero ? (
-                <label
-                  htmlFor={roadmapType === "single" ? "phase-task-banner-single" : "phase-task-banner"}
-                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-white/35 bg-black/45 px-3 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-md transition hover:bg-black/60 sm:text-sm"
-                >
-                  <i className="fa-solid fa-camera text-[#8ec5eb]" aria-hidden />
-                  Change image
-                </label>
-              ) : undefined
-            }
+            // topRight={
+            //   showReferenceHero ? (
+            //     <label
+            //       htmlFor={roadmapType === "single" ? "phase-task-banner-single" : "phase-task-banner"}
+            //       className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-white/35 bg-black/45 px-3 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-md transition hover:bg-black/60 sm:text-sm"
+            //     >
+            //       <i className="fa-solid fa-camera text-[#8ec5eb]" aria-hidden />
+            //       Change image
+            //     </label>
+            //   ) : undefined
+            // }
             breadcrumbItems={[
               { label: "Home", href: "/director/home" },
               { label: "Revitalization Roadmap", href: "/director/revitalization-roadmap" },
               { label: isEditMode ? "Edit roadmap" : "Roadmap creation" },
             ]}
+            
+            
           />
+          {showReferenceHero ? (
+  <div className="relative -mt-20 mb-6 flex justify-end px-6 sm:px-10">
+    <label
+      htmlFor={roadmapType === "single" ? "phase-task-banner-single" : "phase-task-banner"}
+      className="z-[5] inline-flex cursor-pointer items-center gap-2 rounded-lg border border-white/35 bg-black/45 px-3 py-2 text-xs font-semibold text-white shadow-lg backdrop-blur-md transition hover:bg-black/60 sm:text-sm"
+    >
+      <i className="fa-solid fa-camera text-[#8ec5eb]" aria-hidden />
+      Change image
+    </label>
+  </div>
+) : null}
         </div>
       ) : null}
 
@@ -1022,11 +1035,11 @@ export default function DirectorRoadmapCreationPage() {
                   <>
                     {isEditMode && roadmapType === "phase" ? (
                       <div className="rounded-xl border border-[#8ec5eb]/20 bg-white/[0.04] p-4 sm:p-5">
-                        <p className="text-sm font-semibold text-white/95">Roadmap (main list)</p>
+                        {/* <p className="text-sm font-semibold text-white/95">Roadmap (main list)</p>
                         <p className="mt-1 text-xs leading-relaxed text-white/50">
                           Name and text on the revitalization library card — the container for all phases, not
                           the individual phase below.
-                        </p>
+                        </p> */}
                         <div className="mt-4 space-y-4">
                           <div>
                             <label className={directorLabelClass}>
@@ -1046,8 +1059,8 @@ export default function DirectorRoadmapCreationPage() {
                             />
                           </div>
                           <div>
-                            <label className={directorLabelClass}>Short description (library card)</label>
-                            <p className="mb-1.5 text-xs text-white/45">Optional; shown with the name on the main list.</p>
+                            <label className={directorLabelClass}>Description</label>
+                            {/* <p className="mb-1.5 text-xs text-white/45">Optional; shown with the name on the main list.</p> */}
                             <textarea
                               value={parentLibraryDescription}
                               onChange={(e) => setParentLibraryDescription(e.target.value)}
@@ -1110,11 +1123,12 @@ export default function DirectorRoadmapCreationPage() {
                         </div>
                       </>
                     ) : (
-                      <p className="text-sm leading-relaxed text-white/60">
-                        Edit this phase&rsquo;s <span className="text-white/85">name and description</span> in{" "}
-                        <span className="font-semibold text-white/90">Edit tasks</span> (task editor) — not on this
-                        page.
-                      </p>
+                      // <p className="text-sm leading-relaxed text-white/60">
+                      //   Edit this phase&rsquo;s <span className="text-white/85">name and description</span> in{" "}
+                      //   <span className="font-semibold text-white/90">Edit tasks</span> (task editor) — not on this
+                      //   page.
+                      // </p>
+                      null
                     )}
 
                     <div>
@@ -1135,9 +1149,20 @@ export default function DirectorRoadmapCreationPage() {
 
                     {roadmapType === "phase" ? (
                       <div>
-                        <label className={directorLabelClass} htmlFor="phase-division-input">
+                        {/* <label className={directorLabelClass} htmlFor="phase-division-input">
                           Division
-                        </label>
+                        </label> */}
+                        <label className={directorLabelClass} htmlFor="phase-division-input">
+  {isEditMode ? (
+    <>
+      Divisions <span className="text-white/45">(choose the required division)</span>
+    </>
+  ) : (
+    <>
+      Divisions of Phase <span className="text-white/45">(add required divisions)</span>
+    </>
+  )}
+</label>
                         <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-3">
                           <div className="min-w-0 flex-1">
                             <input
@@ -1278,8 +1303,28 @@ export default function DirectorRoadmapCreationPage() {
                   </>
                 )}
               </div>
+{showEditTasksShortcut ? (
+  <p className="mt-6 text-right text-xs leading-relaxed text-white/55">
+    Tip: To edit individual roadmap tasks, save your changes first, then click{" "}
+    <span className="font-semibold text-white/85">Edit tasks</span>.
+  </p>
+) : null}
+              {/* <div className="mt-8 flex flex-wrap justify-end gap-3 border-t border-white/10 pt-7 sm:mt-10"> */}
+              <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-7 sm:mt-10">
+  <div>
+    {showEditTasksShortcut ? (
+      <button
+        type="button"
+        onClick={roadmapType === "phase" ? goToPhaseList : goToTaskEditor}
+        className={`${directorBtnPrimary} !px-6 !py-3 !text-sm`}
+      >
+        <i className="fa-solid fa-list-check mr-2 text-sm" aria-hidden />
+        Edit tasks
+      </button>
+    ) : null}
+  </div>
 
-              <div className="mt-8 flex flex-wrap justify-end gap-3 border-t border-white/10 pt-7 sm:mt-10">
+  <div className="flex w-full flex-col-reverse gap-3 sm:w-auto sm:flex-row sm:justify-end"></div>
                 <div className="flex w-full flex-col-reverse gap-3 sm:w-auto sm:flex-row sm:justify-end">
                   <button
                     type="button"
@@ -1308,7 +1353,7 @@ export default function DirectorRoadmapCreationPage() {
             </div>
           </div>
 
-          {showEditTasksShortcut ? (
+          {/* {showEditTasksShortcut ? (
             <div className="mt-8 flex justify-center sm:mt-10">
               <button
                 type="button"
@@ -1319,7 +1364,7 @@ export default function DirectorRoadmapCreationPage() {
                 Edit tasks
               </button>
             </div>
-          ) : null}
+          ) : null} */}
         </div>
       </main>
 

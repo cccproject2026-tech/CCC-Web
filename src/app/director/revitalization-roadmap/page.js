@@ -221,6 +221,65 @@ function extractRoadmapCreatedAtRaw(item) {
   return raw;
 }
 
+function extractRoadmapDueDateRaw(item) {
+  if (!item || typeof item !== "object") return null;
+
+  const raw =
+    item.endDate ??
+    item.end_date ??
+    item.dueDate ??
+    item.due_date ??
+    item.dueOn ??
+    item.due_on ??
+    item.deadline ??
+    item.targetDate ??
+    item.target_date;
+
+  if (raw == null || raw === "") return null;
+  return raw;
+}
+
+function progressNestedRows(rm) {
+  const raw = rm?.nestedRoadmaps;
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === "object" && Array.isArray(raw.items)) return raw.items;
+  return [];
+}
+
+function isProgressRowCompleted(row) {
+  if (!row || typeof row !== "object") return false;
+
+  const status = String(row.status || "")
+    .toLowerCase()
+    .replace(/_/g, " ")
+    .trim();
+
+  const progressPercentage = Number(row.progressPercentage || 0);
+  const totalSteps = Number(row.totalSteps || 0);
+  const completedSteps = Number(row.completedSteps || 0);
+
+  if (status.includes("complete")) return true;
+  if (progressPercentage >= 100) return true;
+  if (totalSteps > 0 && completedSteps >= totalSteps) return true;
+
+  return false;
+}
+
+function getProgressTaskStats(progressRoadmap) {
+  const nested = progressNestedRows(progressRoadmap);
+
+  if (nested.length > 0) {
+    return {
+      total: nested.length,
+      completed: nested.filter(isProgressRowCompleted).length,
+    };
+  }
+
+  return {
+    total: isProgressRowCompleted(progressRoadmap) ? 1 : 0,
+    completed: isProgressRowCompleted(progressRoadmap) ? 1 : 0,
+  };
+}
 /** Creator display name + avatar from populated user, string name fields, or snake_case API. */
 function extractRoadmapCreator(item) {
   if (!item || typeof item !== "object") return { name: "", avatar: null };
@@ -370,13 +429,17 @@ export default function RevitalizationRoadmapPage() {
   const [metricsByRoadmapId, setMetricsByRoadmapId] = useState({});
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [filterPastorId, setFilterPastorId] = useState("all");
+  const [selectedPastorModalId, setSelectedPastorModalId] = useState(null);
   const [rearrangeMode, setRearrangeMode] = useState(false);
+
+  const [selectMode, setSelectMode] = useState(false);
+const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
   const [orderedIds, setOrderedIds] = useState([]);
   const [dragId, setDragId] = useState(null);
   const [roadmapFetchError, setRoadmapFetchError] = useState("");
   const [pastorFetchError, setPastorFetchError] = useState("");
   /** Created-date ordering. */
-  const [sortCreated, setSortCreated] = useState("newest");
+  const [sortCreated, setSortCreated] = useState("oldest");
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [sortMenuPos, setSortMenuPos] = useState({ top: 0, left: 0 });
   const [browserMounted, setBrowserMounted] = useState(false);
@@ -435,10 +498,12 @@ export default function RevitalizationRoadmapPage() {
           const description = desc || "No description yet";
           const completionTime =
             (nested0 && String(nested0.duration || "").trim()) || String(item.duration || "").trim() || "—";
-          const img = (nested0 && nested0.imageUrl) || item.imageUrl || Card1;
+          // const img = (nested0 && nested0.imageUrl) || item.imageUrl || Card1;
+          const img = item.imageUrl || Card1;
           const rid = stringifyRoadmapId(item._id ?? item.id);
           const createdRaw = extractRoadmapCreatedAtRaw(item);
           const createdAt = createdRaw;
+          const dueDate = extractRoadmapDueDateRaw(item) || extractRoadmapDueDateRaw(nested0);
           const updatedAt = item.updatedAt ?? item.updated_at;
           const { name: createdBy, avatar: createdByAvatar } = extractRoadmapCreator(item);
           return {
@@ -450,6 +515,7 @@ export default function RevitalizationRoadmapPage() {
             raw: item,
             nested0,
             createdAt,
+            dueDate,
             updatedAt,
             createdBy,
             createdByAvatar,
@@ -549,7 +615,8 @@ export default function RevitalizationRoadmapPage() {
       const ids = pastorRows.map((row) => extractUserIdFromOverallProgressRow(row)).filter(Boolean);
 
       const aggregate = {};
-      const bump = (rid, userId, pct, status) => {
+      // const bump = (rid, userId, pct, status) => {
+        const bump = (rid, userId, pct, status, taskStats) => {
         if (!rid || !userId) return;
         const uid = String(userId).trim();
         if (!uid) return;
@@ -559,6 +626,7 @@ export default function RevitalizationRoadmapPage() {
           progressN: 0,
           statuses: [],
           sampleAvatarUrls: [],
+          taskStatsByUserId: {},
         };
         cur.assignedUserIds.add(uid);
         if (typeof pct === "number" && !Number.isNaN(pct)) {
@@ -568,6 +636,9 @@ export default function RevitalizationRoadmapPage() {
         if (status) cur.statuses.push(normLower(status));
         const av = avatarByUserId.get(userId);
         if (av && cur.sampleAvatarUrls.length < 6) cur.sampleAvatarUrls.push(av);
+        if (taskStats) {
+  cur.taskStatsByUserId[uid] = taskStats;
+}
         aggregate[rid] = cur;
       };
 
@@ -579,12 +650,19 @@ export default function RevitalizationRoadmapPage() {
           for (const rm of pr.roadmaps) {
             const rid = stringifyRoadmapId(rm.roadMapId ?? rm.roadmapId ?? rm._id);
             if (!rid) continue;
+            // bump(
+            //   rid,
+            //   userId,
+            //   typeof rm.progressPercentage === "number" ? rm.progressPercentage : Number(rm.progressPercentage),
+            //   rm.status,
+            // );
             bump(
-              rid,
-              userId,
-              typeof rm.progressPercentage === "number" ? rm.progressPercentage : Number(rm.progressPercentage),
-              rm.status,
-            );
+  rid,
+  userId,
+  typeof rm.progressPercentage === "number" ? rm.progressPercentage : Number(rm.progressPercentage),
+  rm.status,
+  getProgressTaskStats(rm),
+);
           }
           return true;
         } catch (e) {
@@ -599,12 +677,19 @@ export default function RevitalizationRoadmapPage() {
       for (const [rid, cur] of Object.entries(aggregate)) {
         const nAssign = cur.assignedUserIds.size;
         const avg = cur.progressN > 0 ? Math.round(cur.progressSum / cur.progressN) : 0;
+        // out[rid] = {
+        //   assignedCount: nAssign,
+        //   avgProgress: avg,
+        //   sampleAvatarUrls: cur.sampleAvatarUrls,
+        //   assignedUserIds: cur.assignedUserIds,
+        // };
         out[rid] = {
-          assignedCount: nAssign,
-          avgProgress: avg,
-          sampleAvatarUrls: cur.sampleAvatarUrls,
-          assignedUserIds: cur.assignedUserIds,
-        };
+  assignedCount: nAssign,
+  avgProgress: avg,
+  sampleAvatarUrls: cur.sampleAvatarUrls,
+  assignedUserIds: cur.assignedUserIds,
+  taskStatsByUserId: cur.taskStatsByUserId,
+};
       }
       setMetricsByRoadmapId(out);
       setLoadingMetrics(false);
@@ -664,10 +749,20 @@ export default function RevitalizationRoadmapPage() {
     const roadmapId = row?.id;
     if (!roadmapId) return;
 
+    // if (isPhaseLibrary) {
+    //   router.push(`/director/revitalization-roadmap/phase-list?roadmapId=${encodeURIComponent(roadmapId)}`);
+    //   return;
+    // }
     if (isPhaseLibrary) {
-      router.push(`/director/revitalization-roadmap/phase-list?roadmapId=${encodeURIComponent(roadmapId)}`);
-      return;
-    }
+  const isPastorSelected = filterPastorId !== "all";
+
+  router.push(
+    `/director/revitalization-roadmap/phase-list?roadmapId=${encodeURIComponent(roadmapId)}${
+      isPastorSelected ? "&pastorView=true" : ""
+    }`
+  );
+  return;
+}
 
     const firstNested = roadmapChildrenList(rm)[0] || null;
     const nestedId = firstNested?._id != null ? String(firstNested._id) : "";
@@ -770,7 +865,8 @@ export default function RevitalizationRoadmapPage() {
       }
     }
 
-    if (filterPastorId !== "all") {
+    // if (filterPastorId !== "all") {
+    if (false) {
       rows = rows.filter((r) => {
         const m = metricsByRoadmapId[r.id];
         const set = m?.assignedUserIds;
@@ -813,8 +909,8 @@ export default function RevitalizationRoadmapPage() {
 
   const totalPages = Math.max(1, Math.ceil(filteredLibrary.length / PAGE_SIZE));
   const clampedPage = Math.min(Math.max(1, libraryPage), totalPages);
-  const pagedLibrary = filteredLibrary.slice((clampedPage - 1) * PAGE_SIZE, clampedPage * PAGE_SIZE);
-
+  // const pagedLibrary = filteredLibrary.slice((clampedPage - 1) * PAGE_SIZE, clampedPage * PAGE_SIZE);
+const pagedLibrary = filteredLibrary;
   useEffect(() => {
     setLibraryPage(1);
   }, [searchQuery, debouncedSearch, filterPastorId, sortCreated]);
@@ -879,7 +975,27 @@ export default function RevitalizationRoadmapPage() {
     }
     return out;
   }, [totalPages, clampedPage]);
+const selectedPastorRoadmaps =
+  selectedPastorModalId == null
+    ? []
+    : orderedLibrary.filter((r) => {
+        const m = metricsByRoadmapId[r.id];
+        const set = m?.assignedUserIds;
+        return set && typeof set.has === "function"
+          ? set.has(String(selectedPastorModalId))
+          : false;
+      });
 
+const selectedPastorNameForModal = (() => {
+  if (selectedPastorModalId == null) return "";
+
+  const hit = pastorsForCarousel.find(
+    (p, idx) =>
+      String(pastorCarouselRowKey(p, idx)) === String(selectedPastorModalId)
+  );
+
+  return hit ? pastorRowDisplayName(hit) : "Pastor";
+})();
   return (
     <div className={directorPageRoot}>
       <DirectorHero
@@ -950,63 +1066,641 @@ export default function RevitalizationRoadmapPage() {
                 </div>,
                 document.body,
               )}
+<div className={`${directorGlassCard} mb-8 overflow-visible p-4 sm:p-6`}>
+  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+    <div className="min-w-0 w-full lg:max-w-xl lg:flex-1">
+      <SearchBar
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder="Search pastors or roadmap titles…"
+        variant="dark"
+        className="w-full"
+      />
+    </div>
+    <button
+  type="button"
+  onClick={() => router.push("/director/revitalization-roadmap/create")}
+  className={`${directorBtnPrimary} !px-4 !py-2.5 !text-[13px]`}
+>
+  <i className="fa-solid fa-plus text-sm" />
+  <span>New Roadmap</span>
+</button>
+  </div>
 
-          <div className={`${directorGlassCard} mb-8 overflow-visible p-4 sm:p-6`}>
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
-              <div className="min-w-0 w-full lg:max-w-xl lg:flex-1">
-                <SearchBar
-                  value={searchQuery}
-                  onChange={setSearchQuery}
-                  placeholder="Search pastors or roadmap titles…"
-                  variant="dark"
-                  className="w-full"
-                />
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <div className="relative shrink-0">
-                  <button
-                    ref={sortTriggerRef}
-                    type="button"
-                    className={glassTrigger}
-                    aria-expanded={showSortMenu}
-                    aria-haspopup="dialog"
-                    onClick={() => setShowSortMenu((v) => !v)}
-                  >
-                    <span>Sort by</span>
-                    <i className={`fa-solid fa-chevron-${showSortMenu ? "up" : "down"} text-xs text-white/60`} />
-                  </button>
-                </div>
+  <div className="mt-5 border-t border-white/10 pt-5" aria-hidden />
 
-                <button
-                  type="button"
-                  onClick={() => setRearrangeMode((v) => !v)}
-                  className={`${directorBtnSecondary} !px-4 !py-2.5 !text-[13px]`}
-                  title="Rearrange cards"
-                >
-                  <i className="fa-solid fa-table-cells-large text-sm" aria-hidden />
-                  <span>Rearrange</span>
-                </button>
+  <div className="pt-1">
+    <div className="relative px-4 py-5">
+      <div className="relative flex items-center gap-3">
+        <button
+          type="button"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[#8ec5eb] shadow-sm transition hover:bg-white/15"
+          aria-label="Scroll pastors left"
+          onClick={() => scrollPastors(-280)}
+        >
+          <i className="fa-solid fa-chevron-left text-sm" />
+        </button>
 
-                <button
-                  type="button"
-                  onClick={() => router.push("/director/revitalization-roadmap/create")}
-                  className={`${directorBtnPrimary} !px-4 !py-2.5 !text-[13px]`}
-                >
-                  <i className="fa-solid fa-plus text-sm" />
-                  <span>New Roadmap</span>
-                </button>
-              </div>
+        <div
+          ref={pastorScrollRef}
+          className="scrollbar-hide flex flex-1 gap-7 overflow-x-auto pb-1 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {loadingPastors ? (
+            <div className="flex min-h-[120px] flex-1 items-center justify-center py-4">
+              <div className={directorSpinner} />
             </div>
+          ) : pastorsForCarousel.length === 0 ? (
+            <div className="flex min-h-[120px] flex-1 flex-col items-center justify-center gap-1 px-4 py-6 text-center text-sm text-white/60">
+              <p>{normLower(debouncedSearch) ? "No pastors match your search." : "No pastors yet."}</p>
+            </div>
+          ) : (
+            pastorsForCarousel.map((p, idx) => {
+              const pid = pastorCarouselRowKey(p, idx);
+              const img =
+                String(p.profilePicture || "").trim() || getInitialsAvatar(p.firstName, p.lastName, "Pastor");
+              const name = pastorRowDisplayName(p);
+              const selected = filterPastorId !== "all" && String(filterPastorId) === String(pid);
 
-            <div className="mt-5 border-t border-white/10 pt-5" aria-hidden />
+              return (
+                <button
+                  key={`${pid}-${idx}`}
+                  type="button"
+                  onClick={() => {
+                    setSelectedPastorModalId(pid);
+                    setFilterPastorId(pid);
+                  }}
+                  className={`group flex shrink-0 flex-col items-center px-2 py-1 text-center transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3498DB]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a1128] ${
+                    selected ? "opacity-100" : "opacity-[0.82] hover:opacity-100"
+                  }`}
+                  aria-pressed={selected}
+                >
+                  <div
+                    className={`relative mb-2 h-[60px] w-[60px] shrink-0 transition-transform duration-200 ease-out sm:h-[72px] sm:w-[72px] ${
+                      selected ? "z-[1] scale-[1.05]" : "scale-100"
+                    }`}
+                  >
+                    <div
+                      className={`box-border h-full w-full rounded-full transition-all duration-200 ${
+                        selected
+                          ? "bg-gradient-to-b from-[#5dade2] to-[#2874a6] p-[3px] shadow-[0_0_0_1px_rgba(255,255,255,0.2),0_8px_28px_rgba(52,152,219,0.42)]"
+                          : "bg-white/[0.06] p-[2px] ring-1 ring-white/[0.14] hover:bg-white/[0.1] hover:ring-white/25"
+                      }`}
+                    >
+                      <div
+                        className={`relative h-full w-full min-h-0 overflow-hidden rounded-full bg-[#041f35] ${
+                          selected ? "ring-2 ring-[#0a1128]/90" : "ring-1 ring-black/40"
+                        }`}
+                      >
+                        <Image
+                          src={img}
+                          alt=""
+                          fill
+                          className={`object-cover transition-[filter,opacity] duration-200 ${
+                            selected ? "brightness-[1.02] saturate-[1.06]" : "brightness-[0.96] saturate-[0.92]"
+                          }`}
+                          sizes="(max-width: 640px) 72px, 88px"
+                          unoptimized={typeof img === "string" && (img.startsWith("blob:") || isRemoteImageSrc(img))}
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-            <div className="mb-4">
+                  <span
+                    className={`max-w-[130px] truncate text-[13px] transition-all duration-200 ${
+                      selected
+                        ? "font-semibold text-[#aed6f1] underline decoration-[#3498DB] decoration-2 underline-offset-4"
+                        : "font-medium text-white/65 group-hover:text-white/85"
+                    }`}
+                  >
+                    {name}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <button
+          type="button"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[#8ec5eb] shadow-sm transition hover:bg-white/15"
+          aria-label="Scroll pastors right"
+          onClick={() => scrollPastors(280)}
+        >
+          <i className="fa-solid fa-chevron-right text-sm" />
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+          <div className="mb-5 mt-2 flex items-center justify-between gap-3">
+  <h2 className="text-lg font-semibold tracking-tight text-white sm:text-xl">
+    {filterPastorId === "all"
+      ? "All roadmaps"
+      : selectedPastorHeading
+        ? `${selectedPastorHeading}'s roadmap`
+        : "Pastor's roadmap"}
+  </h2>
+
+  <div className="flex flex-wrap items-center justify-end gap-2">
+    <button
+  type="button"
+  onClick={() => {
+    setSelectMode((v) => !v);
+    setSelectedRoadmapIds([]);
+  }}
+  className={`${directorBtnSecondary} !px-4 !py-2.5 !text-[13px]`}
+>
+  <i className="fa-regular fa-square-check text-sm" />
+  <span>{selectMode ? "Cancel Select" : "Select"}</span>
+</button>
+    <button
+      type="button"
+      onClick={() => setRearrangeMode((v) => !v)}
+      className={`${directorBtnSecondary} !px-4 !py-2.5 !text-[13px]`}
+      title="Rearrange cards"
+    >
+      <i className="fa-solid fa-table-cells-large text-sm" aria-hidden />
+      <span>Rearrange</span>
+    </button>
+
+    {/* <button
+      type="button"
+      onClick={() => router.push("/director/revitalization-roadmap/create")}
+      className={`${directorBtnPrimary} !px-4 !py-2.5 !text-[13px]`}
+    >
+      <i className="fa-solid fa-plus text-sm" />
+      <span>New Roadmap</span>
+    </button> */}
+  </div>
+</div>
+{selectMode && selectedRoadmapIds.length > 0 ? (
+  <div className="mb-5 flex justify-end gap-2">
+    <button
+      type="button"
+      onClick={() => {
+        const firstSelected = roadmapLibrary.find(
+          (r) => r.id === selectedRoadmapIds[0]
+        );
+
+        if (firstSelected) {
+          setAssignModalRoadmap({
+            id: firstSelected.id,
+            name: firstSelected.title || "Roadmap",
+          });
+        }
+      }}
+      className={`${directorBtnPrimary} !px-4 !py-2.5 !text-[13px]`}
+    >
+      Assign selected
+    </button>
+
+    <button
+      type="button"
+      onClick={async () => {
+        for (const id of selectedRoadmapIds) {
+          await handleDeleteRoadmap(id);
+        }
+
+        setSelectedRoadmapIds([]);
+        setSelectMode(false);
+      }}
+      className={`${directorBtnSecondary} !px-4 !py-2.5 !text-[13px]`}
+    >
+      Delete selected
+    </button>
+  </div>
+) : null}
+          {loadingRoadmaps ? (
+            <div className="flex justify-center py-20">
+              <div className={directorSpinner} />
+            </div>
+          ) : (
+            <>
+              {pagedLibrary.length === 0 ? (
+                <div className={`${directorGlassCard} px-5 py-14 text-center text-sm text-white/65`}>
+                  {roadmapLibrary.length === 0 ? (
+                    "No roadmaps yet. Create one with New Roadmap."
+                  ) : filterPastorId !== "all" && (loadingMetrics || loadingPastors) ? (
+                    <span>Loading roadmaps for this pastor…</span>
+                  ) : (
+                    "No roadmaps match your search or pastor filter."
+                  )}
+                </div>
+              ) : (
+                // <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                  {/* {pagedLibrary.map((roadmap) => { */}
+                  {pagedLibrary.map((roadmap, index) => {
+                    const imgRaw = roadmap?.img;
+                    const thumb =
+                      typeof imgRaw === "string" ? resolveApiMediaUrl(imgRaw) || imgRaw : imgRaw || Card1;
+                    const created = parseDate(roadmap.createdAt);
+                    // const creatorPic = roadmap.createdByAvatar;
+                    // const creatorFallback = Mentor1;
+                    const isPastorSelected = filterPastorId !== "all";
+// const due = parseDate(roadmap.dueDate);
+// const roadmapMetrics = metricsByRoadmapId[roadmap.id];
+// const progressPercent = Math.max(
+//   0,
+//   Math.min(100, Number(roadmapMetrics?.avgProgress || 0)),
+// );
+// const completedText =
+//   progressPercent > 0 ? `${progressPercent}% completed` : "0% completed";
+const due = parseDate(roadmap.dueDate);
+const roadmapMetrics = metricsByRoadmapId[roadmap.id];
+
+const selectedTaskStats =
+  roadmapMetrics?.taskStatsByUserId?.[String(filterPastorId)] || null;
+
+const roadmapTaskCount = roadmapChildrenList(roadmap.raw).length;
+const totalTasks = selectedTaskStats?.total || roadmapTaskCount || 0;
+const completedTasks = selectedTaskStats?.completed || 0;
+
+const progressPercent =
+  totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+const completedText =
+  totalTasks > 0
+    ? `${completedTasks}/${totalTasks} tasks completed`
+    : "0 tasks completed";
+                    const creatorPic = roadmap.createdByAvatar;
+const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director");
+
+// const selectedPastorRoadmaps =
+//   selectedPastorModalId == null
+//     ? []
+//     : orderedLibrary.filter((r) => {
+//         const m = metricsByRoadmapId[r.id];
+//         const set = m?.assignedUserIds;
+//         return set && typeof set.has === "function"
+//           ? set.has(String(selectedPastorModalId))
+//           : false;
+//       });
+
+// const selectedPastorNameForModal = (() => {
+//   if (selectedPastorModalId == null) return "";
+//   const hit = pastorsForCarousel.find((p, idx) => String(pastorCarouselRowKey(p, idx)) === String(selectedPastorModalId));
+//   return hit ? pastorRowDisplayName(hit) : "Pastor";
+// })();
+                    return (
+                      <div
+                        key={roadmap.id}
+                        draggable={rearrangeMode}
+                        onDragStart={(e) => handleDragStart(e, roadmap.id)}
+                        onDragOver={handleDragOver}
+                        onDrop={(e) => handleDropOn(e, roadmap.id)}
+                        className={`${directorGlassCard} flex min-h-[148px] overflow-hidden ${
+                          rearrangeMode ? "cursor-grab ring-1 ring-[#3498DB]/40" : ""
+                        }`}
+                      >
+                        {/* <div className="relative w-[120px] shrink-0 self-stretch sm:w-[140px]">
+                          <Image
+                            src={thumb}
+                            alt=""
+                            fill
+                            className="object-cover"
+                            sizes="140px"
+                            unoptimized={
+                              typeof thumb === "string" &&
+                              (thumb.startsWith("blob:") || isRemoteImageSrc(thumb))
+                            }
+                          />
+                        </div> */}
+                        <div className="relative w-[120px] shrink-0 self-stretch sm:w-[140px]">
+                          {selectMode ? (
+  <label className="absolute left-3 top-3 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg border border-white/25 bg-black/45 backdrop-blur">
+    <input
+      type="checkbox"
+      checked={selectedRoadmapIds.includes(roadmap.id)}
+      onChange={(e) => {
+        setSelectedRoadmapIds((prev) =>
+          e.target.checked
+            ? [...prev, roadmap.id]
+            : prev.filter((id) => id !== roadmap.id)
+        );
+      }}
+      className="h-4 w-4 accent-[#3498DB]"
+    />
+  </label>
+) : null}
+  <Image
+    src={thumb}
+    alt=""
+    fill
+    className="object-cover"
+    sizes="140px"
+    unoptimized={
+      typeof thumb === "string" &&
+      (thumb.startsWith("blob:") || isRemoteImageSrc(thumb))
+    }
+  />
+
+{index > 0 && index <= 3 ? (
+  <span className="absolute bottom-3 left-3 rounded-full bg-yellow-400 px-3 py-1 text-[11px] font-bold text-[#1f2937] shadow-lg">
+    Phase {index}
+  </span>
+) : null}
+</div>
+                        <div className="flex min-w-0 flex-1 flex-col justify-between p-4 sm:p-5">
+                          <div className="min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex min-w-0 items-center gap-2">
+                                <h3 className="truncate text-base font-bold text-white sm:text-lg">{roadmap.title}</h3>
+                              </div>
+                              <div className="relative roadmap-options-menu shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setShowOptionsMenu(showOptionsMenu === roadmap.id ? null : roadmap.id)
+                                  }
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/85 transition hover:bg-white/10"
+                                  aria-label="More options"
+                                >
+                                  <i className="fa-solid fa-ellipsis-vertical" aria-hidden />
+                                </button>
+                                {showOptionsMenu === roadmap.id ? (
+                                  <div className="absolute right-0 z-[120] mt-2 min-w-[11rem] rounded-xl border border-white/15 bg-[#041f35]/98 py-2 shadow-2xl backdrop-blur-xl">
+                                    {/* <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowOptionsMenu(null);
+                                        setAssignModalRoadmap({
+                                          id: roadmap.id,
+                                          name: roadmap.title || "Roadmap",
+                                        });
+                                      }}
+                                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-white/90 hover:bg-white/10"
+                                    >
+                                      <i className="fa-solid fa-user-plus text-[#3498DB]" aria-hidden />
+                                      Assign to
+                                    </button> */}
+                                    {filterPastorId === "all" && (
+  <button
+    type="button"
+    onClick={() => {
+      setShowOptionsMenu(null);
+      setAssignModalRoadmap({
+        id: roadmap.id,
+        name: roadmap.title || "Roadmap",
+      });
+    }}
+    className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-white/90 hover:bg-white/10"
+  >
+    <i className="fa-solid fa-user-plus text-[#3498DB]" aria-hidden />
+    Assign to
+  </button>
+)}
+                                    {/* <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowOptionsMenu(null);
+                                        openRoadmapEdit(roadmap);
+                                      }}
+                                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-white/90 hover:bg-white/10"
+                                    >
+                                      <i className="fa-regular fa-pen-to-square text-[#3498DB]" aria-hidden />
+                                      Edit
+                                    </button> */}
+                                    {/* <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowOptionsMenu(null);
+                                        openRoadmapView(roadmap);
+                                      }}
+                                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-white/90 hover:bg-white/10"
+                                    >
+                                      <i className="fa-regular fa-eye text-[#3498DB]" aria-hidden />
+                                      View
+                                    </button> */}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowOptionsMenu(null);
+                                        handleDeleteRoadmap(roadmap.id);
+                                      }}
+                                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-red-200 hover:bg-red-500/10"
+                                    >
+                                      <i className="fa-solid fa-trash" aria-hidden />
+                                      Delete
+                                    </button>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/65">{roadmap.description}</p>
+                          </div>
+{/* 
+                          <div className="mt-4 grid grid-cols-1 gap-3 border-t border-white/10 pt-3 text-xs text-white/55 sm:grid-cols-3">
+                            <div className="flex flex-col gap-1">
+                              <span className="inline-flex items-center gap-1.5 font-semibold text-white/70">
+                                <i className="fa-regular fa-calendar text-[#3498DB]" aria-hidden />
+                                Created on
+                              </span>
+                              <span className="pl-5 text-[13px] text-white/90">{formatShortDate(created) || "—"}</span>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <span className="inline-flex items-center gap-1.5 font-semibold text-white/70">
+                                <i className="fa-regular fa-user text-[#3498DB]" aria-hidden />
+                                Created by
+                              </span>
+                              <span className="flex items-center gap-2 pl-5 text-[13px] text-white/90">
+                                <span className="relative inline-block h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-white/20">
+                                  <Image
+                                    // src={creatorPic || creatorFallback}
+                                    src={creatorPic || creatorInitials}
+                                    alt=""
+                                    fill
+                                    className="object-cover"
+                                    sizes="28px"
+                                    unoptimized={
+                                      typeof creatorPic === "string" && creatorPic ? isRemoteImageSrc(creatorPic) : false
+                                    }
+                                  />
+                                </span>
+                                <span className="min-w-0 truncate">{roadmap.createdBy || "—"}</span>
+                              </span>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                              <span className="inline-flex items-center gap-1.5 font-semibold text-white/70">
+                                <i className="fa-regular fa-clock text-[#3498DB]" aria-hidden />
+                                Completion time
+                              </span>
+                              <span className="pl-5 text-[13px] text-white/90">{roadmap.completionTime}</span>
+                            </div>
+                          </div> */}
+
+                          <div className="mt-4 grid grid-cols-1 gap-3 border-t border-white/10 pt-3 text-xs text-white/55 sm:grid-cols-3">
+  {isPastorSelected ? (
+    <>
+      <div className="flex flex-col gap-1">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-white/70">
+          <i className="fa-regular fa-calendar-check text-[#3498DB]" aria-hidden />
+          Due on
+        </span>
+        <span className="pl-5 text-[13px] text-white/90">
+          {formatShortDate(due) || "—"}
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-1 sm:col-span-1">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-white/70">
+          <i className="fa-solid fa-list-check text-[#3498DB]" aria-hidden />
+          Tasks completed
+        </span>
+        <div className="pl-5">
+          <div className="mb-1 text-[13px] font-semibold text-white/90">
+            {completedText}
+          </div>
+          <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+            <div
+              className="h-full rounded-full bg-[#3498DB] transition-all"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    </>
+  ) : (
+    <>
+      <div className="flex flex-col gap-1">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-white/70">
+          <i className="fa-regular fa-calendar text-[#3498DB]" aria-hidden />
+          Created on
+        </span>
+        <span className="pl-5 text-[13px] text-white/90">
+          {formatShortDate(created) || "—"}
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="inline-flex items-center gap-1.5 font-semibold text-white/70">
+          <i className="fa-regular fa-user text-[#3498DB]" aria-hidden />
+          Created by
+        </span>
+        <span className="flex items-center gap-2 pl-5 text-[13px] text-white/90">
+          <span className="relative inline-block h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-white/20">
+            <Image
+              src={creatorPic || creatorInitials}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="28px"
+              unoptimized={
+                typeof creatorPic === "string" && creatorPic
+                  ? isRemoteImageSrc(creatorPic)
+                  : false
+              }
+            />
+          </span>
+          <span className="min-w-0 truncate">{roadmap.createdBy || "—"}</span>
+        </span>
+      </div>
+    </>
+  )}
+
+  <div className="flex flex-col gap-1">
+    <span className="inline-flex items-center gap-1.5 font-semibold text-white/70">
+      <i className="fa-regular fa-clock text-[#3498DB]" aria-hidden />
+      Completion time
+    </span>
+    <span className="pl-5 text-[13px] text-white/90">
+      {roadmap.completionTime}
+    </span>
+  </div>
+</div>
+                          <div className="mt-4 flex flex-wrap justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => openRoadmapView(roadmap)}
+                              className="inline-flex items-center rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/18 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#3498DB]/28"
+                            >
+                              View
+                            </button>
+                            {/* <button
+                              type="button"
+                              onClick={() => openRoadmapEdit(roadmap)}
+                              className="inline-flex items-center rounded-lg border border-white/25 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/15"
+                            >
+                              Edit
+                            </button> */}
+                            {!isPastorSelected && (
+  <button
+    type="button"
+    onClick={() => openRoadmapEdit(roadmap)}
+    className="inline-flex items-center rounded-lg border border-white/25 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/15"
+  >
+    Edit
+  </button>
+)}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* {filteredLibrary.length > 0 ? (
+                <div className="mt-10 flex flex-col items-center gap-4 border-t border-white/10 pt-6">
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setLibraryPage((p) => Math.max(1, p - 1))}
+                      disabled={clampedPage <= 1}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/85 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
+                      aria-label="Previous page"
+                    >
+                      <i className="fa-solid fa-chevron-left text-sm" />
+                    </button>
+                    {paginationNumbers.map((item, idx) =>
+                      item === "ellipsis" ? (
+                        <span key={`e-${idx}`} className="px-2 text-white/45">
+                          …
+                        </span>
+                      ) : (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => setLibraryPage(item)}
+                          className={`min-w-[40px] rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                            clampedPage === item
+                              ? "border border-[#3498DB]/45 bg-[#3498DB]/25 text-white shadow-inner"
+                              : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
+                          }`}
+                        >
+                          {item}
+                        </button>
+                      ),
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setLibraryPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={clampedPage >= totalPages}
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/85 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
+                      aria-label="Next page"
+                    >
+                      <i className="fa-solid fa-chevron-right text-sm" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-white/45">
+                    Showing {(clampedPage - 1) * PAGE_SIZE + 1}–
+                    {Math.min(clampedPage * PAGE_SIZE, filteredLibrary.length)} of {filteredLibrary.length}
+                  </p>
+                </div>
+              ) : null} */}
+{/* <div className="mb-4">
               <p className="text-[15px] font-medium text-white/90">
                 Select a pastor below to view their assigned roadmap.
               </p>
             </div>
 
-            <div className="rounded-xl bg-[radial-gradient(ellipse_85%_85%_at_50%_36%,rgba(52,152,219,0.16),transparent_62%)] px-1 py-4 sm:px-2 sm:py-5">
+            <div className="rounded-xl bg-[radial-gradient(ellipse_85%_85%_at_50%_36%,rgba(52,152,219,0.16),transparent_62%)] px-1 py-4 sm:px-2 sm:py-5"> */}
+            {/* <div className="mt-10 border-t border-white/10 pt-7">
+  <p className="mb-5 text-sm font-semibold text-white/80">
+    Select a pastor to view their assigned roadmaps.
+  </p>
+
+ <div className="relative rounded-2xl bg-white/[0.025] px-4 py-5">
               <div className="relative flex items-center gap-3">
                 <button
                   type="button"
@@ -1039,7 +1733,11 @@ export default function RevitalizationRoadmapPage() {
                         <button
                           key={`${pid}-${idx}`}
                           type="button"
-                          onClick={() => setFilterPastorId((prev) => (String(prev) === String(pid) ? "all" : pid))}
+                          // onClick={() => setFilterPastorId((prev) => (String(prev) === String(pid) ? "all" : pid))}
+                          onClick={() => {
+  setSelectedPastorModalId(pid);
+  setFilterPastorId(pid);
+}}
                           className={`group flex shrink-0 flex-col items-center px-2 py-1 text-center transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3498DB]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a1128] ${
                             selected
                               ? "opacity-100"
@@ -1048,7 +1746,7 @@ export default function RevitalizationRoadmapPage() {
                           aria-pressed={selected}
                         >
                           <div
-                            className={`relative mb-2 h-[72px] w-[72px] shrink-0 sm:h-[88px] sm:w-[88px] transition-transform duration-200 ease-out ${
+                            className={`relative mb-2 h-[60px] w-[60px] shrink-0 sm:h-[72px] sm:w-[72px] transition-transform duration-200 ease-out ${
                               selected ? "z-[1] scale-[1.05]" : "scale-100"
                             }`}
                           >
@@ -1105,252 +1803,7 @@ export default function RevitalizationRoadmapPage() {
                 </button>
               </div>
             </div>
-          </div>
-
-          <div className="mb-5 mt-2">
-            <h2 className="text-lg font-semibold tracking-tight text-white sm:text-xl">
-              {filterPastorId === "all"
-                ? "All roadmaps"
-                : selectedPastorHeading
-                  ? `${selectedPastorHeading}'s roadmap`
-                  : "Pastor's roadmap"}
-            </h2>
-          </div>
-
-          {loadingRoadmaps ? (
-            <div className="flex justify-center py-20">
-              <div className={directorSpinner} />
-            </div>
-          ) : (
-            <>
-              {pagedLibrary.length === 0 ? (
-                <div className={`${directorGlassCard} px-5 py-14 text-center text-sm text-white/65`}>
-                  {roadmapLibrary.length === 0 ? (
-                    "No roadmaps yet. Create one with New Roadmap."
-                  ) : filterPastorId !== "all" && (loadingMetrics || loadingPastors) ? (
-                    <span>Loading roadmaps for this pastor…</span>
-                  ) : (
-                    "No roadmaps match your search or pastor filter."
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                  {pagedLibrary.map((roadmap) => {
-                    const imgRaw = roadmap?.img;
-                    const thumb =
-                      typeof imgRaw === "string" ? resolveApiMediaUrl(imgRaw) || imgRaw : imgRaw || Card1;
-                    const created = parseDate(roadmap.createdAt);
-                    // const creatorPic = roadmap.createdByAvatar;
-                    // const creatorFallback = Mentor1;
-                    const creatorPic = roadmap.createdByAvatar;
-const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director");
-                    return (
-                      <div
-                        key={roadmap.id}
-                        draggable={rearrangeMode}
-                        onDragStart={(e) => handleDragStart(e, roadmap.id)}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDropOn(e, roadmap.id)}
-                        className={`${directorGlassCard} flex min-h-[148px] overflow-hidden ${
-                          rearrangeMode ? "cursor-grab ring-1 ring-[#3498DB]/40" : ""
-                        }`}
-                      >
-                        <div className="relative w-[120px] shrink-0 self-stretch sm:w-[140px]">
-                          <Image
-                            src={thumb}
-                            alt=""
-                            fill
-                            className="object-cover"
-                            sizes="140px"
-                            unoptimized={
-                              typeof thumb === "string" &&
-                              (thumb.startsWith("blob:") || isRemoteImageSrc(thumb))
-                            }
-                          />
-                        </div>
-                        <div className="flex min-w-0 flex-1 flex-col justify-between p-4 sm:p-5">
-                          <div className="min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex min-w-0 items-center gap-2">
-                                <h3 className="truncate text-base font-bold text-white sm:text-lg">{roadmap.title}</h3>
-                              </div>
-                              <div className="relative roadmap-options-menu shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setShowOptionsMenu(showOptionsMenu === roadmap.id ? null : roadmap.id)
-                                  }
-                                  className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/85 transition hover:bg-white/10"
-                                  aria-label="More options"
-                                >
-                                  <i className="fa-solid fa-ellipsis-vertical" aria-hidden />
-                                </button>
-                                {showOptionsMenu === roadmap.id ? (
-                                  <div className="absolute right-0 z-[120] mt-2 min-w-[11rem] rounded-xl border border-white/15 bg-[#041f35]/98 py-2 shadow-2xl backdrop-blur-xl">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setShowOptionsMenu(null);
-                                        setAssignModalRoadmap({
-                                          id: roadmap.id,
-                                          name: roadmap.title || "Roadmap",
-                                        });
-                                      }}
-                                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-white/90 hover:bg-white/10"
-                                    >
-                                      <i className="fa-solid fa-user-plus text-[#3498DB]" aria-hidden />
-                                      Assign to
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setShowOptionsMenu(null);
-                                        openRoadmapEdit(roadmap);
-                                      }}
-                                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-white/90 hover:bg-white/10"
-                                    >
-                                      <i className="fa-regular fa-pen-to-square text-[#3498DB]" aria-hidden />
-                                      Edit
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setShowOptionsMenu(null);
-                                        openRoadmapView(roadmap);
-                                      }}
-                                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-white/90 hover:bg-white/10"
-                                    >
-                                      <i className="fa-regular fa-eye text-[#3498DB]" aria-hidden />
-                                      View
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setShowOptionsMenu(null);
-                                        handleDeleteRoadmap(roadmap.id);
-                                      }}
-                                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-red-200 hover:bg-red-500/10"
-                                    >
-                                      <i className="fa-solid fa-trash" aria-hidden />
-                                      Delete
-                                    </button>
-                                  </div>
-                                ) : null}
-                              </div>
-                            </div>
-                            <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-white/65">{roadmap.description}</p>
-                          </div>
-
-                          <div className="mt-4 grid grid-cols-1 gap-3 border-t border-white/10 pt-3 text-xs text-white/55 sm:grid-cols-3">
-                            <div className="flex flex-col gap-1">
-                              <span className="inline-flex items-center gap-1.5 font-semibold text-white/70">
-                                <i className="fa-regular fa-calendar text-[#3498DB]" aria-hidden />
-                                Created on
-                              </span>
-                              <span className="pl-5 text-[13px] text-white/90">{formatShortDate(created) || "—"}</span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <span className="inline-flex items-center gap-1.5 font-semibold text-white/70">
-                                <i className="fa-regular fa-user text-[#3498DB]" aria-hidden />
-                                Created by
-                              </span>
-                              <span className="flex items-center gap-2 pl-5 text-[13px] text-white/90">
-                                <span className="relative inline-block h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-white/20">
-                                  <Image
-                                    // src={creatorPic || creatorFallback}
-                                    src={creatorPic || creatorInitials}
-                                    alt=""
-                                    fill
-                                    className="object-cover"
-                                    sizes="28px"
-                                    unoptimized={
-                                      typeof creatorPic === "string" && creatorPic ? isRemoteImageSrc(creatorPic) : false
-                                    }
-                                  />
-                                </span>
-                                <span className="min-w-0 truncate">{roadmap.createdBy || "—"}</span>
-                              </span>
-                            </div>
-                            <div className="flex flex-col gap-1">
-                              <span className="inline-flex items-center gap-1.5 font-semibold text-white/70">
-                                <i className="fa-regular fa-clock text-[#3498DB]" aria-hidden />
-                                Completion time
-                              </span>
-                              <span className="pl-5 text-[13px] text-white/90">{roadmap.completionTime}</span>
-                            </div>
-                          </div>
-                          <div className="mt-4 flex flex-wrap justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => openRoadmapView(roadmap)}
-                              className="inline-flex items-center rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/18 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#3498DB]/28"
-                            >
-                              View
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => openRoadmapEdit(roadmap)}
-                              className="inline-flex items-center rounded-lg border border-white/25 bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/15"
-                            >
-                              Edit
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {filteredLibrary.length > 0 ? (
-                <div className="mt-10 flex flex-col items-center gap-4 border-t border-white/10 pt-6">
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setLibraryPage((p) => Math.max(1, p - 1))}
-                      disabled={clampedPage <= 1}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/85 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
-                      aria-label="Previous page"
-                    >
-                      <i className="fa-solid fa-chevron-left text-sm" />
-                    </button>
-                    {paginationNumbers.map((item, idx) =>
-                      item === "ellipsis" ? (
-                        <span key={`e-${idx}`} className="px-2 text-white/45">
-                          …
-                        </span>
-                      ) : (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() => setLibraryPage(item)}
-                          className={`min-w-[40px] rounded-lg px-3 py-2 text-sm font-semibold transition ${
-                            clampedPage === item
-                              ? "border border-[#3498DB]/45 bg-[#3498DB]/25 text-white shadow-inner"
-                              : "border border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
-                          }`}
-                        >
-                          {item}
-                        </button>
-                      ),
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setLibraryPage((p) => Math.min(totalPages, p + 1))}
-                      disabled={clampedPage >= totalPages}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 bg-white/5 text-white/85 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
-                      aria-label="Next page"
-                    >
-                      <i className="fa-solid fa-chevron-right text-sm" />
-                    </button>
-                  </div>
-                  <p className="text-xs text-white/45">
-                    Showing {(clampedPage - 1) * PAGE_SIZE + 1}–
-                    {Math.min(clampedPage * PAGE_SIZE, filteredLibrary.length)} of {filteredLibrary.length}
-                  </p>
-                </div>
-              ) : null}
-
+            </div> */}
               {rearrangeMode ? (
                 <p className="mt-6 text-center text-xs text-white/50">
                   Drag cards to reorder for this session. Tap <strong className="text-white/70">Done</strong> on Rearrange when finished.
@@ -1360,13 +1813,184 @@ const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director
           )}
         </div>
       </main>
-      <AssignRoadmapModal
+      {selectedPastorModalId != null ? (
+  <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+    <div className="w-full max-w-3xl rounded-2xl border border-white/15 bg-[#07172b]/95 p-5 shadow-2xl">
+      <div className="mb-4 flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+        <div>
+          <h2 className="text-lg font-semibold text-white">
+            {selectedPastorNameForModal}'s roadmaps
+          </h2>
+          <p className="mt-1 text-xs text-white/50">
+            Assigned roadmap list
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedPastorModalId(null);
+            setFilterPastorId("all");
+          }}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white"
+          aria-label="Close"
+        >
+          <i className="fa-solid fa-xmark" />
+        </button>
+      </div>
+
+      {/* <div className="max-h-[520px] space-y-4 overflow-y-auto pr-1"> */}
+      <div className="custom-scrollbar max-h-[520px] space-y-4 overflow-y-auto pr-1">
+        {selectedPastorRoadmaps.length === 0 ? (
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-10 text-center text-sm text-white/60">
+            No assigned roadmaps found for this pastor.
+          </div>
+        ) : (
+          // selectedPastorRoadmaps.map((roadmap) => (
+          //   <div
+          //     key={`modal-${roadmap.id}`}
+          //     className="flex min-h-[130px] overflow-hidden rounded-2xl border border-white/12 bg-white/[0.04]"
+          //   >
+          //     <div className="relative w-[110px] shrink-0 self-stretch">
+          //       <Image
+          //         src={typeof roadmap.img === "string" ? resolveApiMediaUrl(roadmap.img) || roadmap.img : roadmap.img || Card1}
+          //         alt=""
+          //         fill
+          //         className="object-cover"
+          //         sizes="110px"
+          //         unoptimized={typeof roadmap.img === "string" && isRemoteImageSrc(roadmap.img)}
+          //       />
+          //     </div>
+
+          //     <div className="flex min-w-0 flex-1 flex-col justify-between p-4">
+          //       <div>
+          //         <h3 className="truncate text-base font-semibold text-white">{roadmap.title}</h3>
+          //         <p className="mt-1 line-clamp-2 text-sm text-white/60">{roadmap.description}</p>
+          //       </div>
+
+          //       <div className="mt-3 flex items-center justify-between gap-3">
+          //         <span className="text-xs text-white/55">
+          //           Completion time: <span className="text-white/85">{roadmap.completionTime}</span>
+          //         </span>
+
+          //         <button
+          //           type="button"
+          //           onClick={() => openRoadmapView(roadmap)}
+          //           className="rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/18 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#3498DB]/28"
+          //         >
+          //           View
+          //         </button>
+          //       </div>
+          //     </div>
+          //   </div>
+          // ))
+          selectedPastorRoadmaps.map((roadmap) => {
+  const due = parseDate(roadmap.dueDate);
+  const roadmapMetrics = metricsByRoadmapId[roadmap.id];
+
+  const selectedTaskStats =
+    roadmapMetrics?.taskStatsByUserId?.[String(selectedPastorModalId)] || null;
+
+  const roadmapTaskCount = roadmapChildrenList(roadmap.raw).length;
+  const totalTasks = selectedTaskStats?.total || roadmapTaskCount || 0;
+  const completedTasks = selectedTaskStats?.completed || 0;
+
+  const progressPercent =
+    totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  return (
+    <div
+      key={`modal-${roadmap.id}`}
+      className="flex min-h-[130px] overflow-hidden rounded-2xl border border-white/12 bg-white/[0.04]"
+    >
+      <div className="relative w-[110px] shrink-0 self-stretch">
+        <Image
+          src={
+            typeof roadmap.img === "string"
+              ? resolveApiMediaUrl(roadmap.img) || roadmap.img
+              : roadmap.img || Card1
+          }
+          alt=""
+          fill
+          className="object-cover"
+          sizes="110px"
+          unoptimized={typeof roadmap.img === "string" && isRemoteImageSrc(roadmap.img)}
+        />
+      </div>
+
+      <div className="flex min-w-0 flex-1 flex-col justify-between p-4">
+        <div>
+          <h3 className="truncate text-base font-semibold text-white">{roadmap.title}</h3>
+          <p className="mt-1 line-clamp-2 text-sm text-white/60">{roadmap.description}</p>
+        </div>
+
+        <div className="mt-3 flex items-end justify-between gap-3">
+          <div className="grid flex-1 grid-cols-1 gap-2 text-xs text-white/55 sm:grid-cols-3">
+            <span>
+              Due on: <span className="text-white/85">{formatShortDate(due) || "—"}</span>
+            </span>
+
+            <span>
+              Tasks:{" "}
+              <span className="text-white/85">
+                {totalTasks > 0 ? `${completedTasks}/${totalTasks} completed` : "0 tasks completed"}
+              </span>
+            </span>
+
+            <span>
+              Completion time: <span className="text-white/85">{roadmap.completionTime}</span>
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => openRoadmapView(roadmap)}
+            className="rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/18 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#3498DB]/28"
+          >
+            View
+          </button>
+        </div>
+
+        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full bg-[#3498DB] transition-all"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+})
+        )}
+      </div>
+    </div>
+  </div>
+) : null}
+      {/* <AssignRoadmapModal
         isOpen={Boolean(assignModalRoadmap?.id)}
         onClose={() => setAssignModalRoadmap(null)}
         roadmapIds={assignModalRoadmap?.id ? [String(assignModalRoadmap.id)] : []}
         roadmapName={assignModalRoadmap?.name || "Roadmap"}
         onSuccess={() => setAssignModalRoadmap(null)}
-      />
+      /> */}
+      <AssignRoadmapModal
+  isOpen={Boolean(assignModalRoadmap)}
+  onClose={() => setAssignModalRoadmap(null)}
+  roadmapIds={
+    selectedRoadmapIds.length > 0
+      ? selectedRoadmapIds
+      : assignModalRoadmap?.id
+        ? [assignModalRoadmap.id]
+        : []
+  }
+  roadmapName={assignModalRoadmap?.name || "Selected roadmap"}
+  onSuccess={() => {
+    setSelectedRoadmapIds([]);
+    setSelectMode(false);
+    fetchRoadmaps();
+    reloadPastors();
+  }}
+/>
     </div>
   );
 }
