@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import DirectorHero from "../../DirectorHero";
+import DirectorHero from "@/app/director/DirectorHero";
 import {
   directorBtnPrimary,
   directorBtnSecondary,
@@ -17,7 +17,7 @@ import {
   directorSearchIconClass,
   directorSearchInputClass,
   directorSpinner,
-} from "../../directorUi";
+} from "@/app/director/directorUi";
 import JumpStartBg from "@/app/Assets/roadmap-jump-start-bg.jpg";
 import { apiGetRoadmapById, apiUpdateRoadmap } from "@/app/Services/api";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
@@ -84,7 +84,7 @@ const cardActionPrimary = `${directorBtnPrimary} !px-4 !py-2.5 !text-sm`;
 const cardActionSecondary = `${directorBtnSecondary} !px-4 !py-2.5 !text-sm`;
 const cardActionDanger = `${directorBtnSecondary} !border-red-400/35 !px-4 !py-2.5 !text-sm !text-red-100 hover:!bg-red-500/15`;
 
-export default function DirectorPhaseListPage() {
+export default function MentorPhaseListPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const roadmapId = searchParams.get("roadmapId")?.trim() || "";
@@ -146,7 +146,7 @@ export default function DirectorPhaseListPage() {
     qp.set("name", String(roadmap?.name || ""));
     qp.set("completionTime", String(roadmap?.duration || ""));
     qp.set("selectedDivision", "All");
-    router.push(`/director/revitalization-roadmap/roadmap-form?${qp.toString()}`);
+    router.push(`/mentor/RevitalizationRoadmap/roadmap-form?${qp.toString()}`);
   };
 
   const handleConfirmDeleteTask = async () => {
@@ -195,7 +195,7 @@ export default function DirectorPhaseListPage() {
     qp.set("completionTime", String(phase.duration || ""));
     qp.set("selectedDivision", String(phase.phase || "All"));
     qp.set("bannerImage", String(phase.imageUrl || ""));
-    router.push(`/director/revitalization-roadmap/roadmap-form?${qp.toString()}`);
+    router.push(`/mentor/RevitalizationRoadmap/roadmap-form?${qp.toString()}`);
   };
 
   const heroTitle = roadmap?.name || "Phase roadmap";
@@ -260,9 +260,9 @@ export default function DirectorPhaseListPage() {
               <button type="button" onClick={() => router.back()} className={`${directorBtnSecondary} !px-4 !py-2.5 !text-sm`}>
                 <i className="fa-solid fa-arrow-left text-xs" /> Back
               </button>
-              <button type="button" onClick={goToCreatePhaseTask} className={`${directorBtnPrimary} !px-4 !py-2.5 !text-sm`}>
+              {/* <button type="button" onClick={goToCreatePhaseTask} className={`${directorBtnPrimary} !px-4 !py-2.5 !text-sm`}>
                 <i className="fa-solid fa-plus text-xs" /> Task
-              </button>
+              </button> */}
             </div>
             <div className={`relative ${directorSearchBarWidth}`}>
               <i className={directorSearchIconClass} />
@@ -333,14 +333,14 @@ export default function DirectorPhaseListPage() {
                       ) : null}
                     </div>
                     <div className="mt-auto flex flex-wrap gap-3 pt-4">
-                      {/* <button
+                      <button
                         type="button"
                         onClick={() => openPhaseTaskPage(it.id, { viewOnly: true })}
                         className={cardActionSecondary}
                       >
                         <i className="fa-regular fa-eye text-sm" aria-hidden />
                         View
-                      </button> */}
+                      </button>
                       {/* <button
                         type="button"
                         onClick={() => openPhaseTaskPage(it.id)}
@@ -349,16 +349,16 @@ export default function DirectorPhaseListPage() {
                         <i className="fa-solid fa-list-check text-sm" />
                         Edit tasks
                       </button> */}
-                      {!pastorView ? (
+                      {/* {!pastorView ? (
   <button
     type="button"
     onClick={() => openPhaseTaskPage(it.id)}
     className={cardActionPrimary}
   >
-    <i className="fa-solid fa-list-check" /> View/Edit tasks
+    <i className="fa-solid fa-list-check" /> Edit tasks
   </button>
-) : null}
-                      <button
+) : null} */}
+                      {/* <button
                         type="button"
                         disabled={!it.id}
                         onClick={() => {
@@ -369,7 +369,7 @@ export default function DirectorPhaseListPage() {
                       >
                         <i className="fa-solid fa-trash text-sm" aria-hidden />
                         Delete
-                      </button>
+                      </button> */}
                     </div>
                   </div>
                 </div>

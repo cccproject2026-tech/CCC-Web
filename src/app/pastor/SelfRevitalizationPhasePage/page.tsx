@@ -422,19 +422,25 @@ function SelfRevitalizationContent() {
 
                         <div className="flex justify-end border-t border-white/10 pt-3 sm:border-0 sm:pt-0">
                           {jumpHref ? (
+                            // <Link
+                            //   href={jumpHref}
+                            //   className={`${directorBtnPrimary} !px-5 !py-2.5 !text-sm no-underline`}
+                            // >
+                            //   View
+                            // </Link>
                             <Link
-                              href={jumpHref}
-                              className={`${directorBtnPrimary} !px-5 !py-2.5 !text-sm no-underline`}
-                            >
-                              View
-                            </Link>
+  href={jumpHref}
+  className={`${directorBtnPrimary} !px-5 !py-2.5 !text-sm no-underline`}
+>
+  {status === "Not Started" ? "Start" : "View"}
+</Link>
                           ) : (
                             <button
                               type="button"
                               disabled
                               className={`${directorBtnPrimary} !px-5 !py-2.5 !text-sm disabled:cursor-not-allowed disabled:opacity-50`}
                             >
-                              View
+                              {status === "Not Started" ? "Start" : "View"}
                             </button>
                           )}
                         </div>

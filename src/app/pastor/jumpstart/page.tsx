@@ -659,7 +659,7 @@ const hasRequiredSubmissions = useMemo(() => {
     };
     loadExtras();
   }, [roadmapId, userId, roadmap, nestedRoadMapItemIdForExtras, buildDefaultFormDataFromTemplate]);
-
+const scopedNestedId = nestedRoadMapItemIdForExtras;
   const fetchComments = useCallback(async (showLoader = false) => {
     if (!roadmapId || !userId) return;
     if (showLoader) setCommentsLoading(true);
@@ -675,13 +675,13 @@ const hasRequiredSubmissions = useMemo(() => {
     } finally {
       if (showLoader) setCommentsLoading(false);
     }
-  }, [roadmapId, userId]);
-
+  }, [roadmapId, userId, scopedNestedId]);
+// const scopedNestedId = nestedRoadMapItemIdForExtras;
   const fetchQueries = useCallback(async (status?: string, showLoader = false) => {
     if (!roadmapId || !userId) return;
     if (showLoader) setQueriesLoading(true);
     try {
-      const res = await apiGetQueries(roadmapId, userId, status);
+      const res = await apiGetQueries(roadmapId, userId, status, scopedNestedId);
       const threads: any[] = res.data?.data || res.data || [];
       const allQueries = Array.isArray(threads)
         ? threads.flatMap((t: any) => t?.queries || [])
@@ -694,7 +694,7 @@ const hasRequiredSubmissions = useMemo(() => {
     } finally {
       if (showLoader) setQueriesLoading(false);
     }
-  }, [roadmapId, userId]);
+  }, [roadmapId, userId, scopedNestedId]);
 
   // Prefetch counts so the left rail matches mobile badges.
   useEffect(() => {
@@ -725,7 +725,7 @@ const hasRequiredSubmissions = useMemo(() => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
-  const scopedNestedId = nestedRoadMapItemIdForExtras;
+  // const scopedNestedId = nestedRoadMapItemIdForExtras;
 
   // Mobile parity: show server-saved upload documents after refresh.
   useEffect(() => {
@@ -738,7 +738,7 @@ const hasRequiredSubmissions = useMemo(() => {
         const batches = Array.isArray(list) ? list : [];
         const byName: Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]> = {};
         batches.forEach((b: any) => {
-          const name = String(b?.name ?? "").trim();
+          const name = String(b?.name ?? "").trim().toLowerCase();
           const batchId = String(b?.uploadBatchId ?? "").trim();
           const files = Array.isArray(b?.files) ? b.files : [];
           if (!name || !batchId || files.length === 0) return;
@@ -1196,7 +1196,12 @@ if (!hasRequiredSubmissions) {
     if (!roadmapId || !userId || !newQueryText.trim()) return;
     setQuerySubmitting(true);
     try {
-      await apiAddQuery(roadmapId, { actualQueryText: newQueryText.trim(), userId });
+      // await apiAddQuery(roadmapId, { actualQueryText: newQueryText.trim(), userId });
+      await apiAddQuery(roadmapId, {
+  actualQueryText: newQueryText.trim(),
+  userId,
+  nestedRoadMapItemId: scopedNestedId,
+});
       setNewQueryText("");
       setQueryTab("Pending");
       setQuerySuccess(true);
@@ -1456,7 +1461,7 @@ if (!hasRequiredSubmissions) {
 
       case "UPLOAD": {
         const pending = pendingUploadFiles[fieldKey] ?? [];
-        const saved = savedUploadDocs[fieldKey] ?? [];
+       const saved = savedUploadDocs[String(fieldKey).trim().toLowerCase()] ?? [];
         const uploadedNow = uploadedNowDocs[fieldKey] ?? [];
         const inputId = `upload-${fieldKey.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 
@@ -1751,23 +1756,52 @@ if (!hasRequiredSubmissions) {
           </div>
         );
 
-      case "SECTION":
-        return (
-          <div key={`${fieldKey}_${index}`} className="mb-5 border border-[#3B6EA0] rounded-lg p-4">
-            <h4 className="text-sm font-semibold text-white mb-3">{extra.name}</h4>
-            {extra.checkboxes && extra.checkboxes.length > 0 && (
-              <div className="space-y-2 mb-3">
-                {extra.checkboxes.map((cb, i) => renderExtraComponent(cb, i, fieldKey))}
-              </div>
-            )}
-            {extra.sections && extra.sections.length > 0 && (
-              <div className="space-y-3">
-                {extra.sections.map((sec, i) => renderExtraComponent(sec, i, fieldKey))}
-              </div>
-            )}
-          </div>
-        );
+      // case "SECTION":
+      //   return (
+      //     <div key={`${fieldKey}_${index}`} className="mb-5 border border-[#3B6EA0] rounded-lg p-4">
+      //       <h4 className="text-sm font-semibold text-white mb-3">{extra.name}</h4>
+      //       {extra.checkboxes && extra.checkboxes.length > 0 && (
+      //         <div className="space-y-2 mb-3">
+      //           {extra.checkboxes.map((cb, i) => renderExtraComponent(cb, i, fieldKey))}
+      //         </div>
+      //       )}
+      //       {extra.sections && extra.sections.length > 0 && (
+      //         <div className="space-y-3">
+      //           {extra.sections.map((sec, i) => renderExtraComponent(sec, i, fieldKey))}
+      //         </div>
+      //       )}
+      //     </div>
+      //   );
+case "SECTION":
+  return (
+    <div
+      key={`${fieldKey}_${index}`}
+      className="mb-6 rounded-2xl border border-[#5A8DCB]/60 bg-white/[0.04] p-5 shadow-[0_10px_30px_rgba(0,0,0,0.12)]"
+    >
+      <div className="mb-4 border-b border-white/10 pb-3">
+        <h4 className="text-base font-semibold text-white">
+          {extra.name || "Section"}
+        </h4>
+        <p className="mt-1 text-xs text-[#cde2f2]/60">
+          Section fields
+        </p>
+      </div>
 
+      <div className="space-y-4">
+        {extra.checkboxes && extra.checkboxes.length > 0 ? (
+          <div className="space-y-2">
+            {extra.checkboxes.map((cb, i) => renderExtraComponent(cb, i, fieldKey))}
+          </div>
+        ) : null}
+
+        {extra.sections && extra.sections.length > 0 ? (
+          <div className="space-y-3">
+            {extra.sections.map((sec, i) => renderExtraComponent(sec, i, fieldKey))}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
       default:
         return null;
     }
@@ -1941,9 +1975,9 @@ if (!hasRequiredSubmissions) {
                       {formatListStatusLabel(listAlignedStatus)}
                     </span>
                   </div>
-                  <button type="button" className="text-white/80 hover:text-white text-sm">
+                  {/* <button type="button" className="text-white/80 hover:text-white text-sm">
                     <i className="fa-solid fa-ellipsis-vertical"></i>
-                  </button>
+                  </button> */}
                 </div>
 
                 {description && (
@@ -2009,7 +2043,7 @@ if (!hasRequiredSubmissions) {
                       >
                         {saving ? "Saving…" : "Save and continue"}
                       </button>
-                      {listAlignedStatus !== "Completed" ? (
+                      {/* {listAlignedStatus !== "Completed" ? (
                         <button
                           type="button"
                           onClick={handleMarkComplete}
@@ -2023,7 +2057,7 @@ if (!hasRequiredSubmissions) {
                         >
                           {completeLoading ? "Submitting…" : "Submit"}
                         </button>
-                      ) : null}
+                      ) : null} */}
                     </div>
                   </div>
                 </div>

@@ -532,10 +532,13 @@ export default function MyMentorsPage() {
     setShowRemoveModal(true);
   }, []);
 
+  // const handleListMentees = useCallback((mentor: Mentor) => {
+  //   setSelectedMentor(mentor);
+  //   setShowListMenteesModal(true);
+  // }, []);
   const handleListMentees = useCallback((mentor: Mentor) => {
-    setSelectedMentor(mentor);
-    setShowListMenteesModal(true);
-  }, []);
+  router.push(`/director/mentees?mentorId=${encodeURIComponent(mentor.id)}`);
+}, [router]);
 
   const getMentorOptions = (mentor: Mentor) => [
     {

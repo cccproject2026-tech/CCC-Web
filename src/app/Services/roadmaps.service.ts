@@ -325,9 +325,22 @@ export const apiAddQuery = (roadMapId: string, payload: CreateQueryPayload) =>
   axiosInstance.post(`/roadmaps/${roadMapId}/queries`, payload);
 
 // GET /roadmaps/:roadMapId/queries?userId=&status=
-export const apiGetQueries = (roadMapId: string, userId: string, status?: string) =>
+// export const apiGetQueries = (roadMapId: string, userId: string, status?: string) =>
+//   axiosInstance.get(`/roadmaps/${roadMapId}/queries`, {
+//     params: { userId, ...(status && { status }) },
+//   });
+export const apiGetQueries = (
+  roadMapId: string,
+  userId: string,
+  status?: string,
+  nestedRoadMapItemId?: string,
+) =>
   axiosInstance.get(`/roadmaps/${roadMapId}/queries`, {
-    params: { userId, ...(status && { status }) },
+    params: {
+      userId,
+      ...(status && { status }),
+      ...(nestedRoadMapItemId && { nestedRoadMapItemId }),
+    },
   });
 
 // PATCH /roadmaps/:roadMapId/queries/:queryItemId/reply  body: { repliedAnswer, repliedMentorId }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, Suspense } from "react";
+import type { JSX } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -190,12 +191,46 @@ function TaskPageContent() {
     if (!roadmapId || !userId) return;
     const status = queryTab === "Pending" ? "pending" : "answered";
     try {
-      const res = await apiGetQueries(roadmapId, userId, status);
-      setQueries(unwrapQueriesFromResponse(res));
+      const res = await apiGetQueries(roadmapId, userId, status, taskId || undefined);
+      // setQueries(unwrapQueriesFromResponse(res));
+      const all = unwrapQueriesFromResponse(res);
+
+// const scoped = all.filter((q: any) => {
+//   const qTaskId = String(
+//     q.nestedRoadMapItemId ??
+//     q.nestedItemId ??
+//     q.taskId ??
+//     q.roadmapItemId ??
+//     ""
+//   );
+
+//   return qTaskId === String(taskId);
+// });
+
+// setQueries(scoped);
+const hasScopedIds = all.some((q: any) =>
+  Boolean(q.nestedRoadMapItemId ?? q.nestedItemId ?? q.taskId ?? q.roadmapItemId)
+);
+
+const scoped = hasScopedIds
+  ? all.filter((q: any) => {
+      const qTaskId = String(
+        q.nestedRoadMapItemId ??
+          q.nestedItemId ??
+          q.taskId ??
+          q.roadmapItemId ??
+          ""
+      );
+
+      return qTaskId === String(taskId);
+    })
+  : all;
+
+setQueries(scoped);
     } catch {
       setQueries([]);
     }
-  }, [roadmapId, userId, queryTab]);
+  }, [roadmapId, userId, queryTab, taskId]);
 
   useEffect(() => {
     if (!roadmapId || !taskId) {
@@ -319,7 +354,7 @@ function TaskPageContent() {
       const byName: Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]> = {};
 
       batches.forEach((b: any) => {
-        const name = String(b?.name ?? "").trim();
+        const name = String(b?.name ?? "").trim().toLowerCase();
         const batchId = String(b?.uploadBatchId ?? "").trim();
         const files = Array.isArray(b?.files) ? b.files : [];
 
@@ -629,6 +664,172 @@ const isUpdatedResponse = allRenderableExtras.length > renderableExtras.length;
 
 const pastorHasNoResponses = !extrasLoading && renderableExtras.length === 0;
                       
+const templateExtras = Array.isArray((task as any)?.extras)
+  ? ((task as any).extras as Record<string, any>[])
+  : [];
+
+const answerByName = new Map<string, Record<string, unknown>>();
+
+renderableExtras.forEach((item) => {
+  const label = String(item.name ?? item.key ?? "").trim().toLowerCase();
+  if (label) answerByName.set(label, item);
+});
+
+const renderAnswerCard = (
+  item: Record<string, unknown>,
+  idx: number,
+  fallbackLabel?: string,
+) => {
+  const t = String(item.type ?? "").toUpperCase();
+  const label = String(item.name ?? item.key ?? fallbackLabel ?? `Item ${idx + 1}`);
+  // const uploadedFiles =
+  // pastorUploadDocs[label.trim()] ??
+  // pastorUploadDocs[label.trim().toLowerCase()] ??
+  // [];
+  const normalizedLabel = label.trim().toLowerCase();
+const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
+  const sig = item.signatureData !== undefined ? item.signatureData : undefined;
+  const val = item.value !== undefined ? item.value : sig;
+
+  if (t === "TEXT_DISPLAY") {
+    return (
+      <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+        <p className="text-sm leading-relaxed text-[#cde2f2]">{label}</p>
+      </div>
+    );
+  }
+
+  const empty =
+    val === undefined ||
+    val === null ||
+    (typeof val === "string" && val.trim() === "");
+
+  if (t === "UPLOAD" && uploadedFiles.length > 0) {
+    return (
+      <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+          {label}
+        </p>
+
+        <div className="mt-3 space-y-2">
+          {uploadedFiles.map((file) => (
+            <div
+              key={`${file.fileUrl}-${file.fileName}`}
+              onClick={() => window.open(file.fileUrl, "_blank")}
+              className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-white hover:bg-white/[0.08]"
+            >
+              <i className="fa-solid fa-file text-blue-300" />
+              <span className="min-w-0 flex-1 truncate">{file.fileName}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (empty) {
+    return (
+      <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+          {label}
+        </p>
+        <p className="mt-1 text-sm text-[#cde2f2]/65">No answer submitted.</p>
+      </div>
+    );
+  }
+
+  if (typeof val === "boolean") {
+    return (
+      <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+          {label}
+        </p>
+        <p className="mt-1 text-sm text-white">{val ? "Yes" : "No"}</p>
+      </div>
+    );
+  }
+
+  const str = typeof val === "object" ? JSON.stringify(val, null, 2) : String(val);
+
+  if (
+    t === "SIGNATURE" &&
+    typeof str === "string" &&
+    (str.startsWith("http://") || str.startsWith("https://") || str.startsWith("data:image"))
+  ) {
+    return (
+      <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+          {label}
+        </p>
+        <div className="mt-3">
+          <img
+            src={str}
+            alt=""
+            className="max-h-48 max-w-full rounded-lg border border-white/15 object-contain"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+        {label}
+      </p>
+      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[#cde2f2]">
+        {str}
+      </p>
+    </div>
+  );
+};
+
+const renderTemplateExtra = (extra: Record<string, any>, idx: number): JSX.Element | null => {
+  const type = String(extra.type ?? "").toUpperCase();
+  const label = String(extra.name ?? "").trim();
+
+  if (type === "SECTION") {
+    const children = Array.isArray(extra.sections) ? extra.sections : [];
+
+    return (
+      <div
+        key={`section-${label}-${idx}`}
+        className="rounded-2xl border border-[#5A8DCB]/60 bg-white/[0.04] p-5"
+      >
+        <h4 className="mb-4 text-base font-semibold text-white">
+          {label || "Section"}
+        </h4>
+
+        <div className="space-y-3">
+          {children.length > 0 ? (
+            children.map((child: Record<string, any>, childIdx: number) =>
+              renderTemplateExtra(child, childIdx),
+            )
+          ) : (
+            <p className="text-sm text-[#cde2f2]/65">No fields in this section.</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const answer = answerByName.get(label.toLowerCase());
+
+  if (!answer) {
+    return renderAnswerCard(
+      {
+        type,
+        name: label,
+        value: undefined,
+      },
+      idx,
+      label,
+    );
+  }
+
+  return renderAnswerCard(answer, idx, label);
+};
+
                       const dueRaw =
                         task &&
                         (task.endDate ??
@@ -678,6 +879,11 @@ const pastorHasNoResponses = !extrasLoading && renderableExtras.length === 0;
                               </p>
                             </details>
                           ) : null}
+                          {!pastorHasNoResponses ? (
+  <h3 className="mb-4 text-lg font-semibold text-white">
+    Pastor Tasks :
+  </h3>
+) : null}
 
                           {extrasLoading ? (
                             <div className="flex justify-center py-16">
@@ -700,143 +906,150 @@ const pastorHasNoResponses = !extrasLoading && renderableExtras.length === 0;
                               </div>
                             </div>
                           ) : (
-                            <div className="space-y-1">
-                              {renderableExtras.map((item, idx) => {
-                              const t = String(item.type ?? "").toUpperCase();
-                              const label = String(item.name ?? item.key ?? `Item ${idx + 1}`);
-                              const uploadedFiles = pastorUploadDocs[label] ?? [];
-                              const sig =
-                                item.signatureData !== undefined ? item.signatureData : undefined;
-                              const val = item.value !== undefined ? item.value : sig;
+//                             <div className="space-y-1">
+//                               {renderableExtras.map((item, idx) => {
+//                               const t = String(item.type ?? "").toUpperCase();
+//                               const label = String(item.name ?? item.key ?? `Item ${idx + 1}`);
+//                               const uploadedFiles = pastorUploadDocs[label] ?? [];
+//                               const sig =
+//                                 item.signatureData !== undefined ? item.signatureData : undefined;
+//                               const val = item.value !== undefined ? item.value : sig;
 
-                              if (t === "TEXT_DISPLAY") {
-                                return (
-                                  <div
-                                    key={`${label}-${idx}`}
-                                    className="rounded-xl border border-white/10 bg-white/[0.04] p-4"
-                                  >
-                                    <p className="text-sm leading-relaxed text-[#cde2f2]">{label}</p>
-                                  </div>
-                                );
-                              }
+//                               if (t === "TEXT_DISPLAY") {
+//                                 return (
+//                                   <div
+//                                     key={`${label}-${idx}`}
+//                                     className="rounded-xl border border-white/10 bg-white/[0.04] p-4"
+//                                   >
+//                                     <p className="text-sm leading-relaxed text-[#cde2f2]">{label}</p>
+//                                   </div>
+//                                 );
+//                               }
 
-                              const empty =
-                                val === undefined ||
-                                val === null ||
-                                (typeof val === "string" && val.trim() === "");
+//                               const empty =
+//                                 val === undefined ||
+//                                 val === null ||
+//                                 (typeof val === "string" && val.trim() === "");
 
-                              if (empty) {
-                                return (
-                                  <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
-                                      {label}
-                                    </p>
-                                    <p className="mt-1 text-sm text-[#cde2f2]/65">No answer submitted.</p>
-                                  </div>
-                                );
-                              }
-if (t === "UPLOAD" && uploadedFiles.length > 0) {
-  return (
-    <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
-        {label}
-      </p>
+//                               if (empty) {
+//                                 return (
+//                                   <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+//                                     <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+//                                       {label}
+//                                     </p>
+//                                     <p className="mt-1 text-sm text-[#cde2f2]/65">No answer submitted.</p>
+//                                   </div>
+//                                 );
+//                               }
+// if (t === "UPLOAD" && uploadedFiles.length > 0) {
+//   return (
+//     <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+//       <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+//         {label}
+//       </p>
 
-      <div className="mt-3 space-y-2">
-        {uploadedFiles.map((file) => (
-          <div
-            key={`${file.fileUrl}-${file.fileName}`}
-            onClick={() => window.open(file.fileUrl, "_blank")}
-            className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-white hover:bg-white/[0.08]"
-          >
-            <i className="fa-solid fa-file text-blue-300" />
-            <span className="min-w-0 flex-1 truncate">{file.fileName}</span>
+//       <div className="mt-3 space-y-2">
+//         {uploadedFiles.map((file) => (
+//           <div
+//             key={`${file.fileUrl}-${file.fileName}`}
+//             onClick={() => window.open(file.fileUrl, "_blank")}
+//             className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-white hover:bg-white/[0.08]"
+//           >
+//             <i className="fa-solid fa-file text-blue-300" />
+//             <span className="min-w-0 flex-1 truncate">{file.fileName}</span>
 
-            <button
-              type="button"
-              onClick={async (e) => {
-                e.stopPropagation();
+//             <button
+//               type="button"
+//               onClick={async (e) => {
+//                 e.stopPropagation();
 
-                try {
-                  const response = await fetch(file.fileUrl);
-                  const blob = await response.blob();
+//                 try {
+//                   const response = await fetch(file.fileUrl);
+//                   const blob = await response.blob();
 
-                  const url = window.URL.createObjectURL(blob);
-                  const link = document.createElement("a");
+//                   const url = window.URL.createObjectURL(blob);
+//                   const link = document.createElement("a");
 
-                  link.href = url;
-                  link.download = file.fileName || "download";
-                  document.body.appendChild(link);
-                  link.click();
+//                   link.href = url;
+//                   link.download = file.fileName || "download";
+//                   document.body.appendChild(link);
+//                   link.click();
 
-                  link.remove();
-                  window.URL.revokeObjectURL(url);
-                } catch {
-                  window.open(file.fileUrl, "_blank");
-                }
-              }}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/10 text-blue-200 hover:bg-white/15"
-              title="Download"
-            >
-              <i className="fa-solid fa-download" />
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-                              if (typeof val === "boolean") {
-                                return (
-                                  <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
-                                      {label}
-                                    </p>
-                                    <p className="mt-1 text-sm text-white">{val ? "Yes" : "No"}</p>
-                                  </div>
-                                );
-                              }
+//                   link.remove();
+//                   window.URL.revokeObjectURL(url);
+//                 } catch {
+//                   window.open(file.fileUrl, "_blank");
+//                 }
+//               }}
+//               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/10 text-blue-200 hover:bg-white/15"
+//               title="Download"
+//             >
+//               <i className="fa-solid fa-download" />
+//             </button>
+//           </div>
+//         ))}
+//       </div>
+//     </div>
+//   );
+// }
+//                               if (typeof val === "boolean") {
+//                                 return (
+//                                   <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+//                                     <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+//                                       {label}
+//                                     </p>
+//                                     <p className="mt-1 text-sm text-white">{val ? "Yes" : "No"}</p>
+//                                   </div>
+//                                 );
+//                               }
 
-                              const str =
-                                typeof val === "object" ? JSON.stringify(val, null, 2) : String(val);
+//                               const str =
+//                                 typeof val === "object" ? JSON.stringify(val, null, 2) : String(val);
 
-                              if (
-                                t === "SIGNATURE" &&
-                                typeof str === "string" &&
-                                (str.startsWith("http://") ||
-                                  str.startsWith("https://") ||
-                                  str.startsWith("data:image"))
-                              ) {
-                                return (
-                                  <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
-                                      {label}
-                                    </p>
-                                    <div className="mt-3">
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img
-                                        src={str}
-                                        alt=""
-                                        className="max-h-48 max-w-full rounded-lg border border-white/15 object-contain"
-                                      />
-                                    </div>
-                                  </div>
-                                );
-                              }
+//                               if (
+//                                 t === "SIGNATURE" &&
+//                                 typeof str === "string" &&
+//                                 (str.startsWith("http://") ||
+//                                   str.startsWith("https://") ||
+//                                   str.startsWith("data:image"))
+//                               ) {
+//                                 return (
+//                                   <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+//                                     <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+//                                       {label}
+//                                     </p>
+//                                     <div className="mt-3">
+//                                       {/* eslint-disable-next-line @next/next/no-img-element */}
+//                                       <img
+//                                         src={str}
+//                                         alt=""
+//                                         className="max-h-48 max-w-full rounded-lg border border-white/15 object-contain"
+//                                       />
+//                                     </div>
+//                                   </div>
+//                                 );
+//                               }
 
-                              return (
-                                <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
-                                    {label}
-                                  </p>
-                                  <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[#cde2f2]">
-                                    {str}
-                                  </p>
-                                </div>
-                              );
-                            })}
-                            </div>
-                          )}
+//                               return (
+//                                 <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+//                                   <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+//                                     {label}
+//                                   </p>
+//                                   <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[#cde2f2]">
+//                                     {str}
+//                                   </p>
+//                                 </div>
+//                               );
+//                             })}
+//                             </div>
+
+  <div className="space-y-4">
+    {templateExtras.length > 0
+      ? templateExtras.map((extra, idx) => renderTemplateExtra(extra, idx))
+      : renderableExtras.map((item, idx) => renderAnswerCard(item, idx))}
+  </div>
+)}
+                          
                         </>
                       );
                     })()}

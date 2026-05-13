@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import DirectorHero from "@/app/director/DirectorHero";
 import MentorHeader from "@/app/Components/MentorHeader";
@@ -57,9 +57,21 @@ function matchesQuery(haystack: string, query: string): boolean {
 }
 
 export default function RevitalizationRoadmapPage() {
-  const router = useRouter();
+  // const router = useRouter();
 
-  const [activeTab, setActiveTab] = useState("Pastor");
+  // const [activeTab, setActiveTab] = useState("Pastor");
+  const router = useRouter();
+const searchParams = useSearchParams();
+
+const [activeTab, setActiveTab] = useState(
+  searchParams.get("tab") === "Library" ? "Library" : "Pastor"
+);
+
+useEffect(() => {
+  if (searchParams.get("tab") === "Library") {
+    setActiveTab("Library");
+  }
+}, [searchParams]);
   const [searchQuery, setSearchQuery] = useState("");
 
   const [roadmaps, setRoadmaps] = useState<any[]>([]);
@@ -367,6 +379,44 @@ export default function RevitalizationRoadmapPage() {
                           <p className="mt-3 text-xs text-[#d9ebf8]">
                             Steps: {roadmap.totalSteps ?? roadmap.roadmaps?.length ?? "—"}
                           </p>
+   <div className="mt-4 flex justify-end">
+  <button
+    type="button"
+    onClick={() => {
+  const roadmapType = String(roadmap.type || "").toLowerCase();
+  const isPhaseRoadmap = roadmapType === "phase" || roadmapType.includes("phase");
+
+  if (isPhaseRoadmap) {
+    router.push(
+      `/mentor/RevitalizationRoadmap/phase-list?roadmapId=${encodeURIComponent(rid)}&pastorView=true`
+    );
+    return;
+  }
+
+  const firstNested = Array.isArray(roadmap.roadmaps) ? roadmap.roadmaps[0] : null;
+
+  const qp = new URLSearchParams();
+  qp.set("roadmapId", rid);
+  qp.set("type", "single");
+  qp.set("isEditMode", "true");
+  qp.set("viewOnly", "true");
+
+  if (firstNested?._id) qp.set("nestedRoadmapId", String(firstNested._id));
+
+  qp.set("name", String(firstNested?.name || firstNested?.title || roadmap.name || ""));
+  qp.set("subheading", String(firstNested?.roadMapDetails || firstNested?.description || roadmap.roadMapDetails || ""));
+  qp.set("longDescription", String(firstNested?.description || firstNested?.roadMapDetails || roadmap.description || ""));
+  qp.set("completionTime", String(firstNested?.duration || roadmap.duration || ""));
+  qp.set("selectedDivision", String(firstNested?.phase || "All"));
+  qp.set("bannerImage", String(firstNested?.imageUrl || roadmap.imageUrl || ""));
+
+  router.push(`/mentor/RevitalizationRoadmap/roadmap-form?${qp.toString()}`);
+}}
+    className={mentorPrimaryCtaDashboard}
+  >
+    View
+  </button>
+</div>
                         </div>
                       </div>
                     </div>
