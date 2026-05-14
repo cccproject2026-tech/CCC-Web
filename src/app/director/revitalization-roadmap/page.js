@@ -454,6 +454,7 @@ const [mentorListLoading, setMentorListLoading] = useState(false);
 const [selectedMentor, setSelectedMentor] = useState(null);
 const [selectedMentorPastors, setSelectedMentorPastors] = useState([]);
 const [selectedMentorPastorsLoading, setSelectedMentorPastorsLoading] = useState(false);
+const [openMentorMenuId, setOpenMentorMenuId] = useState(null);
   const [rearrangeMode, setRearrangeMode] = useState(false);
 
   const [selectMode, setSelectMode] = useState(false);
@@ -1398,7 +1399,7 @@ const filteredMentorList = useMemo(() => {
                   type="button"
                   onClick={() => {
                     setSelectedPastorModalId(pid);
-                    setFilterPastorId(pid);
+                    // setFilterPastorId(pid);
                   }}
                   className={`group flex shrink-0 flex-col items-center px-2 py-1 text-center transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3498DB]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a1128] ${
                     selected ? "opacity-100" : "opacity-[0.82] hover:opacity-100"
@@ -1608,10 +1609,13 @@ const filteredMentorList = useMemo(() => {
             <div className="mt-auto flex justify-end pt-4">
               <button
                 type="button"
+                // onClick={() => {
+                //   setFilterPastorId(pastorId);
+                //   setSelectedPastorModalId(pastorId);
+                // }}
                 onClick={() => {
-                  setFilterPastorId(pastorId);
-                  setSelectedPastorModalId(pastorId);
-                }}
+  setSelectedPastorModalId(pastorId);
+}}
                 className="inline-flex h-9 items-center justify-center rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/18 px-4 text-xs font-semibold text-white transition hover:bg-[#3498DB]/28"
               >
                 View
@@ -1646,12 +1650,19 @@ const filteredMentorList = useMemo(() => {
             getInitialsAvatar(mentor?.firstName, mentor?.lastName, "Mentor");
 
           return (
-            <button
-              key={mentorId}
-              type="button"
-              onClick={() => router.push(`/director/revitalization-roadmap/mentor?mentorId=${encodeURIComponent(mentorId)}`)}
-              className={`${directorGlassCard} flex items-center gap-4 p-4 text-left transition hover:border-[#3498DB]/40`}
-            >
+            // <button
+            //   key={mentorId}
+            //   type="button"
+            //   onClick={() => router.push(`/director/revitalization-roadmap/mentor?mentorId=${encodeURIComponent(mentorId)}`)}
+            //   className={`${directorGlassCard} flex items-center gap-4 p-4 text-left transition hover:border-[#3498DB]/40`}
+            // >
+            <div
+  key={mentorId}
+  onClick={() =>
+    router.push(`/director/revitalization-roadmap/mentor?mentorId=${encodeURIComponent(mentorId)}`)
+  }
+  className={`${directorGlassCard} relative flex cursor-pointer items-center gap-4 p-4 text-left transition hover:border-[#3498DB]/40`}
+>
               <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-white/15">
                 <Image
                   src={img}
@@ -1666,13 +1677,60 @@ const filteredMentorList = useMemo(() => {
                 <h3 className="truncate text-sm font-semibold text-white">{name}</h3>
                 <p className="truncate text-xs text-white/55">{mentor?.email || "Mentor"}</p>
               </div>
-            </button>
+              {/* <button
+  type="button"
+  onClick={(e) => {
+    e.stopPropagation();
+    router.push(
+      `/director/schedule?mentorId=${encodeURIComponent(mentorId)}`
+    );
+  }}
+  className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white"
+  title="Schedule meeting"
+>
+  <i className="fa-solid fa-ellipsis-vertical text-sm" />
+</button> */}
+<div className="absolute right-4 top-4">
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      setOpenMentorMenuId((prev) => (prev === mentorId ? null : mentorId));
+    }}
+    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white"
+    title="More options"
+  >
+    <i className="fa-solid fa-ellipsis-vertical text-sm" />
+  </button>
+
+  {openMentorMenuId === mentorId ? (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="absolute right-0 top-11 z-30 w-48 rounded-xl border border-white/15 bg-[#0d1f33] p-2 shadow-xl"
+    >
+      <button
+        type="button"
+        onClick={() => {
+          setOpenMentorMenuId(null);
+          router.push(
+            `/director/schedule?tab=Schedule&recipientType=mentor&mentorId=${encodeURIComponent(mentorId)}`
+          );
+        }}
+        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-white/85 hover:bg-white/10"
+      >
+        <i className="fa-regular fa-calendar-plus text-xs" />
+        Schedule Meeting
+      </button>
+    </div>
+  ) : null}
+</div>
+            </div>
           );
         })}
       </div>
     )}
 
-    {selectedMentor ? (
+    {/* {selectedMentor ? (
       <div className={`${directorGlassCard} p-5`}>
         <h3 className="mb-4 text-base font-semibold text-white">Assigned pastors</h3>
 
@@ -1727,7 +1785,7 @@ const filteredMentorList = useMemo(() => {
           </div>
         )}
       </div>
-    ) : null}
+    ) : null} */}
   </div>
 ) : loadingRoadmaps ? (
             <div className="flex justify-center py-20">
@@ -2272,8 +2330,10 @@ const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director
           )}
         </div>
       </main>
-      {selectedPastorModalId != null ? (
-  <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+      {/* {selectedPastorModalId != null ? ( */}
+      {browserMounted && selectedPastorModalId != null
+  ? createPortal(
+  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
     <div className="w-full max-w-3xl rounded-2xl border border-white/15 bg-[#07172b]/95 p-5 shadow-2xl">
       <div className="mb-4 flex items-center justify-between gap-3 border-b border-white/10 pb-4">
         <div>
@@ -2287,10 +2347,32 @@ const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director
 
         <button
           type="button"
-          onClick={() => {
-            setSelectedPastorModalId(null);
-            setFilterPastorId("all");
-          }}
+          // onClick={() => {
+          //   setSelectedPastorModalId(null);
+          //   // setFilterPastorId("all");
+          // }}
+//           onClick={() => {
+//   const returnTo = searchParams.get("returnTo");
+
+//   if (returnTo) {
+//     router.push(returnTo);
+//     return;
+//   }
+
+//   setSelectedPastorModalId(null);
+//   // setFilterPastorId("all");
+// }}
+onClick={() => {
+  const returnTo = searchParams.get("returnTo");
+
+  if (returnTo) {
+    router.push(returnTo);
+    return;
+  }
+
+  setSelectedPastorModalId(null);
+  setFilterPastorId("all");
+}}
           className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white"
           aria-label="Close"
         >
@@ -2424,7 +2506,11 @@ const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director
       </div>
     </div>
   </div>
-) : null}
+// ) : null}
+,
+document.body
+)
+: null}
       {/* <AssignRoadmapModal
         isOpen={Boolean(assignModalRoadmap?.id)}
         onClose={() => setAssignModalRoadmap(null)}
@@ -2450,6 +2536,132 @@ const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director
     reloadPastors();
   }}
 />
+{selectedMentor ? (
+  <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+    <div className="max-h-[85vh] w-full max-w-5xl overflow-y-auto rounded-[28px] border border-white/15 bg-[#101a33] p-6 shadow-2xl">
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Assigned Pastors</h2>
+          {/* <p className="mt-1 text-sm text-white/60">Pastors Roadmap Under</p> */}
+          <p className="mt-1 text-sm text-white/60">
+          Pastors Roadmap Under  {`${selectedMentor?.firstName ?? ""} ${selectedMentor?.lastName ?? ""}`.trim() ||
+              selectedMentor?.email ||
+              "Selected mentor"}
+
+          </p>
+
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedMentor(null);
+            setSelectedMentorPastors([]);
+          }}
+          className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/15"
+        >
+          ✕
+        </button>
+      </div>
+
+      {selectedMentorPastorsLoading ? (
+        <div className="flex justify-center py-16">
+          <div className={directorSpinner} />
+        </div>
+      ) : selectedMentorPastors.length === 0 ? (
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
+          <h3 className="text-lg font-bold text-white">No assigned pastors found</h3>
+          <p className="mt-2 text-sm text-white/60">
+            This mentor does not have assigned pastors yet.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {selectedMentorPastors.map((pastor) => {
+            const pastorId = String(pastor?._id ?? pastor?.id ?? "");
+            const name =
+              `${pastor?.firstName ?? ""} ${pastor?.lastName ?? ""}`.trim() ||
+              pastor?.email ||
+              "Pastor";
+
+            const img =
+              String(pastor?.profilePicture || "").trim() ||
+              getInitialsAvatar(pastor?.firstName, pastor?.lastName, "Pastor");
+
+            return (
+              <div
+                key={pastorId}
+                className="flex min-h-[210px] flex-col justify-between rounded-3xl border border-white/10 bg-white/[0.06] p-5"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-white/15">
+                    <Image
+                      src={img}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      unoptimized={typeof img === "string" && isRemoteImageSrc(img)}
+                    />
+                  </div>
+
+                  <div className="min-w-0">
+                    <h3 className="truncate text-base font-bold text-white">{name}</h3>
+                    <p className="truncate text-sm text-white/60">
+                      {pastor?.email || "Pastor"}
+                    </p>
+                  </div>
+                </div>
+{/* 
+                <div className="mt-5 flex justify-end">
+                  <button
+                    type="button"
+                  onClick={() => {
+  setSelectedMentor(null);
+  setSelectedMentorPastors([]);
+  setActiveTab("pastor");
+  setSelectedPastorModalId(pastorId);
+}}
+                    className="rounded-2xl bg-[#3498DB] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#5dade2]"
+                  >
+                    View Roadmap
+                  </button>
+                </div> */}
+                <div className="mt-5 flex justify-end gap-3">
+  {pastor?.email ? (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        window.location.href = `mailto:${pastor.email}`;
+      }}
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/75 transition hover:bg-[#3498DB]/25 hover:text-white"
+      title={`Email ${pastor.email}`}
+    >
+      <i className="fa-regular fa-envelope text-sm" />
+    </button>
+  ) : null}
+
+  <button
+    type="button"
+    onClick={() => {
+      setSelectedMentor(null);
+      setSelectedMentorPastors([]);
+      setActiveTab("pastor");
+      setSelectedPastorModalId(pastorId);
+    }}
+    className="rounded-2xl bg-[#3498DB] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#5dade2]"
+  >
+    View Roadmap
+  </button>
+</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  </div>
+) : null}
     </div>
   );
 }

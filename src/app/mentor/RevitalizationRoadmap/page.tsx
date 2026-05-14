@@ -47,6 +47,7 @@ type Mentee = {
   role: string;
   profileInfo?: string;
   profilePicture?: string;
+  country?: string;
   progress: number;
 };
 
@@ -73,6 +74,7 @@ useEffect(() => {
   }
 }, [searchParams]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"default" | "progress" | "country">("default");
 
   const [roadmaps, setRoadmaps] = useState<any[]>([]);
   const [roadmapLoading, setRoadmapLoading] = useState(false);
@@ -80,6 +82,7 @@ useEffect(() => {
   const [mentees, setMentees] = useState<Mentee[]>([]);
   const [loading, setLoading] = useState(true);
   const [sessionMissing, setSessionMissing] = useState(false);
+  const [openPastorMenuId, setOpenPastorMenuId] = useState<string | null>(null);
   const libraryFetchedRef = useRef(false);
 
   useEffect(() => {
@@ -124,8 +127,11 @@ useEffect(() => {
             email: u.email,
             role: u.role,
             profileInfo: u.profileInfo,
+            // profilePicture: u.profilePicture,
+            // progress: found?.progress ?? 0,
             profilePicture: u.profilePicture,
-            progress: found?.progress ?? 0,
+country: u.country || u.interest?.country || u.churchCountry || u.interest?.churchCountry || "",
+progress: found?.progress ?? 0,
           };
         });
 
@@ -178,19 +184,47 @@ useEffect(() => {
     );
   };
 
+  // const filteredPastors = useMemo(() => {
+  //   const q = searchQuery.trim();
+  //   if (!q) return mentees;
+  //   return mentees.filter((m) => {
+  //     const fullName = `${m.firstName || ""} ${m.lastName || ""}`.trim();
+  //     return (
+  //       matchesQuery(fullName, q) ||
+  //       matchesQuery(m.email || "", q) ||
+  //       matchesQuery(m.role || "", q) ||
+  //       matchesQuery(m.profileInfo || "", q)
+  //     );
+  //   });
+  // }, [mentees, searchQuery]);
   const filteredPastors = useMemo(() => {
-    const q = searchQuery.trim();
-    if (!q) return mentees;
-    return mentees.filter((m) => {
-      const fullName = `${m.firstName || ""} ${m.lastName || ""}`.trim();
-      return (
-        matchesQuery(fullName, q) ||
-        matchesQuery(m.email || "", q) ||
-        matchesQuery(m.role || "", q) ||
-        matchesQuery(m.profileInfo || "", q)
-      );
-    });
-  }, [mentees, searchQuery]);
+  const q = searchQuery.trim();
+
+  let list = !q
+    ? mentees
+    : mentees.filter((m) => {
+        const fullName = `${m.firstName || ""} ${m.lastName || ""}`.trim();
+        return (
+          matchesQuery(fullName, q) ||
+          matchesQuery(m.email || "", q) ||
+          matchesQuery(m.role || "", q) ||
+          matchesQuery(m.profileInfo || "", q) ||
+          matchesQuery(m.country || "", q)
+        );
+      });
+
+  if (sortBy === "progress") {
+    list = [...list].sort((a, b) => Number(b.progress || 0) - Number(a.progress || 0));
+  }
+
+  if (sortBy === "country") {
+    list = [...list].sort((a, b) =>
+      String(a.country || "").localeCompare(String(b.country || ""))
+    );
+  }
+
+  return list;
+}, [mentees, searchQuery, sortBy]);
 
   const filteredRoadmaps = useMemo(() => {
     const q = searchQuery.trim();
@@ -225,7 +259,19 @@ useEffect(() => {
               aria-label={activeTab === "Pastor" ? "Search pastors" : "Search roadmap library"}
               className="max-w-none lg:max-w-md"
             />
-
+{activeTab === "Pastor" ? (
+  <select
+    value={sortBy}
+    onChange={(e) =>
+      setSortBy(e.target.value as "default" | "progress" | "country")
+    }
+    className="h-10 rounded-lg border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white outline-none transition hover:bg-white/15 lg:w-[130px] [&>option]:bg-[#0d1f33] [&>option]:text-white"
+  >
+    <option value="default">Sort by</option>
+    <option value="progress">Progress: 100% to 0%</option>
+    <option value="country">Country: A to Z</option>
+  </select>
+) : null}
             <div className={mentorFilterStrip}>
               <button
                 type="button"
@@ -246,7 +292,48 @@ useEffect(() => {
                 Roadmap library
               </button>
             </div>
-          </div>
+                   </div>
+
+          {activeTab === "Pastor" && !loading && filteredPastors.length > 0 ? (
+            <div className="mt-5 border-t border-white/10 pt-5">
+              <div className="flex items-center gap-7 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {filteredPastors.map((mentee) => {
+                  const fullName = `${mentee.firstName || ""} ${mentee.lastName || ""}`.trim();
+                  const initials =
+                    `${mentee.firstName?.[0] ?? ""}${mentee.lastName?.[0] ?? ""}`.toUpperCase() || "P";
+
+                  return (
+                    <button
+                      key={`thumb-${mentee._id}`}
+                      type="button"
+                      onClick={() => handleUserClick(mentee._id)}
+                      className="group flex min-w-[92px] flex-col items-center gap-2 text-center"
+                    >
+                      <div className="relative h-[72px] w-[72px] overflow-hidden rounded-full border-2 border-[#3498DB]/50 bg-[#173653] transition group-hover:scale-105 group-hover:border-[#8ec5eb]">
+                        {mentee.profilePicture ? (
+                          <Image
+                            src={mentee.profilePicture}
+                            alt={fullName}
+                            fill
+                            className="object-cover"
+                            unoptimized={isHttpUrl(mentee.profilePicture)}
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-xl font-bold text-white">
+                            {initials}
+                          </div>
+                        )}
+                      </div>
+
+                      <span className="max-w-[90px] truncate text-xs font-semibold text-[#cde2f2] group-hover:text-white">
+                        {fullName || "Pastor"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
           </div>
 
           {activeTab === "Pastor" && (
@@ -277,15 +364,55 @@ useEffect(() => {
                   No pastors match your search. Try another name, email, or role.
                 </p>
               )}
+              
               <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2">
                 {!loading &&
                   filteredPastors.map((mentee) => (
-                    <button
-                      key={mentee._id}
-                      type="button"
-                      onClick={() => handleUserClick(mentee._id)}
-                      className={`text-left ${mentorGlassCardRoadmap}`}
-                    >
+                    // <button
+                    //   key={mentee._id}
+                    //   type="button"
+                    //   onClick={() => handleUserClick(mentee._id)}
+                    //   className={`text-left ${mentorGlassCardRoadmap}`}
+                    // >
+                    <div
+  key={mentee._id}
+  onClick={() => handleUserClick(mentee._id)}
+  className={`relative cursor-pointer text-left ${mentorGlassCardRoadmap}`}
+>
+  <div className="absolute right-4 top-4 z-20">
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      setOpenPastorMenuId((prev) => (prev === mentee._id ? null : mentee._id));
+    }}
+    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/75 hover:bg-white/15"
+    aria-label="Pastor actions"
+  >
+    <i className="fa-solid fa-ellipsis-vertical text-sm" />
+  </button>
+
+  {openPastorMenuId === mentee._id ? (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="absolute right-0 top-11 z-30 w-48 rounded-xl border border-white/15 bg-[#0d1f33] p-2 shadow-xl"
+    >
+      <button
+        type="button"
+        onClick={() => {
+          setOpenPastorMenuId(null);
+          router.push(
+            `/mentor/MentorSchedule?tab=Schedule&recipientType=pastor&pastorId=${encodeURIComponent(mentee._id)}`
+          );
+        }}
+        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-white/85 hover:bg-white/10"
+      >
+        <i className="fa-regular fa-calendar-plus text-xs" />
+        Schedule Meeting
+      </button>
+    </div>
+  ) : null}
+</div>
                       <div className="relative m-4 h-[180px] w-full shrink-0 sm:h-[200px] sm:w-[200px]">
                         {isHttpUrl(mentee.profilePicture) ? (
                           <Image
@@ -308,6 +435,11 @@ useEffect(() => {
                           <p className="mb-3 text-sm text-[#cde2f2]">
                             {mentee.profileInfo || mentee.role || "Pastor"}
                           </p>
+                          <div className="mb-3 inline-flex w-fit items-center rounded-full bg-[#8ec5eb]/15 px-3 py-1 text-xs font-semibold text-[#8ec5eb]">
+  Phase :&nbsp;
+</div>
+
+
                           <div className="mb-3 flex items-center gap-2">
                             <span className="text-xs font-medium text-[#d9ebf8]">Overall progress</span>
                             <span className="rounded-full border border-[#3498DB]/35 bg-[#3498DB]/15 px-2 py-[2px] text-xs font-semibold text-[#aed6f1]">
@@ -321,11 +453,34 @@ useEffect(() => {
                             />
                           </div>
                         </div>
-                        <div className="mt-4 flex justify-end sm:mt-0">
-                          <span className={mentorPrimaryCtaDashboard}>View roadmaps</span>
-                        </div>
+                        <div className="mt-4 flex items-center justify-between gap-4 sm:mt-0">
+  <div className="flex items-center gap-4 text-[18px] text-[#8ec5eb]">
+    <a
+      href={`mailto:${mentee.email}`}
+      onClick={(e) => e.stopPropagation()}
+      className="transition hover:text-white"
+      title="Email"
+    >
+      <i className="fa-regular fa-envelope" />
+    </a>
+
+    <span className="cursor-not-allowed opacity-40">
+      <i className="fa-regular fa-comment-dots" />
+    </span>
+
+    <span className="cursor-not-allowed opacity-40">
+      <i className="fa-brands fa-whatsapp" />
+    </span>
+
+    <span className="cursor-not-allowed opacity-40">
+      <i className="fa-solid fa-phone" />
+    </span>
+  </div>
+
+  <span className={mentorPrimaryCtaDashboard}>View roadmaps</span>
+</div>
                       </div>
-                    </button>
+                    </div>
                   ))}
               </div>
             </>
@@ -353,7 +508,8 @@ useEffect(() => {
                   const rid = String(roadmap._id ?? roadmap.id ?? "");
                   const imgOk = isHttpUrl(roadmap.imageUrl);
                   return (
-                    <div key={rid || roadmap.name} className={mentorGlassCardRoadmap}>
+                    // <div key={rid || roadmap.name} className={mentorGlassCardRoadmap}>
+                    <div key={rid || roadmap.name} className={`${mentorGlassCardRoadmap} relative pb-10`}>
                       <div className="relative m-4 h-[180px] w-full shrink-0 sm:h-[200px] sm:w-[200px]">
                         {imgOk ? (
                           <Image
@@ -379,7 +535,8 @@ useEffect(() => {
                           <p className="mt-3 text-xs text-[#d9ebf8]">
                             Steps: {roadmap.totalSteps ?? roadmap.roadmaps?.length ?? "—"}
                           </p>
-   <div className="mt-4 flex justify-end">
+   {/* <div className="mt-auto flex justify-end pt-4"> */}
+   <div className="absolute bottom-4 right-5">
   <button
     type="button"
     onClick={() => {

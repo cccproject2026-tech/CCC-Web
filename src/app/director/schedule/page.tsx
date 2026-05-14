@@ -338,6 +338,25 @@ function DirectorScheduleContent() {
       .catch(() => setPastors([]));
   }, []);
 
+  useEffect(() => {
+  const recipientType = searchParams.get("recipientType");
+  const pastorId = searchParams.get("pastorId");
+
+  if (recipientType !== "pastor" || !pastorId || pastors.length === 0) return;
+
+  const matchedPastor = pastors.find(
+    (pastor: any) => String(pastor._id || pastor.id) === String(pastorId)
+  );
+
+  if (!matchedPastor) return;
+
+  setActiveTab("Schedule");
+  setScheduleRecipientType("pastor");
+  setSelectedRecipient(matchedPastor);
+  setIsDrawerOpen(true);
+  setDrawerStep(2);
+}, [searchParams, pastors]);
+
   // ── Fetch mentors ─────────────────────────────────────────────────────────────
   useEffect(() => {
     apiGetAllUsers({ role: "mentor", roleMatch: "mixed", limit: 9999 })
@@ -347,6 +366,24 @@ function DirectorScheduleContent() {
       })
       .catch(() => setMentors([]));
   }, []);
+  useEffect(() => {
+  const recipientType = searchParams.get("recipientType");
+  const mentorId = searchParams.get("mentorId");
+
+  if (recipientType !== "mentor" || !mentorId || mentors.length === 0) return;
+
+  const matchedMentor = mentors.find(
+    (mentor: any) => String(mentor._id || mentor.id) === String(mentorId)
+  );
+
+  if (!matchedMentor) return;
+
+  setActiveTab("Schedule");
+  setScheduleRecipientType("mentor");
+  setSelectedRecipient(matchedMentor);
+  setIsDrawerOpen(true);
+  setDrawerStep(2);
+}, [searchParams, mentors]);
 
   const fetchWeeklyAvailability = useCallback(async () => {
     if (!directorId) return;

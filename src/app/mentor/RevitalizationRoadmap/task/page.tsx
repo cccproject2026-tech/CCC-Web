@@ -713,14 +713,77 @@ const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
 
         <div className="mt-3 space-y-2">
           {uploadedFiles.map((file) => (
+            // <div
+            //   key={`${file.fileUrl}-${file.fileName}`}
+            //   onClick={() => window.open(file.fileUrl, "_blank")}
+            //   className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-white hover:bg-white/[0.08]"
+            // >
+            //   <i className="fa-solid fa-file text-blue-300" />
+            //   <span className="min-w-0 flex-1 truncate">{file.fileName}</span>
+            // </div>
             <div
-              key={`${file.fileUrl}-${file.fileName}`}
-              onClick={() => window.open(file.fileUrl, "_blank")}
-              className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-white hover:bg-white/[0.08]"
-            >
-              <i className="fa-solid fa-file text-blue-300" />
-              <span className="min-w-0 flex-1 truncate">{file.fileName}</span>
-            </div>
+  key={`${file.fileUrl}-${file.fileName}`}
+  onClick={() => window.open(file.fileUrl, "_blank")}
+  className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-white hover:bg-white/[0.08]"
+>
+  <i className="fa-solid fa-file text-blue-300" />
+  <span className="min-w-0 flex-1 truncate">{file.fileName}</span>
+
+  <button
+    type="button"
+    onClick={async (e) => {
+      e.stopPropagation();
+
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: file.fileName,
+            url: file.fileUrl,
+          });
+          return;
+        } catch {
+          // user cancelled share
+        }
+      }
+
+      await navigator.clipboard.writeText(file.fileUrl);
+      alert("File link copied.");
+    }}
+    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/10 text-blue-200 hover:bg-white/15"
+    title="Share"
+  >
+    <i className="fa-solid fa-share-nodes" />
+  </button>
+
+  <button
+    type="button"
+    onClick={async (e) => {
+      e.stopPropagation();
+
+      try {
+        const response = await fetch(file.fileUrl);
+        const blob = await response.blob();
+
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = file.fileName || "download";
+        document.body.appendChild(link);
+        link.click();
+
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      } catch {
+        window.open(file.fileUrl, "_blank");
+      }
+    }}
+    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/10 text-blue-200 hover:bg-white/15"
+    title="Download"
+  >
+    <i className="fa-solid fa-download" />
+  </button>
+</div>
           ))}
         </div>
       </div>
@@ -738,16 +801,39 @@ const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
     );
   }
 
+  // if (typeof val === "boolean") {
+  //   return (
+  //     <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+  //       <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+  //         {label}
+  //       </p>
+  //       <p className="mt-1 text-sm text-white">{val ? "Yes" : "No"}</p>
+  //     </div>
+  //   );
+  // }
   if (typeof val === "boolean") {
-    return (
-      <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
-          {label}
-        </p>
-        <p className="mt-1 text-sm text-white">{val ? "Yes" : "No"}</p>
+  return (
+    <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+        {label}
+      </p>
+
+      <div className="mt-3 flex items-center gap-3 text-sm text-white">
+        <span
+          className={`flex h-5 w-5 items-center justify-center rounded border ${
+            val
+              ? "border-[#8ec5eb] bg-[#8ec5eb] text-[#062946]"
+              : "border-white/35 bg-transparent"
+          }`}
+        >
+          {val ? <i className="fa-solid fa-check text-xs" /> : null}
+        </span>
+
+        <span>{val ? "Yes" : "No"}</span>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   const str = typeof val === "object" ? JSON.stringify(val, null, 2) : String(val);
 

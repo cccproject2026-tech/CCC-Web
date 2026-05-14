@@ -1379,7 +1379,7 @@ export default function DirectorRoadmapFormPage() {
                       />
                     </div>
                     <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3">
-                      <label className="inline-flex items-center gap-2 text-sm text-white/80">
+                      {/* <label className="inline-flex items-center gap-2 text-sm text-white/80">
                         <input
                           type="checkbox"
                           checked={!!fieldDraft.haveButton}
@@ -1387,7 +1387,7 @@ export default function DirectorRoadmapFormPage() {
                           className="h-4 w-4 accent-[#8ec5eb]"
                         />
                         Have button
-                      </label>
+                      </label> */}
                       {fieldDraft.haveButton ? (
                         <div className="w-full sm:w-auto sm:flex-1">
                           <input
