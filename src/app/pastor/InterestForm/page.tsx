@@ -600,7 +600,7 @@ try {
                         <button
                           type="button"
                           onClick={() => removeChurch(idx)}
-                          className="text-xs text-red-400 hover:text-red-300 transition"
+                          className="text-xs font-medium text-red-400 underline underline-offset-4 transition hover:text-red-300"
                         >
                           Remove
                         </button>

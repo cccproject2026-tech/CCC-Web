@@ -1275,7 +1275,18 @@ const filteredMentorList = useMemo(() => {
 </button>
   </div>
 
-  <div className="mt-5 border-t border-white/10 pt-5" aria-hidden />
+  {/* <div className="mt-5 border-t border-white/10 pt-5" aria-hidden /> */}
+  <div className="mt-5 border-t border-white/10 pt-5">
+  {activeTab === "mentor" ? (
+    <p className="mb-4 text-sm font-medium text-[#cde2f2]/85">
+      Select a mentor to view their assigned pastors, then open a pastor to review their roadmaps.
+    </p>
+  ) : activeTab === "pastor" ? (
+    <p className="mb-4 text-sm font-medium text-[#cde2f2]/85">
+      View roadmaps for all pastors, or select a pastor to review their assigned roadmaps.
+    </p>
+  ) : null}
+</div>
   {activeTab === "mentor" && (
   <div className="pt-1">
     <div className="relative px-4 py-5">

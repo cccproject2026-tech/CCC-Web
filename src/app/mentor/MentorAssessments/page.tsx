@@ -165,7 +165,20 @@ function formatCreatedDate(value?: string): string | null {
     year: "numeric",
   });
 }
+function isTodayDate(value?: string): boolean {
+  if (!value) return false;
 
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+
+  const today = new Date();
+
+  return (
+    date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear()
+  );
+}
 function toDateInputValue(value?: string): string {
   if (!value) return "";
   const date = new Date(value);
@@ -514,11 +527,20 @@ export default function MentorAssessments() {
           }
 
           const idStatusRows = assessmentProgress
+            // .map((p: any) => ({
+            //   assessmentId: extractAssessmentIdFromProgressRow(p),
+            //   status: normalizeMentorAssessmentStatus(p?.status),
+            //   assignmentId: p?.assignmentId ? String(p.assignmentId) : undefined,
+            // }))
             .map((p: any) => ({
-              assessmentId: extractAssessmentIdFromProgressRow(p),
-              status: normalizeMentorAssessmentStatus(p?.status),
-              assignmentId: p?.assignmentId ? String(p.assignmentId) : undefined,
-            }))
+  assessmentId: extractAssessmentIdFromProgressRow(p),
+  status: normalizeMentorAssessmentStatus(p?.status),
+  assignmentId: p?.assignmentId ? String(p.assignmentId) : undefined,
+  submittedAt: p?.submittedAt,
+  completedAt: p?.completedAt,
+  updatedAt: p?.updatedAt,
+  createdAt: p?.createdAt,
+}))
             .filter((p: { assessmentId: string }) => p.assessmentId !== "");
 
           const uniqById = idStatusRows.filter(
@@ -560,11 +582,16 @@ export default function MentorAssessments() {
               const hasMeetingDetails = !!(resolvedAppointmentId || appt?.meetingDate);
               const normalizedStatus: MentorAssessmentStatus = hasMeetingDetails ? "completed" : "submitted";
               const resolvedDueDate = pickAssignedDueDate(item, flat);
-              return {
-                ...assessment,
-                _id: assessmentId,
-                id: assessmentId,
-                _mentorAssignmentStatus: normalizedStatus,
+             return {
+  ...assessment,
+  _id: assessmentId,
+  id: assessmentId,
+
+_mentorSubmittedAt:
+  (progressRow as any)?.updatedAt ||
+  assessment?.updatedAt,
+
+  _mentorAssignmentStatus: normalizedStatus,
                 _mentorAssignmentId: flat.assignmentId ?? progressRow?.assignmentId,
                 _mentorDueDate: resolvedDueDate,
                 _mentorAppointmentId: resolvedAppointmentId || undefined,
@@ -784,6 +811,56 @@ export default function MentorAssessments() {
         new Date(String(a?.createdOn ?? a?.createdAt ?? 0)).getTime(),
     );
   }, [assessments, sortBy]);
+
+  const todaySubmissions = useMemo(() => {
+  return filtered.filter((item: any) => {
+    if (
+  item._mentorAssignmentStatus !== "submitted" &&
+  item._mentorAssignmentStatus !== "completed"
+) {
+  return false;
+}
+
+    // const submittedDate =
+    //   item.submittedAt ||
+    //   item.completedAt ||
+    //   item.updatedAt ||
+    //   item.createdAt ||
+    //   item.createdOn;
+   
+//  const submittedDate =
+//   item._mentorSubmittedAt ||
+//   item.submittedAt ||
+//   item.completedAt ||
+//   item.updatedAt ||
+//   item.createdAt ||
+//   item.createdOn;
+const submittedDate = item._mentorSubmittedAt;
+
+    return isTodayDate(submittedDate);
+  });
+}, [filtered]);
+
+const previousSubmissions = useMemo(() => {
+  return filtered.filter((item: any) => {
+    if (
+  item._mentorAssignmentStatus !== "submitted" &&
+  item._mentorAssignmentStatus !== "completed"
+) {
+  return false;
+}
+
+    // const submittedDate =
+    //   item.submittedAt ||
+    //   item.completedAt ||
+    //   item.updatedAt ||
+    //   item.createdAt ||
+    //   item.createdOn;
+    const submittedDate = item._mentorSubmittedAt;
+
+    return submittedDate && !isTodayDate(submittedDate);
+  });
+}, [filtered]);
 
   const filteredFeaturedItems = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
@@ -1174,6 +1251,117 @@ export default function MentorAssessments() {
                       />
                     </div>
                   )}
+                  {selectedMenteeId && (
+  <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <div className={`${mentorFilterPanel} p-5`}>
+      <h3 className="mb-3 text-base font-semibold text-white">
+        Today&apos;s Submissions
+      </h3>
+
+      {todaySubmissions.length > 0 ? (
+        <div className="space-y-3">
+          {todaySubmissions.map((assessment: any, idx: number) => (
+            <div
+              key={`today-submission-${getAssessmentId(assessment) || idx}`}
+              className="rounded-xl border border-white/10 bg-white/[0.04] p-4"
+            >
+              <p className="text-sm font-semibold text-white">
+                {assessment.name || "Assessment"}
+              </p>
+              <p className="mt-1 text-xs text-[#cde2f2]/75">
+                Submitted by {selectedMenteeName}
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}`,
+                    )
+                  }
+                  className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                >
+                  View Result
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
+                    )
+                  }
+                  className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+                >
+                  Send CDP
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-[#cde2f2]/70">
+          No assessments submitted today.
+        </p>
+      )}
+    </div>
+
+    <div className={`${mentorFilterPanel} p-5`}>
+      <h3 className="mb-3 text-base font-semibold text-white">
+        Previous Submissions
+      </h3>
+
+      {previousSubmissions.length > 0 ? (
+        <div className="space-y-3">
+          {previousSubmissions.map((assessment: any, idx: number) => (
+            <div
+              key={`previous-submission-${getAssessmentId(assessment) || idx}`}
+              className="rounded-xl border border-white/10 bg-white/[0.04] p-4"
+            >
+              <p className="text-sm font-semibold text-white">
+                {assessment.name || "Assessment"}
+              </p>
+              <p className="mt-1 text-xs text-[#cde2f2]/75">
+                Submitted by {selectedMenteeName}
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}`,
+                    )
+                  }
+                  className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                >
+                  View Result
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
+                    )
+                  }
+                  className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+                >
+                  Send CDP
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-[#cde2f2]/70">
+          No previous submissions found.
+        </p>
+      )}
+    </div>
+  </div>
+)}
                   <div className="mb-4">
                     <h2 className="text-lg font-semibold text-white sm:text-xl">
                       {selectedMenteeId ? `${selectedMenteeName}'s Assessment` : "All Assessments"}

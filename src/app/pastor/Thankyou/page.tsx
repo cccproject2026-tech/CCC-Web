@@ -48,7 +48,7 @@ function ThankyouContent() {
                 </div>
 
                 <h1 className="text-3xl font-semibold leading-tight text-white md:text-4xl lg:text-[2.5rem] lg:leading-snug">
-                  Thank you!
+                  Thank you !
                 </h1>
 
                 <p className="mt-6 max-w-2xl text-base leading-relaxed text-[#cde2f2] md:text-lg">

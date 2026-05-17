@@ -246,6 +246,18 @@ function AssessmentsPageContent() {
   const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(assignUserFromQuery);
   const [assignDueDate, setAssignDueDate] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name_asc" | "name_desc">("newest");
+  const [activeTab, setActiveTab] = useState<
+  "assessments" | "mentors" | "pastors"
+>("assessments");
+
+const [selectedMentorId, setSelectedMentorId] = useState<string | null>(null);
+const [selectedMentorName, setSelectedMentorName] = useState("");
+
+const [mentorItems, setMentorItems] = useState<FeaturedAvatarItem[]>([]);
+const [mentorPastors, setMentorPastors] = useState<FeaturedAvatarItem[]>([]);
+const [mentorRows, setMentorRows] = useState<any[]>([]);
+const [allPastorRows, setAllPastorRows] = useState<any[]>([]);
+const [mentorPastorRows, setMentorPastorRows] = useState<any[]>([]);
   const lastAssignBootstrap = useRef<string | null>(null);
 
   useEffect(() => {
@@ -262,7 +274,7 @@ function AssessmentsPageContent() {
         setListError(null);
 
         const res = await apiGetAssessments({
-          search: debouncedSearch || undefined,
+          search: activeTab === "assessments" ? debouncedSearch || undefined : undefined,
           _t: Date.now(),
         });
 
@@ -434,7 +446,7 @@ function AssessmentsPageContent() {
     };
 
     fetchAssessments();
-  }, [pathname, debouncedSearch, selectedMenteeId, listRefetchKey]);
+  }, [pathname, debouncedSearch, selectedMenteeId, listRefetchKey, activeTab]);
 
   useEffect(() => {
     if (pathname !== "/director/assessments") return;
@@ -456,7 +468,7 @@ function AssessmentsPageContent() {
           if (Array.isArray(payload.users)) listUsers = payload.users;
           else if (Array.isArray(payload.rows)) listUsers = payload.rows;
         }
-
+setAllPastorRows(listUsers as any[]);
         setFeaturedItems(
           listUsers
             .map((user) => {
@@ -479,7 +491,50 @@ function AssessmentsPageContent() {
 
     void fetchFeaturedPastors();
   }, [pathname]);
+useEffect(() => {
+  if (pathname !== "/director/assessments") return;
 
+  const fetchMentors = async () => {
+    try {
+      const res = await apiGetAllUsers({
+        role: "mentor",
+        roleMatch: "mixed",
+        page: 1,
+        limit: 20,
+      });
+
+      const inner = res?.data?.data;
+      let listUsers: unknown[] = [];
+
+      if (inner && typeof inner === "object") {
+        const payload = inner as { users?: unknown[]; rows?: unknown[] };
+        if (Array.isArray(payload.users)) listUsers = payload.users;
+        else if (Array.isArray(payload.rows)) listUsers = payload.rows;
+      }
+      setMentorRows(listUsers as any[]);
+
+      setMentorItems(
+        listUsers
+          .map((user) => {
+            const row = mapUserToAssignUser(user as Record<string, unknown>);
+            return {
+              id: row.id,
+              name: row.name,
+              img:
+                resolveApiMediaUrl(typeof row.avatar === "string" ? row.avatar : "") ||
+                row.avatar,
+            } satisfies FeaturedAvatarItem;
+          })
+          .filter((item) => String(item.id).trim() !== "")
+      );
+    } catch (error) {
+      console.error("Failed to fetch mentors", error);
+      setMentorItems([]);
+    }
+  };
+
+  void fetchMentors();
+}, [pathname]);
   useEffect(() => {
     if (pathname !== "/director/assessments") return;
     const onVis = () => {
@@ -661,7 +716,15 @@ function AssessmentsPageContent() {
       String(item?.name || "").toLowerCase().includes(q),
     );
   }, [featuredItems, searchQuery]);
+const filteredMentorRows = useMemo(() => {
+  const q = searchQuery.trim().toLowerCase();
+  if (!q) return mentorRows;
 
+  return mentorRows.filter((mentor: any) => {
+    const row = mapUserToAssignUser(mentor);
+    return `${row.name} ${mentor.email || ""}`.toLowerCase().includes(q);
+  });
+}, [mentorRows, searchQuery]);
   const selectedPastorName = useMemo(() => {
     const row = featuredItems.find((item) => String(item.id) === String(selectedMenteeId || ""));
     return row?.name || "Pastor";
@@ -702,88 +765,122 @@ function AssessmentsPageContent() {
 
       <section className="relative py-8">
         <div className={directorPageContainer}>
-          <DirectorFilterSection>
-            <div className="relative w-full flex-1 md:max-w-md">
-              <SearchBar
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="Search assessments or pastors…"
-                variant="dark"
-                className="w-full"
-              />
-              {listError ? (
-                <p className="mt-3 rounded-lg border border-red-400/35 bg-red-500/15 px-3 py-2 text-sm text-red-100">
-                  {listError}
-                </p>
-              ) : null}
-            </div>
+          <div className={`${directorGlassCard} mb-6 p-5`}>
+  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="relative w-full lg:max-w-xl">
+      <SearchBar
+        value={searchQuery}
+        onChange={setSearchQuery}
+        placeholder={
+  activeTab === "mentors"
+    ? "Search mentors..."
+    : activeTab === "pastors"
+      ? "Search pastors..."
+      : "Search assessments..."
+}
+        variant="dark"
+        className="w-full"
+      />
 
-            {/* <div className="flex flex-wrap gap-3">
-              {!isSelectionMode ? (
-                <>
-                  <button type="button" onClick={handleSelectMode} className={directorBtnSecondary}>
-                    <i className="fa-solid fa-check-square"></i>
-                    Select
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => router.push("/director/assessments/create")}
-                    className={directorBtnPrimary}
-                  >
-                    <i className="fa-solid fa-plus"></i>
-                    Add
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (selectedAssessments.length === 0) {
-                      setToast("Select at least one assessment first.");
-                      setTimeout(() => setToast(null), 3500);
-                      return;
-                    }
-                    setShowAssignModal(true);
-                  }}
-                  className={directorBtnPrimary}
-                >
-                  <i className="fa-solid fa-user-plus"></i>
-                  Assigned to
-                </button>
-              )}
-            </div> */}
-            <div className="flex flex-wrap gap-3">
-              {!isSelectionMode && (
-                <>
-                  <select
-                    value={sortBy}
-                    onChange={(e) =>
-                      setSortBy(e.target.value as "newest" | "oldest" | "name_asc" | "name_desc")
-                    }
-                    className="h-[42px] min-w-[170px] rounded-lg border border-white/20 bg-white/10 px-3 text-sm font-medium text-white outline-none transition focus:border-[#8ec5eb]/55 focus:ring-2 focus:ring-[#8ec5eb]/30 [&>option]:bg-[#062946] [&>option]:text-white"
-                    aria-label="Sort assessments"
-                  >
-                    <option value="newest">Newest</option>
-                    <option value="oldest">Oldest</option>
-                    <option value="name_asc">Name A-Z</option>
-                    <option value="name_desc">Name Z-A</option>
-                  </select>
-                  <button type="button" onClick={handleSelectMode} className={directorBtnSecondary}>
-                    <i className="fa-solid fa-check-square"></i>
-                    Select
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => router.push("/director/assessments/create")}
-                    className={directorBtnPrimary}
-                  >
-                    <i className="fa-solid fa-plus"></i>
-                    Add
-                  </button>
-                </>
-              )}
-            </div>
-          </DirectorFilterSection>
+      {listError ? (
+        <p className="mt-3 rounded-lg border border-red-400/35 bg-red-500/15 px-3 py-2 text-sm text-red-100">
+          {listError}
+        </p>
+      ) : null}
+    </div>
+
+    <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-1">
+      <button
+        type="button"
+       onClick={() => {
+  setActiveTab("assessments");
+  setSearchQuery("");
+  setDebouncedSearch("");
+  setSelectedMentorId(null);
+  setSelectedMenteeId(null);
+}}
+        className={`rounded-lg px-5 py-2 text-sm font-semibold transition ${
+          activeTab === "assessments"
+            ? "bg-[#3498DB] text-white"
+            : "text-white/75 hover:bg-white/10"
+        }`}
+      >
+        Assessments
+      </button>
+
+      <button
+        type="button"
+      onClick={() => {
+  setActiveTab("mentors");
+  setSearchQuery("");
+  setDebouncedSearch("");
+  setSelectedMenteeId(null);
+}}
+        className={`rounded-lg px-5 py-2 text-sm font-semibold transition ${
+          activeTab === "mentors"
+            ? "bg-[#3498DB] text-white"
+            : "text-white/75 hover:bg-white/10"
+        }`}
+      >
+        Mentor
+      </button>
+
+      <button
+        type="button"
+        onClick={() => {
+  setActiveTab("pastors");
+  setSearchQuery("");
+  setDebouncedSearch("");
+  setSelectedMentorId(null);
+}}
+        className={`rounded-lg px-5 py-2 text-sm font-semibold transition ${
+          activeTab === "pastors"
+            ? "bg-[#3498DB] text-white"
+            : "text-white/75 hover:bg-white/10"
+        }`}
+      >
+        Pastor Assessments
+      </button>
+    </div>
+  </div>
+
+  {activeTab === "assessments" && (
+  <div className="mt-4 flex w-full flex-wrap justify-end gap-3 border-t border-white/10 pt-4">
+    {!isSelectionMode && (
+      <>
+        <select
+          value={sortBy}
+          onChange={(e) =>
+            setSortBy(e.target.value as "newest" | "oldest" | "name_asc" | "name_desc")
+          }
+          className="h-[42px] min-w-[170px] rounded-lg border border-white/20 bg-white/10 px-3 text-sm font-medium text-white outline-none transition focus:border-[#8ec5eb]/55 focus:ring-2 focus:ring-[#8ec5eb]/30 [&>option]:bg-[#062946] [&>option]:text-white"
+          aria-label="Sort assessments"
+        >
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="name_asc">Name A-Z</option>
+          <option value="name_desc">Name Z-A</option>
+        </select>
+
+        <button type="button" onClick={handleSelectMode} className={directorBtnSecondary}>
+          <i className="fa-solid fa-check-square"></i>
+          Select
+        </button>
+
+        <button
+          type="button"
+          onClick={() => router.push("/director/assessments/create")}
+          className={directorBtnPrimary}
+        >
+          <i className="fa-solid fa-plus"></i>
+          Add
+        </button>
+      </>
+    )}
+  </div>
+)}
+</div>
+        
 
           {isSelectionMode && (
             <div className={`mb-6 flex flex-wrap items-center justify-between gap-4 p-5 ${directorGlassCard}`}>
@@ -863,7 +960,177 @@ function AssessmentsPageContent() {
             </div>
           ) : (
             <>
-              {!featuredLoading && filteredFeaturedItems.length > 0 && (
+            {activeTab === "mentors" && mentorItems.length > 0 && (
+  <div className={`mb-6 ${mentorFilterPanel} px-4 py-4 sm:px-5`}>
+    <p className="mb-4 text-sm leading-snug text-[#cde2f2]/90">
+      Select a mentor below to view their assigned pastors.
+    </p>
+
+    <FeaturedAvatars
+      items={mentorItems}
+      showDivider={false}
+      className="mb-0"
+      gapClass="gap-6 sm:gap-8"
+      selectedId={selectedMentorId}
+      onItemClick={(item) => {
+        const mentorId = String(item.id);
+        setSelectedMentorId(mentorId);
+        setSelectedMentorName(item.name);
+        setSelectedMenteeId(null);
+
+        const assignedPastors = allPastorRows.filter((pastor: any) => {
+          const assignedIds = Array.isArray(pastor.assignedId)
+            ? pastor.assignedId.map(String)
+            : [];
+
+          return assignedIds.includes(mentorId);
+        });
+
+        setMentorPastorRows(assignedPastors);
+      }}
+    />
+  </div>
+)}
+     {activeTab === "mentors" && !selectedMentorId && (
+  <div className="mb-6">
+    <h2 className="mb-4 text-lg font-semibold text-white sm:text-xl">
+      Mentors
+    </h2>
+
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {filteredMentorRows.map((mentor: any) => {
+        const row = mapUserToAssignUser(mentor);
+
+        return (
+          <button
+            key={row.id}
+            type="button"
+            // onClick={() => {
+            //   const mentorId = row.id;
+            //   setSelectedMentorId(mentorId);
+            //   setSelectedMentorName(row.name);
+            //   setSelectedMenteeId(null);
+
+            //   const assignedPastors = allPastorRows.filter((pastor: any) => {
+            //     const assignedIds = Array.isArray(pastor.assignedId)
+            //       ? pastor.assignedId.map(String)
+            //       : [];
+
+            //     return assignedIds.includes(mentorId);
+            //   });
+
+            //   setMentorPastorRows(assignedPastors);
+            // }}
+            onClick={() => {
+  router.push(`/director/assessments/mentor?mentorId=${row.id}`);
+}}
+            className={`${directorGlassCard} flex items-center gap-4 p-4 text-left transition hover:border-[#8ec5eb]/45 hover:bg-white/[0.08]`}
+          >
+            <Image
+              src={row.avatar}
+              alt=""
+              width={64}
+              height={64}
+              className="h-16 w-16 rounded-full object-cover"
+              unoptimized={
+                typeof row.avatar === "string" && isRemoteImageSrc(row.avatar)
+              }
+            />
+
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-base font-bold text-white">
+                {row.name}
+              </h3>
+              <p className="truncate text-sm text-white/60">
+                {mentor.email || "Mentor"}
+              </p>
+            </div>
+
+            <i className="fa-solid fa-chevron-right text-white/45" />
+          </button>
+        );
+      })}
+    </div>
+  </div>
+)}
+
+{activeTab === "mentors" && selectedMentorId && (
+  <div className="mb-6">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 className="text-lg font-semibold text-white sm:text-xl">
+          Assigned Pastors
+        </h2>
+        <p className="mt-1 text-sm text-white/60">
+          Showing pastors assigned to{" "}
+          <span className="font-semibold text-white">{selectedMentorName}</span>
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          setSelectedMentorId(null);
+          setSelectedMentorName("");
+          setMentorPastorRows([]);
+          setSelectedMenteeId(null);
+        }}
+        className={directorBtnSecondary}
+      >
+        Back to Mentors
+      </button>
+    </div>
+
+    {mentorPastorRows.length > 0 ? (
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {mentorPastorRows.map((pastor: any) => {
+          const row = mapUserToAssignUser(pastor);
+
+          return (
+            <div key={row.id} className={`${directorGlassCard} p-4`}>
+              <div className="flex items-center gap-4">
+                <Image
+                  src={row.avatar}
+                  alt=""
+                  width={64}
+                  height={64}
+                  className="h-16 w-16 rounded-full object-cover"
+                  unoptimized={
+                    typeof row.avatar === "string" && isRemoteImageSrc(row.avatar)
+                  }
+                />
+
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-base font-bold text-white">
+                    {row.name}
+                  </h3>
+                  <p className="truncate text-sm text-white/60">
+                    {pastor.email || "Pastor"}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedMenteeId(row.id)}
+                className={`${directorBtnPrimary} mt-4 w-full justify-center`}
+              >
+                View Assessments
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    ) : (
+      <div className={`${directorGlassCard} px-8 py-12 text-center text-sm text-white/60`}>
+        No assigned pastors found for this mentor.
+      </div>
+    )}
+  </div>
+)}
+
+              {/* {!featuredLoading && filteredFeaturedItems.length > 0 && ( */}
+              {activeTab === "pastors" && !featuredLoading && filteredFeaturedItems.length > 0 && (
                 <div className={`mb-6 ${mentorFilterPanel} px-4 py-4 sm:px-5`}>
                   <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 flex-1">
@@ -893,12 +1160,163 @@ function AssessmentsPageContent() {
                   />
                 </div>
               )}
-              <div className="mb-4">
+              {/* {activeTab === "pastors" && !selectedMenteeId && (
+  <div className="mb-6">
+    <h2 className="mb-4 text-lg font-semibold text-white sm:text-xl">
+      Pastor Profiles
+    </h2>
+
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {allPastorRows.map((pastor: any) => {
+        const row = mapUserToAssignUser(pastor);
+
+        return (
+          <button
+            key={row.id}
+            type="button"
+            onClick={() => setSelectedMenteeId(row.id)}
+            className={`${directorGlassCard} flex items-center gap-4 p-4 text-left transition hover:border-[#8ec5eb]/45 hover:bg-white/[0.08]`}
+          >
+            <Image
+              src={row.avatar}
+              alt=""
+              width={64}
+              height={64}
+              className="h-16 w-16 rounded-full object-cover"
+              unoptimized={
+                typeof row.avatar === "string" && isRemoteImageSrc(row.avatar)
+              }
+            />
+
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-base font-bold text-white">
+                {row.name}
+              </h3>
+              <p className="truncate text-sm text-white/60">
+                {pastor.email || "Pastor"}
+              </p>
+            </div>
+
+            <span className="rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white">
+              View Assessments
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  </div>
+)} */}
+{activeTab === "pastors" && !selectedMenteeId && (
+  <div className="mb-6">
+    <h2 className="mb-4 text-lg font-semibold text-white sm:text-xl">
+      Pastor Profiles
+    </h2>
+
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {allPastorRows.map((pastor: any) => {
+        const row = mapUserToAssignUser(pastor);
+
+        return (
+          <div key={row.id} className={`${directorGlassCard} relative flex gap-5 p-5`}>
+            <div className="options-menu-container absolute right-4 top-4">
+  <button
+    type="button"
+    onClick={() =>
+      setShowOptionsMenu(showOptionsMenu === row.id ? null : row.id)
+    }
+    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/70 hover:bg-white/15"
+  >
+    <i className="fa-solid fa-ellipsis-vertical" />
+  </button>
+
+  {showOptionsMenu === row.id && (
+    <div className="absolute right-0 z-20 mt-2 w-48 rounded-xl border border-white/15 bg-[#041f35] py-2 shadow-xl">
+      <button
+        type="button"
+        onClick={() => {
+  setShowOptionsMenu(null);
+  router.push(`/director/schedule?tab=schedule&recipientType=pastor&pastorId=${row.id}`);
+}}
+        className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-semibold text-white/90 hover:bg-white/10"
+      >
+        <i className="fa-regular fa-calendar-plus text-[#8ec5eb]" />
+        Schedule Meeting
+      </button>
+    </div>
+  )}
+</div>
+            <Image
+              src={row.avatar}
+              alt=""
+              width={150}
+              height={150}
+              className="h-32 w-32 rounded-xl object-cover"
+              unoptimized={typeof row.avatar === "string" && isRemoteImageSrc(row.avatar)}
+            />
+
+            <div className="flex min-w-0 flex-1 flex-col">
+              <h3 className="text-lg font-bold text-white">{row.name}</h3>
+              <p className="text-sm text-white/60">Pastor</p>
+              <div className="mt-4 flex items-center gap-2">
+  <a
+    href={`mailto:${pastor.email || ""}?subject=Community Change Assessment`}
+    className="flex h-9 w-9 items-center justify-center rounded-full border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb]"
+    aria-label="Email pastor"
+  >
+    <i className="fa-regular fa-envelope" />
+  </a>
+
+  <button type="button" disabled className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
+    <i className="fa-solid fa-phone" />
+  </button>
+
+  <button type="button" disabled className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
+    <i className="fa-brands fa-whatsapp" />
+  </button>
+
+  <button type="button" disabled className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
+    <i className="fa-regular fa-comment-dots" />
+  </button>
+</div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedMenteeId(row.id)}
+                className={`${directorBtnPrimary} mt-auto self-end`}
+              >
+                View Assessments
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
+              {/* <div className="mb-4">
                 <h2 className="text-lg font-semibold text-white sm:text-xl">
-                  {selectedMenteeId ? `${selectedPastorName}'s Assessment` : "All Assessments"}
+                  
+                  {selectedMenteeId
+  ? `${selectedPastorName}'s Assessments`
+  : activeTab === "mentors"
+    ? "Mentors"
+    : activeTab === "pastors"
+      ? "Pastor Assessments"
+      : "All Assessments"}
                 </h2>
-              </div>
-              {filteredAssessments.length > 0 ? (
+              </div> */}
+              {(activeTab === "assessments" || selectedMenteeId) && (
+  <div className="mb-4">
+    <h2 className="text-lg font-semibold text-white sm:text-xl">
+      {selectedMenteeId
+        ? `${selectedPastorName}'s Assessments`
+        : activeTab === "pastors"
+          ? "Pastor Assessments"
+          : "All Assessments"}
+    </h2>
+  </div>
+)}
+              {(activeTab === "assessments" || selectedMenteeId) && filteredAssessments.length > 0 ? (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
               {filteredAssessments.map((assessment) => (
                 <div
@@ -1118,8 +1536,8 @@ function AssessmentsPageContent() {
                 </div>
               ))}
             </div>
-              ) : (
-            <div className={`mx-auto max-w-md px-8 py-14 text-center ${directorGlassCard}`}>
+            ) : activeTab === "assessments" || selectedMenteeId ? (
+  <div className={`mx-auto max-w-md px-8 py-14 text-center ${directorGlassCard}`}>
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/10">
                 <i className="fa-regular fa-folder-open text-2xl text-[#8ec5eb]" />
               </div>
@@ -1133,10 +1551,10 @@ function AssessmentsPageContent() {
                   ? "Assign assessments from the full list when needed."
                   : "Try another search or create an assessment with Add."}
               </p>
-            </div>
-              )}
-            </>
-          )}
+          </div>
+) : null}
+</>
+)}
         </div>
       </section>
 

@@ -482,6 +482,7 @@ hasCdp,
     if (activeTab === "All") return matchesSearch;
     return a.status === activeTab && matchesSearch;
   });
+  const recommendedAssessment = filtered.find((item) => item.status !== "Completed");
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -550,6 +551,32 @@ hasCdp,
               className="w-full lg:w-auto"
             />
           </div>
+          {recommendedAssessment && (
+  <section className="mb-8 rounded-2xl border border-white/12 bg-white/[0.06] px-6 py-6">
+    <p className="mb-3 text-xs font-bold uppercase tracking-[0.35em] text-[#ffd66b]">
+      Recommended for Today
+    </p>
+
+    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h2 className="text-2xl font-bold text-white">
+          {recommendedAssessment.title}
+        </h2>
+        <p className="mt-2 text-sm text-[#d9ebf8]">
+          Next step: complete your first pending assessment.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => router.push(getAssessmentPrimaryDestination(recommendedAssessment))}
+        className={pastorPrimaryCta}
+      >
+        Continue Assessment
+      </button>
+    </div>
+  </section>
+)}
 
           {filtered.length === 0 ? (
             <div className={pastorEmptyPanel}>No assessments to show.</div>
