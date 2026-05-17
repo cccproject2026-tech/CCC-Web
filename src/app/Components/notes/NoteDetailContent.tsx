@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { isAxiosError } from "axios";
@@ -8,6 +8,11 @@ import MentorHeader from "@/app/Components/MentorHeader";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
 import { directorGlassCard, directorPageRoot } from "@/app/director/directorUi";
+import {
+  mentorGlassCardFrost,
+  mentorMainGradient,
+  mentorPageRoot,
+} from "@/app/Components/mentor/mentor-theme";
 import {
   deleteNoteSafe,
   fetchNoteById,
@@ -18,9 +23,12 @@ import {
   formatNoteTimestamp,
   noteBody,
   notesBasePath,
+  NOTE_FORMAT_TOOLS,
+  applyNoteFormat,
   type NotesVariant,
 } from "./notesUtils";
 import { useNotesSession } from "./useNotesSession";
+import NotesDeleteConfirmDialog from "./NotesDeleteConfirmDialog";
 
 const glassPanelPastor =
   "rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.88)_0%,rgba(10,53,88,0.94)_100%)] shadow-[0_20px_50px_rgba(2,20,38,0.35)]";
@@ -55,7 +63,12 @@ export default function NoteDetailContent({
     variant === "mentor" ? MentorHeader : variant === "pastor" ? PastorHeader : null;
   const { userId, displayName } = useNotesSession(variant);
   const searchParams = useSearchParams();
-  const glassPanel = variant === "director" ? directorGlassCard : glassPanelPastor;
+  const glassPanel =
+    variant === "mentor"
+      ? mentorGlassCardFrost
+      : variant === "director"
+        ? directorGlassCard
+        : glassPanelPastor;
 
   const [note, setNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,173 +79,49 @@ export default function NoteDetailContent({
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionOk, setActionOk] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const editTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-//   const loadOne = useCallback(async () => {
-//     if (!userId || !noteId) {
-//       setLoading(false);
-//       setError("Missing session or note.");
-//       return;
-//     }
-//     setLoading(true);
-//     setError(null);
-//     try {
-//       // const n = await fetchNoteById(userId, noteId);
-//       // setNote(n);
-//       // setDraft(noteBody(n ?? {}));
-//       const n = await fetchNoteById(userId, noteId);
-
-// // if (!n) {
-// //   setError("Note not found.");
-// //   setNote(null);
-// //   return;
-// // }
-// if (!n) {
-//   setError("Note not found in server.");
-//   setNote(null);
-//   return;
-// }
-
-// setNote(n);
-
-// const content =
-//   typeof n.content === "string"
-//     ? n.content
-//     : noteBody(n);
-
-// setDraft(content);
-//     } catch (e) {
-//       console.error(e);
-//       setError(extractApiErrorMessage(e));
-//       setNote(null);
-//     } finally {
-//       setLoading(false);
-//     }
-//   }, [userId, noteId]);
-
-// const loadOne = useCallback(async () => {
-//   if (!userId || !noteId) {
-//     setLoading(false);
-//     setError("Missing session or note.");
-//     return;
-//   }
-
-//   setLoading(true);
-//   setError(null);
-
-//   try {
-//     // ✅ NEW: get note from URL (this is the key fix)
-//     const noteParam = searchParams.get("note");
-
-//     if (noteParam) {
-//       const parsed = JSON.parse(noteParam);
-
-//       setNote(parsed);
-//       setDraft(parsed.content || "");
-
-//       setLoading(false);
-//       return;
-//     }
-
-//     // 🔁 fallback (only if user refreshes page)
-//     const n = await fetchNoteById(userId, noteId);
-
-//     if (!n) {
-//       setError("Note not found.");
-//       setNote(null);
-//       return;
-//     }
-
-//     setNote(n);
-//     setDraft(n.content || "");
-
-//   } catch (e) {
-//     console.error(e);
-//     setError("Failed to load note.");
-//     setNote(null);
-//   } finally {
-//     setLoading(false);
-//   }
-// }, [userId, noteId, searchParams]);
-//--2
-// const loadOne = useCallback(async () => {
-//   if (!userId || !noteId) {
-//     setLoading(false);
-//     setError("Missing session or note.");
-//     return;
-//   }
-
-//   setLoading(true);
-//   setError(null);
-
-//   try {
-//     const noteParam = searchParams.get("note");
-
-//     // 1) Show passed note immediately for fast UI
-//     if (noteParam) {
-//       const parsed = JSON.parse(noteParam);
-//       setNote(parsed);
-//       setDraft(parsed.content || "");
-//     }
-
-//     // 2) Always fetch latest note from backend and override stale URL data
-//     const fresh = await fetchNoteById(userId, noteId);
-
-//     if (fresh) {
-//       setNote(fresh);
-//       setDraft(typeof fresh.content === "string" ? fresh.content : "");
-//     } else if (!noteParam) {
-//       setError("Note not found.");
-//       setNote(null);
-//     }
-//   } catch (e) {
-//     console.error(e);
-//     setError("Failed to load note.");
-//     setNote(null);
-//   } finally {
-//     setLoading(false);
-//   }
-// }, [userId, noteId, searchParams]);
-
-
-const loadOne = useCallback(async () => {
-  if (!userId || !noteId) {
-    setLoading(false);
-    setError("Missing session or note.");
-    return;
-  }
-
-  setLoading(true);
-  setError(null);
-
-  try {
-    const noteParam = searchParams.get("note");
-
-    // ✅ if note is passed from Previous list, trust it and stop here
-    if (noteParam) {
-      const parsed = JSON.parse(noteParam);
-      setNote(parsed);
-      setDraft(typeof parsed.content === "string" ? parsed.content : "");
+  const loadOne = useCallback(async () => {
+    if (!userId || !noteId) {
+      setLoading(false);
+      setError("Missing session or note.");
       return;
     }
 
-    // only fallback when page is opened directly / refreshed
-    const fresh = await fetchNoteById(userId, noteId);
+    setLoading(true);
+    setError(null);
 
-    if (fresh) {
-      setNote(fresh);
-      setDraft(typeof fresh.content === "string" ? fresh.content : "");
-    } else {
-      setError("Note not found.");
+    try {
+      const noteParam = searchParams.get("note");
+
+      // ✅ if note is passed from Previous list, trust it and stop here
+      if (noteParam) {
+        const parsed = JSON.parse(noteParam);
+        setNote(parsed);
+        setDraft(typeof parsed.content === "string" ? parsed.content : "");
+        return;
+      }
+
+      // only fallback when page is opened directly / refreshed
+      const fresh = await fetchNoteById(userId, noteId);
+
+      if (fresh) {
+        setNote(fresh);
+        setDraft(typeof fresh.content === "string" ? fresh.content : "");
+      } else {
+        setError("Note not found.");
+        setNote(null);
+      }
+    } catch (e) {
+      console.error(e);
+      setError("Failed to load note.");
       setNote(null);
+    } finally {
+      setLoading(false);
     }
-  } catch (e) {
-    console.error(e);
-    setError("Failed to load note.");
-    setNote(null);
-  } finally {
-    setLoading(false);
-  }
-}, [userId, noteId, searchParams]);
+  }, [userId, noteId, searchParams]);
+
   useEffect(() => {
     loadOne();
   }, [loadOne]);
@@ -381,68 +270,77 @@ const handleSaveEdit = async () => {
 };
 
 
- const handleDelete = async () => {
-  if (!userId || !noteId) return;
-  if (!window.confirm("Delete this note permanently?")) return;
+  const performDelete = async () => {
+    if (!userId || !noteId) return;
 
-  setDeleting(true);
-  setActionError(null);
-
-  try {
-    await deleteNoteSafe(userId, noteId);
-
-    const notesStorageKey = `notes:${variant}:${userId ?? "guest"}`;
-    const deletedKey = `deletedNotes:${variant}:${userId ?? "guest"}`;
+    setDeleting(true);
+    setActionError(null);
 
     try {
-      const cached = sessionStorage.getItem(notesStorageKey);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
-          const filtered = parsed.filter(
-            (n: any) => String(n?._id) !== String(noteId)
-          );
-          sessionStorage.setItem(notesStorageKey, JSON.stringify(filtered));
+      await deleteNoteSafe(userId, noteId);
+
+      const notesStorageKey = `notes:${variant}:${userId ?? "guest"}`;
+      const deletedKey = `deletedNotes:${variant}:${userId ?? "guest"}`;
+
+      try {
+        const cached = sessionStorage.getItem(notesStorageKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed)) {
+            const filtered = parsed.filter(
+              (n: any) => String(n?._id) !== String(noteId)
+            );
+            sessionStorage.setItem(notesStorageKey, JSON.stringify(filtered));
+          }
         }
+
+        const deletedRaw = sessionStorage.getItem(deletedKey);
+        const deletedIds: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
+        if (!deletedIds.includes(String(noteId))) {
+          deletedIds.push(String(noteId));
+          sessionStorage.setItem(deletedKey, JSON.stringify(deletedIds));
+        }
+      } catch (cacheErr) {
+        console.error("Failed to update notes cache after delete:", cacheErr);
       }
 
-      const deletedRaw = sessionStorage.getItem(deletedKey);
-      const deletedIds: string[] = deletedRaw ? JSON.parse(deletedRaw) : [];
-      if (!deletedIds.includes(String(noteId))) {
-        deletedIds.push(String(noteId));
-        sessionStorage.setItem(deletedKey, JSON.stringify(deletedIds));
-      }
-    } catch (cacheErr) {
-      console.error("Failed to update notes cache after delete:", cacheErr);
+      setDeleteDialogOpen(false);
+      router.replace(basePath);
+      router.refresh();
+    } catch (e) {
+      console.error(e);
+      setDeleteDialogOpen(false);
+      setActionError(extractApiErrorMessage(e));
+    } finally {
+      setDeleting(false);
     }
-
-    router.replace(basePath);
-    router.refresh();
-  } catch (e) {
-    console.error(e);
-    setActionError(extractApiErrorMessage(e));
-  } finally {
-    setDeleting(false);
-  }
-};
+  };
 
   const MainTag = variant === "director" ? "div" : "main";
 
   return (
     <div
       className={
-        variant === "director"
-          ? directorPageRoot
-          : "relative flex min-h-screen flex-col bg-transparent font-[Albert_Sans] text-white"
+        variant === "mentor"
+          ? mentorPageRoot
+          : variant === "director"
+            ? directorPageRoot
+            : "relative flex min-h-screen flex-col bg-transparent font-[Albert_Sans] text-white"
       }
     >
-      {variant !== "director" ? (
+      {variant === "pastor" ? (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(141,211,243,0.16),transparent_40%),linear-gradient(180deg,#041f35_0%,#062946_100%)]" />
       ) : null}
       <div className="relative z-10 flex min-h-screen flex-col">
         {Header ? <Header showFullHeader /> : null}
 
-        <MainTag className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+        <MainTag
+          className={
+            variant === "mentor"
+              ? `mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-10 ${mentorMainGradient}`
+              : "mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-10"
+          }
+        >
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <button
@@ -496,7 +394,7 @@ const handleSaveEdit = async () => {
                     </button>
                     <button
                       type="button"
-                      onClick={handleDelete}
+                      onClick={() => setDeleteDialogOpen(true)}
                       disabled={deleting}
                       className="rounded-xl border border-red-400/40 bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-100 transition hover:bg-red-500/25 disabled:opacity-60"
                     >
@@ -523,12 +421,42 @@ const handleSaveEdit = async () => {
                 {actionError ? <p className="mt-2 text-sm text-[#ffb2b2]">{actionError}</p> : null}
                 {actionOk ? <p className="mt-2 text-sm text-[#8ec5eb]">{actionOk}</p> : null}
                 {editing ? (
-                  <textarea
-                    value={draft}
-                    onChange={(e) => setDraft(e.target.value)}
-                    rows={12}
-                    className="mt-6 w-full resize-y rounded-2xl border border-white/15 bg-[#041f35]/80 px-4 py-3 text-sm leading-relaxed text-white placeholder:text-[#8ec5eb]/50 focus:border-[#8ec5eb]/50 focus:outline-none focus:ring-1 focus:ring-[#8ec5eb]/40"
-                  />
+                  <>
+                    <p className="mb-1 mt-6 text-xs font-semibold uppercase tracking-[0.2em] text-[#8ec5eb]">
+                      Edit note
+                    </p>
+                    <div className="mb-3 flex flex-wrap gap-2 rounded-xl border border-white/10 bg-white/[0.06] p-2">
+                      {NOTE_FORMAT_TOOLS.map((tool) => (
+                        <button
+                          key={tool.icon}
+                          type="button"
+                          onClick={() =>
+                            applyNoteFormat({
+                              format: tool.format,
+                              draft,
+                              setDraft,
+                              textareaRef: editTextareaRef,
+                            })
+                          }
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-[#cde2f2] transition hover:bg-white/10"
+                          title={tool.label}
+                        >
+                          <i className={`fa-solid ${tool.icon} text-xs`} />
+                        </button>
+                      ))}
+                    </div>
+                    <label className="sr-only" htmlFor="note-edit-draft">
+                      Edit note content
+                    </label>
+                    <textarea
+                      ref={editTextareaRef}
+                      id="note-edit-draft"
+                      value={draft}
+                      onChange={(e) => setDraft(e.target.value)}
+                      rows={12}
+                      className="w-full resize-y rounded-2xl border border-white/15 bg-[#041f35]/80 px-4 py-3 text-sm leading-relaxed text-white placeholder:text-[#8ec5eb]/50 focus:border-[#8ec5eb]/50 focus:outline-none focus:ring-1 focus:ring-[#8ec5eb]/40"
+                    />
+                  </>
                 ) : (
                   <div className="mt-6 whitespace-pre-wrap rounded-2xl border border-white/10 bg-[#041f35]/60 px-4 py-4 text-sm leading-relaxed text-[#d9ebf8]">
                     {/* {noteBody(note)} */}
@@ -543,6 +471,18 @@ const handleSaveEdit = async () => {
 
         {/* {variant === "pastor" ? <PastorFooter /> : null} */}
       </div>
+
+      <NotesDeleteConfirmDialog
+        open={deleteDialogOpen}
+        onClose={() => !deleting && setDeleteDialogOpen(false)}
+        onConfirm={() => void performDelete()}
+        deleting={deleting}
+        panelClassName={glassPanel}
+        eyebrow="Delete note"
+        title="Delete this note permanently?"
+        description="This action cannot be undone. The note will be removed from your list."
+        confirmLabel="Delete note"
+      />
     </div>
   );
 }

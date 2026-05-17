@@ -1,3 +1,4 @@
+import type { RefObject } from "react";
 import { getCookie } from "@/app/utils/cookies";
 import type { Note } from "@/app/Services/types/users.types";
 
@@ -97,4 +98,122 @@ export function notesBasePath(variant: NotesVariant): string {
   if (variant === "mentor") return "/mentor/notes";
   if (variant === "director") return "/director/notes";
   return "/pastor/notes";
+}
+
+/** Format actions for the notes textarea toolbar (new + edit). */
+export type NoteFormat =
+  | "heading"
+  | "quote"
+  | "divider"
+  | "bullet"
+  | "number"
+  | "left"
+  | "center"
+  | "right";
+
+export const NOTE_FORMAT_TOOLS: readonly {
+  icon: string;
+  label: string;
+  format: NoteFormat;
+}[] = [
+  { icon: "fa-font", label: "Heading", format: "heading" },
+  { icon: "fa-table-columns", label: "Quote block", format: "quote" },
+  { icon: "fa-minus", label: "Divider", format: "divider" },
+  { icon: "fa-list-ul", label: "Bullet list", format: "bullet" },
+  { icon: "fa-list-ol", label: "Numbered list", format: "number" },
+  { icon: "fa-align-left", label: "Align left", format: "left" },
+  { icon: "fa-align-center", label: "Align center", format: "center" },
+  { icon: "fa-align-right", label: "Align right", format: "right" },
+];
+
+export function applyNoteFormat(args: {
+  format: NoteFormat;
+  draft: string;
+  setDraft: (next: string) => void;
+  textareaRef: RefObject<HTMLTextAreaElement | null>;
+}): void {
+  const { format, draft, setDraft, textareaRef } = args;
+  const textarea = textareaRef.current;
+  if (!textarea) return;
+
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+
+  const selectedText = draft.slice(start, end);
+  const hasSelection = selectedText.length > 0;
+  const targetText = hasSelection ? selectedText : "Your text";
+
+  let formattedText = targetText;
+
+  switch (format) {
+    case "heading":
+      formattedText = targetText
+        .split("\n")
+        .map((line) => (line.trim() ? `# ${line.replace(/^#\s*/, "")}` : line))
+        .join("\n");
+      break;
+
+    case "quote":
+      formattedText = targetText
+        .split("\n")
+        .map((line) => (line.trim() ? `> ${line.replace(/^>\s*/, "")}` : line))
+        .join("\n");
+      break;
+
+    case "divider":
+      formattedText = hasSelection ? `${targetText}\n\n---\n` : `\n---\n`;
+      break;
+
+    case "bullet":
+      formattedText = targetText
+        .split("\n")
+        .map((line) => {
+          const clean = line.replace(/^(\s*[-•]\s*)/, "");
+          return clean.trim() ? `• ${clean}` : clean;
+        })
+        .join("\n");
+      break;
+
+    case "number":
+      formattedText = targetText
+        .split("\n")
+        .map((line, index) => {
+          const clean = line.replace(/^\s*\d+\.\s*/, "");
+          return clean.trim() ? `${index + 1}. ${clean}` : clean;
+        })
+        .join("\n");
+      break;
+
+    case "left":
+      formattedText = targetText
+        .split("\n")
+        .map((line) => line.trimStart())
+        .join("\n");
+      break;
+
+    case "center":
+      formattedText = targetText
+        .split("\n")
+        .map((line) => (line.trim() ? `          ${line.trim()}` : line))
+        .join("\n");
+      break;
+
+    case "right":
+      formattedText = targetText
+        .split("\n")
+        .map((line) => (line.trim() ? `                    ${line.trim()}` : line))
+        .join("\n");
+      break;
+
+    default:
+      break;
+  }
+
+  const nextDraft = draft.slice(0, start) + formattedText + draft.slice(end);
+  setDraft(nextDraft);
+
+  window.setTimeout(() => {
+    textarea.focus();
+    textarea.setSelectionRange(start, start + formattedText.length);
+  }, 0);
 }

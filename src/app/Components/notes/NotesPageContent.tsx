@@ -19,9 +19,12 @@ import {
   formatNoteTimestamp,
   notePreviewTitle,
   notesBasePath,
+  NOTE_FORMAT_TOOLS,
+  applyNoteFormat,
   type NotesVariant,
 } from "./notesUtils";
 import { useNotesSession } from "./useNotesSession";
+import NotesDeleteConfirmDialog from "./NotesDeleteConfirmDialog";
 import {
   mentorGlassCardFrost,
   mentorMainGradient,
@@ -65,7 +68,9 @@ export default function NotesPageContent({ variant }: { variant: NotesVariant })
   const [saveOk, setSaveOk] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [selectMode, setSelectMode] = useState(false);
-const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+  const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([]);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const { userId, displayName } = useNotesSession(variant);
   const notesStorageKey = `notes:${variant}:${userId ?? "guest"}`;
@@ -428,106 +433,6 @@ useEffect(() => {
 //   }, 0);
 // };
 
-type NoteFormat =
-  | "heading"
-  | "quote"
-  | "divider"
-  | "bullet"
-  | "number"
-  | "left"
-  | "center"
-  | "right";
-
-const applyNoteFormat = (format: NoteFormat) => {
-  const textarea = textareaRef.current;
-  if (!textarea) return;
-
-  const start = textarea.selectionStart;
-  const end = textarea.selectionEnd;
-
-  const selectedText = draft.slice(start, end);
-  const hasSelection = selectedText.length > 0;
-  const targetText = hasSelection ? selectedText : "Your text";
-
-  let formattedText = targetText;
-
-  switch (format) {
-    case "heading":
-      formattedText = targetText
-        .split("\n")
-        .map((line) => (line.trim() ? `# ${line.replace(/^#\s*/, "")}` : line))
-        .join("\n");
-      break;
-
-    case "quote":
-      formattedText = targetText
-        .split("\n")
-        .map((line) => (line.trim() ? `> ${line.replace(/^>\s*/, "")}` : line))
-        .join("\n");
-      break;
-
-    case "divider":
-      formattedText = hasSelection
-        ? `${targetText}\n\n---\n`
-        : `\n---\n`;
-      break;
-
-    case "bullet":
-      formattedText = targetText
-        .split("\n")
-        .map((line) => {
-          const clean = line.replace(/^(\s*[-•]\s*)/, "");
-          return clean.trim() ? `• ${clean}` : clean;
-        })
-        .join("\n");
-      break;
-
-    case "number":
-      formattedText = targetText
-        .split("\n")
-        .map((line, index) => {
-          const clean = line.replace(/^\s*\d+\.\s*/, "");
-          return clean.trim() ? `${index + 1}. ${clean}` : clean;
-        })
-        .join("\n");
-      break;
-
-    case "left":
-      formattedText = targetText
-        .split("\n")
-        .map((line) => line.trimStart())
-        .join("\n");
-      break;
-
-    case "center":
-      formattedText = targetText
-        .split("\n")
-        .map((line) => (line.trim() ? `          ${line.trim()}` : line))
-        .join("\n");
-      break;
-
-    case "right":
-      formattedText = targetText
-        .split("\n")
-        .map((line) => (line.trim() ? `                    ${line.trim()}` : line))
-        .join("\n");
-      break;
-
-    default:
-      break;
-  }
-
-  const nextDraft =
-    draft.slice(0, start) + formattedText + draft.slice(end);
-
-  setDraft(nextDraft);
-
-  window.setTimeout(() => {
-    textarea.focus();
-    textarea.setSelectionRange(start, start + formattedText.length);
-  }, 0);
-};
-
 const handleSave = async () => {
   if (!userId) {
     setSaveError("Session expired. Please sign in again.");
@@ -611,22 +516,26 @@ const toggleNoteSelection = (noteId: string) => {
   );
 };
 
-const handleDeleteSelectedNotes = async () => {
-  if (!userId || selectedNoteIds.length === 0) return;
+const performBulkDelete = async () => {
+  if (!userId) return;
+  const ids = [...selectedNoteIds];
+  if (ids.length === 0) return;
 
+  setBulkDeleting(true);
   try {
-    await Promise.all(
-      selectedNoteIds.map((noteId) => deleteNoteSafe(userId, noteId))
-    );
+    await Promise.all(ids.map((noteId) => deleteNoteSafe(userId, noteId)));
 
     setNotes((prev) =>
-      prev.filter((note: any) => !selectedNoteIds.includes(String(note._id || note.id)))
+      prev.filter((note: any) => !ids.includes(String(note._id || note.id)))
     );
 
     setSelectedNoteIds([]);
     setSelectMode(false);
+    setBulkDeleteDialogOpen(false);
   } catch (error) {
     console.error("Failed to delete selected notes:", error);
+  } finally {
+    setBulkDeleting(false);
   }
 };
   return (
@@ -723,20 +632,18 @@ const handleDeleteSelectedNotes = async () => {
                         </button>
                       ),
                     )} */}
-                    {[
-  { icon: "fa-font", label: "Heading", format: "heading" },
-  { icon: "fa-table-columns", label: "Quote block", format: "quote" },
-  { icon: "fa-minus", label: "Divider", format: "divider" },
-  { icon: "fa-list-ul", label: "Bullet list", format: "bullet" },
-  { icon: "fa-list-ol", label: "Numbered list", format: "number" },
-  { icon: "fa-align-left", label: "Align left", format: "left" },
-  { icon: "fa-align-center", label: "Align center", format: "center" },
-  { icon: "fa-align-right", label: "Align right", format: "right" },
-].map((tool) => (
+                    {NOTE_FORMAT_TOOLS.map((tool) => (
   <button
     key={tool.icon}
     type="button"
-    onClick={() => applyNoteFormat(tool.format as NoteFormat)}
+  onClick={() =>
+                      applyNoteFormat({
+                        format: tool.format,
+                        draft,
+                        setDraft,
+                        textareaRef,
+                      })
+                    }
     className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-[#cde2f2] transition hover:bg-white/10"
     title={tool.label}
   >
@@ -780,7 +687,7 @@ const handleDeleteSelectedNotes = async () => {
     {selectMode && selectedNoteIds.length > 0 && (
       <button
         type="button"
-        onClick={handleDeleteSelectedNotes}
+        onClick={() => setBulkDeleteDialogOpen(true)}
         className="rounded-lg border border-red-300/40 bg-red-500/15 px-3 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/25"
       >
         Delete {selectedNoteIds.length}
@@ -876,6 +783,20 @@ if (isDeletedNote(String(n._id))) return null;
 
         {/* {variant === "pastor" ? <PastorFooter /> : null} */}
       </div>
+
+      <NotesDeleteConfirmDialog
+        open={bulkDeleteDialogOpen && selectedNoteIds.length > 0}
+        onClose={() => !bulkDeleting && setBulkDeleteDialogOpen(false)}
+        onConfirm={() => void performBulkDelete()}
+        deleting={bulkDeleting}
+        panelClassName={glassPanel}
+        eyebrow="Delete notes"
+        title={`Delete ${selectedNoteIds.length} note${selectedNoteIds.length === 1 ? "" : "s"} permanently?`}
+        description="This action cannot be undone. Selected notes will be removed from your list."
+        confirmLabel={
+          selectedNoteIds.length <= 1 ? "Delete note" : `Delete ${selectedNoteIds.length} notes`
+        }
+      />
     </div>
   );
 }
