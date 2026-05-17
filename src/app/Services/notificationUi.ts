@@ -154,10 +154,14 @@ function formatAssignmentNotification(title: string, details: string) {
     lowerTitle.includes("assignment completed") ||
     lowerDetails.includes("you assigned:")
   ) {
+    // return {
+    //   title: "Assignment Completed",
+    //   details,
+    // };
     return {
-      title: "Assignment Completed",
-      details,
-    };
+  title: "Mentor Assigned",
+  details: details.replace(/^You assigned:\s*/i, "Mentor: "),
+};
   }
 
   return {

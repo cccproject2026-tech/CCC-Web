@@ -208,6 +208,7 @@ export interface CommentsThread {
 export interface CreateQueryPayload {
   actualQueryText: string;
   userId: string;
+  nestedRoadMapItemId?: string;
 }
 
 export interface ReplyQueryPayload {

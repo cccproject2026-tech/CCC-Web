@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import DirectorHero from "../../DirectorHero";
+import DirectorHero from "@/app/director/DirectorHero";
 import {
   directorBtnPrimary,
   directorBtnSecondary,
@@ -12,7 +12,7 @@ import {
   directorPageContainer,
   directorPageRoot,
   directorSpinner,
-} from "../../directorUi";
+} from "@/app/director/directorUi";
 import {
   apiAddNestedRoadmapItem,
   apiGetAssessments,
@@ -233,7 +233,7 @@ function RoadmapFieldPreview({ f }: { f: Record<string, any> }) {
     case "digital_signature":
       return (
         <div className="rounded-lg border border-dashed border-white/30 bg-white/[0.04] px-4 py-8 text-center text-sm text-white/55">
-          {f.placeholderText || "Sign here"}
+          {f.fieldName || "Signature"} — {f.placeholderText || "Sign here"}
         </div>
       );
     case "section":
@@ -247,7 +247,7 @@ function RoadmapFieldPreview({ f }: { f: Record<string, any> }) {
   }
 }
 
-export default function DirectorRoadmapFormPage() {
+export default function MentorRoadmapFormPage() {
   const router = useRouter();
   const sp = useSearchParams();
 
@@ -256,7 +256,7 @@ export default function DirectorRoadmapFormPage() {
   const roadmapType = (sp.get("type") as "single" | "phase" | null) || "single";
   const isEditMode = sp.get("isEditMode") === "true";
   /** Phase list “View” — read-only task template; requires isEditMode so nested data loads from API. */
-  const viewOnly = isEditMode && sp.get("viewOnly") === "true";
+  const viewOnly = true;
 
   const roadmapData = useMemo(
     () => ({
@@ -867,11 +867,11 @@ export default function DirectorRoadmapFormPage() {
     }
   };
 
-  const breadcrumbItems = [
-    { label: "Home", href: "/director/home" },
-    { label: "Revitalization Roadmap", href: "/director/revitalization-roadmap" },
-    { label: viewOnly ? "View tasks" : isEditMode ? "Edit roadmap" : "Roadmap form" },
-  ];
+const breadcrumbItems = [
+  { label: "Home", href: "/mentor/home" },
+   { label: "Revitalization Roadmap", href: "/mentor/RevitalizationRoadmap?tab=Library" },
+  { label: "View roadmap" },
+];
 
   if (loading) {
     return (
@@ -914,7 +914,9 @@ export default function DirectorRoadmapFormPage() {
               <div className="mb-8 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => router.back()}
+                  onClick={() => {
+  router.push("/mentor/RevitalizationRoadmap?tab=Library");
+}}
                   className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
                 >
                   <i className="fa-solid fa-arrow-left mr-2 text-xs" /> Back
@@ -963,7 +965,6 @@ export default function DirectorRoadmapFormPage() {
                   <label className={directorLabelClass}>
                     Description {!viewOnly ? <span className="text-red-300">*</span> : null}
                   </label>
-                  
                   <textarea
                     value={descriptionVerbiage}
                     readOnly={viewOnly}
@@ -972,13 +973,10 @@ export default function DirectorRoadmapFormPage() {
                     className={`${directorInputClass} min-h-[180px] resize-y ${viewOnly ? "cursor-default opacity-95" : ""}`}
                     placeholder="Numbered or free-form description for this step…"
                   />
-                  <h3 className="text-lg font-semibold text-white">Pastor Tasks :</h3>
                 </div>
-                
-                {/* <h3>Pastor Tasks :</h3> */}
+                <h3 className="text-lg font-semibold text-white">Pastor Tasks :</h3>
 
                 <div className="space-y-4">
-                  
                   {customFields
                     .filter((f) => !f.parentSectionId)
                     .map((f) => {
@@ -1379,7 +1377,7 @@ export default function DirectorRoadmapFormPage() {
                       />
                     </div>
                     <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3">
-                      {/* <label className="inline-flex items-center gap-2 text-sm text-white/80">
+                      <label className="inline-flex items-center gap-2 text-sm text-white/80">
                         <input
                           type="checkbox"
                           checked={!!fieldDraft.haveButton}
@@ -1387,7 +1385,7 @@ export default function DirectorRoadmapFormPage() {
                           className="h-4 w-4 accent-[#8ec5eb]"
                         />
                         Have button
-                      </label> */}
+                      </label>
                       {fieldDraft.haveButton ? (
                         <div className="w-full sm:w-auto sm:flex-1">
                           <input

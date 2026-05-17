@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DashboardFocusSection } from "@/app/utils/dashboard-focus/types";
 
 type Props = {
@@ -21,6 +21,7 @@ export default function DashboardFocusModal({
   isLoading,
   footer,
 }: Props) {
+  const [querySearch, setQuerySearch] = useState("");
   const onKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -38,7 +39,39 @@ export default function DashboardFocusModal({
       document.body.style.overflow = prev;
     };
   }, [open, onKeyDown]);
+const todayOnlySections = useMemo(() => {
+  const today = new Date();
 
+  return sections.map((section) => {
+    if (section.id !== "pastor-queries") return section;
+
+    const filteredItems = section.items.filter((item: any) => {
+      const text = `${item.title ?? ""} ${item.description ?? ""} ${item.meta ?? ""}`.toLowerCase();
+      const matchesSearch = text.includes(querySearch.trim().toLowerCase());
+
+      const rawDate = item.createdDate || item.createdAt || item.date;
+      const dateText = String(item.meta ?? "");
+
+      const isToday =
+        dateText.includes("Today") ||
+        dateText.includes(
+          today.toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          }),
+        );
+
+      return matchesSearch && isToday;
+    });
+
+    return {
+      ...section,
+      title: "",
+      emptyMessage: "No queries for today.",
+      items: filteredItems,
+    };
+  });
+}, [sections, querySearch]);
   if (!open) return null;
 
   return (
@@ -77,11 +110,24 @@ export default function DashboardFocusModal({
             </div>
           ) : (
             <div className="flex flex-col gap-8 pb-2">
-              {sections.map((section) => (
+              {todayOnlySections.map((section) => (
                 <section key={section.id} aria-label={section.title}>
-                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
-                    {section.title}
-                  </h3>
+                 {section.id === "pastor-queries" ? (
+  <div className="mb-4 flex items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-4 py-3">
+    <i className="fa-solid fa-magnifying-glass text-[#8ec5eb]" />
+    <input
+      type="text"
+      value={querySearch}
+      onChange={(e) => setQuerySearch(e.target.value)}
+      placeholder="Search pastor name..."
+      className="w-full bg-transparent text-sm text-white placeholder:text-[#cde2f2]/60 outline-none"
+    />
+  </div>
+) : (
+  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+    {section.title}
+  </h3>
+)}
                   {section.items.length === 0 ? (
                     <p className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white/60">
                       {section.emptyMessage}

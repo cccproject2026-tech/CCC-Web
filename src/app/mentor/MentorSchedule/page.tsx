@@ -311,6 +311,25 @@ function MentorScheduleContent() {
   }, [mentorId]);
 
   useEffect(() => {
+  const recipientType = searchParams.get("recipientType");
+  const pastorId = searchParams.get("pastorId");
+
+  if (recipientType !== "pastor" || !pastorId || pastors.length === 0) return;
+
+  const matchedPastor = pastors.find(
+    (pastor: any) => String(pastor._id || pastor.id) === String(pastorId)
+  );
+
+  if (!matchedPastor) return;
+
+  setActiveTab("Schedule");
+  setScheduleRecipientType("pastor");
+  setSelectedRecipient(matchedPastor);
+  setIsDrawerOpen(true);
+  setDrawerStep(2);
+}, [searchParams, pastors]);
+
+  useEffect(() => {
     if (!mentorId) return;
     const fetchDirectors = async () => {
       try {

@@ -95,6 +95,8 @@ export default function ViewEditAssessmentPage() {
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [selectedSectionIndex, setSelectedSectionIndex] = useState(0);
+const [isEditMode, setIsEditMode] = useState(false);
 
   const scrollToId = useCallback((id: string) => {
     if (typeof document === "undefined") return;
@@ -146,6 +148,7 @@ export default function ViewEditAssessmentPage() {
             ? mapped.sections.map(sectionToDirectorEditWizard)
             : [newDirectorEditSection()],
         );
+        setSelectedSectionIndex(0);
         setPreSurveyRows(preSurveyFromApiDetail(raw));
         const mUrl = resolveApiMediaUrl(mapped.bannerImage) || "";
         if (mUrl) setBannerPreview(mUrl);
@@ -324,7 +327,33 @@ export default function ViewEditAssessmentPage() {
   const handleRemovePreSurveyQuestion = (idx: number) => {
     setPreSurveyRows((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== idx)));
   };
+const handleAddLayerToSelectedSection = () => {
+  setWizardSections((prev) => {
+    const next = [...prev];
+    const section = next[selectedSectionIndex];
 
+    if (!section) return prev;
+
+    const templateLayer = section.layers[section.layers.length - 1];
+
+    next[selectedSectionIndex] = {
+      ...section,
+      layers: [
+        ...section.layers,
+        {
+          ...templateLayer,
+          choices: [""],
+          notes: "",
+        },
+      ],
+    };
+
+    return next;
+  });
+
+  setIsEditMode(true);
+  showToast("Layer added successfully");
+};
   const handleSaveChanges = async () => {
     if (!assessment?.id) {
       showToast("Could not save: assessment id is missing.");
@@ -441,7 +470,7 @@ export default function ViewEditAssessmentPage() {
       setSaving(false);
     }
   };
-
+const selectedSection = wizardSections[selectedSectionIndex] ?? wizardSections[0];
   const displayBanner = bannerFile
     ? bannerPreview
     : bannerPreview || (assessment ? resolveApiMediaUrl(assessment.bannerImage) || "" : "") || null;
@@ -510,7 +539,7 @@ export default function ViewEditAssessmentPage() {
         />
       </div>
 
-      <section className="relative flex-1 pb-28 pt-2 sm:pb-32">
+      {/* <section className="relative flex-1 pb-28 pt-2 sm:pb-32">
         <div className={`${directorPageContainer} px-4 sm:px-6 lg:px-10`}>
           <div className={`${directorGlassCard} mx-auto max-w-3xl p-5 sm:p-8`}>
             {saveSuccess ? (
@@ -992,7 +1021,638 @@ export default function ViewEditAssessmentPage() {
             </p>
           </div>
         </div>
-      </section>
+      </section> */}
+
+      <section className="relative flex-1 px-4 py-6">
+  <div className="mx-auto flex h-full max-w-[1600px] gap-6">
+    {/* Left Sidebar */}
+    <div className="w-80 flex-shrink-0 space-y-3">
+      <div className="mb-4 flex items-center gap-3">
+        <button
+          type="button"
+          onClick={handleAddSection}
+          className="flex items-center gap-2 rounded-lg bg-[#8ec5eb]/90 px-4 py-2 text-sm font-semibold text-[#062946] shadow-md hover:bg-[#8ec5eb]"
+        >
+          <i className="fa-solid fa-plus" />
+          Section
+        </button>
+      </div>
+
+      {wizardSections.map((section, index) => (
+        <div
+          key={section.id}
+          onClick={() => setSelectedSectionIndex(index)}
+          className={`cursor-pointer rounded-xl border-2 p-4 transition-all ${
+            selectedSectionIndex === index
+              ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/20 text-white"
+              : "border-white/15 bg-white/5 text-[#cde2f2] hover:border-white/25 hover:bg-white/10"
+          }`}
+        >
+          <div className="mb-2">
+            <span className="rounded bg-white/10 px-2 py-1 text-xs font-bold text-[#cde2f2]">
+              Section {index + 1}
+            </span>
+          </div>
+
+          <h3 className="text-sm font-semibold leading-tight">
+            {section.name || "Untitled Section"}
+          </h3>
+
+          {section.guidelines ? (
+            <p className="mt-1 text-xs opacity-70">{section.guidelines}</p>
+          ) : null}
+        </div>
+      ))}
+    </div>
+
+    {/* Main Content */}
+    <div className="flex-1">
+      {selectedSection ? (
+        <>
+          <div className="mb-6 rounded-lg border border-white/20 bg-white/8 p-4">
+            <p className="text-sm text-white">
+              Choose the option that best matches how you feel and who you are.
+              This assessment helps provide better support and guidance.
+            </p>
+          </div>
+
+          {/* Basics */}
+          {/* <div className="mb-6 rounded-xl border border-white/20 bg-white/5 p-5">
+            <h3 className="font-semibold text-white">Basics</h3>
+
+            <div className="mt-4 space-y-4">
+              <input
+                id="field-assessment-name"
+                value={assessmentName}
+                onChange={(e) => setAssessmentName(e.target.value)}
+                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                placeholder="Assessment name"
+              />
+
+              <textarea
+                id="field-assessment-desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                placeholder="Description"
+              />
+            </div>
+          </div> */}
+          {/* Basics */}
+<div className="mb-6 rounded-xl border border-white/20 bg-white/5 p-5">
+  <div className="mb-4">
+    <h3 className="font-semibold text-white">Basics</h3>
+    <p className="mt-1 text-sm text-white/60">
+      Update the assessment name and description shown in the list and detail views.
+    </p>
+  </div>
+
+  <div className="space-y-4">
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+        Assessment Name
+      </label>
+      <input
+        id="field-assessment-name"
+        type="text"
+        value={assessmentName}
+        onChange={(e) => setAssessmentName(e.target.value)}
+        placeholder="e.g. Ministry readiness survey"
+        className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+      />
+    </div>
+
+    <div>
+      <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+        Description
+      </label>
+      <textarea
+        id="field-assessment-desc"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={3}
+        placeholder="Brief description for thumbnail / cards"
+        className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+      />
+    </div>
+
+    <div>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <label className="block text-sm font-semibold text-[#cde2f2]">
+          Banner image (optional)
+        </label>
+
+        {bannerFile || bannerPreview ? (
+          <button
+            type="button"
+            onClick={() => {
+              if (bannerPreview?.startsWith("blob:")) URL.revokeObjectURL(bannerPreview);
+              setBannerFile(null);
+              setBannerPreview(null);
+            }}
+            className="text-xs font-semibold text-red-300/90 hover:underline"
+          >
+            Remove image
+          </button>
+        ) : null}
+      </div>
+
+      <input
+        ref={bannerInputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        id="assessment-banner-edit"
+        onChange={(e) => {
+          const f = e.target.files?.[0] || null;
+          e.target.value = "";
+
+          if (f && !ALLOWED_BANNER_TYPES.has(f.type)) {
+            showToast("Use a PNG, JPG, or WEBP image.");
+            return;
+          }
+
+          if (f && f.size > MAX_BANNER_SIZE_BYTES) {
+            showToast("File size must be less than 10 MB.");
+            return;
+          }
+
+          if (bannerPreview?.startsWith("blob:")) {
+            URL.revokeObjectURL(bannerPreview);
+          }
+
+          setBannerFile(f);
+          setBannerPreview(f ? URL.createObjectURL(f) : null);
+        }}
+      />
+
+      <div className="space-y-3 rounded-2xl border border-dashed border-white/25 bg-white/[0.04] px-4 py-4">
+        <button
+          type="button"
+          onClick={() => bannerInputRef.current?.click()}
+          className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+        >
+          {bannerPreview ? "Replace banner" : "Upload banner"}
+        </button>
+
+        {bannerPreview ? (
+          <div
+            className="relative h-40 w-full max-w-md cursor-pointer overflow-hidden rounded-xl border border-white/20"
+            onClick={() => bannerInputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+          >
+            {bannerPreview.startsWith("blob:") || bannerPreview.startsWith("data:") ? (
+              <img
+                src={bannerPreview}
+                alt="Assessment banner preview"
+                className="h-40 w-full object-cover"
+              />
+            ) : (
+              <Image
+                src={bannerPreview}
+                alt="Assessment banner preview"
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 520px"
+                unoptimized={isRemoteImageSrc(bannerPreview)}
+              />
+            )}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  </div>
+</div>
+
+          {/* Instructions */}
+          {/* <div className="mb-6 rounded-xl border border-white/20 bg-white/5 p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="font-semibold text-white">Edit Instructions</h3>
+
+              <button
+                type="button"
+                onClick={handleAddInstruction}
+                className="rounded-lg bg-[#8ec5eb]/90 px-3 py-2 text-xs font-semibold text-[#062946] hover:bg-[#8ec5eb]"
+              >
+                <i className="fa-solid fa-plus mr-1" />
+                Instruction
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {instructions.map((instruction, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <input
+                    id={`director-instruction-${idx}`}
+                    value={instruction}
+                    onChange={(e) => handleUpdateInstruction(idx, e.target.value)}
+                    className="flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                    placeholder={`Instruction ${idx + 1}`}
+                  />
+
+                  {instructions.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveInstruction(idx)}
+                      className="rounded-lg border border-red-300/40 bg-red-500/15 px-3 py-2 text-red-200"
+                    >
+                      <i className="fa-solid fa-trash" />
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div> */}
+          {/* Instructions */}
+<div className="mb-6 rounded-xl border border-white/20 bg-white/5 p-5">
+  <div className="mb-3 flex items-center justify-between">
+    <h3 className="font-semibold text-white">Edit Instructions</h3>
+
+    <button
+      type="button"
+      onClick={handleAddInstruction}
+      className="rounded-lg bg-[#8ec5eb]/90 px-3 py-2 text-xs font-semibold text-[#062946] hover:bg-[#8ec5eb]"
+    >
+      <i className="fa-solid fa-plus mr-1" />
+      Instruction
+    </button>
+  </div>
+
+  <div className="space-y-2">
+    {instructions.map((instruction, idx) => (
+      <div key={idx} className="flex items-center gap-2">
+        <input
+          id={`director-instruction-${idx}`}
+          type="text"
+          value={instruction}
+          onChange={(e) => handleUpdateInstruction(idx, e.target.value)}
+          placeholder={`Instruction ${idx + 1}`}
+          className="flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+        />
+
+        {instructions.length > 1 ? (
+          <button
+            type="button"
+            onClick={() => handleRemoveInstruction(idx)}
+            className="rounded-lg border border-red-300/40 bg-red-500/15 px-3 py-2 text-red-200"
+            aria-label={`Remove instruction ${idx + 1}`}
+          >
+            <i className="fa-solid fa-trash" />
+          </button>
+        ) : null}
+      </div>
+    ))}
+  </div>
+</div>
+
+          {/* Pre Survey */}
+          {/* <div className="mb-6 rounded-xl border border-white/20 bg-white/5 p-5">
+            <span className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+              Include Pre-Survey Questions?
+            </span>
+
+            <div className="flex gap-6">
+              <label className="flex items-center gap-2 text-sm text-white/90">
+                <input
+                  type="radio"
+                  checked={!hasPreSurvey}
+                  onChange={() => setHasPreSurvey(false)}
+                />
+                No
+              </label>
+
+              <label className="flex items-center gap-2 text-sm text-white/90">
+                <input
+                  type="radio"
+                  checked={hasPreSurvey}
+                  onChange={() => setHasPreSurvey(true)}
+                />
+                Yes
+              </label>
+            </div>
+
+            {hasPreSurvey ? (
+              <div className="mt-5 space-y-4 rounded-2xl border border-white/15 bg-white/[0.04] p-5">
+                {preSurveyRows.map((row, qIdx) => (
+                  <div key={row.id} className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+                        Question {qIdx + 1}
+                      </label>
+                      <input
+                        id={`director-presurvey-question-${qIdx}`}
+                        value={row.text}
+                        onChange={(e) =>
+                          handleUpdatePreSurvey(qIdx, "text", e.target.value)
+                        }
+                        className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                        placeholder="Pre-survey question"
+                      />
+                    </div>
+
+                    {preSurveyRows.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePreSurveyQuestion(qIdx)}
+                        className="rounded-lg border border-red-300/40 bg-red-500/15 px-3 py-2 text-sm text-red-200"
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={handleAddPreSurveyQuestion}
+                  className="rounded-lg bg-[#8ec5eb]/90 px-3 py-2 text-xs font-semibold text-[#062946] hover:bg-[#8ec5eb]"
+                >
+                  <i className="fa-solid fa-plus mr-1" />
+                  Add pre-survey question
+                </button>
+              </div>
+            ) : null}
+          </div> */}
+          {/* Pre Survey */}
+<div className="mb-6 rounded-xl border border-white/20 bg-white/5 p-5">
+  <div className="mb-4">
+    <span className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+      Include Pre-Survey Questions?
+    </span>
+    <p className="mb-3 text-sm text-white/60">
+      Select Yes to add pre-survey questions before the main assessment.
+    </p>
+
+    <div className="flex flex-wrap gap-6">
+      <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
+        <input
+          type="radio"
+          name="hasPreSurvey"
+          checked={!hasPreSurvey}
+          onChange={() => setHasPreSurvey(false)}
+          className="h-4 w-4"
+        />
+        No
+      </label>
+
+      <label className="flex cursor-pointer items-center gap-2 text-sm text-white/90">
+        <input
+          type="radio"
+          name="hasPreSurvey"
+          checked={hasPreSurvey}
+          onChange={() => setHasPreSurvey(true)}
+          className="h-4 w-4"
+        />
+        Yes
+      </label>
+    </div>
+  </div>
+
+  {hasPreSurvey ? (
+    <div className="rounded-2xl border border-white/15 bg-white/[0.04] p-5 sm:p-6">
+      <h2 className="mb-1 text-lg font-bold text-white">
+        Pre-Survey Question
+      </h2>
+      <p className="mb-4 text-sm text-white/70">
+        These questions will be shown before the main assessment.
+      </p>
+
+      <div className="space-y-5">
+        {preSurveyRows.map((row, qIdx) => (
+          <div
+            key={row.id}
+            className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-4"
+          >
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="min-w-[220px] flex-1">
+                <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+                  Question {qIdx + 1}
+                </label>
+                <input
+                  id={`director-presurvey-question-${qIdx}`}
+                  type="text"
+                  value={row.text}
+                  onChange={(e) =>
+                    handleUpdatePreSurvey(qIdx, "text", e.target.value)
+                  }
+                  placeholder="e.g. What is your current church?"
+                  className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                />
+              </div>
+
+              {preSurveyRows.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={() => handleRemovePreSurveyQuestion(qIdx)}
+                  className="rounded-lg border border-red-300/40 bg-red-500/15 px-3 py-2 text-sm text-red-200"
+                >
+                  Remove
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ))}
+
+        <button
+          type="button"
+          onClick={handleAddPreSurveyQuestion}
+          className="rounded-lg bg-[#8ec5eb]/90 px-3 py-2 text-xs font-semibold text-[#062946] hover:bg-[#8ec5eb]"
+        >
+          <i className="fa-solid fa-plus mr-1" />
+          Add pre-survey question
+        </button>
+      </div>
+    </div>
+  ) : null}
+</div>
+
+          {/* Edit / Layer buttons */}
+          {/* <div className="mb-6 border-t border-white/20" />
+
+          <div className="mb-6 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsEditMode((prev) => !prev)}
+              className="flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-semibold text-[#2E3B8E] shadow-md hover:bg-gray-100"
+            >
+              <i className="fa-solid fa-pen-to-square" />
+              {isEditMode ? "Done" : "Edit"}
+            </button>
+          </div> */}
+          {/* Divider and Action Buttons */}
+<div className="mb-6 border-t border-white/20" />
+
+<div className="mb-6 flex justify-end gap-2">
+  <button
+    type="button"
+    onClick={() => setIsEditMode((prev) => !prev)}
+    className="flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-semibold text-[#2E3B8E] shadow-md hover:bg-gray-100"
+  >
+    <i className="fa-solid fa-pen-to-square" />
+    {isEditMode ? "Done" : "Edit"}
+  </button>
+
+  <button
+    type="button"
+    onClick={handleAddLayerToSelectedSection}
+    className="flex items-center gap-2 rounded-lg bg-white px-5 py-2 text-sm font-semibold text-[#2E3B8E] shadow-md hover:bg-gray-100"
+  >
+    <i className="fa-solid fa-layer-group" />
+    Layer
+  </button>
+</div>
+
+          {/* Layers */}
+          <div className="space-y-6">
+            {selectedSection.layers.map((layer, layerIdx) => (
+              <div
+               key={`${layerIdx}-${layer.id ?? "layer"}`}
+                className="rounded-xl border-2 border-white/20 bg-white/5 p-5"
+              >
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-semibold text-white">Layer {layerIdx + 1}</h3>
+                  <span className="text-xs text-white/60">Choices</span>
+                </div>
+
+                <div className="mb-4 space-y-2">
+                  {layer.choices.map((choice, choiceIdx) => (
+                    <div
+                      key={choiceIdx}
+                      className="flex items-center gap-3 rounded-lg border border-white/25 bg-white/10 p-3 text-white"
+                    >
+                      <span className="text-sm font-semibold">{choiceIdx + 1}.</span>
+
+                      <input
+                        id={`director-choice-${selectedSectionIndex}-${layerIdx}-${choiceIdx}`}
+                        value={choice}
+                        onChange={(e) =>
+                          handleUpdateLayerChoice(
+                            selectedSectionIndex,
+                            layerIdx,
+                            choiceIdx,
+                            e.target.value
+                          )
+                        }
+                        readOnly={!isEditMode}
+                        className="flex-1 rounded border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/40"
+                        placeholder={`Choice ${choiceIdx + 1}`}
+                      />
+
+                      {isEditMode && layer.choices.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleRemoveLayerChoice(
+                              selectedSectionIndex,
+                              layerIdx,
+                              choiceIdx
+                            )
+                          }
+                          className="rounded-lg border border-red-300/40 bg-red-500/15 px-2.5 py-2 text-red-200"
+                        >
+                          <i className="fa-solid fa-trash" />
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+
+                {isEditMode ? (
+                  <div className="mb-4 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleAddLayerChoice(selectedSectionIndex, layerIdx)}
+                      className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#2E3B8E] shadow-md hover:bg-gray-100"
+                    >
+                      <i className="fa-solid fa-plus" />
+                      Choice
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+
+          {/* CDP */}
+          <div className="mt-6 rounded-xl border-2 border-white/20 bg-white/5 p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-semibold text-white">
+                Customized Development Plans
+              </h3>
+              <span className="text-xs text-white/70">Edit Level 1-4 items</span>
+            </div>
+
+            <div className="space-y-4">
+              {selectedSection.plans.map((plan, planIdx) => (
+                <div
+                  key={plan.id}
+                  className="rounded-lg border border-white/15 bg-white/[0.03] p-4"
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <h4 className="text-sm font-semibold text-[#cde2f2]">
+                      {plan.name}
+                    </h4>
+
+                    <button
+                      type="button"
+                      onClick={() => handleAddPlanItem(selectedSectionIndex, planIdx)}
+                      className="rounded-lg border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold text-white hover:bg-white/15"
+                    >
+                      <i className="fa-solid fa-plus mr-1" />
+                      Plan
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {plan.items.map((item, itemIdx) => (
+                      <div key={itemIdx} className="flex items-center gap-2">
+                        <input
+                          value={item}
+                          onChange={(e) =>
+                            handleUpdatePlanItem(
+                              selectedSectionIndex,
+                              planIdx,
+                              itemIdx,
+                              e.target.value
+                            )
+                          }
+                          className="flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                          placeholder={`Plan item ${itemIdx + 1}`}
+                        />
+
+                        {plan.items.length > 1 ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleRemovePlanItem(
+                                selectedSectionIndex,
+                                planIdx,
+                                itemIdx
+                              )
+                            }
+                            className="rounded-lg border border-red-300/40 bg-red-500/15 px-3 py-2 text-red-200"
+                          >
+                            <i className="fa-solid fa-trash" />
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="flex h-full items-center justify-center">
+          <p className="text-xl font-semibold text-white">Select a section to view</p>
+        </div>
+      )}
+    </div>
+  </div>
+</section>
 
       <div
         className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#041f35]/95 px-4 py-3 shadow-[0_-8px_32px_rgba(0,0,0,0.35)] backdrop-blur-md sm:px-6"

@@ -126,9 +126,9 @@ export default function MentorHomePage() {
         },
         {
           icon: "fa-regular fa-comments",
-          line1: "Pastor",
+          line1: "Today's Pastor",
           line2: "Queries",
-          sheetTitle: "Pastor Queries",
+          sheetTitle: "Today's Pastor Queries",
           sectionId: "pastor-queries",
         },
         {

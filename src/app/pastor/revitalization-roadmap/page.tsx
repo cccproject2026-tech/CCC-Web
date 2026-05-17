@@ -7,6 +7,8 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import SearchBar from "@/app/Components/SearchBar";
 import { pastorMainGradient } from "@/app/Components/pastor/pastor-theme";
+import { apiGetRoadmapById } from "@/app/Services/api";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
 import {
   directorBtnPrimary,
   directorGlassCard,
@@ -19,9 +21,18 @@ import MentorBannerBg from "@/app/Assets/mentor-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { getPastorUserId } from "@/app/utils/pastor-auth";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
+// import {
+//   collapseRoadmapAssignmentsToParents,
+//   fetchRoadmapAssignmentsForUser,
+//   type RoadmapAssignmentUi,
+// } from "@/app/Services/roadmap-assignments";
 import {
   collapseRoadmapAssignmentsToParents,
   fetchRoadmapAssignmentsForUser,
+  unwrapNestedRoadmapsArray,
+  mergeProgressOntoRoadmaps,
+  deriveTaskStatusForList,
+  resolveNestedTemplateItemId,
   type RoadmapAssignmentUi,
 } from "@/app/Services/roadmap-assignments";
 import { subscribeProgressUpdated } from "@/app/utils/progress-sync";
@@ -138,6 +149,31 @@ export default function RevitalizationRoadmap() {
   const [activeTab, setActiveTab] = useState<TabKey>("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [phases, setPhases] = useState<PhaseCard[]>([]);
+//   const [recommendedTask, setRecommendedTask] = useState<{
+//   phase: PhaseCard;
+//   task: any;
+//   taskId: string;
+// } | null>(null);
+// const [recommendedTask, setRecommendedTask] = useState<{
+//   phase: PhaseCard;
+//   task: any;
+//   taskId: string;
+//   totalTasks: number;
+//   completedTasks: number;
+//   progressPercent: number;
+// } | null>(null);
+const [recommendedTasks, setRecommendedTasks] = useState<
+  {
+    phase: PhaseCard;
+    task: any;
+    taskId: string;
+    totalTasks: number;
+    completedTasks: number;
+    progressPercent: number;
+  }[]
+>([]);
+
+const [recommendedIndex, setRecommendedIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   // Sequence gating removed: View should always open.
@@ -163,6 +199,379 @@ export default function RevitalizationRoadmap() {
 
   const getSessionUserId = (): string => getPastorUserId()?.trim() || "";
 
+//   const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: string) => {
+//   try {
+//     // const targetPhase =
+//     //   phaseList.find((phase) => phase.hasNestedTasks && phase.status === "In-progress") ||
+//     //   phaseList.find((phase) => phase.hasNestedTasks && phase.status !== "Completed");
+
+//     // if (!targetPhase) {
+//     //   setRecommendedTask(null);
+//     //   return;
+//     // }
+//     const candidatePhases = [...phaseList]
+//   .filter((phase) => phase.hasNestedTasks)
+//   .sort((a, b) => phaseSequenceIndex(b) - phaseSequenceIndex(a));
+
+//     const [rmRes, progRes] = await Promise.all([
+//       apiGetRoadmapById(targetPhase.id),
+//       apiGetUserProgress(userId),
+//     ]);
+
+//     const body = rmRes.data as { data?: unknown };
+//     const rawRoadmap = body?.data ?? rmRes.data;
+//     // const progressData = progRes?.data?.data ?? progRes?.data;
+//     const progressData = (progRes?.data?.data ?? progRes?.data) as any;
+
+//     const mergedRoadmaps =
+//       rawRoadmap && progressData
+//         ? mergeProgressOntoRoadmaps([rawRoadmap as never], progressData)
+//         : [rawRoadmap];
+
+//     const mergedRoadmap = mergedRoadmaps[0];
+//     const tasks = unwrapNestedRoadmapsArray(mergedRoadmap);
+// const taskStats = tasks.reduce(
+//   (acc: { total: number; completed: number }, task: any) => {
+//     const taskId = resolveNestedTemplateItemId(task);
+//     if (!taskId) return acc;
+
+//     const derivedStatus = deriveTaskStatusForList(progressData, {
+//       parentRoadmapId: targetPhase.id,
+//       taskId,
+//       itemStatus: task.status != null ? String(task.status) : undefined,
+//       endDate: typeof task.endDate === "string" ? task.endDate : undefined,
+//     });
+
+//     acc.total += 1;
+
+//     if (String(derivedStatus).toLowerCase() === "completed") {
+//       acc.completed += 1;
+//     }
+
+//     return acc;
+//   },
+//   { total: 0, completed: 0 }
+// );
+
+// const progressPercent =
+//   taskStats.total > 0
+//     ? Math.round((taskStats.completed / taskStats.total) * 100)
+//     : 0;
+//     const nextTask = tasks.find((task: any) => {
+//       const taskId = resolveNestedTemplateItemId(task);
+//       if (!taskId) return false;
+
+//       const derivedStatus = deriveTaskStatusForList(progressData, {
+//         parentRoadmapId: targetPhase.id,
+//         taskId,
+//         itemStatus: task.status != null ? String(task.status) : undefined,
+//         endDate: typeof task.endDate === "string" ? task.endDate : undefined,
+//       });
+
+//       return String(derivedStatus).toLowerCase() !== "completed";
+//     });
+
+//     const taskId = nextTask ? resolveNestedTemplateItemId(nextTask) : "";
+
+//     if (!nextTask || !taskId) {
+//       setRecommendedTask(null);
+//       return;
+//     }
+
+//     // setRecommendedTask({
+//     //   phase: targetPhase,
+//     //   task: nextTask,
+//     //   taskId,
+//     // });
+//     setRecommendedTask({
+//   phase: targetPhase,
+//   task: nextTask,
+//   taskId,
+//   totalTasks: taskStats.total,
+//   completedTasks: taskStats.completed,
+//   progressPercent,
+// });
+//   } catch (err) {
+//     console.error("Failed to load recommended task", err);
+//     setRecommendedTask(null);
+//   }
+// }, []);
+// const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: string) => {
+//   try {
+//     const candidatePhases = [...phaseList]
+//       .filter((phase) => phase.hasNestedTasks)
+//       .sort((a, b) => phaseSequenceIndex(b) - phaseSequenceIndex(a));
+
+//     for (const targetPhase of candidatePhases) {
+//       const [rmRes, progRes] = await Promise.all([
+//         apiGetRoadmapById(targetPhase.id),
+//         apiGetUserProgress(userId),
+//       ]);
+
+//       const body = rmRes.data as { data?: unknown };
+//       const rawRoadmap = body?.data ?? rmRes.data;
+//       const progressData = (progRes?.data?.data ?? progRes?.data) as any;
+
+//       const mergedRoadmaps =
+//         rawRoadmap && progressData
+//           ? mergeProgressOntoRoadmaps([rawRoadmap as never], progressData)
+//           : [rawRoadmap];
+
+//       const mergedRoadmap = mergedRoadmaps[0];
+//       const tasks = unwrapNestedRoadmapsArray(mergedRoadmap);
+
+//       const taskStats = tasks.reduce(
+//         (acc: { total: number; completed: number }, task: any) => {
+//           const taskId = resolveNestedTemplateItemId(task);
+//           if (!taskId) return acc;
+
+//           const derivedStatus = deriveTaskStatusForList(progressData, {
+//             parentRoadmapId: targetPhase.id,
+//             taskId,
+//             itemStatus: task.status != null ? String(task.status) : undefined,
+//             endDate: typeof task.endDate === "string" ? task.endDate : undefined,
+//           });
+
+//           acc.total += 1;
+
+//           if (String(derivedStatus).toLowerCase() === "completed") {
+//             acc.completed += 1;
+//           }
+
+//           return acc;
+//         },
+//         { total: 0, completed: 0 }
+//       );
+
+//       if (taskStats.completed === 0) {
+//         continue;
+//       }
+
+//       const nextTask = tasks.find((task: any) => {
+//         const taskId = resolveNestedTemplateItemId(task);
+//         if (!taskId) return false;
+
+//         const derivedStatus = deriveTaskStatusForList(progressData, {
+//           parentRoadmapId: targetPhase.id,
+//           taskId,
+//           itemStatus: task.status != null ? String(task.status) : undefined,
+//           endDate: typeof task.endDate === "string" ? task.endDate : undefined,
+//         });
+
+//         return String(derivedStatus).toLowerCase() !== "completed";
+//       });
+
+//       const taskId = nextTask ? resolveNestedTemplateItemId(nextTask) : "";
+
+//       if (nextTask && taskId) {
+//         setRecommendedTask({
+//           phase: targetPhase,
+//           task: nextTask,
+//           taskId,
+//           totalTasks: taskStats.total,
+//           completedTasks: taskStats.completed,
+//           progressPercent:
+//             taskStats.total > 0
+//               ? Math.round((taskStats.completed / taskStats.total) * 100)
+//               : 0,
+//         });
+//         return;
+//       }
+//     }
+
+//     setRecommendedTask(null);
+//   } catch (err) {
+//     console.error("Failed to load recommended task", err);
+//     setRecommendedTask(null);
+//   }
+// }, []);
+// const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: string) => {
+//   try {
+//     // const candidatePhases = [...phaseList]
+//     //   .filter((phase) => phase.hasNestedTasks)
+//     //   .sort((a, b) => phaseSequenceIndex(b) - phaseSequenceIndex(a));
+//     const candidatePhases = [...phaseList]
+//   .filter((phase) => phase.hasNestedTasks)
+//   .sort((a, b) => phaseSequenceIndex(a) - phaseSequenceIndex(b));
+
+//     for (const targetPhase of candidatePhases) {
+//       const [rmRes, progRes] = await Promise.all([
+//         apiGetRoadmapById(targetPhase.id),
+//         apiGetUserProgress(userId),
+//       ]);
+
+//       const body = rmRes.data as { data?: unknown };
+//       const rawRoadmap = body?.data ?? rmRes.data;
+//       const progressData = (progRes?.data?.data ?? progRes?.data) as any;
+
+//       const mergedRoadmaps =
+//         rawRoadmap && progressData
+//           ? mergeProgressOntoRoadmaps([rawRoadmap as never], progressData)
+//           : [rawRoadmap];
+
+//       const mergedRoadmap = mergedRoadmaps[0];
+//       const tasks = unwrapNestedRoadmapsArray(mergedRoadmap);
+
+//       const taskStats = tasks.reduce(
+//         (acc: { total: number; completed: number }, task: any) => {
+//           const taskId = resolveNestedTemplateItemId(task);
+//           if (!taskId) return acc;
+
+//           const derivedStatus = deriveTaskStatusForList(progressData, {
+//             parentRoadmapId: targetPhase.id,
+//             taskId,
+//             itemStatus: task.status != null ? String(task.status) : undefined,
+//             endDate: typeof task.endDate === "string" ? task.endDate : undefined,
+//           });
+
+//           acc.total += 1;
+
+//           if (String(derivedStatus).toLowerCase() === "completed") {
+//             acc.completed += 1;
+//           }
+
+//           return acc;
+//         },
+//         { total: 0, completed: 0 }
+//       );
+
+//       if (taskStats.completed === 0) {
+//         continue;
+//       }
+
+//       const nextTask = tasks.find((task: any) => {
+//         const taskId = resolveNestedTemplateItemId(task);
+//         if (!taskId) return false;
+
+//         const derivedStatus = deriveTaskStatusForList(progressData, {
+//           parentRoadmapId: targetPhase.id,
+//           taskId,
+//           itemStatus: task.status != null ? String(task.status) : undefined,
+//           endDate: typeof task.endDate === "string" ? task.endDate : undefined,
+//         });
+
+//         return String(derivedStatus).toLowerCase() !== "completed";
+//       });
+
+//       const taskId = nextTask ? resolveNestedTemplateItemId(nextTask) : "";
+
+//       if (nextTask && taskId) {
+//         setRecommendedTask({
+//           phase: targetPhase,
+//           task: nextTask,
+//           taskId,
+//           totalTasks: taskStats.total,
+//           completedTasks: taskStats.completed,
+//           progressPercent:
+//             taskStats.total > 0
+//               ? Math.round((taskStats.completed / taskStats.total) * 100)
+//               : 0,
+//         });
+//         return;
+//       }
+//     }
+
+//     setRecommendedTask(null);
+//   } catch (err) {
+//     console.error("Failed to load recommended task", err);
+//     setRecommendedTask(null);
+//   }
+// }, []);
+const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: string) => {
+  try {
+    const candidatePhases = [...phaseList]
+      .filter((phase) => phase.hasNestedTasks)
+      .sort((a, b) => phaseSequenceIndex(a) - phaseSequenceIndex(b));
+
+    const recommendations: {
+      phase: PhaseCard;
+      task: any;
+      taskId: string;
+      totalTasks: number;
+      completedTasks: number;
+      progressPercent: number;
+    }[] = [];
+
+    for (const targetPhase of candidatePhases) {
+      const [rmRes, progRes] = await Promise.all([
+        apiGetRoadmapById(targetPhase.id),
+        apiGetUserProgress(userId),
+      ]);
+
+      const body = rmRes.data as { data?: unknown };
+      const rawRoadmap = body?.data ?? rmRes.data;
+      const progressData = (progRes?.data?.data ?? progRes?.data) as any;
+
+      const mergedRoadmaps =
+        rawRoadmap && progressData
+          ? mergeProgressOntoRoadmaps([rawRoadmap as never], progressData)
+          : [rawRoadmap];
+
+      const mergedRoadmap = mergedRoadmaps[0];
+      const tasks = unwrapNestedRoadmapsArray(mergedRoadmap);
+
+      const taskStats = tasks.reduce(
+        (acc: { total: number; completed: number }, task: any) => {
+          const taskId = resolveNestedTemplateItemId(task);
+          if (!taskId) return acc;
+
+          const derivedStatus = deriveTaskStatusForList(progressData, {
+            parentRoadmapId: targetPhase.id,
+            taskId,
+            itemStatus: task.status != null ? String(task.status) : undefined,
+            endDate: typeof task.endDate === "string" ? task.endDate : undefined,
+          });
+
+          acc.total += 1;
+
+          if (String(derivedStatus).toLowerCase() === "completed") {
+            acc.completed += 1;
+          }
+
+          return acc;
+        },
+        { total: 0, completed: 0 }
+      );
+
+      const nextTask = tasks.find((task: any) => {
+        const taskId = resolveNestedTemplateItemId(task);
+        if (!taskId) return false;
+
+        const derivedStatus = deriveTaskStatusForList(progressData, {
+          parentRoadmapId: targetPhase.id,
+          taskId,
+          itemStatus: task.status != null ? String(task.status) : undefined,
+          endDate: typeof task.endDate === "string" ? task.endDate : undefined,
+        });
+
+        return String(derivedStatus).toLowerCase() !== "completed";
+      });
+
+      const taskId = nextTask ? resolveNestedTemplateItemId(nextTask) : "";
+
+      if (nextTask && taskId) {
+        recommendations.push({
+          phase: targetPhase,
+          task: nextTask,
+          taskId,
+          totalTasks: taskStats.total,
+          completedTasks: taskStats.completed,
+          progressPercent:
+            taskStats.total > 0
+              ? Math.round((taskStats.completed / taskStats.total) * 100)
+              : 0,
+        });
+      }
+    }
+
+    setRecommendedTasks(recommendations);
+    setRecommendedIndex(0);
+  } catch (err) {
+    console.error("Failed to load recommended tasks", err);
+    setRecommendedTasks([]);
+    setRecommendedIndex(0);
+  }
+}, []);
   const fetchRoadmaps = useCallback(async (showLoader = true, bypassSilentThrottle = false) => {
     const now = Date.now();
     if (!showLoader && !bypassSilentThrottle) {
@@ -195,6 +604,7 @@ export default function RevitalizationRoadmap() {
       }));
 
       setPhases(mappedPhases);
+      void loadRecommendedTask(mappedPhases, userId);
       setError("");
       lastSilentFetchAtRef.current = Date.now();
     } catch (err: unknown) {
@@ -207,7 +617,8 @@ export default function RevitalizationRoadmap() {
     } finally {
       if (showLoader) setLoading(false);
     }
-  }, []);
+  // }, []);
+  }, [loadRecommendedTask]);
 
   useLayoutEffect(() => {
     const t = tabKeyFromSearchParam(searchParams.get("tab"));
@@ -295,6 +706,7 @@ export default function RevitalizationRoadmap() {
     });
   }, [phases, searchTerm, activeTab]);
 
+const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
   if (loading) {
     return (
       <div className={PASTOR_MY_MENTORS_STYLE_ROOT}>
@@ -415,7 +827,243 @@ export default function RevitalizationRoadmap() {
                   </div>
                 </div>
               </DirectorFilterSection>
+{/* {recommendedTask ? (
+  <section className={`${directorGlassCard} mb-6 overflow-hidden p-5 sm:p-6`}>
+    <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+      <div className="min-w-0">
+        <p className="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-[#f4d27a]">
+          Recommended for today
+        </p>
 
+        <h2 className="text-xl font-bold text-white sm:text-2xl">
+          {recommendedTask.task?.name || recommendedTask.task?.title || "Continue your next task"}
+        </h2>
+
+        <p className="mt-2 text-sm text-[#cde2f2]">
+          Continue the next step in {recommendedTask.phase.title}.
+        </p>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          router.push(
+            `/pastor/jumpstart?id=${encodeURIComponent(
+              recommendedTask.taskId
+            )}&parentId=${encodeURIComponent(recommendedTask.phase.id)}`
+          );
+        }}
+        className={`${directorBtnPrimary} min-h-[44px] !px-5 !py-2.5 !text-sm`}
+      >
+        Continue Journey
+      </button>
+    </div>
+  </section>
+) : null} */}
+{activeRecommendedTask ? (
+  // <section className={`${directorGlassCard} mb-6 overflow-hidden p-5 sm:p-6`}>
+  //   <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+  //     <div className="min-w-0 flex-1">
+  //       <div className="mb-2 flex items-center justify-between gap-3">
+  //         <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#f4d27a]">
+  //           Recommended for today
+  //         </p>
+
+  //         {recommendedTasks.length > 1 ? (
+  //           <div className="flex items-center gap-2">
+  //             <button
+  //               type="button"
+  //               onClick={() =>
+  //                 setRecommendedIndex((current) =>
+  //                   current === 0 ? recommendedTasks.length - 1 : current - 1
+  //                 )
+  //               }
+  //               className={`${directorIconButton} !h-9 !w-9`}
+  //               aria-label="Previous recommendation"
+  //             >
+  //               <i className="fa-solid fa-chevron-left text-xs" />
+  //             </button>
+
+  //             <button
+  //               type="button"
+  //               onClick={() =>
+  //                 setRecommendedIndex((current) =>
+  //                   current === recommendedTasks.length - 1 ? 0 : current + 1
+  //                 )
+  //               }
+  //               className={`${directorIconButton} !h-9 !w-9`}
+  //               aria-label="Next recommendation"
+  //             >
+  //               <i className="fa-solid fa-chevron-right text-xs" />
+  //             </button>
+  //           </div>
+  //         ) : null}
+  //       </div>
+
+  //       <h2 className="text-xl font-bold text-white sm:text-2xl">
+  //         {activeRecommendedTask.phase.title}
+  //       </h2>
+
+  //       <p className="mt-1 text-sm text-[#cde2f2]">
+  //         Next step:{" "}
+  //         <span className="font-semibold text-white">
+  //           {activeRecommendedTask.task?.name ||
+  //             activeRecommendedTask.task?.title ||
+  //             "Continue your next task"}
+  //         </span>
+  //       </p>
+
+  //       <div className="mt-4 max-w-xl">
+  //         <div className="mb-1 flex items-center justify-between text-xs font-semibold text-white/75">
+  //           <span>
+  //             {activeRecommendedTask.completedTasks}/{activeRecommendedTask.totalTasks} tasks completed
+  //           </span>
+  //           <span>{activeRecommendedTask.progressPercent}%</span>
+  //         </div>
+
+  //         <div className="h-2 overflow-hidden rounded-full bg-white/10">
+  //           <div
+  //             className="h-full rounded-full bg-[#3498DB]"
+  //             style={{ width: `${activeRecommendedTask.progressPercent}%` }}
+  //           />
+  //         </div>
+  //       </div>
+
+  //       {recommendedTasks.length > 1 ? (
+  //         <div className="mt-4 flex items-center gap-2">
+  //           {recommendedTasks.map((item, index) => (
+  //             <button
+  //               key={`${item.phase.id}-${item.taskId}`}
+  //               type="button"
+  //               onClick={() => setRecommendedIndex(index)}
+  //               className={`h-2.5 rounded-full transition-all ${
+  //                 index === recommendedIndex
+  //                   ? "w-8 bg-[#3498DB]"
+  //                   : "w-2.5 bg-white/25 hover:bg-white/45"
+  //               }`}
+  //               aria-label={`Show recommendation ${index + 1}`}
+  //             />
+  //           ))}
+  //         </div>
+  //       ) : null}
+  //     </div>
+
+  //     <button
+  //       type="button"
+  //       onClick={() => {
+  //         router.push(
+  //           `/pastor/jumpstart?id=${encodeURIComponent(
+  //             activeRecommendedTask.taskId
+  //           )}&parentId=${encodeURIComponent(activeRecommendedTask.phase.id)}`
+  //         );
+  //       }}
+  //       className={`${directorBtnPrimary} min-h-[44px] !px-5 !py-2.5 !text-sm`}
+  //     >
+  //       Continue Journey
+  //     </button>
+  //   </div>
+  // </section>
+  <section className={`${directorGlassCard} relative mb-6 overflow-hidden px-5 py-4 sm:px-6 sm:py-5`}>
+  {recommendedTasks.length > 1 ? (
+    <>
+      <button
+        type="button"
+        onClick={() =>
+          setRecommendedIndex((current) =>
+            current === 0 ? recommendedTasks.length - 1 : current - 1
+          )
+        }
+        className={`${directorIconButton} absolute left-4 top-1/2 z-10 !h-9 !w-9 -translate-y-1/2`}
+        aria-label="Previous recommendation"
+      >
+        <i className="fa-solid fa-chevron-left text-xs" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() =>
+          setRecommendedIndex((current) =>
+            current === recommendedTasks.length - 1 ? 0 : current + 1
+          )
+        }
+        className={`${directorIconButton} absolute right-4 top-1/2 z-10 !h-9 !w-9 -translate-y-1/2`}
+        aria-label="Next recommendation"
+      >
+        <i className="fa-solid fa-chevron-right text-xs" />
+      </button>
+    </>
+  ) : null}
+
+  <div className="flex flex-col gap-4 px-0 sm:px-12 lg:flex-row lg:items-center lg:justify-between">
+    <div className="min-w-0 flex-1">
+      <p className="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-[#f4d27a]">
+        Recommended for today
+      </p>
+
+      <h2 className="text-xl font-bold text-white sm:text-2xl">
+        {activeRecommendedTask.phase.title}
+      </h2>
+
+      <p className="mt-1 text-sm text-[#cde2f2]">
+        Next step:{" "}
+        <span className="font-semibold text-white">
+          {activeRecommendedTask.task?.name ||
+            activeRecommendedTask.task?.title ||
+            "Continue your next task"}
+        </span>
+      </p>
+
+      <div className="mt-3 max-w-xl">
+        <div className="mb-1 flex items-center justify-between text-xs font-semibold text-white/75">
+          <span>
+            {activeRecommendedTask.completedTasks}/{activeRecommendedTask.totalTasks} tasks completed
+          </span>
+          <span>{activeRecommendedTask.progressPercent}%</span>
+        </div>
+
+        <div className="h-2 overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full bg-[#3498DB]"
+            style={{ width: `${activeRecommendedTask.progressPercent}%` }}
+          />
+        </div>
+      </div>
+
+      {recommendedTasks.length > 1 ? (
+        <div className="mt-3 flex items-center gap-2">
+          {recommendedTasks.map((item, index) => (
+            <button
+              key={`${item.phase.id}-${item.taskId}`}
+              type="button"
+              onClick={() => setRecommendedIndex(index)}
+              className={`h-2 rounded-full transition-all ${
+                index === recommendedIndex
+                  ? "w-7 bg-[#3498DB]"
+                  : "w-2 bg-white/25 hover:bg-white/45"
+              }`}
+              aria-label={`Show recommendation ${index + 1}`}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+
+    <button
+      type="button"
+      onClick={() => {
+        router.push(
+          `/pastor/jumpstart?id=${encodeURIComponent(
+            activeRecommendedTask.taskId
+          )}&parentId=${encodeURIComponent(activeRecommendedTask.phase.id)}`
+        );
+      }}
+      className={`${directorBtnPrimary} min-h-[42px] !px-5 !py-2.5 !text-sm`}
+    >
+      Continue Journey
+    </button>
+  </div>
+</section>
+) : null}
               {phases.length === 0 ? (
                 <div className={`${directorGlassCard} px-5 py-12 text-center text-sm text-white/65`}>
                   No roadmap assignments found. Please contact your administrator.

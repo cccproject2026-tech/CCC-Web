@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
 import Card1 from "../../Assets/card1.png";
-import { apiGetRoadmaps, apiDeleteRoadmap } from "@/app/Services/api";
+import { apiGetRoadmaps, apiDeleteRoadmap, apiGetAllUsers } from "@/app/Services/api";
+import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import {
   extractUserIdFromOverallProgressRow,
   unwrapOverallProgressList,
@@ -415,9 +416,13 @@ function SortRadio({ checked, onSelect, label, className = "" }) {
 export default function RevitalizationRoadmapPage() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const isRoadmapHub =
     pathname === "/director/revitalization-roadmap" || pathname === "/director/revitalization-roadmap/";
   const [searchQuery, setSearchQuery] = useState("");
+  const [librarySearch, setLibrarySearch] = useState("");
+const [mentorSearch, setMentorSearch] = useState("");
+const [pastorSearch, setPastorSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [roadmapLibrary, setRoadmapLibrary] = useState([]);
   const [loadingRoadmaps, setLoadingRoadmaps] = useState(false);
@@ -430,6 +435,26 @@ export default function RevitalizationRoadmapPage() {
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [filterPastorId, setFilterPastorId] = useState("all");
   const [selectedPastorModalId, setSelectedPastorModalId] = useState(null);
+  const [activeTab, setActiveTab] = useState("library");
+  useEffect(() => {
+  const tab = searchParams.get("tab");
+  const pastorId = searchParams.get("pastorId");
+
+  if (tab === "pastor") {
+    setActiveTab("pastor");
+
+    if (pastorId) {
+      setFilterPastorId(pastorId);
+      setSelectedPastorModalId(pastorId);
+    }
+  }
+}, [searchParams]);
+  const [mentorList, setMentorList] = useState([]);
+const [mentorListLoading, setMentorListLoading] = useState(false);
+const [selectedMentor, setSelectedMentor] = useState(null);
+const [selectedMentorPastors, setSelectedMentorPastors] = useState([]);
+const [selectedMentorPastorsLoading, setSelectedMentorPastorsLoading] = useState(false);
+const [openMentorMenuId, setOpenMentorMenuId] = useState(null);
   const [rearrangeMode, setRearrangeMode] = useState(false);
 
   const [selectMode, setSelectMode] = useState(false);
@@ -476,10 +501,21 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
     };
   }, [showSortMenu, updateSortMenuPosition]);
 
+  // useEffect(() => {
+  //   const id = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 350);
+  //   return () => clearTimeout(id);
+  // }, [searchQuery]);
   useEffect(() => {
-    const id = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 350);
-    return () => clearTimeout(id);
-  }, [searchQuery]);
+  const activeSearch =
+    activeTab === "mentor"
+      ? mentorSearch
+      : activeTab === "pastor"
+        ? pastorSearch
+        : librarySearch;
+
+  const id = setTimeout(() => setDebouncedSearch(activeSearch.trim()), 350);
+  return () => clearTimeout(id);
+}, [activeTab, librarySearch, mentorSearch, pastorSearch]);
 
   const fetchRoadmaps = useCallback(async () => {
     try {
@@ -854,7 +890,23 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
 
   const filteredLibrary = useMemo(() => {
     let rows = [...orderedLibrary];
+if (activeTab === "mentor") {
+  rows = rows.filter(
+    (r) =>
+      String(r.raw?.assignedRole || "")
+        .toLowerCase()
+        .includes("mentor")
+  );
+}
 
+if (activeTab === "pastor") {
+  rows = rows.filter(
+    (r) =>
+      String(r.raw?.assignedRole || "")
+        .toLowerCase()
+        .includes("pastor")
+  );
+}
     const qNorm = normLower(debouncedSearch);
     const matchingPastorIds = new Set();
     if (qNorm) {
@@ -890,15 +942,16 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
     }
 
     return rows;
-  }, [
-    orderedLibrary,
-    filterPastorId,
-    metricsByRoadmapId,
-    sortCreated,
-    rearrangeMode,
-    debouncedSearch,
-    pastorProgressList,
-  ]);
+ }, [
+  activeTab,
+  orderedLibrary,
+  filterPastorId,
+  metricsByRoadmapId,
+  sortCreated,
+  rearrangeMode,
+  debouncedSearch,
+  pastorProgressList,
+]);
 
   const selectedPastorHeading = useMemo(() => {
     if (filterPastorId === "all") return "";
@@ -913,7 +966,8 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
 const pagedLibrary = filteredLibrary;
   useEffect(() => {
     setLibraryPage(1);
-  }, [searchQuery, debouncedSearch, filterPastorId, sortCreated]);
+  // }, [searchQuery, debouncedSearch, filterPastorId, sortCreated]);
+  }, [debouncedSearch, filterPastorId, sortCreated]);
 
   /** Clear pastor selection if they disappear from the filtered carousel (e.g. search changed). */
   useEffect(() => {
@@ -996,6 +1050,70 @@ const selectedPastorNameForModal = (() => {
 
   return hit ? pastorRowDisplayName(hit) : "Pastor";
 })();
+
+const loadMentorsForTab = useCallback(async () => {
+  try {
+    setMentorListLoading(true);
+
+    const res = await apiGetAllUsers({
+      role: "mentor",
+      roleMatch: "mixed",
+      page: 1,
+      limit: 100,
+      t: Date.now(),
+    });
+
+    const data = res?.data?.data;
+    const list = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.users)
+        ? data.users
+        : [];
+
+    setMentorList(list);
+  } catch (error) {
+    console.error("Failed to load mentors", error);
+    setMentorList([]);
+  } finally {
+    setMentorListLoading(false);
+  }
+}, []);
+useEffect(() => {
+  if (activeTab !== "mentor") return;
+  loadMentorsForTab();
+}, [activeTab, loadMentorsForTab]);
+
+const handleSelectMentor = async (mentor) => {
+  const mentorId = String(mentor?._id ?? mentor?.id ?? "");
+  if (!mentorId) return;
+
+  setSelectedMentor(mentor);
+  setSelectedMentorPastors([]);
+  setSelectedMentorPastorsLoading(true);
+
+  try {
+    const res = await apiGetAssignedUsers(mentorId);
+    const list = Array.isArray(res?.data?.data) ? res.data.data : [];
+    setSelectedMentorPastors(list);
+  } catch (error) {
+    console.error("Failed to load assigned pastors", error);
+    setSelectedMentorPastors([]);
+  } finally {
+    setSelectedMentorPastorsLoading(false);
+  }
+};
+const filteredMentorList = useMemo(() => {
+  const q = normLower(mentorSearch);
+
+  if (!q) return mentorList;
+
+  return mentorList.filter((mentor) => {
+    const name = `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.trim();
+    const hay = normLower(`${name} ${mentor?.email ?? ""}`);
+
+    return hay.includes(q);
+  });
+}, [mentorList, mentorSearch]);
   return (
     <div className={directorPageRoot}>
       <DirectorHero
@@ -1069,14 +1187,84 @@ const selectedPastorNameForModal = (() => {
 <div className={`${directorGlassCard} mb-8 overflow-visible p-4 sm:p-6`}>
   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
     <div className="min-w-0 w-full lg:max-w-xl lg:flex-1">
-      <SearchBar
+      {/* <SearchBar
         value={searchQuery}
         onChange={setSearchQuery}
         placeholder="Search pastors or roadmap titles…"
         variant="dark"
         className="w-full"
-      />
+      /> */}
+      <SearchBar
+  value={
+    activeTab === "mentor"
+      ? mentorSearch
+      : activeTab === "pastor"
+        ? pastorSearch
+        : librarySearch
+  }
+  onChange={
+    activeTab === "mentor"
+      ? setMentorSearch
+      : activeTab === "pastor"
+        ? setPastorSearch
+        : setLibrarySearch
+  }
+  placeholder={
+    activeTab === "mentor"
+      ? "Search mentors..."
+      : activeTab === "pastor"
+        ? "Search pastors..."
+        : "Search roadmap titles..."
+  }
+  variant="dark"
+  className="w-full"
+/>
     </div>
+    <div className="flex items-center rounded-xl border border-white/10 bg-white/5 p-1">
+  <button
+    type="button"
+    onClick={() => {
+  setActiveTab("library");
+  setFilterPastorId("all");
+  setSelectedPastorModalId(null);
+}}
+    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+      activeTab === "library"
+        ? "bg-[#3498DB] text-white"
+        : "text-white/70 hover:text-white"
+    }`}
+  >
+    Roadmap Library
+  </button>
+
+  <button
+    type="button"
+    onClick={() => {
+  setActiveTab("mentor");
+  setFilterPastorId("all");
+  setSelectedPastorModalId(null);
+}}
+    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+      activeTab === "mentor"
+        ? "bg-[#3498DB] text-white"
+        : "text-white/70 hover:text-white"
+    }`}
+  >
+    Mentor 
+  </button>
+
+  <button
+    type="button"
+    onClick={() => setActiveTab("pastor")}
+    className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+      activeTab === "pastor"
+        ? "bg-[#3498DB] text-white"
+        : "text-white/70 hover:text-white"
+    }`}
+  >
+    Pastor Roadmaps
+  </button>
+</div>
     <button
   type="button"
   onClick={() => router.push("/director/revitalization-roadmap/create")}
@@ -1087,8 +1275,103 @@ const selectedPastorNameForModal = (() => {
 </button>
   </div>
 
-  <div className="mt-5 border-t border-white/10 pt-5" aria-hidden />
+  {/* <div className="mt-5 border-t border-white/10 pt-5" aria-hidden /> */}
+  <div className="mt-5 border-t border-white/10 pt-5">
+  {activeTab === "mentor" ? (
+    <p className="mb-4 text-sm font-medium text-[#cde2f2]/85">
+      Select a mentor to view their assigned pastors, then open a pastor to review their roadmaps.
+    </p>
+  ) : activeTab === "pastor" ? (
+    <p className="mb-4 text-sm font-medium text-[#cde2f2]/85">
+      View roadmaps for all pastors, or select a pastor to review their assigned roadmaps.
+    </p>
+  ) : null}
+</div>
+  {activeTab === "mentor" && (
+  <div className="pt-1">
+    <div className="relative px-4 py-5">
+      <div className="relative flex items-center gap-3">
+        <button
+          type="button"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[#8ec5eb] shadow-sm transition hover:bg-white/15"
+          onClick={() => pastorScrollRef.current?.scrollBy({ left: -280, behavior: "smooth" })}
+        >
+          <i className="fa-solid fa-chevron-left text-sm" />
+        </button>
 
+        <div
+          ref={pastorScrollRef}
+          className="scrollbar-hide flex flex-1 gap-7 overflow-x-auto pb-1 pt-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {mentorListLoading ? (
+            <div className="flex min-h-[120px] flex-1 items-center justify-center py-4">
+              <div className={directorSpinner} />
+            </div>
+          ) : filteredMentorList.length === 0 ? (
+            <div className="flex min-h-[120px] flex-1 items-center justify-center text-sm text-white/60">
+              No mentors found.
+            </div>
+          ) : (
+            filteredMentorList.map((mentor, idx) => {
+              const mentorId = String(mentor?._id ?? mentor?.id ?? idx);
+              const name =
+                `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.trim() ||
+                mentor?.email ||
+                "Mentor";
+
+              const img =
+                String(mentor?.profilePicture || "").trim() ||
+                getInitialsAvatar(mentor?.firstName, mentor?.lastName, "Mentor");
+
+              const selected =
+                selectedMentor &&
+                String(selectedMentor?._id ?? selectedMentor?.id ?? "") === mentorId;
+
+              return (
+                <button
+                  key={mentorId}
+                  type="button"
+                  onClick={() => handleSelectMentor(mentor)}
+                  className={`group flex shrink-0 flex-col items-center px-2 py-1 text-center transition ${
+                    selected ? "opacity-100" : "opacity-[0.82] hover:opacity-100"
+                  }`}
+                >
+                  <div className={`relative mb-2 h-[72px] w-[72px] rounded-full ${selected ? "scale-[1.05]" : ""}`}>
+                    <div className="h-full w-full rounded-full bg-gradient-to-b from-[#5dade2] to-[#2874a6] p-[3px]">
+                      <div className="relative h-full w-full overflow-hidden rounded-full bg-[#041f35]">
+                        <Image
+                          src={img}
+                          alt=""
+                          fill
+                          className="object-cover"
+                          sizes="72px"
+                          unoptimized={typeof img === "string" && isRemoteImageSrc(img)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <span className="max-w-[130px] truncate text-[13px] font-medium text-white/75 group-hover:text-white">
+                    {name}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <button
+          type="button"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/20 bg-white/10 text-[#8ec5eb] shadow-sm transition hover:bg-white/15"
+          onClick={() => pastorScrollRef.current?.scrollBy({ left: 280, behavior: "smooth" })}
+        >
+          <i className="fa-solid fa-chevron-right text-sm" />
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+{activeTab === "pastor" && (
   <div className="pt-1">
     <div className="relative px-4 py-5">
       <div className="relative flex items-center gap-3">
@@ -1127,7 +1410,7 @@ const selectedPastorNameForModal = (() => {
                   type="button"
                   onClick={() => {
                     setSelectedPastorModalId(pid);
-                    setFilterPastorId(pid);
+                    // setFilterPastorId(pid);
                   }}
                   className={`group flex shrink-0 flex-col items-center px-2 py-1 text-center transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3498DB]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a1128] ${
                     selected ? "opacity-100" : "opacity-[0.82] hover:opacity-100"
@@ -1191,16 +1474,28 @@ const selectedPastorNameForModal = (() => {
       </div>
     </div>
   </div>
+  )}
 </div>
           <div className="mb-5 mt-2 flex items-center justify-between gap-3">
-  <h2 className="text-lg font-semibold tracking-tight text-white sm:text-xl">
+  {/* <h2 className="text-lg font-semibold tracking-tight text-white sm:text-xl">
     {filterPastorId === "all"
       ? "All roadmaps"
       : selectedPastorHeading
         ? `${selectedPastorHeading}'s roadmap`
         : "Pastor's roadmap"}
-  </h2>
-
+  </h2> */}
+  <h2 className="text-lg font-semibold tracking-tight text-white sm:text-xl">
+  {activeTab === "library"
+    ? "Roadmap Library"
+    : activeTab === "mentor"
+      ? "Mentors"
+      : filterPastorId === "all"
+        ? "Pastor Roadmaps"
+        : selectedPastorHeading
+          ? `${selectedPastorHeading}'s roadmap`
+          : "Pastor's roadmap"}
+</h2>
+{activeTab == "library" ? (
   <div className="flex flex-wrap items-center justify-end gap-2">
     <button
   type="button"
@@ -1232,8 +1527,9 @@ const selectedPastorNameForModal = (() => {
       <span>New Roadmap</span>
     </button> */}
   </div>
+  ) : null}
 </div>
-{selectMode && selectedRoadmapIds.length > 0 ? (
+{activeTab === "library" && selectMode && selectedRoadmapIds.length > 0 ? (
   <div className="mb-5 flex justify-end gap-2">
     <button
       type="button"
@@ -1270,7 +1566,239 @@ const selectedPastorNameForModal = (() => {
     </button>
   </div>
 ) : null}
-          {loadingRoadmaps ? (
+
+         {activeTab === "pastor" && filterPastorId === "all" ? (
+  <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+    {pastorsForCarousel.map((pastor, idx) => {
+      const pastorId = String(pastorCarouselRowKey(pastor, idx));
+      const name = pastorRowDisplayName(pastor);
+
+      const img =
+        String(pastor?.profilePicture || "").trim() ||
+        getInitialsAvatar(pastor?.firstName, pastor?.lastName, "Pastor");
+
+      const progress = Number(
+        pastor?.overallProgress ??
+          pastor?.progressPercentage ??
+          pastor?.progress ??
+          0
+      );
+
+      return (
+        <div
+          key={`${pastorId}-${idx}`}
+          className={`${directorGlassCard} flex min-h-[150px] gap-4 overflow-hidden p-4`}
+        >
+          <div className="relative h-[120px] w-[120px] shrink-0 overflow-hidden rounded-xl bg-white/5">
+            <Image
+              src={img}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="120px"
+              unoptimized={typeof img === "string" && isRemoteImageSrc(img)}
+            />
+          </div>
+
+          <div className="flex min-w-0 flex-1 flex-col">
+            <h3 className="truncate text-base font-bold text-white">{name}</h3>
+            <p className="text-sm text-white/60">Pastor</p>
+
+            <div className="mt-4">
+              <div className="mb-1 flex items-center justify-between text-xs font-semibold text-white/75">
+                <span>Tasks Completed</span>
+                <span>{Number.isFinite(progress) ? progress : 0}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-emerald-400"
+                  style={{ width: `${Math.max(0, Math.min(100, progress || 0))}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="mt-auto flex justify-end pt-4">
+              <button
+                type="button"
+                // onClick={() => {
+                //   setFilterPastorId(pastorId);
+                //   setSelectedPastorModalId(pastorId);
+                // }}
+                onClick={() => {
+  setSelectedPastorModalId(pastorId);
+}}
+                className="inline-flex h-9 items-center justify-center rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/18 px-4 text-xs font-semibold text-white transition hover:bg-[#3498DB]/28"
+              >
+                View
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+) : activeTab === "mentor" ? (
+  <div className="space-y-5">
+    {mentorListLoading ? (
+      <div className="flex justify-center py-20">
+        <div className={directorSpinner} />
+      </div>
+    ) : filteredMentorList.length === 0 ? (
+      <div className={`${directorGlassCard} px-5 py-14 text-center text-sm text-white/65`}>
+        No mentors found.
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {filteredMentorList.map((mentor) => {
+          const mentorId = String(mentor?._id ?? mentor?.id ?? "");
+          const name =
+            `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.trim() ||
+            mentor?.email ||
+            "Mentor";
+
+          const img =
+            String(mentor?.profilePicture || "").trim() ||
+            getInitialsAvatar(mentor?.firstName, mentor?.lastName, "Mentor");
+
+          return (
+            // <button
+            //   key={mentorId}
+            //   type="button"
+            //   onClick={() => router.push(`/director/revitalization-roadmap/mentor?mentorId=${encodeURIComponent(mentorId)}`)}
+            //   className={`${directorGlassCard} flex items-center gap-4 p-4 text-left transition hover:border-[#3498DB]/40`}
+            // >
+            <div
+  key={mentorId}
+  onClick={() =>
+    router.push(`/director/revitalization-roadmap/mentor?mentorId=${encodeURIComponent(mentorId)}`)
+  }
+  className={`${directorGlassCard} relative flex cursor-pointer items-center gap-4 p-4 text-left transition hover:border-[#3498DB]/40`}
+>
+              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-white/15">
+                <Image
+                  src={img}
+                  alt=""
+                  fill
+                  className="object-cover"
+                  unoptimized={typeof img === "string" && isRemoteImageSrc(img)}
+                />
+              </div>
+
+              <div className="min-w-0">
+                <h3 className="truncate text-sm font-semibold text-white">{name}</h3>
+                <p className="truncate text-xs text-white/55">{mentor?.email || "Mentor"}</p>
+              </div>
+              {/* <button
+  type="button"
+  onClick={(e) => {
+    e.stopPropagation();
+    router.push(
+      `/director/schedule?mentorId=${encodeURIComponent(mentorId)}`
+    );
+  }}
+  className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white"
+  title="Schedule meeting"
+>
+  <i className="fa-solid fa-ellipsis-vertical text-sm" />
+</button> */}
+<div className="absolute right-4 top-4">
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      setOpenMentorMenuId((prev) => (prev === mentorId ? null : mentorId));
+    }}
+    className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white"
+    title="More options"
+  >
+    <i className="fa-solid fa-ellipsis-vertical text-sm" />
+  </button>
+
+  {openMentorMenuId === mentorId ? (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="absolute right-0 top-11 z-30 w-48 rounded-xl border border-white/15 bg-[#0d1f33] p-2 shadow-xl"
+    >
+      <button
+        type="button"
+        onClick={() => {
+          setOpenMentorMenuId(null);
+          router.push(
+            `/director/schedule?tab=Schedule&recipientType=mentor&mentorId=${encodeURIComponent(mentorId)}`
+          );
+        }}
+        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold text-white/85 hover:bg-white/10"
+      >
+        <i className="fa-regular fa-calendar-plus text-xs" />
+        Schedule Meeting
+      </button>
+    </div>
+  ) : null}
+</div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+
+    {/* {selectedMentor ? (
+      <div className={`${directorGlassCard} p-5`}>
+        <h3 className="mb-4 text-base font-semibold text-white">Assigned pastors</h3>
+
+        {selectedMentorPastorsLoading ? (
+          <div className="flex justify-center py-10">
+            <div className={directorSpinner} />
+          </div>
+        ) : selectedMentorPastors.length === 0 ? (
+          <p className="text-sm text-white/60">No pastors assigned to this mentor.</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {selectedMentorPastors.map((pastor) => {
+              const pastorId = String(pastor?._id ?? pastor?.id ?? "");
+              const name =
+                `${pastor?.firstName ?? ""} ${pastor?.lastName ?? ""}`.trim() ||
+                pastor?.email ||
+                "Pastor";
+
+              const img =
+                String(pastor?.profilePicture || "").trim() ||
+                getInitialsAvatar(pastor?.firstName, pastor?.lastName, "Pastor");
+
+              return (
+                <button
+                  key={pastorId}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("pastor");
+                    setFilterPastorId(pastorId);
+                    setSelectedPastorModalId(pastorId);
+                  }}
+                  className="rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left transition hover:border-[#3498DB]/35 hover:bg-white/[0.08]"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="relative h-11 w-11 overflow-hidden rounded-full border border-white/15">
+                      <Image
+                        src={img}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        unoptimized={typeof img === "string" && isRemoteImageSrc(img)}
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-white">{name}</p>
+                      <p className="truncate text-xs text-white/55">{pastor?.email || "Pastor"}</p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    ) : null} */}
+  </div>
+) : loadingRoadmaps ? (
             <div className="flex justify-center py-20">
               <div className={directorSpinner} />
             </div>
@@ -1813,8 +2341,10 @@ const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director
           )}
         </div>
       </main>
-      {selectedPastorModalId != null ? (
-  <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+      {/* {selectedPastorModalId != null ? ( */}
+      {browserMounted && selectedPastorModalId != null
+  ? createPortal(
+  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
     <div className="w-full max-w-3xl rounded-2xl border border-white/15 bg-[#07172b]/95 p-5 shadow-2xl">
       <div className="mb-4 flex items-center justify-between gap-3 border-b border-white/10 pb-4">
         <div>
@@ -1828,10 +2358,32 @@ const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director
 
         <button
           type="button"
-          onClick={() => {
-            setSelectedPastorModalId(null);
-            setFilterPastorId("all");
-          }}
+          // onClick={() => {
+          //   setSelectedPastorModalId(null);
+          //   // setFilterPastorId("all");
+          // }}
+//           onClick={() => {
+//   const returnTo = searchParams.get("returnTo");
+
+//   if (returnTo) {
+//     router.push(returnTo);
+//     return;
+//   }
+
+//   setSelectedPastorModalId(null);
+//   // setFilterPastorId("all");
+// }}
+onClick={() => {
+  const returnTo = searchParams.get("returnTo");
+
+  if (returnTo) {
+    router.push(returnTo);
+    return;
+  }
+
+  setSelectedPastorModalId(null);
+  setFilterPastorId("all");
+}}
           className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white/75 transition hover:bg-white/15 hover:text-white"
           aria-label="Close"
         >
@@ -1965,7 +2517,11 @@ const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director
       </div>
     </div>
   </div>
-) : null}
+// ) : null}
+,
+document.body
+)
+: null}
       {/* <AssignRoadmapModal
         isOpen={Boolean(assignModalRoadmap?.id)}
         onClose={() => setAssignModalRoadmap(null)}
@@ -1991,6 +2547,132 @@ const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director
     reloadPastors();
   }}
 />
+{selectedMentor ? (
+  <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+    <div className="max-h-[85vh] w-full max-w-5xl overflow-y-auto rounded-[28px] border border-white/15 bg-[#101a33] p-6 shadow-2xl">
+      <div className="mb-6 flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold text-white">Assigned Pastors</h2>
+          {/* <p className="mt-1 text-sm text-white/60">Pastors Roadmap Under</p> */}
+          <p className="mt-1 text-sm text-white/60">
+          Pastors Roadmap Under  {`${selectedMentor?.firstName ?? ""} ${selectedMentor?.lastName ?? ""}`.trim() ||
+              selectedMentor?.email ||
+              "Selected mentor"}
+
+          </p>
+
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedMentor(null);
+            setSelectedMentorPastors([]);
+          }}
+          className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/15"
+        >
+          ✕
+        </button>
+      </div>
+
+      {selectedMentorPastorsLoading ? (
+        <div className="flex justify-center py-16">
+          <div className={directorSpinner} />
+        </div>
+      ) : selectedMentorPastors.length === 0 ? (
+        <div className="rounded-3xl border border-white/10 bg-white/5 p-8 text-center">
+          <h3 className="text-lg font-bold text-white">No assigned pastors found</h3>
+          <p className="mt-2 text-sm text-white/60">
+            This mentor does not have assigned pastors yet.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+          {selectedMentorPastors.map((pastor) => {
+            const pastorId = String(pastor?._id ?? pastor?.id ?? "");
+            const name =
+              `${pastor?.firstName ?? ""} ${pastor?.lastName ?? ""}`.trim() ||
+              pastor?.email ||
+              "Pastor";
+
+            const img =
+              String(pastor?.profilePicture || "").trim() ||
+              getInitialsAvatar(pastor?.firstName, pastor?.lastName, "Pastor");
+
+            return (
+              <div
+                key={pastorId}
+                className="flex min-h-[210px] flex-col justify-between rounded-3xl border border-white/10 bg-white/[0.06] p-5"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-white/15">
+                    <Image
+                      src={img}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      unoptimized={typeof img === "string" && isRemoteImageSrc(img)}
+                    />
+                  </div>
+
+                  <div className="min-w-0">
+                    <h3 className="truncate text-base font-bold text-white">{name}</h3>
+                    <p className="truncate text-sm text-white/60">
+                      {pastor?.email || "Pastor"}
+                    </p>
+                  </div>
+                </div>
+{/* 
+                <div className="mt-5 flex justify-end">
+                  <button
+                    type="button"
+                  onClick={() => {
+  setSelectedMentor(null);
+  setSelectedMentorPastors([]);
+  setActiveTab("pastor");
+  setSelectedPastorModalId(pastorId);
+}}
+                    className="rounded-2xl bg-[#3498DB] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#5dade2]"
+                  >
+                    View Roadmap
+                  </button>
+                </div> */}
+                <div className="mt-5 flex justify-end gap-3">
+  {pastor?.email ? (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        window.location.href = `mailto:${pastor.email}`;
+      }}
+      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/75 transition hover:bg-[#3498DB]/25 hover:text-white"
+      title={`Email ${pastor.email}`}
+    >
+      <i className="fa-regular fa-envelope text-sm" />
+    </button>
+  ) : null}
+
+  <button
+    type="button"
+    onClick={() => {
+      setSelectedMentor(null);
+      setSelectedMentorPastors([]);
+      setActiveTab("pastor");
+      setSelectedPastorModalId(pastorId);
+    }}
+    className="rounded-2xl bg-[#3498DB] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#5dade2]"
+  >
+    View Roadmap
+  </button>
+</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  </div>
+) : null}
     </div>
   );
 }
