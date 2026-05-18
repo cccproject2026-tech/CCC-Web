@@ -577,7 +577,13 @@ hasCdp,
     </div>
   </section>
 )}
+<div className="mb-5 mt-2 flex items-center gap-4">
+  <h2 className="shrink-0 text-2xl font-bold text-white">
+    Your Assessments
+  </h2>
 
+  <div className="h-px flex-1 bg-white/10" />
+</div>
           {filtered.length === 0 ? (
             <div className={pastorEmptyPanel}>No assessments to show.</div>
           ) : (

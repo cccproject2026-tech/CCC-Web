@@ -780,8 +780,11 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
 
   const openRoadmapView = (row) => {
     const rm = row?.raw || {};
-    const t = String(rm.type || "").toLowerCase();
-    const isPhaseLibrary = t === "phase" || t.includes("phase");
+    // const t = String(rm.type || "").toLowerCase();
+    // const isPhaseLibrary = t === "phase" || t.includes("phase");
+    const isPhaseLibrary =
+  Array.isArray(rm?.roadmaps) &&
+  rm.roadmaps.length > 0;
     const roadmapId = row?.id;
     if (!roadmapId) return;
 
@@ -789,14 +792,34 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
     //   router.push(`/director/revitalization-roadmap/phase-list?roadmapId=${encodeURIComponent(roadmapId)}`);
     //   return;
     // }
-    if (isPhaseLibrary) {
-  const isPastorSelected = filterPastorId !== "all";
+//     if (isPhaseLibrary) {
+//   const isPastorSelected = filterPastorId !== "all";
 
-  router.push(
-    `/director/revitalization-roadmap/phase-list?roadmapId=${encodeURIComponent(roadmapId)}${
-      isPastorSelected ? "&pastorView=true" : ""
-    }`
-  );
+//   router.push(
+//     `/director/revitalization-roadmap/phase-list?roadmapId=${encodeURIComponent(roadmapId)}${
+//       isPastorSelected ? "&pastorView=true" : ""
+//     }`
+//   );
+//   return;
+// }
+if (isPhaseLibrary) {
+  const pastorId =
+    selectedPastorModalId != null
+      ? String(selectedPastorModalId)
+      : filterPastorId !== "all"
+        ? String(filterPastorId)
+        : "";
+
+  const qp = new URLSearchParams();
+  qp.set("roadmapId", roadmapId);
+
+  if (pastorId) {
+    qp.set("pastorView", "true");
+    qp.set("userId", pastorId);
+    qp.set("pastorId", pastorId);
+  }
+
+  router.push(`/director/revitalization-roadmap/phase-list?${qp.toString()}`);
   return;
 }
 
@@ -2494,13 +2517,29 @@ onClick={() => {
             </span>
           </div>
 
-          <button
+          {/* <button
             type="button"
             onClick={() => openRoadmapView(roadmap)}
             className="rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/18 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#3498DB]/28"
           >
             View
-          </button>
+          </button> */}
+          <button
+  type="button"
+  onClick={() => {
+    const qp = new URLSearchParams();
+
+    qp.set("roadmapId", roadmap.id);
+    qp.set("pastorView", "true");
+    qp.set("userId", String(selectedPastorModalId));
+    qp.set("pastorId", String(selectedPastorModalId));
+
+    router.push(`/director/revitalization-roadmap/phase-list?${qp.toString()}`);
+  }}
+  className="rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/18 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#3498DB]/28"
+>
+  View
+</button>
         </div>
 
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">

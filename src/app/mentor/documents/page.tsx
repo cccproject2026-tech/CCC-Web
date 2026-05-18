@@ -328,17 +328,21 @@ const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
   try {
     const ownerId = doc.ownerId || userId;
 
-    if (!ownerId || !doc?.fileUrl) return;
-console.log("DELETE DOC DEBUG:", {
-  activeTab,
-  userId,
-  ownerId,
-  fileUrl: doc.fileUrl,
-  doc,
-});
+    // if (!ownerId || !doc?.fileUrl) return;
+// console.log("DELETE DOC DEBUG:", {
+//   activeTab,
+//   userId,
+//   ownerId,
+//   fileUrl: doc.fileUrl,
+//   doc,
+// });
 
-console.log("DELETE DOC DEBUG RAW DOC:", doc);
-    await apiDeleteDocument(ownerId, doc.fileUrl);
+// console.log("DELETE DOC DEBUG RAW DOC:", doc);
+    const docId = doc?._id || doc?.id || doc?.docId;
+
+if (!ownerId || !docId) return;
+
+await apiDeleteDocument(ownerId, docId);
 
     if (activeTab === "mentee") {
       setMenteeDocuments((prev) =>
@@ -625,7 +629,11 @@ console.log("DELETE DOC DEBUG RAW DOC:", doc);
                         </button>
 
                         {openMenuKey === key && (
-                          <div className="absolute right-8 top-6 z-20 w-36 rounded-xl border border-white/15 bg-[#082f4d] p-2 shadow-xl">
+                          <div
+  className={`absolute right-8 z-20 w-36 rounded-xl border border-white/15 bg-[#082f4d] p-2 shadow-xl ${
+    index >= filteredDocuments.length - 2 ? "bottom-6" : "top-6"
+  }`}
+>
                             <button
                               type="button"
                               onClick={() => handleShareDocument(doc)}

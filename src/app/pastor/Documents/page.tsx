@@ -199,9 +199,14 @@ const toggleSelectedDoc = (key: string) => {
 
 const handleDeleteDocument = async (doc: any) => {
   try {
-    if (!userId || !doc?.fileUrl) return;
+    // if (!userId || !doc?.fileUrl) return;
 
-    await apiDeleteDocument(userId, doc.fileUrl);
+    // await apiDeleteDocument(userId, doc.fileUrl);
+    const docId = doc?._id || doc?.id || doc?.docId || doc?.documentId || doc?.fileId;
+
+if (!userId || !docId) return;
+
+await apiDeleteDocument(userId, docId);
 
     setDocuments((prev) =>
       prev.filter((item) => item.fileUrl !== doc.fileUrl),
@@ -495,7 +500,11 @@ const handleDownloadDocument = async (doc: any) => {
           </button>
 
           {openMenuKey === docKey && (
-            <div className="absolute right-8 top-6 z-20 w-32 overflow-hidden rounded-xl border border-white/15 bg-[#082f49] shadow-xl">
+            <div
+  className={`absolute right-8 z-20 w-32 overflow-hidden rounded-xl border border-white/15 bg-[#082f49] shadow-xl ${
+    index >= filteredDocuments.length - 2 ? "bottom-6" : "top-6"
+  }`}
+>
               <button
                 type="button"
                 onClick={() => handleShareDocument(doc)}

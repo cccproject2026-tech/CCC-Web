@@ -74,7 +74,7 @@ useEffect(() => {
   }
 }, [searchParams]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"default" | "progress" | "country">("default");
+  const [sortBy, setSortBy] = useState<"default" | "progress">("default");
 
   const [roadmaps, setRoadmaps] = useState<any[]>([]);
   const [roadmapLoading, setRoadmapLoading] = useState(false);
@@ -217,11 +217,11 @@ progress: found?.progress ?? 0,
     list = [...list].sort((a, b) => Number(b.progress || 0) - Number(a.progress || 0));
   }
 
-  if (sortBy === "country") {
-    list = [...list].sort((a, b) =>
-      String(a.country || "").localeCompare(String(b.country || ""))
-    );
-  }
+  // if (sortBy === "country") {
+  //   list = [...list].sort((a, b) =>
+  //     String(a.country || "").localeCompare(String(b.country || ""))
+  //   );
+  // }
 
   return list;
 }, [mentees, searchQuery, sortBy]);
@@ -259,19 +259,7 @@ progress: found?.progress ?? 0,
               aria-label={activeTab === "Pastor" ? "Search pastors" : "Search roadmap library"}
               className="max-w-none lg:max-w-md"
             />
-{activeTab === "Pastor" ? (
-  <select
-    value={sortBy}
-    onChange={(e) =>
-      setSortBy(e.target.value as "default" | "progress" | "country")
-    }
-    className="h-10 rounded-lg border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white outline-none transition hover:bg-white/15 lg:w-[130px] [&>option]:bg-[#0d1f33] [&>option]:text-white"
-  >
-    <option value="default">Sort by</option>
-    <option value="progress">Progress: 100% to 0%</option>
-    <option value="country">Country: A to Z</option>
-  </select>
-) : null}
+
             <div className={mentorFilterStrip}>
               <button
                 type="button"
@@ -364,6 +352,20 @@ progress: found?.progress ?? 0,
                   No pastors match your search. Try another name, email, or role.
                 </p>
               )}
+      <div className="mb-5 flex justify-end">
+  {activeTab === "Pastor" ? (
+    <select
+      value={sortBy}
+      onChange={(e) =>
+        setSortBy(e.target.value as "default" | "progress")
+      }
+      className="h-11 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white outline-none transition hover:bg-white/15 lg:w-[220px] [&>option]:bg-[#0d1f33] [&>option]:text-white"
+    >
+      <option value="default">Sort by</option>
+      <option value="progress">Progress: High to Low</option>
+    </select>
+  ) : null}
+</div>
               
               <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2">
                 {!loading &&
@@ -487,6 +489,7 @@ progress: found?.progress ?? 0,
           )}
 
           {activeTab === "Library" && (
+            
             <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2">
               {roadmapLoading && (
                 <div className="col-span-full flex justify-center py-12">

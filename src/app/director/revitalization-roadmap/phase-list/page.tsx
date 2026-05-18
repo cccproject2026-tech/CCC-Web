@@ -4,6 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import DirectorHero from "../../DirectorHero";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
+import {
+  findNestedProgressForTask,
+  normalizeRoadmapId,
+  resolveNestedTemplateItemId,
+  unwrapProgressData,
+} from "@/app/Services/roadmap-assignments";
 import {
   directorBtnPrimary,
   directorBtnSecondary,
@@ -89,10 +96,15 @@ export default function DirectorPhaseListPage() {
   const searchParams = useSearchParams();
   const roadmapId = searchParams.get("roadmapId")?.trim() || "";
   const pastorView = searchParams.get("pastorView") === "true";
+  const pastorId =
+  searchParams.get("userId") ||
+  searchParams.get("pastorId") ||
+  "";
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [roadmap, setRoadmap] = useState<RoadmapDoc | null>(null);
+  const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -123,7 +135,57 @@ export default function DirectorPhaseListPage() {
       cancelled = true;
     };
   }, [roadmapId]);
+useEffect(() => {
+  if (!pastorView || !pastorId || !roadmapId || !roadmap) {
+    setCompletedTaskIds(new Set());
+    return;
+  }
 
+  let cancelled = false;
+
+  const loadProgress = async () => {
+    try {
+      const res = await apiGetUserProgress(pastorId);
+      const progress = unwrapProgressData(res);
+
+      const parentRid = normalizeRoadmapId(
+        roadmap._id ?? roadmapId,
+      );
+
+      const ids = new Set<string>();
+
+      nestedRoadmapRows(roadmap).forEach((task) => {
+        const taskId = resolveNestedTemplateItemId(task as any);
+        if (!taskId || !parentRid) return;
+
+        const np = findNestedProgressForTask(progress, parentRid, taskId);
+        if (!np) return;
+
+        const completed = Number(np.completedSteps ?? 0);
+        const total = Number(np.totalSteps ?? 0);
+        const status = String(np.status ?? "").toLowerCase();
+
+        if (
+          status.includes("complete") ||
+          (total > 0 && completed >= total)
+        ) {
+          ids.add(String(task._id ?? taskId));
+        }
+      });
+
+      if (!cancelled) setCompletedTaskIds(ids);
+    } catch (err) {
+      console.error("Failed to load pastor task progress", err);
+      if (!cancelled) setCompletedTaskIds(new Set());
+    }
+  };
+
+  void loadProgress();
+
+  return () => {
+    cancelled = true;
+  };
+}, [pastorView, pastorId, roadmapId, roadmap]);
   const items = useMemo(() => {
     const list = nestedRoadmapRows(roadmap).map((x) => ({
       id: String(x._id || ""),
@@ -178,25 +240,74 @@ export default function DirectorPhaseListPage() {
     }
   };
 
-  const openPhaseTaskPage = (nestedRoadmapId: string, opts?: { viewOnly?: boolean }) => {
-    const phase = nestedRoadmapRows(roadmap).find((r) => String(r._id) === nestedRoadmapId);
-    if (!phase) return;
-    const sub = String(phase.roadMapDetails || phase.description || "");
-    const longDesc = String(phase.description || phase.roadMapDetails || "");
+  // const openPhaseTaskPage = (nestedRoadmapId: string, opts?: { viewOnly?: boolean }) => {
+  //   const phase = nestedRoadmapRows(roadmap).find((r) => String(r._id) === nestedRoadmapId);
+  //   if (!phase) return;
+  //   const sub = String(phase.roadMapDetails || phase.description || "");
+  //   const longDesc = String(phase.description || phase.roadMapDetails || "");
+  //   const qp = new URLSearchParams();
+  //   qp.set("roadmapId", roadmapId);
+  //   qp.set("nestedRoadmapId", nestedRoadmapId);
+  //   qp.set("type", "phase");
+  //   qp.set("isEditMode", "true");
+  //   if (opts?.viewOnly) qp.set("viewOnly", "true");
+  //   qp.set("name", String(phase.name || phase.title || ""));
+  //   qp.set("subheading", sub);
+  //   qp.set("longDescription", longDesc);
+  //   qp.set("completionTime", String(phase.duration || ""));
+  //   qp.set("selectedDivision", String(phase.phase || "All"));
+  //   qp.set("bannerImage", String(phase.imageUrl || ""));
+  //   router.push(`/director/revitalization-roadmap/roadmap-form?${qp.toString()}`);
+  // };
+  const openPhaseTaskPage = (
+  nestedRoadmapId: string,
+  opts?: { viewOnly?: boolean }
+) => {
+  const phase = nestedRoadmapRows(roadmap).find(
+    (r) => String(r._id) === nestedRoadmapId
+  );
+
+  if (!phase) return;
+
+  // pastor view → open existing task page
+  if (pastorView && pastorId) {
     const qp = new URLSearchParams();
+
     qp.set("roadmapId", roadmapId);
-    qp.set("nestedRoadmapId", nestedRoadmapId);
-    qp.set("type", "phase");
-    qp.set("isEditMode", "true");
-    if (opts?.viewOnly) qp.set("viewOnly", "true");
-    qp.set("name", String(phase.name || phase.title || ""));
-    qp.set("subheading", sub);
-    qp.set("longDescription", longDesc);
-    qp.set("completionTime", String(phase.duration || ""));
-    qp.set("selectedDivision", String(phase.phase || "All"));
-    qp.set("bannerImage", String(phase.imageUrl || ""));
-    router.push(`/director/revitalization-roadmap/roadmap-form?${qp.toString()}`);
-  };
+    qp.set("taskId", nestedRoadmapId);
+    qp.set("userId", pastorId);
+
+    router.push(
+      `/director/revitalization-roadmap/task?${qp.toString()}`
+    );
+
+    return;
+  }
+
+  // normal director edit flow
+  const sub = String(phase.roadMapDetails || phase.description || "");
+  const longDesc = String(phase.description || phase.roadMapDetails || "");
+
+  const qp = new URLSearchParams();
+
+  qp.set("roadmapId", roadmapId);
+  qp.set("nestedRoadmapId", nestedRoadmapId);
+  qp.set("type", "phase");
+  qp.set("isEditMode", "true");
+
+  if (opts?.viewOnly) qp.set("viewOnly", "true");
+
+  qp.set("name", String(phase.name || phase.title || ""));
+  qp.set("subheading", sub);
+  qp.set("longDescription", longDesc);
+  qp.set("completionTime", String(phase.duration || ""));
+  qp.set("selectedDivision", String(phase.phase || "All"));
+  qp.set("bannerImage", String(phase.imageUrl || ""));
+
+  router.push(
+    `/director/revitalization-roadmap/roadmap-form?${qp.toString()}`
+  );
+};
 
   const heroTitle = roadmap?.name || "Phase roadmap";
 
@@ -260,9 +371,18 @@ export default function DirectorPhaseListPage() {
               <button type="button" onClick={() => router.back()} className={`${directorBtnSecondary} !px-4 !py-2.5 !text-sm`}>
                 <i className="fa-solid fa-arrow-left text-xs" /> Back
               </button>
-              <button type="button" onClick={goToCreatePhaseTask} className={`${directorBtnPrimary} !px-4 !py-2.5 !text-sm`}>
+              {/* <button type="button" onClick={goToCreatePhaseTask} className={`${directorBtnPrimary} !px-4 !py-2.5 !text-sm`}>
                 <i className="fa-solid fa-plus text-xs" /> Task
-              </button>
+              </button> */}
+              {!pastorView ? (
+  <button
+    type="button"
+    onClick={goToCreatePhaseTask}
+    className={`${directorBtnPrimary} !px-4 !py-2.5 !text-sm`}
+  >
+    <i className="fa-solid fa-plus text-xs" /> Task
+  </button>
+) : null}
             </div>
             <div className={`relative ${directorSearchBarWidth}`}>
               <i className={directorSearchIconClass} />
@@ -286,6 +406,7 @@ export default function DirectorPhaseListPage() {
         ) : (
           <div className="space-y-4">
             {items.map((it) => {
+              const isCompleted = completedTaskIds.has(String(it.id));
               const imgSrc = resolveApiMediaUrl(it.imageUrl) || JumpStartBg.src;
               const imgUnopt = isRemoteImageSrc(imgSrc) || imgSrc.startsWith("blob:");
               return (
@@ -317,9 +438,15 @@ export default function DirectorPhaseListPage() {
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span className="text-[13px] font-semibold text-white/80">Status</span>
                       <div className="h-3.5 w-px bg-white/25" />
-                      <span className="inline-block rounded-lg border border-[#8ec5eb]/35 bg-[#8ec5eb]/15 px-3 py-1 text-[12px] font-semibold text-[#8ec5eb]">
-                        Not Started
-                      </span>
+                      <span
+  className={`inline-block rounded-lg border px-3 py-1 text-[12px] font-semibold ${
+    isCompleted
+      ? "border-emerald-300/40 bg-emerald-400/15 text-emerald-200"
+      : "border-[#8ec5eb]/35 bg-[#8ec5eb]/15 text-[#8ec5eb]"
+  }`}
+>
+  {isCompleted ? "Completed" : "Not Started"}
+</span>
                     </div>
                     <div className="mt-3 text-[13px] text-white/85 sm:text-[14px]">
                       <p>
@@ -349,7 +476,7 @@ export default function DirectorPhaseListPage() {
                         <i className="fa-solid fa-list-check text-sm" />
                         Edit tasks
                       </button> */}
-                      {!pastorView ? (
+                      {/* {!pastorView ? (
   <button
     type="button"
     onClick={() => openPhaseTaskPage(it.id)}
@@ -357,7 +484,38 @@ export default function DirectorPhaseListPage() {
   >
     <i className="fa-solid fa-list-check" /> View/Edit tasks
   </button>
-) : null}
+) : null} */}
+{!pastorView ? (
+  <button
+    type="button"
+    onClick={() => openPhaseTaskPage(it.id)}
+    className={cardActionPrimary}
+  >
+    <i className="fa-solid fa-list-check" /> View/Edit tasks
+  </button>
+) : (
+  <button
+    type="button"
+    onClick={() => {
+      const qp = new URLSearchParams();
+
+      qp.set("roadmapId", roadmapId);
+      qp.set("taskId", it.id);
+
+      if (pastorId) {
+        qp.set("userId", pastorId);
+      }
+
+      router.push(
+        `/director/revitalization-roadmap/task?${qp.toString()}`
+      );
+    }}
+    className={cardActionSecondary}
+  >
+    <i className="fa-regular fa-eye text-sm" />
+    View Response
+  </button>
+)}
                       <button
                         type="button"
                         disabled={!it.id}

@@ -53,7 +53,15 @@ const fileInputRef = useRef<HTMLInputElement>(null);
 
         if (userId) {
           const ownRes = await apiGetDocuments(userId);
-          setDocuments(Array.isArray(ownRes.data?.data) ? ownRes.data.data : []);
+          // setDocuments(Array.isArray(ownRes.data?.data) ? ownRes.data.data : []);
+          const myDocs = Array.isArray(ownRes.data?.data) ? ownRes.data.data : [];
+
+setDocuments(
+  myDocs.map((doc: any) => ({
+    ...doc,
+    ownerId: userId,
+  })),
+);
         }
 
         // const [pastorsRes, mentorsRes] = await Promise.all([
@@ -193,7 +201,8 @@ const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const uploaded = res.data?.data;
 
     if (uploaded) {
-      setDocuments((prev) => [uploaded, ...prev]);
+      // setDocuments((prev) => [uploaded, ...prev]);
+      setDocuments((prev) => [{ ...uploaded, ownerId: userId }, ...prev]);
       setActiveTab("my");
     }
   } catch (err) {
@@ -227,10 +236,14 @@ const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
 
   const handleDeleteDocument = async (doc: any) => {
     try {
-      if (!doc?.ownerId || !doc?.fileUrl) return;
+      // if (!doc?.ownerId || !doc?.fileUrl) return;
 
-      await apiDeleteDocument(doc.ownerId, doc.fileUrl);
+      // await apiDeleteDocument(doc.ownerId, doc.fileUrl);
+const docId = doc?._id || doc?.id || doc?.docId;
 
+if (!doc?.ownerId || !docId) return;
+
+await apiDeleteDocument(doc.ownerId, docId);
       if (activeTab === "mentees") {
         setMenteeDocuments((prev) => prev.filter((item) => item.fileUrl !== doc.fileUrl));
       } else if (activeTab === "mentors") {
@@ -513,7 +526,11 @@ const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
                         </button>
 
                         {openMenuKey === key && (
-                          <div className="absolute right-8 top-6 z-20 w-36 rounded-xl border border-white/15 bg-[#082f4d] p-2 shadow-xl">
+                          <div
+  className={`absolute right-8 z-20 w-36 rounded-xl border border-white/15 bg-[#082f4d] p-2 shadow-xl ${
+    index >= filteredDocuments.length - 2 ? "bottom-6" : "top-6"
+  }`}
+>
                             <button
                               type="button"
                               onClick={() => handleShareDocument(doc)}

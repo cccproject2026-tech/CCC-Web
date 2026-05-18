@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo, useRef, Suspense } from "react";
+
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import DirectorHero from "../DirectorHero";
@@ -30,6 +31,7 @@ import {
   parseAssignedAssessmentsListBody,
   parseAssessmentDetailPayload,
   parseAssessmentsListPayload,
+  apiGetSectionRecommendations,
 } from "@/app/Services/assessment.service";
 import { apiGetAllUsers } from "@/app/Services/users.service";
 import { apiAssignAssessment, apiGetUserProgress } from "@/app/Services/progress.service";
@@ -70,6 +72,7 @@ type AssessmentCardRow = {
   appointmentId?: string;
   meetingDateLabel?: string;
   meetingActive?: boolean;
+  hasCdp?: boolean;
 };
 
 function toDateInputValue(value?: string): string {
@@ -165,6 +168,33 @@ function countPastorsAssigned(item: any): number {
 
   return 0;
 }
+function hasCdpPayload(body: any): boolean {
+  const data = body?.data ?? body;
+
+  if (Array.isArray(data)) {
+    return data.some((row) => {
+      const recs = row?.recommendations;
+      return Array.isArray(recs) && recs.length > 0;
+    });
+  }
+
+  const sections = Array.isArray(data?.sections) ? data.sections : [];
+  return sections.some((section: any) => {
+    const recs = section?.recommendations;
+    if (Array.isArray(recs) && recs.length > 0) return true;
+
+    const layers = Array.isArray(section?.layers) ? section.layers : [];
+    return layers.some((layer: any) =>
+      String(
+        layer?.mentorCdp ??
+          layer?.cdp ??
+          layer?.customizedDevelopmentPlan ??
+          layer?.recommendation ??
+          "",
+      ).trim(),
+    );
+  });
+}
 
 function normalizeAssessmentStatus(raw: unknown): "not_started" | "submitted" | "completed" {
   const s = String(raw || "").toLowerCase().replace(/\s+/g, "_");
@@ -246,6 +276,7 @@ function AssessmentsPageContent() {
   const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(assignUserFromQuery);
   const [assignDueDate, setAssignDueDate] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name_asc" | "name_desc">("newest");
+  const [statusFilter, setStatusFilter] = useState<"all" | "not_started" | "submitted" | "completed">("all");
   const [activeTab, setActiveTab] = useState<
   "assessments" | "mentors" | "pastors"
 >("assessments");
@@ -348,8 +379,10 @@ const [mentorPastorRows, setMentorPastorRows] = useState<any[]>([]);
                 appointmentsByAssessmentId.set(linkedAssessmentId, prev);
               }
             }
-            const assigned = assignedRows
-              .map((item) => {
+            // const assigned = assignedRows
+            //   .map((item) => {
+            const assigned = (await Promise.all(
+  assignedRows.map(async (item) => {
                 const flat = flattenAssignedAssessmentRow(item);
                 if (!flat) return null;
 
@@ -391,12 +424,28 @@ const [mentorPastorRows, setMentorPastorRows] = useState<any[]>([]);
                     (assignmentId && rowAssignmentId && rowAssignmentId === assignmentId)
                   );
                 });
-                const hasMeetingDetails = !!(resolvedAppointmentId || appt?.meetingDate);
-                const progressStatus = hasMeetingDetails ? "completed" : "submitted";
-                const resolvedDueDate = pickAssignedDueDate(item, flat);
+                // const hasMeetingDetails = !!(resolvedAppointmentId || appt?.meetingDate);
+                // const progressStatus = hasMeetingDetails ? "completed" : "submitted";
+                // const progressStatus = normalizeAssessmentStatus(progressRow?.status);
+                // const resolvedDueDate = pickAssignedDueDate(item, flat);
 
-                return {
+                // return {
+                const progressStatus = normalizeAssessmentStatus(progressRow?.status);
+const resolvedDueDate = pickAssignedDueDate(item, flat);
+
+let hasCdp = false;
+
+try {
+  const recRes = await apiGetSectionRecommendations(assessmentId, selectedMenteeId);
+  hasCdp = hasCdpPayload(recRes.data);
+} catch {
+  hasCdp = false;
+}
+
+return {
+                  
                   id: assessmentId,
+                  hasCdp,
                   title: String(detailObj.name || "Untitled"),
                   description: String(detailObj.description || ""),
                   image,
@@ -412,8 +461,10 @@ const [mentorPastorRows, setMentorPastorRows] = useState<any[]>([]);
                     ? isMeetingStillActive(appt?.meetingDate, appt?.status)
                     : false,
                 } satisfies AssessmentCardRow;
-              })
-              .filter((item): item is NonNullable<typeof item> => item != null);
+              // })
+              // .filter((item): item is NonNullable<typeof item> => item != null);
+                })
+)).filter((item): item is NonNullable<typeof item> => item != null);
 
             if (assigned.length === 0) {
               setAssessments([]);
@@ -685,11 +736,23 @@ useEffect(() => {
     }
   };
 
+  // const filteredAssessments = useMemo(() => {
+  //   const q = searchQuery.toLowerCase();
+  //   const filtered = assessments.filter((assessment) =>
+  //     String(assessment.title ?? "").toLowerCase().includes(q),
+  //   );
   const filteredAssessments = useMemo(() => {
-    const q = searchQuery.toLowerCase();
-    const filtered = assessments.filter((assessment) =>
-      String(assessment.title ?? "").toLowerCase().includes(q),
-    );
+  const q = searchQuery.toLowerCase();
+
+  const filtered = assessments.filter((assessment) => {
+    const matchesSearch = String(assessment.title ?? "").toLowerCase().includes(q);
+    const matchesStatus =
+      !selectedMenteeId ||
+      statusFilter === "all" ||
+      assessment.progressStatus === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
     const list = [...filtered];
     if (sortBy === "name_asc") {
       return list.sort((a, b) => String(a.title ?? "").localeCompare(String(b.title ?? "")));
@@ -707,7 +770,8 @@ useEffect(() => {
       (a, b) =>
         new Date(String(b.createdOn ?? 0)).getTime() - new Date(String(a.createdOn ?? 0)).getTime(),
     );
-  }, [assessments, searchQuery, sortBy]);
+  // }, [assessments, searchQuery, sortBy]);
+  }, [assessments, searchQuery, sortBy, selectedMenteeId, statusFilter]);
 
   const filteredFeaturedItems = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -766,7 +830,7 @@ const filteredMentorRows = useMemo(() => {
       <section className="relative py-8">
         <div className={directorPageContainer}>
           <div className={`${directorGlassCard} mb-6 p-5`}>
-  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+  <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
     <div className="relative w-full lg:max-w-xl">
       <SearchBar
         value={searchQuery}
@@ -789,7 +853,19 @@ const filteredMentorRows = useMemo(() => {
       ) : null}
     </div>
 
-    <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-1">
+    {/* <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-1"> */}
+   <div className="ml-auto flex shrink-0 flex-wrap items-center gap-3">
+     {activeTab === "assessments" && !isSelectionMode && (
+      <button
+        type="button"
+        onClick={() => router.push("/director/assessments/create")}
+        className="inline-flex h-[44px] items-center justify-center gap-2 rounded-xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/15 px-5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+      >
+        <i className="fa-solid fa-plus" />
+        Add
+      </button>
+    )}
+  <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-1">
       <button
         type="button"
        onClick={() => {
@@ -838,13 +914,21 @@ const filteredMentorRows = useMemo(() => {
             ? "bg-[#3498DB] text-white"
             : "text-white/75 hover:bg-white/10"
         }`}
-      >
+  //     >
+  //       Pastor Assessments
+  //     </button>
+  //   </div>
+  // </div>
+        >
         Pastor Assessments
       </button>
     </div>
-  </div>
 
-  {activeTab === "assessments" && (
+    
+  </div>
+</div>
+
+  {/* {activeTab === "assessments" && (
   <div className="mt-4 flex w-full flex-wrap justify-end gap-3 border-t border-white/10 pt-4">
     {!isSelectionMode && (
       <>
@@ -878,7 +962,33 @@ const filteredMentorRows = useMemo(() => {
       </>
     )}
   </div>
-)}
+)} */}
+{/* {activeTab === "assessments" && !isSelectionMode && (
+  <div className="mt-4 flex w-full flex-wrap justify-end gap-3 border-t border-white/10 pt-4">
+    <select
+      value={sortBy}
+      onChange={(e) =>
+        setSortBy(e.target.value as "newest" | "oldest" | "name_asc" | "name_desc")
+      }
+      className="h-[44px] min-w-[170px] rounded-xl border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white outline-none [&>option]:bg-[#062946] [&>option]:text-white"
+      aria-label="Sort assessments"
+    >
+      <option value="newest">Newest</option>
+      <option value="oldest">Oldest</option>
+      <option value="name_asc">Name A-Z</option>
+      <option value="name_desc">Name Z-A</option>
+    </select>
+
+    <button
+      type="button"
+      onClick={handleSelectMode}
+      className="inline-flex h-[44px] min-w-[170px] items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15"
+    >
+      <i className="fa-solid fa-check-square" />
+      Select
+    </button>
+  </div>
+)} */}
 </div>
         
 
@@ -1305,7 +1415,7 @@ const filteredMentorRows = useMemo(() => {
       : "All Assessments"}
                 </h2>
               </div> */}
-              {(activeTab === "assessments" || selectedMenteeId) && (
+              {/* {(activeTab === "assessments" || selectedMenteeId) && (
   <div className="mb-4">
     <h2 className="text-lg font-semibold text-white sm:text-xl">
       {selectedMenteeId
@@ -1314,6 +1424,59 @@ const filteredMentorRows = useMemo(() => {
           ? "Pastor Assessments"
           : "All Assessments"}
     </h2>
+  </div>
+)} */}
+{(activeTab === "assessments" || selectedMenteeId) && (
+  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <h2 className="text-lg font-semibold text-white sm:text-xl">
+      {selectedMenteeId
+        ? `${selectedPastorName}'s Assessments`
+        : activeTab === "pastors"
+          ? "Pastor Assessments"
+          : "All Assessments"}
+    </h2>
+{activeTab === "assessments" && !selectedMenteeId && !isSelectionMode && (
+  <div className="ml-auto flex flex-wrap items-center gap-3">
+    <select
+      value={sortBy}
+      onChange={(e) =>
+        setSortBy(e.target.value as "newest" | "oldest" | "name_asc" | "name_desc")
+      }
+      className="h-[42px] min-w-[160px] rounded-xl border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white outline-none [&>option]:bg-[#062946] [&>option]:text-white"
+      aria-label="Sort assessments"
+    >
+      <option value="newest">Newest</option>
+      <option value="oldest">Oldest</option>
+      <option value="name_asc">Name A-Z</option>
+      <option value="name_desc">Name Z-A</option>
+    </select>
+
+    <button
+      type="button"
+      onClick={handleSelectMode}
+      className="inline-flex h-[42px] min-w-[150px] items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15"
+    >
+      <i className="fa-solid fa-check-square" />
+      Select
+    </button>
+  </div>
+)}
+    {selectedMenteeId && (
+      <select
+        value={statusFilter}
+        onChange={(e) =>
+          setStatusFilter(
+            e.target.value as "all" | "not_started" | "submitted" | "completed",
+          )
+        }
+        className="h-[42px] min-w-[170px] rounded-xl border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white outline-none [&>option]:bg-[#062946] [&>option]:text-white"
+      >
+        <option value="all">All</option>
+        <option value="not_started">Not Started</option>
+        <option value="submitted">Submitted</option>
+        <option value="completed">Completed</option>
+      </select>
+    )}
   </div>
 )}
               {(activeTab === "assessments" || selectedMenteeId) && filteredAssessments.length > 0 ? (
@@ -1501,6 +1664,21 @@ const filteredMentorRows = useMemo(() => {
                             >
                               View
                             </button> */}
+                           {/* {(assessment.progressStatus === "submitted" ||
+  assessment.progressStatus === "completed") && ( */}
+  {assessment.hasCdp && (
+    <button
+      type="button"
+      onClick={() =>
+        router.push(
+          `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}`,
+        )
+      }
+      className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+    >
+      View CDP
+    </button>
+  )}
                           </div>
                         </div>
                       </div>

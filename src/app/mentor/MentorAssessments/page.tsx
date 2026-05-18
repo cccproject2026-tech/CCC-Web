@@ -464,6 +464,9 @@ export default function MentorAssessments() {
   const [featuredItems, setFeaturedItems] = useState<FeaturedAvatarItem[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(false);
   const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"all" | "pastors">("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "submitted" | "completed" | "not_started">("all");
+  const [allPastorSubmissions, setAllPastorSubmissions] = useState<any[]>([]);
   const [recommendationOpen, setRecommendationOpen] = useState(false);
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationSubmitting, setRecommendationSubmitting] = useState(false);
@@ -472,6 +475,7 @@ export default function MentorAssessments() {
   const [recommendationAssessmentTitle, setRecommendationAssessmentTitle] = useState("Assessment");
   const [failedBannerImageIds, setFailedBannerImageIds] = useState<Record<string, true>>({});
   const [deepLinkHandled, setDeepLinkHandled] = useState(false);
+  const [submissionView, setSubmissionView] = useState<"today" | "previous">("today");
 
   const deepLinkMenteeId = (searchParams.get("menteeId") || "").trim();
   const deepLinkAssessmentId = (searchParams.get("assessmentId") || "").trim();
@@ -579,8 +583,10 @@ export default function MentorAssessments() {
               // For mentee-filtered cards: status is based on meeting scheduling state.
               // - no meeting details yet => submitted
               // - meeting details available => completed
-              const hasMeetingDetails = !!(resolvedAppointmentId || appt?.meetingDate);
-              const normalizedStatus: MentorAssessmentStatus = hasMeetingDetails ? "completed" : "submitted";
+              // const hasMeetingDetails = !!(resolvedAppointmentId || appt?.meetingDate);
+              // const normalizedStatus: MentorAssessmentStatus = hasMeetingDetails ? "completed" : "submitted";
+              const normalizedStatus: MentorAssessmentStatus =
+  progressRow?.status || "not_started";
               const resolvedDueDate = pickAssignedDueDate(item, flat);
              return {
   ...assessment,
@@ -792,25 +798,29 @@ _mentorSubmittedAt:
 
   const filtered = useMemo(() => {
     const list = [...assessments];
+    const statusFiltered =
+  selectedMenteeId && statusFilter !== "all"
+    ? list.filter((item) => item._mentorAssignmentStatus === statusFilter)
+    : list;
     if (sortBy === "name_asc") {
-      return list.sort((a, b) => String(a?.name || "").localeCompare(String(b?.name || "")));
+      return statusFiltered.sort((a, b) => String(a?.name || "").localeCompare(String(b?.name || "")));
     }
     if (sortBy === "name_desc") {
-      return list.sort((a, b) => String(b?.name || "").localeCompare(String(a?.name || "")));
+      return statusFiltered.sort((a, b) => String(b?.name || "").localeCompare(String(a?.name || "")));
     }
     if (sortBy === "oldest") {
-      return list.sort(
+      return statusFiltered.sort(
         (a, b) =>
           new Date(String(a?.createdOn ?? a?.createdAt ?? 0)).getTime() -
           new Date(String(b?.createdOn ?? b?.createdAt ?? 0)).getTime(),
       );
     }
-    return list.sort(
+    return statusFiltered.sort(
       (a, b) =>
         new Date(String(b?.createdOn ?? b?.createdAt ?? 0)).getTime() -
         new Date(String(a?.createdOn ?? a?.createdAt ?? 0)).getTime(),
     );
-  }, [assessments, sortBy]);
+  }, [assessments, sortBy, selectedMenteeId, statusFilter]);
 
   const todaySubmissions = useMemo(() => {
   return filtered.filter((item: any) => {
@@ -875,7 +885,59 @@ const previousSubmissions = useMemo(() => {
       ? matched
       : [selected, ...matched];
   }, [featuredItems, searchTerm, selectedMenteeId]);
+  const allTodaySubmissions = useMemo(() => {
+  return allPastorSubmissions.filter((item) => isTodayDate(item.submittedAt));
+}, [allPastorSubmissions]);
 
+const allPreviousSubmissions = useMemo(() => {
+  return allPastorSubmissions.filter(
+    (item) => item.submittedAt && !isTodayDate(item.submittedAt),
+  );
+}, [allPastorSubmissions]);
+useEffect(() => {
+  if (activeTab !== "all" || featuredItems.length === 0 || assessments.length === 0) return;
+
+  let cancelled = false;
+
+  const loadAllPastorSubmissions = async () => {
+    const results: any[] = [];
+
+    for (const pastor of featuredItems) {
+      for (const assessment of assessments) {
+        const assessmentId = getAssessmentId(assessment);
+        if (!assessmentId) continue;
+
+        try {
+          const res = await apiGetUserAnswers(assessmentId, String(pastor.id));
+          const body: any = res.data;
+          const answerData = body?.data;
+
+          if (!answerData?._id) continue;
+
+          results.push({
+            ...assessment,
+            _id: assessmentId,
+            pastorId: pastor.id,
+            pastorName: pastor.name,
+            submittedAt: answerData.updatedAt || answerData.createdAt,
+          });
+        } catch {
+          // no answer found
+        }
+      }
+    }
+
+    if (!cancelled) {
+      setAllPastorSubmissions(results);
+    }
+  };
+
+  void loadAllPastorSubmissions();
+
+  return () => {
+    cancelled = true;
+  };
+}, [activeTab, featuredItems, assessments]);
   const getCardImageSrc = (assessment: any): string | typeof Thumb1 => {
     const assessmentId = getAssessmentId(assessment);
     if (assessmentId && failedBannerImageIds[assessmentId]) return Thumb1;
@@ -1131,6 +1193,34 @@ const previousSubmissions = useMemo(() => {
                       className="w-full"
                     />
                   </div>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-1">
+  <button
+    type="button"
+    onClick={() => {
+      setActiveTab("all");
+      setSelectedMenteeId(null);
+    }}
+    className={`rounded-lg px-5 py-2 text-sm font-semibold transition ${
+      activeTab === "all"
+        ? "bg-[#3498DB] text-white"
+        : "text-white/75 hover:bg-white/10"
+    }`}
+  >
+    All Assessments
+  </button>
+
+  <button
+    type="button"
+    onClick={() => setActiveTab("pastors")}
+    className={`rounded-lg px-5 py-2 text-sm font-semibold transition ${
+      activeTab === "pastors"
+        ? "bg-[#3498DB] text-white"
+        : "text-white/75 hover:bg-white/10"
+    }`}
+  >
+    Pastors Assessment
+  </button>
+</div>
 
                   <div className="flex flex-wrap gap-3">
                     {mode !== "select" && (
@@ -1220,7 +1310,7 @@ const previousSubmissions = useMemo(() => {
                 </div>
               ) : (
                 <>
-                  {!featuredLoading && filteredFeaturedItems.length > 0 && (
+                  {activeTab === "pastors" && !featuredLoading && filteredFeaturedItems.length > 0 && (
                     <div className={`mb-6 ${mentorFilterPanel} px-4 py-3 sm:px-5`}>
                       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0 flex-1">
@@ -1251,7 +1341,115 @@ const previousSubmissions = useMemo(() => {
                       />
                     </div>
                   )}
-                  {selectedMenteeId && (
+                  {activeTab === "pastors" && !selectedMenteeId && (
+  <div className="mb-6">
+    <h2 className="mb-4 text-lg font-semibold text-white sm:text-xl">
+      Pastor Profiles
+    </h2>
+
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {filteredFeaturedItems.map((pastor) => (
+        // <div key={pastor.id} className={`${mentorFilterPanel} flex items-center gap-5 p-5`}>
+        //   <Image
+        //     src={pastor.img || UserProfile}
+        //     alt=""
+        //     width={96}
+        //     height={96}
+        //     className="h-24 w-24 rounded-xl object-cover"
+        //     unoptimized={typeof pastor.img === "string" && isRemoteImageSrc(pastor.img)}
+        //   />
+
+        //   <div className="min-w-0 flex-1">
+        //     <h3 className="text-lg font-bold text-white">{pastor.name}</h3>
+        //     <p className="text-sm text-white/60">Pastor</p>
+        //   </div>
+
+        //   <button
+        //     type="button"
+        //     onClick={() => setSelectedMenteeId(String(pastor.id))}
+        //     className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+        //   >
+        //     View
+        //   </button>
+        // </div>
+        <div key={pastor.id} className={`${mentorFilterPanel} relative flex items-center gap-5 p-5`}>
+  <div className="options-menu-container absolute right-4 top-4">
+    <button
+      type="button"
+      onClick={() =>
+        setShowOptionsMenu(showOptionsMenu === String(pastor.id) ? null : String(pastor.id))
+      }
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/70 hover:bg-white/15"
+    >
+      <i className="fa-solid fa-ellipsis-vertical" />
+    </button>
+
+    {showOptionsMenu === String(pastor.id) && (
+      <div className="absolute right-0 z-20 mt-2 w-48 rounded-xl border border-white/15 bg-[#041f35] py-2 shadow-xl">
+        <button
+          type="button"
+          onClick={() => {
+            setShowOptionsMenu(null);
+            router.push(`/mentor/MentorSchedule?recipientType=pastor&pastorId=${pastor.id}`);
+          }}
+          className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-semibold text-white/90 hover:bg-white/10"
+        >
+          <i className="fa-regular fa-calendar-plus text-[#8ec5eb]" />
+          Schedule Meeting
+        </button>
+      </div>
+    )}
+  </div>
+
+  <Image
+    src={pastor.img || UserProfile}
+    alt=""
+    width={96}
+    height={96}
+    className="h-24 w-24 rounded-xl object-cover"
+    unoptimized={typeof pastor.img === "string" && isRemoteImageSrc(pastor.img)}
+  />
+
+  <div className="min-w-0 flex-1">
+    <h3 className="text-lg font-bold text-white">{pastor.name}</h3>
+    <p className="text-sm text-white/60">Pastor</p>
+
+    <div className="mt-4 flex items-center gap-2">
+      <a
+        href={`mailto:?subject=Community Change Assessment`}
+        className="flex h-9 w-9 items-center justify-center rounded-full border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb]"
+        aria-label="Email pastor"
+      >
+        <i className="fa-regular fa-envelope" />
+      </a>
+
+      <button type="button" disabled className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
+        <i className="fa-solid fa-phone" />
+      </button>
+
+      <button type="button" disabled className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
+        <i className="fa-brands fa-whatsapp" />
+      </button>
+
+      <button type="button" disabled className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
+        <i className="fa-regular fa-comment-dots" />
+      </button>
+    </div>
+  </div>
+
+  <button
+    type="button"
+    onClick={() => setSelectedMenteeId(String(pastor.id))}
+    className="mr-12 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+  >
+    View
+  </button>
+</div>
+      ))}
+    </div>
+  </div>
+)}
+                  {/* {selectedMenteeId && (
   <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
     <div className={`${mentorFilterPanel} p-5`}>
       <h3 className="mb-3 text-base font-semibold text-white">
@@ -1361,11 +1559,134 @@ const previousSubmissions = useMemo(() => {
       )}
     </div>
   </div>
+)} */}
+{activeTab === "all" && !selectedMenteeId && (
+  <div className="mb-4 flex justify-end">
+    <button
+      type="button"
+      onClick={() => router.push("/mentor/MentorAssessments/meetings")}
+      className="inline-flex items-center gap-2 rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+    >
+      <i className="fa-regular fa-calendar-check" />
+      Scheduled Meetings
+    </button>
+  </div>
 )}
-                  <div className="mb-4">
+{activeTab === "all" && !selectedMenteeId && (
+  <section className={`${mentorFilterPanel} mb-6 p-5`}>
+    <div className="mb-4 flex items-center justify-between gap-4">
+      <div>
+        <h3 className="text-lg font-semibold text-white">
+          {submissionView === "today" ? "Today's Submissions" : "Previous Submissions"}
+        </h3>
+
+        <button
+          type="button"
+          onClick={() => router.push("/mentor/MentorAssessments/submissions")}
+          className="mt-1 text-xs font-semibold text-[#8ec5eb] hover:underline"
+        >
+          View all
+        </button>
+      </div>
+
+      {/* <button
+        type="button"
+        onClick={() =>
+          setSubmissionView((prev) => (prev === "today" ? "previous" : "today"))
+        }
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/15 text-white transition hover:bg-[#8ec5eb]/25"
+      >
+        <i className="fa-solid fa-arrow-right" />
+      </button> */}
+      <div className="flex items-center gap-3">
+  <span className="text-xs font-semibold text-[#cde2f2]/70">
+    {submissionView === "today" ? "Go to previous submissions" : "Go to today’s submissions"}
+  </span>
+
+  <button
+    type="button"
+    onClick={() =>
+      setSubmissionView((prev) => (prev === "today" ? "previous" : "today"))
+    }
+    className="flex h-10 w-10 items-center justify-center rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/15 text-white transition hover:bg-[#8ec5eb]/25"
+  >
+    <i className={`fa-solid ${submissionView === "today" ? "fa-arrow-right" : "fa-arrow-left"}`} />
+  </button>
+</div>
+    </div>
+
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      {(submissionView === "today" ? allTodaySubmissions : allPreviousSubmissions)
+        .slice(0, 2)
+        .map((assessment: any, idx: number) => (
+          <div
+            key={`${submissionView}-${assessment._id}-${assessment.pastorId}-${idx}`}
+            className="flex min-h-[112px] flex-col rounded-xl border border-white/10 bg-white/[0.04] p-4"
+          >
+            <p className="text-sm font-semibold text-white">
+              {assessment.name || "Assessment"}
+            </p>
+
+            <p className="mt-1 text-xs font-semibold text-amber-200">
+              Submitted by {assessment.pastorName}
+            </p>
+
+            <div className="mt-auto flex justify-end gap-2 pt-3">
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(
+                    `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${assessment.pastorId}`,
+                  )
+                }
+                className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+              >
+                View Result
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  router.push(
+                    `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${assessment.pastorId}&editRecommendation=1`,
+                  )
+                }
+                className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+              >
+                Send CDP
+              </button>
+            </div>
+          </div>
+        ))}
+
+      {(submissionView === "today" ? allTodaySubmissions : allPreviousSubmissions).length === 0 && (
+        <p className="col-span-full py-6 text-sm text-[#cde2f2]/70">
+          No {submissionView === "today" ? "assessments submitted today" : "previous submissions found"}.
+        </p>
+      )}
+    </div>
+  </section>
+)}
+{(activeTab === "all" || selectedMenteeId) && (
+  <>
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <h2 className="text-lg font-semibold text-white sm:text-xl">
-                      {selectedMenteeId ? `${selectedMenteeName}'s Assessment` : "All Assessments"}
+                      {selectedMenteeId ? `${selectedMenteeName}'s Assessments` : "All Assessments"}
                     </h2>
+                    {selectedMenteeId && (
+  <select
+    value={statusFilter}
+    onChange={(e) =>
+      setStatusFilter(e.target.value as "all" | "submitted" | "completed" | "not_started")
+    }
+    className="h-[42px] min-w-[170px] rounded-xl border border-white/20 bg-white/10 px-4 text-sm font-semibold text-white outline-none [&>option]:bg-[#062946] [&>option]:text-white"
+  >
+    <option value="all">All Status</option>
+    <option value="submitted">Submitted</option>
+    <option value="completed">Completed</option>
+    <option value="not_started">Not Started</option>
+  </select>
+)}
                   </div>
                   {filtered.length > 0 ? (
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
@@ -1635,8 +1956,10 @@ const previousSubmissions = useMemo(() => {
                       ? "Assign assessments from the full list when needed."
                       : "Try another search or create an assessment with Add."}
                   </p>
-                </div>
+                               </div>
                   )}
+  </>
+)}
                 </>
               )}
             </>

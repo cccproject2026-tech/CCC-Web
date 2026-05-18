@@ -102,10 +102,17 @@ export const apiGetDocuments = (userId: string) =>
   axiosInstance.get<{ success: boolean; data: UploadedDocument[] }>(`/users/${userId}/documents`);
 
 // DELETE /users/:id/documents?fileUrl=
-export const apiDeleteDocument = (userId: string, fileUrl: string) =>
+// export const apiDeleteDocument = (userId: string, fileUrl: string) =>
+//   axiosInstance.delete<{ success: boolean; message: string }>(
+//     `/users/${userId}/documents`,
+//     { params: { fileUrl } },
+//   );
+export const apiDeleteDocument = (userId: string, docId: string) =>
   axiosInstance.delete<{ success: boolean; message: string }>(
     `/users/${userId}/documents`,
-    { params: { fileUrl } },
+    {
+      data: { docId },
+    },
   );
 
 // ─── Notes ────────────────────────────────────────────────────────────────────

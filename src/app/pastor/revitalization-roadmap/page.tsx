@@ -1064,6 +1064,13 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
   </div>
 </section>
 ) : null}
+<div className="mb-5 mt-2 flex items-center gap-4">
+  <h2 className="shrink-0 text-2xl font-bold text-white">
+    Your Roadmaps
+  </h2>
+
+  <div className="h-px flex-1 bg-white/10" />
+</div>
               {phases.length === 0 ? (
                 <div className={`${directorGlassCard} px-5 py-12 text-center text-sm text-white/65`}>
                   No roadmap assignments found. Please contact your administrator.
