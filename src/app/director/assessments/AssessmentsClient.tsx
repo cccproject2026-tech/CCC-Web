@@ -168,6 +168,33 @@ function countPastorsAssigned(item: any): number {
 
   return 0;
 }
+// function hasCdpPayload(body: any): boolean {
+//   const data = body?.data ?? body;
+
+//   if (Array.isArray(data)) {
+//     return data.some((row) => {
+//       const recs = row?.recommendations;
+//       return Array.isArray(recs) && recs.length > 0;
+//     });
+//   }
+
+//   const sections = Array.isArray(data?.sections) ? data.sections : [];
+//   return sections.some((section: any) => {
+//     const recs = section?.recommendations;
+//     if (Array.isArray(recs) && recs.length > 0) return true;
+
+//     const layers = Array.isArray(section?.layers) ? section.layers : [];
+//     return layers.some((layer: any) =>
+//       String(
+//         layer?.mentorCdp ??
+//           layer?.cdp ??
+//           layer?.customizedDevelopmentPlan ??
+//           layer?.recommendation ??
+//           "",
+//       ).trim(),
+//     );
+//   });
+// }
 function hasCdpPayload(body: any): boolean {
   const data = body?.data ?? body;
 
@@ -179,23 +206,12 @@ function hasCdpPayload(body: any): boolean {
   }
 
   const sections = Array.isArray(data?.sections) ? data.sections : [];
+
   return sections.some((section: any) => {
     const recs = section?.recommendations;
-    if (Array.isArray(recs) && recs.length > 0) return true;
-
-    const layers = Array.isArray(section?.layers) ? section.layers : [];
-    return layers.some((layer: any) =>
-      String(
-        layer?.mentorCdp ??
-          layer?.cdp ??
-          layer?.customizedDevelopmentPlan ??
-          layer?.recommendation ??
-          "",
-      ).trim(),
-    );
+    return Array.isArray(recs) && recs.length > 0;
   });
 }
-
 function normalizeAssessmentStatus(raw: unknown): "not_started" | "submitted" | "completed" {
   const s = String(raw || "").toLowerCase().replace(/\s+/g, "_");
   if (s === "submitted") return "submitted";
@@ -435,8 +451,20 @@ const resolvedDueDate = pickAssignedDueDate(item, flat);
 
 let hasCdp = false;
 
+// try {
+//   const recRes = await apiGetSectionRecommendations(assessmentId, selectedMenteeId);
+//   hasCdp = hasCdpPayload(recRes.data);
+// } catch {
 try {
   const recRes = await apiGetSectionRecommendations(assessmentId, selectedMenteeId);
+
+  console.log("DIRECTOR CDP CHECK:", {
+    pastorId: selectedMenteeId,
+    assessmentId,
+    title: detailObj.name,
+    data: recRes.data,
+  });
+
   hasCdp = hasCdpPayload(recRes.data);
 } catch {
   hasCdp = false;
@@ -1666,12 +1694,13 @@ const filteredMentorRows = useMemo(() => {
                             </button> */}
                            {/* {(assessment.progressStatus === "submitted" ||
   assessment.progressStatus === "completed") && ( */}
-  {assessment.hasCdp && (
+  {(assessment.progressStatus === "submitted" ||
+  assessment.progressStatus === "completed") && (
     <button
       type="button"
       onClick={() =>
         router.push(
-          `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}`,
+          `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}&viewRecommendation=1`,
         )
       }
       className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"

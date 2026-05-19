@@ -448,6 +448,7 @@ export default function MentorAssessmentResultPage() {
   const assessmentId = (searchParams.get("assessmentId") || "").trim();
   const userId = (searchParams.get("userId") || "").trim();
   const editRecommendation = (searchParams.get("editRecommendation") || "").trim() === "1";
+  const viewRecommendation = (searchParams.get("viewRecommendation") || "").trim() === "1";
 
   const [loading, setLoading] = useState(true);
   const [sections, setSections] = useState<any[]>([]);
@@ -577,7 +578,15 @@ export default function MentorAssessmentResultPage() {
           sectionId,
           sectionTitle,
           score: currentScore,
-          message: existing?.message || answerText || previewText || layerText || existingFromAssessment || rulesText,
+          // message: existing?.message || answerText || previewText || layerText || existingFromAssessment || rulesText,
+          message: viewRecommendation
+  ? existing?.message || previewText || answerText || ""
+  : existing?.message ||
+    answerText ||
+    previewText ||
+    layerText ||
+    existingFromAssessment ||
+    rulesText,
         };
       });
 
@@ -593,11 +602,13 @@ export default function MentorAssessmentResultPage() {
   };
 
   useEffect(() => {
-    if (!editRecommendation || didAutoOpenRecommendation) return;
+    // if (!editRecommendation || didAutoOpenRecommendation) return;
+    if (!(editRecommendation || viewRecommendation) || didAutoOpenRecommendation) return;
     if (!assessmentId || !userId || loading) return;
     setDidAutoOpenRecommendation(true);
     void openRecommendationEditor();
-  }, [editRecommendation, didAutoOpenRecommendation, assessmentId, userId, loading]);
+  // }, [editRecommendation, didAutoOpenRecommendation, assessmentId, userId, loading]);
+  }, [editRecommendation, viewRecommendation, didAutoOpenRecommendation, assessmentId, userId, loading]);
 
   const handleSendRecommendations = async () => {
     if (!assessmentId || !userId) return;
@@ -634,14 +645,60 @@ export default function MentorAssessmentResultPage() {
           }),
         ),
       );
-      const failed = sendResults.filter((r) => r.status === "rejected").length;
-      const succeeded = sendResults.length - failed;
-      if (failed === sendResults.length) throw new Error("All recommendation requests failed");
-      setToast(
-        failed > 0
-          ? `Sent ${succeeded} recommendation section(s); ${failed} failed`
-          : "Recommendations sent successfully",
-      );
+      // const failed = sendResults.filter((r) => r.status === "rejected").length;
+      // const succeeded = sendResults.length - failed;
+      const isAlreadySentError = (r: any) =>
+  r.status === "rejected" &&
+  String(r.reason?.response?.data?.message || "")
+    .toLowerCase()
+    .includes("recommendation already sent");
+
+const failed = sendResults.filter(
+  (r: any) => r.status === "rejected" && !isAlreadySentError(r),
+).length;
+
+const alreadySent = sendResults.filter(isAlreadySentError).length;
+
+const succeeded =
+  sendResults.filter((r: any) => r.status === "fulfilled").length + alreadySent;
+// console.log(
+//   "CDP SEND FAILED DETAILS:",
+//   sendResults.map((r: any) =>
+//     r.status === "rejected"
+//       ? {
+//           message: r.reason?.message,
+//           status: r.reason?.response?.status,
+//           data: r.reason?.response?.data,
+//           url: r.reason?.config?.url,
+//           method: r.reason?.config?.method,
+//           payload: r.reason?.config?.data,
+//         }
+//       : r,
+//   ),
+// );
+      // if (failed === sendResults.length) throw new Error("All recommendation requests failed");
+//       if (failed === sendResults.length) {
+//   // console.error("ALL CDP REQUESTS FAILED:", sendResults);
+//   setToast("Failed to send CDP");
+//   return;
+// }
+if (failed > 0 && succeeded === 0) {
+  console.error("ALL CDP REQUESTS FAILED:", sendResults);
+  setToast("Failed to send CDP");
+  return;
+}
+      // setToast(
+      //   failed > 0
+      //     ? `Sent ${succeeded} recommendation section(s); ${failed} failed`
+      //     : "Recommendations sent successfully",
+      // );
+      if (alreadySent > 0 && failed === 0) {
+  setToast("CDP already sent");
+} else if (failed > 0) {
+  setToast(`Sent ${succeeded} recommendation section(s); ${failed} failed`);
+} else {
+  setToast("Recommendations sent successfully");
+}
       setRecommendationOpen(false);
       setTimeout(() => setToast(null), 3000);
     } catch (err) {
@@ -652,7 +709,53 @@ export default function MentorAssessmentResultPage() {
       setRecommendationSubmitting(false);
     }
   };
+const handleDownloadCdpPdf = () => {
+  const rows = recommendationRows.filter((row) =>
+    String(row.message || "").trim(),
+  );
 
+  if (rows.length === 0) {
+    setToast("No CDP available to download");
+    setTimeout(() => setToast(null), 3000);
+    return;
+  }
+
+  const html = `
+    <html>
+      <head>
+        <title>CDP - ${assessmentTitle}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 32px; color: #111; }
+          h1 { font-size: 22px; margin-bottom: 4px; }
+          h2 { font-size: 16px; margin-top: 24px; }
+          .score { font-size: 12px; color: #555; margin-bottom: 10px; }
+          .box { border: 1px solid #ddd; padding: 14px; border-radius: 8px; white-space: pre-line; }
+        </style>
+      </head>
+      <body>
+        <h1>Customized Development Plan</h1>
+        <p>${assessmentTitle}</p>
+        ${rows
+          .map(
+            (row) => `
+              <h2>${row.sectionTitle}</h2>
+              ${typeof row.score === "number" ? `<div class="score">Score: ${row.score}</div>` : ""}
+              <div class="box">${String(row.message).replaceAll("\n", "<br />")}</div>
+            `,
+          )
+          .join("")}
+      </body>
+    </html>
+  `;
+
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) return;
+
+  printWindow.document.write(html);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+};
   const selectedCount = useMemo(() => Object.keys(answers).length, [answers]);
 
   return (
@@ -717,7 +820,7 @@ export default function MentorAssessmentResultPage() {
                   onClick={openRecommendationEditor}
                   className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
                 >
-                  Send CDP
+                  {viewRecommendation || hasRecommendations || Object.keys(mentorLayerCdp).length > 0 ? "CDP Sent" : "Send CDP"}
                 </button>
               </div>
               <div className="space-y-5">
@@ -828,7 +931,7 @@ export default function MentorAssessmentResultPage() {
           <div className="relative z-10 w-full max-w-3xl rounded-2xl border border-white/15 bg-[#062946] shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
               <div>
-                <h3 className="text-lg font-semibold text-white">Edit and send recommendations</h3>
+                <h3 className="text-lg font-semibold text-white">{viewRecommendation ? "Sent CDP" : "Edit and send recommendations"}</h3>
                 <p className="mt-1 text-xs text-white/75">{assessmentTitle}</p>
               </div>
               <button
@@ -860,6 +963,7 @@ export default function MentorAssessmentResultPage() {
                     <textarea
                       rows={4}
                       value={row.message}
+                      readOnly={viewRecommendation}
                       onChange={(e) => {
                         const value = e.target.value;
                         setRecommendationRows((prev) => prev.map((item, i) => (i === idx ? { ...item, message: value } : item)));
@@ -873,6 +977,15 @@ export default function MentorAssessmentResultPage() {
             </div>
 
             <div className="flex items-center justify-end gap-3 border-t border-white/10 px-6 py-4">
+            {viewRecommendation && (
+  <button
+    type="button"
+    onClick={handleDownloadCdpPdf}
+    className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8ec5eb]/30"
+  >
+    Download PDF
+  </button>
+)}
               <button
                 type="button"
                 onClick={() => setRecommendationOpen(false)}
@@ -880,14 +993,24 @@ export default function MentorAssessmentResultPage() {
               >
                 Cancel
               </button>
-              <button
+              {/* <button
                 type="button"
                 disabled={recommendationSubmitting || recommendationLoading}
                 onClick={handleSendRecommendations}
                 className="rounded-lg bg-[#8ec5eb]/90 px-5 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#8ec5eb] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {recommendationSubmitting ? "Sending..." : "Send to mentee"}
-              </button>
+              </button> */}
+              {!viewRecommendation && (
+  <button
+    type="button"
+    disabled={recommendationSubmitting || recommendationLoading}
+    onClick={handleSendRecommendations}
+    className="rounded-lg bg-[#8ec5eb]/90 px-5 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#8ec5eb] disabled:cursor-not-allowed disabled:opacity-60"
+  >
+    {recommendationSubmitting ? "Sending..." : "Send to mentee"}
+  </button>
+)}
             </div>
           </div>
         </div>

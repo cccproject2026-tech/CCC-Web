@@ -96,6 +96,7 @@ export default function MentorHeader({ showFullHeader = false }) {
     { name: "Track Progress", path: "/mentor/TrackProgress" },
     { name: "Appointments", path: "/mentor/MentorSchedule" },
     { name: "Notes", path: "/mentor/notes" },
+    { name: "Mentorship Sessions", path: "/mentor/mentoring-session" },
   ];
 
   useEffect(() => {
@@ -171,7 +172,7 @@ setNotificationList(newestFirst);
   const profileMenu = [
     { icon: <User size={18} />, label: "Profile", path: "/mentor/profile" },
     { icon: <Award size={18} />, label: "Certificates", path: "/mentor/certificates" },
-    { icon: <Clipboard size={18} />, label: "Mentorship Sessions", path: "/mentor/mentoring-session" },
+    // { icon: <Clipboard size={18} />, label: "Mentorship Sessions", path: "/mentor/mentoring-session" },
     // { icon: <File size={18} />, label: "Assignments", path: "/mentor/assignments" },
     { icon: <Trophy size={18} />, label: "Micro Grant", path: "/mentor/micro-grant" },
     { icon: <FolderOpen size={18} />, label: "Documents", path: "/mentor/documents" },
@@ -198,7 +199,8 @@ setNotificationList(newestFirst);
 
       {/* ✅ Middle Nav Links */}
       {showFullHeader && (
-        <nav className="hidden lg:flex items-center gap-6">
+        // <nav className="hidden lg:flex items-center gap-6">
+        <nav className="hidden lg:flex items-center gap-4">
           {navLinks.map((link, index) => {
             const isActive =
               pathname === link.path ||

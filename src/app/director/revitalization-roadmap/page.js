@@ -432,10 +432,12 @@ const [pastorSearch, setPastorSearch] = useState("");
   const [assignModalRoadmap, setAssignModalRoadmap] = useState(null);
   const [libraryPage, setLibraryPage] = useState(1);
   const [metricsByRoadmapId, setMetricsByRoadmapId] = useState({});
+  const [pastorProgressDetails, setPastorProgressDetails] = useState([]);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [filterPastorId, setFilterPastorId] = useState("all");
   const [selectedPastorModalId, setSelectedPastorModalId] = useState(null);
   const [activeTab, setActiveTab] = useState("library");
+  // const [roadmapSubmissionView, setRoadmapSubmissionView] = useState("today");
   useEffect(() => {
   const tab = searchParams.get("tab");
   const pastorId = searchParams.get("pastorId");
@@ -735,6 +737,59 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
       cancelled = true;
     };
   }, [pastorProgressList, roadmapIdsKey, loadingPastors, roadmapLibrary.length]);
+//   useEffect(() => {
+//   if (!pastorProgressList.length) {
+//     setPastorProgressDetails([]);
+//     return;
+//   }
+
+//   let cancelled = false;
+
+//   (async () => {
+//     try {
+//       const ids = pastorProgressList
+//         .map((row) => extractUserIdFromOverallProgressRow(row))
+//         .filter(Boolean);
+
+//       const results = await mapLimit(ids, 5, async (userId) => {
+//         try {
+//           const res = await apiGetUserProgress(userId);
+//           const progress = unwrapUserProgressDetail(res);
+
+//           const pastorRow = pastorProgressList.find(
+//             (row) =>
+//               String(extractUserIdFromOverallProgressRow(row)) === String(userId),
+//           );
+
+//           return {
+//             pastorId: String(userId),
+//             pastorName: pastorRowDisplayName(pastorRow),
+//             roadmaps: Array.isArray(progress?.roadmaps)
+//               ? progress.roadmaps
+//               : [],
+//           };
+//         } catch (e) {
+//           console.warn("Detailed roadmap progress failed", userId, e);
+//           return null;
+//         }
+//       });
+
+//       if (!cancelled) {
+//         setPastorProgressDetails(results.filter(Boolean));
+//       }
+//     } catch (e) {
+//       console.error(e);
+
+//       if (!cancelled) {
+//         setPastorProgressDetails([]);
+//       }
+//     }
+//   })();
+
+//   return () => {
+//     cancelled = true;
+//   };
+// }, [pastorProgressList]);
 
   useEffect(() => {
     if (!showSortMenu) return;
@@ -1137,6 +1192,131 @@ const filteredMentorList = useMemo(() => {
     return hay.includes(q);
   });
 }, [mentorList, mentorSearch]);
+
+// const isSameDay = (value) => {
+//   const d = parseDate(value);
+//   if (!d) return false;
+
+//   const today = new Date();
+//   return (
+//     d.getDate() === today.getDate() &&
+//     d.getMonth() === today.getMonth() &&
+//     d.getFullYear() === today.getFullYear()
+//   );
+// };
+
+// const isWithinLast7Days = (value) => {
+//   const d = parseDate(value);
+//   if (!d) return false;
+
+//   const now = new Date();
+//   const sevenDaysAgo = new Date();
+//   sevenDaysAgo.setDate(now.getDate() - 7);
+
+//   return d >= sevenDaysAgo && d <= now;
+// };
+
+// const getTaskSubmittedDate = (task) =>
+//   task?.submittedAt ||
+//   task?.submitted_at ||
+//   task?.completedAt ||
+//   task?.completed_at ||
+//   task?.updatedAt ||
+//   task?.updated_at ||
+//   null;
+
+// const roadmapSubmissions = useMemo(() => {
+//   const rows = [];
+
+//   for (const pastor of pastorProgressDetails) {
+//     // const pastorId = extractUserIdFromOverallProgressRow(pastor);
+//     // if (!pastorId) continue;
+
+//     // const pastorName = pastorRowDisplayName(pastor);
+//     const pastorId = pastor.pastorId;
+// const pastorName = pastor.pastorName;
+//     const userMetrics = Object.entries(metricsByRoadmapId);
+
+//     for (const [roadmapId, metric] of userMetrics) {
+//       const taskStats = metric?.taskStatsByUserId?.[String(pastorId)];
+//       if (!taskStats) continue;
+
+//       const roadmap = roadmapById.get(roadmapId);
+//       if (!roadmap) continue;
+
+//       const progressRoadmap =
+//   pastor.roadmaps?.find?.(
+//           (rm) =>
+//             stringifyRoadmapId(rm?.roadMapId ?? rm?.roadmapId ?? rm?._id) ===
+//             String(roadmapId),
+//         ) || null;
+
+//       const tasks = progressNestedRows(progressRoadmap);
+//       console.log("TASK DATE DEBUG:", {
+//   pastorId,
+//   pastorName,
+//   roadmapId,
+//   roadmapName: roadmap?.title,
+//   progressRoadmap,
+//   tasks,
+//   taskDates: tasks.map((task) => ({
+//     name: task?.name || task?.title || task?.taskName,
+//     status: task?.status,
+//     submittedAt: task?.submittedAt,
+//     completedAt: task?.completedAt,
+//     updatedAt: task?.updatedAt,
+//     createdAt: task?.createdAt,
+//   })),
+// });
+
+//       for (const task of tasks) {
+//         if (!isProgressRowCompleted(task)) continue;
+
+//         const submittedAt = getTaskSubmittedDate(task);
+//         if (!submittedAt) continue;
+
+//         if (!isSameDay(submittedAt) && !isWithinLast7Days(submittedAt)) continue;
+
+//         rows.push({
+//           pastorId,
+//           pastorName,
+//           roadmapId,
+//           roadmapName: roadmap.title || "Roadmap",
+//           phaseName:
+//             task?.phaseName ||
+//             task?.phase ||
+//             task?.sectionTitle ||
+//             roadmap?.nested0?.phase ||
+//             "Phase",
+//           taskId: String(task?._id ?? task?.id ?? task?.nestedRoadMapItemId ?? ""),
+//           taskName:
+//             task?.name ||
+//             task?.title ||
+//             task?.taskName ||
+//             task?.roadMapDetails ||
+//             "Submitted task",
+//           submittedAt,
+//           isToday: isSameDay(submittedAt),
+//         });
+//       }
+//     }
+//   }
+
+//   return rows.sort(
+//     (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
+//   );
+// }, [pastorProgressDetails, metricsByRoadmapId, roadmapById]);
+// console.log("ROADMAP SUBMISSIONS:", roadmapSubmissions);
+// console.log("PASTOR PROGRESS RAW:", pastorProgressList);
+// console.log("METRICS RAW:", metricsByRoadmapId);
+
+// const todaysRoadmapSubmissions = roadmapSubmissions.filter((item) => item.isToday);
+// const previousRoadmapSubmissions = roadmapSubmissions.filter((item) => !item.isToday);
+
+// const visibleRoadmapSubmissions =
+//   roadmapSubmissionView === "today"
+//     ? todaysRoadmapSubmissions
+//     : previousRoadmapSubmissions;
   return (
     <div className={directorPageRoot}>
       <DirectorHero
@@ -1499,6 +1679,106 @@ const filteredMentorList = useMemo(() => {
   </div>
   )}
 </div>
+{/* {activeTab === "pastor" && (
+  <section className={`${directorGlassCard} mb-6 p-5`}>
+    <div className="mb-4 flex items-center justify-between gap-4">
+      <div>
+        <h3 className="text-lg font-semibold text-white">
+          {roadmapSubmissionView === "today"
+            ? "Today's Roadmap Submissions"
+            : "Previous Roadmap Submissions"}
+        </h3>
+
+        <button
+          type="button"
+          onClick={() =>
+            router.push(
+              `/director/revitalization-roadmap/submissions?view=${roadmapSubmissionView}`,
+            )
+          }
+          className="mt-1 text-xs font-semibold text-[#8ec5eb] hover:underline"
+        >
+          View all
+        </button>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-semibold text-[#cde2f2]/70">
+          {roadmapSubmissionView === "today"
+            ? "Go to previous submissions"
+            : "Go to today’s submissions"}
+        </span>
+
+        <button
+          type="button"
+          onClick={() =>
+            setRoadmapSubmissionView((prev) =>
+              prev === "today" ? "previous" : "today",
+            )
+          }
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/15 text-white transition hover:bg-[#8ec5eb]/25"
+        >
+          <i
+            className={`fa-solid ${
+              roadmapSubmissionView === "today"
+                ? "fa-arrow-right"
+                : "fa-arrow-left"
+            }`}
+          />
+        </button>
+      </div>
+    </div>
+
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      {visibleRoadmapSubmissions.slice(0, 2).map((item, idx) => (
+        <div
+          key={`${item.roadmapId}-${item.taskId}-${idx}`}
+          className="rounded-xl border border-white/10 bg-white/[0.04] p-4"
+        >
+          <p className="text-sm font-semibold text-white">
+            {item.roadmapName}
+          </p>
+
+          <p className="mt-1 text-xs text-[#cde2f2]/75">
+            Phase: {item.phaseName}
+          </p>
+
+          <p className="mt-1 text-xs font-semibold text-amber-200">
+            Submitted task: {item.taskName}
+          </p>
+
+          <p className="mt-1 text-xs font-semibold text-[#8ec5eb]">
+            Pastor: {item.pastorName}
+          </p>
+
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() =>
+                router.push(
+                  `/director/revitalization-roadmap/phase-list?roadmapId=${item.roadmapId}&pastorView=true&userId=${item.pastorId}&pastorId=${item.pastorId}`,
+                )
+              }
+              className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+            >
+              View Roadmap
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {visibleRoadmapSubmissions.length === 0 && (
+        <p className="col-span-full py-6 text-sm text-[#cde2f2]/70">
+          No{" "}
+          {roadmapSubmissionView === "today"
+            ? "roadmap submissions today"
+            : "previous roadmap submissions"}{" "}
+          found.
+        </p>
+      )}
+    </div>
+  </section>
+)} */}
           <div className="mb-5 mt-2 flex items-center justify-between gap-3">
   {/* <h2 className="text-lg font-semibold tracking-tight text-white sm:text-xl">
     {filterPastorId === "all"
@@ -1518,7 +1798,7 @@ const filteredMentorList = useMemo(() => {
           ? `${selectedPastorHeading}'s roadmap`
           : "Pastor's roadmap"}
 </h2>
-{activeTab == "library" ? (
+{/* {activeTab == "library" ? (
   <div className="flex flex-wrap items-center justify-end gap-2">
     <button
   type="button"
@@ -1549,8 +1829,54 @@ const filteredMentorList = useMemo(() => {
       <i className="fa-solid fa-plus text-sm" />
       <span>New Roadmap</span>
     </button> */}
+  {/* </div>
+  ) : nul */}
+  {activeTab === "library" || activeTab === "pastor" ? (
+  <div className="flex flex-wrap items-center justify-end gap-2">
+
+    {activeTab === "pastor" && selectedPastorModalId ? (
+      <button
+        type="button"
+        onClick={() =>
+          router.push(
+            `/director/revitalization-roadmap/completed-tasks?userId=${selectedPastorModalId}`
+          )
+        }
+        className={`${directorBtnSecondary} !px-4 !py-2.5 !text-[13px]`}
+      >
+        <i className="fa-solid fa-check-double text-sm" />
+        <span>Completed Tasks</span>
+      </button>
+    ) : null}
+
+    {activeTab === "library" ? (
+      <>
+        <button
+          type="button"
+          onClick={() => {
+            setSelectMode((v) => !v);
+            setSelectedRoadmapIds([]);
+          }}
+          className={`${directorBtnSecondary} !px-4 !py-2.5 !text-[13px]`}
+        >
+          <i className="fa-regular fa-square-check text-sm" />
+          <span>{selectMode ? "Cancel Select" : "Select"}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setRearrangeMode((v) => !v)}
+          className={`${directorBtnSecondary} !px-4 !py-2.5 !text-[13px]`}
+          title="Rearrange cards"
+        >
+          <i className="fa-solid fa-table-cells-large text-sm" aria-hidden />
+          <span>Rearrange</span>
+        </button>
+      </>
+    ) : null}
+
   </div>
-  ) : null}
+) : null}
 </div>
 {activeTab === "library" && selectMode && selectedRoadmapIds.length > 0 ? (
   <div className="mb-5 flex justify-end gap-2">
@@ -2374,13 +2700,28 @@ const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director
           <h2 className="text-lg font-semibold text-white">
             {selectedPastorNameForModal}'s roadmaps
           </h2>
+       
           <p className="mt-1 text-xs text-white/50">
             Assigned roadmap list
           </p>
         </div>
+      
 
-        <button
-          type="button"
+          <div className="flex items-center gap-3">
+    <button
+      type="button"
+      onClick={() =>
+        router.push(
+          `/director/revitalization-roadmap/completed-tasks?userId=${selectedPastorModalId}`,
+        )
+      }
+      className="rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+    >
+      Completed Tasks
+    </button>
+
+    <button
+      type="button"
           // onClick={() => {
           //   setSelectedPastorModalId(null);
           //   // setFilterPastorId("all");
@@ -2412,6 +2753,7 @@ onClick={() => {
         >
           <i className="fa-solid fa-xmark" />
         </button>
+          </div>
       </div>
 
       {/* <div className="max-h-[520px] space-y-4 overflow-y-auto pr-1"> */}

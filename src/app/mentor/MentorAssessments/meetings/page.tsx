@@ -274,7 +274,7 @@ const visibleUpcomingMeetings = useMemo(() => {
     type="button"
     onClick={() =>
       meeting.id &&
-      router.push(`/mentor/MentorSchedule/${encodeURIComponent(meeting.id)}?mode=reschedule`)
+      router.push(`/mentor/MentorSchedule?appointmentId=${encodeURIComponent(meeting.id)}&reschedule=1`)
     }
     className="rounded-lg border border-amber-300/40 bg-amber-400/15 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-400/25"
   >

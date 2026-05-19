@@ -159,6 +159,8 @@ function resolveOtherPerson(
 
 function MentorScheduleContent() {
   const searchParams = useSearchParams();
+  const rescheduleAppointmentId = searchParams.get("appointmentId");
+const shouldOpenReschedule = searchParams.get("reschedule") === "1";
   const [activeTab, setActiveTab] = useState<
     "Appointments" | "Availability" | "Schedule" | "Appointment History"
   >(() => tabFromQueryParam(searchParams.get("tab")) ?? "Appointments");
@@ -294,7 +296,18 @@ function MentorScheduleContent() {
       cancelled = true;
     };
   }, [mentorId]);
+useEffect(() => {
+  if (!shouldOpenReschedule || !rescheduleAppointmentId || appointments.length === 0) return;
 
+  const appt = appointments.find(
+    (item) => appointmentEntityId(item) === rescheduleAppointmentId,
+  );
+
+  if (!appt) return;
+
+  setActiveTab("Appointments");
+  openRescheduleModal(appt);
+}, [shouldOpenReschedule, rescheduleAppointmentId, appointments]);
   useEffect(() => {
     if (!mentorId) return;
     const fetchAssignedPastors = async () => {

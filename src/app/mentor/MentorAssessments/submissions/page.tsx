@@ -17,17 +17,25 @@ import {
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 
+// function isTodayDate(value?: string): boolean {
+//   if (!value) return false;
+//   const date = new Date(value);
+//   if (Number.isNaN(date.getTime())) return false;
+//   const today = new Date();
+
+//   return (
+//     date.getDate() === today.getDate() &&
+//     date.getMonth() === today.getMonth() &&
+//     date.getFullYear() === today.getFullYear()
+//   );
+// }
 function isTodayDate(value?: string): boolean {
   if (!value) return false;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-  const today = new Date();
 
-  return (
-    date.getDate() === today.getDate() &&
-    date.getMonth() === today.getMonth() &&
-    date.getFullYear() === today.getFullYear()
-  );
+  const submittedDay = value.slice(0, 10);
+  const todayDay = new Date().toISOString().slice(0, 10);
+
+  return submittedDay === todayDay;
 }
 
 function getAssessmentId(item: { _id?: string; id?: string }): string {
@@ -76,13 +84,31 @@ const pastors: any[] = Array.isArray(usersRes.data?.data) ? usersRes.data.data :
               const answerData = (res.data as any)?.data;
 
               if (!answerData?._id) continue;
-
+console.log("SUBMISSION DATE CHECK:", {
+  pastorName,
+  assessment: assessment.name,
+  submittedAt: answerData.submittedAt,
+  createdAt: answerData.createdAt,
+  updatedAt: answerData.updatedAt,
+  finalDate:
+    answerData.submittedAt ||
+    answerData.createdAt ||
+    answerData.updatedAt,
+  isToday: isTodayDate(
+    answerData.submittedAt ||
+    answerData.createdAt ||
+    answerData.updatedAt,
+  ),
+});
               results.push({
                 ...assessment,
                 _id: assessmentId,
                 pastorId,
                 pastorName,
-                submittedAt: answerData.updatedAt || answerData.createdAt,
+                submittedAt:
+  answerData.submittedAt ||
+  answerData.createdAt ||
+  answerData.updatedAt,
               });
             } catch {
               // No submission for this pastor + assessment.

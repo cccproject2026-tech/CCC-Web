@@ -45,7 +45,14 @@ const PASTOR_MY_MENTORS_STYLE_ROOT =
 const MY_MENTORS_HERO_OVERLAY =
   "absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.12),transparent_38%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]";
 
-type TabKey = "All" | "Due" | "In Progress" | "Not Started" | "Completed";
+// type TabKey = "All" | "Due" | "In Progress" | "Not Started" | "Completed";
+type TabKey =
+  | "All"
+  | "Due"
+  | "In Progress"
+  | "Not Started"
+  | "Completed"
+  | "Completed Tasks";
 type UiStatus = "Not Started" | "In-progress" | "Due" | "Completed";
 
 interface PhaseCard {
@@ -76,7 +83,15 @@ function phaseSequenceIndex(phase: PhaseCard): number {
   return -1;
 }
 
-const TABS: TabKey[] = ["All", "Due", "In Progress", "Not Started", "Completed"];
+// const TABS: TabKey[] = ["All", "Due", "In Progress", "Not Started", "Completed"];
+const TABS: TabKey[] = [
+  "All",
+  "Due",
+  "In Progress",
+  "Not Started",
+  "Completed",
+  "Completed Tasks",
+];
 
 /** Minimum gap between background refreshes (focus / visibility) to avoid API rate limits. */
 const SILENT_REFRESH_MIN_MS = 45_000;
@@ -174,6 +189,16 @@ const [recommendedTasks, setRecommendedTasks] = useState<
 >([]);
 
 const [recommendedIndex, setRecommendedIndex] = useState(0);
+const [completedTasks, setCompletedTasks] = useState<
+  {
+    id: string;
+    roadmapName: string;
+    phaseName: string;
+    taskName: string;
+    duration: string;
+    imageUrl?: string;
+  }[]
+>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   // Sequence gating removed: View should always open.
@@ -477,6 +502,132 @@ const [recommendedIndex, setRecommendedIndex] = useState(0);
 //     setRecommendedTask(null);
 //   }
 // }, []);
+// const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: string) => {
+//   try {
+//     const candidatePhases = [...phaseList]
+//       .filter((phase) => phase.hasNestedTasks)
+//       .sort((a, b) => phaseSequenceIndex(a) - phaseSequenceIndex(b));
+
+//     const recommendations: {
+//       phase: PhaseCard;
+//       task: any;
+//       taskId: string;
+//       totalTasks: number;
+//       completedTasks: number;
+//       progressPercent: number;
+//     }[] = [];
+
+//     for (const targetPhase of candidatePhases) {
+//       const [rmRes, progRes] = await Promise.all([
+//         apiGetRoadmapById(targetPhase.id),
+//         apiGetUserProgress(userId),
+//       ]);
+
+//       const body = rmRes.data as { data?: unknown };
+//       const rawRoadmap = body?.data ?? rmRes.data;
+//       const progressData = (progRes?.data?.data ?? progRes?.data) as any;
+
+//       const mergedRoadmaps =
+//         rawRoadmap && progressData
+//           ? mergeProgressOntoRoadmaps([rawRoadmap as never], progressData)
+//           : [rawRoadmap];
+
+//       const mergedRoadmap = mergedRoadmaps[0];
+//       const tasks = unwrapNestedRoadmapsArray(mergedRoadmap);
+
+//       const taskStats = tasks.reduce(
+//         (acc: { total: number; completed: number }, task: any) => {
+//           const taskId = resolveNestedTemplateItemId(task);
+//           if (!taskId) return acc;
+
+//           const derivedStatus = deriveTaskStatusForList(progressData, {
+//             parentRoadmapId: targetPhase.id,
+//             taskId,
+//             itemStatus: task.status != null ? String(task.status) : undefined,
+//             endDate: typeof task.endDate === "string" ? task.endDate : undefined,
+//           });
+
+//           acc.total += 1;
+
+//           if (String(derivedStatus).toLowerCase() === "completed") {
+//             acc.completed += 1;
+//           }
+
+//           return acc;
+//         },
+//         { total: 0, completed: 0 }
+//       );
+
+//       const nextTask = tasks.find((task: any) => {
+//         const taskId = resolveNestedTemplateItemId(task);
+//         if (!taskId) return false;
+
+//         const derivedStatus = deriveTaskStatusForList(progressData, {
+//           parentRoadmapId: targetPhase.id,
+//           taskId,
+//           itemStatus: task.status != null ? String(task.status) : undefined,
+//           endDate: typeof task.endDate === "string" ? task.endDate : undefined,
+//         });
+
+//         return String(derivedStatus).toLowerCase() !== "completed";
+//       });
+
+//       const taskId = nextTask ? resolveNestedTemplateItemId(nextTask) : "";
+
+//       if (nextTask && taskId) {
+//         recommendations.push({
+//           phase: targetPhase,
+//           task: nextTask,
+//           taskId,
+//           totalTasks: taskStats.total,
+//           completedTasks: taskStats.completed,
+//           progressPercent:
+//             taskStats.total > 0
+//               ? Math.round((taskStats.completed / taskStats.total) * 100)
+//               : 0,
+//         });
+//       }
+//     }
+// const completedList: {
+//   id: string;
+//   roadmapName: string;
+//   phaseName: string;
+//   taskName: string;
+//   duration: string;
+//   imageUrl?: string;
+// }[] = [];
+
+// tasks.forEach((task: any) => {
+//   const nestedTaskId = resolveNestedTemplateItemId(task);
+//   if (!nestedTaskId) return;
+
+//   const derivedStatus = deriveTaskStatusForList(progressData, {
+//     parentRoadmapId: targetPhase.id,
+//     taskId: nestedTaskId,
+//     itemStatus: task.status != null ? String(task.status) : undefined,
+//     endDate: typeof task.endDate === "string" ? task.endDate : undefined,
+//   });
+
+//   if (String(derivedStatus).toLowerCase() === "completed") {
+//     completedList.push({
+//       id: nestedTaskId,
+//       roadmapName: targetPhase.parentRoadmapName,
+//       phaseName: targetPhase.title,
+//       taskName: task?.name || task?.title || "Completed Task",
+//       duration: targetPhase.months || "N/A",
+//       imageUrl: targetPhase.imageUrl,
+//     });
+//   }
+// });
+//     setRecommendedTasks(recommendations);
+//     setCompletedTasks(completedList);
+//     setRecommendedIndex(0);
+//   } catch (err) {
+//     console.error("Failed to load recommended tasks", err);
+//     setRecommendedTasks([]);
+//     setRecommendedIndex(0);
+//   }
+// }, []);
 const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: string) => {
   try {
     const candidatePhases = [...phaseList]
@@ -490,6 +641,15 @@ const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: s
       totalTasks: number;
       completedTasks: number;
       progressPercent: number;
+    }[] = [];
+
+    const completedList: {
+      id: string;
+      roadmapName: string;
+      phaseName: string;
+      taskName: string;
+      duration: string;
+      imageUrl?: string;
     }[] = [];
 
     for (const targetPhase of candidatePhases) {
@@ -509,6 +669,29 @@ const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: s
 
       const mergedRoadmap = mergedRoadmaps[0];
       const tasks = unwrapNestedRoadmapsArray(mergedRoadmap);
+
+      tasks.forEach((task: any) => {
+        const nestedTaskId = resolveNestedTemplateItemId(task);
+        if (!nestedTaskId) return;
+
+        const derivedStatus = deriveTaskStatusForList(progressData, {
+          parentRoadmapId: targetPhase.id,
+          taskId: nestedTaskId,
+          itemStatus: task.status != null ? String(task.status) : undefined,
+          endDate: typeof task.endDate === "string" ? task.endDate : undefined,
+        });
+
+        if (String(derivedStatus).toLowerCase() === "completed") {
+          completedList.push({
+            id: `${targetPhase.id}-${nestedTaskId}`,
+            roadmapName: targetPhase.parentRoadmapName,
+            phaseName: targetPhase.title,
+            taskName: task?.name || task?.title || "Completed Task",
+            duration: targetPhase.months || "N/A",
+            imageUrl: targetPhase.imageUrl,
+          });
+        }
+      });
 
       const taskStats = tasks.reduce(
         (acc: { total: number; completed: number }, task: any) => {
@@ -565,10 +748,12 @@ const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: s
     }
 
     setRecommendedTasks(recommendations);
+    setCompletedTasks(completedList);
     setRecommendedIndex(0);
   } catch (err) {
     console.error("Failed to load recommended tasks", err);
     setRecommendedTasks([]);
+    setCompletedTasks([]);
     setRecommendedIndex(0);
   }
 }, []);
@@ -1071,7 +1256,7 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
 
   <div className="h-px flex-1 bg-white/10" />
 </div>
-              {phases.length === 0 ? (
+              {/* {phases.length === 0 ? (
                 <div className={`${directorGlassCard} px-5 py-12 text-center text-sm text-white/65`}>
                   No roadmap assignments found. Please contact your administrator.
                 </div>
@@ -1080,6 +1265,7 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
                   No roadmaps match this filter.
                 </div>
               ) : (
+                
                 <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 md:gap-6">
                   {filteredPhases.map((phase) => {
                     const img =
@@ -1156,7 +1342,163 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
                     );
                   })}
                 </div>
+              )} */}
+              {phases.length === 0 ? (
+  <div className={`${directorGlassCard} px-5 py-12 text-center text-sm text-white/65`}>
+    No roadmap assignments found. Please contact your administrator.
+  </div>
+) : activeTab === "Completed Tasks" ? (
+  completedTasks.length === 0 ? (
+    <div className={`${directorGlassCard} px-5 py-12 text-center text-sm text-white/65`}>
+      No completed tasks found.
+    </div>
+  ) : (
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      {completedTasks.map((task) => {
+        const img =
+          typeof task.imageUrl === "string"
+            ? resolveApiMediaUrl(task.imageUrl) || task.imageUrl
+            : task.imageUrl;
+
+        return (
+          <div key={task.id} className={`${directorGlassCard} flex gap-4 p-4`}>
+            <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl bg-white/5">
+              {img ? (
+                <Image
+                  src={img}
+                  alt=""
+                  fill
+                  className="object-cover"
+                  sizes="112px"
+                  unoptimized={
+                    typeof img === "string" &&
+                    (img.startsWith("blob:") || isRemoteImageSrc(img))
+                  }
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-xs text-white/60">
+                  No image
+                </div>
               )}
+
+              <div className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white">
+                <i className="fa-solid fa-check text-xs" />
+              </div>
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-lg font-bold text-white">
+                {task.taskName}
+              </h3>
+
+              <p className="line-clamp-2 text-sm text-white/65">
+                {task.phaseName}
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
+                  Roadmap: {task.roadmapName}
+                </span>
+
+                <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-100">
+                  Status: Completed
+                </span>
+              </div>
+
+              <p className="mt-3 text-xs text-white/55">
+                Duration: {task.duration}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  )
+) : filteredPhases.length === 0 ? (
+  <div className={`${directorGlassCard} px-5 py-12 text-center text-sm text-white/65`}>
+    No roadmaps match this filter.
+  </div>
+) : (
+  <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 md:gap-6">
+    {filteredPhases.map((phase) => {
+      const img =
+        typeof phase.imageUrl === "string"
+          ? resolveApiMediaUrl(phase.imageUrl) || phase.imageUrl
+          : phase.imageUrl;
+
+      return (
+        <div
+          key={`${phase.parentRoadmapId || "parent"}-${phase.id}`}
+          className={`${directorGlassCard} flex flex-col overflow-hidden sm:flex-row`}
+        >
+          <div className="relative aspect-[16/10] max-h-52 w-full shrink-0 sm:aspect-auto sm:h-auto sm:max-h-none sm:min-h-[200px] sm:w-[42%] sm:max-w-[220px]">
+            {img ? (
+              <Image
+                src={img}
+                alt=""
+                fill
+                className="object-cover"
+                sizes="(max-width: 640px) 100vw, 220px"
+                unoptimized={
+                  typeof img === "string" &&
+                  (img.startsWith("blob:") || isRemoteImageSrc(img))
+                }
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-white/5 text-xs font-semibold uppercase tracking-wide text-white/45">
+                No image
+              </div>
+            )}
+
+            <div className="absolute left-3 top-3">
+              <span
+                className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${statusBadgeClasses(phase.status)}`}
+              >
+                {formatStatusDisplay(phase.status)}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex min-w-0 flex-1 flex-col justify-between gap-3 p-4 sm:gap-4 sm:p-5">
+            <div className="min-w-0 space-y-2">
+              <h3 className="break-words text-base font-bold leading-snug text-white sm:text-lg">
+                {phase.title}
+              </h3>
+
+              <p className="line-clamp-4 text-sm leading-relaxed text-white/65 sm:line-clamp-3">
+                {phase.description}
+              </p>
+
+              {phase.sessionDate ? (
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <i className="fa-regular fa-calendar text-[#8ec5eb] text-sm" aria-hidden />
+                  <span className="rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-[#d9ebf8]">
+                    {phase.sessionDate}
+                  </span>
+                </div>
+              ) : null}
+
+              <p className="text-sm text-white/75">
+                Completion time{" "}
+                <span className="font-semibold text-white">{phase.months}</span>
+              </p>
+            </div>
+
+            <div className="flex border-t border-white/10 pt-3 sm:justify-end sm:border-0 sm:pt-0">
+              <button
+                type="button"
+                onClick={() => handleViewPhase(phase)}
+                className={`${directorBtnPrimary} min-h-[44px] w-full !px-5 !py-2.5 !text-sm sm:min-h-0 sm:w-auto`}
+              >
+                {phase.status === "Not Started" ? "Start" : "View"}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+)}
         </div>
       </main>
     </div>

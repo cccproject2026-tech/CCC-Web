@@ -156,6 +156,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
     { name: "Assessments", path: "/pastor/Assessments" },
     { name: "Progress", path: "/pastor/Myprogress" },
     { name: "Appointments", path: "/pastor/appointments" },
+    { name: "Mentorship Sessions", path: "/pastor/mentoring-session" },
     { name: "Notes", path: "/pastor/notes" },
   ];
 
@@ -163,7 +164,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
   const profileMenu = [
     { icon: <User size={18} />, label: "Profile", path: "/pastor/profile" },
     { icon: <Award size={18} />, label: "Certificates", path: "/pastor/Certificates" },
-    { icon: <Clipboard size={18} />, label: "Mentorship Sessions", path: "/pastor/mentoring-session" },
+    // { icon: <Clipboard size={18} />, label: "Mentorship Sessions", path: "/pastor/mentoring-session" },
     // { icon: <File size={18} />, label: "Assignments", path: "/pastor/Assignments" },
     { icon: <Trophy size={18} />, label: "Micro Grant", path: "/pastor/MicroGrantApplication" },
     { icon: <FolderOpen size={18} />, label: "Documents", path: "/pastor/Documents" },

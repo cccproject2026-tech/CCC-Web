@@ -8,7 +8,18 @@ import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStat
 import { formatSessionTime, getNextSessionId } from "./utils/sessionFlow";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMentorGroupedSessionsQuery, type MentorSession } from "./hooks/useMentorshipQueries";
-
+const SESSION_TITLES = [
+  "Building Trust, Self-Awareness & Resources",
+  "Creating a Life of Prayer, Vision, & Family Balance",
+  "Empowering Disciples & Addressing Resistance",
+  "Fostering a Culture of Hospitality & Generosity",
+  "Building Social Bridges",
+  "Creating Community Engagement Frameworks",
+  "Training & Equipping for Community Engagement",
+  "Transforming Community through Active Presence",
+  "Celebrating & Envisioning Growth",
+  "Expanding Mentoring Networks",
+];
 export default function MentorMentoringSessionPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -36,10 +47,100 @@ export default function MentorMentoringSessionPage() {
     const handleViewDetails = (session: MentorSession) => {
         router.push(`/mentor/mentoring-session/${encodeURIComponent(session.id)}?pastorId=${encodeURIComponent(session.pastorId)}`);
     };
+const buildAllSessions = (sessions: MentorSession[], pastorId: string) => {
+  const sorted = [...sessions].sort((a, b) => a.sessionNumber - b.sessionNumber);
 
+  const completedCount = sorted.filter(
+    (s) => s.status === "COMPLETED"
+  ).length;
+
+  const unlockedSessionNumber = Math.min(completedCount + 1, 10);
+
+  return SESSION_TITLES.map((title, index) => {
+    const sessionNumber = index + 1;
+
+    const apiSession = sorted.find(
+      (s) => s.sessionNumber === sessionNumber
+    );
+
+    const lastCompleted = [...sorted]
+      .filter(
+        (s) =>
+          s.status === "COMPLETED" &&
+          s.sessionNumber < sessionNumber
+      )
+      .sort((a, b) => b.sessionNumber - a.sessionNumber)[0];
+
+    const fallbackDate = lastCompleted?.scheduledDate
+      ? new Date(
+          new Date(lastCompleted.scheduledDate).getTime() +
+            30 * 24 * 60 * 60 * 1000
+        )
+      : null;
+
+    const isCompleted = apiSession?.status === "COMPLETED";
+
+    // const status = isCompleted
+    //   ? "COMPLETED"
+    //   : sessionNumber === unlockedSessionNumber
+    //   ? "SCHEDULED"
+    //   : "LOCKED";
+    const isUnlocked = sessionNumber === unlockedSessionNumber;
+const scheduledDate = fallbackDate?.toISOString() || apiSession?.scheduledDate || "";
+const isPastDue =
+  isUnlocked &&
+  scheduledDate &&
+  new Date(scheduledDate).getTime() < Date.now();
+
+const status = isCompleted
+  ? "COMPLETED"
+  : isPastDue
+    ? "MISSED"
+    : isUnlocked
+      ? "SCHEDULED"
+      : "LOCKED";
+
+    return {
+      ...(apiSession || {}),
+      id:
+        apiSession?.id ||
+        `locked-${pastorId}-${sessionNumber}`,
+      appointmentId:
+        apiSession?.appointmentId ||
+        `locked-${pastorId}-${sessionNumber}`,
+      pastorId,
+      sessionNumber,
+    //   title:
+    //     apiSession?.title ||
+    //     `Session ${sessionNumber}—${title}`,
+    title: `Session ${sessionNumber}—${title}`,
+      status,
+    //   scheduledDate: isCompleted
+    //     ? apiSession?.scheduledDate || ""
+    //     : sessionNumber === unlockedSessionNumber
+    //     ? fallbackDate?.toISOString() ||
+    //       apiSession?.scheduledDate ||
+    //       ""
+    //     : "",
+    scheduledDate: isCompleted
+  ? apiSession?.scheduledDate || ""
+  : isUnlocked
+    ? scheduledDate
+    : "",
+    } as MentorSession & { status: string };
+  });
+};
     const selectedGroup = selectedPastorId ? groupedSessions.find(g => g.pastorId === selectedPastorId) : undefined;
+    // const sessionsForPastor = selectedGroup?.sessions ?? [];
+    // const sortedSessions = useMemo(() => [...sessionsForPastor].sort((a, b) => a.sessionNumber - b.sessionNumber), [sessionsForPastor]);
     const sessionsForPastor = selectedGroup?.sessions ?? [];
-    const sortedSessions = useMemo(() => [...sessionsForPastor].sort((a, b) => a.sessionNumber - b.sessionNumber), [sessionsForPastor]);
+
+const allSessionsForPastor = useMemo(
+  () => selectedGroup ? buildAllSessions(sessionsForPastor, selectedGroup.pastorId) : [],
+  [sessionsForPastor, selectedGroup],
+);
+
+const sortedSessions = allSessionsForPastor;
     const nextSessionId = getNextSessionId(
         sortedSessions.map((s) => ({ id: s.id, status: s.status, scheduledDate: s.scheduledDate })),
     );
@@ -75,7 +176,7 @@ export default function MentorMentoringSessionPage() {
             </section>
 
             {/* MAIN SECTION - TWO PANEL LAYOUT */}
-            <main className="flex-1 px-0 py-10">
+            <main className="flex-1 px-6 py-10 lg:px-10">
                 {loading ? (
                     <div className="flex items-center justify-center py-20">
                         <div className="text-center">
@@ -98,32 +199,125 @@ export default function MentorMentoringSessionPage() {
                                 <h2 className="text-lg font-semibold text-[#8ec5eb] mb-4">
                                     Assigned Pastors
                                 </h2>
-                                <div className="space-y-3 max-h-[600px] overflow-y-auto">
+                                <div className="custom-scrollbar max-h-[600px] space-y-3 overflow-y-auto pr-2">
                                     {groupedSessions.length > 0 ? (
-                                        groupedSessions.map((group) => (
-                                            <button
-                                                key={group.pastorId}
-                                                onClick={() => {
-                                                    setSelectedPastorId(group.pastorId);
-                                                }}
-                                                className={`w-full text-left px-4 py-3 rounded-lg transition border ${selectedPastorId === group.pastorId
-                                                    ? "bg-[#8ec5eb]/25 border-[#8ec5eb]/35 text-white"
-                                                    : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"
-                                                    }`}
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex-1">
-                                                        <p className="font-medium text-sm">{group.pastorName}</p>
-                                                        <p className="text-xs text-white/50 mt-1 truncate">
-                                                            {group.pastorEmail}
-                                                        </p>
-                                                    </div>
-                                                    <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#8ec5eb]/30 text-xs font-semibold">
-                                                        {group.sessions.length}
-                                                    </span>
-                                                </div>
-                                            </button>
-                                        ))
+                                        // groupedSessions.map((group) => (
+                                        //     <button
+                                        //         key={group.pastorId}
+                                        //         onClick={() => {
+                                        //             setSelectedPastorId(group.pastorId);
+                                        //         }}
+                                        //         className={`w-full text-left px-4 py-3 rounded-lg transition border ${selectedPastorId === group.pastorId
+                                        //             ? "bg-[#8ec5eb]/25 border-[#8ec5eb]/35 text-white"
+                                        //             : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"
+                                        //             }`}
+                                        //     >
+                                        //         <div className="flex items-center justify-between">
+                                        //             <div className="flex-1">
+                                        //                 <p className="font-medium text-sm">{group.pastorName}</p>
+                                        //                 <p className="text-xs text-white/50 mt-1 truncate">
+                                        //                     {group.pastorEmail}
+                                        //                 </p>
+                                        //             </div>
+                                        //             <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#8ec5eb]/30 text-xs font-semibold">
+                                        //                 {group.sessions.length}
+                                        //             </span>
+                                        //         </div>
+                                        //     </button>
+                                        groupedSessions.map((group) => {
+  const allSessions = buildAllSessions(group.sessions, group.pastorId);
+
+  const completedCount = allSessions.filter(
+    (s) => String(s.status) === "COMPLETED"
+  ).length;
+
+  const currentSession = allSessions.find(
+    (s) => String(s.status) === "SCHEDULED"
+  );
+
+//   const missedSession = allSessions.find(
+//     (s) => String(s.status) === "MISSED"
+//   );
+const missedSession =
+  group.sessions.find((s) => String(s.status) === "MISSED") ||
+  allSessions.find((s) => String(s.status) === "MISSED");
+
+  const isDone = completedCount >= 10;
+
+  const label = missedSession
+    ? "Needs Action"
+    : isDone
+      ? "Completed"
+      : currentSession
+        ? "Upcoming"
+        : "Current";
+
+  const initials =
+    group.pastorName
+      ?.split(" ")
+      .map((x) => x[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "P";
+
+  return (
+    <button
+      key={group.pastorId}
+      onClick={() => setSelectedPastorId(group.pastorId)}
+      className={`w-full rounded-xl border p-4 text-left transition ${
+        selectedPastorId === group.pastorId
+          ? "border-[#8ec5eb]/45 bg-[#8ec5eb]/20 text-white"
+          : "border-white/10 bg-white/5 text-white/75 hover:bg-white/10 hover:text-white"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-white/15 bg-[#173653] text-sm font-bold text-white">
+          {initials}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="truncate font-semibold text-white">{group.pastorName}</p>
+
+            {/* <span className="rounded-md border border-blue-400/30 bg-blue-500/20 px-2 py-0.5 text-[10px] font-bold text-blue-100"> */}
+            <span
+  className={`rounded-md border px-2 py-0.5 text-[10px] font-bold ${
+    missedSession
+      ? "border-red-400/30 bg-red-500/20 text-red-100"
+      : isDone
+        ? "border-emerald-400/30 bg-emerald-500/20 text-emerald-100"
+        : "border-blue-400/30 bg-blue-500/20 text-blue-100"
+  }`}
+>
+              {label}
+            </span>
+          </div>
+
+          <p className="mt-1 truncate text-xs text-white/50">{group.pastorEmail}</p>
+
+          <p className="mt-3 text-xs font-semibold text-white/80">
+            Session {isDone ? 10 : Math.min(completedCount + 1, 10)} of 10
+          </p>
+
+          <p className={`mt-1 text-xs ${missedSession ? "text-red-300" : "text-white/55"}`}>
+            {missedSession
+              ? `Missed Session ${missedSession.sessionNumber}`
+              : isDone
+                ? "All 10 sessions completed"
+                : currentSession?.scheduledDate
+                  ? `Next: ${new Date(currentSession.scheduledDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}`
+                  : "Next session pending"}
+          </p>
+        </div>
+      </div>
+    </button>
+  );
+})
+                                        
                                     ) : (
                                         <p className="text-sm text-white/50 text-center py-6">
                                             No mentoring sessions yet
@@ -140,7 +334,10 @@ export default function MentorMentoringSessionPage() {
                                     const selectedGroup = groupedSessions.find(g => g.pastorId === selectedPastorId);
                                     if (!selectedGroup) return null;
 
-                                    const filteredSessions = selectedGroup.sessions.filter((session) => {
+                                    // const filteredSessions = selectedGroup.sessions.filter((session) => {
+                                    const allSessions = buildAllSessions(selectedGroup.sessions, selectedGroup.pastorId);
+
+const filteredSessions = allSessions.filter((session) => {
                                         const statusMatch = filterStatus === "All" ||
                                             (filterStatus === "Scheduled" && session.status === "SCHEDULED") ||
                                             (filterStatus === "Completed" && session.status === "COMPLETED") ||
@@ -154,7 +351,7 @@ export default function MentorMentoringSessionPage() {
                                     return (
                                         <div>
                                             {/* HEADER WITH PASTOR INFO */}
-                                            <div className="mb-6 rounded-2xl border border-white/15 bg-white/5 backdrop-blur-sm p-6">
+                                            {/* <div className="mb-6 rounded-2xl border border-white/15 bg-white/5 backdrop-blur-sm p-6">
                                                 <h2 className="text-xl font-semibold text-[#8ec5eb] mb-2">
                                                     {selectedGroup.pastorName}
                                                 </h2>
@@ -162,8 +359,62 @@ export default function MentorMentoringSessionPage() {
                                                 <p className="text-xs text-white/50">
                                                     Session History ({filteredSessions.length} session{filteredSessions.length !== 1 ? 's' : ''})
                                                 </p>
-                                            </div>
+                                            </div> */}
+{(() => {
+  const missedSession = allSessions.find((s) => String(s.status) === "MISSED");
 
+  return (
+    <div className="mb-6 rounded-2xl border border-white/15 bg-white/5 p-6 backdrop-blur-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <h2 className="mb-2 text-xl font-semibold text-[#8ec5eb]">
+            {selectedGroup.pastorName}
+          </h2>
+          <p className="mb-1 text-sm text-white/60">{selectedGroup.pastorEmail}</p>
+          <p className="text-xs text-white/50">
+            Session History ({filteredSessions.length} session{filteredSessions.length !== 1 ? "s" : ""})
+          </p>
+        </div>
+
+        {missedSession ? (
+          <div className="w-full rounded-xl border border-red-400/30 bg-red-500/10 p-4 lg:max-w-[420px]">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-300">
+                <i className="fa-solid fa-triangle-exclamation text-sm" />
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-red-200">
+                  Missed Session {missedSession.sessionNumber}
+                </p>
+                <p className="mt-1 text-xs text-red-100/75">
+                  Was scheduled on{" "}
+                  {missedSession.scheduledDate
+                    ? new Date(missedSession.scheduledDate).toLocaleDateString("en-US", {
+                        month: "long",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : "the scheduled date"}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    // TODO: wire reschedule API/modal later
+                  }}
+                  className="mt-3 rounded-lg border border-red-300/30 bg-red-500/20 px-3 py-1.5 text-xs font-semibold text-red-100 hover:bg-red-500/30"
+                >
+                  Reschedule missed meeting
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+})()}
                                             {/* PROGRESS HEADER (Mobile parity) */}
                                             <SessionProgressHeader sessions={sortedSessions as any} />
 
@@ -182,7 +433,7 @@ export default function MentorMentoringSessionPage() {
                                             </div>
 
                                             {/* FILTER TABS */}
-                                            <div className="mb-8 flex flex-wrap gap-2">
+                                            {/* <div className="mb-8 flex flex-wrap gap-2">
                                                 {["All", "Scheduled", "Completed", "Missed", "Cancelled"].map((status) => (
                                                     <button
                                                         key={status}
@@ -195,8 +446,30 @@ export default function MentorMentoringSessionPage() {
                                                         {status}
                                                     </button>
                                                 ))}
-                                            </div>
+                                            </div> */}
+                                            {/* FILTER TABS */}
+<div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+  <div className="flex flex-wrap gap-2">
+    {["All", "Scheduled", "Completed", "Missed", "Cancelled"].map((status) => (
+      <button
+        key={status}
+        onClick={() => setFilterStatus(status)}
+        className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+          filterStatus === status
+            ? "bg-[#8ec5eb]/25 text-[#8ec5eb] border border-[#8ec5eb]/35"
+            : "bg-white/5 text-white/70 border border-white/10 hover:bg-white/10"
+        }`}
+      >
+        {status}
+      </button>
+    ))}
+  </div>
 
+  <div className="flex items-center gap-2 rounded-xl border border-yellow-400/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-100">
+    <i className="fa-solid fa-info text-yellow-300" />
+    <span>Sessions are scheduled every 30 days.</span>
+  </div>
+</div>
                                             {/* SESSIONS LIST */}
                                             {filteredSessions.length > 0 ? (
                                                 <div className="space-y-4">
@@ -217,17 +490,32 @@ export default function MentorMentoringSessionPage() {
                                                                             ) : null}
                                                                         </div>
                                                                         <p className="mt-1 text-sm text-white/60">
-                                                                            {new Date(session.scheduledDate).toLocaleDateString("en-US", {
+                                                                            {/* {new Date(session.scheduledDate).toLocaleDateString("en-US", {
                                                                                 weekday: "short",
                                                                                 year: "numeric",
                                                                                 month: "short",
                                                                                 day: "numeric",
                                                                             })}{" "}
-                                                                            · {formatSessionTime(session.scheduledDate) || "Time TBD"}
+                                                                            · {formatSessionTime(session.scheduledDate) || "Time TBD"} */}
+                                                                            {String(session.status) === "LOCKED" || !session.scheduledDate
+  ? "Locked"
+  : `${new Date(session.scheduledDate).toLocaleDateString("en-US", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    })} · ${formatSessionTime(session.scheduledDate) || "Time TBD"}`}
                                                                         </p>
                                                                     </div>
                                                                     <div className="shrink-0 flex items-center gap-3">
-                                                                        <SessionStatusBadge status={session.status} compact />
+                                                                        {/* <SessionStatusBadge status={session.status} compact /> */}
+                                                                        {String(session.status) === "LOCKED" ? (
+  <span className="rounded-md bg-white/10 px-3 py-1 text-xs font-bold text-white/55">
+    LOCKED
+  </span>
+) : (
+  <SessionStatusBadge status={session.status as any} compact />
+)}
                                                                         <i className="fas fa-chevron-right text-white/40" />
                                                                     </div>
                                                                 </div>

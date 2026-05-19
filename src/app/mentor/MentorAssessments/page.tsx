@@ -165,19 +165,27 @@ function formatCreatedDate(value?: string): string | null {
     year: "numeric",
   });
 }
+// function isTodayDate(value?: string): boolean {
+//   if (!value) return false;
+
+//   const date = new Date(value);
+//   if (Number.isNaN(date.getTime())) return false;
+
+//   const today = new Date();
+
+//   return (
+//     date.getDate() === today.getDate() &&
+//     date.getMonth() === today.getMonth() &&
+//     date.getFullYear() === today.getFullYear()
+//   );
+// }
 function isTodayDate(value?: string): boolean {
   if (!value) return false;
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
+  const submittedDay = value.slice(0, 10);
+  const todayDay = new Date().toISOString().slice(0, 10);
 
-  const today = new Date();
-
-  return (
-    date.getDate() === today.getDate() &&
-    date.getMonth() === today.getMonth() &&
-    date.getFullYear() === today.getFullYear()
-  );
+  return submittedDay === todayDay;
 }
 function toDateInputValue(value?: string): string {
   if (!value) return "";
@@ -588,10 +596,25 @@ export default function MentorAssessments() {
               const normalizedStatus: MentorAssessmentStatus =
   progressRow?.status || "not_started";
               const resolvedDueDate = pickAssignedDueDate(item, flat);
+              const storedCdp = getStoredRecommendationsForPastorAssessment(
+  selectedMenteeId,
+  assessmentId,
+);
+
+const hasSentCdp = storedCdp.some((rec) => rec.sent === true);
+
+console.log("CDP CHECK:", {
+  pastorId: selectedMenteeId,
+  assessmentId,
+  assessmentName: assessment?.name,
+  storedCdp,
+  hasSentCdp,
+});
              return {
   ...assessment,
   _id: assessmentId,
   id: assessmentId,
+  _mentorHasSentCdp: hasSentCdp,
 
 _mentorSubmittedAt:
   (progressRow as any)?.updatedAt ||
@@ -611,11 +634,54 @@ _mentorSubmittedAt:
               };
             })
             .filter((value): value is any => value != null);
+const assignedWithCdp = await Promise.all(
+  assigned.map(async (assessment: any) => {
+    try {
+      const recRes = await apiGetSectionRecommendations(
+        assessment._id,
+        selectedMenteeId,
+      );
 
+      const body: any = recRes.data;
+      const data = body?.data ?? body;
+
+      // const hasBackendCdp =
+      //   Array.isArray(data)
+      //     ? data.length > 0
+      //     : Array.isArray(data?.sections)
+      //       ? data.sections.some((section: any) =>
+      //           Array.isArray(section?.recommendations) &&
+      //           section.recommendations.length > 0,
+      //         )
+      //       : false;
+      const hasBackendCdp =
+  Array.isArray(data)
+    ? data.some((rec: any) => rec?.sent === true || rec?.status === "sent")
+    : Array.isArray(data?.sections)
+      ? data.sections.some((section: any) =>
+          Array.isArray(section?.recommendations) &&
+          section.recommendations.some(
+            (rec: any) => rec?.sent === true || rec?.status === "sent",
+          ),
+        )
+      : false;
+
+      return {
+        ...assessment,
+        _mentorHasSentCdp: assessment._mentorHasSentCdp || hasBackendCdp,
+      };
+    } catch {
+      return assessment;
+    }
+  }),
+);
           const q = searchTerm.trim().toLowerCase();
+          // const filteredAssigned = !q
+          //   ? assigned
+          //   : assigned.filter((a: any) => {
           const filteredAssigned = !q
-            ? assigned
-            : assigned.filter((a: any) => {
+  ? assignedWithCdp
+  : assignedWithCdp.filter((a: any) => {
               const name = String(a?.name || "").toLowerCase();
               const desc = String(a?.description || "").toLowerCase();
               return name.includes(q) || desc.includes(q);
@@ -913,13 +979,28 @@ useEffect(() => {
           const answerData = body?.data;
 
           if (!answerData?._id) continue;
-
+console.log("ANSWER DATE CHECK:", {
+  pastor: pastor.name,
+  assessment: assessment.name,
+  createdAt: answerData.createdAt,
+  updatedAt: answerData.updatedAt,
+  submittedAt: answerData.submittedAt,
+});
           results.push({
             ...assessment,
             _id: assessmentId,
             pastorId: pastor.id,
             pastorName: pastor.name,
-            submittedAt: answerData.updatedAt || answerData.createdAt,
+            // submittedAt: answerData.updatedAt || answerData.createdAt,
+            submittedAt:
+  answerData.submittedAt ||
+  answerData.createdAt ||
+  answerData.updatedAt,
+  _mentorHasSentCdp:
+  getStoredRecommendationsForPastorAssessment(
+    String(pastor.id),
+    assessmentId,
+  ).some((rec) => rec.sent === true),
           });
         } catch {
           // no answer found
@@ -1078,6 +1159,7 @@ useEffect(() => {
           }),
         ),
       );
+      console.log("CDP SEND RESULTS:", sendResults);
 
       const failed = sendResults.filter((r) => r.status === "rejected").length;
       const succeeded = sendResults.length - failed;
@@ -1565,7 +1647,7 @@ useEffect(() => {
     <button
       type="button"
       onClick={() => router.push("/mentor/MentorAssessments/meetings")}
-      className="inline-flex items-center gap-2 rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+      className="inline-flex h-[44px] items-center justify-center gap-2 rounded-xl border-2 border-[#9b5cff] bg-[#123a5a]/65 px-5 text-sm font-semibold text-white shadow-[0_0_10px_rgba(155,92,255,0.28)] transition hover:bg-[#173f62]/75 hover:shadow-[0_0_14px_rgba(155,92,255,0.38)]"
     >
       <i className="fa-regular fa-calendar-check" />
       Scheduled Meetings
@@ -1647,13 +1729,18 @@ useEffect(() => {
               <button
                 type="button"
                 onClick={() =>
-                  router.push(
-                    `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${assessment.pastorId}&editRecommendation=1`,
-                  )
+                  
+                    // `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${assessment.pastorId}&editRecommendation=1`,
+                    router.push(
+  assessment._mentorHasSentCdp
+    ? `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${assessment.pastorId}&viewRecommendation=1`
+    : `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${assessment.pastorId}&editRecommendation=1`,
+)
+                  
                 }
                 className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
               >
-                Send CDP
+                {assessment._mentorHasSentCdp ? "CDP Sent" : "Send CDP"}
               </button>
             </div>
           </div>
@@ -1742,14 +1829,19 @@ useEffect(() => {
                                         type="button"
                                         onClick={() => {
                                           setShowOptionsMenu(null);
+                                          // router.push(
+                                          //   `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
+                                          // );
                                           router.push(
-                                            `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
-                                          );
+  assessment._mentorHasSentCdp
+    ? `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&viewRecommendation=1`
+    : `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
+);
                                         }}
                                         className="flex w-full items-center gap-2 border-t border-white/10 px-4 py-2 text-left text-sm text-white/90 transition hover:bg-white/10"
                                       >
                                         <i className="fa-regular fa-clipboard text-[#8ec5eb]" />
-                                        View CDP
+                                        {assessment._mentorHasSentCdp ? "CDP Sent" : "Send CDP"}
                                       </button>
                                     )}
                                 </>
@@ -1852,9 +1944,65 @@ useEffect(() => {
                             <div>
                               <h3 className="mb-2 text-lg font-bold text-white">{assessment.name}</h3>
                               <p className="text-sm text-white/65">{assessment.description}</p>
+                              {assessment._mentorMeetingActive && (
+  <div className="mt-4 max-w-xl rounded-xl border border-[#8ec5eb]/35 bg-[#173a55]/65 px-4 py-3">
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-sm font-bold text-white">
+          Meeting <span className="font-medium text-white/65">(tap for details)</span>
+          <span className="ml-2 font-medium text-[#cde2f2]">
+            {assessment._mentorMeetingDateLabel || "Meeting scheduled"}
+          </span>
+          <span className="mx-2 text-white/35">|</span>
+          <span className="font-semibold text-[#8ec5eb]">zoom</span>
+        </p>
+
+        <button
+          type="button"
+          onClick={() => router.push(`/mentor/MentorSchedule/${assessment._mentorAppointmentId}`)}
+          className="mt-3 rounded-lg border border-[#8ec5eb]/35 bg-white/5 px-4 py-2 text-xs font-semibold text-[#8ec5eb] transition hover:bg-[#8ec5eb]/15"
+        >
+          Join link
+        </button>
+      </div>
+
+      <div className="options-menu-container relative shrink-0">
+        <button
+          type="button"
+          onClick={() =>
+            setShowDropdown(
+              showDropdown === `meeting-${assessment._id}` ? null : `meeting-${assessment._id}`,
+            )
+          }
+          className="flex h-7 w-7 items-center justify-center rounded-full text-white/70 hover:bg-white/10"
+        >
+          <i className="fa-solid fa-ellipsis-vertical" />
+        </button>
+
+        {showDropdown === `meeting-${assessment._id}` && (
+          <div className="absolute right-0 z-50 mt-2 w-40 rounded-xl border border-white/15 bg-[#041f35] py-2 shadow-xl">
+            <button
+              type="button"
+              onClick={() => {
+                setShowDropdown(null);
+                router.push(
+  `/mentor/MentorSchedule?appointmentId=${assessment._mentorAppointmentId}&reschedule=1`,
+);
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-semibold text-white/90 hover:bg-white/10"
+            >
+              Reschedule
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
                             </div>
                           </div>
                         </div>
+                        
 
                         {selectedMenteeId ? (
                           <div className="w-full border-t border-white/10">
@@ -1886,13 +2034,18 @@ useEffect(() => {
                                     <button
                                       type="button"
                                       onClick={() =>
+                                        // router.push(
+                                        //   `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
+                                        // )
                                         router.push(
-                                          `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
-                                        )
+  assessment._mentorHasSentCdp
+    ? `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&viewRecommendation=1`
+    : `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
+)
                                       }
                                       className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
                                     >
-                                      Send CDP
+                                      {assessment._mentorHasSentCdp ? "CDP Sent" : "Send CDP"}
                                     </button>
                                   )}
                                 {/* <button
