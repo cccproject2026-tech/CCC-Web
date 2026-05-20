@@ -15,12 +15,14 @@ import {
   mentorGlassCardFrost,
   mentorPageRoot,
   mentorPrimaryCta,
+  mentorSecondaryCta,
   mentorSearchBarWrap,
   mentorSearchIcon,
   mentorSearchInput,
   mentorSelectDark,
 } from "@/app/Components/mentor/mentor-theme";
 import VoiceNoteStatusBadge from "./VoiceNoteStatusBadge";
+import VoiceNoteRecordModal from "./VoiceNoteRecordModal";
 import VoiceNoteUploadModal from "./VoiceNoteUploadModal";
 import VoiceNotesEmptyState from "./ui/VoiceNotesEmptyState";
 import { VoiceNotesListSkeleton } from "./ui/VoiceNotesSkeletons";
@@ -39,6 +41,7 @@ export default function VoiceNotesListContent({ variant }: { variant: VoiceNotes
   const basePath = voiceNotesBasePath(variant);
   const Header = variant === "mentor" ? MentorHeader : PastorHeader;
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [recordOpen, setRecordOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | VoiceNoteStatus>("all");
 
@@ -74,18 +77,33 @@ export default function VoiceNotesListContent({ variant }: { variant: VoiceNotes
             <div>
               <h1 className="text-2xl font-bold text-white sm:text-3xl">Voice Notes</h1>
               <p className="mt-1 text-sm text-white/70">
-                Upload audio to generate a transcript and AI summary.
+                Record or upload audio to generate a transcript and AI summary.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setUploadOpen(true)}
-              className={`${ctaClass} shrink-0 self-start`}
-              aria-label="Upload audio file"
-            >
-              <i className="fa-solid fa-plus mr-2 text-xs" aria-hidden />
-              Upload Audio
-            </button>
+            <div className="flex shrink-0 flex-col gap-2 self-start sm:flex-row">
+              <button
+                type="button"
+                onClick={() => setRecordOpen(true)}
+                className={
+                  variant === "mentor"
+                    ? mentorSecondaryCta
+                    : "rounded-lg border border-white/25 bg-white/10 px-5 py-2 text-sm font-semibold text-white hover:bg-white/15"
+                }
+                aria-label="Record voice note"
+              >
+                <i className="fa-solid fa-microphone mr-2 text-xs" aria-hidden />
+                Record Voice
+              </button>
+              <button
+                type="button"
+                onClick={() => setUploadOpen(true)}
+                className={`${ctaClass} min-h-[44px]`}
+                aria-label="Upload audio file"
+              >
+                <i className="fa-solid fa-plus mr-2 text-xs" aria-hidden />
+                Upload Audio
+              </button>
+            </div>
           </div>
 
           {!listQuery.isLoading && allNotes.length > 0 ? (
@@ -142,7 +160,10 @@ export default function VoiceNotesListContent({ variant }: { variant: VoiceNotes
               </button>
             </div>
           ) : allNotes.length === 0 ? (
-            <VoiceNotesEmptyState onUpload={() => setUploadOpen(true)} />
+            <VoiceNotesEmptyState
+              onUpload={() => setUploadOpen(true)}
+              onRecord={() => setRecordOpen(true)}
+            />
           ) : filteredNotes.length === 0 ? (
             <div className={`${mentorGlassCardFrost} p-10 text-center`}>
               <p className="text-lg font-semibold text-white">No matching voice notes</p>
@@ -207,6 +228,11 @@ export default function VoiceNotesListContent({ variant }: { variant: VoiceNotes
 
       {variant === "pastor" ? <PastorFooter /> : null}
 
+      <VoiceNoteRecordModal
+        isOpen={recordOpen}
+        onClose={() => setRecordOpen(false)}
+        variant={variant}
+      />
       <VoiceNoteUploadModal
         isOpen={uploadOpen}
         onClose={() => setUploadOpen(false)}

@@ -82,6 +82,31 @@ export function formatVoiceNoteDate(iso: string): string {
   }
 }
 
+/** MM:SS for recording timer display */
+export function formatRecordingTimer(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+export function defaultRecordingTitle(): string {
+  const d = new Date();
+  const label = d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `Voice recording ${label}`;
+}
+
+export function recordingBlobToFile(blob: Blob, mimeType: string): File {
+  const type = blob.type || mimeType || "audio/webm";
+  const ext = type.includes("mp4") || type.includes("m4a") ? "m4a" : "webm";
+  return new File([blob], `voice-recording-${Date.now()}.${ext}`, { type });
+}
+
 export function titleFromFileName(name: string): string {
   const base = name.replace(/\.[^/.]+$/, "").trim();
   return base || "Voice note";

@@ -15,13 +15,24 @@ function unwrapData<T>(res: { data?: ApiListEnvelope<T> | T }): T {
   return body as T;
 }
 
-export const uploadVoiceNote = (
-  file: File,
-  options?: { title?: string; onUploadProgress?: (percent: number) => void },
-) => {
+export type VoiceNoteUploadOptions = {
+  title?: string;
+  onUploadProgress?: (percent: number) => void;
+  /** Set when audio was captured in-app via MediaRecorder */
+  source?: "recording" | "upload";
+  recordingPlatform?: string;
+  recordingDurationSeconds?: number;
+};
+
+export const uploadVoiceNote = (file: File, options?: VoiceNoteUploadOptions) => {
   const formData = new FormData();
   formData.append("audio", file);
   if (options?.title?.trim()) formData.append("title", options.title.trim());
+  if (options?.source) formData.append("source", options.source);
+  if (options?.recordingPlatform) formData.append("recordingPlatform", options.recordingPlatform);
+  if (options?.recordingDurationSeconds != null && options.recordingDurationSeconds >= 0) {
+    formData.append("recordingDurationSeconds", String(Math.round(options.recordingDurationSeconds)));
+  }
 
   return axiosInstance
     .post<ApiListEnvelope<VoiceNoteUploadResponseDto>>("/voice-notes", formData, {

@@ -52,11 +52,20 @@ export function useUploadVoiceNoteMutation() {
       file,
       title,
       onUploadProgress,
+      recording,
     }: {
       file: File;
       title?: string;
       onUploadProgress?: (percent: number) => void;
-    }) => uploadVoiceNote(file, { title, onUploadProgress }),
+      recording?: { durationSeconds: number };
+    }) =>
+      uploadVoiceNote(file, {
+        title,
+        onUploadProgress,
+        source: recording ? "recording" : undefined,
+        recordingPlatform: recording ? "web" : undefined,
+        recordingDurationSeconds: recording?.durationSeconds,
+      }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: voiceNotesQueryKeys.all });
     },
