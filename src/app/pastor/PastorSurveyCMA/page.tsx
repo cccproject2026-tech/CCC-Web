@@ -397,7 +397,12 @@ function PastorSurveyCMAContent() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const searchParams = useSearchParams();
   const assessmentId = searchParams.get("assessmentId");
+  const meetingId = searchParams.get("meetingId")?.trim() || "";
+const meetingDate = searchParams.get("meetingDate")?.trim() || "";
+const mentorName = searchParams.get("mentorName")?.trim() || "";
+const meetingPlatform = searchParams.get("platform")?.trim() || "";
   const reviewUserId = (searchParams.get("userId") || "").trim();
+  const [scheduledMeeting, setScheduledMeeting] = useState(false);
   // const shouldOpenScheduleMeeting = searchParams.get("scheduleMeeting") === "1";
   // const shouldOpenScheduleMeeting =
   // searchParams.get("scheduleMeeting") === "1" && readOnlySelf;
@@ -828,6 +833,7 @@ const confirmClearResponses = () => {
         "",
       ).trim();
       setScheduledAppointmentId(appointmentId);
+      setScheduledMeeting(true);
       setShowMeetingDetails(false);
       setShowFinalPopup(true);
     } catch (err) {
@@ -857,7 +863,7 @@ const confirmClearResponses = () => {
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.92)_100%)]" />
 
-        <div className="relative z-10 flex w-full max-w-5xl items-start justify-between gap-4">
+        {/* <div className="relative z-10 flex w-full max-w-5xl items-start justify-between gap-4">
           <div className="max-w-4xl">
             <h2 className="text-xl font-bold sm:text-2xl md:text-3xl">
               {assessmentTitle || "Church Assessment Evaluation (CMA)"}
@@ -871,8 +877,92 @@ const confirmClearResponses = () => {
             </p>
           </div>
 
-          {/* Buttons moved to bottom right */}
-        </div>
+          
+        </div> */}
+        <div className="relative z-10 flex w-full max-w-6xl flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+  <div className="max-w-4xl">
+    <h2 className="text-xl font-bold sm:text-2xl md:text-3xl">
+      {assessmentTitle || "Church Assessment Evaluation (CMA)"}
+    </h2>
+
+    <p className="mt-2 max-w-full text-sm text-[#d9ebf8] sm:max-w-2xl">
+      {mentorReviewMode
+        ? "Read-only review of this pastor’s saved responses."
+        : selfReadOnlyMode
+          ? "Read-only view of your saved responses."
+          : "Complete each section using the options that best reflect your church."}
+    </p>
+  </div>
+
+  {selfReadOnlyMode ? (
+    meetingId || scheduledMeeting ? (
+    <button
+  type="button"
+  onClick={() => {
+    if (meetingId) {
+      router.push(`/pastor/appointments/${encodeURIComponent(meetingId)}`);
+    }
+  }}
+  className="w-full max-w-[520px] rounded-2xl border border-yellow-300/45 bg-[linear-gradient(135deg,rgba(250,204,21,0.18)_0%,rgba(245,158,11,0.12)_45%,rgba(15,74,118,0.28)_100%)] px-5 py-4 text-left shadow-[0_18px_45px_rgba(245,158,11,0.22)] backdrop-blur-md transition hover:border-yellow-300/65 hover:bg-yellow-400/20"
+>
+  <div className="flex items-center gap-3">
+    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-300/25 text-yellow-100">
+      <i className="fa-regular fa-calendar-check" />
+    </span>
+
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-yellow-200">
+        Meeting scheduled
+      </p>
+
+      <p className="mt-1 text-sm font-semibold text-white">
+        {meetingDate ? `Meeting on ${meetingDate}` : "Tap to open meeting details"}
+      </p>
+
+      {(mentorName || meetingPlatform) ? (
+        <p className="mt-1 text-xs text-[#cde2f2]/80">
+          {mentorName ? `Mentor: ${mentorName}` : ""}
+          {mentorName && meetingPlatform ? " | " : ""}
+          {meetingPlatform ? `Platform: ${meetingPlatform}` : ""}
+        </p>
+      ) : null}
+
+      {meetingId ? (
+        <p className="mt-2 text-xs font-medium text-[#8ec5eb] underline underline-offset-2">
+          Open appointment →
+        </p>
+      ) : null}
+    </div>
+  </div>
+</button>
+    ) : (
+      <button
+  type="button"
+  onClick={() => {
+    setShowMentorSidebar(true);
+    setMentorStep(1);
+  }}
+  className="w-full max-w-[520px] rounded-2xl border border-yellow-300/45 bg-[linear-gradient(135deg,rgba(250,204,21,0.18)_0%,rgba(245,158,11,0.12)_45%,rgba(15,74,118,0.28)_100%)] px-5 py-4 text-left shadow-[0_18px_45px_rgba(245,158,11,0.22)] backdrop-blur-md transition hover:border-yellow-300/65 hover:bg-yellow-400/20"
+>
+  <div className="flex items-center gap-3">
+    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-300/25 text-yellow-100">
+      <i className="fa-regular fa-calendar-plus" />
+    </span>
+
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-yellow-200">
+        Mentor meeting required
+      </p>
+      <p className="mt-1 text-sm font-semibold text-white">Schedule meeting</p>
+      <p className="mt-1 text-xs text-[#cde2f2]/80">
+        Book a time with your mentor to complete this step.
+      </p>
+    </div>
+  </div>
+</button>
+    )
+  ) : null}
+</div>
       </header>
 
       <main className={`${mainBand} flex flex-col gap-6 px-4 py-8 sm:flex-row sm:gap-8 md:px-16 md:py-10`}>

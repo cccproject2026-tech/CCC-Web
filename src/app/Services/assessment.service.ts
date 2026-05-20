@@ -235,10 +235,10 @@ export const apiGetAssessmentById = (id: string) => {
 export const apiDeleteAssessments = (ids: string[]) =>
   axiosInstance.delete<{ success: boolean; message: string }>("/assessment", { data: { ids } });
 
-// PATCH /assessment/:id — optional: name, description, type, preSurvey (if backend supports)
+// PATCH /assessment/:id/instructions — optional: name, description, type, preSurvey
 export const apiPatchAssessment = (assessmentId: string, body: UpdateAssessmentPayload) =>
   axiosInstance.patch<{ success: boolean; data: AssessmentResponse }>(
-    `/assessment/${assessmentId}`,
+    `/assessment/${assessmentId}/instructions`,
     body,
   );
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import headerBg from "@/app/Assets/CMA-hero-bg.png";
@@ -449,7 +449,8 @@ export default function MentorAssessmentResultPage() {
   const userId = (searchParams.get("userId") || "").trim();
   const editRecommendation = (searchParams.get("editRecommendation") || "").trim() === "1";
   const viewRecommendation = (searchParams.get("viewRecommendation") || "").trim() === "1";
-
+  
+const contentTopRef = useRef<HTMLDivElement | null>(null);
   const [loading, setLoading] = useState(true);
   const [sections, setSections] = useState<any[]>([]);
   const [activeSection, setActiveSection] = useState(0);
@@ -458,6 +459,8 @@ export default function MentorAssessmentResultPage() {
   const [mentorLayerCdp, setMentorLayerCdp] = useState<CdpMap>({});
   const [hasRecommendations, setHasRecommendations] = useState(false);
   const [recommendationOpen, setRecommendationOpen] = useState(false);
+  const hasExistingCdp =
+  viewRecommendation || hasRecommendations || Object.keys(mentorLayerCdp).length > 0;
   const [recommendationLoading, setRecommendationLoading] = useState(false);
   const [recommendationSubmitting, setRecommendationSubmitting] = useState(false);
   const [recommendationRows, setRecommendationRows] = useState<RecommendationRow[]>([]);
@@ -601,6 +604,15 @@ export default function MentorAssessmentResultPage() {
     }
   };
 
+  const openExistingCdpPage = () => {
+    if (!assessmentId || !userId) return;
+    router.push(
+      `/mentor/MentorAssessments/result/cdp?assessmentId=${encodeURIComponent(
+        assessmentId,
+      )}&userId=${encodeURIComponent(userId)}`,
+    );
+  };
+
   useEffect(() => {
     // if (!editRecommendation || didAutoOpenRecommendation) return;
     if (!(editRecommendation || viewRecommendation) || didAutoOpenRecommendation) return;
@@ -728,7 +740,7 @@ const handleDownloadCdpPdf = () => {
           body { font-family: Arial, sans-serif; padding: 32px; color: #111; }
           h1 { font-size: 22px; margin-bottom: 4px; }
           h2 { font-size: 16px; margin-top: 24px; }
-          .score { font-size: 12px; color: #555; margin-bottom: 10px; }
+         .score { display: inline-block; font-size: 12px; font-weight: bold; color: #92400e; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 999px; padding: 5px 10px; margin-bottom: 10px; }
           .box { border: 1px solid #ddd; padding: 14px; border-radius: 8px; white-space: pre-line; }
         </style>
       </head>
@@ -739,7 +751,7 @@ const handleDownloadCdpPdf = () => {
           .map(
             (row) => `
               <h2>${row.sectionTitle}</h2>
-              ${typeof row.score === "number" ? `<div class="score">Score: ${row.score}</div>` : ""}
+              ${typeof row.score === "number" ? `<div class="score">Level: ${row.score}</div>` : ""}
               <div class="box">${String(row.message).replaceAll("\n", "<br />")}</div>
             `,
           )
@@ -757,7 +769,14 @@ const handleDownloadCdpPdf = () => {
   printWindow.print();
 };
   const selectedCount = useMemo(() => Object.keys(answers).length, [answers]);
-
+const scrollToSectionTop = () => {
+  window.requestAnimationFrame(() => {
+    contentTopRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  });
+};
   return (
     <div className="min-h-screen bg-[#062946] font-[Albert_Sans] text-white antialiased">
       <MentorHeader showFullHeader={true} />
@@ -813,14 +832,17 @@ const handleDownloadCdpPdf = () => {
               </div>
             </aside>
 
-            <section className="min-w-0 flex-1">
+            <section ref={contentTopRef} className="min-w-0 flex-1">
               <div className="mb-5 flex justify-end">
                 <button
                   type="button"
-                  onClick={openRecommendationEditor}
+                  onClick={hasExistingCdp ? openExistingCdpPage : openRecommendationEditor}
                   className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
                 >
-                  {viewRecommendation || hasRecommendations || Object.keys(mentorLayerCdp).length > 0 ? "CDP Sent" : "Send CDP"}
+                 {/* {viewRecommendation || hasRecommendations || Object.keys(mentorLayerCdp).length > 0
+  ? "Customized Development Plan"
+  : "Send Customized Development Plan"} */}
+  {hasExistingCdp ? "Customized Development Plan" : "Send Customized Development Plan"}
                 </button>
               </div>
               <div className="space-y-5">
@@ -890,7 +912,10 @@ const handleDownloadCdpPdf = () => {
               <div className="mt-8 flex items-center justify-between">
                 <button
                   type="button"
-                  onClick={() => setActiveSection((v) => Math.max(0, v - 1))}
+                 onClick={() => {
+  setActiveSection((v) => Math.max(0, v - 1));
+  scrollToSectionTop();
+}}
                   disabled={activeSection === 0}
                   className="rounded-lg border border-white/25 bg-white/10 px-4 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -908,7 +933,10 @@ const handleDownloadCdpPdf = () => {
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setActiveSection((v) => Math.min(sections.length - 1, v + 1))}
+                    onClick={() => {
+  setActiveSection((v) => Math.min(sections.length - 1, v + 1));
+  scrollToSectionTop();
+}}
                     className="rounded-lg bg-white px-5 py-2 text-sm font-semibold text-[#0f4a76]"
                   >
                     Next
@@ -954,16 +982,22 @@ const handleDownloadCdpPdf = () => {
                   <div key={row.sectionId || idx} className="rounded-xl border border-white/15 bg-white/5 p-4">
                     <div className="mb-2 flex items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-[#8ec5eb]">{row.sectionTitle}</p>
-                      {typeof row.score === "number" && (
+                      {/* {typeof row.score === "number" && (
                         <span className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-[11px] text-white/80">
                           Score: {row.score}
                         </span>
-                      )}
+                      )} */}
+                      {typeof row.score === "number" && (
+  <span className="rounded-full border border-yellow-300/50 bg-yellow-300/20 px-3 py-1.5 text-xs font-bold text-yellow-100 shadow-[0_0_18px_rgba(250,204,21,0.18)]">
+    Level: {row.score}
+  </span>
+)}
                     </div>
                     <textarea
                       rows={4}
                       value={row.message}
-                      readOnly={viewRecommendation}
+                      // readOnly={viewRecommendation}
+                      readOnly={hasExistingCdp}
                       onChange={(e) => {
                         const value = e.target.value;
                         setRecommendationRows((prev) => prev.map((item, i) => (i === idx ? { ...item, message: value } : item)));
@@ -1001,7 +1035,7 @@ const handleDownloadCdpPdf = () => {
               >
                 {recommendationSubmitting ? "Sending..." : "Send to mentee"}
               </button> */}
-              {!viewRecommendation && (
+              {!hasExistingCdp && (
   <button
     type="button"
     disabled={recommendationSubmitting || recommendationLoading}

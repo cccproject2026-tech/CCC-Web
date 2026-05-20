@@ -1012,11 +1012,12 @@ console.log("ANSWER DATE CHECK:", {
   answerData.submittedAt ||
   answerData.createdAt ||
   answerData.updatedAt,
-  _mentorHasSentCdp:
-  getStoredRecommendationsForPastorAssessment(
-    String(pastor.id),
-    assessmentId,
-  ).some((rec) => rec.sent === true),
+  // _mentorHasSentCdp:
+  // getStoredRecommendationsForPastorAssessment(
+  //   String(pastor.id),
+  //   assessmentId,
+  // ).some((rec) => rec.sent === true),
+  _mentorHasSentCdp: false,
           });
         } catch {
           // no answer found
@@ -1764,15 +1765,14 @@ console.log("ANSWER DATE CHECK:", {
                   
                     // `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${assessment.pastorId}&editRecommendation=1`,
                     router.push(
-  assessment._mentorHasSentCdp
-    ? `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${assessment.pastorId}&viewRecommendation=1`
-    : `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${assessment.pastorId}&editRecommendation=1`,
-)
-                  
+assessment._mentorHasSentCdp
+  ? `/mentor/MentorAssessments/result/cdp?assessmentId=${assessment._id}&userId=${assessment.pastorId}`
+  : `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${assessment.pastorId}&editRecommendation=1`
+                    )          
                 }
                 className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
               >
-                {assessment._mentorHasSentCdp ? "CDP Sent" : "Send CDP"}
+                {assessment._mentorHasSentCdp ? "Customized Development Plan Sent" : "Send Customized Development Plan"}
               </button>
             </div>
           </div>
@@ -1866,14 +1866,14 @@ console.log("ANSWER DATE CHECK:", {
                                           // );
                                           router.push(
   assessment._mentorHasSentCdp
-    ? `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&viewRecommendation=1`
+    ? `/mentor/MentorAssessments/result/cdp?assessmentId=${assessment._id}&userId=${selectedMenteeId}`
     : `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
 );
                                         }}
                                         className="flex w-full items-center gap-2 border-t border-white/10 px-4 py-2 text-left text-sm text-white/90 transition hover:bg-white/10"
                                       >
                                         <i className="fa-regular fa-clipboard text-[#8ec5eb]" />
-                                        {assessment._mentorHasSentCdp ? "CDP Sent" : "Send CDP"}
+                                        {assessment._mentorHasSentCdp ? "Customized Development Plan Sent" : "Send Customized Development Plan"}
                                       </button>
                                     )}
                                 </>
@@ -2086,13 +2086,13 @@ console.log("ANSWER DATE CHECK:", {
                                         // )
                                         router.push(
   assessment._mentorHasSentCdp
-    ? `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&viewRecommendation=1`
+    ? `/mentor/MentorAssessments/result/cdp?assessmentId=${assessment._id}&userId=${selectedMenteeId}`
     : `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
 )
                                       }
                                       className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
                                     >
-                                      {assessment._mentorHasSentCdp ? "CDP Sent" : "Send CDP"}
+                                      {assessment._mentorHasSentCdp ? "Customized Development Plan Sent" : "Send Customized Development Plan"}
                                     </button>
                                   )}
                                 {/* <button

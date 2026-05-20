@@ -28,7 +28,16 @@ function GuidelinesInner() {
       listHref="/pastor/Assessments"
       listLabel="Back to Assessments"
       surveyUrl={surveyUrl}
-      surveyReadOnlyHref={`${surveyUrl}&readOnly=1`}
+      // surveyReadOnlyHref={`${surveyUrl}&readOnly=1`}
+      surveyReadOnlyHref={`${surveyUrl}&readOnly=1${
+  meetingId ? `&meetingId=${encodeURIComponent(meetingId)}` : ""
+}${
+  meetingDate ? `&meetingDate=${encodeURIComponent(meetingDate)}` : ""
+}${
+  mentorName ? `&mentorName=${encodeURIComponent(mentorName)}` : ""
+}${
+  meetingPlatform ? `&platform=${encodeURIComponent(meetingPlatform)}` : ""
+}`}
       surveyRetakeUrl={`${surveyUrl}&retake=1`}
       preSurveyUrl={`/pastor/Assessments/pre-survey?assessmentId=${encodeURIComponent(assessmentId)}`}
       preSurveyRetakeUrl={`/pastor/Assessments/pre-survey?assessmentId=${encodeURIComponent(assessmentId)}&retake=1`}
