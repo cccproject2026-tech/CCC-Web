@@ -536,9 +536,13 @@ export default function MyMentorsPage() {
   //   setSelectedMentor(mentor);
   //   setShowListMenteesModal(true);
   // }, []);
-  const handleListMentees = useCallback((mentor: Mentor) => {
-  router.push(`/director/mentees?mentorId=${encodeURIComponent(mentor.id)}`);
-}, [router]);
+//   const handleListMentees = useCallback((mentor: Mentor) => {
+//   router.push(`/director/mentees?mentorId=${encodeURIComponent(mentor.id)}`);
+// }, [router]);
+const handleListMentees = useCallback((mentor: Mentor) => {
+  setSelectedMentor(mentor);
+  setShowListMenteesModal(true);
+}, []);
 
   const getMentorOptions = (mentor: Mentor) => [
     {

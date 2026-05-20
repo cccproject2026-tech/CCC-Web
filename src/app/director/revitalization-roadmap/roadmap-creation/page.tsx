@@ -708,9 +708,15 @@ export default function DirectorRoadmapCreationPage() {
 
     setSaving(true);
     try {
-      if (isEditMode && roadmapType === "phase") {
-        const libName = parentLibraryName.trim();
-        const libDesc = parentLibraryDescription.trim();
+      // if (isEditMode && roadmapType === "phase") {
+      if (isEditMode && (roadmapType === "phase" || roadmapType === "single")) {
+        // const libName = parentLibraryName.trim();
+        // const libDesc = parentLibraryDescription.trim();
+        const libName =
+  roadmapType === "single" ? nameToPersist : parentLibraryName.trim();
+
+const libDesc =
+  roadmapType === "single" ? subheading.trim() : parentLibraryDescription.trim();
         const parentType = safeString((parent as { type?: string }).type);
         await apiUpdateRoadmap(
           roadmapId,

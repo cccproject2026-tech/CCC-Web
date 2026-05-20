@@ -39,6 +39,7 @@ import { apiGetAppointments } from "@/app/Services/appointments.service";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { emitPastorAssignmentsChanged } from "@/app/utils/progress-sync";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
+import { getStoredRecommendationsForPastorAssessment } from "@/app/utils/assessment-recommendations";
 
 function getApiErrorMessage(err: unknown, fallback: string): string {
   if (err && typeof err === "object" && "response" in err) {
@@ -470,24 +471,17 @@ const [mentorPastorRows, setMentorPastorRows] = useState<any[]>([]);
             const rawProgressStatus = normalizeAssessmentStatus(progressRow?.status);
 const resolvedDueDate = pickAssignedDueDate(item, flat);
 
-let hasCdp = false;
-// try {
-//   const recRes = await apiGetSectionRecommendations(assessmentId, selectedMenteeId);
-//   hasCdp = hasCdpPayload(recRes.data);
-// } catch {
+const storedCdp = getStoredRecommendationsForPastorAssessment(
+  selectedMenteeId,
+  assessmentId,
+);
+let hasCdp = storedCdp.some((rec) => rec.sent === true);
+
 try {
   const recRes = await apiGetSectionRecommendations(assessmentId, selectedMenteeId);
-
-  console.log("DIRECTOR CDP CHECK:", {
-    pastorId: selectedMenteeId,
-    assessmentId,
-    title: detailObj.name,
-    data: recRes.data,
-  });
-
-  hasCdp = hasCdpPayload(recRes.data);
+  hasCdp = hasCdp || hasCdpPayload(recRes.data);
 } catch {
-  hasCdp = false;
+  // Keep stored CDP result.
 }
 const hasActiveMeeting = Boolean(resolvedAppointmentId || appt?.meetingDate);
 
@@ -870,7 +864,7 @@ const filteredMentorRows = useMemo(() => {
   return (
     <div className={directorPageRoot}>
       <DirectorHero
-        title="Assessments"
+        title="Assessments Library"
         subtitle={
           selectedMenteeId
             ? "Assessments assigned to the selected pastor."
@@ -937,7 +931,7 @@ const filteredMentorRows = useMemo(() => {
             : "text-white/75 hover:bg-white/10"
         }`}
       >
-        Assessments
+        Assessments Library
       </button>
 
       <button
@@ -1489,7 +1483,7 @@ const filteredMentorRows = useMemo(() => {
         ? `${selectedPastorName}'s Assessments`
         : activeTab === "pastors"
           ? "Pastor Assessments"
-          : "All Assessments"}
+          : "Assessments Library"}
     </h2>
 {activeTab === "assessments" && !selectedMenteeId && !isSelectionMode && (
   <div className="ml-auto flex flex-wrap items-center gap-3">
@@ -1735,18 +1729,17 @@ const filteredMentorRows = useMemo(() => {
                             </button> */}
                            {/* {(assessment.progressStatus === "submitted" ||
   assessment.progressStatus === "completed") && ( */}
-  {(assessment.progressStatus === "submitted" ||
-  assessment.progressStatus === "completed") && (
+  {assessment.hasCdp === true && (
     <button
       type="button"
       onClick={() =>
         router.push(
-          `/director/assessments/result?assessmentId=${assessment.id}&userId=${selectedMenteeId}&viewRecommendation=1`,
+          `/director/assessments/result/cdp?assessmentId=${assessment.id}&userId=${selectedMenteeId}`,
         )
       }
       className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
     >
-      View CDP
+      Customized Development Plan
     </button>
   )}
                           </div>
