@@ -195,21 +195,42 @@ function countPastorsAssigned(item: any): number {
 //     );
 //   });
 // }
+// function hasCdpPayload(body: any): boolean {
+//   const data = body?.data ?? body;
+
+//   if (Array.isArray(data)) {
+//     return data.some((row) => {
+//       const recs = row?.recommendations;
+//       return Array.isArray(recs) && recs.length > 0;
+//     });
+//   }
+
+//   const sections = Array.isArray(data?.sections) ? data.sections : [];
+
+//   return sections.some((section: any) => {
+//     const recs = section?.recommendations;
+//     return Array.isArray(recs) && recs.length > 0;
+//   });
+// }
 function hasCdpPayload(body: any): boolean {
   const data = body?.data ?? body;
 
   if (Array.isArray(data)) {
-    return data.some((row) => {
-      const recs = row?.recommendations;
-      return Array.isArray(recs) && recs.length > 0;
-    });
+    return data.some(
+      (row) => row?.sent === true || row?.status === "sent",
+    );
   }
 
   const sections = Array.isArray(data?.sections) ? data.sections : [];
 
   return sections.some((section: any) => {
-    const recs = section?.recommendations;
-    return Array.isArray(recs) && recs.length > 0;
+    const recs = Array.isArray(section?.recommendations)
+      ? section.recommendations
+      : [];
+
+    return recs.some(
+      (rec: any) => rec?.sent === true || rec?.status === "sent",
+    );
   });
 }
 function normalizeAssessmentStatus(raw: unknown): "not_started" | "submitted" | "completed" {
@@ -446,11 +467,10 @@ const [mentorPastorRows, setMentorPastorRows] = useState<any[]>([]);
                 // const resolvedDueDate = pickAssignedDueDate(item, flat);
 
                 // return {
-                const progressStatus = normalizeAssessmentStatus(progressRow?.status);
+            const rawProgressStatus = normalizeAssessmentStatus(progressRow?.status);
 const resolvedDueDate = pickAssignedDueDate(item, flat);
 
 let hasCdp = false;
-
 // try {
 //   const recRes = await apiGetSectionRecommendations(assessmentId, selectedMenteeId);
 //   hasCdp = hasCdpPayload(recRes.data);
@@ -469,6 +489,14 @@ try {
 } catch {
   hasCdp = false;
 }
+const hasActiveMeeting = Boolean(resolvedAppointmentId || appt?.meetingDate);
+
+const progressStatus =
+  hasCdp || hasActiveMeeting
+    ? "completed"
+    : rawProgressStatus === "completed"
+      ? "submitted"
+      : rawProgressStatus;
 
 return {
                   
@@ -1636,22 +1664,35 @@ const filteredMentorRows = useMemo(() => {
 
                       <div className="flex flex-1 flex-col justify-between">
                         <div>
-                          <h3 className="mb-2 text-lg font-bold text-white">{assessment.title}</h3>
-                          <p className="text-sm text-white/65">{assessment.description}</p>
+                        <h3 className="mb-2 text-lg font-bold text-white">{assessment.title}</h3>
+
+<p className="line-clamp-2 min-h-[44px] text-sm leading-[22px] text-white/65">
+  {assessment.description || "No description available."}
+</p>
+
+{selectedMenteeId && (
+  <span
+    className={`mt-3 inline-flex w-fit rounded-lg border px-3 py-1 text-sm font-bold ${assessmentStatusChipClass(
+      assessment.progressStatus,
+    )}`}
+  >
+    {assessmentStatusLabel(assessment.progressStatus)}
+  </span>
+)}
                         </div>
                       </div>
                     </div>
 
                     {selectedMenteeId ? (
                       <div className="w-full border-t border-white/10">
-                        <div className="flex items-center px-6 py-4">
-                          <span
+                        <div className="flex items-center justify-end px-6 py-4">
+                          {/* <span
                             className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${assessmentStatusChipClass(
                               assessment.progressStatus,
                             )}`}
                           >
                             {assessmentStatusLabel(assessment.progressStatus)}
-                          </span>
+                          </span> */}
                           <div className="ml-auto flex items-center gap-2">
                             {(assessment.progressStatus === "submitted" ||
                               assessment.progressStatus === "completed") && (

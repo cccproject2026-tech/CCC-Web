@@ -226,13 +226,16 @@ function findExtraByFieldName(items: ExtraComponent[] | undefined, name: string)
   return undefined;
 }
 
+// const UPLOAD_FIELD_ACCEPT =
+//   ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const UPLOAD_FIELD_ACCEPT =
-  ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.mp4,.mov,.avi,.mkv,.webm,video/*,image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 const UPLOAD_HINT_LINE =
   "Supported file types: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, PNG, JPG · Max file size: 25 MB";
 
-const MAX_PASTOR_UPLOAD_BYTES = 25 * 1024 * 1024;
+// const MAX_PASTOR_UPLOAD_BYTES = 25 * 1024 * 1024;
+const MAX_PASTOR_UPLOAD_BYTES = 150 * 1024 * 1024;
 
 function JumpStartContent() {
   const router = useRouter();
@@ -973,7 +976,22 @@ const scopedNestedId = nestedRoadMapItemIdForExtras;
 
 for (const [key, files] of Object.entries(pendingUploadFiles)) {
   if (files?.length) {
-    await apiUploadExtrasDocuments(roadmapId, userId, files, scopedNestedId, key);
+    // await apiUploadExtrasDocuments(roadmapId, userId, files, scopedNestedId, key);
+    try {
+ try {
+  await apiUploadExtrasDocuments(roadmapId, userId, files, scopedNestedId, key);
+} catch (uploadErr) {
+  console.error("Upload failed:", uploadErr);
+  setSaveFeedback("Video upload failed. Backend may not allow this file type or size.");
+  setTimeout(() => setSaveFeedback(null), 5000);
+  continue;
+}
+} catch (uploadErr) {
+  console.error("Upload failed:", uploadErr);
+  setSaveFeedback("Video upload failed. Backend may not allow this file type or size.");
+  setTimeout(() => setSaveFeedback(null), 5000);
+  continue;
+}
 
     uploadedNowNames[key] = files.map((file) => ({
       fileName: file.name,

@@ -157,7 +157,9 @@ function RoadmapFieldPreview({ f }: { f: Record<string, any> }) {
           <p className="text-sm font-medium text-white/90">
             Drag & Drop or Click here to choose file
           </p>
-          <p className="mt-1 text-xs text-white/50">Max file size : 10 MB</p>
+          <p className="mt-1 text-xs text-white/50">
+  Supports images, documents, and videos · Max file size : 10 MB
+</p>
         </div>
       );
     case "datepicker":
@@ -351,7 +353,13 @@ export default function DirectorRoadmapFormPage() {
           fields.push({ id: fieldId, type: "text", label: extra.name, placeholder: extra.placeHolder || "" });
           break;
         case "UPLOAD":
-          fields.push({ id: fieldId, type: "upload", buttonLabel: extra.name });
+          // fields.push({ id: fieldId, type: "upload", buttonLabel: extra.name });
+          fields.push({
+  id: fieldId,
+  type: "upload",
+  buttonLabel: extra.name,
+  allowedFileTypes: extra.allowedFileTypes || ["image", "document", "video"],
+});
           break;
         case "DATE_PICKER":
           fields.push({
@@ -405,7 +413,12 @@ export default function DirectorRoadmapFormPage() {
               const base = { id: nestedId, parentSectionId: fieldId };
               if (sectionExtra.type === "TEXT_FIELD") fields.push({ ...base, type: "text", label: sectionExtra.name, placeholder: sectionExtra.placeHolder || "" });
               else if (sectionExtra.type === "TEXT_AREA") fields.push({ ...base, type: "textarea", label: sectionExtra.name, placeholder: sectionExtra.placeHolder || "" });
-              else if (sectionExtra.type === "UPLOAD") fields.push({ ...base, type: "upload", buttonLabel: sectionExtra.name });
+              else if (sectionExtra.type === "UPLOAD") fields.push({
+  ...base,
+  type: "upload",
+  buttonLabel: sectionExtra.name,
+  allowedFileTypes: sectionExtra.allowedFileTypes || ["image", "document", "video"],
+});
               else if (sectionExtra.type === "TEXT_DISPLAY") fields.push({ ...base, type: "text_display", name: sectionExtra.name });
               else if (sectionExtra.type === "CHECKBOX") fields.push({ ...base, type: "checkbox_item", name: sectionExtra.name, haveButton: !!sectionExtra.haveButton, buttonName: sectionExtra.buttonName || "" });
               else if (sectionExtra.type === "DATE_PICKER") {
@@ -452,8 +465,14 @@ export default function DirectorRoadmapFormPage() {
             return { type: "TEXT_AREA", name: field.label || field.name || "Text Area", ...(field.placeholder ? { placeHolder: field.placeholder } : {}) };
           case "text":
             return { type: "TEXT_FIELD", name: field.label || field.name || "Text Field", ...(field.placeholder ? { placeHolder: field.placeholder } : {}) };
+          // case "upload":
+          //   return { type: "UPLOAD", name: field.buttonLabel || "Upload" };
           case "upload":
-            return { type: "UPLOAD", name: field.buttonLabel || "Upload" };
+  return {
+    type: "UPLOAD",
+    name: field.buttonLabel || "Upload",
+    allowedFileTypes: field.allowedFileTypes || ["image", "document", "video"],
+  };
           case "datepicker": {
             const checkboxes = [
               field.allowPastorSelect ? { type: "CHECKBOX", name: "Allow pastor to select Date", haveButton: false } : null,

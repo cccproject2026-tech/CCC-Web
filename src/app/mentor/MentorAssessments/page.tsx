@@ -75,10 +75,18 @@ type RuleSection = {
   layers?: RuleLayer[];
 };
 
+// function normalizeMentorAssessmentStatus(raw: unknown): MentorAssessmentStatus {
+//   const s = String(raw || "").toLowerCase().replace(/\s+/g, "_");
+//   if (s === "submitted") return "submitted";
+//   if (s === "completed" || s === "reviewed") return "completed";
+//   return "not_started";
+// }
 function normalizeMentorAssessmentStatus(raw: unknown): MentorAssessmentStatus {
   const s = String(raw || "").toLowerCase().replace(/\s+/g, "_");
+
   if (s === "submitted") return "submitted";
   if (s === "completed" || s === "reviewed") return "completed";
+
   return "not_started";
 }
 
@@ -593,9 +601,6 @@ export default function MentorAssessments() {
               // - meeting details available => completed
               // const hasMeetingDetails = !!(resolvedAppointmentId || appt?.meetingDate);
               // const normalizedStatus: MentorAssessmentStatus = hasMeetingDetails ? "completed" : "submitted";
-              const normalizedStatus: MentorAssessmentStatus =
-  progressRow?.status || "not_started";
-              const resolvedDueDate = pickAssignedDueDate(item, flat);
               const storedCdp = getStoredRecommendationsForPastorAssessment(
   selectedMenteeId,
   assessmentId,
@@ -603,6 +608,14 @@ export default function MentorAssessments() {
 
 const hasSentCdp = storedCdp.some((rec) => rec.sent === true);
 
+const progressStatus = progressRow?.status || "not_started";
+
+const normalizedStatus: MentorAssessmentStatus =
+  progressStatus === "completed" && !hasSentCdp
+    ? "submitted"
+    : progressStatus;
+              const resolvedDueDate = pickAssignedDueDate(item, flat);
+              
 console.log("CDP CHECK:", {
   pastorId: selectedMenteeId,
   assessmentId,
@@ -617,7 +630,10 @@ console.log("CDP CHECK:", {
   _mentorHasSentCdp: hasSentCdp,
 
 _mentorSubmittedAt:
+  (progressRow as any)?.submittedAt ||
+  (progressRow as any)?.completedAt ||
   (progressRow as any)?.updatedAt ||
+  assessment?.submittedAt ||
   assessment?.updatedAt,
 
   _mentorAssignmentStatus: normalizedStatus,
@@ -1958,8 +1974,23 @@ console.log("ANSWER DATE CHECK:", {
 
                           <div className="flex flex-1 flex-col justify-between">
                             <div>
+                              {/* <h3 className="mb-2 text-lg font-bold text-white">{assessment.name}</h3>
+                              <p className="text-sm text-white/65">{assessment.description}</p> */}
                               <h3 className="mb-2 text-lg font-bold text-white">{assessment.name}</h3>
-                              <p className="text-sm text-white/65">{assessment.description}</p>
+
+<p className="line-clamp-2 min-h-[44px] text-sm leading-[22px] text-white/65">
+  {assessment.description || "No description available."}
+</p>
+
+{selectedMenteeId && (
+  <span
+    className={`mt-3 inline-flex w-fit rounded-lg border px-3 py-1 text-sm font-bold ${assessmentStatusChipClass(
+      assessment._mentorAssignmentStatus,
+    )}`}
+  >
+    {assessmentStatusLabel(assessment._mentorAssignmentStatus)}
+  </span>
+)}
                               {assessment._mentorMeetingActive && (
   <div className="mt-4 max-w-xl rounded-xl border border-[#8ec5eb]/35 bg-[#173a55]/65 px-4 py-3">
     <div className="flex items-start justify-between gap-3">
@@ -2022,14 +2053,14 @@ console.log("ANSWER DATE CHECK:", {
 
                         {selectedMenteeId ? (
                           <div className="w-full border-t border-white/10">
-                            <div className="flex items-center px-6 py-4">
-                              <span
+                            <div className="flex items-center justify-end px-6 py-4">
+                              {/* <span
                                 className={`rounded-md border px-2 py-0.5 text-xs font-semibold ${assessmentStatusChipClass(
                                   assessment._mentorAssignmentStatus,
                                 )}`}
                               >
                                 {assessmentStatusLabel(assessment._mentorAssignmentStatus)}
-                              </span>
+                              </span> */}
                               <div className="ml-auto flex items-center gap-2">
                                 {(assessment._mentorAssignmentStatus === "submitted" ||
                                   assessment._mentorAssignmentStatus === "completed") && (
