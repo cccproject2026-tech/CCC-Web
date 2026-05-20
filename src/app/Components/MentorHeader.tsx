@@ -96,6 +96,7 @@ export default function MentorHeader({ showFullHeader = false }) {
     { name: "Track Progress", path: "/mentor/TrackProgress" },
     { name: "Appointments", path: "/mentor/MentorSchedule" },
     { name: "Notes", path: "/mentor/notes" },
+    { name: "Voice Notes", path: "/mentor/voice-notes" },
     { name: "Mentorship Sessions", path: "/mentor/mentoring-session" },
   ];
 

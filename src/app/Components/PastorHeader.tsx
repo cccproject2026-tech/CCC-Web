@@ -158,6 +158,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
     { name: "Appointments", path: "/pastor/appointments" },
     { name: "Mentorship Sessions", path: "/pastor/mentoring-session" },
     { name: "Notes", path: "/pastor/notes" },
+    { name: "Voice Notes", path: "/pastor/voice-notes" },
   ];
 
 
