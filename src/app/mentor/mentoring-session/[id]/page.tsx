@@ -44,17 +44,49 @@ export default function MentorMentoringSessionDetailPage() {
   const params = useParams<{ id: string }>();
   const search = useSearchParams();
   const pastorIdFromQuery = search.get("pastorId") || "";
+  const sessionNumberFromQuery = Number(search.get("sessionNumber") || "");
+  const titleFromQuery = search.get("title") || "";
+const statusFromQuery = search.get("status") || "";
+const scheduledDateFromQuery = search.get("scheduledDate") || "";
 
+  // const sessionId = decodeURIComponent(params.id);
   const sessionId = decodeURIComponent(params.id);
+const isGeneratedSessionId = sessionId.startsWith("locked-");
   const queryClient = useQueryClient();
 
   const [confirm, setConfirm] = useState<{ kind: "complete" | "redo" } | null>(null);
   const [tsData, setTsData] = useState<TranscriptSummary | null>(null);
   const [tsTab, setTsTab] = useState<"transcript" | "summary">("transcript");
-  const detailQuery = useMentorSessionDetailQuery(sessionId, pastorIdFromQuery);
+  // const detailQuery = useMentorSessionDetailQuery(sessionId, pastorIdFromQuery);
+  const detailQuery = useMentorSessionDetailQuery(
+  isGeneratedSessionId ? "" : sessionId,
+  pastorIdFromQuery
+);
   const { completeMutation, redoMutation, actionLoading } = useMentorSessionActions(sessionId);
   const loading = detailQuery.isLoading;
-  const session = detailQuery.data?.session ?? null;
+  // const session = detailQuery.data?.session ?? null;
+ const rawSession = detailQuery.data?.session ?? null;
+
+const fallbackSession =
+  isGeneratedSessionId && sessionNumberFromQuery
+    ? {
+        id: sessionId,
+        appointmentId: "",
+        pastorId: pastorIdFromQuery,
+        sessionNumber: sessionNumberFromQuery,
+        title: titleFromQuery || `Session ${sessionNumberFromQuery}`,
+        status: statusFromQuery || "LOCKED",
+        scheduledDate: scheduledDateFromQuery,
+      }
+    : null;
+
+const session =
+  rawSession ||
+  detailQuery.data?.sessionsForPastor?.find(
+    (s) => Number(s.sessionNumber) === sessionNumberFromQuery
+  ) ||
+  fallbackSession ||
+  null;
   const sessionsForPastor = detailQuery.data?.sessionsForPastor ?? [];
   const appointment = (detailQuery.data?.appointment ?? null) as AppointmentResponse | null;
   const pastorId = detailQuery.data?.pastorId ?? "";
@@ -242,6 +274,8 @@ export default function MentorMentoringSessionDetailPage() {
   }
 
   const isCurrent = session.id === nextSessionId;
+  const isMissedSession = String(session.status).toUpperCase() === "MISSED";
+  const isLockedSession = String(session.status).toUpperCase() === "LOCKED";
 
   return (
     <div className="min-h-screen bg-[#062946] text-white font-[Albert_Sans]">
@@ -290,6 +324,25 @@ export default function MentorMentoringSessionDetailPage() {
         {/* Meeting details */}
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
           <div className="text-sm font-semibold text-[#8ec5eb] mb-4">Meeting details</div>
+          {isMissedSession ? (
+  <div className="mb-4 rounded-xl border border-yellow-400/20 bg-yellow-500/10 px-4 py-3">
+    <p className="text-sm font-semibold text-yellow-100">
+      This meeting was missed.
+    </p>
+    <p className="mt-1 text-xs text-yellow-100/70">
+      Reschedule this session before marking it as completed.
+    </p>
+
+    <button
+      type="button"
+      onClick={() => setConfirm({ kind: "redo" })}
+      disabled={actionLoading != null}
+      className="mt-3 rounded-lg border border-green-400/30 bg-green-500/20 px-3 py-1.5 text-xs font-semibold text-green-100 hover:bg-green-500/30"
+    >
+      Reschedule meeting
+    </button>
+  </div>
+) : null}
           {meetingLink ? (
             <div className="space-y-2 text-sm">
               <div className="flex justify-between gap-3">
@@ -335,14 +388,23 @@ export default function MentorMentoringSessionDetailPage() {
             <button
               type="button"
               onClick={() => setConfirm({ kind: "complete" })}
-              disabled={session.status === "COMPLETED" || actionLoading != null}
+            disabled={session.status === "COMPLETED" || isMissedSession || isLockedSession || actionLoading != null}
+              // className={`rounded-xl px-4 py-2 text-sm font-semibold border ${
+              //   session.status === "COMPLETED"
+              //     ? "bg-white/5 text-white/40 border-white/10 cursor-not-allowed"
+              //     : "bg-green-500/20 text-green-200 border-green-400/30 hover:bg-green-500/25"
+              // } ${actionLoading != null ? "opacity-60 cursor-not-allowed" : ""}`}
               className={`rounded-xl px-4 py-2 text-sm font-semibold border ${
-                session.status === "COMPLETED"
-                  ? "bg-white/5 text-white/40 border-white/10 cursor-not-allowed"
-                  : "bg-green-500/20 text-green-200 border-green-400/30 hover:bg-green-500/25"
-              } ${actionLoading != null ? "opacity-60 cursor-not-allowed" : ""}`}
+  session.status === "COMPLETED" || isMissedSession || isLockedSession
+    ? "bg-white/5 text-white/40 border-white/10 cursor-not-allowed"
+    : "bg-green-500/20 text-green-200 border-green-400/30 hover:bg-green-500/25"
+} ${actionLoading != null ? "opacity-60 cursor-not-allowed" : ""}`}
             >
-              {actionLoading === "complete" ? "Completing…" : session.status === "COMPLETED" ? "Completed" : "Mark as Completed"}
+           {actionLoading === "complete"
+  ? "Completing…"
+  : session.status === "COMPLETED"
+    ? "Completed"
+    : "Mark as Completed"}
             </button>
 
             <button
@@ -353,7 +415,7 @@ export default function MentorMentoringSessionDetailPage() {
                 actionLoading != null ? "opacity-60 cursor-not-allowed" : ""
               }`}
             >
-              {actionLoading === "redo" ? "Scheduling…" : "Schedule Repeat Session"}
+       {actionLoading === "redo" ? "Scheduling…" : "Schedule Repeat Session"}
             </button>
 
             <a

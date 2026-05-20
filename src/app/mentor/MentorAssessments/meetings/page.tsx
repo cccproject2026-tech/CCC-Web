@@ -315,7 +315,7 @@ const visibleUpcomingMeetings = useMemo(() => {
             Assessment Scheduled Meetings
           </h1>
           <p className="mt-2 text-sm text-[#cde2f2]/75">
-            Review today&apos;s and this week&apos;s assessment-related meetings.
+            Review meetings scheduled after assessment submissions.
           </p>
         </div>
 

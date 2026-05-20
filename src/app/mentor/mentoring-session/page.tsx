@@ -26,6 +26,7 @@ export default function MentorMentoringSessionPage() {
     const pastorIdFromQuery = searchParams.get("pastorId") || "";
     const [filterStatus, setFilterStatus] = useState("All");
     const [search, setSearch] = useState("");
+    const [rescheduleRequests, setRescheduleRequests] = useState<any[]>([]);
     const [selectedPastorId, setSelectedPastorId] = useState<string | null>(null);
     const { data: groupedSessions = [], isLoading: loading, error } = useMentorGroupedSessionsQuery();
 
@@ -43,10 +44,27 @@ export default function MentorMentoringSessionPage() {
         // If nothing selected (first load), auto-select the first pastor with sessions.
         setSelectedPastorId((prev) => (prev && groupedSessions.some((g) => g.pastorId === prev) ? prev : groupedSessions[0].pastorId));
     }, [groupedSessions, pastorIdFromQuery]);
+    useEffect(() => {
+  const requests = JSON.parse(localStorage.getItem("missedSessionRescheduleRequests") || "[]");
+  setRescheduleRequests(requests);
+}, []);
 
-    const handleViewDetails = (session: MentorSession) => {
-        router.push(`/mentor/mentoring-session/${encodeURIComponent(session.id)}?pastorId=${encodeURIComponent(session.pastorId)}`);
-    };
+    // const handleViewDetails = (session: MentorSession) => {
+    //     router.push(`/mentor/mentoring-session/${encodeURIComponent(session.id)}?pastorId=${encodeURIComponent(session.pastorId)}`);
+    // };
+ const handleViewDetails = (session: MentorSession) => {
+  const params = new URLSearchParams({
+    pastorId: session.pastorId,
+    sessionNumber: String(session.sessionNumber),
+    title: session.title || "",
+    status: String(session.status || ""),
+    scheduledDate: session.scheduledDate || "",
+  });
+
+  router.push(
+    `/mentor/mentoring-session/${encodeURIComponent(session.id)}?${params.toString()}`
+  );
+};
 const buildAllSessions = (sessions: MentorSession[], pastorId: string) => {
   const sorted = [...sessions].sort((a, b) => a.sessionNumber - b.sessionNumber);
 
@@ -86,7 +104,7 @@ const buildAllSessions = (sessions: MentorSession[], pastorId: string) => {
     //   ? "SCHEDULED"
     //   : "LOCKED";
     const isUnlocked = sessionNumber === unlockedSessionNumber;
-const scheduledDate = fallbackDate?.toISOString() || apiSession?.scheduledDate || "";
+const scheduledDate = apiSession?.scheduledDate || fallbackDate?.toISOString() || "";
 const isPastDue =
   isUnlocked &&
   scheduledDate &&
@@ -144,6 +162,13 @@ const sortedSessions = allSessionsForPastor;
     const nextSessionId = getNextSessionId(
         sortedSessions.map((s) => ({ id: s.id, status: s.status, scheduledDate: s.scheduledDate })),
     );
+
+const getRescheduleRequestForSession = (session: any) =>
+  rescheduleRequests.find(
+    (req) =>
+      req.sessionId === session.id ||
+      req.sessionNumber === session.sessionNumber
+  );
 
     return (
         <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
@@ -249,7 +274,7 @@ const missedSession =
     : isDone
       ? "Completed"
       : currentSession
-        ? "Upcoming"
+        ? "In Progress"
         : "Current";
 
   const initials =
@@ -376,7 +401,7 @@ const filteredSessions = allSessions.filter((session) => {
           </p>
         </div>
 
-        {missedSession ? (
+        {/* {missedSession ? (
           <div className="w-full rounded-xl border border-red-400/30 bg-red-500/10 p-4 lg:max-w-[420px]">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-300">
@@ -410,7 +435,43 @@ const filteredSessions = allSessions.filter((session) => {
               </div>
             </div>
           </div>
-        ) : null}
+        ) : null} */}
+        {missedSession ? (
+  <div className="flex w-full flex-col items-start gap-2 lg:max-w-[300px]">
+    <div className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+      <div className="flex items-center gap-2">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70">
+          <i className="fa-solid fa-clock text-xs" />
+        </span>
+
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-white/85">
+            Missed Session {missedSession.sessionNumber}
+          </p>
+          <p className="mt-0.5 text-[11px] text-white/50">
+            {missedSession.scheduledDate
+              ? new Date(missedSession.scheduledDate).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })
+              : "Scheduled date unavailable"}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <button
+      type="button"
+      onClick={() => {
+        // TODO: wire reschedule API/modal later
+      }}
+     className="self-end rounded-lg border border-green-400/30 bg-green-500/20 px-3 py-1.5 text-xs font-semibold text-green-100 hover:bg-green-500/30"
+    >
+      Reschedule meeting
+    </button>
+  </div>
+) : null}
       </div>
     </div>
   );
@@ -473,7 +534,7 @@ const filteredSessions = allSessions.filter((session) => {
                                             {/* SESSIONS LIST */}
                                             {filteredSessions.length > 0 ? (
                                                 <div className="space-y-4">
-                                                    {filteredSessions.map((session) => (
+             {filteredSessions.map((session) => (
                                                         <div
                                                             key={session.appointmentId}
                                                             className="group rounded-2xl border border-white/15 bg-white/5 backdrop-blur-sm transition hover:border-[#8ec5eb]/30 hover:bg-white/10"
@@ -514,13 +575,22 @@ const filteredSessions = allSessions.filter((session) => {
     LOCKED
   </span>
 ) : (
+  <>
+  {getRescheduleRequestForSession(session) ? (
+    <span className="rounded-md border border-yellow-400/30 bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-100">
+      RESCHEDULE REQUESTED
+    </span>
+  ) : null}
+
   <SessionStatusBadge status={session.status as any} compact />
+</>
 )}
                                                                         <i className="fas fa-chevron-right text-white/40" />
                                                                     </div>
                                                                 </div>
                                                             </button>
                                                         </div>
+  
                                                     ))}
                                                 </div>
                                             ) : (

@@ -77,7 +77,16 @@ export default function ProfileDropdown({
           <i className="fa-regular fa-file-lines text-[#2E3B8E] text-lg w-5"></i>
           <span className="text-gray-800 font-medium">Documents</span>
         </button>
-
+<button
+  onClick={() => {
+    router.push("/director/mentoring-session");
+    onClose();
+  }}
+  className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors text-left"
+>
+  <i className="fa-solid fa-chalkboard-user text-[#2E3B8E] text-lg w-5"></i>
+  <span className="text-gray-800 font-medium">Mentoring Sessions</span>
+</button>
         <button
           onClick={() => {
             onSettingsClick();

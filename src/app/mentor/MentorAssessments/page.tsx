@@ -1288,7 +1288,7 @@ console.log("ANSWER DATE CHECK:", {
         : "text-white/75 hover:bg-white/10"
     }`}
   >
-    All Assessments
+     Assessment Library
   </button>
 
   <button
@@ -1643,7 +1643,18 @@ console.log("ANSWER DATE CHECK:", {
   </div>
 )} */}
 {activeTab === "all" && !selectedMenteeId && (
+  // <div className="mb-4 flex justify-end">
+  //   <button
+  //     type="button"
+  //     onClick={() => router.push("/mentor/MentorAssessments/meetings")}
+  //     className="inline-flex h-[44px] items-center justify-center gap-2 rounded-xl border-2 border-[#9b5cff] bg-[#123a5a]/65 px-5 text-sm font-semibold text-white shadow-[0_0_10px_rgba(155,92,255,0.28)] transition hover:bg-[#173f62]/75 hover:shadow-[0_0_14px_rgba(155,92,255,0.38)]"
+  //   >
+  //     <i className="fa-regular fa-calendar-check" />
+  //     Scheduled Meetings
+  //   </button>
+  // </div>
   <div className="mb-4 flex justify-end">
+  <div className="flex flex-col items-end">
     <button
       type="button"
       onClick={() => router.push("/mentor/MentorAssessments/meetings")}
@@ -1652,7 +1663,12 @@ console.log("ANSWER DATE CHECK:", {
       <i className="fa-regular fa-calendar-check" />
       Scheduled Meetings
     </button>
+
+    <p className="mt-2 text-xs font-medium text-white/65">
+      Meetings scheduled after assessment submissions.
+    </p>
   </div>
+</div>
 )}
 {activeTab === "all" && !selectedMenteeId && (
   <section className={`${mentorFilterPanel} mb-6 p-5`}>
@@ -1681,9 +1697,9 @@ console.log("ANSWER DATE CHECK:", {
         <i className="fa-solid fa-arrow-right" />
       </button> */}
       <div className="flex items-center gap-3">
-  <span className="text-xs font-semibold text-[#cde2f2]/70">
-    {submissionView === "today" ? "Go to previous submissions" : "Go to today’s submissions"}
-  </span>
+  <span className="text-base font-extrabold tracking-wide text-white drop-shadow-sm">
+  {submissionView === "today" ? "Go to previous submissions" : "Go to today’s submissions"}
+</span>
 
   <button
     type="button"
@@ -1758,7 +1774,7 @@ console.log("ANSWER DATE CHECK:", {
   <>
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <h2 className="text-lg font-semibold text-white sm:text-xl">
-                      {selectedMenteeId ? `${selectedMenteeName}'s Assessments` : "All Assessments"}
+                      {selectedMenteeId ? `${selectedMenteeName}'s Assessments` : " Assessment Library"}
                     </h2>
                     {selectedMenteeId && (
   <select
