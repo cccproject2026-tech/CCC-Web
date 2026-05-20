@@ -18,6 +18,8 @@ import { useUploadVoiceNoteMutation } from "./hooks/useVoiceNotesQueries";
 import {
   titleFromFileName,
   validateVoiceNoteFile,
+  VOICE_NOTE_FILE_ACCEPT,
+  VOICE_NOTE_SUPPORTED_FORMATS_LABEL,
   voiceNotesBasePath,
   type VoiceNotesVariant,
 } from "./voiceNotesUtils";
@@ -148,8 +150,13 @@ export default function VoiceNoteUploadModal({
           </button>
         </div>
 
-        <p className="mb-4 text-sm text-gray-600">
-          MP3, WAV, M4A, or WebM — max 25 MB. Your note will be transcribed and summarized automatically.
+        <p className="mb-2 text-sm text-gray-600">
+          {VOICE_NOTE_SUPPORTED_FORMATS_LABEL} — max 25 MB. Your note will be transcribed and summarized
+          automatically.
+        </p>
+        <p className="mb-4 text-xs leading-relaxed text-gray-500">
+          <span className="font-medium text-gray-600">Supports:</span> WhatsApp audio, Android recordings,
+          iPhone recordings, MP4 audio files, and Telegram voice notes.
         </p>
 
         <div
@@ -178,14 +185,14 @@ export default function VoiceNoteUploadModal({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".mp3,.wav,.m4a,.webm,audio/mpeg,audio/wav,audio/mp4,audio/webm"
+            accept={VOICE_NOTE_FILE_ACCEPT}
             className="hidden"
             onChange={(e) => applyFile(e.target.files?.[0] ?? null)}
           />
         </div>
 
         {validationError ? (
-          <p className="mt-3 text-sm font-medium text-red-600" role="alert">
+          <p className="mt-3 whitespace-pre-line text-sm font-medium text-red-600" role="alert">
             {validationError}
           </p>
         ) : null}
