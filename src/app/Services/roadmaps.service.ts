@@ -354,9 +354,16 @@ export const apiUpdatePastorQuery = (
   payload: UpdatePastorQueryPayload,
 ) => axiosInstance.patch(`/roadmaps/${roadMapId}/queries/${queryItemId}`, payload);
 
-// DELETE /roadmaps/:roadMapId/queries/:queryItemId?userId=
-export const apiDeletePastorQuery = (roadMapId: string, queryItemId: string, userId: string) =>
-  axiosInstance.delete(`/roadmaps/${roadMapId}/queries/${queryItemId}`, { params: { userId } });
+// DELETE /roadmaps/:roadMapId/queries/:queryItemId?userId=&nestedRoadMapItemId=
+export const apiDeletePastorQuery = (
+  roadMapId: string,
+  queryItemId: string,
+  userId: string,
+  nestedRoadMapItemId?: string,
+) =>
+  axiosInstance.delete(`/roadmaps/${roadMapId}/queries/${queryItemId}`, {
+    params: { userId, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
+  });
 
 // DELETE /roadmaps/:roadMapId/queries/:queryItemId/reply?repliedMentorId=
 export const apiDeleteQueryReply = (roadMapId: string, queryItemId: string, repliedMentorId: string) =>

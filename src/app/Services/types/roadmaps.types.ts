@@ -220,6 +220,7 @@ export interface ReplyQueryPayload {
 export interface UpdatePastorQueryPayload {
   userId: string;
   actualQueryText: string;
+  nestedRoadMapItemId?: string;
 }
 
 export interface QueryItem {
@@ -230,6 +231,10 @@ export interface QueryItem {
   repliedDate?: string;
   repliedMentorId?: PopulatedUser;
   status: 'pending' | 'answered';
+  nestedRoadMapItemId?: string;
+  nestedItemId?: string;
+  taskId?: string;
+  roadmapItemId?: string;
 }
 
 export interface QueriesThread {

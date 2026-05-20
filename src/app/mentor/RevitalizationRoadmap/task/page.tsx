@@ -192,41 +192,12 @@ function TaskPageContent() {
     const status = queryTab === "Pending" ? "pending" : "answered";
     try {
       const res = await apiGetQueries(roadmapId, userId, status, taskId || undefined);
-      // setQueries(unwrapQueriesFromResponse(res));
       const all = unwrapQueriesFromResponse(res);
-
-// const scoped = all.filter((q: any) => {
-//   const qTaskId = String(
-//     q.nestedRoadMapItemId ??
-//     q.nestedItemId ??
-//     q.taskId ??
-//     q.roadmapItemId ??
-//     ""
-//   );
-
-//   return qTaskId === String(taskId);
-// });
-
-// setQueries(scoped);
-const hasScopedIds = all.some((q: any) =>
-  Boolean(q.nestedRoadMapItemId ?? q.nestedItemId ?? q.taskId ?? q.roadmapItemId)
-);
-
-const scoped = hasScopedIds
-  ? all.filter((q: any) => {
-      const qTaskId = String(
-        q.nestedRoadMapItemId ??
-          q.nestedItemId ??
-          q.taskId ??
-          q.roadmapItemId ??
-          ""
-      );
-
-      return qTaskId === String(taskId);
-    })
-  : all;
-
-setQueries(scoped);
+      const scoped = all.filter((q: any) => {
+        const qTaskId = String(q.nestedRoadMapItemId || q.nestedItemId || q.taskId || q.roadmapItemId || "");
+        return qTaskId === String(taskId);
+      });
+      setQueries(scoped);
     } catch {
       setQueries([]);
     }

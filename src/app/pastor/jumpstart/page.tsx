@@ -232,10 +232,10 @@ const UPLOAD_FIELD_ACCEPT =
   ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.mp4,.mov,.avi,.mkv,.webm,video/*,image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 const UPLOAD_HINT_LINE =
-  "Supported file types: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, PNG, JPG · Max file size: 25 MB";
+  "Supported file types: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, PNG, JPG, MP4, MOV, WEBM · Max file size: 10 MB";
 
 // const MAX_PASTOR_UPLOAD_BYTES = 25 * 1024 * 1024;
-const MAX_PASTOR_UPLOAD_BYTES = 150 * 1024 * 1024;
+const MAX_PASTOR_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 function JumpStartContent() {
   const router = useRouter();
@@ -662,7 +662,10 @@ const hasRequiredSubmissions = useMemo(() => {
     };
     loadExtras();
   }, [roadmapId, userId, roadmap, nestedRoadMapItemIdForExtras, buildDefaultFormDataFromTemplate]);
-const scopedNestedId = nestedRoadMapItemIdForExtras;
+  const scopedNestedId = nestedRoadMapItemIdForExtras;
+  const queryNestedRoadMapItemId =
+    parentRoadmapId && nestedItemId?.trim() ? nestedItemId.trim() : undefined;
+
   const fetchComments = useCallback(async (showLoader = false) => {
     if (!roadmapId || !userId) return;
     if (showLoader) setCommentsLoading(true);
@@ -679,25 +682,30 @@ const scopedNestedId = nestedRoadMapItemIdForExtras;
       if (showLoader) setCommentsLoading(false);
     }
   }, [roadmapId, userId, scopedNestedId]);
-// const scopedNestedId = nestedRoadMapItemIdForExtras;
   const fetchQueries = useCallback(async (status?: string, showLoader = false) => {
     if (!roadmapId || !userId) return;
     if (showLoader) setQueriesLoading(true);
     try {
-      const res = await apiGetQueries(roadmapId, userId, status, scopedNestedId);
+      const res = await apiGetQueries(roadmapId, userId, status, queryNestedRoadMapItemId);
       const threads: any[] = res.data?.data || res.data || [];
       const allQueries = Array.isArray(threads)
         ? threads.flatMap((t: any) => t?.queries || [])
         : (threads as any)?.queries || [];
-      setQueries(allQueries);
-      if (!status) setQueriesCount(allQueries.length);
+      const scopedQueries = queryNestedRoadMapItemId
+        ? allQueries.filter((q: any) => {
+            const qTaskId = String(q.nestedRoadMapItemId || q.nestedItemId || q.taskId || q.roadmapItemId || "");
+            return qTaskId === queryNestedRoadMapItemId;
+          })
+        : allQueries;
+      setQueries(scopedQueries);
+      if (!status) setQueriesCount(scopedQueries.length);
     } catch {
       setQueries([]);
       if (!status) setQueriesCount(0);
     } finally {
       if (showLoader) setQueriesLoading(false);
     }
-  }, [roadmapId, userId, scopedNestedId]);
+  }, [roadmapId, userId, queryNestedRoadMapItemId]);
 
   // Prefetch counts so the left rail matches mobile badges.
   useEffect(() => {
@@ -976,22 +984,14 @@ const scopedNestedId = nestedRoadMapItemIdForExtras;
 
 for (const [key, files] of Object.entries(pendingUploadFiles)) {
   if (files?.length) {
-    // await apiUploadExtrasDocuments(roadmapId, userId, files, scopedNestedId, key);
     try {
- try {
-  await apiUploadExtrasDocuments(roadmapId, userId, files, scopedNestedId, key);
-} catch (uploadErr) {
-  console.error("Upload failed:", uploadErr);
-  setSaveFeedback("Video upload failed. Backend may not allow this file type or size.");
-  setTimeout(() => setSaveFeedback(null), 5000);
-  continue;
-}
-} catch (uploadErr) {
-  console.error("Upload failed:", uploadErr);
-  setSaveFeedback("Video upload failed. Backend may not allow this file type or size.");
-  setTimeout(() => setSaveFeedback(null), 5000);
-  continue;
-}
+      await apiUploadExtrasDocuments(roadmapId, userId, files, scopedNestedId, key);
+    } catch (uploadErr) {
+      console.error("Upload failed:", uploadErr);
+      setSaveFeedback("Upload failed. Backend may not allow this file type or size.");
+      setTimeout(() => setSaveFeedback(null), 5000);
+      continue;
+    }
 
     uploadedNowNames[key] = files.map((file) => ({
       fileName: file.name,
@@ -1214,12 +1214,11 @@ if (!hasRequiredSubmissions) {
     if (!roadmapId || !userId || !newQueryText.trim()) return;
     setQuerySubmitting(true);
     try {
-      // await apiAddQuery(roadmapId, { actualQueryText: newQueryText.trim(), userId });
       await apiAddQuery(roadmapId, {
-  actualQueryText: newQueryText.trim(),
-  userId,
-  nestedRoadMapItemId: scopedNestedId,
-});
+        actualQueryText: newQueryText.trim(),
+        userId,
+        nestedRoadMapItemId: queryNestedRoadMapItemId,
+      });
       setNewQueryText("");
       setQueryTab("Pending");
       setQuerySuccess(true);
@@ -1251,7 +1250,11 @@ if (!hasRequiredSubmissions) {
     if (!text) return;
     setQueryActionLoadingId(queryId);
     try {
-      await apiUpdatePastorQuery(roadmapId, queryId, { userId, actualQueryText: text });
+      await apiUpdatePastorQuery(roadmapId, queryId, {
+        userId,
+        actualQueryText: text,
+        nestedRoadMapItemId: queryNestedRoadMapItemId,
+      });
       cancelPastorQueryEdit();
       await fetchQueries(undefined, false);
       await fetchQueries("pending", false);
@@ -1270,7 +1273,7 @@ if (!hasRequiredSubmissions) {
     if (!ok) return;
     setQueryActionLoadingId(queryId);
     try {
-      await apiDeletePastorQuery(roadmapId, queryId, userId);
+      await apiDeletePastorQuery(roadmapId, queryId, userId, queryNestedRoadMapItemId);
       cancelPastorQueryEdit();
       await fetchQueries(undefined, false);
       await fetchQueries("pending", false);
