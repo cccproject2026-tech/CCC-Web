@@ -1,3 +1,5 @@
+import type { TranscriptSummaryDto } from "@/app/Services/types/appointments.types";
+
 export type VoiceNotesVariant = "mentor" | "pastor";
 
 export const VOICE_NOTE_MAX_BYTES = 25 * 1024 * 1024;
@@ -52,4 +54,17 @@ export function validateVoiceNoteFile(file: File): string | null {
 export function isVoiceNoteProcessing(status: string): boolean {
   const s = String(status || "").toLowerCase();
   return s === "pending" || s === "transcribing" || s === "summarizing";
+}
+
+export function hasVoiceNoteTranscriptSummary(
+  summary: TranscriptSummaryDto | null | undefined,
+): boolean {
+  if (!summary) return false;
+  return !!(
+    summary.sessionOverview?.trim() ||
+    summary.keyDiscussionPoints?.length ||
+    summary.mentorGuidance?.length ||
+    summary.actionItems?.length ||
+    summary.followUp?.trim()
+  );
 }

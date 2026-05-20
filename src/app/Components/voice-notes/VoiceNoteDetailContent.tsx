@@ -20,6 +20,7 @@ import VoiceNoteUploadModal from "./VoiceNoteUploadModal";
 import { useVoiceNoteDetailQuery } from "./hooks/useVoiceNotesQueries";
 import {
   formatVoiceNoteDate,
+  hasVoiceNoteTranscriptSummary,
   isVoiceNoteProcessing,
   voiceNotesBasePath,
   type VoiceNotesVariant,
@@ -39,6 +40,9 @@ export default function VoiceNoteDetailContent({ variant }: { variant: VoiceNote
   const processing = note ? isVoiceNoteProcessing(note.status) : false;
   const failed = note?.status === "failed";
   const completed = note?.status === "completed";
+  const transcriptSummary = note?.transcriptSummary;
+  const hasSummary = hasVoiceNoteTranscriptSummary(transcriptSummary);
+  const hasTranscript = !!note?.transcript?.trim();
 
   useEffect(() => {
     if (!detailQuery.error) return;
@@ -157,16 +161,16 @@ export default function VoiceNoteDetailContent({ variant }: { variant: VoiceNote
           </div>
         ) : null}
 
-        {(completed || (note.transcript?.trim() || note.summary)) && !processing ? (
+        {(completed || hasTranscript || hasSummary) && !processing ? (
           <TranscriptSummarySection
             transcript={note.transcript}
-            summary={note.summary}
+            summary={transcriptSummary}
             isLoading={false}
-            defaultTab={note.transcript?.trim() ? "transcript" : "summary"}
+            defaultTab={hasTranscript ? "transcript" : "summary"}
           />
         ) : null}
 
-        {!processing && !failed && !completed && !note.transcript && !note.summary ? (
+        {!processing && !failed && !completed && !hasTranscript && !hasSummary ? (
           <div className={`${mentorGlassCardFrost} p-8 text-center text-sm text-white/65`}>
             Results will appear here when processing completes.
           </div>

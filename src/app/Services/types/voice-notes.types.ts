@@ -18,7 +18,8 @@ export interface VoiceNoteListItemDto {
 export interface VoiceNoteDetailDto extends VoiceNoteListItemDto {
   audioUrl?: string;
   transcript?: string;
-  summary?: TranscriptSummaryDto;
+  /** AI summary payload from GET /voice-notes/:id */
+  transcriptSummary?: TranscriptSummaryDto;
   errorMessage?: string;
 }
 
