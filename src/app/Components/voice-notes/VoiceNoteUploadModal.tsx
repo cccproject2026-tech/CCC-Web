@@ -132,12 +132,18 @@ export default function VoiceNoteUploadModal({
 
   return (
     <div className={mentorModalOverlay} role="dialog" aria-modal="true" aria-labelledby="voice-upload-title">
-      <div className={`${mentorModalPanel} max-w-lg`}>
+      <div className={`${mentorModalPanel} max-h-[90vh] max-w-lg overflow-y-auto`}>
         <div className={mentorModalHeader}>
           <h2 id="voice-upload-title" className={mentorModalTitle}>
             Upload Audio
           </h2>
-          <button type="button" onClick={handleClose} className={mentorModalCloseBtn} disabled={busy}>
+          <button
+            type="button"
+            onClick={handleClose}
+            className={mentorModalCloseBtn}
+            disabled={busy}
+            aria-label="Close upload dialog"
+          >
             <i className="fa-solid fa-xmark text-lg" aria-hidden />
           </button>
         </div>

@@ -1,6 +1,16 @@
 import type { TranscriptSummaryDto } from "@/app/Services/types/appointments.types";
+import type { VoiceNoteStatus } from "@/app/Services/types/voice-notes.types";
 
 export type VoiceNotesVariant = "mentor" | "pastor";
+
+export const VOICE_NOTE_STATUS_FILTER_OPTIONS: { value: "all" | VoiceNoteStatus; label: string }[] = [
+  { value: "all", label: "All statuses" },
+  { value: "pending", label: "Pending" },
+  { value: "transcribing", label: "Transcribing" },
+  { value: "summarizing", label: "Summarizing" },
+  { value: "completed", label: "Completed" },
+  { value: "failed", label: "Failed" },
+];
 
 export const VOICE_NOTE_MAX_BYTES = 25 * 1024 * 1024;
 
@@ -54,6 +64,27 @@ export function validateVoiceNoteFile(file: File): string | null {
 export function isVoiceNoteProcessing(status: string): boolean {
   const s = String(status || "").toLowerCase();
   return s === "pending" || s === "transcribing" || s === "summarizing";
+}
+
+export function getVoiceNoteProcessingMessage(status: VoiceNoteStatus | string): string {
+  const s = String(status || "").toLowerCase();
+  if (s === "pending") return "Uploading audio…";
+  if (s === "transcribing") return "Generating transcript…";
+  if (s === "summarizing") return "Creating AI summary…";
+  return "Processing…";
+}
+
+export function filterVoiceNotesList<T extends { title: string; status: string }>(
+  notes: T[],
+  search: string,
+  statusFilter: "all" | VoiceNoteStatus,
+): T[] {
+  const q = search.trim().toLowerCase();
+  return notes.filter((n) => {
+    const statusOk = statusFilter === "all" || String(n.status).toLowerCase() === statusFilter;
+    const titleOk = !q || n.title.toLowerCase().includes(q);
+    return statusOk && titleOk;
+  });
 }
 
 export function hasVoiceNoteTranscriptSummary(

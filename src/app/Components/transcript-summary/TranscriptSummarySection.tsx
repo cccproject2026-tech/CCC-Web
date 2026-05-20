@@ -14,6 +14,8 @@ type TranscriptSummarySectionProps = {
   isLoading?: boolean;
   sectionTitle?: string;
   defaultTab?: Tab;
+  enhanced?: boolean;
+  disabled?: boolean;
 };
 
 function buildSummaryCopyText(summary: TranscriptSummaryDto): string {
@@ -39,6 +41,8 @@ export default function TranscriptSummarySection({
   isLoading = false,
   sectionTitle = "Transcript & AI Summary",
   defaultTab = "transcript",
+  enhanced = false,
+  disabled = false,
 }: TranscriptSummarySectionProps) {
   const toast = useToast();
   const [tab, setTab] = useState<Tab>(defaultTab);
@@ -48,11 +52,18 @@ export default function TranscriptSummarySection({
       <div className="text-sm font-semibold text-[#8ec5eb]">{sectionTitle}</div>
 
       <div className="mt-5">
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-[#041f35]/40 p-2">
+        <div
+          className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/10 bg-[#041f35]/40 p-2"
+          role="tablist"
+          aria-label="Transcript and summary"
+        >
           <button
             type="button"
             onClick={() => setTab("transcript")}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+            disabled={disabled}
+            role="tab"
+            aria-selected={tab === "transcript"}
+            className={`min-h-[40px] rounded-xl px-4 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#3498DB] disabled:cursor-not-allowed disabled:opacity-50 ${
               tab === "transcript"
                 ? "bg-white text-[#062946]"
                 : "bg-white/5 text-white/80 hover:bg-white/10"
@@ -63,7 +74,10 @@ export default function TranscriptSummarySection({
           <button
             type="button"
             onClick={() => setTab("summary")}
-            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+            disabled={disabled}
+            role="tab"
+            aria-selected={tab === "summary"}
+            className={`min-h-[40px] rounded-xl px-4 py-2 text-sm font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#3498DB] disabled:cursor-not-allowed disabled:opacity-50 ${
               tab === "summary"
                 ? "bg-white text-[#062946]"
                 : "bg-white/5 text-white/80 hover:bg-white/10"
@@ -88,12 +102,13 @@ export default function TranscriptSummarySection({
                   void navigator.clipboard.writeText(text);
                   toast.show({ kind: "success", title: "Transcript copied" });
                 }}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10"
+                aria-label="Copy transcript to clipboard"
+                className="min-h-[36px] rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#3498DB]"
               >
-                Copy
+                Copy Transcript
               </button>
             </div>
-            <TranscriptChatView transcript={transcript} isLoading={isLoading} />
+            <TranscriptChatView transcript={transcript} isLoading={isLoading} enhanced={enhanced} />
           </div>
         ) : (
           <div className="mt-4 rounded-2xl border border-white/10 bg-[#041f35]/40 p-5">
@@ -114,12 +129,13 @@ export default function TranscriptSummarySection({
                   void navigator.clipboard.writeText(lines);
                   toast.show({ kind: "success", title: "Summary copied" });
                 }}
-                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10"
+                aria-label="Copy AI summary to clipboard"
+                className="min-h-[36px] rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#3498DB]"
               >
-                Copy
+                Copy AI Summary
               </button>
             </div>
-            <TranscriptSummaryView summary={summary} isLoading={isLoading} />
+            <TranscriptSummaryView summary={summary} isLoading={isLoading} enhanced={enhanced} />
           </div>
         )}
       </div>

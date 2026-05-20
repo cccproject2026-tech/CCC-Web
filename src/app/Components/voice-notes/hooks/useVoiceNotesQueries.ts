@@ -21,7 +21,8 @@ export function useVoiceNotesListQuery() {
   return useQuery({
     queryKey: voiceNotesQueryKeys.all,
     queryFn: getVoiceNotes,
-    staleTime: 15_000,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
     retry: 1,
   });
 }
@@ -32,7 +33,9 @@ export function useVoiceNoteDetailQuery(id: string) {
     enabled: !!id,
     queryFn: () => getVoiceNoteById(id),
     staleTime: 5_000,
+    gcTime: 5 * 60_000,
     refetchOnWindowFocus: false,
+    refetchIntervalInBackground: false,
     refetchInterval: (query) => {
       const status = (query.state.data as VoiceNoteDetailDto | undefined)?.status;
       if (status && isVoiceNoteProcessing(status)) return POLL_MS;
