@@ -49,3 +49,29 @@ export interface ResetPasswordPayload {
 export interface RefreshTokenPayload {
   refreshToken: string;
 }
+
+/** Backend-driven onboarding resume step (`POST /auth/check-onboarding-status`). */
+export type OnboardingNextStep =
+  | "pending"
+  | "verify-email"
+  | "set-password"
+  | "login"
+  | "rejected";
+
+export interface CheckOnboardingStatusRequest {
+  email: string;
+}
+
+export interface CheckOnboardingStatusData {
+  email: string;
+  interestStatus: string;
+  isEmailVerified: boolean;
+  isPasswordSet: boolean;
+  nextStep: OnboardingNextStep;
+}
+
+export interface CheckOnboardingStatusResponse {
+  success: boolean;
+  message?: string;
+  data: CheckOnboardingStatusData;
+}

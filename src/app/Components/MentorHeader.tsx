@@ -26,6 +26,7 @@ import {
   Lock,
   BellOff,
   UserX,
+  Mic,
 } from "lucide-react";
 import { apiGetUserById } from "../Services/users.service";
 import { getGreeting } from "../Services/utils/helpers";
@@ -96,6 +97,7 @@ export default function MentorHeader({ showFullHeader = false }) {
     { name: "Track Progress", path: "/mentor/TrackProgress" },
     { name: "Appointments", path: "/mentor/MentorSchedule" },
     { name: "Notes", path: "/mentor/notes" },
+    { name: "Voice Notes", path: "/mentor/voice-notes" },
     { name: "Mentorship Sessions", path: "/mentor/mentoring-session" },
   ];
 
@@ -176,6 +178,7 @@ setNotificationList(newestFirst);
     // { icon: <File size={18} />, label: "Assignments", path: "/mentor/assignments" },
     { icon: <Trophy size={18} />, label: "Micro Grant", path: "/mentor/micro-grant" },
     { icon: <FolderOpen size={18} />, label: "Documents", path: "/mentor/documents" },
+    { icon: <Mic size={18} />, label: "Voice Notes", path: "/mentor/voice-notes" },
     {
       icon: <Settings size={18} />,
       label: "Settings",

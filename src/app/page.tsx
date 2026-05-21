@@ -4,23 +4,17 @@ import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiGetInterestByEmail, apiGetUserById } from "@/app/Services/api";
-
 import PastorHeader from "@/app/Components/PastorHeader";
+import ContinueApplicationModal from "@/app/Components/ContinueApplicationModal";
 import CccfinalLogo from "@/app/Assets/cclogofinal.png";
 import Book from "@/app/Assets/book.png";
 
-// type ModalMode = "login" | "interest" | null;
-type ModalMode = "login" | "interest" | "track" | null;
+type ModalMode = "login" | "interest" | "continue" | null;
 
 export default function LandingPage() {
   const router = useRouter();
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const [trackEmail, setTrackEmail] = useState("");
-const [trackLastName, setTrackLastName] = useState("");
-const [trackLoading, setTrackLoading] = useState(false);
-const [trackError, setTrackError] = useState<string | null>(null);
 
   // const isChooseModalOpen = modalMode !== null;
   const isChooseModalOpen = modalMode === "login" || modalMode === "interest";
@@ -73,68 +67,6 @@ const [trackError, setTrackError] = useState<string | null>(null);
       router.push(path);
     }, 350);
   };
-  const handleTrackApplication = async () => {
-  const email = trackEmail.trim();
-  const lastName = trackLastName.trim();
-
-  if (!email || !lastName) {
-    setTrackError("Please enter both email and last name.");
-    return;
-  }
-
-  try {
-    setTrackLoading(true);
-    setTrackError(null);
-
-    const res = await apiGetInterestByEmail(email);
-    const application = res.data?.data;
-   
-
-    if (!application) {
-      setTrackError("No application found for this email.");
-      return;
-    }
-
-    const savedLastName = String(application.lastName ?? "").trim().toLowerCase();
-
-    if (savedLastName !== lastName.toLowerCase()) {
-      setTrackError("Email and last name do not match.");
-      return;
-    }
-    const userId = String(
-  (application as any)?.userId ??
-    (application as any)?.user?._id ??
-    (application as any)?.user?.id ??
-    ""
-);
-
-if (userId) {
-  const userRes = await apiGetUserById(userId);
-  const userData = (userRes as any)?.data?.data ?? (userRes as any)?.data;
-  console.log("TRACK USER DATA:", userData);
-
-  const alreadyHasPassword =
-  Boolean(userData?.password) ||
-  Boolean(userData?.hasPassword) ||
-  Boolean(userData?.isPasswordSet) ||
-  Boolean(userData?.passwordCreated) ||
-  userData?.isEmailVerified === true;
-  if (alreadyHasPassword) {
-    setTrackError("This account is already set up. Please login instead.");
-    return;
-  }
-}
-
-    // router.push(`/pastor/Thankyou?email=${encodeURIComponent(email)}`);
-    router.push(`/pastor/Processing?email=${encodeURIComponent(email)}`);
-  } catch (error) {
-    console.error("Track application failed:", error);
-    setTrackError("Could not find your application. Please check your details.");
-  } finally {
-    setTrackLoading(false);
-  }
-};
-
   return (
     <div className="min-h-screen bg-[#062946] text-white font-[Albert_Sans]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),radial-gradient(circle_at_48%_56%,rgba(111,178,246,0.12),transparent_42%),radial-gradient(circle_at_90%_80%,rgba(8,52,85,0.4),transparent_40%),linear-gradient(180deg,#041f35_0%,#062946_100%)]" />
@@ -190,17 +122,13 @@ if (userId) {
                   <i className="fa-solid fa-right-to-bracket text-sm" />
                 </button>
                 <button
-  type="button"
-  onClick={() => {
-    setModalMode("track");
-    setTrackError(null);
-  }}
-  className="inline-flex items-center gap-2 rounded-full border border-[#8ec5eb]/40 bg-[#8ec5eb]/10 px-8 py-4 text-base font-semibold text-[#d7efff] shadow-[0_10px_24px_rgba(0,0,0,0.2)] backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#8ec5eb]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ec5eb] focus-visible:ring-offset-2 focus-visible:ring-offset-[#062946]"
->
-  Track Application
-  {/* <i className="fa-solid fa-magnifying-glass text-sm" /> */}
- <i className="fa-solid fa-clipboard-check text-sm" />
-</button>
+                  type="button"
+                  onClick={() => setModalMode("continue")}
+                  className="inline-flex items-center gap-2 rounded-full border border-[#8ec5eb]/40 bg-[#8ec5eb]/10 px-8 py-4 text-base font-semibold text-[#d7efff] shadow-[0_10px_24px_rgba(0,0,0,0.2)] backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#8ec5eb]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ec5eb] focus-visible:ring-offset-2 focus-visible:ring-offset-[#062946]"
+                >
+                  Continue Application
+                  <i className="fa-solid fa-clipboard-check text-sm" />
+                </button>
               </div>
               <p className="mt-3 text-sm text-[#cde2f2]">
                 New here? Use <span className="font-semibold text-white">Get Started</span> to submit interest. Returning? Use{" "}
@@ -334,81 +262,10 @@ if (userId) {
           </div>
         </section>
       </main>
-{modalMode === "track" && (
-  <div
-    className="fixed inset-0 z-50 flex items-center justify-center bg-[radial-gradient(circle_at_20%_15%,rgba(120,186,232,0.2),transparent_40%),rgba(2,16,30,0.72)] px-4 backdrop-blur-md"
-    onClick={() => setModalMode(null)}
-  >
-    <div
-      onClick={(e) => e.stopPropagation()}
-      className="w-full max-w-md rounded-3xl border border-white/20 bg-[linear-gradient(180deg,rgba(12,58,95,0.96)_0%,rgba(8,46,78,0.96)_100%)] p-6 text-white shadow-[0_30px_80px_rgba(2,20,38,0.56)] sm:p-8"
-    >
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-white">
-            Track Application
-          </h2>
-          <p className="mt-2 text-sm text-[#d4e8f6]">
-            Enter your email and last name to view your application status.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setModalMode(null)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white/80 transition hover:bg-white/20 hover:text-white"
-          aria-label="Close track application"
-        >
-          <i className="fa-solid fa-xmark text-xl" />
-        </button>
-      </div>
-
-      <div className="space-y-4">
-        <div>
-          <label className="mb-1 block text-sm font-medium text-[#d4e8f6]">
-            Email
-          </label>
-          <input
-            type="email"
-            value={trackEmail}
-            onChange={(e) => setTrackEmail(e.target.value)}
-            placeholder="Enter your email"
-            className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none placeholder:text-white/45 focus:border-[#8ec5eb]"
-          />
-        </div>
-
-        <div>
-          <label className="mb-1 block text-sm font-medium text-[#d4e8f6]">
-            Last Name
-          </label>
-          <input
-            type="text"
-            value={trackLastName}
-            onChange={(e) => setTrackLastName(e.target.value)}
-            placeholder="Enter your last name"
-            className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none placeholder:text-white/45 focus:border-[#8ec5eb]"
-          />
-        </div>
-
-        {trackError ? (
-          <p className="rounded-xl border border-red-400/25 bg-red-500/10 px-4 py-2 text-sm text-red-200">
-            {trackError}
-          </p>
-        ) : null}
-
-        <button
-          type="button"
-          onClick={handleTrackApplication}
-          disabled={trackLoading}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-[#1f4f7d] transition hover:bg-[#e7f1fa] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {trackLoading ? "Checking..." : "Track Application"}
-          {!trackLoading ? <i className="fa-solid fa-arrow-right text-xs" /> : null}
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      <ContinueApplicationModal
+        isOpen={modalMode === "continue"}
+        onClose={() => setModalMode(null)}
+      />
       {isChooseModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-[radial-gradient(circle_at_20%_15%,rgba(120,186,232,0.2),transparent_40%),rgba(2,16,30,0.72)] px-4 backdrop-blur-md"

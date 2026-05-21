@@ -11,6 +11,7 @@ import {
 } from "@/app/utils/mentor-auth";
 
 import LoginPasswordField from "@/app/Components/LoginPasswordField";
+import ContinueApplicationModal from "@/app/Components/ContinueApplicationModal";
 import MentorHeader from "@/app/Components/MentorHeader";
 import AndrewsLogo from "../../Assets/andrews-logo.png";
 
@@ -32,6 +33,12 @@ function LoginInner() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [continueModalOpen, setContinueModalOpen] = useState(false);
+
+  useEffect(() => {
+    const prefill = searchParams.get("email");
+    if (prefill?.trim()) setEmail(prefill.trim());
+  }, [searchParams]);
 
   useEffect(() => {
     if (hasMentorSession()) {
@@ -234,6 +241,21 @@ const destination = isSafeMentorReturnUrl(next)
                 {isLoading ? "Logging in…" : "Log in"}
               </button>
 
+              <div className="relative flex items-center justify-center py-1">
+                <span className="absolute inset-x-0 top-1/2 h-px bg-white/15" aria-hidden />
+                <span className="relative bg-white/5 px-3 text-[11px] font-medium uppercase tracking-wide text-[#cde2f2]/90">
+                  or
+                </span>
+              </div>
+
+              <button
+                type="button"
+                className="w-full rounded-lg border border-white/25 bg-white/5 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
+                onClick={() => setContinueModalOpen(true)}
+              >
+                Continue Application
+              </button>
+
               {/* <div className="relative flex items-center justify-center py-1">
                 <span className="absolute inset-x-0 top-1/2 h-px bg-white/15" aria-hidden />
                 <span className="relative bg-white/5 px-3 text-[11px] font-medium uppercase tracking-wide text-[#cde2f2]/90">
@@ -260,6 +282,12 @@ const destination = isSafeMentorReturnUrl(next)
           </div>
         </div>
       </section>
+
+      <ContinueApplicationModal
+        isOpen={continueModalOpen}
+        onClose={() => setContinueModalOpen(false)}
+        initialEmail={email}
+      />
 
       {toastMessage && (
         <div className="fixed left-1/2 top-20 z-[70] -translate-x-1/2 rounded-lg border border-white/20 bg-[#0a3558] px-4 py-3 text-sm text-white shadow-[0_12px_28px_rgba(2,20,38,0.45)]">

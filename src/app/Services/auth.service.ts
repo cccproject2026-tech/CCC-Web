@@ -7,6 +7,8 @@ import type {
   ForgotPasswordPayload,
   ResetPasswordPayload,
   RefreshTokenPayload,
+  CheckOnboardingStatusRequest,
+  CheckOnboardingStatusResponse,
 } from "./types/auth.types";
 
 // POST login through shared axios instance (same base/proxy as all web API calls)
@@ -74,3 +76,11 @@ export const apiRefreshToken = (payload: RefreshTokenPayload) =>
 // POST /auth/logout  (JWT protected)
 export const apiLogout = () =>
   axiosInstance.post<{ success: boolean; message: string }>("/auth/logout");
+
+// POST /auth/check-onboarding-status — resume onboarding (public; matches mobile)
+export const apiCheckOnboardingStatus = (email: string) =>
+  axiosInstance.post<CheckOnboardingStatusResponse>(
+    "/auth/check-onboarding-status",
+    { email: email.trim() } satisfies CheckOnboardingStatusRequest,
+    { skipAuth: true },
+  );

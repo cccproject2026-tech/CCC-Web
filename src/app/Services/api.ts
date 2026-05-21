@@ -13,6 +13,7 @@ export {
   apiResetPassword,
   apiRefreshToken,
   apiLogout,
+  apiCheckOnboardingStatus,
 } from './auth.service';
 
 // ─── Appointments ─────────────────────────────────────────────────────────────

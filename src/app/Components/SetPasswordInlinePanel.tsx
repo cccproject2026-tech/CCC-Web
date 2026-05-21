@@ -26,15 +26,22 @@ function apiErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-// export default function SetPasswordInlinePanel() {
 export default function SetPasswordInlinePanel({
   onSuccess,
+  email: emailProp,
+  initialStep,
+  loginPath = "/pastor/login",
 }: {
   onSuccess?: () => void;
+  /** Primary email source (URL / onboarding API); overrides cookie. */
+  email?: string;
+  /** Open directly on OTP (1), verify (2), or password (3) — e.g. after mobile verify. */
+  initialStep?: Step;
+  loginPath?: string;
 }) {
   const router = useRouter();
 
-  const [step, setStep] = useState<Step>(1);
+  const [step, setStep] = useState<Step>(initialStep ?? 1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,20 +52,27 @@ export default function SetPasswordInlinePanel({
   });
 
   const [otp, setOtp] = useState("");
-  const [emailFromCookie, setEmailFromCookie] = useState(false);
+  const [emailLocked, setEmailLocked] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
-const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
-    const email = getCookie("interestEmail");
+    const resolved =
+      (emailProp?.trim() || "") || (getCookie("interestEmail")?.trim() || "");
 
-    if (email) {
-      setFormData((prev) => ({ ...prev, email }));
-      setEmailFromCookie(true);
+    if (resolved) {
+      setFormData((prev) => ({ ...prev, email: resolved }));
+      setEmailLocked(Boolean(emailProp?.trim() || getCookie("interestEmail")));
     }
-  }, []);
+  }, [emailProp]);
+
+  useEffect(() => {
+    if (initialStep != null) {
+      setStep(initialStep);
+    }
+  }, [initialStep]);
 
   const userEmail = formData.email.trim();
 
@@ -168,7 +182,7 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
             <button
               type="button"
-              onClick={() => router.push("/pastor/login")}
+              onClick={() => router.push(loginPath)}
               className="mt-4 rounded-xl bg-white px-6 py-2.5 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa]"
             >
               Continue to login
@@ -232,7 +246,7 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
             placeholder="Email address"
             className={`${inputClass} read-only:cursor-not-allowed read-only:bg-white/[0.07]`}
             value={formData.email}
-            readOnly={emailFromCookie}
+            readOnly={emailLocked}
             onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
             autoComplete="email"
           />

@@ -47,6 +47,12 @@ const quickLinks = [
     route: "/mentor/notes",
   },
   {
+    icon: "fa-solid fa-microphone",
+    line1: "Voice",
+    line2: "Notes",
+    route: "/mentor/voice-notes",
+  },
+  {
     icon: "fa-regular fa-calendar",
     line1: "Mentorship",
     line2: "Sessions",

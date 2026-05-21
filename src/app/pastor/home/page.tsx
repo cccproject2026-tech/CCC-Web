@@ -72,6 +72,12 @@ const pastorQuickLinks = [
     href: "/pastor/notes",
   },
   {
+    icon: "fa-solid fa-microphone",
+    line1: "Voice",
+    line2: "Notes",
+    href: "/pastor/voice-notes",
+  },
+  {
     icon: "fa-solid fa-chart-line",
     line1: "Progress",
     line2: "Tracker",
@@ -939,7 +945,7 @@ Development
                 </div>
                 <h3 className="text-2xl font-semibold">Quick Links</h3>
               </div>
-              <p className="text-sm text-[#cde2f2]">Sessions, notes, progress, and roadmap.</p>
+              <p className="text-sm text-[#cde2f2]">Sessions, notes, voice notes, progress, and roadmap.</p>
               <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {pastorQuickLinks.map((q) => (
                   <Link

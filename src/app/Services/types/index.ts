@@ -9,3 +9,4 @@ export * from './progress.types';
 export * from './assessment.types';
 export * from './microgrant.types';
 export * from './roadmaps.types';
+export * from './voice-notes.types';

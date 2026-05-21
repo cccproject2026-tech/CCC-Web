@@ -29,6 +29,7 @@ import {
   Menu,
   X,
   Clipboard,
+  Mic,
 } from "lucide-react";
 import { getNotifications, getSingleUser } from "../Services/pastor.service";
 import type { NotificationItem } from "../Services/types/home.types";
@@ -158,6 +159,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
     { name: "Appointments", path: "/pastor/appointments" },
     { name: "Mentorship Sessions", path: "/pastor/mentoring-session" },
     { name: "Notes", path: "/pastor/notes" },
+    { name: "Voice Notes", path: "/pastor/voice-notes" },
   ];
 
 
@@ -168,6 +170,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
     // { icon: <File size={18} />, label: "Assignments", path: "/pastor/Assignments" },
     { icon: <Trophy size={18} />, label: "Micro Grant", path: "/pastor/MicroGrantApplication" },
     { icon: <FolderOpen size={18} />, label: "Documents", path: "/pastor/Documents" },
+    { icon: <Mic size={18} />, label: "Voice Notes", path: "/pastor/voice-notes" },
     { icon: <Settings size={18} />, label: "Settings", path: "/pastor/Settings" },
     { icon: <LogOut size={18} />, label: "Log out" },
   ];
