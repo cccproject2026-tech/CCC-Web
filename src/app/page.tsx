@@ -4,7 +4,9 @@ import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiGetInterestByEmail, apiGetUserById } from "@/app/Services/api";
+
 import PastorHeader from "@/app/Components/PastorHeader";
+import CccfinalLogo from "@/app/Assets/cclogofinal.png";
 import Book from "@/app/Assets/book.png";
 
 // type ModalMode = "login" | "interest" | null;
@@ -145,9 +147,18 @@ if (userId) {
       <PastorHeader />
 
       <main id="home" className="relative z-10">
-        <section className="mx-auto w-full max-w-7xl px-6 pb-20 pt-16 lg:px-8 lg:pt-24">
+        {/* <section className="mx-auto w-full max-w-7xl px-6 pb-20 pt-16 lg:px-8 lg:pt-24"> */}
+        <section className="mx-auto w-full max-w-7xl px-6 pb-20 pt-2 lg:px-8 lg:pt-4">
           <div className="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
             <div className="animate-fadeInUp">
+<Image
+  src={CccfinalLogo}
+  alt="Center for Community Change"
+  width={360}
+  height={170}
+  priority
+  className="mb-6 w-[300px] h-auto md:w-[360px]"
+/>
               <p className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-medium text-[#cde2f2] shadow-[0_6px_16px_rgba(2,20,38,0.25)]">
                 <span className="h-2 w-2 rounded-full bg-[#f5cc76]" />
                 Community. Revitalization. Change.
