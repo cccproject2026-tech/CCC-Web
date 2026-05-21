@@ -25,6 +25,7 @@ import Mentor1 from "../../Assets/mentor1.png";
 import {
   apiGetAssignedAssessments,
   apiGetAssessmentById,
+  apiAssignAssessmentViaModule,
   apiDeleteAssessments,
   flattenAssignedAssessmentRow,
   apiGetAssessments,
@@ -34,7 +35,7 @@ import {
   apiGetSectionRecommendations,
 } from "@/app/Services/assessment.service";
 import { apiGetAllUsers } from "@/app/Services/users.service";
-import { apiAssignAssessment, apiGetUserProgress } from "@/app/Services/progress.service";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetAppointments } from "@/app/Services/appointments.service";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { emitPastorAssignmentsChanged } from "@/app/utils/progress-sync";
@@ -730,9 +731,8 @@ useEffect(() => {
       setLoading(true);
 
       for (const assessmentId of assessmentIds) {
-        await apiAssignAssessment({
+        await apiAssignAssessmentViaModule(assessmentId, {
           userIds,
-          assessmentIds: [assessmentId],
           dueDate: assignDueDate ? new Date(`${assignDueDate}T23:59:59`).toISOString() : undefined,
         });
       }

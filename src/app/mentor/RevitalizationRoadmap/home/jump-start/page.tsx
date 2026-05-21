@@ -167,7 +167,7 @@ function JumpStartPageContent() {
       if (!roadmapId || !userId) return;
 
       const status = queryTab === "Pending" ? "pending" : "answered";
-      const res = await apiGetQueries(roadmapId, userId, status);
+      const res = await apiGetQueries(roadmapId, userId, status, undefined, "pastor");
 
       setQueries(unwrapQueriesFromResponse(res));
     } catch (err) {
@@ -251,10 +251,15 @@ function JumpStartPageContent() {
       }
       setQuerySaving(true);
 
-      await apiReplyToQuery(roadmapId, queryId, {
-        repliedAnswer: answer.trim(),
-        repliedMentorId: mentorId,
-      });
+      await apiReplyToQuery(
+        roadmapId,
+        queryId,
+        {
+          repliedAnswer: answer.trim(),
+          repliedMentorId: mentorId,
+        },
+        "pastor",
+      );
 
       setQueryAnswers(prev => ({
         ...prev,

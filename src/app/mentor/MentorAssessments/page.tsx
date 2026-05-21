@@ -18,12 +18,13 @@ import {
   apiGetAssessments,
   apiGetSectionRecommendations,
   apiGetUserAnswers,
+  apiAssignAssessmentViaModule,
   parseAssignedAssessmentsListBody,
   parseAssessmentDetailPayload,
   parseAssessmentsListPayload,
   apiSendSectionRecommendations,
 } from "@/app/Services/assessment.service";
-import { apiAssignAssessment, apiGetUserProgress } from "@/app/Services/progress.service";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { apiGetAppointments } from "@/app/Services/appointments.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
@@ -860,11 +861,12 @@ const assignedWithCdp = await Promise.all(
     }
     try {
       setAssignSubmitting(true);
-      await apiAssignAssessment({
-        userIds: selectedAssignUserIds,
-        assessmentIds: assignAssessmentIds,
-        dueDate: assignDueDate ? new Date(`${assignDueDate}T23:59:59`).toISOString() : undefined,
-      });
+      for (const assessmentId of assignAssessmentIds) {
+        await apiAssignAssessmentViaModule(assessmentId, {
+          userIds: selectedAssignUserIds,
+          dueDate: assignDueDate ? new Date(`${assignDueDate}T23:59:59`).toISOString() : undefined,
+        });
+      }
       setShowAssignDrawer(false);
       setAssignDueDate("");
       setToastMsg("Assessment assigned successfully");

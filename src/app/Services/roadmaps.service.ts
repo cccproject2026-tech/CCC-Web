@@ -310,7 +310,7 @@ export const apiUpdateNestedRoadmapItem = (
 
 // ─── Comments ────────────────────────────────────────────────────────────────
 
-// POST /roadmaps/:roadMapId/comments  body: { text, userId, mentorId }
+// POST /roadmaps/:roadMapId/comments  (`/api/v1/...` via proxy) — body: { text, userId, mentorId }
 export const apiAddComment = (roadMapId: string, payload: AddCommentPayload) =>
   axiosInstance.post(`/roadmaps/${roadMapId}/comments`, payload);
 
@@ -320,22 +320,30 @@ export const apiGetComments = (roadMapId: string, userId: string) =>
 
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
-// POST /roadmaps/:roadMapId/queries  body: { actualQueryText, userId }
-export const apiAddQuery = (roadMapId: string, payload: CreateQueryPayload) =>
-  axiosInstance.post(`/roadmaps/${roadMapId}/queries`, payload);
+/** Use `pastor` for mentor-facing pastor roadmap threads (`/roadmaps/pastor/:id/...`): matches CCC-Backend inbox / email branching. `default` is `/roadmaps/:id/...`. */
+export type RoadmapQueriesScope = "default" | "pastor";
 
-// GET /roadmaps/:roadMapId/queries?userId=&status=
-// export const apiGetQueries = (roadMapId: string, userId: string, status?: string) =>
-//   axiosInstance.get(`/roadmaps/${roadMapId}/queries`, {
-//     params: { userId, ...(status && { status }) },
-//   });
+function roadmapQueriesRoot(roadMapId: string, scope: RoadmapQueriesScope): string {
+  const id = encodeURIComponent(String(roadMapId ?? "").trim());
+  return scope === "pastor" ? `/roadmaps/pastor/${id}` : `/roadmaps/${id}`;
+}
+
+/** POST `/roadmaps/pastor/:roadMapId/queries` when `scope` is pastor; else POST `/roadmaps/:roadMapId/queries`. */
+export const apiAddQuery = (
+  roadMapId: string,
+  payload: CreateQueryPayload,
+  scope: RoadmapQueriesScope = "default",
+) => axiosInstance.post(`${roadmapQueriesRoot(roadMapId, scope)}/queries`, payload);
+
+/** GET queries — same pastor vs root prefix split as POST. */
 export const apiGetQueries = (
   roadMapId: string,
   userId: string,
   status?: string,
   nestedRoadMapItemId?: string,
+  scope: RoadmapQueriesScope = "default",
 ) =>
-  axiosInstance.get(`/roadmaps/${roadMapId}/queries`, {
+  axiosInstance.get(`${roadmapQueriesRoot(roadMapId, scope)}/queries`, {
     params: {
       userId,
       ...(status && { status }),
@@ -343,33 +351,58 @@ export const apiGetQueries = (
     },
   });
 
-// PATCH /roadmaps/:roadMapId/queries/:queryItemId/reply  body: { repliedAnswer, repliedMentorId }
-export const apiReplyToQuery = (roadMapId: string, queryItemId: string, payload: ReplyQueryPayload) =>
-  axiosInstance.patch(`/roadmaps/${roadMapId}/queries/${queryItemId}/reply`, payload);
+/** PATCH `…/queries/:queryItemId/reply` — pastor or default prefix must match thread where query was created. */
+export const apiReplyToQuery = (
+  roadMapId: string,
+  queryItemId: string,
+  payload: ReplyQueryPayload,
+  scope: RoadmapQueriesScope = "default",
+) =>
+  axiosInstance.patch(
+    `${roadmapQueriesRoot(roadMapId, scope)}/queries/${encodeURIComponent(queryItemId)}/reply`,
+    payload,
+  );
 
-// PATCH /roadmaps/:roadMapId/queries/:queryItemId  body: { userId, actualQueryText }
+/** PATCH pastor query body — same prefix as create. */
 export const apiUpdatePastorQuery = (
   roadMapId: string,
   queryItemId: string,
   payload: UpdatePastorQueryPayload,
-) => axiosInstance.patch(`/roadmaps/${roadMapId}/queries/${queryItemId}`, payload);
+  scope: RoadmapQueriesScope = "default",
+) =>
+  axiosInstance.patch(
+    `${roadmapQueriesRoot(roadMapId, scope)}/queries/${encodeURIComponent(queryItemId)}`,
+    payload,
+  );
 
-// DELETE /roadmaps/:roadMapId/queries/:queryItemId?userId=&nestedRoadMapItemId=
+/** DELETE query — prefix must match create. */
 export const apiDeletePastorQuery = (
   roadMapId: string,
   queryItemId: string,
   userId: string,
   nestedRoadMapItemId?: string,
+  scope: RoadmapQueriesScope = "default",
 ) =>
-  axiosInstance.delete(`/roadmaps/${roadMapId}/queries/${queryItemId}`, {
-    params: { userId, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
-  });
+  axiosInstance.delete(
+    `${roadmapQueriesRoot(roadMapId, scope)}/queries/${encodeURIComponent(queryItemId)}`,
+    {
+      params: { userId, ...(nestedRoadMapItemId && { nestedRoadMapItemId }) },
+    },
+  );
 
-// DELETE /roadmaps/:roadMapId/queries/:queryItemId/reply?repliedMentorId=
-export const apiDeleteQueryReply = (roadMapId: string, queryItemId: string, repliedMentorId: string) =>
-  axiosInstance.delete(`/roadmaps/${roadMapId}/queries/${queryItemId}/reply`, {
-    params: { repliedMentorId },
-  });
+/** DELETE mentor reply — prefix must match query thread. */
+export const apiDeleteQueryReply = (
+  roadMapId: string,
+  queryItemId: string,
+  repliedMentorId: string,
+  scope: RoadmapQueriesScope = "default",
+) =>
+  axiosInstance.delete(
+    `${roadmapQueriesRoot(roadMapId, scope)}/queries/${encodeURIComponent(queryItemId)}/reply`,
+    {
+      params: { repliedMentorId },
+    },
+  );
 
 // ─── Extras ──────────────────────────────────────────────────────────────────
 

@@ -162,3 +162,9 @@ export interface SendSectionRecommendationsPayload {
   sectionId: string;
   recommendations: string[];
 }
+
+/** POST `/assessment/:assessmentId/assign` — assign from assessment module (notification path can differ from progress assign). */
+export interface AssignAssessmentUsersPayload {
+  userIds: string[];
+  dueDate?: string;
+}

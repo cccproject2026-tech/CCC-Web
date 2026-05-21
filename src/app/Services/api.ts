@@ -125,6 +125,7 @@ export {
   apiGetUserRoadmaps,
   apiUploadRoadmapFile,
 } from './roadmaps.service';
+export type { RoadmapQueriesScope } from './roadmaps.service';
 
 // ─── Progress ─────────────────────────────────────────────────────────────────
 export {
@@ -152,6 +153,7 @@ export {
   apiCreateAssessment,
   apiGetAssessments,
   apiGetAssessmentById,
+  apiAssignAssessmentViaModule,
   apiGetUserAnswers,
   apiDeleteAssessments,
   apiUpdateInstructions,
