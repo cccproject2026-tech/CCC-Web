@@ -1,53 +1,102 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/hero-bg.png";
+import { apiCheckOnboardingStatus } from "@/app/Services/auth.service";
 import { apiGetInterestByEmail } from "@/app/Services/interests.service";
-import { getCookie } from "@/app/utils/cookies";
-import { Interest } from "@/app/Services/types";
+import { getCookie, setCookie } from "@/app/utils/cookies";
+import type { CheckOnboardingStatusData } from "@/app/Services/types/auth.types";
+import type { Interest } from "@/app/Services/types";
 import SetPasswordInlinePanel from "@/app/Components/SetPasswordInlinePanel";
+import {
+  processingStepToInitialPanelStep,
+  resolveOnboardingRoute,
+} from "@/app/utils/onboarding-navigation";
 
-function normStatus(s: string | undefined | null): string {
-  return String(s ?? "")
-    .trim()
-    .toLowerCase();
+function inferLoginPathFromInterest(interest: Interest | null): string {
+  const interestRole = String(interest?.title ?? "").toLowerCase();
+  return interestRole.includes("mentor") ? "/mentor/login" : "/pastor/login";
+}
+
+function getPanelInitialStep(
+  stepParam: string | null,
+  onboarding: CheckOnboardingStatusData | null,
+): 1 | 2 | 3 | undefined {
+  const fromUrl = processingStepToInitialPanelStep(
+    stepParam,
+    onboarding?.isEmailVerified ?? false,
+  );
+  if (fromUrl) return fromUrl;
+  if (!onboarding) return undefined;
+  if (onboarding.nextStep === "set-password" && onboarding.isEmailVerified) return 3;
+  if (onboarding.nextStep === "verify-email") return 1;
+  if (onboarding.nextStep === "set-password") return 1;
+  return undefined;
 }
 
 function ProcessingPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const emailFromUrl = searchParams.get("email") ?? "";
+  const stepParam = searchParams.get("step");
 
+  const resolvedEmail = useMemo(() => {
+    const fromUrl = emailFromUrl.trim();
+    if (fromUrl) return fromUrl;
+    return (getCookie("interestEmail") ?? "").trim();
+  }, [emailFromUrl]);
+
+  const [onboarding, setOnboarding] = useState<CheckOnboardingStatusData | null>(null);
   const [interest, setInterest] = useState<Interest | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [statusError, setStatusError] = useState<string | null>(null);
-const [showStatusText, setShowStatusText] = useState(false);
-  const fetchStatus = useCallback(async (): Promise<Interest | null> => {
-    const email = emailFromUrl || getCookie("interestEmail");
+  const [showStatusText, setShowStatusText] = useState(false);
 
-    if (!email?.trim()) {
+  const fetchOnboarding = useCallback(async (): Promise<CheckOnboardingStatusData | null> => {
+    if (!resolvedEmail) {
       setStatusError(
-        "No saved email. Open the interest link from your confirmation email or resubmit the form.",
+        "No saved email. Use Continue Application on the home page or open the link from your confirmation email.",
       );
-      setInterest(null);
+      setOnboarding(null);
       return null;
     }
 
-    const res = await apiGetInterestByEmail(email);
-    const body = res.data as { success?: boolean; message?: string; data?: Interest | null };
+    setCookie("interestEmail", resolvedEmail);
 
-    if (body.success === false) {
-      throw new Error(body.message || "Unable to load status");
+    const res = await apiCheckOnboardingStatus(resolvedEmail);
+    const body = res.data;
+
+    if (!body?.success || !body.data) {
+      throw new Error(body?.message || "Unable to load onboarding status");
     }
 
-    const data = body.data ?? null;
-    setInterest(data);
+    const data = body.data;
+    setOnboarding(data);
     setStatusError(null);
+
+    if (data.nextStep === "login") {
+      try {
+        const interestRes = await apiGetInterestByEmail(resolvedEmail);
+        const interestData = interestRes.data?.data ?? null;
+        setInterest(interestData);
+        const role = inferLoginPathFromInterest(interestData).includes("mentor")
+          ? "mentor"
+          : "pastor";
+        router.replace(
+          resolveOnboardingRoute("login", { email: resolvedEmail, role }),
+        );
+      } catch {
+        router.replace(
+          resolveOnboardingRoute("login", { email: resolvedEmail, role: "pastor" }),
+        );
+      }
+      return data;
+    }
+
     return data;
-  }, [emailFromUrl]);
+  }, [resolvedEmail, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -55,7 +104,15 @@ const [showStatusText, setShowStatusText] = useState(false);
     (async () => {
       try {
         setStatusLoading(true);
-        await fetchStatus();
+        await fetchOnboarding();
+        if (!cancelled && resolvedEmail) {
+          try {
+            const interestRes = await apiGetInterestByEmail(resolvedEmail);
+            if (!cancelled) setInterest(interestRes.data?.data ?? null);
+          } catch {
+            // Interest record is supplemental (role hint only).
+          }
+        }
       } catch {
         if (!cancelled) {
           setStatusError("Unable to load your status. Please try again later.");
@@ -68,24 +125,23 @@ const [showStatusText, setShowStatusText] = useState(false);
     return () => {
       cancelled = true;
     };
-  }, [fetchStatus]);
+  }, [fetchOnboarding, resolvedEmail]);
 
   useEffect(() => {
-    const email = emailFromUrl || getCookie("interestEmail");
-    if (!email?.trim()) return;
+    if (!resolvedEmail || statusLoading) return;
+    if (onboarding && onboarding.nextStep !== "pending") return;
 
     let intervalId: ReturnType<typeof setInterval> | undefined;
 
     const tick = async () => {
       try {
-        const data = await fetchStatus();
-        const next = normStatus(data?.status);
-
-        if ((next === "accepted" || next === "rejected") && intervalId != null) {
+        const data = await fetchOnboarding();
+        const next = data?.nextStep;
+        if (next && next !== "pending" && intervalId != null) {
           clearInterval(intervalId);
         }
       } catch {
-        // Polling failed, retry on next interval.
+        // Retry on next interval.
       }
     };
 
@@ -97,62 +153,39 @@ const [showStatusText, setShowStatusText] = useState(false);
     return () => {
       if (intervalId != null) clearInterval(intervalId);
     };
-  }, [emailFromUrl, fetchStatus]);
+  }, [resolvedEmail, statusLoading, onboarding?.nextStep, fetchOnboarding]);
 
-  const status = normStatus(interest?.status);
-  const isAccepted = status === "accepted";
-  const isRejected = status === "rejected";
-  const isPending = !isAccepted && !isRejected && !statusError;
+  const nextStep = onboarding?.nextStep;
+  const isRejected = nextStep === "rejected";
+  const isPending = nextStep === "pending";
+  const showPasswordFlow =
+    nextStep === "verify-email" || nextStep === "set-password";
+
+  const loginPath = inferLoginPathFromInterest(interest);
+
+  const panelInitialStep = getPanelInitialStep(stepParam, onboarding);
+  const panelEmail = resolvedEmail || onboarding?.email || "";
 
   const statusLabel = statusLoading
-  ? "Checking..."
-  : statusError
-    ? "Unavailable"
-    : isAccepted
-      ? "Accepted"
+    ? "Checking..."
+    : statusError
+      ? "Unavailable"
       : isRejected
         ? "Rejected"
-        : "Waiting for Approval";
+        : showPasswordFlow
+          ? "Continue setup"
+          : isPending
+            ? "Waiting for Approval"
+            : "Status";
 
-        const interestRole = String(
-           (interest as any)?.title ||
-  (interest as any)?.interestFor ||
-  (interest as any)?.type ||
-  (interest as any)?.role ||
-  (interest as any)?.userType ||
-  ""
-).toLowerCase();
-
-const loginPath = interestRole.includes("mentor")
-  ? "/mentor/login"
-  : "/pastor/login";
-
-const handlePasswordSetSuccess = () => {
-  setTimeout(() => {
-    router.push(loginPath);
-  }, 1200);
-};
-
-  // const handleCheckStatus = async () => {
-  //   const email = emailFromUrl || getCookie("interestEmail");
-  //   if (!email?.trim()) return;
-
-  //   setStatusLoading(true);
-  //   setStatusError(null);
-
-  //   try {
-  //     await fetchStatus();
-  //   } catch {
-  //     setStatusError("Unable to load your status. Please try again later.");
-  //   } finally {
-  //     setStatusLoading(false);
-  //   }
-  // };
+  const handlePasswordSetSuccess = () => {
+    setTimeout(() => {
+      router.push(loginPath);
+    }, 1200);
+  };
 
   return (
     <div className="flex min-h-screen flex-col bg-transparent text-white font-[Albert_Sans]">
-      {/* <PastorHeader showFullHeader={true} /> */}
-
       <section
         className="relative flex-1 overflow-hidden bg-cover bg-top px-4 pb-16 pt-6 sm:px-8 lg:px-20"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
@@ -161,9 +194,11 @@ const handlePasswordSetSuccess = () => {
 
         <div className="relative z-10 mx-auto w-full max-w-6xl">
           <div className="mb-8 flex flex-col items-center gap-4 sm:flex-row sm:items-start sm:justify-between">
-            {/* <div
-              className={`inline-flex items-center gap-3 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-lg sm:order-2 ${
-                isAccepted
+            <button
+              type="button"
+              onClick={() => setShowStatusText((prev) => !prev)}
+              className={`inline-flex items-center gap-3 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:scale-[1.02] sm:order-2 ${
+                showPasswordFlow
                   ? "bg-emerald-600/90 shadow-emerald-900/30"
                   : isRejected
                     ? "bg-red-600/85 shadow-red-900/30"
@@ -189,71 +224,27 @@ const handlePasswordSetSuccess = () => {
                   }
                 />
               )}
-              {statusLoading
-                ? "Checking status..."
-                : statusError
-                  ? "Could not load status"
-                  : isAccepted
-                    ? "Application accepted"
-                    : isRejected
-                      ? "Application not approved"
-                      : "Waiting for Approval"}
-              {!statusLoading && !statusError && <i className="fa-solid fa-chevron-right text-xs text-white/80" aria-hidden />}
-            </div> */}
-            <button
-  type="button"
-  onClick={() => setShowStatusText((prev) => !prev)}
-  className={`inline-flex items-center gap-3 rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition hover:scale-[1.02] sm:order-2 ${
-    isAccepted
-      ? "bg-emerald-600/90 shadow-emerald-900/30"
-      : isRejected
-        ? "bg-red-600/85 shadow-red-900/30"
-        : statusError
-          ? "bg-amber-600/85 shadow-amber-900/30"
-          : ""
-  }`}
-  style={
-    isPending || statusLoading
-      ? { background: "linear-gradient(90deg, #B83AF3 0%, #21B6E9 100%)" }
-      : undefined
-  }
->
-  {statusLoading ? (
-    <i className="fa-solid fa-circle-notch animate-spin text-white/90" aria-hidden />
-  ) : (
-    <span
-      className="h-2.5 w-2.5 rounded-full bg-white"
-      style={
-        isPending && !statusLoading
-          ? { boxShadow: "0 0 0 3px rgba(255,255,255,0.25)" }
-          : undefined
-      }
-    />
-  )}
 
-  <span>Status</span>
+              <span>Status</span>
 
-  {!statusLoading && !statusError && (
-    <i className="fa-solid fa-chevron-right text-xs text-white/80" aria-hidden />
-  )}
+              {!statusLoading && !statusError && (
+                <i className="fa-solid fa-chevron-right text-xs text-white/80" aria-hidden />
+              )}
 
-  {showStatusText && (
-    <span>{statusLabel}</span>
-  )}
-</button>
+              {showStatusText && <span>{statusLabel}</span>}
+            </button>
             <p className="text-center text-xs uppercase tracking-[0.2em] text-white/75 sm:order-1 sm:text-left">
               Live status · updates
             </p>
           </div>
 
-          {/* <div className="grid gap-8 lg:grid-cols-12 lg:gap-10"> */}
           <div className="grid items-center gap-8 lg:grid-cols-12 lg:gap-10">
             <div className="lg:col-span-7 xl:col-span-8">
               <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.55)_0%,rgba(9,49,80,0.72)_100%)] p-8 shadow-[0_20px_50px_rgba(2,20,38,0.4)] backdrop-blur-md md:p-10 lg:p-12">
                 <div className="mb-8 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/15 bg-white/10 md:h-20 md:w-20">
                   {statusLoading ? (
                     <i className="fa-solid fa-spinner fa-spin text-3xl text-[#8ec5eb] md:text-4xl" aria-hidden />
-                  ) : isAccepted ? (
+                  ) : showPasswordFlow ? (
                     <i className="fa-solid fa-circle-check text-3xl text-emerald-300 md:text-4xl" aria-hidden />
                   ) : isRejected ? (
                     <i className="fa-solid fa-circle-xmark text-3xl text-red-300 md:text-4xl" aria-hidden />
@@ -269,8 +260,8 @@ const handlePasswordSetSuccess = () => {
                     ? "Checking your application..."
                     : statusError
                       ? "We couldn’t refresh your status"
-                      : isAccepted
-                        ? "Your application has been accepted!"
+                      : showPasswordFlow
+                        ? "Continue your account setup"
                         : isRejected
                           ? "Your application was not approved"
                           : "Your Application Under Review"}
@@ -279,17 +270,26 @@ const handlePasswordSetSuccess = () => {
                 <div className="mt-6 max-w-2xl space-y-4 text-base leading-relaxed text-[#cde2f2] md:text-lg">
                   {statusError ? (
                     <p>{statusError}</p>
-                  ) : isAccepted ? (
+                  ) : showPasswordFlow ? (
                     <>
-                      <p>You’re approved to continue. Complete your account setup by creating your password.</p>
+                      <p>
+                        {onboarding?.isEmailVerified
+                          ? "Your email is verified. Create your password to finish activating your account."
+                          : "Verify your email, then create your password to activate your account."}
+                      </p>
                       <div className="mt-6">
-                        {/* <SetPasswordInlinePanel /> */}
-                        <SetPasswordInlinePanel onSuccess={handlePasswordSetSuccess} />
+                        <SetPasswordInlinePanel
+                          email={panelEmail}
+                          initialStep={panelInitialStep}
+                          loginPath={loginPath}
+                          onSuccess={handlePasswordSetSuccess}
+                        />
                       </div>
                     </>
                   ) : isRejected ? (
                     <p>
-                      If you have questions, please contact us using the information on this page. We’re grateful for your interest in Community Change.
+                      If you have questions, please contact us using the information on this page.
+                      We’re grateful for your interest in Community Change.
                     </p>
                   ) : (
                     <>
@@ -299,39 +299,16 @@ const handlePasswordSetSuccess = () => {
                     </>
                   )}
                 </div>
-{/* 
-                {/* {isPending && !statusLoading ? (
-                  <p className="mt-6 flex flex-wrap items-center gap-2 text-sm text-[#8ec5eb]/95">
-                    <i className="fa-solid fa-rotate text-[#8ec5eb]" aria-hidden />
-                     This page rechecks your approval about every 20 seconds. Use <strong className="font-semibold text-white">Check Status</strong> for an immediate refresh. */}
-                     {/* This page rechecks your approval about every 20 seconds.  */}
-                   {/* </p> 
-                  ) : null}   */}
+
                 <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-                  {/* <button
-                    type="button"
-                    disabled={statusLoading}
-                    onClick={() => {
-                      void handleCheckStatus();
-                    }}
-                    className="rounded-xl bg-white px-8 py-3 text-sm font-semibold text-[#0f4a76] shadow-[0_8px_24px_rgba(0,0,0,0.2)] transition hover:bg-[#e7f1fa] disabled:cursor-not-allowed disabled:opacity-70 md:px-10 md:text-base"
-                  >
-                    {statusLoading ? "Checking..." : "Check Status"}
-                  </button> */}
-                  {/* <Link
-                    href="/pastor/Thankyou"
-                    className="text-center text-sm font-medium text-[#8ec5eb] underline-offset-4 hover:underline sm:text-left"
-                  >
-                    Thank you page
-                  </Link> */}
                   <div className="mt-8">
-  <Link
-    href="/"
-    className="inline-flex items-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#0b2d4f] transition hover:scale-105"
-  >
-    Back
-  </Link>
-</div>
+                    <Link
+                      href="/"
+                      className="inline-flex items-center rounded-full bg-white px-6 py-3 text-sm font-semibold text-[#0b2d4f] transition hover:scale-105"
+                    >
+                      Back
+                    </Link>
+                  </div>
                 </div>
               </div>
             </div>
@@ -359,7 +336,6 @@ const handlePasswordSetSuccess = () => {
                   </li>
                 </ul>
               </div>
-
             </div>
           </div>
         </div>
