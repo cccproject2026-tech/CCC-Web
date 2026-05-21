@@ -1772,7 +1772,7 @@ assessment._mentorHasSentCdp
                 }
                 className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
               >
-                {assessment._mentorHasSentCdp ? "Customized Development Plan Sent" : "Send Customized Development Plan"}
+                {assessment._mentorHasSentCdp ? "Customized Development Plan " : "Send Customized Development Plan"}
               </button>
             </div>
           </div>
@@ -1873,7 +1873,7 @@ assessment._mentorHasSentCdp
                                         className="flex w-full items-center gap-2 border-t border-white/10 px-4 py-2 text-left text-sm text-white/90 transition hover:bg-white/10"
                                       >
                                         <i className="fa-regular fa-clipboard text-[#8ec5eb]" />
-                                        {assessment._mentorHasSentCdp ? "Customized Development Plan Sent" : "Send Customized Development Plan"}
+                                        {assessment._mentorHasSentCdp ? "Customized Development Plan " : "Send Customized Development Plan"}
                                       </button>
                                     )}
                                 </>
@@ -2092,7 +2092,7 @@ assessment._mentorHasSentCdp
                                       }
                                       className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
                                     >
-                                      {assessment._mentorHasSentCdp ? "Customized Development Plan Sent" : "Send Customized Development Plan"}
+                                      {assessment._mentorHasSentCdp ? "Customized Development Plan " : "Send Customized Development Plan"}
                                     </button>
                                   )}
                                 {/* <button

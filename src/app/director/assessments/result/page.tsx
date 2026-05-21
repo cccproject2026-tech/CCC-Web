@@ -719,11 +719,6 @@ export default function DirectorAssessmentResultPage() {
                     Send CDP
                   </button>
                 </div> */}
-                {viewRecommendation && Object.keys(mentorLayerCdp).length === 0 && (
-  <div className={`rounded-2xl border border-white/12 p-5 text-sm text-white/70 ${directorGlassCard}`}>
-    No CDP has been sent for this assessment yet.
-  </div>
-)}
                 {(sections[activeSection]?.layers || []).map((layer: any, layerIndex: number) => {
                   const layerId = resolveLayerKey(layer, activeSection, layerIndex);
                   return (
@@ -761,58 +756,6 @@ export default function DirectorAssessmentResultPage() {
                           );
                         })}
                       </div>
-{(() => {
-  // const cdp = String(
-  //   mentorLayerCdp[layerId] ||
-  //     (layer?.layerId != null && mentorLayerCdp[String(layer.layerId)]) ||
-  //     (layer?._id != null && mentorLayerCdp[String(layer._id)]) ||
-  //     "",
-  // ).trim();
-const sectionId = String(
-  sections[activeSection]?._id ??
-    sections[activeSection]?.id ??
-    sections[activeSection]?.sectionId ??
-    "",
-);
-
-const cdp = String(
-  mentorLayerCdp[layerId] ||
-    mentorLayerCdp[sectionId] ||
-    mentorLayerCdp[`layer_${activeSection}_${layerIndex}`] ||
-    (layer?.layerId != null && mentorLayerCdp[String(layer.layerId)]) ||
-    (layer?._id != null && mentorLayerCdp[String(layer._id)]) ||
-    "",
-).trim();
-  if (!cdp) return null;
-
-  return (
-    <div className="mt-4 rounded-xl border border-[#8ec5eb]/35 bg-[#041f35]/80 p-4">
-      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#8ec5eb]">
-        Customized Development Plan (CDP)
-      </p>
-      <p className="whitespace-pre-line text-sm leading-relaxed text-[#d9ebf8]">{cdp}</p>
-    </div>
-  );
-})()}
-                      {/* CDP display intentionally disabled for Director for now.
-                          Keep this block commented to restore quickly when needed.
-                      {(() => {
-                        const cdp = String(
-                          mentorLayerCdp[layerId] ||
-                            (layer?.layerId != null && mentorLayerCdp[String(layer.layerId)]) ||
-                            (layer?._id != null && mentorLayerCdp[String(layer._id)]) ||
-                            "",
-                        ).trim();
-                        if (!cdp) return null;
-                        return (
-                          <div className="mt-4 rounded-xl border border-[#8ec5eb]/35 bg-[#041f35]/80 p-4">
-                            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#8ec5eb]">
-                              Recommendation / CDP
-                            </p>
-                            <p className="whitespace-pre-line text-sm leading-relaxed text-[#d9ebf8]">{cdp}</p>
-                          </div>
-                        );
-                      })()} */}
                     </div>
                   );
                 })}
