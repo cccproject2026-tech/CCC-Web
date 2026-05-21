@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { isAxiosError } from "axios";
 import {
   apiGetAssessmentById,
@@ -11,6 +12,7 @@ import {
   parseAssessmentDetailPayload,
 } from "@/app/Services/assessment.service";
 import { getCookie } from "@/app/utils/cookies";
+import { resolveApiMediaUrl } from "@/app/utils/image";
 
 export type AssessmentGuidelinesClientProps = {
   assessmentId: string;
@@ -201,7 +203,9 @@ export function AssessmentGuidelinesClient({
   const cardContent = typeRaw.includes("PMP")
     ? { acronym: "PMP", line1: "PASTORAL MINISTRY", line2: "PROFILE" }
     : { acronym: "CMA", line1: "CHURCH ASSESSMENT", line2: "EVALUATION" };
-
+const bannerUrl =
+  resolveApiMediaUrl(String(assessment?.bannerImage || "")) ||
+  String(assessment?.bannerImage || "");
   const preSurveyRaw =
     (assessment as { preSurvey?: unknown; preSurveyQuestions?: unknown })?.preSurvey ??
     (assessment as { preSurveyQuestions?: unknown })?.preSurveyQuestions;
@@ -286,10 +290,10 @@ export function AssessmentGuidelinesClient({
                     <button
                       type="button"
                       onClick={() => router.push(`/pastor/appointments/${encodeURIComponent(meetingId)}`)}
-                      className="rounded-2xl border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 px-5 py-4 text-left shadow-[0_18px_45px_rgba(2,20,38,0.35)] backdrop-blur-md transition hover:bg-[#8ec5eb]/15"
+                     className="rounded-2xl border border-yellow-300/60 bg-yellow-400/15 px-5 py-4 text-left shadow-[0_18px_45px_rgba(245,158,11,0.18)] backdrop-blur-md transition hover:bg-yellow-400/25"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-300/25 text-yellow-200">
                           <i className="fa-regular fa-calendar-check" />
                         </span>
 
@@ -317,7 +321,7 @@ export function AssessmentGuidelinesClient({
                     <button
                       type="button"
                       onClick={() => router.push(scheduleMeetingHref)}
-                      className="rounded-2xl border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 px-5 py-4 text-left shadow-[0_18px_45px_rgba(2,20,38,0.35)] backdrop-blur-md transition hover:bg-[#8ec5eb]/15"
+                     className="rounded-2xl border border-yellow-300/45 bg-[linear-gradient(135deg,rgba(250,204,21,0.18)_0%,rgba(245,158,11,0.12)_45%,rgba(15,74,118,0.28)_100%)] px-5 py-4 text-left shadow-[0_18px_45px_rgba(245,158,11,0.22)] backdrop-blur-md transition hover:border-yellow-300/65 hover:bg-yellow-400/20"
                     >
                       <div className="flex items-center gap-3">
                         <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#8ec5eb]/20 text-[#8ec5eb]">
@@ -325,7 +329,7 @@ export function AssessmentGuidelinesClient({
                         </span>
 
                         <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#8ec5eb]">
+                          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-yellow-200">
                             Mentor meeting required
                           </p>
                           <p className="mt-1 text-sm font-semibold text-white">Schedule meeting</p>
@@ -346,7 +350,7 @@ export function AssessmentGuidelinesClient({
                   className="rounded-2xl border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 px-5 py-4 text-left shadow-[0_18px_45px_rgba(2,20,38,0.35)] backdrop-blur-md transition hover:bg-[#8ec5eb]/15"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#8ec5eb]/20 text-[#8ec5eb]">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-yellow-300/25 text-yellow-100">
                       <i className="fa-regular fa-calendar-check" />
                     </span>
                     <div>
@@ -460,14 +464,38 @@ export function AssessmentGuidelinesClient({
 
         <h1 className="text-2xl font-semibold md:text-3xl">{title}</h1>
         <p className="mt-1 text-sm text-[#cde2f2]">Assessment</p>
-
+{/* 
         <div className="mt-8 rounded-2xl border border-white/20 bg-white/10 p-8 text-center backdrop-blur">
           <p className="text-3xl font-bold text-white">{cardContent.acronym}</p>
           <div className="mx-auto my-4 h-px w-24 bg-white/30" />
           <p className="text-sm font-medium tracking-wide text-[#cde2f2]">{cardContent.line1}</p>
           <p className="text-sm font-medium tracking-wide text-[#cde2f2]">{cardContent.line2}</p>
-        </div>
-
+        </div> */}
+<div className="mt-8 overflow-hidden rounded-2xl border border-white/20 bg-white/10 backdrop-blur">
+  {bannerUrl ? (
+    <div className="relative h-64 w-full">
+      <Image
+        src={bannerUrl}
+        alt={title}
+        fill
+        className="object-cover"
+        sizes="(max-width: 768px) 100vw, 768px"
+        unoptimized
+      />
+    </div>
+  ) : (
+    <div className="p-8 text-center">
+      <p className="text-3xl font-bold text-white">{cardContent.acronym}</p>
+      <div className="mx-auto my-4 h-px w-24 bg-white/30" />
+      <p className="text-sm font-medium tracking-wide text-[#cde2f2]">
+        {cardContent.line1}
+      </p>
+      <p className="text-sm font-medium tracking-wide text-[#cde2f2]">
+        {cardContent.line2}
+      </p>
+    </div>
+  )}
+</div>
         {instructions.length > 0 && (
           <div className="mt-10">
             <h2 className="mb-3 text-lg font-semibold">Instructions</h2>
