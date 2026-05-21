@@ -686,7 +686,13 @@ const hasRequiredSubmissions = useMemo(() => {
     if (!roadmapId || !userId) return;
     if (showLoader) setQueriesLoading(true);
     try {
-      const res = await apiGetQueries(roadmapId, userId, status, queryNestedRoadMapItemId);
+      const res = await apiGetQueries(
+        roadmapId,
+        userId,
+        status,
+        queryNestedRoadMapItemId,
+        "pastor",
+      );
       const threads: any[] = res.data?.data || res.data || [];
       const allQueries = Array.isArray(threads)
         ? threads.flatMap((t: any) => t?.queries || [])
@@ -1214,11 +1220,15 @@ if (!hasRequiredSubmissions) {
     if (!roadmapId || !userId || !newQueryText.trim()) return;
     setQuerySubmitting(true);
     try {
-      await apiAddQuery(roadmapId, {
-        actualQueryText: newQueryText.trim(),
-        userId,
-        nestedRoadMapItemId: queryNestedRoadMapItemId,
-      });
+      await apiAddQuery(
+        roadmapId,
+        {
+          actualQueryText: newQueryText.trim(),
+          userId,
+          nestedRoadMapItemId: queryNestedRoadMapItemId,
+        },
+        "pastor",
+      );
       setNewQueryText("");
       setQueryTab("Pending");
       setQuerySuccess(true);
@@ -1250,11 +1260,16 @@ if (!hasRequiredSubmissions) {
     if (!text) return;
     setQueryActionLoadingId(queryId);
     try {
-      await apiUpdatePastorQuery(roadmapId, queryId, {
-        userId,
-        actualQueryText: text,
-        nestedRoadMapItemId: queryNestedRoadMapItemId,
-      });
+      await apiUpdatePastorQuery(
+        roadmapId,
+        queryId,
+        {
+          userId,
+          actualQueryText: text,
+          nestedRoadMapItemId: queryNestedRoadMapItemId,
+        },
+        "pastor",
+      );
       cancelPastorQueryEdit();
       await fetchQueries(undefined, false);
       await fetchQueries("pending", false);
@@ -1273,7 +1288,13 @@ if (!hasRequiredSubmissions) {
     if (!ok) return;
     setQueryActionLoadingId(queryId);
     try {
-      await apiDeletePastorQuery(roadmapId, queryId, userId, queryNestedRoadMapItemId);
+      await apiDeletePastorQuery(
+        roadmapId,
+        queryId,
+        userId,
+        queryNestedRoadMapItemId,
+        "pastor",
+      );
       cancelPastorQueryEdit();
       await fetchQueries(undefined, false);
       await fetchQueries("pending", false);

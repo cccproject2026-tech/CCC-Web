@@ -338,7 +338,7 @@ export async function loadPastorFocusSections(input: PastorFocusInput): Promise<
       try {
         const [commentsRes, queriesRes] = await Promise.all([
           apiGetComments(rid, pastorUserId),
-          apiGetQueries(rid, pastorUserId),
+          apiGetQueries(rid, pastorUserId, undefined, undefined, "pastor"),
         ]);
         const comments = unwrapCommentsFromThread(commentsRes);
         const queries = unwrapQueriesFromThreads(queriesRes);

@@ -296,7 +296,7 @@ return {
         if (!rid) continue;
         const roadmapName = String(rdoc.name ?? "Roadmap");
         try {
-          const res = await apiGetQueries(rid, pastorId, "pending");
+          const res = await apiGetQueries(rid, pastorId, "pending", undefined, "pastor");
           const flat = unwrapQueriesFromResponse(res);
 
           for (const q of flat) {

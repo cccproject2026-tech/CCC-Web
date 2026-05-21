@@ -119,10 +119,10 @@ export default function WaitingForApproval() {
         );
       }
     } else {
-      // mentor module
+      // mentor module — single interest form route; distinguish mentor applicants via query params
       if (authMode === "signup") {
         router.push(
-          `/mentor/InterestForm?userType=${encodeURIComponent(userTypeKey)}`
+          `/pastor/InterestForm?role=mentor&userType=${encodeURIComponent(userTypeKey)}`
         );
       } else {
         router.push(
