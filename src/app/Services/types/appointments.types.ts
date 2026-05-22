@@ -36,6 +36,9 @@ export interface AppointmentResponse {
   zoomJoinUrl?: string;
   createdAt?: string;
   updatedAt?: string;
+  /** Populated after creation when backend syncs to Google Calendar (optional). */
+  googleCalendarHtmlLink?: string;
+  googleCalendarEventId?: string;
 }
 
 export interface CreateAppointmentPayload {
@@ -46,6 +49,22 @@ export interface CreateAppointmentPayload {
   platform: string;
   meetingLink?: string;
   notes?: string;
+  /** When backend supports calendar sync — creates attendee Google event(s). */
+  googleCalendarSync?: boolean;
+  googleCalendarTitle?: string;
+  googleCalendarDescription?: string;
+}
+
+export interface CalendarBusyPeriod {
+  start: string;
+  end: string;
+}
+
+/** POST `/appointments/calendar/external-busy` body (CCC backend convention — see docs). */
+export interface ExternalCalendarBusyPayload {
+  userIds: string[];
+  timeMin: string;
+  timeMax: string;
 }
 
 export interface UpdateAppointmentPayload {

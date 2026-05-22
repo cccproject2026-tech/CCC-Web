@@ -40,6 +40,7 @@ export {
   apiMarkAvailabilityDayAvailable,
   apiPatchMentorAvailabilitySettings,
   apiDeleteAvailabilitySlot,
+  apiFetchExternalCalendarBusy,
 } from './appointments.service';
 
 // ─── Interests ────────────────────────────────────────────────────────────────

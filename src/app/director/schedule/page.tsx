@@ -41,6 +41,10 @@ import {
   uiMeetingModeToPlatform,
   unwrapAppointmentsAxiosData,
 } from "@/app/Services/appointment-utils";
+import {
+  filterSlotLabelsAgainstExternalCalendar,
+  googleCalendarSuccessHintFromCreateResponse,
+} from "@/app/Services/google-calendar-scheduling";
 import { apiGetAllUsers } from "@/app/Services/api";
 import type { AppointmentResponse, PersonInfo } from "@/app/Services/types";
 import { isRemoteImageSrc } from "@/app/utils/image";
@@ -224,6 +228,10 @@ function DirectorScheduleContent() {
   const [selectedSlot, setSelectedSlot] = useState("");
   const [selectedPlatform, setSelectedPlatform] = useState("zoom");
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [calendarSlotSyncLoading, setCalendarSlotSyncLoading] = useState(false);
+  const [calendarSlotSyncError, setCalendarSlotSyncError] = useState<string | null>(null);
+  const [calendarSlotSyncSkipped, setCalendarSlotSyncSkipped] = useState(false);
+  const [calendarBusyStripped, setCalendarBusyStripped] = useState(0);
   const [isScheduling, setIsScheduling] = useState(false);
 
   // schedule drawer calendar state
@@ -363,77 +371,138 @@ function DirectorScheduleContent() {
   setDrawerStep(2);
 }, [searchParams, mentors]);
 
-  // ── Fetch available slots for schedule step 2 ─────────────────────────────────
+  // ── Fetch available slots for schedule step 2 (CCC availability ∩ Google Calendar busy) ─────────────────
   useEffect(() => {
-    if (!meetingDate) return;
+    if (!meetingDate || !directorId) return;
 
-    if (scheduleRecipientType === "pastor") {
-      // For pastors: derive available slots from the director's own monthly availability
-      const normalize = (t: string) => t.replace(/\s+/g, "").toLowerCase();
-      const bookedSlots = appointments
-        .filter((a) => a.meetingDate.startsWith(meetingDate) && !["cancelled", "canceled"].includes((a.status || "").toLowerCase()))
-        .map((a) => {
-          const d = new Date(a.meetingDate);
-          return normalize(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-        });
-      const daySlots = scheduleMonthlyAvailabilitySlots.filter((s: any) => {
-        const ymd = slotDateToYmd(s?.date ?? s?.day ?? s?.calendarDate ?? s?.meetingDate ?? s?.dateString);
-        return ymd === meetingDate;
-      });
-      const formatted = daySlots
-        .flatMap((s: any) =>
-          (s.slots || []).map(
-            (slot: any) =>
-              `${slot.startTime ?? "00:00"} ${(slot.startPeriod ?? "AM").toUpperCase()} - ${slot.endTime ?? "00:00"} ${(slot.endPeriod ?? "PM").toUpperCase()}`,
-          ),
-        )
-        .filter((slot: string) => !bookedSlots.includes(normalize(slot.split(" - ")[0])));
-      setAvailableSlots(formatted);
-    } else if (scheduleRecipientType === "mentor" && (selectedRecipient?._id || selectedRecipient?.id)) {
-      // For mentors, fetch their availability
-      const mentorId = selectedRecipient._id || selectedRecipient.id;
+    let cancelled = false;
 
-      // Convert the meeting date to the Sunday of that week for API call
-      const meetingDateObj = new Date(`${meetingDate}T12:00:00`);
-      const dayOfWeek = meetingDateObj.getDay();
-      const sunday = new Date(meetingDateObj);
-      sunday.setDate(meetingDateObj.getDate() - dayOfWeek);
-      const apiDate = sunday.toISOString().split("T")[0];
+    void (async () => {
+      setCalendarSlotSyncLoading(true);
+      setCalendarSlotSyncError(null);
 
-      apiGetWeeklyAvailability(mentorId, apiDate)
-        .then((res) => {
-          const raw = res.data?.data ?? res.data;
-          const data = Array.isArray(raw) ? raw : [];
-          const dayData = data.find((d: any) => {
-            // Match by specific date first, then fall back to day-of-week index
-            if (typeof d.date === "string" && d.date.length >= 10 && d.date.startsWith(meetingDate)) return true;
-            const dNum = typeof d.day === "number" ? d.day : Number(d.day);
-            return dNum === dayOfWeek;
-          });
-          if (!dayData?.slots?.length) {
-            setAvailableSlots([]);
-            return;
-          }
+      try {
+        let formatted: string[] = [];
+
+        if (scheduleRecipientType === "pastor") {
           const normalize = (t: string) => t.replace(/\s+/g, "").toLowerCase();
           const bookedSlots = appointments
-            .filter((a) => a.meetingDate.startsWith(meetingDate) && !["cancelled", "canceled"].includes((a.status || "").toLowerCase()))
+            .filter(
+              (a) =>
+                a.meetingDate.startsWith(meetingDate) &&
+                !["cancelled", "canceled"].includes((a.status || "").toLowerCase()),
+            )
             .map((a) => {
               const d = new Date(a.meetingDate);
               return normalize(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
             });
-          const formatted = dayData.slots
-            .map((s: any) => `${s.startTime ?? "00:00"} ${(s.startPeriod ?? "AM").toUpperCase()} - ${s.endTime ?? "00:00"} ${(s.endPeriod ?? "PM").toUpperCase()}`)
+          const daySlots = scheduleMonthlyAvailabilitySlots.filter((s: any) => {
+            const ymd = slotDateToYmd(s?.date ?? s?.day ?? s?.calendarDate ?? s?.meetingDate ?? s?.dateString);
+            return ymd === meetingDate;
+          });
+          formatted = daySlots
+            .flatMap((s: any) =>
+              (s.slots || []).map(
+                (slot: any) =>
+                  `${slot.startTime ?? "00:00"} ${(slot.startPeriod ?? "AM").toUpperCase()} - ${slot.endTime ?? "00:00"} ${(slot.endPeriod ?? "PM").toUpperCase()}`,
+              ),
+            )
             .filter((slot: string) => !bookedSlots.includes(normalize(slot.split(" - ")[0])));
-          setAvailableSlots(formatted);
-        })
-        .catch((err) => {
-          console.error("Failed to fetch mentor availability:", err);
+        } else if (scheduleRecipientType === "mentor" && (selectedRecipient?._id || selectedRecipient?.id)) {
+          const mentorWeeklyId = selectedRecipient._id || selectedRecipient.id;
+          const meetingDateObj = new Date(`${meetingDate}T12:00:00`);
+          const dayOfWeek = meetingDateObj.getDay();
+          const sunday = new Date(meetingDateObj);
+          sunday.setDate(meetingDateObj.getDate() - dayOfWeek);
+          const apiDate = sunday.toISOString().split("T")[0];
+
+          try {
+            const res = await apiGetWeeklyAvailability(mentorWeeklyId, apiDate);
+            const raw = res.data?.data ?? res.data;
+            const data = Array.isArray(raw) ? raw : [];
+            const dayData = data.find((d: any) => {
+              if (typeof d.date === "string" && d.date.length >= 10 && d.date.startsWith(meetingDate)) return true;
+              const dNum = typeof d.day === "number" ? d.day : Number(d.day);
+              return dNum === dayOfWeek;
+            });
+
+            if (dayData?.slots?.length) {
+              const normalize = (t: string) => t.replace(/\s+/g, "").toLowerCase();
+              const bookedSlots = appointments
+                .filter(
+                  (a) =>
+                    a.meetingDate.startsWith(meetingDate) &&
+                    !["cancelled", "canceled"].includes((a.status || "").toLowerCase()),
+                )
+                .map((a) => {
+                  const d = new Date(a.meetingDate);
+                  return normalize(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+                });
+
+              formatted = dayData.slots
+                .map(
+                  (s: any) =>
+                    `${s.startTime ?? "00:00"} ${(s.startPeriod ?? "AM").toUpperCase()} - ${s.endTime ?? "00:00"} ${(s.endPeriod ?? "PM").toUpperCase()}`,
+                )
+                .filter((slot: string) => !bookedSlots.includes(normalize(slot.split(" - ")[0])));
+            }
+          } catch (err) {
+            console.error("Failed to fetch mentor availability:", err);
+          }
+        } else if (!cancelled) {
           setAvailableSlots([]);
+          setCalendarBusyStripped(0);
+          setCalendarSlotSyncSkipped(false);
+          setCalendarSlotSyncError(null);
+          return;
+        }
+
+        const recipientId = String(selectedRecipient?._id || selectedRecipient?.id || "").trim();
+        const participantUserIds = Array.from(new Set([String(directorId), recipientId].filter(Boolean)));
+
+        const gc = await filterSlotLabelsAgainstExternalCalendar({
+          meetingDateYmd: meetingDate.slice(0, 10),
+          rawSlotLabels: formatted,
+          participantUserIds,
+          meetingDurationMinutes: 60,
+          expandIntoGrid: true,
         });
-    } else {
-      setAvailableSlots([]);
-    }
-  }, [meetingDate, scheduleRecipientType, selectedRecipient, appointments, scheduleMonthlyAvailabilitySlots]);
+
+        if (cancelled) return;
+        setCalendarSlotSyncSkipped(gc.skipped);
+        setCalendarBusyStripped(gc.error ? 0 : gc.strippedCount);
+        if (gc.error) {
+          setCalendarSlotSyncError(gc.error);
+          setAvailableSlots([]);
+          setSelectedSlot("");
+        } else {
+          setCalendarSlotSyncError(null);
+          setAvailableSlots(gc.slots);
+          setSelectedSlot((prev) => (prev && gc.slots.includes(prev) ? prev : ""));
+        }
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) {
+          setAvailableSlots([]);
+          setCalendarSlotSyncError(extractApiErrorMessage(err) || "Could not refresh Google Calendar.");
+          setSelectedSlot("");
+        }
+      } finally {
+        if (!cancelled) setCalendarSlotSyncLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    meetingDate,
+    scheduleRecipientType,
+    selectedRecipient,
+    appointments,
+    scheduleMonthlyAvailabilitySlots,
+    directorId,
+  ]);
 
   // ── Schedule drawer calendar navigation handlers ──────────────────────────────
   const handleSchedulePrevMonth = () => {
@@ -697,33 +766,96 @@ function DirectorScheduleContent() {
       showToast(`Please select a ${scheduleRecipientType}`);
       return;
     }
-    if (!meetingDate || !selectedSlot) { showToast("Please select date and time"); return; }
+    if (!meetingDate || !selectedSlot) {
+      showToast("Please select date and time");
+      return;
+    }
     const scheduledIso = parseSlotStartToIso(meetingDate, selectedSlot.replace(/\u2013/g, "-"));
     if (meetingDate === new Date().toISOString().split("T")[0] && new Date(scheduledIso).getTime() <= Date.now()) {
       showToast("For today, please choose a time after the current time.");
       return;
     }
     if (isScheduling) return;
+
+    const proposedMs = new Date(scheduledIso).getTime();
+
+    try {
+      const upcoming = await apiGetAppointments({
+        mentorId: directorId,
+        futureOnly: true,
+        status: "scheduled",
+      });
+      const busyAppointments = unwrapAppointmentsAxiosData(upcoming);
+      const hasOverlap = busyAppointments.some((a) => {
+        const t = new Date(String(a.meetingDate ?? "")).getTime();
+        return !Number.isNaN(t) && Math.abs(t - proposedMs) < 60 * 60 * 1000;
+      });
+      if (hasOverlap) {
+        showToast("This time slot overlaps with an existing appointment.");
+        return;
+      }
+    } catch (_) {
+      // continue to Google recheck — server may still enforce conflicts
+    }
+
+    const recipientIdCal = String(selectedRecipient._id || selectedRecipient.id || "").trim();
+    const gcRecheck = await filterSlotLabelsAgainstExternalCalendar({
+      meetingDateYmd: meetingDate.slice(0, 10),
+      rawSlotLabels: availableSlots,
+      participantUserIds: Array.from(new Set([String(directorId), recipientIdCal].filter(Boolean))),
+      meetingDurationMinutes: 60,
+      expandIntoGrid: true,
+    });
+    if (!gcRecheck.skipped) {
+      if (gcRecheck.error) {
+        showToast(gcRecheck.error, 5500);
+        return;
+      }
+      if (!gcRecheck.slots.includes(selectedSlot)) {
+        showToast(
+          "That time conflicts with someone's Google Calendar. Pick another slot and try again.",
+          5500,
+        );
+        return;
+      }
+    }
+
+    let successToastMs = 3500;
     setIsScheduling(true);
     try {
-      await apiCreateAppointment({
+      const recipientLabel =
+        `${selectedRecipient.firstName ?? ""} ${selectedRecipient.lastName ?? ""}`.trim() ||
+        scheduleRecipientType;
+      const res = await apiCreateAppointment({
         userId: selectedRecipient._id || selectedRecipient.id,
         mentorId: directorId,
         meetingDate: scheduledIso,
         platform: uiMeetingModeToPlatform(selectedPlatform),
         notes: "Scheduled by director",
+        googleCalendarSync: true,
+        googleCalendarTitle: `Meeting · director & ${recipientLabel}`,
+        googleCalendarDescription: `Scheduled in CCC · Platform: ${selectedPlatform}`,
       });
+
+      const gHint = googleCalendarSuccessHintFromCreateResponse(res?.data);
+      if (gHint) successToastMs = 7000;
+
       const refresh = await apiGetAppointments({ futureOnly: false });
-      setAppointments(unwrapAppointmentsAxiosData(refresh).sort(
-        (a: any, b: any) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
-      ));
+      setAppointments(
+        unwrapAppointmentsAxiosData(refresh).sort(
+          (a: any, b: any) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
+        ),
+      );
       setIsDrawerOpen(false);
       setDrawerStep(1);
       setSelectedRecipient(null);
       setMeetingDate("");
       setSelectedSlot("");
       setAvailabilityRefreshKey((k) => k + 1);
-      showToast("Meeting scheduled successfully");
+      showToast(
+        gHint ? `Meeting scheduled successfully. ${gHint}` : "Meeting scheduled successfully",
+        successToastMs,
+      );
     } catch (e) {
       showToast(extractApiErrorMessage(e) || "Failed to schedule meeting");
     } finally {
@@ -853,9 +985,9 @@ function DirectorScheduleContent() {
     }
   };
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, dismissMs = 3500) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
+    setTimeout(() => setToastMessage(null), dismissMs);
   };
 
   const renderHistoryAppointmentCard = (appt: AppointmentResponse, index: number, listPage: number, keyPrefix: string) => {
@@ -1659,7 +1791,25 @@ function DirectorScheduleContent() {
                   {meetingDate && (
                     <div className="mb-5">
                       <p className="mb-2 text-sm text-[#cde2f2]">Available time slots</p>
-                      {availableSlots.length === 0 ? (
+                      {(calendarSlotSyncLoading || scheduleAvailabilityLoading) && (
+                        <p className="mb-2 flex items-center gap-2 text-xs text-[#8ec5eb]">
+                          <span className="inline-flex h-3 w-3 animate-spin rounded-full border border-[#8ec5eb]/30 border-t-[#8ec5eb]" />
+                          Syncing Google Calendar availability…
+                        </p>
+                      )}
+                      {calendarSlotSyncError ? (
+                        <p className="mb-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-50">
+                          {calendarSlotSyncError} Time slots cannot be validated until calendar access works.
+                        </p>
+                      ) : null}
+                      {!calendarSlotSyncSkipped && calendarBusyStripped > 0 && !calendarSlotSyncError ? (
+                        <p className="mb-2 text-xs text-[#cde2f2]/80">
+                          Some times are hidden due to conflicting events on linked Google Calendars.
+                        </p>
+                      ) : null}
+                      {availableSlots.length === 0 &&
+                      !calendarSlotSyncLoading &&
+                      !scheduleAvailabilityLoading ? (
                         <p className="text-sm text-white/50">No slots available for selected date.</p>
                       ) : (
                         <div className="grid grid-cols-2 gap-2">

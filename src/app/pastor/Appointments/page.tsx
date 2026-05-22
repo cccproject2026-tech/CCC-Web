@@ -41,6 +41,7 @@ import {
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import {
   appointmentEntityId,
+  extractApiErrorMessage,
   formatAvailabilitySlotLabel,
   meetingDateLocalYmd,
   parseSlotStartToIso,
@@ -49,6 +50,10 @@ import {
   unwrapAppointmentsAxiosData,
   unwrapMonthlyAvailabilityPayload,
 } from "@/app/Services/appointment-utils";
+import {
+  filterSlotLabelsAgainstExternalCalendar,
+  googleCalendarSuccessHintFromCreateResponse,
+} from "@/app/Services/google-calendar-scheduling";
 import { getCookie } from "@/app/utils/cookies";
 import { filterSlotsAfter2Hours } from "@/app/Services/utils/helpers";
 
@@ -59,6 +64,7 @@ export default function PastorAppointmentsPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerStep, setDrawerStep] = useState<"mentor" | "schedule">("mentor");
   const [showPopup, setShowPopup] = useState(false);
+  const [googleCalendarBookingHint, setGoogleCalendarBookingHint] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState("");
   const [appointments, setAppointments] = useState([]);
   const [appointmentsToday, setAppointmentsToday] = useState([]);
@@ -83,6 +89,10 @@ export default function PastorAppointmentsPage() {
   const [schedulePlatform, setSchedulePlatform] = useState("Zoom");
   const [availableTimesForBooking, setAvailableTimesForBooking] = useState<any[]>([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [calendarSlotSyncLoading, setCalendarSlotSyncLoading] = useState(false);
+  const [calendarSlotSyncError, setCalendarSlotSyncError] = useState<string | null>(null);
+  const [calendarSlotSyncSkipped, setCalendarSlotSyncSkipped] = useState(false);
+  const [calendarBusyStripped, setCalendarBusyStripped] = useState(0);
   const [isScheduling, setIsScheduling] = useState(false);
   const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -351,6 +361,10 @@ export default function PastorAppointmentsPage() {
       setAvailableTimesForBooking([]);
       setMonthlyAvailabilitySlots([]);
       setAvailabilityLoading(false);
+      setCalendarSlotSyncLoading(false);
+      setCalendarSlotSyncError(null);
+      setCalendarSlotSyncSkipped(false);
+      setCalendarBusyStripped(0);
       return;
     }
     const mentorId = String(selectedMentor.id ?? selectedMentor._id ?? "").trim();
@@ -437,9 +451,44 @@ export default function PastorAppointmentsPage() {
           return !bookedMs.some((bMs: number) => Math.abs(bMs - slotMs) < 30 * 60 * 1000);
         });
 
+        setCalendarSlotSyncLoading(true);
+        setCalendarSlotSyncError(null);
+
+        const pastorUid = getPastorUserId();
+        const participantUserIds = Array.from(new Set([...(pastorUid ? [pastorUid] : []), mentorIdStr].filter(Boolean)));
+
+        let displayTimes = times;
+
+        try {
+          const gc = await filterSlotLabelsAgainstExternalCalendar({
+            meetingDateYmd: selectedYmd,
+            rawSlotLabels: times.map((lab) => String(lab).replace(/\u2013/g, "-").replace(/\u2014/g, "-")),
+            participantUserIds,
+            meetingDurationMinutes: 60,
+            expandIntoGrid: true,
+          });
+          setCalendarSlotSyncSkipped(gc.skipped);
+          setCalendarBusyStripped(gc.error ? 0 : gc.strippedCount);
+          if (gc.error) {
+            setCalendarSlotSyncError(gc.error);
+            displayTimes = [];
+          } else {
+            setCalendarSlotSyncError(null);
+            displayTimes = gc.slots;
+          }
+        } catch (calErr) {
+          console.error(calErr);
+          setCalendarSlotSyncSkipped(false);
+          setCalendarBusyStripped(0);
+          setCalendarSlotSyncError(extractApiErrorMessage(calErr) || "Could not refresh Google Calendar.");
+          displayTimes = [];
+        }
+
         if (!cancelled) {
-          setAvailableTimesForBooking(times);
+          setAvailableTimesForBooking(displayTimes);
+          setSelectedTime((prev: string) => (prev && displayTimes.includes(prev) ? prev : ""));
           setAvailabilityLoading(false);
+          setCalendarSlotSyncLoading(false);
         }
       } catch (error) {
         console.error("Error fetching availability:", error);
@@ -447,6 +496,8 @@ export default function PastorAppointmentsPage() {
           setAvailableTimesForBooking([]);
           setMonthlyAvailabilitySlots([]);
           setAvailabilityLoading(false);
+          setCalendarSlotSyncLoading(false);
+          setCalendarSlotSyncError(null);
         }
       }
     })();
@@ -476,7 +527,8 @@ export default function PastorAppointmentsPage() {
     }
 
     const yyyyMmDd = new Date(currentYear, currentMonth, selectedDate).toLocaleDateString("en-CA");
-    const meetingDateISO = parseSlotStartToIso(yyyyMmDd, selectedTime);
+    const meetingDateISO = parseSlotStartToIso(yyyyMmDd, selectedTime.replace(/\u2013/g, "-"));
+
     const proposedMs = new Date(meetingDateISO).getTime();
     const hasOverlap = (appointments as any[]).some((a: any) => {
       const t = new Date(String(a.meetingDate ?? "")).getTime();
@@ -487,7 +539,36 @@ export default function PastorAppointmentsPage() {
       return;
     }
 
+    const participantUserIds = Array.from(new Set([userId, String(mid)].filter(Boolean)));
+
+    const gcRecheck = await filterSlotLabelsAgainstExternalCalendar({
+      meetingDateYmd: yyyyMmDd,
+      rawSlotLabels: availableTimesForBooking.map((lab) =>
+        String(lab).replace(/\u2013/g, "-").replace(/\u2014/g, "-"),
+      ),
+      participantUserIds,
+      meetingDurationMinutes: 60,
+      expandIntoGrid: true,
+    });
+    if (!gcRecheck.skipped) {
+      if (gcRecheck.error) {
+        showToast(gcRecheck.error, 5500);
+        return;
+      }
+      const normalizedChosen = selectedTime.replace(/\u2013/g, "-").replace(/\u2014/g, "-");
+      if (!gcRecheck.slots.includes(normalizedChosen)) {
+        showToast(
+          "That time conflicts with someone's Google Calendar. Pick another slot and try again.",
+          5500,
+        );
+        return;
+      }
+    }
+
     setIsScheduling(true);
+
+    const mentorDisplay =
+      `${(selectedMentor as any)?.firstName ?? ""} ${(selectedMentor as any)?.lastName ?? ""}`.trim() || "Mentor";
 
     const payload = {
       userId,
@@ -495,12 +576,17 @@ export default function PastorAppointmentsPage() {
       meetingDate: meetingDateISO,
       platform: uiMeetingModeToPlatform(schedulePlatform),
       notes: "Mentorship session",
+      googleCalendarSync: true,
+      googleCalendarTitle: `Meeting · pastor & ${mentorDisplay}`,
+      googleCalendarDescription: `Scheduled in CCC · Platform: ${schedulePlatform}`,
     };
 
     try {
-      await apiCreateAppointment(payload);
+      const res = await apiCreateAppointment(payload);
+      const gHint = googleCalendarSuccessHintFromCreateResponse(res?.data);
+      setGoogleCalendarBookingHint(gHint ?? null);
 
-      setAvailabilityRefreshKey(prev => prev + 1);
+      setAvailabilityRefreshKey((prev) => prev + 1);
       setDrawerOpen(false);
       setShowPopup(true);
       setSelectedTime("");
@@ -605,10 +691,15 @@ export default function PastorAppointmentsPage() {
 
   useEffect(() => {
     if (showPopup) {
-      const t = setTimeout(() => setShowPopup(false), 2000);
+      const dur = googleCalendarBookingHint ? 5200 : 2000;
+      const t = setTimeout(() => {
+        setShowPopup(false);
+        setGoogleCalendarBookingHint(null);
+      }, dur);
       return () => clearTimeout(t);
     }
-  }, [showPopup]);
+    return undefined;
+  }, [showPopup, googleCalendarBookingHint]);
 
   const handleChangeMode = async () => {
     if (!appointmentToEdit) return;
@@ -1538,32 +1629,43 @@ export default function PastorAppointmentsPage() {
                       ({new Date(currentYear, currentMonth, selectedDate).toLocaleDateString()})
                     </span>
                   </label>
-                  {availabilityLoading ? (
+                  {availabilityLoading || calendarSlotSyncLoading ? (
                     <div className="mb-4 flex items-center justify-center py-6">
                       <div className="flex items-center gap-2 text-xs text-[#cde2f2]">
                         <span className="h-2 w-2 animate-pulse rounded-full bg-[#8ec5eb]" />
-                        Loading available times…
+                        Checking availability &amp; syncing Google Calendar…
                       </div>
                     </div>
+                  ) : calendarSlotSyncError ? (
+                    <p className="mb-4 rounded-lg border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-50">
+                      {calendarSlotSyncError} You need working calendar sync to pick a validated time slot.
+                    </p>
                   ) : availableTimesForBooking.length === 0 ? (
                     <p className="mb-4 text-xs text-[#cde2f2]/85">
                       No open slots on this date. Please try another day.
                     </p>
                   ) : (
-                    <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3">
-                      {availableTimesForBooking.map((t: any) => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => setSelectedTime(t)}
-                          className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${selectedTime === t
-                            ? "border-[#8ec5eb] bg-[#8ec5eb]/25 text-white shadow-[0_0_0_1px_rgba(142,197,235,0.35)]"
-                            : "border-[#8ec5eb]/30 bg-[#8ec5eb]/10 text-white hover:border-[#8ec5eb]/55 hover:bg-[#8ec5eb]/20"
-                            }`}
-                        >
-                          {t}
-                        </button>
-                      ))}
+                    <div className="mb-4 space-y-2">
+                      {!calendarSlotSyncSkipped && calendarBusyStripped > 0 ? (
+                        <p className="text-xs text-[#cde2f2]/80">
+                          Some times are hidden because they overlap with Google Calendar events.
+                        </p>
+                      ) : null}
+                      <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                        {availableTimesForBooking.map((t: any) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setSelectedTime(t)}
+                            className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${selectedTime === t
+                              ? "border-[#8ec5eb] bg-[#8ec5eb]/25 text-white shadow-[0_0_0_1px_rgba(142,197,235,0.35)]"
+                              : "border-[#8ec5eb]/30 bg-[#8ec5eb]/10 text-white hover:border-[#8ec5eb]/55 hover:bg-[#8ec5eb]/20"
+                              }`}
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
 
@@ -1636,9 +1738,14 @@ export default function PastorAppointmentsPage() {
 
       {showPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-lg shadow-lg px-10 py-6 flex items-center gap-3 text-[#0B1C58] font-medium text-[15px] animate-fade-in">
-            <i className="fa-solid fa-check text-green-600 text-xl"></i>
-            New Appointment has been Scheduled
+          <div className="flex max-w-sm flex-col items-center gap-1 rounded-lg bg-white px-10 py-6 text-center font-medium text-[#0B1C58] shadow-lg animate-fade-in text-[15px]">
+            <div className="flex items-center gap-3">
+              <i className="fa-solid fa-check text-xl text-green-600" aria-hidden />
+              <span>New appointment has been scheduled</span>
+            </div>
+            {googleCalendarBookingHint ? (
+              <p className="text-sm font-normal text-green-800">{googleCalendarBookingHint}</p>
+            ) : null}
           </div>
         </div>
       )}

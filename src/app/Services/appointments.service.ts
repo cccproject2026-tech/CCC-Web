@@ -11,6 +11,7 @@ import type {
   PatchMentorAvailabilityDayPayload,
   GetAppointmentsParams,
   TranscriptSummaryResponseDto,
+  ExternalCalendarBusyPayload,
 } from "./types/appointments.types";
 
 // GET /appointments/upcoming?userId=&mentorId=&status=&futureOnly=
@@ -175,6 +176,15 @@ export const apiPatchMentorAvailabilitySettings = (
     `/appointments/availability/${encodeURIComponent(mentorId)}/settings`,
     body,
   );
+
+/**
+ * Returns busy periods for the supplied user ids (typically Google Calendar free/busy via backend).
+ * 404 = integration not wired — caller should treat as skipped.
+ */
+export const apiFetchExternalCalendarBusy = (payload: ExternalCalendarBusyPayload) =>
+  axiosInstance.post<unknown>("/appointments/calendar/external-busy", payload, {
+    validateStatus: (s) => (s >= 200 && s < 300) || s === 404,
+  });
 
 type DeleteAvailabilitySlotPayload = {
   slotId: string;

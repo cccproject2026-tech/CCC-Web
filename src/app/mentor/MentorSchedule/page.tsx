@@ -47,6 +47,10 @@ import {
 } from "@/app/Services/appointment-utils";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 import { apiGetAllUsers, apiGetAssignedUsers } from "@/app/Services/api";
+import {
+  filterSlotLabelsAgainstExternalCalendar,
+  googleCalendarSuccessHintFromCreateResponse,
+} from "@/app/Services/google-calendar-scheduling";
 
 function tabFromQueryParam(raw: string | null): "Appointments" | "Availability" | "Schedule" | "Appointment History" | null {
   if (!raw) return null;
@@ -183,6 +187,10 @@ const shouldOpenReschedule = searchParams.get("reschedule") === "1";
   const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
   const [isScheduling, setIsScheduling] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [calendarSlotSyncLoading, setCalendarSlotSyncLoading] = useState(false);
+  const [calendarSlotSyncError, setCalendarSlotSyncError] = useState<string | null>(null);
+  const [calendarSlotSyncSkipped, setCalendarSlotSyncSkipped] = useState(false);
+  const [calendarBusyStripped, setCalendarBusyStripped] = useState(0);
 
   // schedule drawer calendar state
   const today = new Date();
@@ -351,7 +359,11 @@ useEffect(() => {
         : mentorId;
     if (!targetId) return;
 
-    const fetchSlots = async () => {
+    let cancelled = false;
+
+    void (async () => {
+      setCalendarSlotSyncLoading(true);
+      setCalendarSlotSyncError(null);
       try {
         const res = await apiGetWeeklyAvailability(targetId, meetingDate);
         const data = res.data?.data || [];
@@ -362,24 +374,27 @@ useEffect(() => {
         });
         const busyAppointments = unwrapAppointmentsAxiosData(busyRes);
 
-        const dayData = data.find((d: any) =>
-          d.date?.startsWith(meetingDate)
-        );
+        const dayData = data.find((d: any) => d.date?.startsWith(meetingDate));
 
         if (!dayData?.slots) {
-          setAvailableSlots([]);
+          if (!cancelled) {
+            setAvailableSlots([]);
+            setCalendarBusyStripped(0);
+            setCalendarSlotSyncSkipped(false);
+          }
           return;
         }
-        const normalize = (t: string) =>
-          t.replace(/\s+/g, "").toLowerCase();
+        const normalize = (t: string) => t.replace(/\s+/g, "").toLowerCase();
 
         const bookedSlots = busyAppointments
-          .filter(a => a.meetingDate.startsWith(meetingDate) && !["cancelled", "canceled"].includes((a.status || "").toLowerCase()))
-          .map(a => {
+          .filter(
+            (a) =>
+              a.meetingDate.startsWith(meetingDate) &&
+              !["cancelled", "canceled"].includes((a.status || "").toLowerCase()),
+          )
+          .map((a) => {
             const d = new Date(a.meetingDate);
-            return normalize(
-              d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-            );
+            return normalize(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
           });
 
         const formatted = dayData.slots
@@ -391,14 +406,42 @@ useEffect(() => {
             return !bookedSlots.includes(startTime);
           });
 
-        setAvailableSlots(formatted);
+        const participantUserIds = Array.from(
+          new Set([String(targetId), String(mentorId)].filter(Boolean)),
+        );
+        const gc = await filterSlotLabelsAgainstExternalCalendar({
+          meetingDateYmd: meetingDate.slice(0, 10),
+          rawSlotLabels: formatted,
+          participantUserIds,
+          meetingDurationMinutes: 60,
+          expandIntoGrid: true,
+        });
+
+        if (cancelled) return;
+        setCalendarSlotSyncSkipped(gc.skipped);
+        setCalendarBusyStripped(gc.error ? 0 : gc.strippedCount);
+        if (gc.error) {
+          setCalendarSlotSyncError(gc.error);
+          setAvailableSlots([]);
+        } else {
+          setCalendarSlotSyncError(null);
+          setAvailableSlots(gc.slots);
+        }
+        setSelectedSlot((prev) => (prev && !gc.error && gc.slots.includes(prev) ? prev : ""));
       } catch (e) {
         console.error(e);
-        setAvailableSlots([]);
+        if (!cancelled) {
+          setAvailableSlots([]);
+          setCalendarSlotSyncError(extractApiErrorMessage(e));
+        }
+      } finally {
+        if (!cancelled) setCalendarSlotSyncLoading(false);
       }
-    };
+    })();
 
-    fetchSlots();
+    return () => {
+      cancelled = true;
+    };
   }, [mentorId, meetingDate, availabilityRefreshKey, scheduleRecipientType, selectedRecipient]);
 
   // ── Schedule drawer calendar navigation handlers ──────────────────────────────
@@ -615,22 +658,59 @@ useEffect(() => {
       return;
     }
 
+    const participantUserIdsForCalendar = Array.from(
+      new Set([String(targetMentorId), String(mentorId)].filter(Boolean)),
+    );
+    const gcRecheck = await filterSlotLabelsAgainstExternalCalendar({
+      meetingDateYmd: meetingDate.slice(0, 10),
+      rawSlotLabels: availableSlots,
+      participantUserIds: participantUserIdsForCalendar,
+      meetingDurationMinutes: 60,
+      expandIntoGrid: true,
+    });
+    if (!gcRecheck.skipped) {
+      if (gcRecheck.error) {
+        setToastMessage(gcRecheck.error);
+        setTimeout(() => setToastMessage(null), 5000);
+        return;
+      }
+      if (!gcRecheck.slots.includes(selectedSlot)) {
+        setToastMessage(
+          "That time conflicts with someone's Google Calendar. Pick another slot and try again.",
+        );
+        setTimeout(() => setToastMessage(null), 5000);
+        return;
+      }
+    }
+
     setIsScheduling(true);
 
+    let mentorToastDismissMs = 3000;
+
     try {
-      await apiCreateAppointment({
+      const recipientLabel =
+        `${(selectedRecipient as any)?.firstName ?? ""} ${(selectedRecipient as any)?.lastName ?? ""}`.trim() ||
+        (scheduleRecipientType === "pastor" ? "Pastor" : "Director");
+
+      const res = await apiCreateAppointment({
         userId:
           scheduleRecipientType === "director"
             ? mentorId
             : String(selectedRecipient._id || selectedRecipient.id),
         mentorId: targetMentorId,
-        meetingDate: toIsoFromDateAndSlot(meetingDate, selectedSlot),
+        meetingDate: proposedIso,
         platform: uiMeetingModeToPlatform(selectedPlatform),
-        notes: "Scheduled by mentor",
+        notes: `Scheduled by mentor (${uiMeetingModeToPlatform(selectedPlatform)})`,
+        googleCalendarSync: true,
+        googleCalendarTitle: `Meeting · mentor & ${recipientLabel}`,
+        googleCalendarDescription: `Scheduled in CCC · Platform: ${selectedPlatform}`,
       });
 
-      setAvailableSlots(prev => prev.filter(s => s !== selectedSlot));
-      setAvailabilityRefreshKey(prev => prev + 1);
+      const gHint = googleCalendarSuccessHintFromCreateResponse(res?.data);
+      if (gHint) mentorToastDismissMs = 7000;
+
+      setAvailableSlots((prev) => prev.filter((s) => s !== selectedSlot));
+      setAvailabilityRefreshKey((prev) => prev + 1);
       const refresh = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: true });
       setAppointments(unwrapAppointmentsAxiosData(refresh));
       setIsDrawerOpen(false);
@@ -638,16 +718,17 @@ useEffect(() => {
       setSelectedRecipient(null);
       setMeetingDate("");
       setSelectedSlot("");
-      setToastMessage("Appointment created successfully");
+      setToastMessage(
+        gHint ? `Appointment created. ${gHint}` : "Appointment created successfully",
+      );
     } catch (error) {
       console.error("Failed to create appointment", error);
       setToastMessage("Failed to create appointment");
-    }
-    finally {
+    } finally {
       setIsScheduling(false);
     }
 
-    setTimeout(() => setToastMessage(null), 3000);
+    setTimeout(() => setToastMessage(null), mentorToastDismissMs);
   };
 
   const handleCancelMentorAppointment = async (appt: Appointment) => {
@@ -1400,7 +1481,23 @@ useEffect(() => {
                   </div>
 
                   <div className="mb-6 grid grid-cols-2 gap-3">
-                    {availableSlots.length === 0 ? (
+                    {(calendarSlotSyncLoading || scheduleAvailabilityLoading) && (
+                      <p className="col-span-2 flex items-center gap-2 text-xs text-[#8ec5eb]">
+                        <i className="fa-solid fa-spinner fa-spin" aria-hidden />
+                        Syncing Google Calendar availability…
+                      </p>
+                    )}
+                    {calendarSlotSyncError ? (
+                      <p className="col-span-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-50">
+                        {calendarSlotSyncError} Time slots cannot be validated until calendar access works.
+                      </p>
+                    ) : null}
+                    {!calendarSlotSyncSkipped && calendarBusyStripped > 0 && !calendarSlotSyncError ? (
+                      <p className="col-span-2 text-xs text-[#cde2f2]/80">
+                        Some times are hidden due to conflicting events on linked Google Calendars.
+                      </p>
+                    ) : null}
+                    {availableSlots.length === 0 && !calendarSlotSyncLoading && !scheduleAvailabilityLoading ? (
                       <p className="text-sm text-[#cde2f2]">No slots available</p>
                     ) : (
                       availableSlots.map((label, slotIdx) => (
