@@ -542,7 +542,7 @@ export const apiDeleteFinalComment = (payload: DeleteFinalCommentPayload) =>
     { data: payload },
   );
 
-// PATCH /progress/:userId/mark-complete
+// PATCH /users/:userId/mark-completed — program completion (same URL as apiMarkUserCompleted in users.service)
 export const apiMarkProgramComplete = (userId: string) =>
   axiosInstance.patch<{ success: boolean; data: ProgressResponse }>(
     `/users/${userId}/mark-completed`,
