@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { Fragment, Suspense, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -8,6 +8,7 @@ import { getCookie } from "@/app/utils/cookies";
 import axiosInstance from "@/app/Services/config/axios-instance";
 import DirectorHero from "../DirectorHero";
 import AvailabilityCalendar from "@/app/Components/AvailabilityCalendar";
+import MentorAvailabilityRecurringWorkspace from "@/app/mentor/MentorSchedule/MentorAvailabilityRecurringWorkspace";
 import {
   directorBtnPrimary,
   directorBtnSecondary,
@@ -27,8 +28,6 @@ import UserProfile from "../../Assets/user-profile.png";
 import {
   apiCancelAppointment,
   apiCreateAppointment,
-  apiCreateAvailability,
-  apiDeleteAvailabilitySlot,
   apiGetAppointments,
   apiRescheduleAppointment,
   apiGetWeeklyAvailability,
@@ -39,11 +38,9 @@ import {
   formatAvailabilitySlotLabel,
   parseSlotStartToIso,
   slotDateToYmd,
-  slotToHHmm,
   uiMeetingModeToPlatform,
   unwrapAppointmentsAxiosData,
 } from "@/app/Services/appointment-utils";
-import { timeOptions } from "@/app/Services/utils/helpers";
 import { apiGetAllUsers } from "@/app/Services/api";
 import type { AppointmentResponse, PersonInfo } from "@/app/Services/types";
 import { isRemoteImageSrc } from "@/app/utils/image";
@@ -107,8 +104,6 @@ function isTodayDate(iso: string) {
   );
 }
 
-const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
-
 function tabFromParam(raw: string | null): "Appointments" | "Availability" | "Schedule" | "Appointment History" | null {
   if (!raw) return null;
   const t = raw.trim().toLowerCase();
@@ -118,13 +113,6 @@ function tabFromParam(raw: string | null): "Appointments" | "Availability" | "Sc
   if (t === "appointment-history" || t === "appointmenthistory" || t === "history") return "Appointment History";
   return null;
 }
-
-const period = (p: unknown, fallback: "AM" | "PM"): "AM" | "PM" => {
-  const s = String(p ?? "").trim().toUpperCase();
-  if (s === "PM" || s.startsWith("P")) return "PM";
-  if (s === "AM" || s.startsWith("A")) return "AM";
-  return fallback;
-};
 
 /** Convert a time string ("09:00") + period ("AM"/"PM") to total minutes since midnight */
 const slotToMins = (time: string, p: string): number => {
@@ -222,17 +210,7 @@ function DirectorScheduleContent() {
   const [selectedAppointmentDate, setSelectedAppointmentDate] = useState(() => localYmdToday());
   const [selectedDateView, setSelectedDateView] = useState<"my" | "other">("my");
 
-  // availability state
-  const [availability, setAvailability] = useState<any[]>([]);
-  const [weekStart, setWeekStart] = useState(new Date());
-  const [selectedAvailabilityDay, setSelectedAvailabilityDay] = useState<number | null>(null);
   const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
-  const [isAddSlotModalOpen, setIsAddSlotModalOpen] = useState(false);
-  const [newSlot, setNewSlot] = useState<any>(null);
-  const [slotError, setSlotError] = useState<string | null>(null);
-  const [maxBookingsPerDay, setMaxBookingsPerDay] = useState(5);
-  /** Backend `advanceNotice` is in hours (see AvailabilityPayload). */
-  const [advanceNoticeHours, setAdvanceNoticeHours] = useState(2);
 
   // schedule drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -384,53 +362,6 @@ function DirectorScheduleContent() {
   setIsDrawerOpen(true);
   setDrawerStep(2);
 }, [searchParams, mentors]);
-
-  const fetchWeeklyAvailability = useCallback(async () => {
-    if (!directorId) return;
-    const sunday = new Date(weekStart);
-    sunday.setDate(sunday.getDate() - sunday.getDay());
-    const date = sunday.toISOString().split("T")[0];
-    try {
-      const res = await apiGetWeeklyAvailability(directorId, date);
-      const raw = res.data?.data ?? res.data;
-      const data = Array.isArray(raw) ? raw : [];
-      if (data.length === 0) {
-        setAvailability(
-          [0, 1, 2, 3, 4, 5, 6].map((day) => ({
-            date: "",
-            day,
-            enabled: false,
-            slots: [],
-          })),
-        );
-      } else {
-        setAvailability(
-          data.map((d: any) => ({
-            date: d.date,
-            day: typeof d.day === "number" ? d.day : Number(d.day) || 0,
-            enabled: Array.isArray(d.slots) && d.slots.length > 0,
-            slots:
-              Array.isArray(d.slots) && d.slots.length > 0
-                ? d.slots.map((s: any) => ({
-                  _id: s._id,
-                  startTime: s.startTime || "09:00",
-                  startPeriod: s.startPeriod || "AM",
-                  endTime: s.endTime || "05:00",
-                  endPeriod: s.endPeriod || "PM",
-                }))
-                : [],
-          })),
-        );
-      }
-    } catch {
-      // Keep existing availability when fetch fails.
-    }
-  }, [directorId, weekStart]);
-
-  // ── Fetch weekly availability ─────────────────────────────────────────────────
-  useEffect(() => {
-    void fetchWeeklyAvailability();
-  }, [fetchWeeklyAvailability, availabilityRefreshKey]);
 
   // ── Fetch available slots for schedule step 2 ─────────────────────────────────
   useEffect(() => {
@@ -617,20 +548,6 @@ function DirectorScheduleContent() {
     return () => { cancelled = true; };
   }, [selectedRecipient, scheduleRecipientType]);
 
-  // ── Auto-select current date in availability tab ──────────────────────────────
-  useEffect(() => {
-    if (availability.length === 0) { setSelectedAvailabilityDay(null); return; }
-    setSelectedAvailabilityDay((prev) => {
-      if (prev !== null && availability.some((d) => d.day === prev)) return prev;
-      // Try to select today's day of the week first
-      const todayDayOfWeek = new Date().getDay();
-      if (availability.some((d) => d.day === todayDayOfWeek)) return todayDayOfWeek;
-      // Fall back to first enabled day
-      const first = availability.find((d) => d.enabled)?.day;
-      return typeof first === "number" ? first : availability[0]?.day ?? 0;
-    });
-  }, [availability]);
-
   // ── Derived calendar values ───────────────────────────────────────────────────
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -772,70 +689,6 @@ function DirectorScheduleContent() {
 
     fetchAvailability();
   }, [isRescheduleModalOpen, rescheduleTarget, rescheduleYear, rescheduleMonth, directorId]);
-
-  // ── Availability helpers ───────────────────────────────────────────────────────
-  const resolveAvailabilityRowDate = (d: any): string => {
-    const raw = typeof d.date === "string" ? d.date.trim() : "";
-    if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
-    const anchor = new Date(weekStart);
-    anchor.setHours(12, 0, 0, 0);
-    const sunday = new Date(anchor);
-    sunday.setDate(anchor.getDate() - anchor.getDay());
-    const di = Number(d.day ?? 0) % 7;
-    const dt = new Date(sunday);
-    dt.setDate(sunday.getDate() + di);
-    return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-  };
-
-  const weekCalendarDates = Array.from({ length: 7 }, (_, dayIndex) => {
-    const dayData = availability.find((d) => d.day === dayIndex);
-    const dateKey = resolveAvailabilityRowDate(dayData ?? { day: dayIndex });
-    const date = new Date(`${dateKey}T12:00:00`);
-    return { dayIndex, date, hasSlots: Boolean(dayData?.enabled && dayData?.slots?.length > 0) };
-  });
-
-  const weekMonthYearLabel =
-    weekCalendarDates.length > 0
-      ? weekCalendarDates[0].date.toLocaleDateString("default", { month: "long", year: "numeric" })
-      : "—";
-
-  const selectedDayData =
-    selectedAvailabilityDay === null ? null : availability.find((d) => d.day === selectedAvailabilityDay) || null;
-
-  // ── Save availability ─────────────────────────────────────────────────────────
-  const handleSaveAvailability = async (overrideAvail?: any[]) => {
-    if (!directorId) return;
-    const avail = overrideAvail ?? availability;
-    const enabled = avail.filter((d) => d.enabled && d.slots?.length > 0);
-    if (enabled.length === 0) {
-      if (!overrideAvail) showToast("Please add at least one availability slot");
-      return;
-    }
-    const dated = enabled.map((d) => ({ date: resolveAvailabilityRowDate(d), uiSlots: d.slots || [] }));
-    const body = {
-      mentorId: directorId,
-      meetingDuration: 60,
-      advanceNotice: advanceNoticeHours,
-      maxBookingsPerDay,
-      weeklySlots: dated.map(({ date, uiSlots }) => ({
-        date,
-        slots: uiSlots.map((s: any) => ({
-          startTime: String(s.startTime || "09:00").replace(/\s*(AM|PM)\s*/gi, "").trim(),
-          startPeriod: period(s.startPeriod, "AM"),
-          endTime: String(s.endTime || "05:00").replace(/\s*(AM|PM)\s*/gi, "").trim(),
-          endPeriod: period(s.endPeriod, "PM"),
-        })),
-      })),
-    };
-    try {
-      await apiCreateAvailability(body as any);
-      setAvailabilityRefreshKey((k) => k + 1);
-      await fetchWeeklyAvailability();
-      showToast("Availability saved successfully");
-    } catch (e) {
-      showToast(extractApiErrorMessage(e) || "Failed to save availability");
-    }
-  };
 
   // ── Create appointment (Schedule tab) ────────────────────────────────────────
   const handleCreateAppointment = async () => {
@@ -1537,324 +1390,18 @@ function DirectorScheduleContent() {
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════
-              AVAILABILITY TAB
-          ══════════════════════════════════════════════ */}
-          {!loading && activeTab === "Availability" && (
-            <div className="grid grid-cols-1 gap-10 lg:grid-cols-2">
-
-              {/* Left: Weekly calendar + settings */}
-              <div className={`${directorGlassCard} p-5 text-white sm:p-6`}>
-                <h3 className="mb-5 text-[15px] font-medium">My weekly availability</h3>
-                <p className="mb-4 text-sm leading-relaxed text-[#cde2f2]/85">
-                  Tip: Select a day, add slots, then save so pastors and directors can book meetings in your available hours.
-                </p>
-                <div className="mb-6 rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.85)_0%,rgba(10,53,88,0.92)_100%)] p-5 text-center shadow-inner">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setWeekStart((prev) => { const n = new Date(prev); n.setDate(n.getDate() - 7); return n; })}
-                      className="rounded-lg px-2 py-1 text-white/90 transition hover:bg-white/10"
-                      aria-label="Previous week"
-                    >◀</button>
-                    <p className="text-sm font-medium text-[#d9ebf8]">{weekMonthYearLabel}</p>
-                    <button
-                      type="button"
-                      onClick={() => setWeekStart((prev) => { const n = new Date(prev); n.setDate(n.getDate() + 7); return n; })}
-                      className="rounded-lg px-2 py-1 text-white/90 transition hover:bg-white/10"
-                      aria-label="Next week"
-                    >▶</button>
-                  </div>
-                  <div className="grid grid-cols-7 gap-2 text-[13px]">
-                    {weekCalendarDates.map(({ dayIndex, date, hasSlots }) => {
-                      const day = date.toLocaleDateString("default", { weekday: "short" });
-                      const isSelected = selectedAvailabilityDay === dayIndex;
-                      const isPast = isPastDate(date.toISOString().split("T")[0]);
-                      const isToday = date.toDateString() === new Date().toDateString();
-                      return (
-                        <div
-                          key={date.toISOString()}
-                          onClick={() => !isPast && setSelectedAvailabilityDay(dayIndex)}
-                          className={`rounded-md py-2 text-center transition ${isPast
-                            ? "opacity-40 cursor-not-allowed pointer-events-none"
-                            : "cursor-pointer"
-                            } ${isSelected
-                              ? "bg-[#8ec5eb]/30 font-semibold text-white ring-1 ring-[#8ec5eb]/55"
-                              : "text-[#d9ebf8] hover:bg-white/10"
-                            } ${hasSlots && !isPast ? "ring-1 ring-amber-300/55" : ""}`}
-                        >
-                          <div>{day}</div>
-                          <div className="text-xs text-white/80">{date.getDate()}</div>
-                          {isToday && <div className="mx-auto mt-0.5 h-1 w-1 rounded-full bg-[#8ec5eb]" />}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="mb-1 block text-xs text-[#cde2f2]">Meeting Duration</label>
-                    <select className={directorSelectDark}><option>60 Minutes</option><option>90 Minutes</option><option>30 Minutes</option></select>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-[#cde2f2]">Max. Bookings/Day</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={20}
-                      value={maxBookingsPerDay}
-                      onChange={(e) => setMaxBookingsPerDay(Math.max(1, Number(e.target.value)))}
-                      className={directorSelectDark}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-[#cde2f2]">Min. notice (hours)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={168}
-                      step={1}
-                      value={advanceNoticeHours}
-                      onChange={(e) => {
-                        const n = Number(e.target.value);
-                        if (!Number.isFinite(n)) return
-                          ;
-                        setAdvanceNoticeHours(Math.max(1, Math.min(168, Math.floor(n))));
-                      }}
-                      className={directorSelectDark}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs text-[#cde2f2]">Preferred Mode</label>
-                    <select className={directorSelectDark}><option>Zoom</option>
-                      {/* <option>Google Meet</option> */}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Right: Slot editor */}
-              <div className="text-white">
-                <h3 className="mb-3 text-[15px] font-medium">Available hours</h3>
-                {!selectedDayData ? (
-                  <div className={`${directorGlassCard} flex items-center justify-center p-8`}>
-                    <p className="text-sm text-white/60">
-                      Select a date from the weekly calendar to edit that day.
-                      <br />
-                      Tip: Add one or more time slots and click Save Availability.
-                    </p>
-                  </div>
-                ) : (
-                  <div className={`${directorGlassCard} p-4 sm:p-5`}>
-                    <div className="mb-4 border-b border-white/15 pb-4">
-                      <p className="text-sm font-medium text-[#d9ebf8]">
-                        {DAY_LABELS[selectedDayData.day as number]} —{" "}
-                        {new Date(`${resolveAvailabilityRowDate(selectedDayData)}T12:00:00`).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {(selectedDayData.slots || []).map((slot: any, i: number) => (
-                        <div key={i} className="rounded-lg border border-white/15 bg-white/[0.03] p-2">
-                          <div className="mb-1 flex items-center justify-between">
-                            <span className="text-[11px] text-[#cde2f2]">Slot {i + 1}</span>
-                            <button
-                              type="button"
-                              aria-label={`Delete slot ${i + 1}`}
-                              onClick={async () => {
-                                if (!slot?._id) {
-                                  // Unsaved slot: remove only from local UI state, no API call.
-                                  setAvailability((prev) =>
-                                    prev.map((d) =>
-                                      d.day === selectedAvailabilityDay
-                                        ? { ...d, slots: (d.slots || []).filter((_: any, idx: number) => idx !== i) }
-                                        : d,
-                                    ),
-                                  );
-                                  return;
-                                }
-                                if (!directorId) return;
-                                const dateStr = resolveAvailabilityRowDate(selectedDayData);
-                                try {
-                                  await apiDeleteAvailabilitySlot(directorId, {
-                                    slotId: slot._id,
-                                    date: dateStr,
-                                  });
-                                  setAvailabilityRefreshKey((k) => k + 1);
-                                  showToast("Slot deleted successfully");
-                                } catch (err: any) {
-                                  const msg = err?.response?.data?.message || "Failed to delete slot";
-                                  showToast(msg);
-                                }
-                              }}
-                              className="rounded p-0.5 text-red-400 transition hover:bg-red-400/15 hover:text-red-300"
-                            >
-                              <i className="fa-solid fa-trash-can text-[11px]" />
-                            </button>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <select
-                              className="rounded border border-white/15 bg-white/10 px-1.5 py-1 text-[11px] text-white outline-none [&>option]:bg-[#062946]"
-                              value={`${slot.startTime}-${slot.startPeriod}`}
-                              onChange={(e) => {
-                                const [time, slotPeriod] = e.target.value.split("-");
-                                setAvailability((prev) =>
-                                  prev.map((d) =>
-                                    d.day === selectedAvailabilityDay
-                                      ? { ...d, slots: d.slots.map((s: any, idx: number) => idx === i ? { ...s, startTime: time, startPeriod: slotPeriod } : s) }
-                                      : d,
-                                  ),
-                                );
-                              }}
-                            >
-                              {timeOptions.map((t) => (
-                                <option key={t.label} value={`${t.time}-${t.period}`}>{t.label}</option>
-                              ))}
-                            </select>
-                            <span className="text-[11px] text-[#d9ebf8]">to</span>
-                            <select
-                              className="rounded border border-white/15 bg-white/10 px-1.5 py-1 text-[11px] text-white outline-none [&>option]:bg-[#062946]"
-                              value={`${slot.endTime}-${slot.endPeriod}`}
-                              onChange={(e) => {
-                                const [time, slotPeriod] = e.target.value.split("-");
-                                setAvailability((prev) =>
-                                  prev.map((d) =>
-                                    d.day === selectedAvailabilityDay
-                                      ? { ...d, slots: d.slots.map((s: any, idx: number) => idx === i ? { ...s, endTime: time, endPeriod: slotPeriod } : s) }
-                                      : d,
-                                  ),
-                                );
-                              }}
-                            >
-                              {timeOptions.map((t) => (
-                                <option key={t.label} value={`${t.time}-${t.period}`}>{t.label}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-4">
-                      <button
-                        type="button"
-                        className={`${directorBtnSecondary} px-3 py-1.5 text-xs`}
-                        onClick={() => {
-                          setNewSlot({ startTime: "9:00", startPeriod: "AM", endTime: "10:00", endPeriod: "AM" });
-                          setSlotError(null);
-                          setIsAddSlotModalOpen(true);
-                        }}
-                      >
-                        + Add slot
-                      </button>
-                    </div>
-                  </div>
-                )}
-                <div className="mt-6">
-                  <button type="button" onClick={() => handleSaveAvailability()} className={directorBtnPrimary}>
-                    Save availability
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Add slot modal */}
-          {!loading && activeTab === "Availability" && isAddSlotModalOpen && newSlot && (
-            <>
-              <div
-                className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
-                onClick={() => { setIsAddSlotModalOpen(false); setNewSlot(null); setSlotError(null); }}
-                aria-hidden
-              />
-              <div className="fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/20 bg-[#041f35] p-5 text-white shadow-2xl">
-                <h3 className="mb-4 text-base font-semibold">Add new slot</h3>
-                {slotError && (
-                  <p className="mb-3 rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{slotError}</p>
-                )}
-                <div className="mb-5 flex items-center gap-2">
-                  <select
-                    className={directorSelectDark}
-                    value={`${newSlot.startTime}-${newSlot.startPeriod}`}
-                    onChange={(e) => { const [time, slotPeriod] = e.target.value.split("-"); setNewSlot((p: any) => ({ ...p, startTime: time, startPeriod: slotPeriod })); }}
-                  >
-                    {timeOptions.map((t) => <option key={t.label} value={`${t.time}-${t.period}`}>{t.label}</option>)}
-                  </select>
-                  <span className="shrink-0 text-sm text-[#d9ebf8]">to</span>
-                  <select
-                    className={directorSelectDark}
-                    value={`${newSlot.endTime}-${newSlot.endPeriod}`}
-                    onChange={(e) => { const [time, slotPeriod] = e.target.value.split("-"); setNewSlot((p: any) => ({ ...p, endTime: time, endPeriod: slotPeriod })); }}
-                  >
-                    {timeOptions.map((t) => <option key={t.label} value={`${t.time}-${t.period}`}>{t.label}</option>)}
-                  </select>
-                </div>
-                <div className="flex justify-end gap-3">
-                  <button type="button" className={directorBtnSecondary} onClick={() => { setIsAddSlotModalOpen(false); setNewSlot(null); setSlotError(null); }}>
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className={directorBtnPrimary}
-                    onClick={() => {
-                      const newStart = slotToMins(newSlot.startTime, newSlot.startPeriod);
-                      const newEnd = slotToMins(newSlot.endTime, newSlot.endPeriod);
-                      if (newEnd <= newStart) {
-                        setSlotError("End time must be after start time.");
-                        return;
-                      }
-                      const daySlots = (availability.find((d) => d.day === selectedAvailabilityDay)?.slots || []) as any[];
-                      const overlaps = daySlots.some((s: any) => {
-                        const sStart = slotToMins(s.startTime, s.startPeriod);
-                        const sEnd = slotToMins(s.endTime, s.endPeriod);
-                        return newStart < sEnd && newEnd > sStart;
-                      });
-                      if (overlaps) {
-                        setSlotError("This time range overlaps with an existing slot.");
-                        return;
-                      }
-                      // Check against scheduled appointments on this date
-                      const selectedDayAvail = availability.find((d) => d.day === selectedAvailabilityDay);
-                      const slotDateStr = selectedDayAvail ? resolveAvailabilityRowDate(selectedDayAvail) : null;
-                      if (slotDateStr) {
-                        const now = new Date();
-                        const todayYmd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-                        if (slotDateStr === todayYmd) {
-                          const nowMins = now.getHours() * 60 + now.getMinutes();
-                          if (newStart <= nowMins) {
-                            setSlotError("For today, start time must be after the current time.");
-                            return;
-                          }
-                        }
-                        const conflictingAppt = appointments.find((a) => {
-                          if (!a.meetingDate.startsWith(slotDateStr)) return false;
-                          if (["cancelled", "canceled"].includes((a.status || "").toLowerCase())) return false;
-                          const d = new Date(a.meetingDate);
-                          const apptStart = d.getHours() * 60 + d.getMinutes();
-                          const apptEnd = apptStart + 60; // meetings are 60 min
-                          return newStart < apptEnd && newEnd > apptStart;
-                        });
-                        if (conflictingAppt) {
-                          const apptTime = new Date(conflictingAppt.meetingDate).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
-                          setSlotError(`This time conflicts with an existing appointment at ${apptTime}.`);
-                          return;
-                        }
-                      }
-                      setAvailability((prev) =>
-                        prev.map((d) =>
-                          d.day === selectedAvailabilityDay
-                            ? { ...d, enabled: true, slots: [...(d.slots || []), newSlot] }
-                            : d,
-                        ),
-                      );
-                      setIsAddSlotModalOpen(false);
-                      setSlotError(null);
-                      setNewSlot(null);
-                    }}
-                  >
-                    Save slot
-                  </button>
-                </div>
-              </div>
-            </>
+          {!loading && directorId && activeTab === "Availability" && (
+            <MentorAvailabilityRecurringWorkspace
+              mentorId={directorId}
+              onToast={(message, kind) => {
+                if (message) {
+                  setToastMessage(message);
+                  const ms = kind === "err" ? 5200 : 3800;
+                  setTimeout(() => setToastMessage(null), ms);
+                }
+              }}
+              onAvailabilitySaved={() => setAvailabilityRefreshKey((k) => k + 1)}
+            />
           )}
 
           {/* ══════════════════════════════════════════════

@@ -89,6 +89,53 @@ export interface AvailabilityPayload {
   maxBookingsPerDay?: number;
 }
 
+/** Time window for recurring / day-level availability (`TimeSlotDto` on backend). */
+export type AppointmentSlotPeriod = "AM" | "PM";
+
+export interface AppointmentAvailabilityTimeSlot {
+  startTime: string;
+  startPeriod: AppointmentSlotPeriod;
+  endTime: string;
+  endPeriod: AppointmentSlotPeriod;
+}
+
+/** One calendar day template row for recurring save — `UTC` YYYY-MM-DD weekday defines repetition. */
+export interface TemplateWeeklySlotRowDto {
+  date: string;
+  slots: AppointmentAvailabilityTimeSlot[];
+}
+
+/** POST appointments/availability/recurring */
+export interface CreateRecurringAvailabilityPayload {
+  mentorId: string;
+  templateWeeklySlots: TemplateWeeklySlotRowDto[];
+  horizonDays?: number;
+  clearPersonalizations?: boolean;
+  meetingDuration?: number;
+  minSchedulingNoticeHours?: number;
+  maxBookingsPerDay?: number;
+  preferredPlatform?: string;
+}
+
+/** PATCH appointments/availability/:mentorId/settings */
+export interface UpdateMentorAvailabilitySettingsPayload {
+  meetingDuration?: number;
+  minSchedulingNoticeHours?: number;
+  maxBookingsPerDay?: number;
+  preferredPlatform?: string;
+}
+
+/** PATCH appointments/availability/:mentorId/day — single-date override (+ optional backend fields). */
+export interface PatchMentorAvailabilityDayPayload {
+  date: string;
+  slots: AppointmentAvailabilityTimeSlot[];
+  meetingDuration?: number;
+  minSchedulingNoticeHours?: number;
+  maxBookingsPerDay?: number;
+  preferredPlatform?: string;
+}
+
+
 export interface GetAppointmentsParams {
   userId?: string;
   mentorId?: string;
