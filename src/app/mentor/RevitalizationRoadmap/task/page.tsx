@@ -191,7 +191,7 @@ function TaskPageContent() {
     if (!roadmapId || !userId) return;
     const status = queryTab === "Pending" ? "pending" : "answered";
     try {
-      const res = await apiGetQueries(roadmapId, userId, status, taskId || undefined);
+      const res = await apiGetQueries(roadmapId, userId, status, taskId || undefined, "pastor");
       const all = unwrapQueriesFromResponse(res);
       const scoped = all.filter((q: any) => {
         const qTaskId = String(q.nestedRoadMapItemId || q.nestedItemId || q.taskId || q.roadmapItemId || "");
@@ -388,10 +388,15 @@ function TaskPageContent() {
     }
 
     try {
-      await apiReplyToQuery(roadmapId, queryId, {
-        repliedAnswer: answer,
-        repliedMentorId: mentorId,
-      });
+      await apiReplyToQuery(
+        roadmapId,
+        queryId,
+        {
+          repliedAnswer: answer,
+          repliedMentorId: mentorId,
+        },
+        "pastor",
+      );
       setQueryAnswers((prev) => ({ ...prev, [queryId]: "" }));
       await fetchQueries();
     } catch (err) {
@@ -420,10 +425,15 @@ function TaskPageContent() {
     if (!mentorId) return;
     setReplyActionQueryId(queryId);
     try {
-      await apiReplyToQuery(roadmapId, queryId, {
-        repliedAnswer: text,
-        repliedMentorId: mentorId,
-      });
+      await apiReplyToQuery(
+        roadmapId,
+        queryId,
+        {
+          repliedAnswer: text,
+          repliedMentorId: mentorId,
+        },
+        "pastor",
+      );
       cancelMentorReplyEdit();
       await fetchQueries();
     } catch (err) {
@@ -441,7 +451,7 @@ function TaskPageContent() {
     if (!ok) return;
     setReplyActionQueryId(queryId);
     try {
-      await apiDeleteQueryReply(roadmapId, queryId, mentorId);
+      await apiDeleteQueryReply(roadmapId, queryId, mentorId, "pastor");
       cancelMentorReplyEdit();
       await fetchQueries();
     } catch (err) {

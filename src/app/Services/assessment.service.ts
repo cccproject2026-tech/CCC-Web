@@ -2,6 +2,7 @@ import { isAxiosError } from "axios";
 import axiosInstance from "./config/axios-instance";
 import type {
   AssessmentResponse,
+  AssignAssessmentUsersPayload,
   CreateAssessmentPayload,
   SendSectionRecommendationsPayload,
   SubmitPreSurveyPayload,
@@ -230,6 +231,13 @@ export const apiGetAssessmentById = (id: string) => {
   if (!id) throw new Error("Assessment ID is required");
   return axiosInstance.get<{ success: boolean; data: AssessmentResponse }>(`/assessment/${id}`);
 };
+
+// POST /assessment/:assessmentId/assign  (assessment-module assign — keep distinct from `/progress/assign-assessment`)
+export const apiAssignAssessmentViaModule = (assessmentId: string, payload: AssignAssessmentUsersPayload) =>
+  axiosInstance.post<{ success: boolean; message?: string; data?: unknown }>(
+    `/assessment/${encodeURIComponent(assessmentId)}/assign`,
+    payload,
+  );
 
 // DELETE /assessment  body: { ids }
 export const apiDeleteAssessments = (ids: string[]) =>

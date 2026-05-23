@@ -75,7 +75,7 @@ export interface UpdateInterestPayload {
 }
 
 export interface UpdateInterestStatusPayload {
-  status: 'accepted' | 'rejected';
+  status: Extract<InterestStatus, 'accepted' | 'rejected' | 'pending'>;
 }
 
 // Dynamic fields

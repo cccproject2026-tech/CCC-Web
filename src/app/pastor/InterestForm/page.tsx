@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 
 
 import { Country, State } from "country-state-city";
@@ -39,6 +39,23 @@ const emptyChurch = (): ChurchRow => ({
   zipCode: "",
   country: "",
 });
+
+/** Map URL `userType` (from onboarding) onto API `InterestTitle` when role matches. */
+function interestTitleFromUserType(
+  userTypeRaw: string | null,
+  roleParam: string
+): InterestTitle | null {
+  const u = (userTypeRaw ?? "").trim().toLowerCase().replace(/\s+/g, "-");
+  if (roleParam === "mentor") {
+    if (u === "field-mentor") return "Field Mentor";
+    if (u === "mentor") return "Mentor";
+    return null;
+  }
+  if (u === "lay-leader") return "Lay Leader";
+  if (u === "seminarian") return "Seminarian";
+  if (u === "pastor") return "Pastor";
+  return null;
+}
 
 function axiosErrorMessage(err: unknown): string {
   if (isAxiosError(err)) {
@@ -94,6 +111,14 @@ function InterestFormContent() {
   });
 
   const [churches, setChurches] = useState<ChurchRow[]>([emptyChurch()]);
+
+  useEffect(() => {
+    const userType = searchParams.get("userType");
+    const mapped = interestTitleFromUserType(userType, role);
+    if (mapped) {
+      setForm((prev) => ({ ...prev, title: mapped }));
+    }
+  }, [searchParams, role]);
 
   // const interests = [
   //   "I would like to find out more about the Center for Community Change",
