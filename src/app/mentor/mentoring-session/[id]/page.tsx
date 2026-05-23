@@ -7,7 +7,12 @@ import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStat
 import ConfirmModal from "@/app/Components/ui/ConfirmModal";
 import { useToast } from "@/app/Components/ui/Toast";
 import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
-import { apiGenerateTranscriptSummary, apiGetTranscriptSummary } from "@/app/Services/appointments.service";
+import { apiGenerateTranscriptSummary } from "@/app/Services/appointments.service";
+import {
+  apiCompleteMentoringSession,
+  apiGetMentoringSessionById,
+  apiGetMentoringSessionTranscriptSummary,
+} from "@/app/Services/mentoring-sessions.service";
 import type { AppointmentResponse, TranscriptSummaryResponseDto } from "@/app/Services/types/appointments.types";
 import {
   appointmentPlatformLabel,
@@ -20,7 +25,6 @@ import {
 } from "@/app/utils/meetingLinkDetails";
 import { formatSessionTime, getNextSessionId } from "../utils/sessionFlow";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMentorSessionActions, useMentorSessionDetailQuery } from "../hooks/useMentorshipQueries";
 
 type TranscriptSummary = {
   appointmentId: string;
@@ -38,54 +42,68 @@ type TranscriptSummary = {
   cached?: boolean;
 };
 
+function getStringValue(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
+}
+
+function unwrapMentoringSessionResponse(res: any) {
+  const root = res?.data;
+  const payload = root?.data ?? root;
+  return payload?.session ?? payload?.mentoringSession ?? payload ?? null;
+}
+
+function getEmbeddedAppointment(session: any): AppointmentResponse | null {
+  const appointment = session?.appointment || session?.appointmentDetails || null;
+  return appointment && typeof appointment === "object" ? (appointment as AppointmentResponse) : null;
+}
+
 export default function MentorMentoringSessionDetailPage() {
   const toast = useToast();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const search = useSearchParams();
   const pastorIdFromQuery = search.get("pastorId") || "";
-  const sessionNumberFromQuery = Number(search.get("sessionNumber") || "");
-  const titleFromQuery = search.get("title") || "";
-const statusFromQuery = search.get("status") || "";
-const scheduledDateFromQuery = search.get("scheduledDate") || "";
 
   // const sessionId = decodeURIComponent(params.id);
   const sessionId = decodeURIComponent(params.id);
-const isGeneratedSessionId = sessionId.startsWith("locked-");
+const isGeneratedSessionId =
+  sessionId.startsWith("locked-") || sessionId.startsWith("unscheduled-");
   const queryClient = useQueryClient();
 
   const [confirm, setConfirm] = useState<{ kind: "complete" | "redo" } | null>(null);
+  const [actionLoading, setActionLoading] = useState<"complete" | null>(null);
   const [tsData, setTsData] = useState<TranscriptSummary | null>(null);
   const [tsTab, setTsTab] = useState<"transcript" | "summary">("transcript");
-  // const detailQuery = useMentorSessionDetailQuery(sessionId, pastorIdFromQuery);
-  const detailQuery = useMentorSessionDetailQuery(
-  isGeneratedSessionId ? "" : sessionId,
-  pastorIdFromQuery
-);
-  const { completeMutation, redoMutation, actionLoading } = useMentorSessionActions(sessionId);
+  const detailQuery = useQuery({
+    queryKey: ["mentoring-session", sessionId],
+    enabled: Boolean(sessionId) && !isGeneratedSessionId,
+    retry: false,
+    queryFn: async () => {
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[mentor mentoring-session detail] fetching session", { sessionId });
+      }
+
+      const res = await apiGetMentoringSessionById(sessionId);
+      const session = unwrapMentoringSessionResponse(res);
+      if (!session) return null;
+      return {
+        session,
+        sessionsForPastor: [session],
+        appointment: getEmbeddedAppointment(session),
+        pastorId: getStringValue(session?.pastorId, session?.userId, pastorIdFromQuery),
+      };
+    },
+  });
   const loading = detailQuery.isLoading;
   // const session = detailQuery.data?.session ?? null;
  const rawSession = detailQuery.data?.session ?? null;
 
-const fallbackSession =
-  isGeneratedSessionId && sessionNumberFromQuery
-    ? {
-        id: sessionId,
-        appointmentId: "",
-        pastorId: pastorIdFromQuery,
-        sessionNumber: sessionNumberFromQuery,
-        title: titleFromQuery || `Session ${sessionNumberFromQuery}`,
-        status: statusFromQuery || "LOCKED",
-        scheduledDate: scheduledDateFromQuery,
-      }
-    : null;
-
 const session =
   rawSession ||
-  detailQuery.data?.sessionsForPastor?.find(
-    (s) => Number(s.sessionNumber) === sessionNumberFromQuery
-  ) ||
-  fallbackSession ||
   null;
   const sessionsForPastor = detailQuery.data?.sessionsForPastor ?? [];
   const appointment = (detailQuery.data?.appointment ?? null) as AppointmentResponse | null;
@@ -149,8 +167,9 @@ const session =
     queryFn: async () => {
       const appointmentId = String(session?.appointmentId ?? "").trim();
       if (!appointmentId) throw new Error("Missing appointment ID");
-      const res = await apiGetTranscriptSummary(appointmentId);
-      return (res.data?.data ?? res.data) as TranscriptSummaryResponseDto;
+      const res = await apiGetMentoringSessionTranscriptSummary(appointmentId);
+      const data = res.data as TranscriptSummaryResponseDto | { data?: TranscriptSummaryResponseDto };
+      return ("data" in data && data.data ? data.data : data) as TranscriptSummaryResponseDto;
     },
   });
 
@@ -220,8 +239,13 @@ const session =
   };
 
   const runAction = async (kind: "complete" | "redo") => {
-    if (!session?.appointmentId) {
-      toast.show({ kind: "error", title: "Missing appointment/pastor info" });
+    if (kind === "redo") {
+      toast.show({ kind: "info", title: "Reschedule date picker is not implemented yet." });
+      return;
+    }
+
+    if (!session?.id) {
+      toast.show({ kind: "error", title: "Missing session info" });
       return;
     }
     if (!pastorId) {
@@ -229,19 +253,14 @@ const session =
       return;
     }
     try {
-      if (kind === "complete") {
-        await completeMutation.mutateAsync({ appointmentId: String(session.appointmentId) });
-        toast.show({ kind: "success", title: "Session completed" });
-      } else {
-        await redoMutation.mutateAsync({ appointmentId: String(session.appointmentId) });
-        toast.show({ kind: "success", title: "Redo scheduled" });
-        router.push(`/mentor/mentoring-session?pastorId=${encodeURIComponent(pastorId)}`);
-        return;
-      }
-      await queryClient.invalidateQueries({ queryKey: ["mentorship-sessions"] });
-      await queryClient.invalidateQueries({ queryKey: ["mentorship-session", sessionId] });
+      setActionLoading("complete");
+      await apiCompleteMentoringSession(String(session.id));
+      toast.show({ kind: "success", title: "Session completed" });
+      await queryClient.invalidateQueries({ queryKey: ["mentoring-session", sessionId] });
     } catch (e) {
-      toast.show({ kind: "error", title: kind === "complete" ? "Cannot complete session" : "Cannot redo session", subtitle: extractApiErrorMessage(e) });
+      toast.show({ kind: "error", title: "Cannot complete session", subtitle: extractApiErrorMessage(e) });
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -250,6 +269,28 @@ const session =
       <div className="min-h-screen bg-[#062946] text-white font-[Albert_Sans]">
         <MentorHeader showFullHeader />
         <div className="mx-auto max-w-5xl px-4 md:px-8 py-10 text-white/70">Loading…</div>
+      </div>
+    );
+  }
+
+  if (isGeneratedSessionId) {
+    return (
+      <div className="min-h-screen bg-[#062946] text-white font-[Albert_Sans]">
+        <MentorHeader showFullHeader />
+        <div className="mx-auto max-w-5xl px-4 md:px-8 py-10">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+            <div className="text-lg font-semibold">This session is locked/not available yet</div>
+            <p className="mt-2 text-sm text-white/60">
+              Complete the earlier sessions before opening this session.
+            </p>
+            <button
+              className="mt-4 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
+              onClick={() => router.push("/mentor/mentoring-session")}
+            >
+              Back
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -415,7 +456,7 @@ const session =
                 actionLoading != null ? "opacity-60 cursor-not-allowed" : ""
               }`}
             >
-       {actionLoading === "redo" ? "Scheduling…" : "Schedule Repeat Session"}
+       Schedule Repeat Session
             </button>
 
             <a

@@ -7,7 +7,10 @@ import SessionProgressHeader from "@/app/Components/mentorship-sessions/SessionP
 import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStatusBadge";
 import { formatSessionTime, getNextSessionId } from "./utils/sessionFlow";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMentorGroupedSessionsQuery, type MentorSession } from "./hooks/useMentorshipQueries";
+import {
+  apiGetMentorMentoringSessionsGrouped,
+  apiGetMentorRescheduleRequests,
+} from "@/app/Services/mentoring-sessions.service";
 const SESSION_TITLES = [
   "Building Trust, Self-Awareness & Resources",
   "Creating a Life of Prayer, Vision, & Family Balance",
@@ -20,6 +23,138 @@ const SESSION_TITLES = [
   "Celebrating & Envisioning Growth",
   "Expanding Mentoring Networks",
 ];
+
+type MentorSession = {
+  id: string;
+  appointmentId?: string;
+  pastorId: string;
+  pastorName?: string;
+  pastorEmail?: string;
+  sessionNumber: number;
+  title: string;
+  status: string;
+  scheduledDate: string;
+  mentorNote?: string;
+};
+
+type MentorSessionGroup = {
+  pastorId: string;
+  pastorName: string;
+  pastorEmail: string;
+  sessions: MentorSession[];
+};
+
+function getStringValue(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
+}
+
+function parseStoredUserId(value: string) {
+  if (!value) return "";
+  try {
+    const parsed = JSON.parse(decodeURIComponent(value));
+    return getStringValue(parsed?.id, parsed?._id, parsed?.userId);
+  } catch {
+    return "";
+  }
+}
+
+function getCookieValue(name: string) {
+  if (typeof document === "undefined") return "";
+  return (
+    document.cookie
+      .split("; ")
+      .find((row) => row.startsWith(`${name}=`))
+      ?.split("=")[1] || ""
+  );
+}
+
+function getBrowserMentorId() {
+  if (typeof window === "undefined") return "";
+
+  return (
+    parseStoredUserId(getCookieValue("mentor")) ||
+    parseStoredUserId(localStorage.getItem("mentor") || "") ||
+    parseStoredUserId(getCookieValue("user")) ||
+    parseStoredUserId(localStorage.getItem("user") || "") ||
+    localStorage.getItem("mentorId") ||
+    localStorage.getItem("userId") ||
+    getCookieValue("mentorId") ||
+    getCookieValue("userId") ||
+    ""
+  );
+}
+
+function unwrapGroupedSessionsResponse(res: any): any[] {
+  const data = res?.data?.data ?? res?.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.groups)) return data.groups;
+  if (Array.isArray(data?.grouped)) return data.grouped;
+  if (Array.isArray(data?.pastors)) return data.pastors;
+  return [];
+}
+
+function normalizeBackendSession(session: any, group: any): MentorSession | null {
+  const appointmentId = getStringValue(session?.appointmentId, session?.appointment?._id, session?.appointment?.id);
+  const id = getStringValue(session?._id, session?.sessionId, session?.id);
+  if (!id) return null;
+
+  const pastor = group?.pastor && typeof group.pastor === "object" ? group.pastor : null;
+  const pastorId = getStringValue(
+    session?.pastorId,
+    session?.userId,
+    group?.pastorId,
+    group?.userId,
+    pastor?._id,
+    pastor?.id,
+  );
+
+  return {
+    ...session,
+    id,
+    appointmentId,
+    pastorId,
+    pastorName: getStringValue(
+      session?.pastorName,
+      group?.pastorName,
+      group?.name,
+      `${pastor?.firstName || ""} ${pastor?.lastName || ""}`.trim(),
+      pastor?.email,
+    ),
+    pastorEmail: getStringValue(session?.pastorEmail, group?.pastorEmail, group?.email, pastor?.email),
+    sessionNumber: Number(session?.sessionNumber || session?.sessionNo || 0),
+    title: getStringValue(session?.title),
+    mentorNote: getStringValue(session?.mentorNote, session?.title),
+    status: getStringValue(session?.status, "SCHEDULED").toUpperCase(),
+    scheduledDate: getStringValue(session?.scheduledDate, session?.meetingDate, session?.date),
+  };
+}
+
+function normalizeGroupedSession(group: any): MentorSessionGroup | null {
+  const pastor = group?.pastor && typeof group.pastor === "object" ? group.pastor : null;
+  const pastorId = getStringValue(group?.pastorId, group?.userId, pastor?._id, pastor?.id);
+  if (!pastorId) return null;
+
+  const sessions = (Array.isArray(group?.sessions) ? group.sessions : [])
+    .map((session: any) => normalizeBackendSession(session, group))
+    .filter(Boolean) as MentorSession[];
+
+  return {
+    pastorId,
+    pastorName: getStringValue(
+      group?.pastorName,
+      group?.name,
+      `${pastor?.firstName || ""} ${pastor?.lastName || ""}`.trim(),
+      pastor?.email,
+      "Pastor",
+    ),
+    pastorEmail: getStringValue(group?.pastorEmail, group?.email, pastor?.email),
+    sessions,
+  };
+}
 export default function MentorMentoringSessionPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -28,9 +163,9 @@ export default function MentorMentoringSessionPage() {
     const [search, setSearch] = useState("");
     const [rescheduleRequests, setRescheduleRequests] = useState<any[]>([]);
     const [selectedPastorId, setSelectedPastorId] = useState<string | null>(null);
-    const { data: groupedSessions = [], isLoading: loading, error } = useMentorGroupedSessionsQuery();
-
-    const groupedError = error instanceof Error ? error.message : null;
+    const [groupedSessions, setGroupedSessions] = useState<MentorSessionGroup[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [groupedError, setGroupedError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!groupedSessions.length) return;
@@ -44,15 +179,76 @@ export default function MentorMentoringSessionPage() {
         // If nothing selected (first load), auto-select the first pastor with sessions.
         setSelectedPastorId((prev) => (prev && groupedSessions.some((g) => g.pastorId === prev) ? prev : groupedSessions[0].pastorId));
     }, [groupedSessions, pastorIdFromQuery]);
+
     useEffect(() => {
-  const requests = JSON.parse(localStorage.getItem("missedSessionRescheduleRequests") || "[]");
-  setRescheduleRequests(requests);
-}, []);
+      let cancelled = false;
+
+      const loadGroupedSessions = async () => {
+        try {
+          setLoading(true);
+          setGroupedError(null);
+
+          const mentorId = getBrowserMentorId();
+          if (!mentorId) {
+            setGroupedSessions([]);
+            setRescheduleRequests([]);
+            return;
+          }
+
+          const [groupedRes, requestRes] = await Promise.all([
+            apiGetMentorMentoringSessionsGrouped(mentorId),
+            apiGetMentorRescheduleRequests(mentorId),
+          ]);
+
+          const groups = unwrapGroupedSessionsResponse(groupedRes)
+            .map(normalizeGroupedSession)
+            .filter(Boolean) as MentorSessionGroup[];
+          const requestPayload = requestRes?.data as any;
+          const requests = Array.isArray(requestPayload)
+            ? requestPayload
+            : Array.isArray(requestPayload?.data)
+              ? requestPayload.data
+              : [];
+
+          if (!cancelled) {
+            setGroupedSessions(groups);
+            setRescheduleRequests(requests);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setGroupedSessions([]);
+            setRescheduleRequests([]);
+            setGroupedError(err instanceof Error ? err.message : "Failed to load mentoring sessions.");
+          }
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      };
+
+      loadGroupedSessions();
+      return () => {
+        cancelled = true;
+      };
+    }, []);
 
     // const handleViewDetails = (session: MentorSession) => {
     //     router.push(`/mentor/mentoring-session/${encodeURIComponent(session.id)}?pastorId=${encodeURIComponent(session.pastorId)}`);
     // };
  const handleViewDetails = (session: MentorSession) => {
+  const sessionId = String(session.id || "");
+  if (sessionId.startsWith("locked-") || sessionId.startsWith("unscheduled-")) {
+    alert("This session is not available yet.");
+    return;
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    console.debug("[mentor mentoring-session] opening detail route", {
+      routeSessionId: sessionId,
+      appointmentId: session.appointmentId || "",
+      usesAppointmentId: Boolean(session.appointmentId && sessionId === session.appointmentId),
+    });
+  }
+
   const params = new URLSearchParams({
     pastorId: session.pastorId,
     sessionNumber: String(session.sessionNumber),
@@ -62,7 +258,7 @@ export default function MentorMentoringSessionPage() {
   });
 
   router.push(
-    `/mentor/mentoring-session/${encodeURIComponent(session.id)}?${params.toString()}`
+    `/mentor/mentoring-session/${encodeURIComponent(sessionId)}?${params.toString()}`
   );
 };
 const buildAllSessions = (sessions: MentorSession[], pastorId: string) => {
@@ -124,14 +320,13 @@ const status = isCompleted
         apiSession?.id ||
         `locked-${pastorId}-${sessionNumber}`,
       appointmentId:
-        apiSession?.appointmentId ||
-        `locked-${pastorId}-${sessionNumber}`,
+        apiSession?.appointmentId,
       pastorId,
       sessionNumber,
     //   title:
     //     apiSession?.title ||
     //     `Session ${sessionNumber}—${title}`,
-    title: `Session ${sessionNumber}—${title}`,
+    title: apiSession?.title || `Session ${sessionNumber}—${title}`,
       status,
     //   scheduledDate: isCompleted
     //     ? apiSession?.scheduledDate || ""
@@ -159,9 +354,16 @@ const allSessionsForPastor = useMemo(
 );
 
 const sortedSessions = allSessionsForPastor;
+    // const nextSessionId = getNextSessionId(
+    //     sortedSessions.map((s) => ({ id: s.id, status: s.status, scheduledDate: s.scheduledDate })),
+    // );
     const nextSessionId = getNextSessionId(
-        sortedSessions.map((s) => ({ id: s.id, status: s.status, scheduledDate: s.scheduledDate })),
-    );
+  sortedSessions.map((s) => ({
+    id: s.id,
+    status: s.status as any,
+    scheduledDate: s.scheduledDate,
+  })),
+);
 
 const getRescheduleRequestForSession = (session: any) =>
   rescheduleRequests.find(
@@ -536,7 +738,7 @@ const filteredSessions = allSessions.filter((session) => {
                                                 <div className="space-y-4">
              {filteredSessions.map((session) => (
                                                         <div
-                                                            key={session.appointmentId}
+                                                            key={session.id}
                                                             className="group rounded-2xl border border-white/15 bg-white/5 backdrop-blur-sm transition hover:border-[#8ec5eb]/30 hover:bg-white/10"
                                                         >
                                                             <button onClick={() => handleViewDetails(session)} className="w-full px-6 py-4 text-left">

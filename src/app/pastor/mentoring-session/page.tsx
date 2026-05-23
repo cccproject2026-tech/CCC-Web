@@ -1,6 +1,10 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { apiGetUserById } from "@/app/Services/users.service";
+import {
+  apiGetPastorMentoringSessions,
+  apiRequestMentoringSessionReschedule,
+} from "@/app/Services/mentoring-sessions.service";
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/progress-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -8,7 +12,6 @@ import SessionProgressHeader from "@/app/Components/mentorship-sessions/SessionP
 import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStatusBadge";
 import { formatSessionTime, getNextSessionId } from "./utils/sessionFlow";
 import { useRouter } from "next/navigation";
-import { usePastorSessionsQuery } from "@/app/mentor/mentoring-session/hooks/useMentorshipQueries";
 
 const SESSION_FLOW = [
     {
@@ -85,14 +88,61 @@ function isSessionMissed(session: any) {
   if (!session?.scheduledDate || session.status !== "SCHEDULED") return false;
   return new Date(session.scheduledDate).getTime() < Date.now();
 }
+
+function unwrapMentoringSessionsResponse(res: any): any[] {
+  const data = res?.data?.data ?? res?.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.sessions)) return data.sessions;
+  if (Array.isArray(res?.data?.sessions)) return res.data.sessions;
+  return [];
+}
+
+function normalizeBackendSession(session: any) {
+  const id = getStringValue(session?.id, session?._id);
+  if (!id) return null;
+
+  return {
+    ...session,
+    id,
+    sessionNumber: Number(session?.sessionNumber || session?.sessionNo || 0),
+    title: getStringValue(session?.title),
+    mentorNote: getStringValue(session?.mentorNote, session?.title),
+    status: getStringValue(session?.status, "SCHEDULED").toUpperCase(),
+    scheduledDate: getStringValue(session?.scheduledDate, session?.meetingDate, session?.date),
+  };
+}
+
+function getBrowserUserId() {
+  if (typeof window === "undefined") return "";
+
+  const parseUserId = (value: string) => {
+    if (!value) return "";
+    try {
+      const parsed = JSON.parse(decodeURIComponent(value));
+      return getStringValue(parsed?.id, parsed?._id, parsed?.userId);
+    } catch {
+      return "";
+    }
+  };
+
+  const cookieUser =
+    document.cookie
+      .split("; ")
+      .find((row) => row.startsWith("user="))
+      ?.split("=")[1] || "";
+
+  return parseUserId(cookieUser) || parseUserId(localStorage.getItem("user") || "") || "";
+}
 export default function PastorMentoringSessionPage() {
     const router = useRouter();
     const [filterStatus, setFilterStatus] = useState("All");
     const [search, setSearch] = useState("");
     const [selectedSessionNumber, setSelectedSessionNumber] = useState<number | null>(null);
-    const { data: sessions = [], isLoading: loading, error } = usePastorSessionsQuery();
+    const [sessions, setSessions] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [sessionsError, setSessionsError] = useState<string | null>(null);
     const [assignedMentor, setAssignedMentor] = useState<any>(null);
-    const sessionsError = error instanceof Error ? error.message : null;
+    const [rescheduleRequestingId, setRescheduleRequestingId] = useState<string | null>(null);
 
     useEffect(() => {
   const getCookieValue = (name: string) => {
@@ -108,7 +158,8 @@ export default function PastorMentoringSessionPage() {
   const getCurrentUserId = () => {
     if (typeof window === "undefined") return "";
 
-    const userId = localStorage.getItem("userId") || getCookieValue("userId");
+    const resolvedUserId = getBrowserUserId();
+    const userId = resolvedUserId || localStorage.getItem("userId") || getCookieValue("userId");
     if (userId) return userId;
 
     const userValue =
@@ -170,6 +221,48 @@ for (const mentorId of mentorIds) {
   };
 
   loadAssignedMentor();
+}, []);
+
+useEffect(() => {
+  let cancelled = false;
+
+  const loadSessions = async () => {
+    try {
+      setLoading(true);
+      setSessionsError(null);
+
+      const resolvedUserId = getBrowserUserId();
+      const pastorId =
+        resolvedUserId ||
+        (() => {
+          if (typeof window === "undefined") return "";
+          return localStorage.getItem("userId") || "";
+        })();
+
+      if (!pastorId) {
+        setSessions([]);
+        return;
+      }
+
+      const res = await apiGetPastorMentoringSessions(pastorId);
+      const rows = unwrapMentoringSessionsResponse(res)
+        .map(normalizeBackendSession)
+        .filter(Boolean);
+      if (!cancelled) setSessions(rows);
+    } catch (err) {
+      if (!cancelled) {
+        setSessions([]);
+        setSessionsError(err instanceof Error ? err.message : "Failed to load mentoring sessions.");
+      }
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  };
+
+  loadSessions();
+  return () => {
+    cancelled = true;
+  };
 }, []);
 
     // const filteredSessions = sessions.filter((session) => {
@@ -243,7 +336,7 @@ const status = isCompleted
     return {
       id: apiSession?.id || `locked-session-${sessionNumber}`,
       sessionNumber,
-      title,
+      title: apiSession?.title || title,
       mentorNote: apiSession?.mentorNote || `Session ${sessionNumber}—${title}`,
       status,
     //   scheduledDate: apiSession?.scheduledDate || fallbackDate?.toISOString() || "",
@@ -660,33 +753,26 @@ const selectedTranscriptText = getTranscriptText(
           {selectedSessionMissed ? (
   <button
     type="button"
-    onClick={() => {
-      const requests = JSON.parse(localStorage.getItem("missedSessionRescheduleRequests") || "[]");
+    disabled={!selectedRaw?.id || rescheduleRequestingId === selectedRaw.id}
+    onClick={async () => {
+      if (!selectedRaw?.id) {
+        alert("This session is not available for reschedule yet.");
+        return;
+      }
 
-const newRequest = {
-  sessionId: selectedSession.id,
-  sessionNumber: selectedSession.sessionNumber,
-  pastorId: selectedRaw?.pastorId || selectedRaw?.userId || "",
-  mentorId: selectedMentor?.id || selectedMentor?._id || "",
-  title: selectedSession.title,
-  scheduledDate: selectedSession.scheduledDate,
-  status: "REQUESTED",
-  requestedAt: new Date().toISOString(),
-};
-
-localStorage.setItem(
-  "missedSessionRescheduleRequests",
-  JSON.stringify([
-    ...requests.filter((req: any) => req.sessionId !== selectedSession.id),
-    newRequest,
-  ])
-);
-
-alert("Reschedule request sent to your mentor.");
+      try {
+        setRescheduleRequestingId(selectedRaw.id);
+        await apiRequestMentoringSessionReschedule(selectedRaw.id);
+        alert("Reschedule request sent to your mentor.");
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Failed to request reschedule.");
+      } finally {
+        setRescheduleRequestingId(null);
+      }
     }}
-    className="mt-4 w-full rounded-xl bg-[#8ec5eb] px-4 py-3 text-sm font-bold text-[#062946] transition hover:bg-[#b7def6]"
+    className="mt-4 w-full rounded-xl bg-[#8ec5eb] px-4 py-3 text-sm font-bold text-[#062946] transition hover:bg-[#b7def6] disabled:cursor-not-allowed disabled:opacity-60"
   >
-   Request Reschedule Missed Session
+   {rescheduleRequestingId === selectedRaw?.id ? "Sending request..." : "Request Reschedule Missed Session"}
   </button>
 ) : null}
         </div>

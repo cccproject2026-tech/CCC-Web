@@ -155,7 +155,9 @@ export interface CreateRoadMapPayload {
 }
 
 export interface UpdateRoadMapPayload extends Partial<CreateRoadMapPayload> {}
-
+export interface ReorderRoadmapsPayload {
+  orderedRoadmapIds: string[];
+}
 export interface UpdateNestedRoadMapItemPayload {
   name?: string;
   roadMapDetails?: string;

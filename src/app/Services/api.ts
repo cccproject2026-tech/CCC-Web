@@ -108,6 +108,7 @@ export {
   apiGetRoadmapsByUser,
   apiGetRoadmapById,
   apiCreateRoadmap,
+  apiReorderRoadmaps,
   apiUpdateRoadmap,
   apiDeleteRoadmap,
   apiGetNestedRoadmapItem,
