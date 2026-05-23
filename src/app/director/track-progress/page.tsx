@@ -57,13 +57,21 @@ type MentorListItem = {
   mentorImage: string;
 };
 
+// type ProgressListItem = {
+//   userId: string;
+//   fullName: string;
+//   role: string;
+//   progress: number;
+//   // profileImage: string | (typeof PLACEHOLDER_IMAGES)[number];
+//   profileImage: string;
+// };
 type ProgressListItem = {
   userId: string;
   fullName: string;
   role: string;
   progress: number;
-  // profileImage: string | (typeof PLACEHOLDER_IMAGES)[number];
   profileImage: string;
+  email?: string;
 };
 
 function numFromApi(v: unknown): number {
@@ -102,16 +110,26 @@ function normalizeRow(
     `${item.firstName ?? ""} ${item.lastName ?? ""}`.trim() ||
     item.email ||
     "Unknown";
+  // return {
+  //   userId,
+  //   fullName,
+  //   role: item.role ?? "—",
+  //   progress: Math.round(
+  //     Math.min(100, Math.max(0, item.overallProgress ?? 0)),
+  //   ),
+  //   // profileImage: imageForItem(item.profilePicture, index),
+  //   profileImage: imageForItem(item.profilePicture, fullName),
+  // };
   return {
-    userId,
-    fullName,
-    role: item.role ?? "—",
-    progress: Math.round(
-      Math.min(100, Math.max(0, item.overallProgress ?? 0)),
-    ),
-    // profileImage: imageForItem(item.profilePicture, index),
-    profileImage: imageForItem(item.profilePicture, fullName),
-  };
+  userId,
+  fullName,
+  role: item.role ?? "—",
+  progress: Math.round(
+    Math.min(100, Math.max(0, item.overallProgress ?? 0)),
+  ),
+  profileImage: imageForItem(item.profilePicture, fullName),
+  email: item.email || "",
+};
 }
 
 function isMenteeRole(role: string | undefined): boolean {
@@ -846,10 +864,18 @@ const mentorImage =
                     progress={item.progress}
                     slug={item.userId}
                     showCompleteButton={false}
-                    onEmailClick={(e) => e.stopPropagation()}
-                    onMessageClick={(e) => e.stopPropagation()}
-                    onWhatsAppClick={(e) => e.stopPropagation()}
-                    onPhoneClick={(e) => e.stopPropagation()}
+                    // onEmailClick={(e) => e.stopPropagation()}
+                    // onMessageClick={(e) => e.stopPropagation()}
+                    // onWhatsAppClick={(e) => e.stopPropagation()}
+                    // onPhoneClick={(e) => e.stopPropagation()}
+                    onEmailClick={(e) => {
+  e.stopPropagation();
+  if (!item.email) return;
+
+window.location.href = `mailto:${item.email}?subject=${encodeURIComponent(
+  "Community Change Progress",
+)}`;
+}}
                   />
                 </div>
               ))}

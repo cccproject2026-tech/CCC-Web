@@ -10,6 +10,10 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import {
+  collapseRoadmapAssignmentsToParents,
+  fetchRoadmapAssignmentsForUser,
+} from "@/app/Services/roadmap-assignments";
+import {
   IndividualBreakdownBarChart,
   OverallProgressDonut,
   ProgressFilterSegmented,
@@ -154,42 +158,88 @@ export default function PastorMyProgressPage() {
     });
   }, [userId]);
 
-  useEffect(() => {
-    if (!progress?.roadmaps?.length) return;
+//   useEffect(() => {
+//     if (!progress?.roadmaps?.length) return;
 
-    const hydrateRoadmaps = async () => {
-      try {
-        const results = await Promise.allSettled(
-          progress.roadmaps.map(async (r: any) => {
-            const rid = r.roadMapId ?? r.roadmapId ?? r._id;
-            const res = await apiGetRoadmapById(rid);
-            const roadmap = res.data?.data;
-            const percent = r.progressPercentage ?? 0;
-            const isPhase =
-              String(roadmap?.type || "").toLowerCase() === "phase" ||
-              roadmap?.haveNextedRoadMaps === true ||
-              (Array.isArray(roadmap?.roadmaps) && roadmap.roadmaps.length > 0);
-            return {
-              ...r,
-              roadMapId: rid,
-              title: roadmap?.name,
-              description: roadmap?.description,
-              timeline: roadmap?.timeline,
-              imageUrl: roadmap?.imageUrl,
-              percent,
-              isPhase,
-            };
-          }),
-        );
-        const valid = results.filter((r) => r.status === "fulfilled").map((r: any) => r.value);
-        setRoadmaps(valid);
-      } catch (err) {
-        console.error("Failed to load roadmap details", err);
-      }
-    };
+//     const hydrateRoadmaps = async () => {
+//       try {
+//         const results = await Promise.allSettled(
+//           progress.roadmaps.map(async (r: any) => {
+//             const rid = r.roadMapId ?? r.roadmapId ?? r._id;
+//             const res = await apiGetRoadmapById(rid);
+//             const roadmap = res.data?.data;
+//             const percent = r.progressPercentage ?? 0;
+//            const normalizedPercent = Math.min(100, Math.max(0, Number(percent || 0)));
+// const normalizedStatus = String(r.status || "").toLowerCase();
+//             const isPhase =
+//               String(roadmap?.type || "").toLowerCase() === "phase" ||
+//               roadmap?.haveNextedRoadMaps === true ||
+//               (Array.isArray(roadmap?.roadmaps) && roadmap.roadmaps.length > 0);
+//             return {
+//               ...r,
+//               roadMapId: rid,
+//               title: roadmap?.name,
+//               description: roadmap?.description,
+//               timeline: roadmap?.timeline,
+//               imageUrl: roadmap?.imageUrl,
+//               // percent,
+//               percent: normalizedPercent,
+// status: normalizedStatus,
+//               isPhase,
+//             };
+//           }),
+//         );
+//         const valid = results.filter((r) => r.status === "fulfilled").map((r: any) => r.value);
+//         setRoadmaps(valid);
+//       } catch (err) {
+//         console.error("Failed to load roadmap details", err);
+//       }
+//     };
 
-    hydrateRoadmaps();
-  }, [progress]);
+//     hydrateRoadmaps();
+//   }, [progress]);
+useEffect(() => {
+  if (!userId) return;
+
+  const hydrateRoadmaps = async () => {
+    try {
+      const data = await fetchRoadmapAssignmentsForUser(userId);
+      const parentCards = collapseRoadmapAssignmentsToParents(data);
+      console.log("PARENT CARDS", parentCards);
+
+      const mapped = parentCards.map((item: any) => ({
+        roadMapId: item.id,
+        title: item.title,
+        description: item.desc || "No description",
+        timeline: item.months || "—",
+        imageUrl: item.imageUrl,
+        percent: item.progress ?? 0,
+        status: item.status,
+        // completedSteps: item.completedSteps ?? 0,
+        // totalSteps: item.totalSteps ?? 0,
+        completedSteps:
+  item.completedSteps ??
+  item.completedTaskCount ??
+  item.completedTasks ??
+  0,
+
+totalSteps:
+  item.totalSteps ??
+  item.totalTaskCount ??
+  item.totalTasks ??
+  0,
+        isPhase: item.hasNestedTasks === true,
+      }));
+
+      setRoadmaps(mapped);
+    } catch (err) {
+      console.error("Failed to load roadmap details", err);
+      setRoadmaps([]);
+    }
+  };
+
+  hydrateRoadmaps();
+}, [userId]);
 
   useEffect(() => {
     if (!userId) return;
@@ -392,8 +442,17 @@ function formatDateShort(raw: string | undefined | null): string | null {
 function PastorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: () => void }) {
   const title = roadmap.title || "Roadmap";
   const desc = roadmap.description || "";
-  const progressPct = Number(roadmap.percent ?? 0);
-  const completed = `${roadmap.completedSteps ?? 0}/${roadmap.totalSteps ?? 0}`;
+  // const progressPct = Number(roadmap.percent ?? 0);
+  // const completed = `${roadmap.completedSteps ?? 0}/${roadmap.totalSteps ?? 0}`;
+  const progressPct = Math.min(100, Math.max(0, Number(roadmap.percent ?? 0)));
+
+const totalSteps = Math.max(0, Number(roadmap.totalSteps ?? 0));
+const completedSteps = Math.min(
+  totalSteps,
+  Math.max(0, Number(roadmap.completedSteps ?? 0)),
+);
+
+const completed = `${completedSteps}/${totalSteps}`;
   const time = roadmap.timeline || "—";
   const statusLabel = formatRoadmapStatusLabel(roadmap.status);
   const chip = progressStatusChipClass(roadmap.status);
@@ -421,14 +480,17 @@ function PastorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: 
             <span className="text-[12px] font-medium text-[#8ec5eb]/90">Status</span>
             <span className={`rounded-full px-2 py-[3px] text-[11px] font-medium ${chip}`}>{statusLabel}</span>
           </div>
-          <p className="mb-1 text-[12px] text-[#8ec5eb]/80">Tasks</p>
+          {/* <p className="mb-1 text-[12px] text-[#8ec5eb]/80">Tasks</p>
           <div className="mb-1 h-2.5 w-full rounded-full bg-white/10 sm:h-3">
             <div
               className="h-full rounded-full bg-gradient-to-r from-[#5a9ec9] to-[#8ec5eb] transition-all duration-700"
               style={{ width: `${Math.min(100, progressPct)}%` }}
             />
           </div>
-          <p className="mb-2 text-[12px] font-medium text-white">{completed}</p>
+          <p className="mb-2 text-[12px] font-medium text-white">{completed}</p> */}
+          <p className="mb-2 text-[12px] text-[#8ec5eb]/80">
+  Progress status is synced with your roadmap page.
+</p>
           <p className="text-[12px] text-[#cde2f2]/80">
             Timeline <span className="font-semibold text-[#8ec5eb]">{time}</span>
           </p>

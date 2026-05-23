@@ -880,6 +880,12 @@ const hasRequiredSubmissions = useMemo(() => {
       setTimeout(() => setSaveFeedback(null), 4000);
       return;
     }
+    if (!hasRequiredSignature || !hasRequiredUploads || !hasRequiredSubmissions) {
+  setSaveSuccess(false);
+  setSaveFeedback("Please complete the task first.");
+  setTimeout(() => setSaveFeedback(null), 4000);
+  return;
+}
     setSaving(true);
     setSaveFeedback(null);
     try {
@@ -1041,6 +1047,7 @@ setPendingUploadFiles({});
       await fetchQueries(undefined, false);
       setSaveSuccess(true);
       setSaveFeedback(extrasExist ? "Progress updated." : "Progress saved.");
+      await handleMarkComplete();
       setTimeout(() => {
         setSaveSuccess(false);
         setSaveFeedback(null);
