@@ -6,8 +6,12 @@ import type {
   CancelAppointmentPayload,
   RescheduleAppointmentPayload,
   AvailabilityPayload,
+  CreateRecurringAvailabilityPayload,
+  UpdateMentorAvailabilitySettingsPayload,
+  PatchMentorAvailabilityDayPayload,
   GetAppointmentsParams,
   TranscriptSummaryResponseDto,
+  ExternalCalendarBusyPayload,
 } from "./types/appointments.types";
 
 // GET /appointments/upcoming?userId=&mentorId=&status=&futureOnly=
@@ -90,9 +94,97 @@ export const apiGetAvailability = (mentorId: string) =>
 export const apiGetWeeklyAvailability = (mentorId: string, date: string) =>
   axiosInstance.get(`/appointments/availability/${mentorId}/week`, { params: { date } });
 
-// GET /appointments/availability/:mentorId/month?date=
-export const apiGetMonthlyAvailability = (mentorId: string, date: string) =>
-  axiosInstance.get(`/appointments/availability/${mentorId}/month`, { params: { date } });
+/** GET `/appointments/availability/:mentorId/month` — prefer `year` + `month` (1–12) per backend. */
+export const apiGetMonthlyAvailability = (
+  mentorId: string,
+  paramsOrDate:
+    | { year: number; month: number; participantUserId?: string }
+    | string,
+  maybeParticipant?: string,
+) => {
+  const id = encodeURIComponent(mentorId);
+  if (typeof paramsOrDate === "string") {
+    const d = paramsOrDate.slice(0, 10);
+    return axiosInstance.get(`/appointments/availability/${id}/month`, {
+      params: { date: d, ...(maybeParticipant ? { participantUserId: maybeParticipant } : {}) },
+    });
+  }
+  return axiosInstance.get(`/appointments/availability/${id}/month`, {
+    params: {
+      year: paramsOrDate.year,
+      month: paramsOrDate.month,
+      ...(paramsOrDate.participantUserId
+        ? { participantUserId: paramsOrDate.participantUserId }
+        : {}),
+    },
+  });
+};
+
+/** GET `/appointments/availability/:mentorId/week?date=` (+ optional participant). */
+export const apiGetWeeklyAvailabilityWithParticipant = (
+  mentorId: string,
+  dateYmd: string,
+  participantUserId?: string,
+) =>
+  axiosInstance.get(`/appointments/availability/${encodeURIComponent(mentorId)}/week`, {
+    params: {
+      date: dateYmd.slice(0, 10),
+      ...(participantUserId ? { participantUserId } : {}),
+    },
+  });
+
+/** POST `/appointments/availability/recurring` — recurring pattern + horizon (backend materializes concrete days). */
+export const apiCreateRecurringAvailability = (payload: CreateRecurringAvailabilityPayload) =>
+  axiosInstance.post<{ success: boolean; message?: string }>("/appointments/availability/recurring", payload);
+
+/** PATCH `/appointments/availability/:mentorId/day` — one concrete date override. */
+export const apiPatchAvailabilityDay = (mentorId: string, body: PatchMentorAvailabilityDayPayload) =>
+  axiosInstance.patch<{ success: boolean; message?: string }>(
+    `/appointments/availability/${encodeURIComponent(mentorId)}/day`,
+    body,
+  );
+
+/** DELETE `/appointments/availability/:mentorId/day/:date` — remove materialized overrides for `YYYY-MM-DD`. */
+export const apiDeleteAvailabilityDayOccurrence = (mentorId: string, dateYmd: string) =>
+  axiosInstance.delete<{ success: boolean; message?: string }>(
+    `/appointments/availability/${encodeURIComponent(mentorId)}/day/${encodeURIComponent(dateYmd.slice(0, 10))}`,
+  );
+
+/** POST block whole day unavailable. */
+export const apiMarkAvailabilityDayUnavailable = (mentorId: string, dateYmd: string) =>
+  axiosInstance.post<{ success: boolean; message?: string }>(
+    `/appointments/availability/${encodeURIComponent(mentorId)}/day/unavailable`,
+    { date: dateYmd.slice(0, 10) },
+  );
+
+/** POST re-open blocked day with explicit slots (UTC calendar date string). */
+export const apiMarkAvailabilityDayAvailable = (
+  mentorId: string,
+  body: PatchMentorAvailabilityDayPayload,
+) =>
+  axiosInstance.post<{ success: boolean; message?: string }>(
+    `/appointments/availability/${encodeURIComponent(mentorId)}/day/available`,
+    { ...body, date: body.date.slice(0, 10) },
+  );
+
+/** PATCH mentor-level defaults shown when booking / booking rules. */
+export const apiPatchMentorAvailabilitySettings = (
+  mentorId: string,
+  body: UpdateMentorAvailabilitySettingsPayload,
+) =>
+  axiosInstance.patch<{ success: boolean; message?: string }>(
+    `/appointments/availability/${encodeURIComponent(mentorId)}/settings`,
+    body,
+  );
+
+/**
+ * Returns busy periods for the supplied user ids (typically Google Calendar free/busy via backend).
+ * 404 = integration not wired — caller should treat as skipped.
+ */
+export const apiFetchExternalCalendarBusy = (payload: ExternalCalendarBusyPayload) =>
+  axiosInstance.post<unknown>("/appointments/calendar/external-busy", payload, {
+    validateStatus: (s) => (s >= 200 && s < 300) || s === 404,
+  });
 
 type DeleteAvailabilitySlotPayload = {
   slotId: string;

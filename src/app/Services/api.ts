@@ -32,6 +32,15 @@ export {
   apiGetAvailability,
   apiGetWeeklyAvailability,
   apiGetMonthlyAvailability,
+  apiGetWeeklyAvailabilityWithParticipant,
+  apiCreateRecurringAvailability,
+  apiPatchAvailabilityDay,
+  apiDeleteAvailabilityDayOccurrence,
+  apiMarkAvailabilityDayUnavailable,
+  apiMarkAvailabilityDayAvailable,
+  apiPatchMentorAvailabilitySettings,
+  apiDeleteAvailabilitySlot,
+  apiFetchExternalCalendarBusy,
 } from './appointments.service';
 
 // ─── Interests ────────────────────────────────────────────────────────────────
