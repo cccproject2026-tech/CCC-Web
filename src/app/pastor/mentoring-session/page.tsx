@@ -85,8 +85,7 @@ function getTranscriptText(value: unknown): string {
   return "";
 }
 function isSessionMissed(session: any) {
-  if (!session?.scheduledDate || session.status !== "SCHEDULED") return false;
-  return new Date(session.scheduledDate).getTime() < Date.now();
+  return String(session?.status || "").toUpperCase() === "MISSED";
 }
 
 function unwrapMentoringSessionsResponse(res: any): any[] {
@@ -98,16 +97,15 @@ function unwrapMentoringSessionsResponse(res: any): any[] {
 }
 
 function normalizeBackendSession(session: any) {
-  const id = getStringValue(session?.id, session?._id);
-  if (!id) return null;
+  const sessionNumber = Number(session?.sessionNumber || session?.sessionNo || 0);
 
   return {
     ...session,
-    id,
-    sessionNumber: Number(session?.sessionNumber || session?.sessionNo || 0),
-    title: getStringValue(session?.title),
-    mentorNote: getStringValue(session?.mentorNote, session?.title),
-    status: getStringValue(session?.status, "SCHEDULED").toUpperCase(),
+    id: getStringValue(session?.id, session?._id, session?.sessionId),
+    sessionNumber,
+    title: getStringValue(session?.title, SESSION_TITLES[sessionNumber - 1], `Session ${sessionNumber}`),
+    mentorNote: getStringValue(session?.mentorNote, session?.title, `Session ${sessionNumber}`),
+    status: getStringValue(session?.status, "LOCKED").toUpperCase(),
     scheduledDate: getStringValue(session?.scheduledDate, session?.meetingDate, session?.date),
   };
 }
@@ -247,7 +245,7 @@ useEffect(() => {
       const res = await apiGetPastorMentoringSessions(pastorId);
       const rows = unwrapMentoringSessionsResponse(res)
         .map(normalizeBackendSession)
-        .filter(Boolean);
+        .filter((session) => session.sessionNumber > 0);
       if (!cancelled) setSessions(rows);
     } catch (err) {
       if (!cancelled) {
@@ -303,8 +301,34 @@ useEffect(() => {
 
 const completedCount = sortedSessions.filter((s) => s.status === "COMPLETED").length;
 const unlockedSessionNumber = Math.min(completedCount + 1, 10);
+const backendHasFullJourney = sortedSessions.length >= 10;
 
 const allSessions = useMemo(() => {
+  if (backendHasFullJourney) {
+    return sortedSessions.map((session) => {
+      const sessionNumber = Number(session?.sessionNumber || session?.sessionNo || 0);
+
+      return {
+        ...session,
+        id: getStringValue(session?.id, session?._id, session?.sessionId),
+        sessionNumber,
+        title: getStringValue(
+          session?.title,
+          SESSION_TITLES[sessionNumber - 1],
+          `Session ${sessionNumber}`,
+        ),
+        mentorNote: getStringValue(
+          session?.mentorNote,
+          session?.title,
+          `Session ${sessionNumber}`,
+        ),
+        status: getStringValue(session?.status, "LOCKED").toUpperCase(),
+        scheduledDate: getStringValue(session?.scheduledDate, session?.meetingDate, session?.date),
+        raw: session,
+      };
+    });
+  }
+
   return SESSION_TITLES.map((title, index) => {
     const sessionNumber = index + 1;
     const apiSession = sortedSessions.find((s) => s.sessionNumber === sessionNumber);
@@ -357,7 +381,7 @@ scheduledDate:
       raw: apiSession,
     };
   });
-}, [sortedSessions, unlockedSessionNumber]);
+}, [backendHasFullJourney, sortedSessions, unlockedSessionNumber]);
 const filteredSessions = allSessions.filter((session) => {
   if (filterStatus === "Completed") return session.status === "COMPLETED";
   if (filterStatus === "Cancelled") return session.status === "CANCELLED";
@@ -381,6 +405,7 @@ const selectedSession =
     const selectedSessionMissed = isSessionMissed(selectedSession);
 
     const selectedRaw = (selectedSession?.raw || {}) as any;
+const selectedSessionId = getStringValue(selectedRaw?.id, selectedRaw?._id, selectedRaw?.sessionId, selectedSession?.id);
 const selectedAppointment = selectedRaw?.appointment || selectedRaw?.appointmentDetails || {};
 // const selectedMentor =
 //   selectedRaw?.mentor ||
@@ -538,14 +563,23 @@ const selectedTranscriptText = getTranscriptText(
 >
     <SessionProgressHeader sessions={allSessions as any} />
 
-    {visible.map((session) => (
+    {visible.map((session, index) => {
+      const sessionStatus = String(session.status || "").toUpperCase();
+      const isLockedSession = sessionStatus === "LOCKED";
+      const isCurrentSession = backendHasFullJourney
+        ? sessionStatus === "SCHEDULED" || sessionStatus === "MISSED"
+        : session.sessionNumber === unlockedSessionNumber;
+
+      return (
       <div
-        key={session.id}
+        key={session.id || `session-${session.sessionNumber}-${index}`}
         className="group rounded-2xl border border-white/15 bg-white/5 backdrop-blur-sm transition hover:border-[#8ec5eb]/30 hover:bg-white/10"
       >
         <button
+          type="button"
+          disabled={isLockedSession}
           onClick={() => setSelectedSessionNumber(session.sessionNumber)}
-          className="w-full px-6 py-4 text-left"
+          className={`w-full px-6 py-4 text-left ${isLockedSession ? "cursor-not-allowed opacity-75" : ""}`}
         >
           <div className="flex items-center justify-between">
             <div className="flex flex-1 items-center gap-4">
@@ -559,7 +593,7 @@ const selectedTranscriptText = getTranscriptText(
                     Session {session.sessionNumber}
                   </span>
 
-                  {session.sessionNumber === unlockedSessionNumber ? (
+                  {isCurrentSession ? (
                     <span className="rounded-md border border-yellow-400/30 bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-200">
                       Current
                     </span>
@@ -571,7 +605,7 @@ const selectedTranscriptText = getTranscriptText(
                 </p>
 
                 <p className="text-sm text-white/60">
-                  {session.status === "LOCKED" || !session.scheduledDate
+                  {sessionStatus === "LOCKED" || !session.scheduledDate
                     ? "Locked"
                     : `${new Date(session.scheduledDate).toLocaleDateString("en-US", {
                         weekday: "short",
@@ -582,7 +616,7 @@ const selectedTranscriptText = getTranscriptText(
                 </p>
               </div>
 
-              {session.status === "LOCKED" ? (
+              {sessionStatus === "LOCKED" ? (
                 <span className="rounded-md bg-white/10 px-3 py-1 text-xs font-bold text-white/55">
                   LOCKED
                 </span>
@@ -598,7 +632,8 @@ const selectedTranscriptText = getTranscriptText(
           </div>
         </button>
       </div>
-    ))}
+      );
+    })}
   </div>
 
   {selectedSession ? (
@@ -753,16 +788,16 @@ const selectedTranscriptText = getTranscriptText(
           {selectedSessionMissed ? (
   <button
     type="button"
-    disabled={!selectedRaw?.id || rescheduleRequestingId === selectedRaw.id}
+    disabled={!selectedSessionId || rescheduleRequestingId === selectedSessionId}
     onClick={async () => {
-      if (!selectedRaw?.id) {
+      if (!selectedSessionId) {
         alert("This session is not available for reschedule yet.");
         return;
       }
 
       try {
-        setRescheduleRequestingId(selectedRaw.id);
-        await apiRequestMentoringSessionReschedule(selectedRaw.id);
+        setRescheduleRequestingId(selectedSessionId);
+        await apiRequestMentoringSessionReschedule(selectedSessionId);
         alert("Reschedule request sent to your mentor.");
       } catch (err) {
         alert(err instanceof Error ? err.message : "Failed to request reschedule.");
@@ -772,7 +807,7 @@ const selectedTranscriptText = getTranscriptText(
     }}
     className="mt-4 w-full rounded-xl bg-[#8ec5eb] px-4 py-3 text-sm font-bold text-[#062946] transition hover:bg-[#b7def6] disabled:cursor-not-allowed disabled:opacity-60"
   >
-   {rescheduleRequestingId === selectedRaw?.id ? "Sending request..." : "Request Reschedule Missed Session"}
+   {rescheduleRequestingId === selectedSessionId ? "Sending request..." : "Request Reschedule Missed Session"}
   </button>
 ) : null}
         </div>
