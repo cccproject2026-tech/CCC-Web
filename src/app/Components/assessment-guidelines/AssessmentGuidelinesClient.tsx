@@ -11,6 +11,8 @@ import {
   apiGetUserAnswers,
   parseAssessmentDetailPayload,
 } from "@/app/Services/assessment.service";
+import { apiGetAppointments } from "@/app/Services/appointments.service";
+import { appointmentEntityId, unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
 import { getCookie } from "@/app/utils/cookies";
 import { resolveApiMediaUrl } from "@/app/utils/image";
 
@@ -20,6 +22,8 @@ export type AssessmentGuidelinesClientProps = {
   meetingDate: string;
   mentorName: string;
   meetingPlatform: string;
+  roadmapId?: string;
+  taskId?: string;
   /** When set, load answers / CDP state for this user (mentor or director review). Otherwise use logged-in user from cookie. */
   answersUserId: string | null;
   /** Mentor/director viewing a pastor — different copy and no retake / pastor-only scheduling. */
@@ -35,6 +39,109 @@ export type AssessmentGuidelinesClientProps = {
   cdpHref: string;
   renderHeader: () => ReactNode;
 };
+
+type GuidelinesMeeting = {
+  id: string;
+  meetingDate: string;
+  platform: string;
+};
+
+function readAppointmentField(appt: Record<string, any>, key: string): string {
+  const metadata = appt.metadata || appt.meta || appt.context || {};
+  return String(appt[key] ?? metadata?.[key] ?? "").trim();
+}
+
+function notesContainToken(notes: string, key: string, value?: string | null): boolean {
+  const target = String(value ?? "").trim();
+  if (!target) return false;
+  return notes.includes(`${key}:${target}`) || notes.includes(`${key}=${target}`);
+}
+
+function formatMeetingDateTime(iso?: string) {
+  if (!iso) return { date: "", time: "" };
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { date: String(iso), time: "" };
+  return {
+    date: d.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }),
+    time: d.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    }),
+  };
+}
+
+function formatMeetingPlatform(platform?: string) {
+  const raw = String(platform ?? "").trim();
+  if (!raw) return "";
+  const normalized = raw.toLowerCase();
+  if (normalized === "google-meet" || normalized === "gmeet") return "Google Meet";
+  if (normalized === "zoom") return "Zoom";
+  if (normalized === "teams") return "Microsoft Teams";
+  if (normalized === "in-person") return "In person";
+  if (normalized === "phone") return "Phone";
+  return raw;
+}
+
+function findRoadmapAssessmentMeeting(
+  appointments: Record<string, any>[],
+  params: {
+    assessmentId: string;
+    roadmapId: string;
+    taskId: string;
+  },
+): GuidelinesMeeting | null {
+  const matches = appointments
+    .map((appt) => {
+      const status = String(appt?.status ?? "").toLowerCase();
+      if (status.includes("cancel")) return { appt, score: -1 };
+
+      const notes = String(appt?.notes ?? "");
+      let score = 0;
+
+      if (
+        readAppointmentField(appt, "assessmentId") === params.assessmentId ||
+        notesContainToken(notes, "assessmentId", params.assessmentId)
+      ) {
+        score += 10;
+      }
+
+      if (
+        readAppointmentField(appt, "roadmapId") === params.roadmapId ||
+        notesContainToken(notes, "roadmapId", params.roadmapId)
+      ) {
+        score += 4;
+      }
+
+      if (
+        readAppointmentField(appt, "taskId") === params.taskId ||
+        notesContainToken(notes, "taskId", params.taskId)
+      ) {
+        score += 4;
+      }
+
+      return { appt, score };
+    })
+    .filter((row) => row.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const aTime = new Date(String(a.appt?.meetingDate ?? "")).getTime();
+      const bTime = new Date(String(b.appt?.meetingDate ?? "")).getTime();
+      return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
+    });
+
+  const match = matches[0]?.appt;
+  if (!match) return null;
+
+  return {
+    id: appointmentEntityId(match),
+    meetingDate: String(match.meetingDate ?? ""),
+    platform: String(match.platform ?? ""),
+  };
+}
 
 const hasCdpInRecommendationsPayload = (body: unknown): boolean => {
   const walk = (node: unknown, parentSent = false): boolean => {
@@ -107,6 +214,8 @@ export function AssessmentGuidelinesClient({
   meetingDate,
   mentorName,
   meetingPlatform,
+  roadmapId = "",
+  taskId = "",
   answersUserId,
   staffReview,
   listHref,
@@ -126,6 +235,7 @@ export function AssessmentGuidelinesClient({
   const [answersSubmitted, setAnswersSubmitted] = useState(false);
   const [hasCdp, setHasCdp] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [roadmapMeeting, setRoadmapMeeting] = useState<GuidelinesMeeting | null>(null);
 
   useEffect(() => {
     if (!assessmentId) {
@@ -197,6 +307,46 @@ export function AssessmentGuidelinesClient({
     };
   }, [assessmentId, answersUserId]);
 
+  useEffect(() => {
+    if (staffReview || !assessmentId || !roadmapId || !taskId) {
+      setRoadmapMeeting(null);
+      return;
+    }
+
+    const userId = resolveAnswersUserId(null);
+    if (!userId) {
+      setRoadmapMeeting(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadRoadmapMeeting = async () => {
+      try {
+        const res = await apiGetAppointments({
+          userId,
+          futureOnly: false,
+        });
+        const appointments = unwrapAppointmentsAxiosData(res) as Record<string, any>[];
+        const match = findRoadmapAssessmentMeeting(appointments, {
+          assessmentId,
+          roadmapId,
+          taskId,
+        });
+        if (!cancelled) setRoadmapMeeting(match);
+      } catch (err) {
+        console.error("guidelines: meeting fetch", err);
+        if (!cancelled) setRoadmapMeeting(null);
+      }
+    };
+
+    void loadRoadmapMeeting();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assessmentId, roadmapId, taskId, staffReview]);
+
   const title = String(assessment?.name ?? "Assessment");
   const instructions = (assessment?.instructions as string[] | undefined) || [];
   const typeRaw = String(assessment?.type ?? "CMA").toUpperCase();
@@ -210,6 +360,16 @@ const bannerUrl =
     (assessment as { preSurvey?: unknown; preSurveyQuestions?: unknown })?.preSurvey ??
     (assessment as { preSurveyQuestions?: unknown })?.preSurveyQuestions;
   const hasPreSurvey = Array.isArray(preSurveyRaw) && preSurveyRaw.length > 0;
+  const scheduledMeeting: GuidelinesMeeting | null =
+    meetingId || meetingDate || meetingPlatform
+      ? {
+          id: meetingId,
+          meetingDate,
+          platform: meetingPlatform,
+        }
+      : roadmapMeeting;
+  const scheduledMeetingParts = formatMeetingDateTime(scheduledMeeting?.meetingDate);
+  const scheduledMeetingPlatform = formatMeetingPlatform(scheduledMeeting?.platform);
 
   if (!assessmentId) {
     return (
@@ -286,10 +446,14 @@ const bannerUrl =
 
               {!staffReview && (
                 <>
-                  {meetingId ? (
+                  {scheduledMeeting ? (
                     <button
                       type="button"
-                      onClick={() => router.push(`/pastor/appointments/${encodeURIComponent(meetingId)}`)}
+                      onClick={() => {
+                        if (scheduledMeeting.id) {
+                          router.push(`/pastor/appointments/${encodeURIComponent(scheduledMeeting.id)}`);
+                        }
+                      }}
                      className="rounded-2xl border border-yellow-300/60 bg-yellow-400/15 px-5 py-4 text-left shadow-[0_18px_45px_rgba(245,158,11,0.18)] backdrop-blur-md transition hover:bg-yellow-400/25"
                     >
                       <div className="flex items-center gap-3">
@@ -302,18 +466,22 @@ const bannerUrl =
                             Meeting scheduled
                           </p>
                           <p className="mt-1 text-sm font-semibold text-white">
-                            {meetingDate ? `Meeting on ${meetingDate}` : "Tap to open meeting details"}
+                            {scheduledMeetingParts.date
+                              ? `Meeting on ${scheduledMeetingParts.date}${scheduledMeetingParts.time ? ` at ${scheduledMeetingParts.time}` : ""}`
+                              : "Meeting details recorded"}
                           </p>
-                          {(mentorName || meetingPlatform) && (
+                          {(mentorName || scheduledMeetingPlatform) && (
                             <p className="mt-1 text-xs text-[#cde2f2]/80">
                               {mentorName ? `Mentor: ${mentorName}` : ""}
-                              {mentorName && meetingPlatform ? " | " : ""}
-                              {meetingPlatform ? `Platform: ${meetingPlatform}` : ""}
+                              {mentorName && scheduledMeetingPlatform ? " | " : ""}
+                              {scheduledMeetingPlatform ? `Platform: ${scheduledMeetingPlatform}` : ""}
                             </p>
                           )}
+                          {scheduledMeeting.id ? (
                           <p className="mt-2 text-xs font-medium text-[#8ec5eb] underline underline-offset-2">
                             Open appointment →
                           </p>
+                          ) : null}
                         </div>
                       </div>
                     </button>
@@ -343,10 +511,14 @@ const bannerUrl =
                 </>
               )}
 
-              {staffReview && meetingId ? (
+              {staffReview && scheduledMeeting ? (
                 <button
                   type="button"
-                  onClick={() => router.push(`/pastor/appointments/${encodeURIComponent(meetingId)}`)}
+                  onClick={() => {
+                    if (scheduledMeeting.id) {
+                      router.push(`/pastor/appointments/${encodeURIComponent(scheduledMeeting.id)}`);
+                    }
+                  }}
                   className="rounded-2xl border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 px-5 py-4 text-left shadow-[0_18px_45px_rgba(2,20,38,0.35)] backdrop-blur-md transition hover:bg-[#8ec5eb]/15"
                 >
                   <div className="flex items-center gap-3">
@@ -358,18 +530,22 @@ const bannerUrl =
                         Meeting scheduled
                       </p>
                       <p className="mt-1 text-sm font-semibold text-white">
-                        {meetingDate ? `Meeting on ${meetingDate}` : "Tap to open meeting details"}
+                        {scheduledMeetingParts.date
+                          ? `Meeting on ${scheduledMeetingParts.date}${scheduledMeetingParts.time ? ` at ${scheduledMeetingParts.time}` : ""}`
+                          : "Meeting details recorded"}
                       </p>
-                      {(mentorName || meetingPlatform) && (
+                      {(mentorName || scheduledMeetingPlatform) && (
                         <p className="mt-1 text-xs text-[#cde2f2]/80">
                           {mentorName ? `Mentor: ${mentorName}` : ""}
-                          {mentorName && meetingPlatform ? " | " : ""}
-                          {meetingPlatform ? `Platform: ${meetingPlatform}` : ""}
+                          {mentorName && scheduledMeetingPlatform ? " | " : ""}
+                          {scheduledMeetingPlatform ? `Platform: ${scheduledMeetingPlatform}` : ""}
                         </p>
                       )}
+                      {scheduledMeeting.id ? (
                       <p className="mt-2 text-xs font-medium text-[#8ec5eb] underline underline-offset-2">
                         Open appointment →
                       </p>
+                      ) : null}
                     </div>
                   </div>
                 </button>

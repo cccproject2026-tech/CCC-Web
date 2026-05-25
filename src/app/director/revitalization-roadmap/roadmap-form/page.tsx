@@ -948,7 +948,7 @@ export default function DirectorRoadmapFormPage() {
                     </label>
                     <p className="mb-2 text-xs text-white/50">
                       {roadmapType === "phase"
-                        ? "Title for this phase in the list and in the header above."
+                        ? "Title for this roadmap task "
                         : "Title for this roadmap in the list and in the header above."}
                     </p>
                     <input

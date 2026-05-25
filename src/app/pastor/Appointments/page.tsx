@@ -1,10 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-<<<<<<< HEAD
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-=======
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
->>>>>>> 4e28cac401fada7225c8d9149257ca69f675e3bc
 import Image from "next/image";
 import Link from "next/link";
 import PastorHeader from "@/app/Components/PastorHeader";

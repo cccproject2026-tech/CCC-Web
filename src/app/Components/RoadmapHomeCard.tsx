@@ -22,6 +22,10 @@ interface RoadmapHomeCardProps {
     completed: number;
     total: number;
   };
+  meetingInfo?: {
+    date: string;
+    time: string;
+  };
   // Show checkmark overlay on image
   showCheckmark?: boolean;
 }
@@ -40,6 +44,7 @@ export default function RoadmapHomeCard({
   completedOn,
   lastUpdatedOn,
   taskCompleted,
+  meetingInfo,
   showCheckmark = false,
 }: RoadmapHomeCardProps) {
   const [selectedDate, setSelectedDate] = useState("");
@@ -211,6 +216,19 @@ export default function RoadmapHomeCard({
                   </div>
                 </div>
               )}
+
+            {isMentor && meetingInfo && (
+              <div className="mb-4 rounded-xl border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 px-3 py-2.5">
+                <div className="mb-1 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide text-[#8ec5eb]">
+                  <i className="fa-regular fa-calendar text-[11px]" aria-hidden />
+                  <span>Meeting Scheduled</span>
+                </div>
+                <p className="text-[13px] text-[#d9ebf8]">
+                  {meetingInfo.date}
+                  {meetingInfo.time ? <span className="text-[#cde2f2]/75"> at {meetingInfo.time}</span> : null}
+                </p>
+              </div>
+            )}
 
             {/* Date Selector - Conditional */}
             {showDateSelector && status === "Not Started" && (
