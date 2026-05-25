@@ -39,6 +39,11 @@ export interface AppointmentResponse {
   /** Populated after creation when backend syncs to Google Calendar (optional). */
   googleCalendarHtmlLink?: string;
   googleCalendarEventId?: string;
+  /** Per-side event ids when backend creates Google events (CCC + Google integration). */
+  mentorGoogleCalendarEventId?: string | null;
+  userGoogleCalendarEventId?: string | null;
+  /** Non-blocking warnings when sync partially failed or OAuth missing. */
+  googleCalendarSyncWarnings?: string[];
 }
 
 export interface CreateAppointmentPayload {

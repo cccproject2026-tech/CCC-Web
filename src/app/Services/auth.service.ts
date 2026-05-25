@@ -77,6 +77,21 @@ export const apiRefreshToken = (payload: RefreshTokenPayload) =>
 export const apiLogout = () =>
   axiosInstance.post<{ success: boolean; message: string }>("/auth/logout");
 
+/** GET `/auth/google?userId=` — returns OAuth URL; redirect browser to start Google Calendar linking. */
+export const apiGetGoogleCalendarAuthUrl = (userId: string) =>
+  axiosInstance.get<{ url?: string; data?: { url?: string }; success?: boolean }>("/auth/google", {
+    params: { userId: String(userId).trim() },
+  });
+
+export function unwrapGoogleOAuthRedirectUrl(payload: unknown): string | null {
+  const root = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : null;
+  if (!root) return null;
+  if (typeof root.url === "string" && root.url.startsWith("http")) return root.url;
+  const data = root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : null;
+  if (data && typeof data.url === "string" && data.url.startsWith("http")) return data.url;
+  return null;
+}
+
 // POST /auth/check-onboarding-status — resume onboarding (public; matches mobile)
 export const apiCheckOnboardingStatus = (email: string) =>
   axiosInstance.post<CheckOnboardingStatusResponse>(

@@ -14,6 +14,8 @@ export {
   apiRefreshToken,
   apiLogout,
   apiCheckOnboardingStatus,
+  apiGetGoogleCalendarAuthUrl,
+  unwrapGoogleOAuthRedirectUrl,
 } from './auth.service';
 
 // ─── Appointments ─────────────────────────────────────────────────────────────
@@ -41,6 +43,7 @@ export {
   apiPatchMentorAvailabilitySettings,
   apiDeleteAvailabilitySlot,
   apiFetchExternalCalendarBusy,
+  apiGetMergedAvailabilityRange,
 } from './appointments.service';
 
 // ─── Interests ────────────────────────────────────────────────────────────────
