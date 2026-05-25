@@ -8,7 +8,12 @@ import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
 import Card1 from "../../Assets/card1.png";
-import { apiGetRoadmaps, apiDeleteRoadmap, apiGetAllUsers } from "@/app/Services/api";
+import {
+  apiGetRoadmaps,
+  apiDeleteRoadmap,
+  apiGetAllUsers,
+  apiReorderRoadmaps,
+} from "@/app/Services/api";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import {
   extractUserIdFromOverallProgressRow,
@@ -1011,13 +1016,20 @@ if (activeTab === "pastor") {
       rows = rows.filter((r) => roadmapRowMatchesTextQuery(r, qNorm));
     }
 
-    if (!rearrangeMode) {
-      rows.sort((a, b) => {
-        const da = parseDate(a.createdAt)?.getTime() || 0;
-        const db = parseDate(b.createdAt)?.getTime() || 0;
-        return sortCreated === "newest" ? db - da : da - db;
-      });
-    }
+    // if (!rearrangeMode) {
+    //   rows.sort((a, b) => {
+    //     const da = parseDate(a.createdAt)?.getTime() || 0;
+    //     const db = parseDate(b.createdAt)?.getTime() || 0;
+    //     return sortCreated === "newest" ? db - da : da - db;
+    //   });
+    // }
+    if (!rearrangeMode && activeTab !== "library") {
+  rows.sort((a, b) => {
+    const da = parseDate(a.createdAt)?.getTime() || 0;
+    const db = parseDate(b.createdAt)?.getTime() || 0;
+    return sortCreated === "newest" ? db - da : da - db;
+  });
+}
 
     return rows;
  }, [
@@ -1865,12 +1877,24 @@ const filteredMentorList = useMemo(() => {
 
         <button
           type="button"
-          onClick={() => setRearrangeMode((v) => !v)}
+          // onClick={() => setRearrangeMode((v) => !v)}
+ onClick={async () => {
+  if (rearrangeMode) {
+    try {
+      await apiReorderRoadmaps(orderedIds);
+      await fetchRoadmaps();
+    } catch (error) {
+      console.error("Failed to save roadmap order", error);
+    }
+  }
+
+  setRearrangeMode((v) => !v);
+}}
           className={`${directorBtnSecondary} !px-4 !py-2.5 !text-[13px]`}
           title="Rearrange cards"
         >
           <i className="fa-solid fa-table-cells-large text-sm" aria-hidden />
-          <span>Rearrange</span>
+          <span>{rearrangeMode ? "Done" : "Rearrange"}</span>
         </button>
       </>
     ) : null}

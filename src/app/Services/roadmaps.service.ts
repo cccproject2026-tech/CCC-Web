@@ -1,4 +1,5 @@
 import axiosInstance from "./config/axios-instance";
+import type { ReorderRoadmapsPayload } from "./types/roadmaps.types";
 import type {
   CreateRoadMapPayload,
   UpdateRoadMapPayload,
@@ -274,7 +275,11 @@ export const apiUpdateRoadmap = (id: string, payload: UpdateRoadMapPayload, imag
 // DELETE /roadmaps/:id
 export const apiDeleteRoadmap = (id: string) =>
   axiosInstance.delete(`/roadmaps/${id}`);
-
+// PATCH /roadmaps/reorder
+export const apiReorderRoadmaps = (orderedRoadmapIds: string[]) =>
+  axiosInstance.patch("/roadmaps/reorder", {
+    orderedRoadmapIds,
+  } satisfies ReorderRoadmapsPayload);
 // ─── Nested RoadMap Items ─────────────────────────────────────────────────────
 
 // GET /roadmaps/:roadMapId/nested/:nestedItemId

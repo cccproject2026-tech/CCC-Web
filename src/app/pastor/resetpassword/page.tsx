@@ -562,12 +562,18 @@ export default function ResetPasswordPage() {
       //   password,
       //   confirmPassword,
       // });
+      // const response = await apiResetPassword({
+      //   email: email.trim(),
+      //   otp: otp.trim(),
+      //   password,
+      //   confirmPassword,
+      // });
       const response = await apiResetPassword({
-        email: email.trim(),
-        otp: otp.trim(),
-        password,
-        confirmPassword,
-      });
+  email: email.trim(),
+  otp: otp.trim(),
+  newPassword: password,
+  confirmPassword,
+} as any);
 
       if (!response.data.success) {
         setErrorMsg(response.data.message || "Failed to reset password.");

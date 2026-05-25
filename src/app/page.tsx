@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiGetInterestByEmail, apiGetUserById } from "@/app/Services/api";
 import PastorHeader from "@/app/Components/PastorHeader";
 import ContinueApplicationModal from "@/app/Components/ContinueApplicationModal";
 import CccfinalLogo from "@/app/Assets/cclogofinal.png";
