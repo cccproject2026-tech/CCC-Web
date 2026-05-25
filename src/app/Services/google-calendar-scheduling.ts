@@ -1,6 +1,12 @@
 import { extractApiErrorMessage, parseSlotStartToIso } from "@/app/Services/appointment-utils";
-import { apiFetchExternalCalendarBusy } from "@/app/Services/appointments.service";
+import { apiFetchExternalCalendarBusy, apiGetMergedAvailabilityRange } from "@/app/Services/appointments.service";
 import type { CalendarBusyPeriod } from "@/app/Services/types/appointments.types";
+import {
+  buildGoogleConnectBanners,
+  extractCccSlotLabelsForYmd,
+  extractMergedGoogleBundle,
+  mergeBusyIntervals,
+} from "@/app/Services/merged-availability";
 
 const DEFAULT_DURATION_MIN = 60;
 export const CALENDAR_GRID_STEP_MIN = 30;
@@ -174,6 +180,12 @@ export type ApplyGoogleBusyResult = {
   skipped: boolean;
   error?: string;
   strippedCount: number;
+  /** From merged `/availability` when present; null when unknown or legacy POST-only path. */
+  googleMentorLinked?: boolean | null;
+  googleParticipantLinked?: boolean | null;
+  connectGoogleBanners?: string[];
+  /** True when busy intervals came from GET `/availability/...`; false when legacy POST `/appointments/calendar/external-busy`. */
+  usedMergedAvailabilityApi?: boolean;
 };
 
 /**
@@ -183,77 +195,196 @@ export type ApplyGoogleBusyResult = {
 export async function filterSlotLabelsAgainstExternalCalendar(options: {
   meetingDateYmd: string;
   rawSlotLabels: string[];
-  /** Everyone whose Google Calendar matters for collisions (uniq host + attendee). */
+  /** Everyone whose Google Calendar matters for collisions (uniq host + attendee) — used for legacy busy POST fallback. */
   participantUserIds: string[];
+  /** GET `/availability/:mentorUserId` — CCC host / mentor owning the grid. Enables merged Google busy + linked flags. */
+  availabilityMentorUserId?: string;
+  /** Participant (e.g. pastor) when narrowing Google busy to both calendars. */
+  availabilityParticipantUserId?: string;
   meetingDurationMinutes?: number;
   gridStepMinutes?: number;
   /** When false, skips expansion — uses each raw row as booking start at parsed window opener (legacy). */
   expandIntoGrid?: boolean;
 }): Promise<ApplyGoogleBusyResult> {
   const ids = [...new Set(options.participantUserIds.map((id) => String(id).trim()).filter(Boolean))];
-  const { dayStartMs, dayEndPlusBufferMs } = localBoundariesForYmd(options.meetingDateYmd);
+  const ymd = options.meetingDateYmd.slice(0, 10);
+  const { dayStartMs, dayEndPlusBufferMs } = localBoundariesForYmd(ymd);
+  const fromIso = new Date(dayStartMs).toISOString();
+  const toIso = new Date(dayEndPlusBufferMs).toISOString();
+
+  let rawLabels = options.rawSlotLabels;
+  let busy: CalendarBusyPeriod[] = [];
+  let skipped = false;
+  let mentorLinked: boolean | null = null;
+  let participantLinked: boolean | null = null;
+  let banners: string[] = [];
+  let usedMergedAvailabilityApi = false;
+
+  const mentorForMerge = options.availabilityMentorUserId?.trim();
+  const participantForMerge = options.availabilityParticipantUserId?.trim();
+
+  if (mentorForMerge) {
+    try {
+      const res = await apiGetMergedAvailabilityRange(mentorForMerge, {
+        from: fromIso,
+        to: toIso,
+        ...(participantForMerge ? { participantUserId: participantForMerge } : {}),
+      });
+
+      if (res.status !== 404) {
+        usedMergedAvailabilityApi = true;
+        const mergedCcc = extractCccSlotLabelsForYmd(res.data, ymd);
+        if (mergedCcc.length > 0) {
+          rawLabels = mergedCcc;
+        }
+
+        const g = extractMergedGoogleBundle(res.data);
+        mentorLinked = g.mentor.googleCalendarLinked;
+        participantLinked = g.participant.googleCalendarLinked;
+        busy = mergeBusyIntervals(g.mentor.busyIntervals, g.participant.busyIntervals);
+        banners = buildGoogleConnectBanners(participantForMerge, g.mentor, g.participant);
+      }
+    } catch (_e: unknown) {
+      usedMergedAvailabilityApi = false;
+      busy = [];
+    }
+  }
+
   const expanded =
     options.expandIntoGrid ?? true
-      ? expandSelectableSlotLabels(options.rawSlotLabels, options.meetingDateYmd, {
+      ? expandSelectableSlotLabels(rawLabels, ymd, {
           meetingDurationMinutes: options.meetingDurationMinutes ?? DEFAULT_DURATION_MIN,
           stepMinutes: options.gridStepMinutes ?? CALENDAR_GRID_STEP_MIN,
         })
-      : [...options.rawSlotLabels];
+      : [...rawLabels];
+
+  if (usedMergedAvailabilityApi) {
+    const duration = options.meetingDurationMinutes ?? DEFAULT_DURATION_MIN;
+    const kept = expanded.filter((label) => {
+      const iso = parseSlotStartToIso(ymd, label.replace(/\u2013/g, "-"));
+      return !meetingSpanBlockedByBusy(iso, duration, busy);
+    });
+
+    return {
+      slots: kept,
+      skipped: false,
+      strippedCount: Math.max(0, expanded.length - kept.length),
+      googleMentorLinked: mentorLinked,
+      googleParticipantLinked: participantLinked,
+      connectGoogleBanners: banners,
+      usedMergedAvailabilityApi: true,
+    };
+  }
 
   if (ids.length === 0) {
     return { slots: expanded, skipped: true, strippedCount: 0 };
   }
 
-  let busy: CalendarBusyPeriod[] = [];
   try {
     const res = await apiFetchExternalCalendarBusy({
       userIds: ids,
-      timeMin: new Date(dayStartMs).toISOString(),
-      timeMax: new Date(dayEndPlusBufferMs).toISOString(),
+      timeMin: fromIso,
+      timeMax: toIso,
     });
     const status = res.status ?? 200;
     if (status === 404) {
-      return { slots: expanded, skipped: true, strippedCount: 0 };
+      skipped = true;
+      busy = [];
+    } else {
+      busy = unwrapBusyPeriodsFromResponse(res.data);
     }
-    busy = unwrapBusyPeriodsFromResponse(res.data);
   } catch (e: unknown) {
     const axiosStatus =
       typeof e === "object" && e !== null && "response" in e
         ? (e as { response?: { status?: number } }).response?.status
         : undefined;
     if (axiosStatus === 404) {
-      return { slots: expanded, skipped: true, strippedCount: 0 };
+      skipped = true;
+      busy = [];
+    } else {
+      return {
+        slots: [],
+        skipped: false,
+        error: extractApiErrorMessage(e) || "Could not refresh Google Calendar",
+        strippedCount: 0,
+        usedMergedAvailabilityApi: false,
+      };
     }
-    return {
-      slots: [],
-      skipped: false,
-      error: extractApiErrorMessage(e) || "Could not refresh Google Calendar",
-      strippedCount: 0,
-    };
   }
 
   const duration = options.meetingDurationMinutes ?? DEFAULT_DURATION_MIN;
 
   const kept = expanded.filter((label) => {
-    const iso = parseSlotStartToIso(options.meetingDateYmd, label.replace(/\u2013/g, "-"));
+    const iso = parseSlotStartToIso(ymd, label.replace(/\u2013/g, "-"));
     return !meetingSpanBlockedByBusy(iso, duration, busy);
   });
 
   return {
     slots: kept,
-    skipped: false,
+    skipped,
     strippedCount: Math.max(0, expanded.length - kept.length),
+    usedMergedAvailabilityApi: false,
+  };
+}
+
+function asPayloadRecord(body: unknown): Record<string, unknown> {
+  return body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+}
+
+/** Parse POST `/appointments` envelope for Google Calendar sync outcome. */
+export function extractGoogleCalendarCreateOutcome(resBody: unknown): {
+  successHints: string[];
+  warnings: string[];
+  mentorGoogleCalendarEventId?: string | null;
+  userGoogleCalendarEventId?: string | null;
+} {
+  const body = asPayloadRecord(resBody);
+  const data = asPayloadRecord(body.data);
+
+  const warningsRaw = data.googleCalendarSyncWarnings;
+  const warnings = Array.isArray(warningsRaw)
+    ? warningsRaw.filter((x): x is string => typeof x === "string")
+    : [];
+
+  const mentorIdRaw = data.mentorGoogleCalendarEventId;
+  const userIdRaw = data.userGoogleCalendarEventId;
+
+  const successHints: string[] = [];
+
+  const addIf = (id: unknown, role: string) => {
+    if (typeof id === "string" && id.trim()) {
+      successHints.push(`${role} Google Calendar event created.`);
+    }
+  };
+  addIf(mentorIdRaw, "Mentor");
+  addIf(userIdRaw, "Participant");
+
+  if (!successHints.length && (data.googleCalendarHtmlLink ?? data.googleCalendarEventId)) {
+    successHints.push("Event created in Google Calendar.");
+  }
+
+  return {
+    successHints,
+    warnings,
+    mentorGoogleCalendarEventId: typeof mentorIdRaw === "string" ? mentorIdRaw : mentorIdRaw === null ? null : undefined,
+    userGoogleCalendarEventId: typeof userIdRaw === "string" ? userIdRaw : userIdRaw === null ? null : undefined,
   };
 }
 
 /** Optional post-booking copy when `googleCalendarSync` was requested — uses API metadata when present. */
 export function googleCalendarSuccessHintFromCreateResponse(resBody: unknown): string | undefined {
-  const body = (resBody ?? {}) as Record<string, unknown>;
-  const envelope = (body.data && typeof body.data === "object" ? body.data : body) as Record<string, unknown>;
-  if (envelope.googleCalendarHtmlLink || envelope.googleCalendarEventId) {
-    return "Event also created in Google Calendar.";
-  }
-  const msg = typeof envelope.message === "string" ? envelope.message : typeof body.message === "string" ? body.message : "";
+  const { successHints } = extractGoogleCalendarCreateOutcome(resBody);
+  const primary = successHints.join(" ").trim();
+  if (primary.length) return primary;
+
+  const body = asPayloadRecord(resBody);
+  const data = asPayloadRecord(body.data);
+  const msg =
+    typeof data.message === "string"
+      ? data.message
+      : typeof body.message === "string"
+        ? body.message
+        : "";
   const m = msg.toLowerCase();
   if (m.includes("google") && m.includes("calendar")) return msg;
 

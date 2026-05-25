@@ -186,6 +186,24 @@ export const apiFetchExternalCalendarBusy = (payload: ExternalCalendarBusyPayloa
     validateStatus: (s) => (s >= 200 && s < 300) || s === 404,
   });
 
+/**
+ * GET `/availability/:mentorUserId?from=&to=&participantUserId=`
+ * Merged CCC availability + Google busy / link flags (preferred over separate busy POST).
+ */
+export const apiGetMergedAvailabilityRange = (
+  mentorUserId: string,
+  params: { from: string; to: string; participantUserId?: string },
+) =>
+  axiosInstance.get<unknown>(`/availability/${encodeURIComponent(mentorUserId)}`, {
+    params: {
+      from: params.from,
+      to: params.to,
+      ...(params.participantUserId ? { participantUserId: params.participantUserId } : {}),
+    },
+    validateStatus: (s) => (s >= 200 && s < 300) || s === 404,
+    timeout: 30_000,
+  });
+
 type DeleteAvailabilitySlotPayload = {
   slotId: string;
   date: string;

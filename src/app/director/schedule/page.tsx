@@ -1,13 +1,14 @@
 "use client";
 
 import { Fragment, Suspense, useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { getCookie } from "@/app/utils/cookies";
 import axiosInstance from "@/app/Services/config/axios-instance";
 import DirectorHero from "../DirectorHero";
 import AvailabilityCalendar from "@/app/Components/AvailabilityCalendar";
+import GoogleCalendarConnectButton from "@/app/Components/GoogleCalendarConnectButton";
 import MentorAvailabilityRecurringWorkspace from "@/app/mentor/MentorSchedule/MentorAvailabilityRecurringWorkspace";
 import {
   directorBtnPrimary,
@@ -42,6 +43,7 @@ import {
   unwrapAppointmentsAxiosData,
 } from "@/app/Services/appointment-utils";
 import {
+  extractGoogleCalendarCreateOutcome,
   filterSlotLabelsAgainstExternalCalendar,
   googleCalendarSuccessHintFromCreateResponse,
 } from "@/app/Services/google-calendar-scheduling";
@@ -188,6 +190,7 @@ function DirectorScheduleContent() {
     email: string;
   }>({ firstName: "", lastName: "", email: "" });
   const router = useRouter();
+  const pathname = usePathname();
 
   // shared state
   const [appointments, setAppointments] = useState<AppointmentResponse[]>([]);
@@ -232,6 +235,7 @@ function DirectorScheduleContent() {
   const [calendarSlotSyncError, setCalendarSlotSyncError] = useState<string | null>(null);
   const [calendarSlotSyncSkipped, setCalendarSlotSyncSkipped] = useState(false);
   const [calendarBusyStripped, setCalendarBusyStripped] = useState(0);
+  const [calendarConnectBanners, setCalendarConnectBanners] = useState<string[]>([]);
   const [isScheduling, setIsScheduling] = useState(false);
 
   // schedule drawer calendar state
@@ -292,6 +296,18 @@ function DirectorScheduleContent() {
     const next = tabFromParam(searchParams.get("tab"));
     if (next) setActiveTab(next);
   }, [searchParams]);
+
+  /** After Google OAuth redirects back to the SPA */
+  useEffect(() => {
+    const linked = searchParams.get("googleCalendar");
+    if (linked !== "linked" && linked !== "1") return;
+    setToastMessage("Google Calendar connected.");
+    setTimeout(() => setToastMessage(null), 4500);
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("googleCalendar");
+    const q = next.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname);
+  }, [searchParams, pathname, router]);
 
   // ── Fetch all appointments ────────────────────────────────────────────────────
   useEffect(() => {
@@ -380,6 +396,7 @@ function DirectorScheduleContent() {
     void (async () => {
       setCalendarSlotSyncLoading(true);
       setCalendarSlotSyncError(null);
+      setCalendarConnectBanners([]);
 
       try {
         let formatted: string[] = [];
@@ -458,6 +475,17 @@ function DirectorScheduleContent() {
         }
 
         const recipientId = String(selectedRecipient?._id || selectedRecipient?.id || "").trim();
+
+        let mergeMentorId = "";
+        let mergeParticipantId: string | undefined;
+        if (scheduleRecipientType === "pastor") {
+          mergeMentorId = String(directorId);
+          mergeParticipantId = recipientId || undefined;
+        } else if (recipientId) {
+          mergeMentorId = recipientId;
+          mergeParticipantId = String(directorId);
+        }
+
         const participantUserIds = Array.from(new Set([String(directorId), recipientId].filter(Boolean)));
 
         const gc = await filterSlotLabelsAgainstExternalCalendar({
@@ -466,9 +494,12 @@ function DirectorScheduleContent() {
           participantUserIds,
           meetingDurationMinutes: 60,
           expandIntoGrid: true,
+          availabilityMentorUserId: mergeMentorId || undefined,
+          availabilityParticipantUserId: mergeParticipantId,
         });
 
         if (cancelled) return;
+        setCalendarConnectBanners(gc.connectGoogleBanners ?? []);
         setCalendarSlotSyncSkipped(gc.skipped);
         setCalendarBusyStripped(gc.error ? 0 : gc.strippedCount);
         if (gc.error) {
@@ -799,12 +830,24 @@ function DirectorScheduleContent() {
     }
 
     const recipientIdCal = String(selectedRecipient._id || selectedRecipient.id || "").trim();
+    let mergeMentorRecheck = "";
+    let mergeParticipantRecheck: string | undefined;
+    if (scheduleRecipientType === "pastor") {
+      mergeMentorRecheck = String(directorId);
+      mergeParticipantRecheck = recipientIdCal || undefined;
+    } else {
+      mergeMentorRecheck = recipientIdCal;
+      mergeParticipantRecheck = String(directorId);
+    }
+
     const gcRecheck = await filterSlotLabelsAgainstExternalCalendar({
       meetingDateYmd: meetingDate.slice(0, 10),
       rawSlotLabels: availableSlots,
       participantUserIds: Array.from(new Set([String(directorId), recipientIdCal].filter(Boolean))),
       meetingDurationMinutes: 60,
       expandIntoGrid: true,
+      availabilityMentorUserId: mergeMentorRecheck || undefined,
+      availabilityParticipantUserId: mergeParticipantRecheck,
     });
     if (!gcRecheck.skipped) {
       if (gcRecheck.error) {
@@ -838,7 +881,9 @@ function DirectorScheduleContent() {
       });
 
       const gHint = googleCalendarSuccessHintFromCreateResponse(res?.data);
+      const outcome = extractGoogleCalendarCreateOutcome(res?.data);
       if (gHint) successToastMs = 7000;
+      if (outcome.warnings.length) successToastMs = Math.max(successToastMs, 9000);
 
       const refresh = await apiGetAppointments({ futureOnly: false });
       setAppointments(
@@ -853,7 +898,8 @@ function DirectorScheduleContent() {
       setSelectedSlot("");
       setAvailabilityRefreshKey((k) => k + 1);
       showToast(
-        gHint ? `Meeting scheduled successfully. ${gHint}` : "Meeting scheduled successfully",
+        (gHint ? `Meeting scheduled successfully. ${gHint}` : "Meeting scheduled successfully") +
+          (outcome.warnings.length > 0 ? ` Note: ${outcome.warnings.join(" · ")}` : ""),
         successToastMs,
       );
     } catch (e) {
@@ -1790,6 +1836,19 @@ function DirectorScheduleContent() {
 
                   {meetingDate && (
                     <div className="mb-5">
+                      <div className="mb-3 flex flex-col gap-2 rounded-lg border border-white/10 bg-white/5 p-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <GoogleCalendarConnectButton userId={directorId} label="Link my Google Calendar" />
+                          <span className="text-[11px] leading-snug text-[#cde2f2]/75">
+                            Connect Google so busy intervals apply and bookings can mirror to Calendar when OAuth is complete.
+                          </span>
+                        </div>
+                        {calendarConnectBanners.map((msg) => (
+                          <p key={msg.slice(0, 88)} className="text-[11px] text-amber-100/95">
+                            {msg}
+                          </p>
+                        ))}
+                      </div>
                       <p className="mb-2 text-sm text-[#cde2f2]">Available time slots</p>
                       {(calendarSlotSyncLoading || scheduleAvailabilityLoading) && (
                         <p className="mb-2 flex items-center gap-2 text-xs text-[#8ec5eb]">
