@@ -1,11 +1,12 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorSearchBar from "@/app/Components/pastor/PastorSearchBar";
 import AvailabilityCalendar from "@/app/Components/AvailabilityCalendar";
+import GoogleCalendarConnectButton from "@/app/Components/GoogleCalendarConnectButton";
 import {
   pastorContainer,
   pastorControlsRow,
@@ -51,6 +52,7 @@ import {
   unwrapMonthlyAvailabilityPayload,
 } from "@/app/Services/appointment-utils";
 import {
+  extractGoogleCalendarCreateOutcome,
   filterSlotLabelsAgainstExternalCalendar,
   googleCalendarSuccessHintFromCreateResponse,
 } from "@/app/Services/google-calendar-scheduling";
@@ -65,6 +67,7 @@ export default function PastorAppointmentsPage() {
   const [drawerStep, setDrawerStep] = useState<"mentor" | "schedule">("mentor");
   const [showPopup, setShowPopup] = useState(false);
   const [googleCalendarBookingHint, setGoogleCalendarBookingHint] = useState<string | null>(null);
+  const [googleCalendarSyncWarnings, setGoogleCalendarSyncWarnings] = useState<string[]>([]);
   const [selectedTime, setSelectedTime] = useState("");
   const [appointments, setAppointments] = useState([]);
   const [appointmentsToday, setAppointmentsToday] = useState([]);
@@ -93,17 +96,31 @@ export default function PastorAppointmentsPage() {
   const [calendarSlotSyncError, setCalendarSlotSyncError] = useState<string | null>(null);
   const [calendarSlotSyncSkipped, setCalendarSlotSyncSkipped] = useState(false);
   const [calendarBusyStripped, setCalendarBusyStripped] = useState(0);
+  const [calendarConnectBanners, setCalendarConnectBanners] = useState<string[]>([]);
   const [isScheduling, setIsScheduling] = useState(false);
   const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [appointmentsTab, setAppointmentsTab] = useState<"next" | "history">("next");
   const [monthlyAvailabilitySlots, setMonthlyAvailabilitySlots] = useState<any[]>([]);
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const showToast = (msg: string, duration = 3000) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), duration);
   };
+
+  /** Google OAuth redirect may land with ?googleCalendar=linked */
+  useEffect(() => {
+    const linked = searchParams.get("googleCalendar");
+    if (linked !== "linked" && linked !== "1") return;
+    showToast("Google Calendar connected.", 4500);
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("googleCalendar");
+    const q = next.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname);
+  }, [searchParams, pathname, router]);
 
 
 
@@ -365,6 +382,7 @@ export default function PastorAppointmentsPage() {
       setCalendarSlotSyncError(null);
       setCalendarSlotSyncSkipped(false);
       setCalendarBusyStripped(0);
+      setCalendarConnectBanners([]);
       return;
     }
     const mentorId = String(selectedMentor.id ?? selectedMentor._id ?? "").trim();
@@ -377,10 +395,16 @@ export default function PastorAppointmentsPage() {
         const selectedYmdForWeek = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}`;
         const selectedYmd = new Date(currentYear, currentMonth, selectedDate).toLocaleDateString("en-CA");
         let slots: any[] = [];
+        const pastorUidForMonth = getPastorUserId();
+
         try {
           // Use year/month parameters format
           const availRes = await axiosInstance.get(`/appointments/availability/${mentorId}/month`, {
-            params: { year: currentYear, month: currentMonth + 1 },
+            params: {
+              year: currentYear,
+              month: currentMonth + 1,
+              ...(pastorUidForMonth ? { participantUserId: pastorUidForMonth } : {}),
+            },
           });
           const raw = availRes.data?.data ?? availRes.data;
           slots = Array.isArray(raw) ? raw : [];
@@ -453,6 +477,7 @@ export default function PastorAppointmentsPage() {
 
         setCalendarSlotSyncLoading(true);
         setCalendarSlotSyncError(null);
+        setCalendarConnectBanners([]);
 
         const pastorUid = getPastorUserId();
         const participantUserIds = Array.from(new Set([...(pastorUid ? [pastorUid] : []), mentorIdStr].filter(Boolean)));
@@ -466,8 +491,11 @@ export default function PastorAppointmentsPage() {
             participantUserIds,
             meetingDurationMinutes: 60,
             expandIntoGrid: true,
+            availabilityMentorUserId: mentorIdStr,
+            availabilityParticipantUserId: pastorUid ?? undefined,
           });
           setCalendarSlotSyncSkipped(gc.skipped);
+          setCalendarConnectBanners(gc.connectGoogleBanners ?? []);
           setCalendarBusyStripped(gc.error ? 0 : gc.strippedCount);
           if (gc.error) {
             setCalendarSlotSyncError(gc.error);
@@ -549,6 +577,8 @@ export default function PastorAppointmentsPage() {
       participantUserIds,
       meetingDurationMinutes: 60,
       expandIntoGrid: true,
+      availabilityMentorUserId: String(mid),
+      availabilityParticipantUserId: userId,
     });
     if (!gcRecheck.skipped) {
       if (gcRecheck.error) {
@@ -584,7 +614,9 @@ export default function PastorAppointmentsPage() {
     try {
       const res = await apiCreateAppointment(payload);
       const gHint = googleCalendarSuccessHintFromCreateResponse(res?.data);
+      const outcome = extractGoogleCalendarCreateOutcome(res?.data);
       setGoogleCalendarBookingHint(gHint ?? null);
+      setGoogleCalendarSyncWarnings(outcome.warnings);
 
       setAvailabilityRefreshKey((prev) => prev + 1);
       setDrawerOpen(false);
@@ -653,8 +685,13 @@ export default function PastorAppointmentsPage() {
     (async () => {
       try {
         setRescheduleAvailabilityLoading(true);
+        const pastorUidRs = getPastorUserId();
         const res = await axiosInstance.get(`/appointments/availability/${mentorId}/month`, {
-          params: { year: rescheduleYear, month: rescheduleMonth + 1 },
+          params: {
+            year: rescheduleYear,
+            month: rescheduleMonth + 1,
+            ...(pastorUidRs ? { participantUserId: pastorUidRs } : {}),
+          },
         });
 
         if (!cancelled) {
@@ -691,15 +728,17 @@ export default function PastorAppointmentsPage() {
 
   useEffect(() => {
     if (showPopup) {
-      const dur = googleCalendarBookingHint ? 5200 : 2000;
+      let dur = googleCalendarBookingHint ? 5200 : 2000;
+      if (googleCalendarSyncWarnings.length > 0) dur = Math.max(dur, 8000);
       const t = setTimeout(() => {
         setShowPopup(false);
         setGoogleCalendarBookingHint(null);
+        setGoogleCalendarSyncWarnings([]);
       }, dur);
       return () => clearTimeout(t);
     }
     return undefined;
-  }, [showPopup, googleCalendarBookingHint]);
+  }, [showPopup, googleCalendarBookingHint, googleCalendarSyncWarnings.length]);
 
   const handleChangeMode = async () => {
     if (!appointmentToEdit) return;
@@ -1623,6 +1662,20 @@ export default function PastorAppointmentsPage() {
                     isLoading={availabilityLoading}
                   />
 
+                  <div className="my-4 flex flex-col gap-2 rounded-xl border border-white/15 bg-white/[0.04] p-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <GoogleCalendarConnectButton userId={getPastorUserId()} label="Link my Google Calendar" />
+                      <span className="text-[11px] leading-snug text-[#cde2f2]/80">
+                        Connect your Google account (same CCC login identity) so we can read busy times when scheduling.
+                      </span>
+                    </div>
+                    {calendarConnectBanners.map((msg) => (
+                      <p key={msg.slice(0, 88)} className="text-[11px] text-amber-100/95">
+                        {msg}
+                      </p>
+                    ))}
+                  </div>
+
                   <label className={pastorFieldLabel} htmlFor="time-slot" style={{ marginTop: "1.5rem" }}>
                     Select a time
                     <span className="ml-1 font-normal text-[#cde2f2]">
@@ -1745,6 +1798,13 @@ export default function PastorAppointmentsPage() {
             </div>
             {googleCalendarBookingHint ? (
               <p className="text-sm font-normal text-green-800">{googleCalendarBookingHint}</p>
+            ) : null}
+            {googleCalendarSyncWarnings.length > 0 ? (
+              <ul className="mt-2 max-w-xs list-disc pl-5 text-left text-xs font-normal text-amber-900">
+                {googleCalendarSyncWarnings.map((w) => (
+                  <li key={w.slice(0, 160)}>{w}</li>
+                ))}
+              </ul>
             ) : null}
           </div>
         </div>

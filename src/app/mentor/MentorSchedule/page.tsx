@@ -1,6 +1,6 @@
 "use client";
 import { Suspense, useEffect, useLayoutEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Image from "next/image";
 import HeroBg from "../../Assets/appointment-bg.png";
 import DuoIcon from "../../Assets/duo.png";
@@ -14,6 +14,7 @@ import MentorHeader from "@/app/Components/MentorHeader";
 import MentorAvailabilityRecurringWorkspace from "@/app/mentor/MentorSchedule/MentorAvailabilityRecurringWorkspace";
 import MentorFilterTabGroup from "@/app/Components/mentor/MentorFilterTabGroup";
 import AvailabilityCalendar from "@/app/Components/AvailabilityCalendar";
+import GoogleCalendarConnectButton from "@/app/Components/GoogleCalendarConnectButton";
 import {
   mentorBodyText,
   mentorDateInputDark,
@@ -48,6 +49,7 @@ import {
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 import { apiGetAllUsers, apiGetAssignedUsers } from "@/app/Services/api";
 import {
+  extractGoogleCalendarCreateOutcome,
   filterSlotLabelsAgainstExternalCalendar,
   googleCalendarSuccessHintFromCreateResponse,
 } from "@/app/Services/google-calendar-scheduling";
@@ -161,6 +163,7 @@ function resolveOtherPerson(
 
 function MentorScheduleContent() {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const rescheduleAppointmentId = searchParams.get("appointmentId");
 const shouldOpenReschedule = searchParams.get("reschedule") === "1";
   const [activeTab, setActiveTab] = useState<
@@ -191,6 +194,7 @@ const shouldOpenReschedule = searchParams.get("reschedule") === "1";
   const [calendarSlotSyncError, setCalendarSlotSyncError] = useState<string | null>(null);
   const [calendarSlotSyncSkipped, setCalendarSlotSyncSkipped] = useState(false);
   const [calendarBusyStripped, setCalendarBusyStripped] = useState(0);
+  const [calendarConnectBanners, setCalendarConnectBanners] = useState<string[]>([]);
 
   // schedule drawer calendar state
   const today = new Date();
@@ -249,6 +253,18 @@ const shouldOpenReschedule = searchParams.get("reschedule") === "1";
     const next = tabFromQueryParam(searchParams.get("tab"));
     if (next) setActiveTab(next);
   }, [searchParams]);
+
+  /** After Google OAuth completes, backend may redirect here with ?googleCalendar=linked */
+  useEffect(() => {
+    const linked = searchParams.get("googleCalendar");
+    if (linked !== "linked" && linked !== "1") return;
+    setToastMessage("Google Calendar connected.");
+    setTimeout(() => setToastMessage(null), 4500);
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("googleCalendar");
+    const q = next.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname);
+  }, [searchParams, pathname, router]);
 
   useEffect(() => {
     const onDocClick = (event: MouseEvent) => {
@@ -364,6 +380,7 @@ useEffect(() => {
     void (async () => {
       setCalendarSlotSyncLoading(true);
       setCalendarSlotSyncError(null);
+      setCalendarConnectBanners([]);
       try {
         const res = await apiGetWeeklyAvailability(targetId, meetingDate);
         const data = res.data?.data || [];
@@ -409,15 +426,23 @@ useEffect(() => {
         const participantUserIds = Array.from(
           new Set([String(targetId), String(mentorId)].filter(Boolean)),
         );
+        const recipientCalId =
+          scheduleRecipientType === "director"
+            ? String(mentorId)
+            : String(selectedRecipient?._id || selectedRecipient?.id || "").trim() || undefined;
+
         const gc = await filterSlotLabelsAgainstExternalCalendar({
           meetingDateYmd: meetingDate.slice(0, 10),
           rawSlotLabels: formatted,
           participantUserIds,
           meetingDurationMinutes: 60,
           expandIntoGrid: true,
+          availabilityMentorUserId: String(targetId),
+          availabilityParticipantUserId: recipientCalId,
         });
 
         if (cancelled) return;
+        setCalendarConnectBanners(gc.connectGoogleBanners ?? []);
         setCalendarSlotSyncSkipped(gc.skipped);
         setCalendarBusyStripped(gc.error ? 0 : gc.strippedCount);
         if (gc.error) {
@@ -667,6 +692,11 @@ useEffect(() => {
       participantUserIds: participantUserIdsForCalendar,
       meetingDurationMinutes: 60,
       expandIntoGrid: true,
+      availabilityMentorUserId: String(targetMentorId),
+      availabilityParticipantUserId:
+        scheduleRecipientType === "director"
+          ? String(mentorId)
+          : String(selectedRecipient?._id || selectedRecipient?.id || "").trim() || undefined,
     });
     if (!gcRecheck.skipped) {
       if (gcRecheck.error) {
@@ -707,7 +737,11 @@ useEffect(() => {
       });
 
       const gHint = googleCalendarSuccessHintFromCreateResponse(res?.data);
+      const outcome = extractGoogleCalendarCreateOutcome(res?.data);
       if (gHint) mentorToastDismissMs = 7000;
+      if (outcome.warnings.length) {
+        mentorToastDismissMs = Math.max(mentorToastDismissMs, 9000);
+      }
 
       setAvailableSlots((prev) => prev.filter((s) => s !== selectedSlot));
       setAvailabilityRefreshKey((prev) => prev + 1);
@@ -718,8 +752,11 @@ useEffect(() => {
       setSelectedRecipient(null);
       setMeetingDate("");
       setSelectedSlot("");
+      const warningSuffix =
+        outcome.warnings.length > 0 ? ` Note: ${outcome.warnings.join(" · ")}` : "";
       setToastMessage(
-        gHint ? `Appointment created. ${gHint}` : "Appointment created successfully",
+        (gHint ? `Appointment created. ${gHint}` : "Appointment created successfully") +
+          warningSuffix,
       );
     } catch (error) {
       console.error("Failed to create appointment", error);
@@ -1478,6 +1515,20 @@ useEffect(() => {
                       availabilitySlots={scheduleMonthlyAvailabilitySlots}
                       isLoading={scheduleAvailabilityLoading}
                     />
+                  </div>
+
+                  <div className="mb-4 flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <GoogleCalendarConnectButton userId={mentorId} label="Link my Google Calendar" />
+                      <span className="text-[11px] leading-snug text-[#cde2f2]/75">
+                        Connect Google so busy times hide automatically and bookings create Calendar events after OAuth.
+                      </span>
+                    </div>
+                    {calendarConnectBanners.map((msg) => (
+                      <p key={msg.slice(0, 80)} className="text-[11px] text-amber-100/95">
+                        {msg}
+                      </p>
+                    ))}
                   </div>
 
                   <div className="mb-6 grid grid-cols-2 gap-3">

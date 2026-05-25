@@ -65,6 +65,58 @@ Alternatively return `data.calendarEventId` — the UI treats presence of calend
 
 ---
 
+## Preferred: `GET /availability/:mentorUserId`
+
+**Query:** `participantUserId` (optional, pastor/participant mongo id), `from`, `to` (ISO datetimes).
+
+**Conceptual JSON**
+
+```json
+{
+  "cccAvailability": [{}],
+  "google": {
+    "mentor": { "googleCalendarLinked": true, "busyIntervals": [{ "start": "...", "end": "..." }] },
+    "participant": { "googleCalendarLinked": false, "busyIntervals": [] }
+  }
+}
+```
+
+- Frontend subtracts overlaps from **both** `busyIntervals` arrays when merging.
+- `googleCalendarLinked === false`: busy may be empty; UI shows **“Connect Google Calendar to avoid double booking.”**
+- **404**: frontend falls back to `POST /appointments/calendar/external-busy` for busy times only.
+
+---
+
+## Link Calendar (per user): `GET /auth/google`
+
+**Query:** `userId=<mongoUserId>`
+
+**Response:** `{ "url": "https://accounts.google.com/..." }` (or `{ "data": { "url": "..." } }`).
+
+Frontend redirects the browser (`window.location.assign(url)`). Callback is backend-only (`/auth/google/callback`). After redirect back to SPA, optionally use `?googleCalendar=linked` — UI shows confirmation.
+
+Repeat OAuth for **each** logged-in account that must sync (mentor, pastor, director as applicable).
+
+---
+
+## `POST /appointments` Google outcome fields
+
+Prefer these on `data`:
+
+- `mentorGoogleCalendarEventId`
+- `userGoogleCalendarEventId`
+- `googleCalendarSyncWarnings: string[]` — non-blocking; show as toast/banner (e.g. mentor not linked, partial failure).
+
+Do not assume events exist if warnings are present or ids are null.
+
+---
+
+## Monthly availability with Google (alternate)
+
+`GET /appointments/availability/:mentorId/month?year=&month=&participantUserId=` — when backend applies Google server-side, pass `participantUserId` for pastor flows.
+
+---
+
 ## OAuth / tokens
 
 The browser never calls Google directly. Tokens stay on the backend and are refreshed there.
