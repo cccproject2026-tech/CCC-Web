@@ -160,14 +160,27 @@ export function flattenAssignedAssessmentRow(item: unknown): FlatAssignedAssessm
   const hasShape = typeof row.name === "string" || Array.isArray(row.sections);
   if (!hasShape) return null;
 
+  // return {
+  //   assessmentId,
+  //   assignmentId: row.assignmentId != null ? String(row.assignmentId) : undefined,
+  //   assessment: row as Record<string, unknown>,
+  //   dueDate: typeof row.dueDate === "string" ? row.dueDate : undefined,
+  //   meetingDate: typeof row.meetingDate === "string" ? row.meetingDate : undefined,
+  //   updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : undefined,
+  // };
   return {
-    assessmentId,
-    assignmentId: row.assignmentId != null ? String(row.assignmentId) : undefined,
-    assessment: row as Record<string, unknown>,
-    dueDate: typeof row.dueDate === "string" ? row.dueDate : undefined,
-    meetingDate: typeof row.meetingDate === "string" ? row.meetingDate : undefined,
-    updatedAt: typeof row.updatedAt === "string" ? row.updatedAt : undefined,
-  };
+  assessmentId,
+  assignmentId: row.assignmentId != null ? String(row.assignmentId) : undefined,
+  assessment: row as Record<string, unknown>,
+  dueDate: typeof row.dueDate === "string" ? row.dueDate : undefined,
+  meetingDate: typeof row.meetingDate === "string" ? row.meetingDate : undefined,
+  updatedAt:
+    typeof row.updatedAt === "string"
+      ? row.updatedAt
+      : typeof row.assignedAt === "string"
+        ? row.assignedAt
+        : undefined,
+};
 }
 
 /**

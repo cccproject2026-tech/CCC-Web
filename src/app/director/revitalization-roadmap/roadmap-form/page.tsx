@@ -791,7 +791,6 @@ export default function DirectorRoadmapFormPage() {
     setError(null);
 
     if (
-      isEditMode &&
       (roadmapType === "phase" || roadmapType === "single") &&
       !nestedItemTitle.trim()
     ) {
@@ -941,7 +940,7 @@ export default function DirectorRoadmapFormPage() {
               </div>
 
               <div className="space-y-8">
-                {isEditMode && (roadmapType === "phase" || roadmapType === "single") && !viewOnly ? (
+                {(roadmapType === "phase" || roadmapType === "single") && !viewOnly ? (
                   <div>
                     <label className={directorLabelClass} htmlFor="nested-item-title">
                       {roadmapType === "phase" ? "Phase name" : "Roadmap name"}{" "}

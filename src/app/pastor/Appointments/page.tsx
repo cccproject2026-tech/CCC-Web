@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import PastorHeader from "@/app/Components/PastorHeader";
@@ -99,7 +99,15 @@ export default function PastorAppointmentsPage() {
   const [appointmentsTab, setAppointmentsTab] = useState<"next" | "history">("next");
   const [monthlyAvailabilitySlots, setMonthlyAvailabilitySlots] = useState<any[]>([]);
   const router = useRouter();
+const pathname = usePathname();
+const searchParams = useSearchParams();
 
+const routeAssessmentId = searchParams.get("assessmentId");
+const routeRoadmapId = searchParams.get("roadmapId");
+const routeTaskId = searchParams.get("taskId");
+const routeParentId = searchParams.get("parentId");
+const routeAppointmentId = searchParams.get("appointmentId")?.trim() || "";
+const shouldOpenScheduleDrawer = searchParams.get("openSchedule") === "1";
   const showToast = (msg: string, duration = 3000) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), duration);
@@ -245,7 +253,41 @@ export default function PastorAppointmentsPage() {
   useEffect(() => {
     refreshAppointmentLists();
   }, []);
+//   useEffect(() => {
+//   if (searchParams.get("openSchedule") === "1") {
+//     setDrawerOpen(true);
+//     setDrawerStep("mentor");
+//   }
+// }, [searchParams]);
+useEffect(() => {
+  const open = searchParams.get("openSchedule") === "1";
+  console.log("openSchedule:", searchParams.get("openSchedule"));
 
+  if (!open) return;
+
+  setDrawerOpen(true);
+  setDrawerStep("mentor");
+}, [searchParams.toString()]);
+
+useEffect(() => {
+  if (!routeAppointmentId || pathname?.toLowerCase() !== "/pastor/appointments") return;
+
+  const loadedAppointments = [
+    ...(appointments as any[]),
+    ...(appointmentsToday as any[]),
+    ...(upcomingAppointments as any[]),
+  ];
+
+  const match = loadedAppointments.find((appointment) => {
+    const id = appointmentEntityId(appointment);
+    return id === routeAppointmentId || String(appointment?._id ?? appointment?.id ?? "") === routeAppointmentId;
+  });
+
+  if (!match) return;
+
+  const id = appointmentEntityId(match) || routeAppointmentId;
+  router.push(`/pastor/appointments/${encodeURIComponent(id)}`);
+}, [routeAppointmentId, pathname, appointments, appointmentsToday, upcomingAppointments, router]);
   /** Keep selected day valid when month/year changes (e.g. Jan 31 → Feb). */
   useEffect(() => {
     const max = getDaysInMonth(currentMonth, currentYear);
@@ -575,7 +617,9 @@ export default function PastorAppointmentsPage() {
       mentorId: String(mid),
       meetingDate: meetingDateISO,
       platform: uiMeetingModeToPlatform(schedulePlatform),
-      notes: "Mentorship session",
+      notes: routeAssessmentId
+  ? `Roadmap assessment meeting | assessmentId:${routeAssessmentId} | roadmapId:${routeRoadmapId || ""} | taskId:${routeTaskId || ""} | parentId:${routeParentId || ""}`
+  : "Mentorship session",
       googleCalendarSync: true,
       googleCalendarTitle: `Meeting · pastor & ${mentorDisplay}`,
       googleCalendarDescription: `Scheduled in CCC · Platform: ${schedulePlatform}`,
@@ -589,8 +633,16 @@ export default function PastorAppointmentsPage() {
       setAvailabilityRefreshKey((prev) => prev + 1);
       setDrawerOpen(false);
       setShowPopup(true);
+      // setSelectedTime("");
+      // await refreshAppointmentLists();
       setSelectedTime("");
-      await refreshAppointmentLists();
+await refreshAppointmentLists();
+
+if (routeAssessmentId && routeRoadmapId && routeTaskId) {
+  router.push(
+    `/pastor/jumpstart?id=${routeTaskId}&parentId=${routeRoadmapId}`,
+  );
+}
     } catch (error) {
       console.error("Error scheduling appointment:", error);
       showToast("Failed to schedule appointment.");

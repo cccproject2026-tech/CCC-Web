@@ -3,10 +3,15 @@
 import { useCallback, useEffect, useState, Suspense } from "react";
 import type { JSX } from "react";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { apiGetExtrasDocuments } from "@/app/Services/api";
+import {
+  apiGetUserAnswers,
+  apiGetSectionRecommendations,
+} from "@/app/Services/assessment.service";
 
+import { getStoredRecommendationsForPastorAssessment } from "@/app/utils/assessment-recommendations";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import UserProfile from "@/app/Assets/user-profile.png";
 
@@ -123,6 +128,7 @@ function isRenderablePastorExtraRow(item: Record<string, unknown>): boolean {
 
 function TaskPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const taskId = searchParams.get("taskId");
   const roadmapId = searchParams.get("roadmapId");
   const userId = searchParams.get("userId");
@@ -139,6 +145,11 @@ function TaskPageContent() {
   Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]>
 >({});
   const [extrasLoading, setExtrasLoading] = useState(false);
+  const [assessmentTaskState, setAssessmentTaskState] = useState<{
+  assessmentId: string;
+  submitted: boolean;
+  hasCdp: boolean;
+} | null>(null);
 
   const [comments, setComments] = useState<Record<string, unknown>[]>([]);
   const [queries, setQueries] = useState<Record<string, unknown>[]>([]);
@@ -356,6 +367,110 @@ function TaskPageContent() {
     cancelled = true;
   };
 }, [roadmapId, userId, taskId]);
+
+const resolveAssessmentIdFromTaskExtra = (extra: any): string | null => {
+  const direct = extra?.assessmentId;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+
+  const pickId = (obj: any): string | null => {
+    if (!obj || typeof obj !== "object") return null;
+    const id = obj?._id ?? obj?.id ?? obj?.assessmentId;
+    return id ? String(id).trim() : null;
+  };
+
+  return (
+    pickId(extra?.assessment) ||
+    pickId(extra?.selectedAssessment) ||
+    null
+  );
+};
+
+const findAssessmentExtra = (items: any[] | undefined): any | null => {
+  if (!Array.isArray(items)) return null;
+
+  for (const item of items) {
+    const type = String(item?.type || "").toUpperCase();
+
+    if (type === "ASSESSMENT") return item;
+
+    const fromSections = findAssessmentExtra(item?.sections);
+    if (fromSections) return fromSections;
+
+    const fromCheckboxes = findAssessmentExtra(item?.checkboxes);
+    if (fromCheckboxes) return fromCheckboxes;
+  }
+
+  return null;
+};
+useEffect(() => {
+  if (!task || !userId) {
+    setAssessmentTaskState(null);
+    return;
+  }
+
+  const assessmentExtra = findAssessmentExtra((task as any)?.extras);
+  const assessmentId = assessmentExtra
+    ? resolveAssessmentIdFromTaskExtra(assessmentExtra)
+    : null;
+
+  if (!assessmentId) {
+    setAssessmentTaskState(null);
+    return;
+  }
+
+  let cancelled = false;
+
+  const loadAssessmentTaskState = async () => {
+    let submitted = false;
+    let hasCdp = getStoredRecommendationsForPastorAssessment(
+      userId,
+      assessmentId,
+    ).some((rec) => rec.sent === true);
+
+    try {
+      const answersRes = await apiGetUserAnswers(assessmentId, userId);
+      submitted = Boolean((answersRes?.data as any)?.data?._id);
+    } catch {
+      submitted = false;
+    }
+
+    try {
+      const recRes = await apiGetSectionRecommendations(assessmentId, userId);
+      const data: any = (recRes?.data as any)?.data ?? recRes?.data;
+
+      if (Array.isArray(data)) {
+        hasCdp =
+          hasCdp ||
+          data.some((row: any) => row?.sent === true || row?.status === "sent");
+      } else if (Array.isArray(data?.sections)) {
+        hasCdp =
+          hasCdp ||
+          data.sections.some((section: any) =>
+            Array.isArray(section?.recommendations) &&
+            section.recommendations.some(
+              (rec: any) => rec?.sent === true || rec?.status === "sent",
+            ),
+          );
+      }
+    } catch {
+      // keep stored CDP value
+    }
+
+    if (!cancelled) {
+      setAssessmentTaskState({
+        assessmentId,
+        submitted,
+        hasCdp,
+      });
+    }
+  };
+
+  void loadAssessmentTaskState();
+
+  return () => {
+    cancelled = true;
+  };
+}, [task, userId]);
 
   const handleSendComment = async () => {
     if (!newComment.trim() || !roadmapId || !userId) return;
@@ -643,7 +758,13 @@ const renderableExtras = Array.from(latestExtrasMap.values());
 
 const isUpdatedResponse = allRenderableExtras.length > renderableExtras.length;
 
-const pastorHasNoResponses = !extrasLoading && renderableExtras.length === 0;
+// const pastorHasNoResponses = !extrasLoading && renderableExtras.length === 0;
+const pastorHasAssessmentResponse = assessmentTaskState?.submitted === true;
+
+const pastorHasNoResponses =
+  !extrasLoading &&
+  renderableExtras.length === 0 &&
+  !pastorHasAssessmentResponse;
                       
 const templateExtras = Array.isArray((task as any)?.extras)
   ? ((task as any).extras as Record<string, any>[])
@@ -950,6 +1071,48 @@ const renderTemplateExtra = (extra: Record<string, any>, idx: number): JSX.Eleme
   <h3 className="mb-4 text-lg font-semibold text-white">
     Pastor Tasks :
   </h3>
+) : null}
+{assessmentTaskState?.submitted ? (
+  <div className="mb-5 rounded-xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 p-5">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-sm font-semibold text-white">
+          Assessment submitted
+        </p>
+        <p className="mt-1 text-xs text-[#cde2f2]/80">
+          This pastor completed the assessment linked to this roadmap task.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() =>
+            router.push(
+              `/mentor/MentorAssessments/result?assessmentId=${assessmentTaskState.assessmentId}&userId=${userId}&roadmapId=${roadmapId || ""}&taskId=${taskId || ""}`,
+            )
+          }
+          className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+        >
+          View Submitted Answers
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            router.push(
+              assessmentTaskState.hasCdp
+                ? `/mentor/MentorAssessments/result/cdp?assessmentId=${assessmentTaskState.assessmentId}&userId=${userId}&roadmapId=${roadmapId || ""}&taskId=${taskId || ""}`
+                : `/mentor/MentorAssessments/result?assessmentId=${assessmentTaskState.assessmentId}&userId=${userId}&roadmapId=${roadmapId || ""}&taskId=${taskId || ""}&editRecommendation=1`,
+            )
+          }
+          className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+        >
+          {assessmentTaskState.hasCdp ? "View CDP" : "Send CDP"}
+        </button>
+      </div>
+    </div>
+  </div>
 ) : null}
 
                           {extrasLoading ? (

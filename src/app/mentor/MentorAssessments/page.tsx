@@ -514,12 +514,62 @@ export default function MentorAssessments() {
       try {
         setLoading(true);
         if (selectedMenteeId) {
-          const [assignedRes, progressRes, appointmentsRes] = await Promise.all([
-            apiGetAssignedAssessments(selectedMenteeId),
-            apiGetUserProgress(selectedMenteeId),
-            apiGetAppointments({ userId: selectedMenteeId, futureOnly: false } as any),
-          ]);
-          const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
+          // const [assignedRes, progressRes, appointmentsRes] = await Promise.all([
+          //   apiGetAssignedAssessments(selectedMenteeId),
+          //   apiGetUserProgress(selectedMenteeId),
+          //   apiGetAppointments({ userId: selectedMenteeId, futureOnly: false } as any),
+          // ]);
+          // const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
+          const [assignedRes, allAssessmentsRes, progressRes, appointmentsRes] = await Promise.all([
+  apiGetAssignedAssessments(selectedMenteeId),
+  apiGetAssessments(),
+  apiGetUserProgress(selectedMenteeId),
+  apiGetAppointments({ userId: selectedMenteeId, futureOnly: false } as any),
+]);
+
+let assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
+
+const allAssessmentsBody: any = allAssessmentsRes?.data;
+
+const allAssessments = Array.isArray(allAssessmentsBody?.data)
+  ? allAssessmentsBody.data
+  : Array.isArray(allAssessmentsBody)
+    ? allAssessmentsBody
+    : [];
+
+const assignmentList = allAssessments
+  .map((assessment: any) => {
+    const assignment = Array.isArray(assessment?.assignments)
+      ? assessment.assignments.find(
+          (row: any) => String(row?.userId) === String(selectedMenteeId),
+        )
+      : null;
+
+    if (!assignment) return null;
+
+    return {
+      assessment,
+      assessmentId: assessment?._id || assessment?.id,
+      assignmentId: assignment?._id,
+      dueDate: assignment?.dueDate,
+      assignedDueDate: assignment?.dueDate,
+      updatedAt: assignment?.assignedAt || assessment?.updatedAt,
+    };
+  })
+  .filter(Boolean);
+
+const existingIds = new Set(
+  assignedRows
+    .map((item: any) => flattenAssignedAssessmentRow(item)?.assessmentId)
+    .filter(Boolean),
+);
+
+const missingFromAssignedApi = assignmentList.filter((item: any) => {
+  const id = String(item?.assessmentId || "");
+  return id && !existingIds.has(id);
+});
+
+assignedRows = [...assignedRows, ...missingFromAssignedApi];
           const progressData = unwrapProgressData(progressRes);
           const assessmentProgress = Array.isArray(progressData?.assessments)
             ? progressData.assessments
@@ -573,8 +623,10 @@ export default function MentorAssessments() {
             uniqById.map((row) => [row.assessmentId, row]),
           );
 
-          const assigned = assignedRows
-            .map((item) => {
+          // const assigned = assignedRows
+          //   .map((item) => {
+          const assigned = (await Promise.all(
+  assignedRows.map(async (item) => {
               const flat = flattenAssignedAssessmentRow(item);
               if (!flat) return null;
               const assessment = flat.assessment as any;
@@ -607,14 +659,49 @@ export default function MentorAssessments() {
   assessmentId,
 );
 
+// const hasSentCdp = storedCdp.some((rec) => rec.sent === true);
+
+// const progressStatus = progressRow?.status || "not_started";
+
+// const normalizedStatus: MentorAssessmentStatus =
+//   progressStatus === "completed" && !hasSentCdp
+//     ? "submitted"
+//     : progressStatus;
 const hasSentCdp = storedCdp.some((rec) => rec.sent === true);
+
+// const answersRes = await apiGetUserAnswers(
+//   assessmentId,
+//   selectedMenteeId,
+// );
+
+// const hasSubmittedAnswers = Boolean((answersRes?.data as any)?.data?._id);
+let hasSubmittedAnswers = false;
+
+try {
+  const answersRes = await apiGetUserAnswers(
+    assessmentId,
+    selectedMenteeId,
+  );
+
+  hasSubmittedAnswers = Boolean((answersRes?.data as any)?.data?._id);
+} catch {
+  hasSubmittedAnswers = false;
+}
 
 const progressStatus = progressRow?.status || "not_started";
 
-const normalizedStatus: MentorAssessmentStatus =
-  progressStatus === "completed" && !hasSentCdp
-    ? "submitted"
-    : progressStatus;
+let normalizedStatus: MentorAssessmentStatus = "not_started";
+
+if (hasSentCdp) {
+  normalizedStatus = "completed";
+} else if (
+  hasSubmittedAnswers ||
+  progressStatus === "submitted" ||
+  progressStatus === "completed" 
+  
+) {
+  normalizedStatus = "submitted";
+}
               const resolvedDueDate = pickAssignedDueDate(item, flat);
               
 console.log("CDP CHECK:", {
@@ -649,8 +736,10 @@ _mentorSubmittedAt:
                   : false,
                 menteeAssigned: countMenteesAssigned(assessment),
               };
-            })
-            .filter((value): value is any => value != null);
+            // })
+            // .filter((value): value is any => value != null);
+              })
+)).filter((value): value is any => value != null);
 const assignedWithCdp = await Promise.all(
   assigned.map(async (assessment: any) => {
     try {
@@ -861,8 +950,15 @@ const assignedWithCdp = await Promise.all(
     }
     try {
       setAssignSubmitting(true);
+      // for (const assessmentId of assignAssessmentIds) {
+      //   await apiAssignAssessmentViaModule(assessmentId, {
       for (const assessmentId of assignAssessmentIds) {
-        await apiAssignAssessmentViaModule(assessmentId, {
+  console.log("ASSIGNING ASSESSMENT:", {
+    assessmentId,
+    selectedAssignUserIds,
+  });
+
+  await apiAssignAssessmentViaModule(assessmentId, {
           userIds: selectedAssignUserIds,
           dueDate: assignDueDate ? new Date(`${assignDueDate}T23:59:59`).toISOString() : undefined,
         });
@@ -1859,24 +1955,44 @@ assessment._mentorHasSentCdp
 
                                   {(assessment._mentorAssignmentStatus === "submitted" ||
                                     assessment._mentorAssignmentStatus === "completed") && (
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setShowOptionsMenu(null);
-                                          // router.push(
-                                          //   `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
-                                          // );
-                                          router.push(
-  assessment._mentorHasSentCdp
-    ? `/mentor/MentorAssessments/result/cdp?assessmentId=${assessment._id}&userId=${selectedMenteeId}`
-    : `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
-);
-                                        }}
-                                        className="flex w-full items-center gap-2 border-t border-white/10 px-4 py-2 text-left text-sm text-white/90 transition hover:bg-white/10"
-                                      >
-                                        <i className="fa-regular fa-clipboard text-[#8ec5eb]" />
-                                        {assessment._mentorHasSentCdp ? "Customized Development Plan " : "Send Customized Development Plan"}
-                                      </button>
+//                                       <button
+//                                         type="button"
+//                                         onClick={() => {
+//                                           setShowOptionsMenu(null);
+//                                           // router.push(
+//                                           //   `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
+//                                           // );
+//                                           router.push(
+//   assessment._mentorHasSentCdp
+//     ? `/mentor/MentorAssessments/result/cdp?assessmentId=${assessment._id}&userId=${selectedMenteeId}`
+//     : `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
+// );
+//                                         }}
+//                                         className="flex w-full items-center gap-2 border-t border-white/10 px-4 py-2 text-left text-sm text-white/90 transition hover:bg-white/10"
+//                                       >
+//                                         <i className="fa-regular fa-clipboard text-[#8ec5eb]" />
+//                                         {assessment._mentorHasSentCdp ? "Customized Development Plan " : "Send Customized Development Plan"}
+//                                       </button>
+<button
+  type="button"
+  disabled={!assessment._mentorHasSentCdp && !assessment._mentorAppointmentId}
+  onClick={() => {
+    setShowOptionsMenu(null);
+
+    if (!assessment._mentorHasSentCdp && !assessment._mentorAppointmentId) {
+      setToastMsg("Schedule a meeting before sending CDP.");
+      setTimeout(() => setToastMsg(""), 3000);
+      return;
+    }
+
+    router.push(
+      assessment._mentorHasSentCdp
+        ? `/mentor/MentorAssessments/result/cdp?assessmentId=${assessment._id}&userId=${selectedMenteeId}`
+        : `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
+    );
+  }}
+  className="flex w-full items-center gap-2 border-t border-white/10 px-4 py-2 text-left text-sm text-white/90 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:text-white/40 disabled:hover:bg-transparent"
+></button>
                                     )}
                                 </>
                               ) : (
@@ -2080,22 +2196,42 @@ assessment._mentorHasSentCdp
                                   )}
                                 {(assessment._mentorAssignmentStatus === "submitted" ||
                                   assessment._mentorAssignmentStatus === "completed") && (
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        // router.push(
-                                        //   `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
-                                        // )
-                                        router.push(
-  assessment._mentorHasSentCdp
-    ? `/mentor/MentorAssessments/result/cdp?assessmentId=${assessment._id}&userId=${selectedMenteeId}`
-    : `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
-)
-                                      }
-                                      className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
-                                    >
-                                      {assessment._mentorHasSentCdp ? "Customized Development Plan " : "Send Customized Development Plan"}
-                                    </button>
+//                                     <button
+//                                       type="button"
+//                                       onClick={() =>
+//                                         // router.push(
+//                                         //   `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
+//                                         // )
+//                                         router.push(
+//   assessment._mentorHasSentCdp
+//     ? `/mentor/MentorAssessments/result/cdp?assessmentId=${assessment._id}&userId=${selectedMenteeId}`
+//     : `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
+// )
+//                                       }
+//                                       className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+//                                     >
+//                                       {assessment._mentorHasSentCdp ? "Customized Development Plan " : "Send Customized Development Plan"}
+//                                     </button>
+<button
+  type="button"
+  disabled={!assessment._mentorHasSentCdp && !assessment._mentorAppointmentId}
+  onClick={() => {
+    if (!assessment._mentorHasSentCdp && !assessment._mentorAppointmentId) {
+      setToastMsg("Schedule a meeting before sending CDP.");
+      setTimeout(() => setToastMsg(""), 3000);
+      return;
+    }
+
+    router.push(
+      assessment._mentorHasSentCdp
+        ? `/mentor/MentorAssessments/result/cdp?assessmentId=${assessment._id}&userId=${selectedMenteeId}`
+        : `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${selectedMenteeId}&editRecommendation=1`,
+    );
+  }}
+  className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-white/10"
+>
+  {assessment._mentorHasSentCdp ? "Customized Development Plan " : "Send Customized Development Plan"}
+</button>
                                   )}
                                 {/* <button
                                   type="button"

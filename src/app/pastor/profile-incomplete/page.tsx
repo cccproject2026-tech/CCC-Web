@@ -355,14 +355,14 @@ const newUrl = uploadedUrl ? `${uploadedUrl}?t=${Date.now()}` : undefined;
           <button
   type="button"
   onClick={handleSaveProfile}
-  disabled={!hasProfileChanged || isProfileUploading}
+  disabled={(!hasProfileChanged && documents.length === 0) || isProfileUploading || isDocUploading}
   className={`mt-4 flex items-center justify-center gap-2 mx-auto text-sm font-semibold px-8 py-2 rounded-lg transition ${
-    hasProfileChanged && !isProfileUploading
+    (hasProfileChanged || documents.length > 0) && !isProfileUploading && !isDocUploading
       ? "bg-[#f5cc76] text-[#062946] hover:bg-[#ffd98a]"
       : "bg-white/20 text-white/50 cursor-not-allowed"
   }`}
 >
-  {isProfileUploading ? "Saving..." : "Save"}
+  {isProfileUploading || isDocUploading ? "Saving..." : "Save"}
 </button>
 
           {/* hidden file input for documents */}
