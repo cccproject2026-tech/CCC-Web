@@ -482,11 +482,15 @@ function DirectorScheduleContent() {
           mergeMentorId = String(directorId);
           mergeParticipantId = recipientId || undefined;
         } else if (recipientId) {
+          /** Mentor-only picker: host availability is the mentor's document; omit participantUserId (Director Google enforced on POST). */
           mergeMentorId = recipientId;
-          mergeParticipantId = String(directorId);
+          mergeParticipantId = undefined;
         }
 
-        const participantUserIds = Array.from(new Set([String(directorId), recipientId].filter(Boolean)));
+        const participantUserIds =
+          scheduleRecipientType === "mentor" && recipientId
+            ? [recipientId]
+            : Array.from(new Set([String(directorId), recipientId].filter(Boolean)));
 
         const gc = await filterSlotLabelsAgainstExternalCalendar({
           meetingDateYmd: meetingDate.slice(0, 10),
@@ -586,6 +590,9 @@ function DirectorScheduleContent() {
           params: {
             year: scheduleYear,
             month: scheduleMonth + 1,
+            ...(scheduleRecipientType === "pastor" && selectedRecipient
+              ? { participantUserId: String(selectedRecipient._id || selectedRecipient.id) }
+              : {}),
           },
         });
         const raw = res.data?.data ?? res.data;
@@ -837,13 +844,16 @@ function DirectorScheduleContent() {
       mergeParticipantRecheck = recipientIdCal || undefined;
     } else {
       mergeMentorRecheck = recipientIdCal;
-      mergeParticipantRecheck = String(directorId);
+      mergeParticipantRecheck = undefined;
     }
+
+    const participantUserIdsRecheck =
+      scheduleRecipientType === "mentor" ? [recipientIdCal] : Array.from(new Set([String(directorId), recipientIdCal]));
 
     const gcRecheck = await filterSlotLabelsAgainstExternalCalendar({
       meetingDateYmd: meetingDate.slice(0, 10),
       rawSlotLabels: availableSlots,
-      participantUserIds: Array.from(new Set([String(directorId), recipientIdCal].filter(Boolean))),
+      participantUserIds: participantUserIdsRecheck,
       meetingDurationMinutes: 60,
       expandIntoGrid: true,
       availabilityMentorUserId: mergeMentorRecheck || undefined,
@@ -878,6 +888,7 @@ function DirectorScheduleContent() {
         googleCalendarSync: true,
         googleCalendarTitle: `Meeting · director & ${recipientLabel}`,
         googleCalendarDescription: `Scheduled in CCC · Platform: ${selectedPlatform}`,
+        initiatorRole: "director",
       });
 
       const gHint = googleCalendarSuccessHintFromCreateResponse(res?.data);

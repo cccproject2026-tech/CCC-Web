@@ -242,7 +242,7 @@ export async function filterSlotLabelsAgainstExternalCalendar(options: {
         mentorLinked = g.mentor.googleCalendarLinked;
         participantLinked = g.participant.googleCalendarLinked;
         busy = mergeBusyIntervals(g.mentor.busyIntervals, g.participant.busyIntervals);
-        banners = buildGoogleConnectBanners(participantForMerge, g.mentor, g.participant);
+        banners = buildGoogleConnectBanners(Boolean(participantForMerge), g.mentor, g.participant);
       }
     } catch (_e: unknown) {
       usedMergedAvailabilityApi = false;

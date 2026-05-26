@@ -178,20 +178,17 @@ export function mergeBusyIntervals(a: CalendarBusyPeriod[], b: CalendarBusyPerio
 }
 
 export function buildGoogleConnectBanners(
-  participantUserIdTrimmed: string | undefined,
+  /** True when `/availability` was called with participantUserId (second calendar merged in picker). */
+  participantMergedInRequest: boolean,
   mentor: ParsedGoogleSide,
   participant: ParsedGoogleSide,
 ): string[] {
   const banners: string[] = [];
   if (mentor.googleCalendarLinked === false) {
-    banners.push(
-      "Mentor (host) has not connected Google Calendar — connect Calendar to hide real busy times and avoid double booking.",
-    );
+    banners.push("Link Google Calendar to avoid double-booking.");
   }
-  if (participantUserIdTrimmed && participant.googleCalendarLinked === false) {
-    banners.push(
-      "Participant has not connected Google Calendar — both sides should link Calendar for reliable availability.",
-    );
+  if (participantMergedInRequest && participant.googleCalendarLinked === false) {
+    banners.push("Booking participant: link Google Calendar to avoid double-booking.");
   }
   return banners;
 }

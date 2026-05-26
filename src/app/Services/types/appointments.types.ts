@@ -58,6 +58,13 @@ export interface CreateAppointmentPayload {
   googleCalendarSync?: boolean;
   googleCalendarTitle?: string;
   googleCalendarDescription?: string;
+  /** Host-initiated flow hint for CCC backend (`mentor` | `director` | `pastor`, etc.). */
+  initiatorRole?: string;
+  /**
+   * When `userId` is not the Mongo user whose Google should receive `userGoogleCalendarEventId`
+   * (booking edge cases). Omit when `userId` already identifies that party.
+   */
+  googleCalendarNonMentorUserId?: string;
 }
 
 export interface CalendarBusyPeriod {
