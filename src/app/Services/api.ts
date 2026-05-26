@@ -28,6 +28,8 @@ export {
   apiGetMentorSchedule,
   apiCreateAppointment,
   apiUpdateAppointment,
+  apiPostAppointmentJoin,
+  apiGetAppointmentById,
   apiRescheduleAppointment,
   apiCancelAppointment,
   apiMarkAppointmentMissed,

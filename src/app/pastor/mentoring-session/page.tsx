@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { apiGetUserById } from "@/app/Services/users.service";
 import {
   apiGetPastorMentoringSessions,
-  apiRequestMentoringSessionReschedule,
+  apiRequestPastorMentoringReschedulePreferred,
+  isPastorMentoringRescheduleEligibleStatus,
 } from "@/app/Services/mentoring-sessions.service";
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/progress-bg.png";
@@ -107,6 +108,7 @@ function normalizeBackendSession(session: any) {
     mentorNote: getStringValue(session?.mentorNote, session?.title, `Session ${sessionNumber}`),
     status: getStringValue(session?.status, "LOCKED").toUpperCase(),
     scheduledDate: getStringValue(session?.scheduledDate, session?.meetingDate, session?.date),
+    appointmentId: getStringValue(session?.appointmentId),
   };
 }
 
@@ -363,6 +365,7 @@ const status = isCompleted
       title: apiSession?.title || title,
       mentorNote: apiSession?.mentorNote || `Session ${sessionNumber}—${title}`,
       status,
+      appointmentId: getStringValue(apiSession?.appointmentId),
     //   scheduledDate: apiSession?.scheduledDate || fallbackDate?.toISOString() || "",
 //     scheduledDate:
 //   apiSession?.status === "COMPLETED"
@@ -406,7 +409,20 @@ const selectedSession =
 
     const selectedRaw = (selectedSession?.raw || {}) as any;
 const selectedSessionId = getStringValue(selectedRaw?.id, selectedRaw?._id, selectedRaw?.sessionId, selectedSession?.id);
+
 const selectedAppointment = selectedRaw?.appointment || selectedRaw?.appointmentDetails || {};
+
+const selectedAppointmentId = getStringValue(
+  selectedRaw?.appointmentId,
+  (selectedSession as { appointmentId?: string } | null)?.appointmentId,
+  selectedAppointment?._id,
+  selectedAppointment?.id,
+);
+
+const pastorRescheduleEligible =
+  !!selectedSession &&
+  selectedSession.status !== "LOCKED" &&
+  isPastorMentoringRescheduleEligibleStatus(selectedSession.status);
 // const selectedMentor =
 //   selectedRaw?.mentor ||
 //   selectedRaw?.mentorId ||
@@ -779,13 +795,13 @@ const selectedTranscriptText = getTranscriptText(
           <p className="mt-2 leading-relaxed text-white/70">
            {selectedSession.status === "COMPLETED"
   ? "This session has been completed."
-  : selectedSessionMissed
-    ? "This session was missed. Please reschedule it."
-    : selectedSession.status === "SCHEDULED"
-      ? "This is your current mentoring session."
-      : "Complete the previous session to unlock this session."}
+  : pastorRescheduleEligible
+    ? "You can request a new time from your mentor for this session."
+    : selectedSession.status === "LOCKED"
+      ? "Complete the previous session to unlock this session."
+      : "Summary will appear here once the session is underway."}
           </p>
-          {selectedSessionMissed ? (
+          {pastorRescheduleEligible ? (
   <button
     type="button"
     disabled={!selectedSessionId || rescheduleRequestingId === selectedSessionId}
@@ -795,9 +811,21 @@ const selectedTranscriptText = getTranscriptText(
         return;
       }
 
+      const pastorUserId =
+        getBrowserUserId() ||
+        (typeof window !== "undefined" ? String(localStorage.getItem("userId") || "").trim() : "");
+      if (!pastorUserId) {
+        alert("Sign in to request a reschedule.");
+        return;
+      }
+
       try {
         setRescheduleRequestingId(selectedSessionId);
-        await apiRequestMentoringSessionReschedule(selectedSessionId);
+        await apiRequestPastorMentoringReschedulePreferred({
+          sessionId: selectedSessionId,
+          pastorId: pastorUserId,
+          appointmentId: selectedAppointmentId,
+        });
         alert("Reschedule request sent to your mentor.");
       } catch (err) {
         alert(err instanceof Error ? err.message : "Failed to request reschedule.");
@@ -807,7 +835,7 @@ const selectedTranscriptText = getTranscriptText(
     }}
     className="mt-4 w-full rounded-xl bg-[#8ec5eb] px-4 py-3 text-sm font-bold text-[#062946] transition hover:bg-[#b7def6] disabled:cursor-not-allowed disabled:opacity-60"
   >
-   {rescheduleRequestingId === selectedSessionId ? "Sending request..." : "Request Reschedule Missed Session"}
+   {rescheduleRequestingId === selectedSessionId ? "Sending request..." : "Request reschedule"}
   </button>
 ) : null}
         </div>

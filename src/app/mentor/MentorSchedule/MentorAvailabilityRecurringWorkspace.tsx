@@ -169,7 +169,12 @@ export default function MentorAvailabilityRecurringWorkspace({
       const res = await apiGetAvailability(mentorId);
       const blob = digAvailabilityBlob(res?.data);
       if (blob) {
-        setMeetingDuration(coerceNumber(blob.meetingDuration, 60));
+        setMeetingDuration(
+          (() => {
+            const parsedDur = coerceNumber(blob.meetingDuration, 60);
+            return parsedDur === 30 || parsedDur === 60 ? parsedDur : 60;
+          })(),
+        );
         setMinNoticeHours(
           coerceNumber(blob.minSchedulingNoticeHours ?? blob.advanceNotice ?? blob.minNoticeHours, 2),
         );
@@ -637,9 +642,8 @@ export default function MentorAvailabilityRecurringWorkspace({
               value={String(meetingDuration)}
               onChange={(e) => setMeetingDuration(Number(e.target.value))}
             >
-              <option value="30" disabled>30 minutes — coming soon</option>
+              <option value="30">30 minutes</option>
               <option value="60">60 minutes</option>
-              <option value="90" disabled>90 minutes — coming soon</option>
             </select>
           </label>
           <label className="block text-[13px] font-medium text-white">

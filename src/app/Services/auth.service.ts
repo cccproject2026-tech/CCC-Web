@@ -77,18 +77,30 @@ export const apiRefreshToken = (payload: RefreshTokenPayload) =>
 export const apiLogout = () =>
   axiosInstance.post<{ success: boolean; message: string }>("/auth/logout");
 
-/** GET `/auth/google?userId=` — returns OAuth URL; redirect browser to start Google Calendar linking. */
-export const apiGetGoogleCalendarAuthUrl = (userId: string) =>
-  axiosInstance.get<{ url?: string; data?: { url?: string }; success?: boolean }>("/auth/google", {
-    params: { userId: String(userId).trim() },
-  });
+/** GET `/auth/google` — returns OAuth URL. Send `Authorization: Bearer` only (no anonymous ?userId= flow). Optional ?userId is omitted here; backend derives user from JWT. */
+export const apiGetGoogleCalendarAuthUrl = () =>
+  axiosInstance.get<{ url?: string; data?: { url?: string }; success?: boolean }>("/auth/google");
 
+function pickOAuthUrl(record: Record<string, unknown>): string | null {
+  const keys = ["url", "oauthUrl", "authUrl", "authorizationUrl", "redirectUrl", "link"] as const;
+  for (const k of keys) {
+    const v = record[k];
+    if (typeof v === "string" && /^https?:\/\//i.test(v.trim())) return v.trim();
+  }
+  return null;
+}
+
+/** Extract Google OAuth authorize URL from common CCC backend envelopes. */
 export function unwrapGoogleOAuthRedirectUrl(payload: unknown): string | null {
   const root = payload && typeof payload === "object" ? (payload as Record<string, unknown>) : null;
   if (!root) return null;
-  if (typeof root.url === "string" && root.url.startsWith("http")) return root.url;
+  const top = pickOAuthUrl(root);
+  if (top) return top;
   const data = root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : null;
-  if (data && typeof data.url === "string" && data.url.startsWith("http")) return data.url;
+  if (data) {
+    const inner = pickOAuthUrl(data);
+    if (inner) return inner;
+  }
   return null;
 }
 

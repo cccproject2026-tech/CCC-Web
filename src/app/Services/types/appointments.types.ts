@@ -6,7 +6,8 @@ export type AppointmentStatus =
   | 'completed'
   | 'cancelled'
   | 'rescheduled'
-  | 'missed';
+  | 'missed'
+  | 'postponed';
 export type AppointmentPlatform = 'zoom' | 'google-meet' | 'teams' | 'in-person' | 'phone';
 
 export interface PersonInfo {
@@ -40,6 +41,10 @@ export interface AppointmentResponse {
   notes?: string;
   zoomMeetingId?: string;
   zoomJoinUrl?: string;
+  /** Zoom meeting passcode when the join URL omits `pwd=` (preferred over parsing the URL). */
+  zoomPasscode?: string;
+  /** Populated Zoom object from provider (may include `password`). */
+  zoomMeeting?: { password?: string; [key: string]: unknown };
   createdAt?: string;
   updatedAt?: string;
   /** Populated after creation when backend syncs to Google Calendar (optional). */

@@ -22,9 +22,9 @@ export const apiGetAppointments = (params?: GetAppointmentsParams) =>
     { params, timeout: 30_000 },
   );
 
-// Convenience: today's upcoming scheduled appointments
+// Convenience: today's upcoming appointments (omit status filter so `in-progress` is not hidden)
 export const apiGetTodaysAppointments = (userId?: string) =>
-  apiGetAppointments({ futureOnly: true, status: 'scheduled', ...(userId ? { userId } : {}) });
+  apiGetAppointments({ futureOnly: true, ...(userId ? { userId } : {}) });
 
 // Convenience: all upcoming for a user
 export const apiGetUserAppointments = (userId: string, futureOnly = true) =>
@@ -66,6 +66,13 @@ export const apiUpdateAppointment = (id: string, payload: UpdateAppointmentPaylo
     `/appointments/${id}`,
     payload,
   );
+
+/** POST `/appointments/:id/join` — preferred transition to `in-progress` vs PATCH when backend supports it. */
+export const apiPostAppointmentJoin = (
+  id: string,
+  payload: { userId: string; kind: "host" | "participant" },
+) =>
+  axiosInstance.post<{ success: boolean; data: AppointmentResponse }>(`/appointments/${id}/join`, payload);
 
 // PATCH /appointments/:id/reschedule
 export const apiRescheduleAppointment = (id: string, payload: RescheduleAppointmentPayload) =>

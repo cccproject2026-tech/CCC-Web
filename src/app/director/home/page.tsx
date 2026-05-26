@@ -771,7 +771,7 @@ for (let i = 0; i < maxL; i++) {
 
       const results = await Promise.allSettled([
         // apiGetTodaysAppointments(uid || undefined),
-        apiGetAppointments({ futureOnly: true, status: "scheduled" }),
+        apiGetAppointments({ futureOnly: true }),
         apiGetAllInterests({ status: 'new' }),
         
         // apiGetMentors({ limit: 4, roleMatch: "mixed" }),
@@ -1468,7 +1468,6 @@ const openMonthlyAppointmentsModal = async () => {
 
     const res = await apiGetAppointments({
       futureOnly: false,
-      status: "scheduled",
       t: Date.now(),
     } as any);
 

@@ -121,13 +121,34 @@ const shouldOpenScheduleDrawer = searchParams.get("openSchedule") === "1";
     setTimeout(() => setToastMessage(null), duration);
   };
 
-  /** Google OAuth redirect may land with ?googleCalendar=linked */
+  /** Google OAuth redirect: ?googleCalendar=linked | error&reason= */
   useEffect(() => {
     const linked = searchParams.get("googleCalendar");
-    if (linked !== "linked" && linked !== "1") return;
-    showToast("Google Calendar connected.", 4500);
+    if (!linked) return;
+
+    const reasonRaw = searchParams.get("reason");
+    const reason =
+      reasonRaw && reasonRaw.trim()
+        ? (() => {
+            try {
+              return decodeURIComponent(reasonRaw.replace(/\+/g, " "));
+            } catch {
+              return reasonRaw;
+            }
+          })()
+        : "";
+
+    if (linked === "linked" || linked === "1") {
+      showToast("Google Calendar connected.", 4500);
+    } else if (linked === "error") {
+      showToast(reason ? `Google Calendar: ${reason}` : "Google Calendar linking failed.", 6000);
+    } else {
+      return;
+    }
+
     const next = new URLSearchParams(searchParams.toString());
     next.delete("googleCalendar");
+    next.delete("reason");
     const q = next.toString();
     router.replace(q ? `${pathname}?${q}` : pathname);
   }, [searchParams, pathname, router]);
@@ -1794,7 +1815,7 @@ if (routeAssessmentId && routeRoadmapId && routeTaskId) {
 
                   <div className="my-4 flex flex-col gap-2 rounded-xl border border-white/15 bg-white/[0.04] p-3">
                     <div className="flex flex-wrap items-center gap-3">
-                      <GoogleCalendarConnectButton userId={getPastorUserId()} label="Link my Google Calendar" />
+                      <GoogleCalendarConnectButton label="Link my Google Calendar" />
                       <span className="text-[11px] leading-snug text-[#cde2f2]/80">
                         Connect your Google account (same CCC login identity) so we can read busy times when scheduling.
                       </span>

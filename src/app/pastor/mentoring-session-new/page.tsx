@@ -5,7 +5,8 @@ import PastorHeader from "@/app/Components/PastorHeader";
 import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStatusBadge";
 import {
   apiGetPastorMentoringSessions,
-  apiRequestMentoringSessionReschedule,
+  apiRequestPastorMentoringReschedulePreferred,
+  isPastorMentoringRescheduleEligibleStatus,
   type MentoringSession,
 } from "@/app/Services/mentoring-sessions.service";
 
@@ -79,6 +80,8 @@ function formatDate(value?: string) {
 function statusLabel(status: string) {
   if (status === "MISSED") return "Needs Action";
   if (status === "SCHEDULED") return "Upcoming";
+  if (status === "POSTPONED") return "Postponed";
+  if (status === "IN PROGRESS" || status === "IN_PROGRESS") return "In progress";
   if (status === "COMPLETED") return "Completed";
   if (status === "LOCKED") return "Locked";
   return status;
@@ -130,13 +133,27 @@ export default function PastorMentoringSessionNewPage() {
 
   const requestReschedule = async (session: MentoringSession) => {
     const sessionId = getSessionId(session);
+    const appointmentId =
+      typeof (session as unknown as Record<string, unknown>)?.appointmentId === "string"
+        ? ((session as unknown as Record<string, string>).appointmentId || "").trim()
+        : "";
+
+    const pastorId = getCurrentPastorId();
     if (!sessionId) {
       alert("This session is not available for reschedule yet.");
       return;
     }
+    if (!pastorId) {
+      alert("Sign in to request a reschedule.");
+      return;
+    }
     try {
       setRequestingId(sessionId);
-      await apiRequestMentoringSessionReschedule(sessionId);
+      await apiRequestPastorMentoringReschedulePreferred({
+        sessionId,
+        pastorId,
+        appointmentId: appointmentId || undefined,
+      });
       alert("Reschedule request sent to your mentor.");
     } catch (err) {
       alert(err instanceof Error ? err.message : "Failed to request reschedule.");
@@ -182,7 +199,7 @@ export default function PastorMentoringSessionNewPage() {
               const sessionId = getSessionId(session);
               const status = getSessionStatus(session);
               const locked = status === "LOCKED";
-              const missed = status === "MISSED";
+              const rescheduleEligible = !locked && isPastorMentoringRescheduleEligibleStatus(session.status || "");
               const title = getStringValue(session.title, session.mentorNote, `Session ${session.sessionNumber || index + 1}`);
               return (
                 <article
@@ -204,7 +221,7 @@ export default function PastorMentoringSessionNewPage() {
                     <div className="flex flex-wrap items-center gap-3">
                       <SessionStatusBadge status={status} compact />
                       <span className="text-xs font-semibold text-white/60">{statusLabel(status)}</span>
-                      {missed ? (
+                      {rescheduleEligible ? (
                         <button
                           type="button"
                           onClick={() => void requestReschedule(session)}

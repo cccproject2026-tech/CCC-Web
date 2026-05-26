@@ -99,11 +99,11 @@ Alternatively return `data.calendarEventId` — the UI treats presence of calend
 
 ## Link Calendar (per user): `GET /auth/google`
 
-**Query:** `userId=<mongoUserId>`
+**Auth:** Always send **`Authorization: Bearer <accessToken>`**. Do **not** call this route anonymously or with a `userId=` query unless it **exactly** matches the JWT subject (prefer omitting the query and letting the backend derive the user).
 
-**Response:** `{ "url": "https://accounts.google.com/..." }` (or `{ "data": { "url": "..." } }`).
+**Response:** `{ "url": "https://accounts.google.com/..." }` and/or **`{ "data": { "url": "..." } }`** — the SPA reads **`response.data.url`** or **`response.data.data.url`** from the Axios body (avoid bookmarking stale URLs).
 
-Frontend redirects the browser (`window.location.assign(url)`). Callback is backend-only (`/auth/google/callback`). After redirect back to SPA, optionally use `?googleCalendar=linked` — UI shows confirmation.
+Frontend redirects the browser (`window.location.assign(url)`). Callback is backend-only (`/auth/google/callback`). After redirect back to SPA, optionally use **`?googleCalendar=linked`** on success or **`?googleCalendar=error&reason=…`** — UI shows a toast/banner accordingly.
 
 Repeat OAuth for **each** logged-in account that must sync (mentor, pastor, director as applicable).
 

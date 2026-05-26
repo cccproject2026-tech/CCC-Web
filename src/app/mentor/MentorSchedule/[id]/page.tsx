@@ -15,6 +15,7 @@ import {
   apiGetAppointmentById,
   apiGetMentorSchedule,
   apiGenerateTranscriptSummary,
+  apiPostAppointmentJoin,
   apiUpdateAppointment,
 } from "@/app/Services/appointments.service";
 import type {
@@ -112,6 +113,7 @@ function humanStatusLabel(normalized: string): string {
   if (normalized === "scheduled") return "Scheduled";
   if (normalized === "completed") return "Completed";
   if (normalized === "missed") return "Missed";
+  if (normalized === "postponed") return "Postponed";
   if (normalized === "cancelled" || normalized === "canceled") return "Cancelled";
   if (normalized === "rescheduled") return "Rescheduled";
   return normalized ? normalized.replace(/-/g, " ") : "Unknown";
@@ -127,6 +129,7 @@ function StatusBadge({ status }: { status: string }) {
     cancelled: "bg-red-500/20 text-red-300 border-red-400/30",
     rescheduled: "bg-yellow-500/20 text-yellow-300 border-yellow-400/30",
     missed: "bg-amber-600/25 text-amber-100 border-amber-400/35",
+    postponed: "bg-violet-500/20 text-violet-100 border-violet-400/35",
   };
   const showCheck = s === "scheduled";
   return (
@@ -289,25 +292,53 @@ export default function MentorAppointmentDetailPage() {
     if (!url) return;
 
     setJoinSubmitting(true);
-    const st = normalizeAppointmentStatus(appt);
-    if (st === "scheduled") {
-      try {
-        const res = await apiUpdateAppointment(apptId, { status: "in-progress" });
-        const next = (res.data as { data?: AppointmentResponse })?.data;
-        if (next?.meetingDate) setAppt(next);
-        else setAppt((prev) => (prev ? { ...prev, status: "in-progress" } : prev));
-      } catch (e) {
-        toast.show({
-          kind: "error",
-          title: "Could not update meeting status",
-          subtitle: extractApiErrorMessage(e),
-        });
-        setAppt((prev) => (prev ? { ...prev, status: "in-progress" } : prev));
-      }
-    }
+    try {
+      const st = normalizeAppointmentStatus(appt);
+      if (st === "scheduled") {
+        let nextAppt: AppointmentResponse | undefined;
 
-    window.open(url, "_blank", "noopener,noreferrer");
-    setJoinSubmitting(false);
+        let hostUserId = "";
+        try {
+          const mentorCookie = Cookies.get("mentor");
+          if (mentorCookie) {
+            const mentorData = JSON.parse(decodeURIComponent(mentorCookie));
+            hostUserId = String(mentorData?.id ?? mentorData?._id ?? "").trim();
+          }
+        } catch {
+          hostUserId = "";
+        }
+
+        if (hostUserId) {
+          try {
+            const joinRes = await apiPostAppointmentJoin(apptId, { userId: hostUserId, kind: "host" });
+            nextAppt = (joinRes.data as { data?: AppointmentResponse })?.data;
+          } catch {
+            /* PATCH fallback below */
+          }
+        }
+
+        if (!nextAppt?.meetingDate) {
+          try {
+            const res = await apiUpdateAppointment(apptId, { status: "in-progress" });
+            const patchBody = (res.data as { data?: AppointmentResponse })?.data;
+            if (patchBody?.meetingDate) nextAppt = patchBody;
+          } catch (e) {
+            toast.show({
+              kind: "error",
+              title: "Could not update meeting status",
+              subtitle: extractApiErrorMessage(e),
+            });
+          }
+        }
+
+        if (nextAppt?.meetingDate) setAppt(nextAppt);
+        else setAppt((prev) => (prev ? { ...prev, status: "in-progress" } : prev));
+      }
+
+      window.open(url, "_blank", "noopener,noreferrer");
+    } finally {
+      setJoinSubmitting(false);
+    }
   }, [appt, apptId, meetingWindow?.joinEnabled, toast]);
 
   if (loading) {
@@ -363,7 +394,12 @@ export default function MentorAppointmentDetailPage() {
 
   const meetingNumericId = String(appt.zoomMeetingId || "").replace(/\D/g, "") || zoomJoinNumericId(meetLink);
   const meetingIdDisplay = formatZoomMeetingIdDisplay(meetingNumericId);
-  const passcode = zoomPasscodeFromUrl(meetLink) || "—";
+  const zmPwd =
+    appt.zoomMeeting && typeof appt.zoomMeeting === "object" && typeof appt.zoomMeeting.password === "string"
+      ? appt.zoomMeeting.password.trim()
+      : "";
+  const payloadPasscode = String(appt.zoomPasscode ?? "").trim();
+  const passcode = zoomPasscodeFromUrl(meetLink) || payloadPasscode || zmPwd || "—";
 
   const timeStart = meetingDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });
   const timeEnd = new Date(endMs).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true });

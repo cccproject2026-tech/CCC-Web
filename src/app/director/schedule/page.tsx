@@ -399,11 +399,31 @@ function DirectorScheduleContent() {
   /** After Google OAuth redirects back to the SPA */
   useEffect(() => {
     const linked = searchParams.get("googleCalendar");
-    if (linked !== "linked" && linked !== "1") return;
-    setToastMessage("Google Calendar connected.");
-    setTimeout(() => setToastMessage(null), 4500);
+    if (!linked) return;
+
+    const reasonRaw = searchParams.get("reason");
+    const reason =
+      reasonRaw && reasonRaw.trim()
+        ? (() => {
+            try {
+              return decodeURIComponent(reasonRaw.replace(/\+/g, " "));
+            } catch {
+              return reasonRaw;
+            }
+          })()
+        : "";
+
+    if (linked === "linked" || linked === "1") {
+      setToastMessage("Google Calendar connected.");
+    } else if (linked === "error") {
+      setToastMessage(reason ? `Google Calendar: ${reason}` : "Google Calendar linking failed.");
+    } else {
+      return;
+    }
+    setTimeout(() => setToastMessage(null), linked === "error" ? 6000 : 4500);
     const next = new URLSearchParams(searchParams.toString());
     next.delete("googleCalendar");
+    next.delete("reason");
     const q = next.toString();
     router.replace(q ? `${pathname}?${q}` : pathname);
   }, [searchParams, pathname, router]);
@@ -974,7 +994,6 @@ function DirectorScheduleContent() {
       const upcoming = await apiGetAppointments({
         mentorId: directorId,
         futureOnly: true,
-        status: "scheduled",
       });
       const busyAppointments = unwrapAppointmentsAxiosData(upcoming);
       const ownerAppointmentsForDay = busyAppointments.filter(
@@ -2072,7 +2091,7 @@ function DirectorScheduleContent() {
                     <div className="mb-5">
                       <div className="mb-3 flex flex-col gap-2 rounded-lg border border-white/10 bg-white/5 p-3">
                         <div className="flex flex-wrap items-center gap-3">
-                          <GoogleCalendarConnectButton userId={directorId} label="Link my Google Calendar" />
+                          <GoogleCalendarConnectButton label="Link my Google Calendar" />
                           <span className="text-[11px] leading-snug text-[#cde2f2]/75">
                             Connect Google so busy intervals apply and bookings can mirror to Calendar when OAuth is complete.
                           </span>
