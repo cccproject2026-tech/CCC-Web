@@ -29,6 +29,7 @@ import UserProfile from "../../Assets/user-profile.png";
 import {
   apiCancelAppointment,
   apiCreateAppointment,
+  apiGetAvailability,
   apiGetAppointments,
   apiRescheduleAppointment,
   apiGetWeeklyAvailability,
@@ -172,6 +173,92 @@ function getPlatformIcon(platform?: string) {
   return ZoomIcon;
 }
 
+type ActiveBookingRules = {
+  meetingDuration: 30 | 60;
+  minSchedulingNoticeHours: number;
+  maxBookingsPerDay: number;
+  preferredPlatform: string;
+};
+
+const DEFAULT_BOOKING_RULES: ActiveBookingRules = {
+  meetingDuration: 60,
+  minSchedulingNoticeHours: 2,
+  maxBookingsPerDay: 5,
+  preferredPlatform: "zoom",
+};
+
+function coerceBookingRuleNumber(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) {
+    return Number(value);
+  }
+  return fallback;
+}
+
+function normalizeSupportedMeetingDuration(value: unknown): 30 | 60 {
+  const next = coerceBookingRuleNumber(value, DEFAULT_BOOKING_RULES.meetingDuration);
+  return next === 30 ? 30 : 60;
+}
+
+function findAvailabilitySettingsBlob(root: unknown, depth = 5): Record<string, unknown> | null {
+  if (!root || typeof root !== "object" || depth <= 0) return null;
+  const o = root as Record<string, unknown>;
+  const hasSettings =
+    typeof o.meetingDuration === "number" ||
+    typeof o.minSchedulingNoticeHours === "number" ||
+    typeof o.advanceNotice === "number" ||
+    typeof o.maxBookingsPerDay === "number" ||
+    typeof o.preferredPlatform === "string";
+  if (hasSettings) return o;
+  if (o.data && typeof o.data === "object") return findAvailabilitySettingsBlob(o.data, depth - 1);
+  return null;
+}
+
+function extractBookingRules(root: unknown): ActiveBookingRules {
+  const blob = findAvailabilitySettingsBlob(root);
+  if (!blob) return DEFAULT_BOOKING_RULES;
+
+  return {
+    meetingDuration: normalizeSupportedMeetingDuration(blob.meetingDuration),
+    minSchedulingNoticeHours: Math.max(
+      1,
+      Math.min(
+        168,
+        coerceBookingRuleNumber(
+          blob.minSchedulingNoticeHours ?? blob.advanceNotice ?? blob.minNoticeHours,
+          DEFAULT_BOOKING_RULES.minSchedulingNoticeHours,
+        ),
+      ),
+    ),
+    maxBookingsPerDay: Math.max(
+      1,
+      coerceBookingRuleNumber(blob.maxBookingsPerDay, DEFAULT_BOOKING_RULES.maxBookingsPerDay),
+    ),
+    preferredPlatform:
+      typeof blob.preferredPlatform === "string" && blob.preferredPlatform.trim()
+        ? blob.preferredPlatform.trim().toLowerCase()
+        : DEFAULT_BOOKING_RULES.preferredPlatform,
+  };
+}
+
+function bookingRulePlatformToUiValue(platform: string): string {
+  const value = platform.trim().toLowerCase();
+  if (value.includes("google") || value === "meet") return "google-meet";
+  if (value.includes("team")) return "teams";
+  if (value.includes("phone")) return "phone";
+  if (value.includes("person")) return "in-person";
+  return "zoom";
+}
+
+function filterSlotsByMinimumNotice(slots: string[], meetingDate: string, noticeHours: number): string[] {
+  const minStartMs = Date.now() + Math.max(1, noticeHours) * 60 * 60 * 1000;
+  return slots.filter((slot) => {
+    const iso = parseSlotStartToIso(meetingDate, slot.replace(/\u2013/g, "-"));
+    const startMs = new Date(iso).getTime();
+    return Number.isNaN(startMs) || startMs >= minStartMs;
+  });
+}
+
 // ─── Inner content (needs useSearchParams — wrapped in Suspense) ──────────────
 
 function DirectorScheduleContent() {
@@ -230,6 +317,7 @@ function DirectorScheduleContent() {
   const [meetingDate, setMeetingDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
   const [selectedPlatform, setSelectedPlatform] = useState("zoom");
+  const [activeBookingRules, setActiveBookingRules] = useState<ActiveBookingRules>(DEFAULT_BOOKING_RULES);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [calendarSlotSyncLoading, setCalendarSlotSyncLoading] = useState(false);
   const [calendarSlotSyncError, setCalendarSlotSyncError] = useState<string | null>(null);
@@ -248,6 +336,14 @@ function DirectorScheduleContent() {
   // mentor today-availability preview (Schedule drawer)
   const [mentorTodaySlots, setMentorTodaySlots] = useState<string[] | null>(null);
   const [mentorTodayLoading, setMentorTodayLoading] = useState(false);
+
+  const activeAvailabilityOwnerId = useMemo(() => {
+    if (drawerStep !== 2) return "";
+    if (scheduleRecipientType === "mentor") {
+      return String(selectedRecipient?._id || selectedRecipient?.id || "").trim();
+    }
+    return String(directorId || "").trim();
+  }, [drawerStep, scheduleRecipientType, selectedRecipient, directorId]);
 
   // ── Resolve director ID from cookie ──────────────────────────────────────────
   useEffect(() => {
@@ -387,6 +483,34 @@ function DirectorScheduleContent() {
   setDrawerStep(2);
 }, [searchParams, mentors]);
 
+  useEffect(() => {
+    if (!activeAvailabilityOwnerId) {
+      setActiveBookingRules(DEFAULT_BOOKING_RULES);
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await apiGetAvailability(activeAvailabilityOwnerId);
+        if (cancelled) return;
+        const rules = extractBookingRules(res?.data);
+        setActiveBookingRules(rules);
+        setSelectedPlatform(bookingRulePlatformToUiValue(rules.preferredPlatform));
+      } catch (e) {
+        console.error("Failed to load availability booking rules:", e);
+        if (!cancelled) {
+          setActiveBookingRules(DEFAULT_BOOKING_RULES);
+          setSelectedPlatform(DEFAULT_BOOKING_RULES.preferredPlatform);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAvailabilityOwnerId, availabilityRefreshKey]);
+
   // ── Fetch available slots for schedule step 2 (CCC availability ∩ Google Calendar busy) ─────────────────
   useEffect(() => {
     if (!meetingDate || !directorId) return;
@@ -491,12 +615,19 @@ function DirectorScheduleContent() {
           scheduleRecipientType === "mentor" && recipientId
             ? [recipientId]
             : Array.from(new Set([String(directorId), recipientId].filter(Boolean)));
+        const ownerAppointmentCountForDay = appointments.filter(
+          (a) =>
+            a.meetingDate.startsWith(meetingDate) &&
+            appointmentNotCancelled(a) &&
+            appointmentMentorIdString(a) === mergeMentorId,
+        ).length;
+        const reachedDailyLimit = ownerAppointmentCountForDay >= activeBookingRules.maxBookingsPerDay;
 
         const gc = await filterSlotLabelsAgainstExternalCalendar({
           meetingDateYmd: meetingDate.slice(0, 10),
           rawSlotLabels: formatted,
           participantUserIds,
-          meetingDurationMinutes: 60,
+          meetingDurationMinutes: activeBookingRules.meetingDuration,
           expandIntoGrid: true,
           availabilityMentorUserId: mergeMentorId || undefined,
           availabilityParticipantUserId: mergeParticipantId,
@@ -512,8 +643,15 @@ function DirectorScheduleContent() {
           setSelectedSlot("");
         } else {
           setCalendarSlotSyncError(null);
-          setAvailableSlots(gc.slots);
-          setSelectedSlot((prev) => (prev && gc.slots.includes(prev) ? prev : ""));
+          const filteredSlots = reachedDailyLimit
+            ? []
+            : filterSlotsByMinimumNotice(
+                gc.slots,
+                meetingDate.slice(0, 10),
+                activeBookingRules.minSchedulingNoticeHours,
+              );
+          setAvailableSlots(filteredSlots);
+          setSelectedSlot((prev) => (prev && filteredSlots.includes(prev) ? prev : ""));
         }
       } catch (err) {
         console.error(err);
@@ -537,6 +675,7 @@ function DirectorScheduleContent() {
     appointments,
     scheduleMonthlyAvailabilitySlots,
     directorId,
+    activeBookingRules,
   ]);
 
   // ── Schedule drawer calendar navigation handlers ──────────────────────────────
@@ -813,6 +952,13 @@ function DirectorScheduleContent() {
       showToast("For today, please choose a time after the current time.");
       return;
     }
+    if (
+      new Date(scheduledIso).getTime() <
+      Date.now() + activeBookingRules.minSchedulingNoticeHours * 60 * 60 * 1000
+    ) {
+      showToast(`Please choose a time at least ${activeBookingRules.minSchedulingNoticeHours} hour(s) from now.`);
+      return;
+    }
     if (isScheduling) return;
 
     const proposedMs = new Date(scheduledIso).getTime();
@@ -824,9 +970,19 @@ function DirectorScheduleContent() {
         status: "scheduled",
       });
       const busyAppointments = unwrapAppointmentsAxiosData(upcoming);
+      const ownerAppointmentsForDay = busyAppointments.filter(
+        (a) =>
+          a.meetingDate.startsWith(meetingDate) &&
+          appointmentNotCancelled(a) &&
+          appointmentMentorIdString(a) === String(directorId),
+      );
+      if (ownerAppointmentsForDay.length >= activeBookingRules.maxBookingsPerDay) {
+        showToast("Daily meeting limit reached for this date.");
+        return;
+      }
       const hasOverlap = busyAppointments.some((a) => {
         const t = new Date(String(a.meetingDate ?? "")).getTime();
-        return !Number.isNaN(t) && Math.abs(t - proposedMs) < 60 * 60 * 1000;
+        return !Number.isNaN(t) && Math.abs(t - proposedMs) < activeBookingRules.meetingDuration * 60 * 1000;
       });
       if (hasOverlap) {
         showToast("This time slot overlaps with an existing appointment.");
@@ -854,7 +1010,7 @@ function DirectorScheduleContent() {
       meetingDateYmd: meetingDate.slice(0, 10),
       rawSlotLabels: availableSlots,
       participantUserIds: participantUserIdsRecheck,
-      meetingDurationMinutes: 60,
+      meetingDurationMinutes: activeBookingRules.meetingDuration,
       expandIntoGrid: true,
       availabilityMentorUserId: mergeMentorRecheck || undefined,
       availabilityParticipantUserId: mergeParticipantRecheck,
@@ -1909,9 +2065,10 @@ function DirectorScheduleContent() {
                       className={directorSelectDark}
                     >
                       <option value="zoom">Zoom</option>
-                      {/* <option value="google meet">Google Meet</option>
-                    <option value="teams">Microsoft Teams</option>
-                    <option value="phone">Phone</option> */}
+                      <option value="google-meet">Google Meet</option>
+                      <option value="teams">Microsoft Teams</option>
+                      <option value="phone">Phone</option>
+                      <option value="in-person">In person</option>
                     </select>
                   </div>
                 </div>

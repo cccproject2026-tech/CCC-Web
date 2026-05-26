@@ -1102,27 +1102,82 @@ setLastName("");
   const currentData = useMemo(() => activeTab === "mentors" ? mentors : pastors, [activeTab, mentors, pastors]);
   const currentLoading = useMemo(() => activeTab === "mentors" ? mentorsLoading : pastorsLoading, [activeTab, mentorsLoading, pastorsLoading]);
 
-  const formatAppointment = useCallback((appointment: Appointment) => {
-    const p = (appointment.platform || "").toLowerCase();
- const platformIcon =
-  p === "zoom" || p.includes("zoom")
-    ? ZoomIcon
-    : p === "gmeet" || p === "google-meet" || p.includes("google")
-      ? MeetIcon
-      : DuoIcon;
-    const mentorName = appointment.mentor
-      ? `${appointment.mentor.firstName || ''} ${appointment.mentor.lastName || ''}`.trim()
-      : 'Mentor';
-    const mentorRole = appointment.mentor?.role || 'mentor';
-    const meetingDate = new Date(appointment.meetingDate);
-    const meetingTime = meetingDate.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
+//   const formatAppointment = useCallback((appointment: Appointment) => {
+//     const p = (appointment.platform || "").toLowerCase();
+//  const platformIcon =
+//   p === "zoom" || p.includes("zoom")
+//     ? ZoomIcon
+//     : p === "gmeet" || p === "google-meet" || p.includes("google")
+//       ? MeetIcon
+//       : DuoIcon;
+//     const mentorName = appointment.mentor
+//       ? `${appointment.mentor.firstName || ''} ${appointment.mentor.lastName || ''}`.trim()
+//       : 'Mentor';
+//     const mentorRole = appointment.mentor?.role || 'mentor';
+//     const meetingDate = new Date(appointment.meetingDate);
+//     const meetingTime = meetingDate.toLocaleTimeString('en-US', {
+//       hour: '2-digit',
+//       minute: '2-digit',
+//       hour12: true
+//     });
 
-    return { platformIcon, mentorName, mentorRole, meetingDate, meetingTime };
-  }, []);
+//     return { platformIcon, mentorName, mentorRole, meetingDate, meetingTime };
+//   }, []);
+const formatAppointment = useCallback((appointment: Appointment) => {
+  const p = (appointment.platform || "").toLowerCase();
+
+  const platformIcon =
+    p === "zoom" || p.includes("zoom")
+      ? ZoomIcon
+      : p === "gmeet" || p === "google-meet" || p.includes("google")
+        ? MeetIcon
+        : DuoIcon;
+
+  // const mentor = appointment.mentor;
+  // const attendee = appointment.user;
+  const mentor =
+  appointment.mentor ??
+  (typeof (appointment as any).mentorId === "object"
+    ? (appointment as any).mentorId
+    : undefined);
+
+const attendee =
+  appointment.user ??
+  (typeof (appointment as any).userId === "object"
+    ? (appointment as any).userId
+    : undefined);
+
+  const mentorName =
+    `${mentor?.firstName || ""} ${mentor?.lastName || ""}`.trim() ||
+    mentor?.email ||
+    "Mentor";
+
+  const mentorRole = mentor?.role || "mentor";
+
+  const attendeeName =
+    `${attendee?.firstName || ""} ${attendee?.lastName || ""}`.trim() ||
+    attendee?.email ||
+    "Participant";
+
+  const attendeeRole = attendee?.role || "pastor";
+
+  const meetingDate = new Date(appointment.meetingDate);
+  const meetingTime = meetingDate.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  return {
+    platformIcon,
+    mentorName,
+    mentorRole,
+    attendeeName,
+    attendeeRole,
+    meetingDate,
+    meetingTime,
+  };
+}, []);
 
   const displayName =
     user?.firstName || cookieUser?.firstName
@@ -1920,32 +1975,45 @@ const selectedAssignMentorName =
           return ( */}
           {appointments.map((appointment) => {
             const appointmentId = appointmentEntityId(appointment);
-  const { platformIcon, meetingTime } = formatAppointment(appointment);
+  // const { platformIcon, meetingTime } = formatAppointment(appointment);
+const {
+  platformIcon,
+  mentorName,
+  mentorRole,
+  attendeeName,
+  attendeeRole,
+  meetingTime,
+} = formatAppointment(appointment);
+  // const mentor =
+  //   appointment.mentor ??
+  //   (typeof (appointment as any).mentorId === "object"
+  //     ? (appointment as any).mentorId
+  //     : undefined);
 
-  const mentor =
-    appointment.mentor ??
-    (typeof (appointment as any).mentorId === "object"
-      ? (appointment as any).mentorId
-      : undefined);
+  // const attendee =
+  //   appointment.user ??
+  //   (typeof (appointment as any).userId === "object"
+  //     ? (appointment as any).userId
+  //     : undefined);
 
-  const attendee =
-    appointment.user ??
-    (typeof (appointment as any).userId === "object"
-      ? (appointment as any).userId
-      : undefined);
+  // const mentorName =
+  //   `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.trim() ||
+  //   mentor?.email ||
+  //   "Director";
 
-  const mentorName =
-    `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.trim() ||
-    mentor?.email ||
-    "Director";
+  // const attendeeName =
+  //   `${attendee?.firstName ?? ""} ${attendee?.lastName ?? ""}`.trim() ||
+  //   attendee?.email ||
+  //   "Participant";
 
-  const attendeeName =
-    `${attendee?.firstName ?? ""} ${attendee?.lastName ?? ""}`.trim() ||
-    attendee?.email ||
-    "Participant";
-
-  const attendeeRole = attendee?.role || "Pastor";
-  const attendeeEmail = attendee?.email || "";
+  // const attendeeRole = attendee?.role || "Pastor";
+  // const attendeeEmail = attendee?.email || "";
+  const attendeeEmail =
+  appointment.user?.email ||
+  ((appointment as any).userId && typeof (appointment as any).userId === "object"
+    ? (appointment as any).userId.email
+    : "") ||
+  "";
 
   return (
             <div
@@ -1973,8 +2041,11 @@ const selectedAssignMentorName =
   {mentorName}
 </h4>
 
-<p className="mt-0.5 text-xs capitalize text-white/60">
+{/* <p className="mt-0.5 text-xs capitalize text-white/60">
   Director
+</p> */}
+<p className="mt-0.5 text-xs capitalize text-white/60">
+  {mentorRole}
 </p>
 
 <p className="mt-2 text-sm font-semibold text-white">

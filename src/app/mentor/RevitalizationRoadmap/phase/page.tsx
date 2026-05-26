@@ -16,6 +16,8 @@ import {
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
 import { apiGetUserById } from "@/app/Services/users.service";
+import { apiGetAppointments } from "@/app/Services/appointments.service";
+import { unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
 import MentorHeader from "@/app/Components/MentorHeader";
 import DirectorHero from "@/app/director/DirectorHero";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
@@ -28,6 +30,7 @@ import {
   unwrapProgressData,
 } from "@/app/Services/roadmap-assignments";
 import { verifyMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
+import { getMentorUserId } from "@/app/utils/mentor-auth";
 import { resolveRoadmapCardImageUrl } from "@/app/utils/image";
 
 function formatStatus(status: string): "Not Started" | "In-progress" | "Completed" | "Over Due" {
@@ -55,6 +58,135 @@ function taskCounts(task: Record<string, unknown>): { completed: number; total: 
   return { completed, total: Math.max(total, completed, 1) };
 }
 
+function formatMeetingDate(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatMeetingTime(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function readEntityId(value: unknown): string {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    return String(obj._id ?? obj.id ?? "").trim();
+  }
+  return String(value).trim();
+}
+
+function readAppointmentField(appt: Record<string, any>, key: string): string {
+  const metadata = appt.metadata || appt.meta || appt.context || {};
+  return String(appt[key] ?? metadata?.[key] ?? "").trim();
+}
+
+function notesContainToken(notes: string, key: string, value?: string | null): boolean {
+  const target = String(value ?? "").trim();
+  if (!target) return false;
+  return notes.includes(`${key}:${target}`) || notes.includes(`${key}=${target}`);
+}
+
+function resolveAssessmentIdFromExtra(extra: any): string | null {
+  const direct = extra?.assessmentId;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+
+  const pickId = (obj: any): string | null => {
+    if (!obj || typeof obj !== "object") return null;
+    const id = obj?._id ?? obj?.id ?? obj?.assessmentId;
+    return id ? String(id).trim() : null;
+  };
+
+  return pickId(extra?.assessment) || pickId(extra?.selectedAssessment) || null;
+}
+
+function findAssessmentExtra(items: any[] | undefined): any | null {
+  if (!Array.isArray(items)) return null;
+
+  for (const item of items) {
+    const type = String(item?.type || "").toUpperCase();
+    if (type === "ASSESSMENT") return item;
+
+    const fromSections = findAssessmentExtra(item?.sections);
+    if (fromSections) return fromSections;
+
+    const fromCheckboxes = findAssessmentExtra(item?.checkboxes);
+    if (fromCheckboxes) return fromCheckboxes;
+  }
+
+  return null;
+}
+
+function matchAppointmentForTask(
+  appointments: Record<string, any>[],
+  params: {
+    userId: string;
+    mentorId: string;
+    roadmapId: string;
+    taskId: string;
+    assessmentId: string;
+  },
+) {
+  const matches = appointments
+    .map((appt) => {
+      const status = String(appt?.status ?? "").toLowerCase();
+      if (status.includes("cancel")) return { appt, score: -1 };
+
+      const pastorId = readEntityId(appt?.userId) || readEntityId(appt?.user);
+      const appointmentMentorId = readEntityId(appt?.mentorId) || readEntityId(appt?.mentor);
+      if (pastorId && pastorId !== params.userId) return { appt, score: -1 };
+      if (appointmentMentorId && appointmentMentorId !== params.mentorId) return { appt, score: -1 };
+
+      const notes = String(appt?.notes ?? "");
+      let score = 0;
+
+      if (
+        readAppointmentField(appt, "assessmentId") === params.assessmentId ||
+        notesContainToken(notes, "assessmentId", params.assessmentId)
+      ) {
+        score += 10;
+      }
+
+      if (
+        readAppointmentField(appt, "roadmapId") === params.roadmapId ||
+        notesContainToken(notes, "roadmapId", params.roadmapId)
+      ) {
+        score += 4;
+      }
+
+      if (
+        readAppointmentField(appt, "taskId") === params.taskId ||
+        notesContainToken(notes, "taskId", params.taskId)
+      ) {
+        score += 4;
+      }
+
+      return { appt, score };
+    })
+    .filter((row) => row.score > 0)
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const aTime = new Date(String(a.appt?.meetingDate ?? "")).getTime();
+      const bTime = new Date(String(b.appt?.meetingDate ?? "")).getTime();
+      return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
+    });
+
+  return matches[0]?.appt ?? null;
+}
+
 function PhasePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -68,6 +200,7 @@ function PhasePageContent() {
   const [user, setUser] = useState<{ firstName?: string; lastName?: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [accessError, setAccessError] = useState<string | null>(null);
+  const [taskMeetings, setTaskMeetings] = useState<Record<string, Record<string, any>>>({});
 
   useEffect(() => {
     if (!userId) return;
@@ -176,6 +309,61 @@ function PhasePageContent() {
 
     fetchRoadmap();
   }, [roadmapId, userId]);
+
+  useEffect(() => {
+    if (!roadmapId || !userId || tasks.length === 0) {
+      setTaskMeetings({});
+      return;
+    }
+
+    const mentorId = getMentorUserId();
+    if (!mentorId) {
+      setTaskMeetings({});
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadMeetings = async () => {
+      try {
+        const res = await apiGetAppointments({
+          userId,
+          mentorId,
+          futureOnly: false,
+        });
+        const appointments = unwrapAppointmentsAxiosData(res) as Record<string, any>[];
+        const next: Record<string, Record<string, any>> = {};
+
+        tasks.forEach((task) => {
+          const taskId = resolveNestedTemplateItemId(task);
+          const assessmentExtra = findAssessmentExtra((task as any)?.extras);
+          const assessmentId = assessmentExtra ? resolveAssessmentIdFromExtra(assessmentExtra) : null;
+          if (!taskId || !assessmentId) return;
+
+          const match = matchAppointmentForTask(appointments, {
+            userId,
+            mentorId,
+            roadmapId,
+            taskId,
+            assessmentId,
+          });
+
+          if (match) next[taskId] = match;
+        });
+
+        if (!cancelled) setTaskMeetings(next);
+      } catch (err) {
+        console.error("Failed to load task meetings", err);
+        if (!cancelled) setTaskMeetings({});
+      }
+    };
+
+    void loadMeetings();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [roadmapId, userId, tasks]);
 
   const openTask = (taskId: string) => {
     if (!userId || !roadmapId) return;
@@ -296,6 +484,7 @@ function PhasePageContent() {
                 const cardStatus = taskCardStatus(task);
                 const { completed, total } = taskCounts(task);
                 const duration = task.duration != null ? `Months ${task.duration}` : "—";
+                const meeting = tid ? taskMeetings[tid] : null;
                 const blurb =
                   String(task.description ?? "").trim() ||
                   String((task as { roadMapDetails?: unknown }).roadMapDetails ?? "").trim();
@@ -314,6 +503,14 @@ function PhasePageContent() {
                       completed,
                       total,
                     }}
+                    meetingInfo={
+                      meeting
+                        ? {
+                            date: formatMeetingDate(meeting.meetingDate),
+                            time: formatMeetingTime(meeting.meetingDate),
+                          }
+                        : undefined
+                    }
                     onViewClick={() => tid && openTask(tid)}
                     onCardClick={() => tid && openTask(tid)}
                   />

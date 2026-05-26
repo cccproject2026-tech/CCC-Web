@@ -33,6 +33,7 @@ import {
   parseAssessmentDetailPayload,
   parseAssessmentsListPayload,
   apiGetSectionRecommendations,
+  apiGetUserAnswers,
 } from "@/app/Services/assessment.service";
 import { apiGetAllUsers } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
@@ -388,12 +389,61 @@ const [mentorPastorRows, setMentorPastorRows] = useState<any[]>([]);
 
         if (selectedMenteeId) {
           try {
-            const [assignedRes, progRes, appointmentsRes] = await Promise.all([
-              apiGetAssignedAssessments(selectedMenteeId),
-              apiGetUserProgress(selectedMenteeId),
-              apiGetAppointments({ userId: selectedMenteeId, futureOnly: false } as any),
-            ]);
-            const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
+            // const [assignedRes, progRes, appointmentsRes] = await Promise.all([
+            //   apiGetAssignedAssessments(selectedMenteeId),
+            //   apiGetUserProgress(selectedMenteeId),
+            //   apiGetAppointments({ userId: selectedMenteeId, futureOnly: false } as any),
+            // ]);
+            // const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
+            const [assignedRes, allAssessmentsRes, progRes, appointmentsRes] = await Promise.all([
+  apiGetAssignedAssessments(selectedMenteeId),
+  apiGetAssessments(),
+  apiGetUserProgress(selectedMenteeId),
+  apiGetAppointments({ userId: selectedMenteeId, futureOnly: false } as any),
+]);
+
+let assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
+const allAssessmentsBody: any = allAssessmentsRes?.data;
+
+const allAssessments = Array.isArray(allAssessmentsBody?.data)
+  ? allAssessmentsBody.data
+  : Array.isArray(allAssessmentsBody)
+    ? allAssessmentsBody
+    : [];
+
+const assignmentList = allAssessments
+  .map((assessment: any) => {
+    const assignment = Array.isArray(assessment?.assignments)
+      ? assessment.assignments.find(
+          (row: any) => String(row?.userId) === String(selectedMenteeId),
+        )
+      : null;
+
+    if (!assignment) return null;
+
+    return {
+      assessment,
+      assessmentId: assessment?._id || assessment?.id,
+      assignmentId: assignment?._id,
+      dueDate: assignment?.dueDate,
+      assignedDueDate: assignment?.dueDate,
+      updatedAt: assignment?.assignedAt || assessment?.updatedAt,
+    };
+  })
+  .filter(Boolean);
+
+const existingIds = new Set(
+  assignedRows
+    .map((item: any) => flattenAssignedAssessmentRow(item)?.assessmentId)
+    .filter(Boolean),
+);
+
+const missingFromAssignedApi = assignmentList.filter((item: any) => {
+  const id = String(item?.assessmentId || "");
+  return id && !existingIds.has(id);
+});
+
+assignedRows = [...assignedRows, ...missingFromAssignedApi];
             const pr = unwrapProgressData(progRes);
             const rows = pr?.assessments ?? [];
             const appointmentsBody: any = appointmentsRes?.data;
@@ -560,7 +610,7 @@ return {
           role: "pastor",
           roleMatch: "mixed",
           page: 1,
-          limit: 20,
+          limit: 100,
         });
 
         const inner = res?.data?.data;
@@ -669,7 +719,7 @@ useEffect(() => {
           roleMatch: "mixed",
           search: userSearch || undefined,
           page: 1,
-          limit: 20,
+         limit: 100,
         });
 
         const inner = res?.data?.data;
@@ -1373,7 +1423,17 @@ const filteredMentorRows = useMemo(() => {
     </h2>
 
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      {allPastorRows.map((pastor: any) => {
+      {allPastorRows
+  .filter((pastor: any) => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+
+    const row = mapUserToAssignUser(pastor);
+    const email = String(pastor?.email || "").toLowerCase();
+
+    return `${row.name} ${email}`.toLowerCase().includes(q);
+  })
+  .map((pastor: any) => {
         const row = mapUserToAssignUser(pastor);
 
         return (

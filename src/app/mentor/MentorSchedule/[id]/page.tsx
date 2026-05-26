@@ -317,7 +317,12 @@ export default function MentorAppointmentDetailPage() {
         {appt.notes ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
             <p className="mb-3 text-sm font-semibold text-[#8ec5eb]">Notes</p>
-            <p className="text-sm text-white/80">{appt.notes}</p>
+            {/* <p className="text-sm text-white/80">{appt.notes}</p> */}
+            <p className="text-sm text-white/80">
+  {String(appt.notes || "").includes("assessmentId:")
+    ? "Roadmap assessment meeting"
+    : appt.notes}
+</p>
           </div>
         ) : null}
 

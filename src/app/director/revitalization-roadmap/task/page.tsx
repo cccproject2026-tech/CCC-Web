@@ -833,7 +833,13 @@
 import { useCallback, useEffect, useState, Suspense } from "react";
 import type { JSX } from "react";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  apiGetUserAnswers,
+  apiGetSectionRecommendations,
+} from "@/app/Services/assessment.service";
+
+import { apiGetAppointments } from "@/app/Services/appointments.service";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { apiGetExtrasDocuments } from "@/app/Services/api";
 
@@ -956,6 +962,7 @@ function isRenderablePastorExtraRow(item: Record<string, unknown>): boolean {
 
 function TaskPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const taskId = searchParams.get("taskId");
   const roadmapId = searchParams.get("roadmapId");
   const userId = searchParams.get("userId");
@@ -1717,7 +1724,192 @@ const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
 const renderTemplateExtra = (extra: Record<string, any>, idx: number): JSX.Element | null => {
   const type = String(extra.type ?? "").toUpperCase();
   const label = String(extra.name ?? "").trim();
+if (type === "ASSESSMENT") {
+  return (
+    <div
+      key={`assessment-${label}-${idx}`}
+      className="rounded-xl border border-white/10 bg-white/[0.04] p-5"
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-white">
+            Assessment submitted
+          </h3>
+          <p className="mt-1 text-sm text-[#cde2f2]">
+            Pastor completed this roadmap assessment task.
+          </p>
+        </div>
 
+        {/* <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15"
+          >
+            View Submitted Answers
+          </button>
+
+          <button
+            type="button"
+            className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15"
+          >
+            View Meeting Details
+          </button>
+
+          <button
+            type="button"
+            className="rounded-lg border border-white/15 bg-[#8ec5eb] px-4 py-2 text-sm font-semibold text-[#062946]"
+          >
+            View CDP
+          </button>
+        </div> */}
+        <div className="flex flex-wrap gap-3">
+  <button
+    type="button"
+    onClick={async () => {
+      try {
+        const assessmentId = String(
+          extra?.assessmentId ??
+            extra?.assessment?._id ??
+            extra?.assessment ??
+            extra?.selectedAssessment?._id ??
+            extra?.selectedAssessment ??
+            "",
+        ).trim();
+
+        if (!assessmentId || !userId) return;
+
+        const res = await apiGetUserAnswers(assessmentId, userId);
+
+        const answerData =
+          (res?.data as any)?.data ?? res?.data;
+
+        const answerId = String(
+          answerData?._id ??
+            answerData?.answerId ??
+            "",
+        ).trim();
+
+        if (!answerId) return;
+
+        router.push(
+          `/director/assessments/result?assessmentId=${encodeURIComponent(
+            assessmentId,
+          )}&userId=${encodeURIComponent(
+            userId,
+          )}&answerId=${encodeURIComponent(answerId)}`,
+        );
+      } catch (err) {
+        console.error("Failed to open assessment answers", err);
+      }
+    }}
+    className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15"
+  >
+    View Submitted Answers
+  </button>
+
+  <button
+    type="button"
+    onClick={async () => {
+      try {
+        const assessmentId = String(
+          extra?.assessmentId ??
+            extra?.assessment?._id ??
+            extra?.assessment ??
+            extra?.selectedAssessment?._id ??
+            extra?.selectedAssessment ??
+            "",
+        ).trim();
+
+        if (!assessmentId || !userId) return;
+
+        const res = await apiGetAppointments({
+          userId,
+        });
+
+        const appointments =
+          ((res?.data as any)?.data ??
+            res?.data ??
+            []) as any[];
+
+        const match = appointments.find((appt) => {
+          const notes = String(appt?.notes || "");
+
+          return (
+            notes.includes(`assessmentId:${assessmentId}`) &&
+            notes.includes(`taskId:${taskId || ""}`) &&
+            notes.includes(`roadmapId:${roadmapId || ""}`)
+          );
+        });
+
+        const appointmentId = String(
+          match?._id ?? match?.id ?? "",
+        ).trim();
+
+        if (!appointmentId) return;
+
+        router.push(
+          `/director/schedule?appointmentId=${appointmentId}`,
+        );
+      } catch (err) {
+        console.error("Failed to open meeting details", err);
+      }
+    }}
+    className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15"
+  >
+    View Meeting Details
+  </button>
+
+  <button
+    type="button"
+    onClick={async () => {
+      try {
+        const assessmentId = String(
+          extra?.assessmentId ??
+            extra?.assessment?._id ??
+            extra?.assessment ??
+            extra?.selectedAssessment?._id ??
+            extra?.selectedAssessment ??
+            "",
+        ).trim();
+
+        if (!assessmentId || !userId) return;
+
+        const res = await apiGetSectionRecommendations(
+          assessmentId,
+          userId,
+        );
+
+        const recommendation =
+          (res?.data as any)?.data ?? res?.data;
+
+        const recommendationId = String(
+          recommendation?._id ??
+            recommendation?.id ??
+            "",
+        ).trim();
+
+        if (!recommendationId) return;
+
+        router.push(
+          `/director/assessments/result?assessmentId=encodeURIComponent(
+            assessmentId,
+          )}&userId=${encodeURIComponent(
+            userId,
+          )}&viewCdp=1`,
+        );
+      } catch (err) {
+        console.error("Failed to open CDP", err);
+      }
+    }}
+    className="rounded-lg border border-white/15 bg-[#8ec5eb] px-4 py-2 text-sm font-semibold text-[#062946]"
+  >
+    View CDP
+  </button>
+</div>
+      </div>
+    </div>
+  );
+}
   if (type === "SECTION") {
     const children = Array.isArray(extra.sections) ? extra.sections : [];
 

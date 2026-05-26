@@ -4,7 +4,36 @@ import Image from "next/image";
 import { isAxiosError } from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
+import PastorSearchBar from "@/app/Components/pastor/PastorSearchBar";
+import AvailabilityCalendar from "@/app/Components/AvailabilityCalendar";
 import DirectorHero from "@/app/director/DirectorHero";
+import axiosInstance from "@/app/Services/config/axios-instance";
+import {
+  apiGetUserAnswers,
+  apiGetSectionRecommendations,
+} from "@/app/Services/assessment.service";
+import {
+  apiCreateAppointment,
+  apiGetAppointments,
+  apiGetUserSchedule,
+  apiGetWeeklyAvailability,
+} from "@/app/Services/appointments.service";
+import { apiGetAssignedUsers } from "@/app/Services/users.service";
+import {
+  extractApiErrorMessage,
+  formatAvailabilitySlotLabel,
+  meetingDateLocalYmd,
+  parseSlotStartToIso,
+  slotDateToYmd,
+  uiMeetingModeToPlatform,
+  unwrapAppointmentsAxiosData,
+  unwrapMonthlyAvailabilityPayload,
+} from "@/app/Services/appointment-utils";
+import {
+  filterSlotLabelsAgainstExternalCalendar,
+  googleCalendarSuccessHintFromCreateResponse,
+} from "@/app/Services/google-calendar-scheduling";
+import { getStoredRecommendationsForPastorAssessment } from "@/app/utils/assessment-recommendations";
 import {
   directorBtnPrimary,
   directorBtnSecondary,
@@ -45,11 +74,17 @@ import {
   unwrapProgressData,
   type RoadmapAssignmentUi,
 } from "@/app/Services/roadmap-assignments";
-import { pastorRoadmapDescriptionOverview } from "@/app/Components/pastor/pastor-theme";
+import {
+  pastorDarkSelect,
+  pastorFieldLabel,
+  pastorPrimaryCta,
+  pastorRoadmapDescriptionOverview,
+} from "@/app/Components/pastor/pastor-theme";
 import type { ProgressResponse } from "@/app/Services/types/progress.types";
 import { getCookie } from "@/app/utils/cookies";
 import { getPastorUserId } from "@/app/utils/pastor-auth";
 import { emitProgressUpdated } from "@/app/utils/progress-sync";
+import { filterSlotsAfter2Hours } from "@/app/Services/utils/helpers";
 import type {
   CommentItem,
   QueryItem,
@@ -174,7 +209,8 @@ function normalizeExtraType(raw: unknown): ExtraComponent["type"] {
  * - `selectedAssessment` from director builder
  */
 function resolveAssessmentIdFromExtraShape(extra: ExtraComponent): string | null {
-  const raw = extra as Record<string, unknown>;
+  // const raw = extra as Record<string, unknown>;
+  const raw = extra as unknown as Record<string, unknown>;
   const direct = extra.assessmentId ?? raw.assessmentId;
   if (typeof direct === "string" && direct.trim()) return direct.trim();
 
@@ -270,7 +306,41 @@ function JumpStartContent() {
   const [saveFeedback, setSaveFeedback] = useState<string | null>(null);
   const [completeLoading, setCompleteLoading] = useState(false);
   const [completeFeedback, setCompleteFeedback] = useState<string | null>(null);
-
+const [assessmentTaskState, setAssessmentTaskState] = useState<
+  Record<
+    string,
+    {
+      submitted: boolean;
+      hasCdp: boolean;
+    }
+  >
+>({});
+  const today = new Date();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerStep, setDrawerStep] = useState<"mentor" | "schedule">("mentor");
+  const [mentorSearch, setMentorSearch] = useState("");
+  const [mentors, setMentors] = useState<any[]>([]);
+  const [filteredMentors, setFilteredMentors] = useState<any[]>([]);
+  const [selectedMentor, setSelectedMentor] = useState<any>(null);
+  const [selectedTime, setSelectedTime] = useState("");
+  const [schedulePlatform, setSchedulePlatform] = useState("Zoom");
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
+  const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const [selectedDate, setSelectedDate] = useState(today.getDate());
+  const [availableTimesForBooking, setAvailableTimesForBooking] = useState<any[]>([]);
+  const [monthlyAvailabilitySlots, setMonthlyAvailabilitySlots] = useState<any[]>([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [calendarSlotSyncLoading, setCalendarSlotSyncLoading] = useState(false);
+  const [calendarSlotSyncError, setCalendarSlotSyncError] = useState<string | null>(null);
+  const [calendarSlotSyncSkipped, setCalendarSlotSyncSkipped] = useState(false);
+  const [calendarBusyStripped, setCalendarBusyStripped] = useState(0);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [scheduleContext, setScheduleContext] = useState<{
+    assessmentId: string;
+    checkboxKey?: string;
+  } | null>(null);
   // Comments
   const [comments, setComments] = useState<CommentItem[]>([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
@@ -509,7 +579,11 @@ const hasRequiredSubmissions = useMemo(() => {
 
     for (const extra of items) {
       const fieldKey = extra.name;
+const metaDateFields = new Set(["Allow pastor to select Date", "Show date on info card"]);
 
+if (metaDateFields.has(fieldKey)) {
+  continue;
+}
       if (extra.type === "CHECKBOX") {
         if (!formData[fieldKey]) return false;
       }
@@ -519,6 +593,10 @@ const hasRequiredSubmissions = useMemo(() => {
       // }
 
       if (extra.type === "TEXT_FIELD" || extra.type === "TEXT_AREA") {
+  const value = formData[fieldKey];
+  if (value == null || String(value).trim() === "") return false;
+}
+if (extra.type === "DATE_PICKER") {
   const value = formData[fieldKey];
   if (value == null || String(value).trim() === "") return false;
 }
@@ -742,6 +820,223 @@ const hasRequiredSubmissions = useMemo(() => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
+  const showScheduleFeedback = (message: string, duration = 3500) => {
+    setCompleteFeedback(message);
+    setTimeout(() => setCompleteFeedback(null), duration);
+  };
+
+  const getDaysInMonth = (month: number, year: number) => new Date(year, month + 1, 0).getDate();
+
+  const handlePrevMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear((prev) => prev - 1);
+    } else {
+      setCurrentMonth((prev) => prev - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear((prev) => prev + 1);
+    } else {
+      setCurrentMonth((prev) => prev + 1);
+    }
+  };
+
+  useEffect(() => {
+    const max = getDaysInMonth(currentMonth, currentYear);
+    setSelectedDate((day) => (day > max ? max : day));
+  }, [currentMonth, currentYear]);
+
+  const refreshAppointmentLists = useCallback(async (): Promise<any[]> => {
+    if (!userId) return [];
+    try {
+      const [scheduleResult, upcomingResult] = await Promise.allSettled([
+        apiGetUserSchedule(userId),
+        apiGetAppointments({ userId, futureOnly: true }),
+      ]);
+      const scheduleData =
+        scheduleResult.status === "fulfilled" ? unwrapAppointmentsAxiosData(scheduleResult.value) : [];
+      const upcomingData =
+        upcomingResult.status === "fulfilled" ? unwrapAppointmentsAxiosData(upcomingResult.value) : [];
+      const combined = [...scheduleData, ...upcomingData];
+      setAppointments(combined);
+      return combined;
+    } catch {
+      setAppointments([]);
+      return [];
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    void refreshAppointmentLists();
+  }, [refreshAppointmentLists]);
+
+  useEffect(() => {
+    async function fetchMentors() {
+      if (!userId) {
+        setMentors([]);
+        setFilteredMentors([]);
+        return;
+      }
+
+      try {
+        const res = await apiGetAssignedUsers(userId);
+        const body = res.data as { data?: unknown };
+        const raw = Array.isArray(body?.data) ? body.data : [];
+        const list = (raw as Record<string, unknown>[]).map((m) => ({
+          ...m,
+          id: m.id ?? m._id,
+          _id: m._id ?? m.id,
+          firstName: m.firstName ?? "",
+          lastName: m.lastName ?? "",
+          role: m.role ?? "mentor",
+        }));
+        setMentors(list);
+        setFilteredMentors(list);
+      } catch {
+        setMentors([]);
+        setFilteredMentors([]);
+      }
+    }
+
+    if (drawerOpen && drawerStep === "mentor") void fetchMentors();
+  }, [drawerOpen, drawerStep, userId]);
+
+  useEffect(() => {
+    const q = mentorSearch.trim().toLowerCase();
+    if (!q) {
+      setFilteredMentors(mentors);
+      return;
+    }
+
+    setFilteredMentors(
+      mentors.filter((m) =>
+        `${m.firstName ?? ""} ${m.lastName ?? ""} ${m.name ?? ""}`.toLowerCase().includes(q),
+      ),
+    );
+  }, [mentorSearch, mentors]);
+
+  useEffect(() => {
+    if (drawerStep !== "schedule" || !selectedMentor) {
+      setAvailableTimesForBooking([]);
+      setMonthlyAvailabilitySlots([]);
+      setAvailabilityLoading(false);
+      setCalendarSlotSyncLoading(false);
+      setCalendarSlotSyncError(null);
+      setCalendarSlotSyncSkipped(false);
+      setCalendarBusyStripped(0);
+      return;
+    }
+
+    const mentorId = String(selectedMentor.id ?? selectedMentor._id ?? "").trim();
+    if (!mentorId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setAvailabilityLoading(true);
+        const selectedYmdForWeek = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}`;
+        const selectedYmd = new Date(currentYear, currentMonth, selectedDate).toLocaleDateString("en-CA");
+        let slots: any[] = [];
+
+        try {
+          const availRes = await axiosInstance.get(`/appointments/availability/${mentorId}/month`, {
+            params: { year: currentYear, month: currentMonth + 1 },
+          });
+          const raw = availRes.data?.data ?? availRes.data;
+          slots = Array.isArray(raw) ? raw : [];
+        } catch {
+          try {
+            const wk = await apiGetWeeklyAvailability(mentorId, selectedYmdForWeek);
+            const wRaw = unwrapMonthlyAvailabilityPayload(wk);
+            slots = wRaw.length ? wRaw : Array.isArray((wk.data as any)?.data) ? (wk.data as any).data : [];
+          } catch {
+            slots = [];
+          }
+        }
+
+        if (!cancelled) setMonthlyAvailabilitySlots(slots);
+
+        const dateSlot = slots.find((slot: any) => {
+          const ymd = slotDateToYmd(
+            slot?.date ?? slot?.day ?? slot?.calendarDate ?? slot?.meetingDate ?? slot?.dateString,
+          );
+          return ymd === selectedYmd;
+        });
+
+        let times: string[] = [];
+        if (dateSlot?.slots?.length) {
+          times = (dateSlot.slots as any[])
+            .map((raw: any) => formatAvailabilitySlotLabel(raw))
+            .filter((s: string) => s.length > 0);
+          times = filterSlotsAfter2Hours(times, selectedYmd);
+        }
+
+        const bookedMs = appointments
+          .filter((a: any) => {
+            const apptMentorId = String(a.mentor?._id ?? a.mentor?.id ?? a.mentorId ?? "");
+            const status = String(a.status ?? "").toLowerCase();
+            return (
+              apptMentorId === mentorId &&
+              !status.includes("cancel") &&
+              meetingDateLocalYmd(String(a.meetingDate ?? "")) === selectedYmd
+            );
+          })
+          .map((a: any) => new Date(a.meetingDate).getTime())
+          .filter((ms: number) => !Number.isNaN(ms));
+
+        times = times.filter((label) => {
+          const slotMs = new Date(parseSlotStartToIso(selectedYmd, label)).getTime();
+          return !bookedMs.some((bMs) => Math.abs(bMs - slotMs) < 30 * 60 * 1000);
+        });
+
+        setCalendarSlotSyncLoading(true);
+        setCalendarSlotSyncError(null);
+
+        let displayTimes = times;
+        const participantUserIds = Array.from(new Set([userId, mentorId].filter(Boolean)));
+        const gc = await filterSlotLabelsAgainstExternalCalendar({
+          meetingDateYmd: selectedYmd,
+          rawSlotLabels: times.map((lab) => String(lab).replace(/\u2013/g, "-").replace(/\u2014/g, "-")),
+          participantUserIds,
+          meetingDurationMinutes: 60,
+          expandIntoGrid: true,
+        });
+
+        setCalendarSlotSyncSkipped(gc.skipped);
+        setCalendarBusyStripped(gc.error ? 0 : gc.strippedCount);
+        if (gc.error) {
+          setCalendarSlotSyncError(gc.error);
+          displayTimes = [];
+        } else {
+          displayTimes = gc.slots;
+        }
+
+        if (!cancelled) {
+          setAvailableTimesForBooking(displayTimes);
+          setSelectedTime((prev) => (prev && displayTimes.includes(prev) ? prev : ""));
+          setAvailabilityLoading(false);
+          setCalendarSlotSyncLoading(false);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAvailableTimesForBooking([]);
+          setMonthlyAvailabilitySlots([]);
+          setAvailabilityLoading(false);
+          setCalendarSlotSyncLoading(false);
+          setCalendarSlotSyncError(extractApiErrorMessage(error));
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [drawerStep, selectedMentor, currentYear, currentMonth, selectedDate, availabilityRefreshKey, appointments, userId]);
+
   // const scopedNestedId = nestedRoadMapItemIdForExtras;
 
   // Mobile parity: show server-saved upload documents after refresh.
@@ -862,6 +1157,217 @@ const hasRequiredSubmissions = useMemo(() => {
     return null;
   };
 
+  const getAssessmentCheckboxKey = (extra: ExtraComponent): string | undefined => {
+    const checkbox = extra.checkboxes?.find((cb) => cb.type === "CHECKBOX" && String(cb.name || "").trim());
+    return checkbox?.name;
+  };
+//   const hasRoadmapAssessmentMeeting = (assessmentId: string) => {
+//   return appointments.some((appt: any) => {
+//     const notes = String(appt?.notes || "");
+//     const status = String(appt?.status || "").toLowerCase();
+
+//     return (
+//       !status.includes("cancel") &&
+//       notes.includes(`assessmentId:${assessmentId}`) &&
+//       notes.includes(`taskId:${nestedItemId || ""}`) &&
+//       notes.includes(`roadmapId:${roadmapId || ""}`)
+//     );
+//   });
+// };
+const getRoadmapAssessmentMeeting = (assessmentId: string) => {
+  return appointments.find((appt: any) => {
+    const notes = String(appt?.notes || "");
+    const status = String(appt?.status || "").toLowerCase();
+
+    return (
+      !status.includes("cancel") &&
+      notes.includes(`assessmentId:${assessmentId}`) &&
+      notes.includes(`taskId:${nestedItemId || ""}`) &&
+      notes.includes(`roadmapId:${roadmapId || ""}`)
+    );
+  });
+};
+
+  const openAssessmentMeetingDrawer = (extra: ExtraComponent) => {
+    const assessmentId = getAssessmentIdFromExtra(extra);
+    if (!assessmentId) {
+      showScheduleFeedback("This survey is not linked to an assessment yet.");
+      return;
+    }
+
+    setScheduleContext({
+      assessmentId,
+      checkboxKey: getAssessmentCheckboxKey(extra),
+    });
+    setDrawerStep("mentor");
+    setDrawerOpen(true);
+    setSelectedMentor(null);
+    setSelectedTime("");
+    setSchedulePlatform("Zoom");
+  };
+
+  const handleScheduleAssessmentMeeting = async () => {
+    if (isScheduling || !scheduleContext) return;
+
+    const mentorId = String(selectedMentor?.id ?? selectedMentor?._id ?? "").trim();
+    if (!mentorId) {
+      showScheduleFeedback("Please select a mentor.");
+      return;
+    }
+
+    if (!selectedTime) {
+      showScheduleFeedback("Please select a time.");
+      return;
+    }
+
+    if (!userId) {
+      showScheduleFeedback("Please sign in again.");
+      return;
+    }
+
+    const yyyyMmDd = new Date(currentYear, currentMonth, selectedDate).toLocaleDateString("en-CA");
+    const meetingDateISO = parseSlotStartToIso(yyyyMmDd, selectedTime.replace(/\u2013/g, "-"));
+    const proposedMs = new Date(meetingDateISO).getTime();
+    const hasOverlap = appointments.some((a: any) => {
+      const t = new Date(String(a.meetingDate ?? "")).getTime();
+      return !Number.isNaN(t) && Math.abs(t - proposedMs) < 60 * 60 * 1000;
+    });
+
+    if (hasOverlap) {
+      showScheduleFeedback("This time slot overlaps with an existing appointment.");
+      return;
+    }
+
+    setIsScheduling(true);
+    try {
+      const mentorDisplay =
+        `${selectedMentor?.firstName ?? ""} ${selectedMentor?.lastName ?? ""}`.trim() || "Mentor";
+
+      const res = await apiCreateAppointment({
+        userId,
+        mentorId,
+        meetingDate: meetingDateISO,
+        platform: uiMeetingModeToPlatform(schedulePlatform),
+        notes: `Roadmap assessment meeting | assessmentId:${scheduleContext.assessmentId} | roadmapId:${roadmapId || ""} | taskId:${nestedItemId || ""} | parentId:${parentRoadmapId || ""}`,
+        googleCalendarSync: true,
+        googleCalendarTitle: `Meeting - pastor & ${mentorDisplay}`,
+        googleCalendarDescription: `Scheduled in CCC - Platform: ${schedulePlatform}`,
+      });
+
+      const hint = googleCalendarSuccessHintFromCreateResponse(res?.data);
+      if (scheduleContext.checkboxKey) {
+        setFormData((prev) => ({ ...prev, [scheduleContext.checkboxKey as string]: true }));
+      }
+
+      setAvailabilityRefreshKey((prev) => prev + 1);
+      setDrawerOpen(false);
+      setSelectedTime("");
+      await refreshAppointmentLists();
+      showScheduleFeedback(hint ?? "New appointment has been scheduled.");
+    } catch (error) {
+      showScheduleFeedback(extractApiErrorMessage(error) || "Failed to schedule appointment.");
+    } finally {
+      setIsScheduling(false);
+    }
+  };
+
+  const assessmentExtras = useMemo(() => {
+  const found: ExtraComponent[] = [];
+
+  const walk = (items: ExtraComponent[] | undefined) => {
+    if (!items?.length) return;
+
+    items.forEach((item) => {
+      if (item.type === "ASSESSMENT") {
+        found.push(item);
+      }
+
+      if (item.sections?.length) walk(item.sections);
+      if (item.checkboxes?.length) walk(item.checkboxes);
+    });
+  };
+
+  walk(templateExtras);
+
+  return found;
+}, [templateExtras]);
+useEffect(() => {
+  if (!userId || assessmentExtras.length === 0) {
+    setAssessmentTaskState({});
+    return;
+  }
+
+  let cancelled = false;
+
+  const loadAssessmentTaskState = async () => {
+    const next: Record<string, { submitted: boolean; hasCdp: boolean }> = {};
+
+    await Promise.all(
+      assessmentExtras.map(async (extra) => {
+        const assessmentId = getAssessmentIdFromExtra(extra);
+        if (!assessmentId) return;
+
+        let submitted = false;
+        let hasCdp = getStoredRecommendationsForPastorAssessment(
+          userId,
+          assessmentId,
+        ).some((rec) => rec.sent === true);
+
+        try {
+          const answersRes = await apiGetUserAnswers(assessmentId, userId);
+          submitted = Boolean((answersRes?.data as any)?.data?._id);
+        } catch {
+          submitted = false;
+        }
+
+        try {
+          const recRes = await apiGetSectionRecommendations(assessmentId, userId);
+          const data: any = (recRes?.data as any)?.data ?? recRes?.data;
+
+          if (Array.isArray(data)) {
+            hasCdp =
+              hasCdp ||
+              data.some((row: any) => row?.sent === true || row?.status === "sent");
+          } else if (Array.isArray(data?.sections)) {
+            hasCdp =
+              hasCdp ||
+              data.sections.some((section: any) =>
+                Array.isArray(section?.recommendations) &&
+                section.recommendations.some(
+                  (rec: any) => rec?.sent === true || rec?.status === "sent",
+                ),
+              );
+          }
+        } catch {
+          // Keep local CDP value.
+        }
+
+        next[assessmentId] = { submitted, hasCdp };
+      }),
+    );
+
+    // if (!cancelled) {
+    //   setAssessmentTaskState(next);
+    // }
+    if (!cancelled) {
+  setAssessmentTaskState(next);
+
+  const hasCompletedCdp = Object.values(next).some(
+    (row) => row.submitted && row.hasCdp,
+  );
+
+  if (hasCompletedCdp) {
+    setStatusUiOverride("Completed");
+  }
+}
+  };
+
+  void loadAssessmentTaskState();
+
+  return () => {
+    cancelled = true;
+  };
+}, [userId, assessmentExtras]);
   const openAssessment = (extra: ExtraComponent) => {
     const assessmentId = getAssessmentIdFromExtra(extra);
     if (!assessmentId) {
@@ -869,9 +1375,16 @@ const hasRequiredSubmissions = useMemo(() => {
       setTimeout(() => setCompleteFeedback(null), 4000);
       return;
     }
+    // router.push(
+    //   `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(assessmentId)}`,
+    // );
     router.push(
-      `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(assessmentId)}`,
-    );
+  `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(
+    assessmentId,
+  )}&roadmapId=${encodeURIComponent(roadmapId || "")}&taskId=${encodeURIComponent(
+    nestedItemId || "",
+  )}&parentId=${encodeURIComponent(parentRoadmapId || "")}`,
+);
   };
 
   const handleSave = async () => {
@@ -1775,35 +2288,129 @@ if (!hasRequiredSubmissions) {
           </div>
         );
 
-      case "ASSESSMENT":
-        return (
-          <div key={`${fieldKey}_${index}`} className="mb-5">
-            <h4 className="text-sm font-semibold text-white mb-2">{extra.name}</h4>
-            {extra.buttonName && (
+      // case "ASSESSMENT":
+      //   return (
+      //     <div key={`${fieldKey}_${index}`} className="mb-5">
+      //       <h4 className="text-sm font-semibold text-white mb-2">{extra.name}</h4>
+      //       {extra.buttonName && (
+      //         <button
+      //           type="button"
+      //           onClick={() => openAssessment(extra)}
+      //           className="mb-3 bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-5 py-2 rounded-md shadow"
+      //         >
+      //           {extra.buttonName}
+      //         </button>
+      //       )}
+      //       {!extra.buttonName && (
+      //         <button
+      //           type="button"
+      //           onClick={() => openAssessment(extra)}
+      //           className="mb-3 rounded-md border border-white/25 bg-white/10 px-5 py-2 text-sm font-medium text-white transition hover:bg-white/20"
+      //         >
+      //           Open Survey
+      //         </button>
+      //       )}
+      //       {extra.checkboxes && extra.checkboxes.length > 0 && (
+      //         <div className="space-y-2 pl-1">
+      //           {extra.checkboxes.map((cb, i) => renderExtraComponent(cb, i, fieldKey))}
+      //         </div>
+      //       )}
+      //     </div>
+      //   );
+      case "ASSESSMENT": {
+  const assessmentId = getAssessmentIdFromExtra(extra);
+  const state = assessmentId ? assessmentTaskState[assessmentId] : null;
+const isSubmitted = state?.submitted === true;
+// const hasScheduledMeeting = assessmentId
+//   ? hasRoadmapAssessmentMeeting(assessmentId)
+//   : false;
+const scheduledMeeting = assessmentId
+  ? getRoadmapAssessmentMeeting(assessmentId)
+  : null;
+  return (
+    <div key={`${fieldKey}_${index}`} className="mb-5">
+      <h4 className="mb-2 text-sm font-semibold text-white">{extra.name}</h4>
+
+      {state?.submitted ? (
+        <div className="mb-4 rounded-xl border border-[#5A8DCB]/40 bg-white/[0.06] p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-white">
+                Assessment submitted
+              </p>
+              <p className="mt-1 text-xs text-white/60">
+                You can view your submitted answers and CDP from this roadmap task.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => openAssessment(extra)}
-                className="mb-3 bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-5 py-2 rounded-md shadow"
+                onClick={() =>
+                  router.push(
+                    // `/pastor/Assessments/result?assessmentId=${assessmentId}&userId=${userId}&roadmapId=${roadmapId || ""}&taskId=${nestedItemId || ""}&parentId=${parentRoadmapId || ""}`,
+                    `/pastor/Assessments/guidelines?assessmentId=${assessmentId}&roadmapId=${roadmapId || ""}&taskId=${nestedItemId || ""}&parentId=${parentRoadmapId || ""}`
+                  )
+                }
+                className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
               >
-                {extra.buttonName}
+                View Submitted Answers
               </button>
-            )}
-            {!extra.buttonName && (
-              <button
-                type="button"
-                onClick={() => openAssessment(extra)}
-                className="mb-3 rounded-md border border-white/25 bg-white/10 px-5 py-2 text-sm font-medium text-white transition hover:bg-white/20"
-              >
-                Open Survey
-              </button>
-            )}
-            {extra.checkboxes && extra.checkboxes.length > 0 && (
-              <div className="space-y-2 pl-1">
-                {extra.checkboxes.map((cb, i) => renderExtraComponent(cb, i, fieldKey))}
-              </div>
-            )}
+
+              {state.hasCdp ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/pastor/Assessments/result/cdp?assessmentId=${assessmentId}&userId=${userId}&roadmapId=${roadmapId || ""}&taskId=${nestedItemId || ""}&parentId=${parentRoadmapId || ""}`,
+                    )
+                  }
+                  className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+                >
+                  View CDP
+                </button>
+              ) : (
+                // <button
+                //   type="button"
+                //   onClick={() => openAssessmentMeetingDrawer(extra)}
+                //   className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+                // >
+                //   Schedule Meeting
+                // </button>
+            <button
+  type="button"
+  onClick={() =>
+    scheduledMeeting
+      ? router.push(`/pastor/appointments/${scheduledMeeting._id || scheduledMeeting.id}`)
+      : openAssessmentMeetingDrawer(extra)
+  }
+  className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+>
+  {scheduledMeeting ? "View Meeting Details" : "Schedule Meeting"}
+</button>
+              )}
+            </div>
           </div>
-        );
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => openAssessment(extra)}
+          className="mb-3 rounded-md border border-white/25 bg-white/10 px-5 py-2 text-sm font-medium text-white transition hover:bg-white/20"
+        >
+          {extra.buttonName || "Open Survey"}
+        </button>
+      )}
+
+      {extra.checkboxes && extra.checkboxes.length > 0 && (
+      
+        <div className="space-y-2 pl-1">
+          {extra.checkboxes.map((cb, i) => renderExtraComponent(cb, i, fieldKey))}
+        </div>
+      )}
+    </div>
+  );
+}
 
       // case "SECTION":
       //   return (
@@ -2382,6 +2989,219 @@ case "SECTION":
           </div>
         </div>
         </div>
+
+        {drawerOpen && (
+          <div className="fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-labelledby="new-meeting-drawer-title">
+            <button
+              type="button"
+              className="absolute inset-0 bg-[#041f35]/70 backdrop-blur-sm"
+              aria-label="Close panel"
+              onClick={() => setDrawerOpen(false)}
+            />
+            <div className="relative ml-auto flex h-full w-full max-w-[440px] flex-col border-l border-[#8ec5eb]/30 bg-[linear-gradient(180deg,rgba(10,52,88,0.97)_0%,rgba(4,28,48,0.99)_100%)] shadow-[-20px_0_48px_rgba(2,12,28,0.65)] animate-slide-left">
+              <div className="flex items-start justify-between gap-3 border-b border-white/15 px-6 py-5">
+                <div>
+                  <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-[#8ec5eb]/90">
+                    New meeting
+                  </p>
+                  <h2 id="new-meeting-drawer-title" className="flex items-center gap-2 text-lg font-semibold text-white">
+                    {drawerStep === "mentor" ? (
+                      <>Choose a mentor</>
+                    ) : (
+                      <>
+                        <i className="fa-regular fa-calendar text-[#8ec5eb]" aria-hidden />
+                        Schedule
+                      </>
+                    )}
+                  </h2>
+                  <p className="mt-1 text-xs text-[#cde2f2]/90">
+                    {drawerStep === "mentor"
+                      ? "Select who you would like to meet with."
+                      : "Pick a date, time, and platform."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDrawerOpen(false)}
+                  className="shrink-0 rounded-lg p-2 text-[#d9ebf8] transition hover:bg-white/10 hover:text-white"
+                  aria-label="Close"
+                >
+                  <i className="fa-solid fa-xmark text-lg" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-6 py-6">
+                {drawerStep === "mentor" ? (
+                  <>
+                    <div className="mb-4 max-w-none">
+                      <PastorSearchBar
+                        value={mentorSearch}
+                        onChange={setMentorSearch}
+                        placeholder="Search mentors"
+                        aria-label="Search mentors"
+                        className="max-w-none"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      {filteredMentors.map((mentor) => {
+                        const mentorId = String(mentor.id ?? mentor._id ?? "");
+                        const selected = String(selectedMentor?.id ?? selectedMentor?._id ?? "") === mentorId;
+                        return (
+                          <div
+                            key={mentorId}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setSelectedMentor(mentor)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setSelectedMentor(mentor);
+                              }
+                            }}
+                            className={`flex cursor-pointer items-center justify-between rounded-xl border px-4 py-3 transition ${
+                              selected
+                                ? "border-[#8ec5eb]/60 bg-white/10 shadow-[0_0_0_1px_rgba(142,197,235,0.25)]"
+                                : "border-white/15 bg-white/[0.04] hover:border-white/25 hover:bg-white/[0.07]"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <Image
+                                src={UserPlaceholder}
+                                alt=""
+                                width={32}
+                                height={32}
+                                className="rounded-full ring-2 ring-white/10"
+                              />
+                              <div>
+                                <p className="text-sm font-medium text-white">
+                                  {[mentor.firstName, mentor.lastName].filter(Boolean).join(" ").trim() ||
+                                    String(mentor.name ?? "Mentor")}
+                                </p>
+                                <p className="text-xs capitalize text-[#cde2f2]/80">
+                                  {String(mentor.role ?? "mentor").replace(/-/g, " ")}
+                                </p>
+                              </div>
+                            </div>
+                            <span
+                              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                                selected ? "border-[#8ec5eb] bg-[#8ec5eb]" : "border-white/35"
+                              }`}
+                              aria-hidden
+                            >
+                              {selected ? <i className="fa-solid fa-check text-[10px] text-[#062946]" /> : null}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <label className={pastorFieldLabel}>Mentor Availability</label>
+                    <AvailabilityCalendar
+                      mentorId={String(selectedMentor?.id || selectedMentor?._id || "")}
+                      currentMonth={currentMonth}
+                      currentYear={currentYear}
+                      selectedDate={selectedDate}
+                      onDateSelect={setSelectedDate}
+                      onPrevMonth={handlePrevMonth}
+                      onNextMonth={handleNextMonth}
+                      availabilitySlots={monthlyAvailabilitySlots}
+                      isLoading={availabilityLoading}
+                    />
+
+                    <label className={pastorFieldLabel} htmlFor="time-slot" style={{ marginTop: "1.5rem" }}>
+                      Select a time
+                      <span className="ml-1 font-normal text-[#cde2f2]">
+                        ({new Date(currentYear, currentMonth, selectedDate).toLocaleDateString()})
+                      </span>
+                    </label>
+                    {availabilityLoading || calendarSlotSyncLoading ? (
+                      <div className="mb-4 flex items-center justify-center py-6">
+                        <div className="flex items-center gap-2 text-xs text-[#cde2f2]">
+                          <span className="h-2 w-2 animate-pulse rounded-full bg-[#8ec5eb]" />
+                          Checking availability &amp; syncing Google Calendar...
+                        </div>
+                      </div>
+                    ) : calendarSlotSyncError ? (
+                      <p className="mb-4 rounded-lg border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-50">
+                        {calendarSlotSyncError}
+                      </p>
+                    ) : availableTimesForBooking.length === 0 ? (
+                      <p className="mb-4 text-xs text-[#cde2f2]/85">
+                        No open slots on this date. Please try another day.
+                      </p>
+                    ) : (
+                      <div className="mb-4 space-y-2">
+                        {!calendarSlotSyncSkipped && calendarBusyStripped > 0 ? (
+                          <p className="text-xs text-[#cde2f2]/80">
+                            Some times are hidden because they overlap with Google Calendar events.
+                          </p>
+                        ) : null}
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                          {availableTimesForBooking.map((time: any) => (
+                            <button
+                              key={time}
+                              type="button"
+                              onClick={() => setSelectedTime(time)}
+                              className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+                                selectedTime === time
+                                  ? "border-[#8ec5eb] bg-[#8ec5eb]/25 text-white shadow-[0_0_0_1px_rgba(142,197,235,0.35)]"
+                                  : "border-[#8ec5eb]/30 bg-[#8ec5eb]/10 text-white hover:border-[#8ec5eb]/55 hover:bg-[#8ec5eb]/20"
+                              }`}
+                            >
+                              {time}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <label className={pastorFieldLabel} htmlFor="new-meeting-platform">
+                      Platform
+                    </label>
+                    <select
+                      id="new-meeting-platform"
+                      value={schedulePlatform}
+                      onChange={(e) => setSchedulePlatform(e.target.value)}
+                      className={`${pastorDarkSelect} mb-2 text-white`}
+                    >
+                      <option value="Zoom" className="bg-[#062946] text-white">
+                        Zoom
+                      </option>
+                    </select>
+                  </>
+                )}
+              </div>
+
+              <div className="flex justify-between gap-3 border-t border-white/15 px-6 py-4">
+                <button
+                  type="button"
+                  onClick={() => (drawerStep === "mentor" ? setDrawerOpen(false) : setDrawerStep("mentor"))}
+                  className="text-sm font-medium text-[#8ec5eb] transition hover:text-white"
+                >
+                  {drawerStep === "mentor" ? "Cancel" : "Back"}
+                </button>
+
+                {drawerStep === "mentor" ? (
+                  <button type="button" onClick={() => setDrawerStep("schedule")} className={pastorPrimaryCta}>
+                    Next
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleScheduleAssessmentMeeting}
+                    disabled={isScheduling}
+                    className={`${pastorPrimaryCta} ${isScheduling ? "cursor-not-allowed opacity-70" : ""}`}
+                  >
+                    {isScheduling ? "Scheduling..." : "Schedule"}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Signature Drawing Modal */}
         {signatureModalOpen && (

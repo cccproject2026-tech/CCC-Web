@@ -32,6 +32,7 @@ import {
   apiGetSectionRecommendations,
   parseAssignedAssessmentsListBody,
   flattenAssignedAssessmentRow,
+  apiGetAssessments,
 } from "@/app/Services/assessment.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
@@ -224,17 +225,98 @@ export default function PastorAssessments() {
       }
       if (!opts?.silent) setLoading(true);
       try {
-        const [assessmentRes, progressRes, appointmentsRes] = await Promise.allSettled([
-          apiGetAssignedAssessments(sessionUserId),
-          apiGetUserProgress(sessionUserId),
-          apiGetAppointments({ userId: sessionUserId, futureOnly: false } as any),
-        ]);
+        // const [assessmentRes, progressRes, appointmentsRes] = await Promise.allSettled([
+        //   apiGetAssignedAssessments(sessionUserId),
+        //   apiGetUserProgress(sessionUserId),
+        //   apiGetAppointments({ userId: sessionUserId, futureOnly: false } as any),
+        // ]);
+        const [assessmentRes, allAssessmentsRes, progressRes, appointmentsRes] = await Promise.allSettled([
+  apiGetAssignedAssessments(sessionUserId),
+  apiGetAssessments(),
+  apiGetUserProgress(sessionUserId),
+  apiGetAppointments({ userId: sessionUserId, futureOnly: false } as any),
+]);
 
         if (assessmentRes.status !== "fulfilled") {
           throw assessmentRes.reason;
         }
 
-        const list = parseAssignedAssessmentsListBody(assessmentRes.value.data);
+        // const list = parseAssignedAssessmentsListBody(assessmentRes.value.data);
+        let list = parseAssignedAssessmentsListBody(assessmentRes.value.data);
+
+// if (list.length === 0 && allAssessmentsRes.status === "fulfilled") {
+//   const allAssessmentsBody: any = allAssessmentsRes.value.data;
+
+//   const allAssessments = Array.isArray(allAssessmentsBody?.data)
+//     ? allAssessmentsBody.data
+//     : Array.isArray(allAssessmentsBody)
+//       ? allAssessmentsBody
+//       : [];
+
+//   list = allAssessments
+//     .map((assessment: any) => {
+//       const assignment = Array.isArray(assessment?.assignments)
+//         ? assessment.assignments.find(
+//             (row: any) => String(row?.userId) === String(sessionUserId)
+//           )
+//         : null;
+
+//       if (!assignment) return null;
+
+//       return {
+//         assessment,
+//         assessmentId: assessment?._id || assessment?.id,
+//         assignmentId: assignment?._id,
+//         dueDate: assignment?.dueDate,
+//         assignedDueDate: assignment?.dueDate,
+//         updatedAt: assignment?.assignedAt || assessment?.updatedAt,
+//       };
+//     })
+//     .filter(Boolean);
+// }
+if (allAssessmentsRes.status === "fulfilled") {
+  const allAssessmentsBody: any = allAssessmentsRes.value.data;
+
+  const allAssessments = Array.isArray(allAssessmentsBody?.data)
+    ? allAssessmentsBody.data
+    : Array.isArray(allAssessmentsBody)
+      ? allAssessmentsBody
+      : [];
+
+  const assignmentList = allAssessments
+    .map((assessment: any) => {
+      const assignment = Array.isArray(assessment?.assignments)
+        ? assessment.assignments.find(
+            (row: any) => String(row?.userId) === String(sessionUserId),
+          )
+        : null;
+
+      if (!assignment) return null;
+
+      return {
+        assessment,
+        assessmentId: assessment?._id || assessment?.id,
+        assignmentId: assignment?._id,
+        dueDate: assignment?.dueDate,
+        assignedDueDate: assignment?.dueDate,
+        updatedAt: assignment?.assignedAt || assessment?.updatedAt,
+      };
+    })
+    .filter(Boolean);
+
+  const existingIds = new Set(
+    list
+      .map((item: any) => flattenAssignedAssessmentRow(item)?.assessmentId)
+      .filter(Boolean),
+  );
+
+  const missingFromAssignedApi = assignmentList.filter((item: any) => {
+    const id = String(item?.assessmentId || "");
+    return id && !existingIds.has(id);
+  });
+
+  list = [...list, ...missingFromAssignedApi];
+}
 
         if (progressRes.status === "rejected") {
           console.warn("Progress request failed; using defaults", progressRes.reason);
@@ -322,16 +404,16 @@ const linkedMeetingId = linkedMeeting
   : "";
 const hasScheduledMeeting = Boolean(linkedMeetingId);
 
-let status: Row["status"] = "Not Started";
-if (ps === "completed" || ps === "reviewed") {
-  status = hasScheduledMeeting ? "Completed" : "Submitted";
-} else if (ps === "submitted") {
-  status = "Submitted";
-} else if (ps === "in_progress" || ps === "inprogress" || ps === "due") {
-  status = "Due";
-} else if (isDueNowOrPast(dueDate)) {
-  status = "Due";
-}
+// let status: Row["status"] = "Not Started";
+// if (ps === "completed" || ps === "reviewed") {
+//   status = hasScheduledMeeting ? "Completed" : "Submitted";
+// } else if (ps === "submitted") {
+//   status = "Submitted";
+// } else if (ps === "in_progress" || ps === "inprogress" || ps === "due") {
+//   status = "Due";
+// } else if (isDueNowOrPast(dueDate)) {
+//   status = "Due";
+// }
 
 const [answersRes, recRes] = await Promise.allSettled([
   apiGetUserAnswers(aid, sessionUserId),
@@ -343,7 +425,30 @@ const hasCdpFromAnswers =
 const hasCdpFromRecommendations =
   recRes.status === "fulfilled" ? hasCdpInRecommendationsPayload(recRes.value.data) : false;
 const hasCdp = hasCdpFromAnswers || hasCdpFromRecommendations;
+const hasSubmittedAnswers =
+  answersRes.status === "fulfilled" &&
+  Boolean((answersRes.value.data as any)?.data?._id);
 
+let status: Row["status"] = "Not Started";
+
+if (hasCdp) {
+  status = "Completed";
+} else if (
+  hasSubmittedAnswers ||
+  ps === "submitted" ||
+  ps === "completed" ||
+  ps === "reviewed"
+) {
+  status = "Submitted";
+} else if (
+  ps === "in_progress" ||
+  ps === "inprogress" ||
+  ps === "due"
+) {
+  status = "Due";
+} else if (isDueNowOrPast(dueDate)) {
+  status = "Due";
+}
 const meeting =
   linkedMeeting && linkedMeetingId
     ? {

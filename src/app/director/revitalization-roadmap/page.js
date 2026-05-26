@@ -539,8 +539,12 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
           const title = pickRoadmapTitle(item, nested0);
           const desc = pickRoadmapDescription(item, nested0);
           const description = desc || "No description yet";
+          // const completionTime =
+          //   (nested0 && String(nested0.duration || "").trim()) || String(item.duration || "").trim() || "—";
           const completionTime =
-            (nested0 && String(nested0.duration || "").trim()) || String(item.duration || "").trim() || "—";
+  String(item.duration || "").trim() ||
+  (nested0 && String(nested0.duration || "").trim()) ||
+  "—";
           // const img = (nested0 && nested0.imageUrl) || item.imageUrl || Card1;
           const img = item.imageUrl || Card1;
           const rid = stringifyRoadmapId(item._id ?? item.id);

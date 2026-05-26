@@ -149,6 +149,68 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   setProfileErrorMsg(null);
 };
 
+// const handleSaveProfile = async () => {
+//   const uid = getPastorUserId() || user?.id || user?._id;
+
+//   if (!uid) {
+//     setProfileErrorMsg("Missing user id. Please login again.");
+//     return;
+//   }
+
+//   if (!selectedProfileFile) {
+//     setProfileErrorMsg("Please choose a profile picture first.");
+//     return;
+//   }
+
+//   const formData = new FormData();
+//   formData.append("file", selectedProfileFile);
+
+//   try {
+//     setIsProfileUploading(true);
+//     setProfileErrorMsg(null);
+
+//     const response = await apiUploadProfilePicture(String(uid), formData);
+//     const json = response.data;
+
+//     if (!json.success) {
+//       setProfileErrorMsg(json.message || "Failed to upload profile picture.");
+//       return;
+//     }
+
+//     // const newUrl: string | undefined = json.data?.profilePicture;
+//     const uploadedUrl: string | undefined = json.data?.profilePicture;
+// const newUrl = uploadedUrl ? `${uploadedUrl}?t=${Date.now()}` : undefined;
+
+//     if (newUrl) {
+//       setProfileImage(newUrl);
+
+//       const updatedUser: User = {
+//         ...user,
+//         id: user?.id || String(uid),
+//         _id: user?._id,
+//         profilePicture: newUrl,
+//       };
+
+//       const merged = normalizeUserCookieForClient(
+//         updatedUser as Record<string, unknown>
+//       ) as User;
+
+//       setUser(merged);
+
+//       if (typeof window !== "undefined") {
+//         setCookie("user", JSON.stringify(merged));
+//       }
+//     }
+
+//     // router.push("/pastor/home");
+//     window.location.href = "/pastor/home";
+//   } catch (err) {
+//     console.error("Upload error:", err);
+//     setProfileErrorMsg("Something went wrong. Please try again.");
+//   } finally {
+//     setIsProfileUploading(false);
+//   }
+// };
 const handleSaveProfile = async () => {
   const uid = getPastorUserId() || user?.id || user?._id;
 
@@ -157,8 +219,13 @@ const handleSaveProfile = async () => {
     return;
   }
 
+  if (!selectedProfileFile && documents.length > 0) {
+    window.location.href = "/pastor/home";
+    return;
+  }
+
   if (!selectedProfileFile) {
-    setProfileErrorMsg("Please choose a profile picture first.");
+    setProfileErrorMsg("Please choose a profile picture or upload a document first.");
     return;
   }
 
@@ -177,9 +244,8 @@ const handleSaveProfile = async () => {
       return;
     }
 
-    // const newUrl: string | undefined = json.data?.profilePicture;
     const uploadedUrl: string | undefined = json.data?.profilePicture;
-const newUrl = uploadedUrl ? `${uploadedUrl}?t=${Date.now()}` : undefined;
+    const newUrl = uploadedUrl ? `${uploadedUrl}?t=${Date.now()}` : undefined;
 
     if (newUrl) {
       setProfileImage(newUrl);
@@ -196,13 +262,9 @@ const newUrl = uploadedUrl ? `${uploadedUrl}?t=${Date.now()}` : undefined;
       ) as User;
 
       setUser(merged);
-
-      if (typeof window !== "undefined") {
-        setCookie("user", JSON.stringify(merged));
-      }
+      setCookie("user", JSON.stringify(merged));
     }
 
-    // router.push("/pastor/home");
     window.location.href = "/pastor/home";
   } catch (err) {
     console.error("Upload error:", err);
@@ -355,14 +417,14 @@ const newUrl = uploadedUrl ? `${uploadedUrl}?t=${Date.now()}` : undefined;
           <button
   type="button"
   onClick={handleSaveProfile}
-  disabled={!hasProfileChanged || isProfileUploading}
+  disabled={(!hasProfileChanged && documents.length === 0) || isProfileUploading || isDocUploading}
   className={`mt-4 flex items-center justify-center gap-2 mx-auto text-sm font-semibold px-8 py-2 rounded-lg transition ${
-    hasProfileChanged && !isProfileUploading
+    (hasProfileChanged || documents.length > 0) && !isProfileUploading && !isDocUploading
       ? "bg-[#f5cc76] text-[#062946] hover:bg-[#ffd98a]"
       : "bg-white/20 text-white/50 cursor-not-allowed"
   }`}
 >
-  {isProfileUploading ? "Saving..." : "Save"}
+  {isProfileUploading || isDocUploading ? "Saving..." : "Save"}
 </button>
 
           {/* hidden file input for documents */}
