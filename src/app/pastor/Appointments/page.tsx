@@ -609,6 +609,7 @@ export default function PastorAppointmentsPage() {
       googleCalendarSync: true,
       googleCalendarTitle: `Meeting · pastor & ${mentorDisplay}`,
       googleCalendarDescription: `Scheduled in CCC · Platform: ${schedulePlatform}`,
+      initiatorRole: "pastor",
     };
 
     try {

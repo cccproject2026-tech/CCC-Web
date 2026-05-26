@@ -52,9 +52,14 @@ Extend `POST /appointments` body with optional keys (ignored if unsupported):
   "notes": "…",
   "googleCalendarSync": true,
   "googleCalendarTitle": "Mentorship — Casey & Avery",
-  "googleCalendarDescription": "Scheduled via CCC"
+  "googleCalendarDescription": "Scheduled via CCC",
+  "initiatorRole": "director",
+  "googleCalendarNonMentorUserId": "..."
 }
 ```
+
+- **`initiatorRole`:** host-initiated flow (`mentor`, `director`, `pastor`, …) per backend DTO.
+- **`googleCalendarNonMentorUserId`:** Mongo id whose Google receives `userGoogleCalendarEventId` when `userId` is not that person; omit when `userId` already owns the attendee-side event.
 
 **Response hints** — any of:
 
@@ -65,9 +70,14 @@ Alternatively return `data.calendarEventId` — the UI treats presence of calend
 
 ---
 
-## Preferred: `GET /availability/:mentorUserId`
+## Preferred: `GET /availability/:hostUserId`
 
-**Query:** `participantUserId` (optional, pastor/participant mongo id), `from`, `to` (ISO datetimes).
+**Host (`:hostUserId`):** Mongo id on the **availability document** — for Directors hosting, this is the Director’s user id; for Mentor-hosted grids, the Mentor’s user id.
+
+**Query:** `from`, `to` (ISO datetimes). **`participantUserId` (optional):** second calendar to merge busy intervals into the picker.
+
+- **Director / Mentor-only picker** (Director sees Mentor’s CCC grid, mentor’s Google busy only): call **without** `participantUserId`. Booking `POST /appointments` may still enforce the booker’s (Director’s) Google `free/busy`.
+- When both sides should block visible slots (e.g. Director + Pastor with host = Director): pass `participantUserId` for the pastor.
 
 **Conceptual JSON**
 
@@ -81,8 +91,8 @@ Alternatively return `data.calendarEventId` — the UI treats presence of calend
 }
 ```
 
-- Frontend subtracts overlaps from **both** `busyIntervals` arrays when merging.
-- `googleCalendarLinked === false`: busy may be empty; UI shows **“Connect Google Calendar to avoid double booking.”**
+- Frontend derives bookable slots from CCC, then removes overlaps vs merged `busyIntervals` (titles are never shown — opaque free/busy only).
+- `googleCalendarLinked === false`: busy may be empty even if Google has events → UI banner: **“Link Google Calendar to avoid double-booking.”**
 - **404**: frontend falls back to `POST /appointments/calendar/external-busy` for busy times only.
 
 ---

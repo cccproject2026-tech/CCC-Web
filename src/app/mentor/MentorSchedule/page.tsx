@@ -734,6 +734,7 @@ useEffect(() => {
         googleCalendarSync: true,
         googleCalendarTitle: `Meeting · mentor & ${recipientLabel}`,
         googleCalendarDescription: `Scheduled in CCC · Platform: ${selectedPlatform}`,
+        initiatorRole: "mentor",
       });
 
       const gHint = googleCalendarSuccessHintFromCreateResponse(res?.data);
