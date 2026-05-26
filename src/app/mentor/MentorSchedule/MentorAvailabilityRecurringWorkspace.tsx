@@ -7,7 +7,6 @@ import type {
 } from "@/app/Services/types/appointments.types";
 import {
   apiCreateRecurringAvailability,
-  apiDeleteAvailabilityDayOccurrence,
   apiGetAvailability,
   apiGetMonthlyAvailability,
   apiMarkAvailabilityDayAvailable,
@@ -95,6 +94,18 @@ function formatYmdHeading(ymd: string): string {
   const dt = new Date(y, mo, d);
   if (Number.isNaN(dt.getTime())) return ymd;
   return dt.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+}
+
+/** Weekday name for `YYYY-MM-DD` (wall date) — sentence case, e.g. "Thursday". */
+function weekdayLongFromYmd(ymd: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd.trim());
+  if (!m) return "this weekday";
+  const y = Number(m[1]);
+  const mo = Number(m[2]) - 1;
+  const d = Number(m[3]);
+  const dt = new Date(y, mo, d);
+  if (Number.isNaN(dt.getTime())) return "this weekday";
+  return dt.toLocaleDateString(undefined, { weekday: "long" });
 }
 
 type MentorAvailabilityRecurringWorkspaceProps = {
@@ -448,12 +459,6 @@ export default function MentorAvailabilityRecurringWorkspace({
               <span>You can block or edit specific dates anytime.</span>
             </li>
           </ul>
-          <button
-            type="button"
-            className="mt-3 text-[12px] font-medium text-[#8ec5eb] underline-offset-4 hover:underline"
-          >
-            Learn more
-          </button>
         </div>
       </div>
 
@@ -1072,6 +1077,12 @@ function DayModal(props: {
     onToast,
   } = props;
 
+  const [blockDayAcknowledged, setBlockDayAcknowledged] = useState(false);
+
+  useEffect(() => {
+    setBlockDayAcknowledged(false);
+  }, [ymd]);
+
   const run = async (fn: () => Promise<void>) => {
     try {
       setBusy(true);
@@ -1113,11 +1124,11 @@ function DayModal(props: {
         <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-white/10 bg-[#062946]/98 px-4 py-4 sm:px-5">
           <div className="min-w-0 pr-2">
             <p id="avail-day-modal-title" className="text-[17px] font-semibold leading-snug tracking-tight text-white">
-              {formatYmdHeading(ymd)}
+              Set custom availability
             </p>
-            <p className="mt-2 text-[12px] text-[#cde2f2]/75">
-              Calendar tag <code className="rounded-md bg-black/30 px-1.5 py-0.5 text-[11px] text-emerald-200/95">{ymd}</code>{' '}
-              — edits here apply to this day only.
+            <p className="mt-2 flex items-center gap-2 text-[13px] text-[#cde2f2]/85">
+              <i className="fa-regular fa-calendar text-[#8ec5eb]" aria-hidden />
+              <span>{formatYmdHeading(ymd)}</span>
             </p>
           </div>
           <button
@@ -1132,19 +1143,36 @@ function DayModal(props: {
         </div>
 
         <div className="space-y-5 px-4 py-5 text-white sm:px-5">
-          <p className="text-[13px] leading-relaxed text-[#cde2f2]/90">
-            {classify.unavailable && slots.length === 0
-              ? "This entire day is turned off for booking. Use “Add meeting hours” below to reopen it, then save."
-              : "Adjust open hours below, or use Reset / Block below if someone shouldn’t meet you this day."}
-          </p>
+          {!showEditors ? (
+            <p className="text-[13px] leading-relaxed text-[#cde2f2]/90">
+              This entire day is turned off for booking. Use “Add meeting hours” below to reopen it, then save.
+            </p>
+          ) : (
+            <>
+              <div className="flex gap-3 rounded-xl border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 px-4 py-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#8ec5eb]/15 text-[#8ec5eb]">
+                  <i className="fa-solid fa-circle-info text-sm" aria-hidden />
+                </span>
+                <p className="text-[13px] leading-relaxed text-[#cde2f2]/95">
+                  <span className="font-semibold text-white">Custom availability</span> for{' '}
+                  <span className="font-semibold text-white">{formatYmdHeading(ymd)}</span> only. Changes here won&apos;t affect
+                  your recurring availability for{' '}
+                  <span className="underline decoration-[#8ec5eb]/55 decoration-2 underline-offset-2">
+                    every {weekdayLongFromYmd(ymd)}
+                  </span>
+                  .
+                </p>
+              </div>
+            </>
+          )}
 
           {showEditors && (
             <div className="rounded-xl border border-white/12 bg-white/[0.04] p-4">
               <h5 className="mb-1 text-[12px] font-semibold uppercase tracking-wider text-[#8ec5eb]/90">
-                Hours you&apos;re available
+                {`Available slots for ${formatYmdHeading(ymd)}`.toUpperCase()}
               </h5>
               <p className="mb-3 text-[11px] text-[#cde2f2]/65">
-                Overlapping times aren&apos;t allowed. Each stretch must fit your usual meeting length ({meetingDuration} min).
+                Overlapping times are not allowed. Each slot must match your usual meeting length ({meetingDuration} min).
               </p>
               <div className="space-y-2">
                 {slots.map((slot, idx) => (
@@ -1253,42 +1281,41 @@ function DayModal(props: {
               </button>
             </div>
 
-            <div className="mt-2 rounded-xl border border-white/10 bg-black/25 p-3">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-amber-200/85">Use with care</p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <button
-                  type="button"
+            <div className="mt-2 flex flex-col items-center rounded-xl border border-white/10 bg-black/25 px-4 py-4 text-center">
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-amber-200/85">
+                Use with care
+              </p>
+              <label className="mb-4 flex max-w-[min(100%,18rem)] cursor-pointer items-start gap-2.5 text-left text-[12px] leading-snug text-[#cde2f2]/90">
+                <input
+                  type="checkbox"
+                  checked={blockDayAcknowledged}
+                  onChange={(e) => setBlockDayAcknowledged(e.target.checked)}
                   disabled={busy}
-                  className={`${mentorSecondaryCta} min-h-[42px] border border-white/15 text-[13px]`}
-                  onClick={() =>
-                    void run(async () => {
-                      await apiDeleteAvailabilityDayOccurrence(mentorId, ymd);
-                      onToast("This day follows your repeating pattern again.", "ok");
-                      onClose();
-                      await onReload();
-                    })
-                  }
-                >
-                  <i className="fa-solid fa-rotate-left mr-2 text-[11px]" aria-hidden />
-                  Reset day to repeating pattern
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  className="min-h-[42px] rounded-lg border border-red-400/35 bg-red-500/15 px-4 py-2 text-[13px] font-medium text-red-100 hover:bg-red-500/25"
-                  onClick={() =>
-                    void run(async () => {
-                      await apiMarkAvailabilityDayUnavailable(mentorId, ymd);
-                      onToast("No meetings can be booked on this day.", "ok");
-                      onClose();
-                      await onReload();
-                    })
-                  }
-                >
-                  <i className="fa-solid fa-ban mr-2 text-[11px]" aria-hidden />
-                  Block entire day
-                </button>
-              </div>
+                  className="mt-1 size-4 shrink-0 accent-red-400"
+                  aria-required
+                />
+                <span>
+                  I understand that blocking prevents new bookings on{' '}
+                  <span className="font-semibold text-white">{formatYmdHeading(ymd)}</span> until I make this day
+                  available again.
+                </span>
+              </label>
+              <button
+                type="button"
+                disabled={busy || !blockDayAcknowledged}
+                className="min-h-[42px] rounded-lg border border-red-400/35 bg-red-500/15 px-4 py-2 text-[13px] font-medium text-red-100 hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-45"
+                onClick={() =>
+                  void run(async () => {
+                    await apiMarkAvailabilityDayUnavailable(mentorId, ymd);
+                    onToast("No meetings can be booked on this day.", "ok");
+                    onClose();
+                    await onReload();
+                  })
+                }
+              >
+                <i className="fa-solid fa-ban mr-2 text-[11px]" aria-hidden />
+                Block entire day
+              </button>
             </div>
           </div>
         </div>
