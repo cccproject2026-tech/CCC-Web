@@ -36,6 +36,7 @@ import {
   apiGetMonthlyAvailability,
   apiGetWeeklyAvailability,
   apiGetUserSchedule,
+  apiMarkAppointmentMissed,
   apiRescheduleAppointment,
   apiUpdateAppointment,
 } from "@/app/Services/appointments.service";
@@ -43,6 +44,9 @@ import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import {
   appointmentEntityId,
   extractApiErrorMessage,
+  isAppointmentMissed,
+  isAppointmentScheduled,
+  normalizeAppointmentStatus,
   formatAvailabilitySlotLabel,
   meetingDateLocalYmd,
   parseSlotStartToIso,
@@ -463,6 +467,7 @@ export default function PastorAppointmentsPage() {
             return (
               apptMentorId === mentorIdStr &&
               !status.includes("cancel") &&
+              status !== "missed" &&
               typeof a.meetingDate === "string" &&
               a.meetingDate.startsWith(selectedYmd)
             );
@@ -817,7 +822,28 @@ export default function PastorAppointmentsPage() {
     }
   };
 
+  const handlePastorMarkAppointmentMissed = async (appt: Record<string, unknown>) => {
+    const id = appointmentEntityId(appt as { _id?: string; id?: string });
+    if (!id) return;
 
+    setMenuOpenId(null);
+    if (
+      !window.confirm(
+        "Mark this appointment as missed? Join links will be cleared for everyone, and CCC can notify participants.",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await apiMarkAppointmentMissed(id);
+      await refreshAppointmentLists();
+      showToast("Appointment marked as missed");
+    } catch (err) {
+      console.error(err);
+      showToast(extractApiErrorMessage(err) || "Failed to mark appointment as missed");
+    }
+  };
 
 
   return (
@@ -987,11 +1013,13 @@ export default function PastorAppointmentsPage() {
                     hour: "2-digit",
                     minute: "2-digit",
                   });
+                  const missed = isAppointmentMissed(appt);
+                  const sched = isAppointmentScheduled(appt);
 
                   return (
                     <div
                       key={appointmentEntityId(appt)}
-                      className={`relative flex flex-col items-start gap-5 p-4 md:flex-row md:items-center md:p-5 ${pastorGlassCard} ${menuOpenId === appointmentEntityId(appt) ? "z-[60]" : ""}`}
+                      className={`relative flex flex-col items-start gap-5 p-4 md:flex-row md:items-center md:p-5 ${pastorGlassCard} ${menuOpenId === appointmentEntityId(appt) ? "z-[60]" : ""} ${missed ? "ring-1 ring-amber-500/40" : ""}`}
                       style={menuOpenId === appointmentEntityId(appt) ? { overflow: "visible" } : undefined}
                     >
                       {/* Icon — link to meeting details */}
@@ -1042,6 +1070,11 @@ export default function PastorAppointmentsPage() {
                             <i className="fa-regular fa-clock"></i>
                             Time: {timeStr}
                           </div>
+                          {missed ? (
+                            <span className="rounded-md border border-amber-400/45 bg-amber-500/15 px-3 py-[4px] text-[10px] font-semibold uppercase tracking-wide text-amber-100">
+                              Missed
+                            </span>
+                          ) : null}
                         </div>
 
                         {/* Mode — tap platform to open meeting details */}
@@ -1092,6 +1125,17 @@ export default function PastorAppointmentsPage() {
                               <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" /> View Details
                             </button>
 
+                            {sched ? (
+                              <button
+                                type="button"
+                                className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                                onClick={() => void handlePastorMarkAppointmentMissed(appt)}
+                              >
+                                <i className="fa-regular fa-user-clock mr-2 text-amber-200" /> Mark as missed
+                              </button>
+                            ) : null}
+
+                            {sched ? (
                             <button
                               type="button"
                               className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1103,7 +1147,9 @@ export default function PastorAppointmentsPage() {
                             >
                               <i className="fa-regular fa-calendar mr-2 text-[#8ec5eb]" /> Reschedule Meeting
                             </button>
+                            ) : null}
 
+                            {sched ? (
                             <button
                               type="button"
                               className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1116,7 +1162,9 @@ export default function PastorAppointmentsPage() {
                               <i className="fa-regular fa-calendar-xmark mr-2 text-red-300" />
                               Cancel Meeting
                             </button>
+                            ) : null}
 
+                            {sched ? (
                             <button
                               type="button"
                               className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1130,6 +1178,7 @@ export default function PastorAppointmentsPage() {
                               <i className="fa-regular fa-pen-to-square mr-2 text-[#8ec5eb]" />
                               Change Meeting Mode
                             </button>
+                            ) : null}
 
 
                           </div>
@@ -1181,11 +1230,13 @@ export default function PastorAppointmentsPage() {
                   const mode = String(appt.platform ?? "Duo");
                   const icon = getModeIcon(mode);
                   const mentor = appt.mentor as { profilePicture?: string; firstName?: string; lastName?: string } | undefined;
+                  const missed = isAppointmentMissed(appt);
+                  const sched = isAppointmentScheduled(appt);
 
                   return (
                     <div
                       key={appointmentEntityId(appt)}
-                      className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard} ${menuOpenId === appointmentEntityId(appt) ? "z-[60]" : ""}`}
+                      className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard} ${menuOpenId === appointmentEntityId(appt) ? "z-[60]" : ""} ${missed ? "ring-1 ring-amber-500/35" : ""}`}
                       style={menuOpenId === appointmentEntityId(appt) ? { overflow: "visible" } : undefined}
                     >
                       <div className="absolute right-3 top-3 z-20">
@@ -1210,6 +1261,18 @@ export default function PastorAppointmentsPage() {
                             >
                               <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" /> View Details
                             </button>
+
+                            {sched ? (
+                              <button
+                                type="button"
+                                className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                                onClick={() => void handlePastorMarkAppointmentMissed(appt)}
+                              >
+                                <i className="fa-regular fa-user-clock mr-2 text-amber-200" /> Mark as missed
+                              </button>
+                            ) : null}
+
+                            {sched ? (
                             <button
                               type="button"
                               className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1221,7 +1284,9 @@ export default function PastorAppointmentsPage() {
                             >
                               <i className="fa-regular fa-calendar mr-2 text-[#8ec5eb]" /> Reschedule Meeting
                             </button>
+                            ) : null}
 
+                            {sched ? (
                             <button
                               type="button"
                               className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1234,7 +1299,9 @@ export default function PastorAppointmentsPage() {
                               <i className="fa-regular fa-calendar-xmark mr-2 text-red-300" />
                               Cancel Meeting
                             </button>
+                            ) : null}
 
+                            {sched ? (
                             <button
                               type="button"
                               className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1248,6 +1315,7 @@ export default function PastorAppointmentsPage() {
                               <i className="fa-regular fa-pen-to-square mr-2 text-[#8ec5eb]" />
                               Change Meeting Mode
                             </button>
+                            ) : null}
                           </div>
                         )}
                       </div>
@@ -1295,6 +1363,11 @@ export default function PastorAppointmentsPage() {
                             <i className="fa-regular fa-clock text-[#24E0C2]" />
                             <span>Time: {formatTime(String(appt.meetingDate ?? ""))}</span>
                           </div>
+                          {missed ? (
+                            <span className="rounded-md border border-amber-400/45 bg-amber-500/15 px-3 py-[3px] text-[10px] font-semibold uppercase tracking-wide text-amber-100">
+                              Missed
+                            </span>
+                          ) : null}
                         </div>
 
                         <div className="flex items-end justify-between">
@@ -1336,11 +1409,12 @@ export default function PastorAppointmentsPage() {
                   const mode = String(appt.platform ?? "Duo");
                   const icon = getModeIcon(mode);
                   const mentor = appt.mentor as { profilePicture?: string; firstName?: string; lastName?: string } | undefined;
+                  const missed = isAppointmentMissed(appt);
 
                   return (
                     <div
                       key={`history-${appointmentEntityId(appt as any)}`}
-                      className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard} ${menuOpenId === appointmentEntityId(appt as any) ? "z-[60]" : ""}`}
+                      className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard} ${menuOpenId === appointmentEntityId(appt as any) ? "z-[60]" : ""} ${missed ? "ring-1 ring-amber-500/35" : ""}`}
                       style={menuOpenId === appointmentEntityId(appt as any) ? { overflow: "visible" } : undefined}
                     >
                       <div className="absolute right-3 top-3 z-20">
@@ -1406,6 +1480,11 @@ export default function PastorAppointmentsPage() {
                             <i className="fa-regular fa-clock text-[#24E0C2]" />
                             <span>Time: {formatTime(String(appt.meetingDate ?? ""))}</span>
                           </div>
+                          {missed ? (
+                            <span className="rounded-md border border-amber-400/45 bg-amber-500/15 px-3 py-[3px] text-[10px] font-semibold uppercase tracking-wide text-amber-100">
+                              Missed
+                            </span>
+                          ) : null}
                         </div>
 
                         <p className="mb-2 text-xs text-[#d9ebf8]">

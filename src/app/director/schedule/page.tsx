@@ -30,6 +30,7 @@ import {
   apiCancelAppointment,
   apiCreateAppointment,
   apiGetAppointments,
+  apiMarkAppointmentMissed,
   apiRescheduleAppointment,
   apiGetWeeklyAvailability,
 } from "@/app/Services/appointments.service";
@@ -37,6 +38,8 @@ import {
   appointmentEntityId,
   extractApiErrorMessage,
   formatAvailabilitySlotLabel,
+  isAppointmentMissed,
+  isAppointmentScheduled,
   parseSlotStartToIso,
   slotDateToYmd,
   uiMeetingModeToPlatform,
@@ -407,7 +410,7 @@ function DirectorScheduleContent() {
             .filter(
               (a) =>
                 a.meetingDate.startsWith(meetingDate) &&
-                !["cancelled", "canceled"].includes((a.status || "").toLowerCase()),
+                !["cancelled", "canceled", "missed"].includes((a.status || "").toLowerCase()),
             )
             .map((a) => {
               const d = new Date(a.meetingDate);
@@ -449,7 +452,7 @@ function DirectorScheduleContent() {
                 .filter(
                   (a) =>
                     a.meetingDate.startsWith(meetingDate) &&
-                    !["cancelled", "canceled"].includes((a.status || "").toLowerCase()),
+                    !["cancelled", "canceled", "missed"].includes((a.status || "").toLowerCase()),
                 )
                 .map((a) => {
                   const d = new Date(a.meetingDate);
@@ -722,9 +725,11 @@ function DirectorScheduleContent() {
     const nowMs = Date.now();
     return appointments
       .filter((a) => {
+        const st = (a.status || "").toLowerCase();
+        if (appointmentUserIdString(a) !== directorId) return false;
+        if (st === "missed") return true;
         const t = new Date(a.meetingDate).getTime();
-        if (Number.isNaN(t) || t >= nowMs) return false;
-        return appointmentUserIdString(a) === directorId;
+        return !Number.isNaN(t) && t < nowMs;
       })
       .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
   }, [appointments, directorId]);
@@ -734,11 +739,13 @@ function DirectorScheduleContent() {
     const nowMs = Date.now();
     return appointments
       .filter((a) => {
-        const t = new Date(a.meetingDate).getTime();
-        if (Number.isNaN(t) || t >= nowMs) return false;
         const uid = appointmentUserIdString(a);
         const mid = appointmentMentorIdString(a);
-        return mid === directorId && uid !== directorId;
+        const st = (a.status || "").toLowerCase();
+        if (mid !== directorId || uid === directorId) return false;
+        if (st === "missed") return true;
+        const t = new Date(a.meetingDate).getTime();
+        return !Number.isNaN(t) && t < nowMs;
       })
       .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
   }, [appointments, directorId]);
@@ -947,6 +954,39 @@ function DirectorScheduleContent() {
     }
   };
 
+  const handleMarkAppointmentMissedDirector = async (appt: AppointmentResponse) => {
+    const id = appointmentEntityId(appt);
+    if (!id) return;
+
+    setShowMenu(null);
+    if (
+      !window.confirm(
+        "Mark this appointment as missed? Join links will be cleared for everyone, and CCC can notify participants.",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await apiMarkAppointmentMissed(id);
+    } catch (e) {
+      console.error(e);
+      showToast(extractApiErrorMessage(e) || "Failed to mark appointment as missed");
+      return;
+    }
+
+    try {
+      const res = await apiGetAppointments({ futureOnly: false });
+      const sorted = unwrapAppointmentsAxiosData(res).sort(
+        (a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
+      );
+      setAppointments(sorted);
+      showToast("Appointment marked as missed");
+    } catch (_) {
+      showToast("Marked as missed but list could not be refreshed — please reload.");
+    }
+  };
+
   const openRescheduleModal = (appt: AppointmentResponse) => {
     setRescheduleTarget(appt);
     setRescheduleDateTime(toLocalDateTimeInput(appt.meetingDate));
@@ -1058,10 +1098,11 @@ function DirectorScheduleContent() {
     const menteeRole = mentee?.role ? mentee.role.charAt(0).toUpperCase() + mentee.role.slice(1).toLowerCase() : "Pastor";
     const mentorId = typeof appt.mentorId === "string" ? appt.mentorId : appt.mentorId?._id ?? appt.mentor?._id;
     const menteeId = typeof appt.userId === "string" ? appt.userId : appt.userId?._id ?? appt.user?._id;
+    const missedHist = isAppointmentMissed(appt);
 
     return (
       <div
-        className={`${directorGlassCard} relative overflow-hidden border border-white/15 bg-[linear-gradient(180deg,rgba(10,53,88,0.9)_0%,rgba(6,41,70,0.92)_100%)] shadow-[0_16px_40px_rgba(0,0,0,0.25)] flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showHistoryMenu === apptKey ? "z-[60]" : ""}`}
+        className={`${directorGlassCard} relative overflow-hidden border border-white/15 bg-[linear-gradient(180deg,rgba(10,53,88,0.9)_0%,rgba(6,41,70,0.92)_100%)] shadow-[0_16px_40px_rgba(0,0,0,0.25)] flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showHistoryMenu === apptKey ? "z-[60]" : ""} ${missedHist ? "ring-1 ring-amber-500/25" : ""}`}
         style={showHistoryMenu === apptKey ? { overflow: "visible" } : undefined}
       >
         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 bg-white/[0.03] py-5 sm:w-[132px] sm:border-b-0 sm:border-r sm:py-7">
@@ -1152,6 +1193,11 @@ function DirectorScheduleContent() {
               <i className="fa-regular fa-clock text-[#8ec5eb]" />
               {md.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
             </span>
+            {missedHist ? (
+              <span className="flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-600/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-100">
+                Missed
+              </span>
+            ) : null}
           </div>
         </div>
       </div>
@@ -1161,6 +1207,8 @@ function DirectorScheduleContent() {
   const renderActiveAppointmentCard = (appt: AppointmentResponse) => {
     const apptKey = appointmentEntityId(appt) || "";
     const md = new Date(appt.meetingDate);
+    const missed = isAppointmentMissed(appt);
+    const sched = isAppointmentScheduled(appt);
     const mentor = appt.mentor ?? (typeof appt.mentorId === "object" ? appt.mentorId : undefined);
     const mentee = appt.user ?? (typeof appt.userId === "object" ? appt.userId : undefined);
     const mentorName = labelPerson(mentor, "Unknown");
@@ -1172,7 +1220,7 @@ function DirectorScheduleContent() {
 
     return (
       <div
-        className={`${directorGlassCard} relative overflow-hidden border border-white/15 bg-[linear-gradient(180deg,rgba(10,53,88,0.9)_0%,rgba(6,41,70,0.92)_100%)] shadow-[0_16px_40px_rgba(0,0,0,0.25)] flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showMenu === apptKey ? "z-[60]" : ""}`}
+        className={`${directorGlassCard} relative overflow-hidden border border-white/15 bg-[linear-gradient(180deg,rgba(10,53,88,0.9)_0%,rgba(6,41,70,0.92)_100%)] shadow-[0_16px_40px_rgba(0,0,0,0.25)] flex flex-col items-stretch gap-0 p-0 sm:flex-row sm:items-center ${showMenu === apptKey ? "z-[60]" : ""} ${missed ? "ring-1 ring-amber-500/25" : ""}`}
         style={showMenu === apptKey ? { overflow: "visible" } : undefined}
       >
         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 bg-white/[0.03] py-5 sm:w-[132px] sm:border-b-0 sm:border-r sm:py-7">
@@ -1204,14 +1252,28 @@ function DirectorScheduleContent() {
                     <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" />
                     View Details
                   </button>
+                  {sched ? (
+                    <button
+                      type="button"
+                      className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                      onClick={() => void handleMarkAppointmentMissedDirector(appt)}
+                    >
+                      <i className="fa-regular fa-user-clock mr-2 text-amber-200" />
+                      Mark as missed
+                    </button>
+                  ) : null}
+                  {sched ? (
                   <button type="button" className="w-full px-4 py-2.5 text-left transition hover:bg-white/10" onClick={() => openRescheduleModal(appt)}>
                     <i className="fa-regular fa-calendar mr-2 text-[#8ec5eb]" />
                     Reschedule meeting
                   </button>
+                  ) : null}
+                  {sched ? (
                   <button type="button" className="w-full px-4 py-2.5 text-left transition hover:bg-white/10" onClick={() => handleCancelAppointment(appt)}>
                     <i className="fa-regular fa-circle-xmark mr-2 text-red-300" />
                     Cancel meeting
                   </button>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -1271,6 +1333,11 @@ function DirectorScheduleContent() {
               <i className="fa-regular fa-clock text-[#8ec5eb]" />
               {md.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
             </span>
+            {missed ? (
+              <span className="flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-600/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-100">
+                Missed
+              </span>
+            ) : null}
           </div>
         </div>
       </div>

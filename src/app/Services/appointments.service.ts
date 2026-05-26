@@ -4,6 +4,7 @@ import type {
   CreateAppointmentPayload,
   UpdateAppointmentPayload,
   CancelAppointmentPayload,
+  MarkAppointmentMissedPayload,
   RescheduleAppointmentPayload,
   AvailabilityPayload,
   CreateRecurringAvailabilityPayload,
@@ -78,6 +79,13 @@ export const apiCancelAppointment = (id: string, payload?: CancelAppointmentPayl
   axiosInstance.patch<{ success: boolean; data: AppointmentResponse }>(
     `/appointments/${id}/cancel`,
     payload,
+  );
+
+// PATCH /appointments/:id/missed
+export const apiMarkAppointmentMissed = (id: string, payload?: MarkAppointmentMissedPayload) =>
+  axiosInstance.patch<{ success: boolean; data: AppointmentResponse }>(
+    `/appointments/${id}/missed`,
+    payload ?? {},
   );
 
 // ─── Availability ─────────────────────────────────────────────────────────────

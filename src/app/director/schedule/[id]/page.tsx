@@ -70,6 +70,7 @@ function StatusBadge({ status }: { status: string }) {
     scheduled: "bg-blue-500/20 text-blue-300 border-blue-400/30",
     cancelled: "bg-red-500/20 text-red-300 border-red-400/30",
     rescheduled: "bg-yellow-500/20 text-yellow-300 border-yellow-400/30",
+    missed: "bg-amber-600/25 text-amber-100 border-amber-400/35",
   };
   return (
     <span

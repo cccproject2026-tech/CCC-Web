@@ -139,6 +139,18 @@ export function slotToHHmm(time: string, period: string): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+export function normalizeAppointmentStatus(appt: { status?: string } | null | undefined): string {
+  return String(appt?.status ?? "").trim().toLowerCase();
+}
+
+export function isAppointmentScheduled(appt: { status?: string } | null | undefined): boolean {
+  return normalizeAppointmentStatus(appt) === "scheduled";
+}
+
+export function isAppointmentMissed(appt: { status?: string } | null | undefined): boolean {
+  return normalizeAppointmentStatus(appt) === "missed";
+}
+
 /** Best-effort message from axios/API errors for toasts. */
 export function extractApiErrorMessage(err: unknown): string {
   if (err && typeof err === "object") {

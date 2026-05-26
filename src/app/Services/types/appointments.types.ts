@@ -1,6 +1,12 @@
 // Appointment types matching CCC-Backend appointments module DTOs
 
-export type AppointmentStatus = 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
+export type AppointmentStatus =
+  | 'scheduled'
+  | 'in-progress'
+  | 'completed'
+  | 'cancelled'
+  | 'rescheduled'
+  | 'missed';
 export type AppointmentPlatform = 'zoom' | 'google-meet' | 'teams' | 'in-person' | 'phone';
 
 export interface PersonInfo {
@@ -88,6 +94,11 @@ export interface UpdateAppointmentPayload {
 }
 
 export interface CancelAppointmentPayload {
+  reason?: string;
+}
+
+/** PATCH `/appointments/:id/missed` — reason is for notifications only (not stored on the appointment). */
+export interface MarkAppointmentMissedPayload {
   reason?: string;
 }
 

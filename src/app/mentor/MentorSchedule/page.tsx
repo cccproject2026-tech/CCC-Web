@@ -37,11 +37,15 @@ import {
   apiCreateAppointment,
   apiGetWeeklyAvailability,
   apiRescheduleAppointment,
+  apiMarkAppointmentMissed,
 } from "@/app/Services/appointments.service";
 import axiosInstance from "@/app/Services/config/axios-instance";
 import {
   appointmentEntityId,
   extractApiErrorMessage,
+  isAppointmentMissed,
+  isAppointmentScheduled,
+  normalizeAppointmentStatus,
   parseSlotStartToIso,
   uiMeetingModeToPlatform,
   unwrapAppointmentsAxiosData,
@@ -288,7 +292,7 @@ const shouldOpenReschedule = searchParams.get("reschedule") === "1";
 
     const fetchAppointments = async () => {
       try {
-        const res = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: true });
+        const res = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: false });
         if (!cancelled) setAppointments(unwrapAppointmentsAxiosData(res));
       } catch (err) {
         console.error("Failed to fetch appointments", err);
@@ -407,7 +411,7 @@ useEffect(() => {
           .filter(
             (a) =>
               a.meetingDate.startsWith(meetingDate) &&
-              !["cancelled", "canceled"].includes((a.status || "").toLowerCase()),
+              !["cancelled", "canceled", "missed"].includes((a.status || "").toLowerCase()),
           )
           .map((a) => {
             const d = new Date(a.meetingDate);
@@ -547,10 +551,18 @@ useEffect(() => {
 
   const selectedDayAppointments = appointments
     .filter((a) => a.meetingDate.startsWith(selectedAppointmentDate))
-    .filter((a) => selectedAppointmentDate !== todayKey || new Date(a.meetingDate).getTime() >= Date.now())
+    .filter((a) => {
+      if (selectedAppointmentDate !== todayKey) return true;
+      const t = new Date(a.meetingDate).getTime();
+      if (t >= Date.now()) return true;
+      return normalizeAppointmentStatus(a) === "missed";
+    })
     .sort((a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime());
   const appointmentHistory = appointments
-    .filter((a) => new Date(a.meetingDate).getTime() < Date.now())
+    .filter((a) => {
+      const ms = new Date(a.meetingDate).getTime();
+      return ms < Date.now() || normalizeAppointmentStatus(a) === "missed";
+    })
     .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
   const historyPageSize = 10;
   const totalHistoryPages = Math.max(1, Math.ceil(appointmentHistory.length / historyPageSize));
@@ -746,7 +758,7 @@ useEffect(() => {
 
       setAvailableSlots((prev) => prev.filter((s) => s !== selectedSlot));
       setAvailabilityRefreshKey((prev) => prev + 1);
-      const refresh = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: true });
+      const refresh = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: false });
       setAppointments(unwrapAppointmentsAxiosData(refresh));
       setIsDrawerOpen(false);
       setDrawerStep(1);
@@ -780,7 +792,7 @@ useEffect(() => {
     }
 
     try {
-      const refresh = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: true });
+      const refresh = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: false });
       const freshList = unwrapAppointmentsAxiosData(refresh);
       setAppointments(freshList);
       setShowMenu(null);
@@ -794,6 +806,38 @@ useEffect(() => {
       setToastMessage("Failed to cancel appointment");
     }
     setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleMarkMentorAppointmentMissed = async (appt: Appointment) => {
+    const id = appointmentEntityId(appt);
+    if (!id || !mentorId) return;
+
+    setShowMenu(null);
+    if (
+      !window.confirm(
+        "Mark this appointment as missed? Join links will be cleared for everyone, and CCC can notify participants.",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await apiMarkAppointmentMissed(id);
+    } catch (e) {
+      console.error(e);
+      setToastMessage(extractApiErrorMessage(e) || "Failed to mark appointment as missed");
+      setTimeout(() => setToastMessage(null), 4000);
+      return;
+    }
+
+    try {
+      const refresh = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: false });
+      setAppointments(unwrapAppointmentsAxiosData(refresh));
+      setToastMessage("Appointment marked as missed");
+    } catch (_) {
+      setToastMessage("Marked as missed but list could not be refreshed — please reload.");
+    }
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   // ── Open reschedule modal ──────────────────────────────────────────────────────
@@ -881,7 +925,7 @@ useEffect(() => {
         startPeriod,
         platform: reschedulePlatform as any,
       });
-      const refresh = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: true });
+      const refresh = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: false });
       setAppointments(unwrapAppointmentsAxiosData(refresh));
       setIsRescheduleModalOpen(false);
       setRescheduleTarget(null);
@@ -1059,6 +1103,8 @@ useEffect(() => {
                   {selectedDayAppointments.map((appt, index) => {
                     const meetingDate = new Date(appt.meetingDate);
                     const apptKey = appointmentEntityId(appt) || String(index);
+                    const missed = isAppointmentMissed(appt);
+                    const sched = isAppointmentScheduled(appt);
                     const otherPerson = resolveOtherPerson(appt, mentorId);
                     const displayName = otherPerson
                       ? `${otherPerson.firstName ?? ""} ${otherPerson.lastName ?? ""}`.trim() || "Unknown"
@@ -1070,7 +1116,7 @@ useEffect(() => {
                     return (
                       <div
                         key={apptKey}
-                        className={`${mentorGlassCardRoadmap} relative items-stretch gap-0 overflow-visible p-4 sm:items-center sm:p-5 ${showMenu === apptKey ? "z-[60]" : ""}`}
+                        className={`${mentorGlassCardRoadmap} relative items-stretch gap-0 overflow-visible p-4 sm:items-center sm:p-5 ${showMenu === apptKey ? "z-[60]" : ""} ${missed ? "ring-1 ring-amber-500/30 opacity-90" : ""}`}
                       >
                         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-0">
                           <div className="flex h-[100px] w-[100px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
@@ -1128,6 +1174,11 @@ useEffect(() => {
                                 hour12: true,
                               })}
                             </div>
+                            {missed ? (
+                              <span className="rounded-lg border border-amber-400/40 bg-amber-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-100">
+                                Missed
+                              </span>
+                            ) : null}
                           </div>
 
                           <p className="mb-2 text-[12px] text-[#cde2f2]">
@@ -1165,6 +1216,18 @@ useEffect(() => {
                                     View details
                                   </button>
 
+                                  {sched ? (
+                                    <button
+                                      type="button"
+                                      className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                                      onClick={() => void handleMarkMentorAppointmentMissed(appt)}
+                                    >
+                                      <i className="fa-regular fa-user-clock mr-2 text-amber-200" />
+                                      Mark as missed
+                                    </button>
+                                  ) : null}
+
+                                  {sched ? (
                                   <button
                                     type="button"
                                     className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1173,7 +1236,9 @@ useEffect(() => {
                                     <i className="fa-regular fa-calendar-check mr-2 text-[#8ec5eb]" />
                                     Reschedule meeting
                                   </button>
+                                  ) : null}
 
+                                  {sched ? (
                                   <button
                                     type="button"
                                     className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1182,7 +1247,9 @@ useEffect(() => {
                                     <i className="fa-regular fa-circle-xmark mr-2 text-red-300" />
                                     Cancel meeting
                                   </button>
+                                  ) : null}
 
+                                  {sched ? (
                                   <button
                                     type="button"
                                     className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1197,6 +1264,7 @@ useEffect(() => {
                                     <i className="fa-regular fa-clock mr-2 text-[#cde2f2]" />
                                     Change meeting mode
                                   </button>
+                                  ) : null}
                                 </div>
                               )}
                             </div>
@@ -1224,6 +1292,7 @@ useEffect(() => {
                   {pagedAppointmentHistory.map((appt, index) => {
                     const meetingDate = new Date(appt.meetingDate);
                     const apptKey = appointmentEntityId(appt) || `history-${historyPage}-${index}`;
+                    const missed = isAppointmentMissed(appt);
                     const otherPerson = resolveOtherPerson(appt, mentorId);
                     const displayName = otherPerson
                       ? `${otherPerson.firstName ?? ""} ${otherPerson.lastName ?? ""}`.trim() || "Unknown"
@@ -1232,7 +1301,7 @@ useEffect(() => {
                     const displayRole = rawRole.charAt(0).toUpperCase() + rawRole.slice(1).toLowerCase();
                     const otherPersonProfile = otherPerson as any;
                     return (
-                      <div key={apptKey} className={`${mentorGlassCardRoadmap} relative items-stretch gap-0 p-4 sm:items-center sm:p-5`}>
+                      <div key={apptKey} className={`${mentorGlassCardRoadmap} relative items-stretch gap-0 p-4 sm:items-center sm:p-5 ${missed ? "ring-1 ring-amber-500/25" : ""}`}>
                         <div className="flex w-full shrink-0 items-center justify-center border-b border-white/10 py-4 sm:w-[120px] sm:border-b-0 sm:border-r sm:py-0">
                           <div className="flex h-[100px] w-[100px] items-center justify-center rounded-xl border border-white/15 bg-white/5">
                             <Image
@@ -1278,6 +1347,11 @@ useEffect(() => {
                               <i className="fa-regular fa-clock text-[#8ec5eb]" />
                               {meetingDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
                             </div>
+                            {missed ? (
+                              <span className="rounded-lg border border-amber-400/40 bg-amber-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-100">
+                                Missed
+                              </span>
+                            ) : null}
                           </div>
                           <p className="mb-2 text-[12px] text-[#cde2f2]">Mode: <span className="font-semibold text-[#8ec5eb]">{appt.platform}</span></p>
                           <button

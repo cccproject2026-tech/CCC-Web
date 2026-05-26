@@ -30,6 +30,7 @@ export {
   apiUpdateAppointment,
   apiRescheduleAppointment,
   apiCancelAppointment,
+  apiMarkAppointmentMissed,
   apiCreateAvailability,
   apiGetAvailability,
   apiGetWeeklyAvailability,
