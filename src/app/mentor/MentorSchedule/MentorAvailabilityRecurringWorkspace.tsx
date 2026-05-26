@@ -79,10 +79,10 @@ function coerceNumber(v: unknown, fallback: number): number {
 
 const PLATFORM_OPTIONS = [
   { label: "Zoom", value: "zoom" },
-  { label: "Google Meet", value: "google-meet" },
-  { label: "Microsoft Teams", value: "teams" },
-  { label: "Phone", value: "phone" },
-  { label: "In person", value: "in-person" },
+  { label: "Google Meet — coming soon", value: "google-meet", disabled: true },
+  { label: "Microsoft Teams — coming soon", value: "teams", disabled: true },
+  { label: "Phone — coming soon", value: "phone", disabled: true },
+  { label: "In person — coming soon", value: "in-person", disabled: true },
 ] as const;
 
 /** Display label for a calendar YYYY-MM-DD (wall date, for headings only). */
@@ -132,6 +132,9 @@ export default function MentorAvailabilityRecurringWorkspace({
   const [dayModalSlots, setDayModalSlots] = useState<AppointmentAvailabilityTimeSlot[]>([]);
   const [dayModalBusy, setDayModalBusy] = useState(false);
   const [docLoading, setDocLoading] = useState(false);
+  const [blockSelectionMode, setBlockSelectionMode] = useState(false);
+  const [pendingBlockYmd, setPendingBlockYmd] = useState<string | null>(null);
+  const [blockDayBusy, setBlockDayBusy] = useState(false);
 
   const selectedDayRow = useMemo(() => {
     if (!dayModalYmd) return undefined;
@@ -324,6 +327,27 @@ export default function MentorAvailabilityRecurringWorkspace({
     setDayModalSlots(c.unavailable ? [] : c.slots.map((s) => ({ ...s })));
   };
 
+  const requestBlockDay = (ymd: string) => {
+    setPendingBlockYmd(ymd);
+  };
+
+  const confirmBlockDay = async () => {
+    if (!mentorId || !pendingBlockYmd) return;
+    setBlockDayBusy(true);
+    try {
+      await apiMarkAvailabilityDayUnavailable(mentorId, pendingBlockYmd);
+      onToast("No meetings can be booked on this day.", "ok");
+      setPendingBlockYmd(null);
+      setBlockSelectionMode(false);
+      await loadMonth();
+      onAvailabilitySaved?.();
+    } catch (e) {
+      onToast(extractApiErrorMessage(e), "err");
+    } finally {
+      setBlockDayBusy(false);
+    }
+  };
+
   const closeDayModal = () => {
     setDayModalYmd(null);
     setDayModalSlots([]);
@@ -364,92 +388,92 @@ export default function MentorAvailabilityRecurringWorkspace({
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-1 sm:px-0">
       {/* Page intro */}
-      <div className="rounded-xl border border-[#8ec5eb]/20 bg-[#0a4066]/35 px-4 py-4 sm:px-5 sm:py-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#8ec5eb]/15 text-[#8ec5eb]">
-            <i className="fa-regular fa-calendar-check text-xl" aria-hidden />
-          </div>
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight text-white sm:text-xl">Your availability</h2>
-            <p className={`mt-1.5 max-w-2xl text-sm leading-relaxed ${mentorBodyText}`}>
-              Set a repeating weekly pattern, adjust booking rules, then tap dates on the calendar for one-off changes (block a day,
-              tweak hours, or reset a date to your default pattern).
-            </p>
-            <ol className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-[#cde2f2]/90">
-              <li>
-                <span className="font-semibold text-[#8ec5eb]">1.</span> Template week below
-              </li>
-              <li>
-                <span className="font-semibold text-[#8ec5eb]">2.</span> Booking rules
-              </li>
-              <li>
-                <span className="font-semibold text-[#8ec5eb]">3.</span> Calendar tweaks
-              </li>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="rounded-xl border border-[#8ec5eb]/20 bg-[#0a4066]/35 px-4 py-4 sm:px-5 sm:py-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex min-w-0 gap-3 sm:gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#8ec5eb]/15 text-[#8ec5eb] ring-1 ring-[#8ec5eb]/20">
+                <i className="fa-regular fa-calendar-check text-xl" aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold tracking-tight text-white sm:text-xl">Your availability</h2>
+                <p className={`mt-1.5 max-w-2xl text-sm leading-relaxed ${mentorBodyText}`}>
+                  Set a repeating weekly pattern, adjust booking rules, then tap dates on the calendar for one-off changes.
+                </p>
+              </div>
+            </div>
+            <ol className="flex shrink-0 flex-wrap gap-2 text-[12px] text-[#cde2f2]/90 md:justify-end">
+              {[
+                ["1", "Weekly pattern"],
+                ["2", "Booking rules"],
+                ["3", "Calendar tweaks"],
+              ].map(([step, label]) => (
+                <li
+                  key={step}
+                  className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5"
+                >
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#8ec5eb]/15 text-[11px] font-semibold text-[#8ec5eb]">
+                    {step}
+                  </span>
+                  <span className="whitespace-nowrap">{label}</span>
+                </li>
+              ))}
             </ol>
           </div>
+        </div>
+
+        <div className="rounded-xl border border-white/12 bg-white/[0.05] px-4 py-4 text-white shadow-[0_12px_34px_rgba(0,0,0,0.12)] sm:px-5">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#f5cc76]/15 text-[#f5cc76]">
+              <i className="fa-solid fa-circle-info text-sm" aria-hidden />
+            </span>
+            <h3 className="text-sm font-semibold">How availability works</h3>
+          </div>
+          <ul className="space-y-2 text-[12px] leading-relaxed text-[#cde2f2]/85">
+            <li className="flex gap-2">
+              <i className="fa-solid fa-check mt-1 text-[10px] text-[#8ec5eb]" aria-hidden />
+              <span>Set your availability for each day of the week.</span>
+            </li>
+            <li className="flex gap-2">
+              <i className="fa-solid fa-check mt-1 text-[10px] text-[#8ec5eb]" aria-hidden />
+              <span>It repeats automatically for the next 60 days.</span>
+            </li>
+            <li className="flex gap-2">
+              <i className="fa-solid fa-check mt-1 text-[10px] text-[#8ec5eb]" aria-hidden />
+              <span>You can block or edit specific dates anytime.</span>
+            </li>
+          </ul>
+          <button
+            type="button"
+            className="mt-3 text-[12px] font-medium text-[#8ec5eb] underline-offset-4 hover:underline"
+          >
+            Learn more
+          </button>
         </div>
       </div>
 
       <div className={`${mentorGlassCardFrost} p-5 sm:p-7 text-white shadow-[0_12px_40px_rgba(0,0,0,0.12)]`}>
         <div className="mb-5 flex flex-col gap-2 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h3 className="text-base font-semibold sm:text-[17px]">Step 1 — Repeating week</h3>
+            <h3 className="text-base font-semibold sm:text-[17px]">Weekly pattern</h3>
             <p className="mt-1 text-[13px] text-[#cde2f2]/85">Choose which days you&apos;re open and add time windows.</p>
           </div>
         </div>
 
-        <div className="mb-5 rounded-xl border border-amber-400/25 bg-amber-500/[0.08] px-4 py-3">
-          <div className="flex gap-3">
-            <i className="fa-solid fa-circle-info mt-0.5 text-amber-200/90" aria-hidden />
-            <div className="min-w-0 space-y-2 text-[13px] leading-relaxed text-[#fdecc8]/95">
-              <p>
-                <span className="font-semibold text-white">Dates use UTC Calendar days.</span> Each{' '}
-                <code className="rounded-md bg-black/25 px-1.5 py-0.5 text-[11px] text-amber-100">YYYY-MM-DD</code>{' '}
-                tells the system which weekday your pattern repeats on — independent of your local timezone. Near midnight or the date line,
-                preview the month calendar after saving.
-              </p>
-              <p className="text-[12px] text-amber-100/85">
-                We generate bookable dates for{' '}
-                <span className="font-semibold text-white">{horizonDays} days</span> ahead (minimum 7, maximum 120; default{' '}
-                <span className="font-semibold text-white">60</span>).
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-12">
-          <div className="sm:col-span-4">
-            <label className="mb-1.5 block text-[13px] font-medium text-white" htmlFor="avail-horizon">
-              How far ahead to publish
-            </label>
-            <p className="mb-2 text-[11px] text-[#cde2f2]/65">Concrete bookable days (7–120)</p>
+        <div className="mb-6 rounded-xl border border-white/10 bg-black/20 p-4">
+          <label className="flex cursor-pointer items-start gap-3">
             <input
-              id="avail-horizon"
-              type="number"
-              min={7}
-              max={120}
-              value={horizonDays}
-              onChange={(e) =>
-                setHorizonDays(Math.min(120, Math.max(7, Math.floor(Number(e.target.value)) || 60)))
-              }
-              className={`${mentorSelectDark} w-full`}
+              type="checkbox"
+              checked={clearPersonalizations}
+              onChange={(e) => setClearPersonalizations(e.target.checked)}
+              className="mt-1 size-4 shrink-0 accent-amber-400"
             />
-          </div>
-          <div className="rounded-xl border border-amber-500/25 bg-black/20 p-4 sm:col-span-8">
-            <label className="flex cursor-pointer items-start gap-3">
-              <input
-                type="checkbox"
-                checked={clearPersonalizations}
-                onChange={(e) => setClearPersonalizations(e.target.checked)}
-                className="mt-1 size-4 shrink-0 accent-amber-400"
-              />
-              <span className="text-[13px] leading-snug text-amber-100/95">
-                <span className="font-semibold text-amber-50">Advanced:</span> When I save my repeating pattern, also remove all{' '}
-                <span className="underline decoration-amber-400/50">single-day edits</span> I made on the calendar. You&apos;ll be asked to
-                confirm — this cannot be undone from here.
-              </span>
-            </label>
-          </div>
+            <span className="text-[13px] leading-snug text-[#cde2f2]/90">
+              <span className="font-semibold text-white">Advanced:</span> When I save my repeating pattern, also remove all{' '}
+              <span className="underline decoration-[#8ec5eb]/50">single-day edits</span> I made on the calendar. You&apos;ll be asked to
+              confirm.
+            </span>
+          </label>
         </div>
 
         <details className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-[13px] text-[#cde2f2]/90 open:bg-white/[0.05]">
@@ -558,7 +582,7 @@ export default function MentorAvailabilityRecurringWorkspace({
                     className={`${mentorSecondaryCta} inline-flex items-center gap-2 px-4 py-2 text-[13px]`}
                   >
                     <i className="fa-solid fa-plus text-[11px]" aria-hidden />
-                    Add another window
+                    Add 
                   </button>
                 </div>
               )}
@@ -566,7 +590,7 @@ export default function MentorAvailabilityRecurringWorkspace({
           ))}
         </div>
 
-        <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
+        {/* <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[12px] text-[#cde2f2]/70">
             {docLoading ? 'Loading your saved pattern…' : 'Saving updates your repeating schedule and refreshes the calendar.'}
           </p>
@@ -588,7 +612,12 @@ export default function MentorAvailabilityRecurringWorkspace({
               </>
             )}
           </button>
-        </div>
+        </div> */}
+        <div className="mt-8 border-t border-white/10 pt-5">
+  <p className="text-[12px] text-[#cde2f2]/70">
+    After choosing your weekly days and time windows, continue to Step 2 to set booking rules and save the repeating schedule.
+  </p>
+</div>
       </div>
 
       {/* Settings */}
@@ -608,9 +637,9 @@ export default function MentorAvailabilityRecurringWorkspace({
               value={String(meetingDuration)}
               onChange={(e) => setMeetingDuration(Number(e.target.value))}
             >
-              <option value="30">30 minutes</option>
+              <option value="30" disabled>30 minutes — coming soon</option>
               <option value="60">60 minutes</option>
-              <option value="90">90 minutes</option>
+              <option value="90" disabled>90 minutes — coming soon</option>
             </select>
           </label>
           <label className="block text-[13px] font-medium text-white">
@@ -646,18 +675,21 @@ export default function MentorAvailabilityRecurringWorkspace({
               onChange={(e) => setPreferredPlatform(e.target.value)}
             >
               {PLATFORM_OPTIONS.map((p) => (
-                <option key={p.value} value={p.value}>
+                <option key={p.value} value={p.value} disabled={"disabled" in p ? p.disabled : false}>
                   {p.label}
                 </option>
               ))}
             </select>
           </label>
         </div>
-        <p className="mt-5 text-[12px] leading-relaxed text-[#cde2f2]/70">
+        {/* <p className="mt-5 text-[12px] leading-relaxed text-[#cde2f2]/70">
           Saving here only updates these rules — it does not redraw your repeating week. Use{' '}
           <span className="text-[#cde2f2]/90">&quot;Save repeating schedule&quot;</span> above to change which days repeat.
-        </p>
-        <button
+        </p> */}
+        <p className="mt-5 text-[12px] leading-relaxed text-[#cde2f2]/70">
+  After setting your booking rules, save your repeating schedule to publish the weekly pattern and refresh the calendar.
+</p>
+        {/* <button
           type="button"
           disabled={settingsBusy}
           onClick={() => void saveSettingsOnly()}
@@ -674,7 +706,46 @@ export default function MentorAvailabilityRecurringWorkspace({
               Save booking rules only
             </>
           )}
-        </button>
+        </button> */}
+        <div className="mt-5 flex flex-wrap gap-3">
+  <button
+    type="button"
+    disabled={settingsBusy}
+    onClick={() => void saveSettingsOnly()}
+    className={`${mentorSecondaryCta} min-h-[44px] px-5 py-2.5 text-[14px] font-semibold`}
+  >
+    {settingsBusy ? (
+      <>
+        <i className="fa-solid fa-spinner fa-spin mr-2" aria-hidden />
+        Saving rules…
+      </>
+    ) : (
+      <>
+        <i className="fa-regular fa-pen-to-square mr-2" aria-hidden />
+        Save booking rules only
+      </>
+    )}
+  </button>
+
+  <button
+    type="button"
+    disabled={recurringBusy || docLoading}
+    onClick={() => void saveRecurring()}
+    className={`${mentorPrimaryCta} min-h-[44px] px-5 py-2.5 text-[14px] font-semibold`}
+  >
+    {recurringBusy ? (
+      <>
+        <i className="fa-solid fa-spinner fa-spin mr-2" aria-hidden />
+        Saving…
+      </>
+    ) : (
+      <>
+        <i className="fa-regular fa-floppy-disk mr-2" aria-hidden />
+        Save repeating schedule
+      </>
+    )}
+  </button>
+</div>
       </div>
 
       {/* Month grid */}
@@ -717,18 +788,36 @@ export default function MentorAvailabilityRecurringWorkspace({
               <i className="fa-solid fa-chevron-right" aria-hidden />
             </button>
           </div>
-          <button
-            type="button"
-            disabled={monthLoading || isViewingCurrentMonth}
-            onClick={() => {
-              const n = new Date();
-              setCalYear(n.getFullYear());
-              setCalMonth(n.getMonth());
-            }}
-            className={`${mentorSecondaryCta} text-[13px] disabled:pointer-events-none disabled:opacity-45`}
-          >
-            Jump to today
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {blockSelectionMode && (
+              <span className="rounded-lg border border-amber-300/25 bg-amber-400/10 px-3 py-2 text-[12px] text-amber-100">
+                Select a future day to block
+              </span>
+            )}
+            <button
+              type="button"
+              disabled={monthLoading}
+              onClick={() => {
+                setBlockSelectionMode((v) => !v);
+                setPendingBlockYmd(null);
+              }}
+              className={`${mentorSecondaryCta} text-[13px] disabled:pointer-events-none disabled:opacity-45`}
+            >
+              {blockSelectionMode ? "Cancel block" : "Block a day"}
+            </button>
+            <button
+              type="button"
+              disabled={monthLoading || isViewingCurrentMonth}
+              onClick={() => {
+                const n = new Date();
+                setCalYear(n.getFullYear());
+                setCalMonth(n.getMonth());
+              }}
+              className={`${mentorSecondaryCta} text-[13px] disabled:pointer-events-none disabled:opacity-45`}
+            >
+              Jump to today
+            </button>
+          </div>
         </div>
         {monthLoading && (
           <p className="mb-4 flex items-center gap-2 text-[13px] text-[#8ec5eb]">
@@ -773,7 +862,7 @@ export default function MentorAvailabilityRecurringWorkspace({
                 key={ymd}
                 type="button"
                 disabled={isPast}
-                onClick={() => openDayModal(ymd)}
+                onClick={() => (blockSelectionMode ? requestBlockDay(ymd) : openDayModal(ymd))}
                 aria-label={`${ymd}${isPast ? ', past date' : ', open availability options'}`}
                 className={`flex min-h-[58px] flex-col items-center justify-center rounded-xl border px-0.5 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8ec5eb]/70 ${
                   isPast
@@ -809,6 +898,18 @@ export default function MentorAvailabilityRecurringWorkspace({
           busy={recurringBusy}
           onCancel={() => setConfirmClearOpen(false)}
           onConfirm={() => void submitRecurring(true)}
+        />
+      )}
+
+      {pendingBlockYmd && (
+        <ConfirmOverlay
+          title="Block this day?"
+          body={`${formatYmdHeading(pendingBlockYmd)} will be unavailable for booking. Existing modal blocking remains unchanged.`}
+          cancelLabel="Cancel"
+          confirmLabel={blockDayBusy ? "Blocking..." : "Block day"}
+          busy={blockDayBusy}
+          onCancel={() => !blockDayBusy && setPendingBlockYmd(null)}
+          onConfirm={() => void confirmBlockDay()}
         />
       )}
 
