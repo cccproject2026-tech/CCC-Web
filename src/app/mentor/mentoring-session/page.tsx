@@ -1,13 +1,20 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import MentorHeader from "@/app/Components/MentorHeader";
+import AvailabilityCalendar from "@/app/Components/AvailabilityCalendar";
+import { mentorSelectDark } from "@/app/Components/mentor/mentor-theme";
 import HeroBg from "../../Assets/progress-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import SessionProgressHeader from "@/app/Components/mentorship-sessions/SessionProgressHeader";
 import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStatusBadge";
 import { formatSessionTime, getNextSessionId } from "./utils/sessionFlow";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMentorGroupedSessionsQuery, type MentorSession } from "./hooks/useMentorshipQueries";
+import {
+  apiGetMentorMentoringSessionsGrouped,
+  apiGetMentorRescheduleRequests,
+  apiRescheduleMentoringSession,
+} from "@/app/Services/mentoring-sessions.service";
+import axiosInstance from "@/app/Services/config/axios-instance";
 const SESSION_TITLES = [
   "Building Trust, Self-Awareness & Resources",
   "Creating a Life of Prayer, Vision, & Family Balance",
@@ -20,6 +27,160 @@ const SESSION_TITLES = [
   "Celebrating & Envisioning Growth",
   "Expanding Mentoring Networks",
 ];
+
+type MentorSession = {
+  id: string;
+  appointmentId?: string;
+  pastorId: string;
+  pastorName?: string;
+  pastorEmail?: string;
+  sessionNumber: number;
+  title: string;
+  status: string;
+  scheduledDate: string;
+  mentorNote?: string;
+};
+
+type MentorSessionGroup = {
+  pastorId: string;
+  pastorName: string;
+  pastorEmail: string;
+  sessions: MentorSession[];
+};
+
+type RescheduleFormState = {
+  platform: string;
+};
+
+function getStringValue(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
+}
+
+function parseStoredUserId(value: string) {
+  if (!value) return "";
+  try {
+    const parsed = JSON.parse(decodeURIComponent(value));
+    return getStringValue(parsed?.id, parsed?._id, parsed?.userId);
+  } catch {
+    return "";
+  }
+}
+
+function getCookieValue(name: string) {
+  if (typeof document === "undefined") return "";
+  return (
+    document.cookie
+      .split("; ")
+      .find((row) => row.startsWith(`${name}=`))
+      ?.split("=")[1] || ""
+  );
+}
+
+function getBrowserMentorId() {
+  if (typeof window === "undefined") return "";
+
+  return (
+    parseStoredUserId(getCookieValue("mentor")) ||
+    parseStoredUserId(localStorage.getItem("mentor") || "") ||
+    parseStoredUserId(getCookieValue("user")) ||
+    parseStoredUserId(localStorage.getItem("user") || "") ||
+    localStorage.getItem("mentorId") ||
+    localStorage.getItem("userId") ||
+    getCookieValue("mentorId") ||
+    getCookieValue("userId") ||
+    ""
+  );
+}
+
+function unwrapGroupedSessionsResponse(res: any): any[] {
+  const data = res?.data?.data ?? res?.data;
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.groups)) return data.groups;
+  if (Array.isArray(data?.grouped)) return data.grouped;
+  if (Array.isArray(data?.pastors)) return data.pastors;
+  return [];
+}
+
+function getRealSessionId(session: any) {
+  const id = getStringValue(session?._id, session?.sessionId, session?.id);
+  if (!id || id.startsWith("locked-") || id.startsWith("unscheduled-")) return "";
+  return id;
+}
+
+function convertTo24Hour(time12: string, period: string): string {
+  let [hours, minutes] = time12.split(":").map(Number);
+  if (period.toUpperCase() === "PM" && hours !== 12) hours += 12;
+  if (period.toUpperCase() === "AM" && hours === 12) hours = 0;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function availabilitySlotToIso(dateValue: string, slot: any) {
+  if (!dateValue || !slot?.startTime || !slot?.startPeriod) return "";
+  return new Date(`${dateValue.slice(0, 10)}T${convertTo24Hour(slot.startTime, slot.startPeriod)}`).toISOString();
+}
+
+function normalizeBackendSession(session: any, group: any): MentorSession | null {
+  const appointmentId = getStringValue(session?.appointmentId, session?.appointment?._id, session?.appointment?.id);
+  const id = getStringValue(session?._id, session?.sessionId, session?.id);
+  const sessionNumber = Number(session?.sessionNumber || session?.sessionNo || 0);
+
+  const pastor = group?.pastor && typeof group.pastor === "object" ? group.pastor : null;
+  const pastorId = getStringValue(
+    session?.pastorId,
+    session?.userId,
+    group?.pastorId,
+    group?.userId,
+    pastor?._id,
+    pastor?.id,
+  );
+
+  return {
+    ...session,
+    id,
+    appointmentId,
+    pastorId,
+    pastorName: getStringValue(
+      session?.pastorName,
+      group?.pastorName,
+      group?.name,
+      `${pastor?.firstName || ""} ${pastor?.lastName || ""}`.trim(),
+      pastor?.email,
+    ),
+    pastorEmail: getStringValue(session?.pastorEmail, group?.pastorEmail, group?.email, pastor?.email),
+    sessionNumber,
+    title: getStringValue(session?.title, SESSION_TITLES[sessionNumber - 1], `Session ${sessionNumber}`),
+    mentorNote: getStringValue(session?.mentorNote, session?.title, `Session ${sessionNumber}`),
+    status: getStringValue(session?.status, "LOCKED").toUpperCase(),
+    scheduledDate: getStringValue(session?.scheduledDate, session?.meetingDate, session?.date),
+  };
+}
+
+function normalizeGroupedSession(group: any): MentorSessionGroup | null {
+  const pastor = group?.pastor && typeof group.pastor === "object" ? group.pastor : null;
+  const pastorId = getStringValue(group?.pastorId, group?.userId, pastor?._id, pastor?.id);
+  if (!pastorId) return null;
+
+  const sessions = (Array.isArray(group?.sessions) ? group.sessions : [])
+    .map((session: any) => normalizeBackendSession(session, group))
+    .filter((session: MentorSession | null): session is MentorSession => Boolean(session && session.sessionNumber > 0));
+
+  return {
+    pastorId,
+    pastorName: getStringValue(
+      group?.pastorName,
+      group?.name,
+      `${pastor?.firstName || ""} ${pastor?.lastName || ""}`.trim(),
+      pastor?.email,
+      "Pastor",
+    ),
+    pastorEmail: getStringValue(group?.pastorEmail, group?.email, pastor?.email),
+    sessions,
+  };
+}
 export default function MentorMentoringSessionPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -28,9 +189,147 @@ export default function MentorMentoringSessionPage() {
     const [search, setSearch] = useState("");
     const [rescheduleRequests, setRescheduleRequests] = useState<any[]>([]);
     const [selectedPastorId, setSelectedPastorId] = useState<string | null>(null);
-    const { data: groupedSessions = [], isLoading: loading, error } = useMentorGroupedSessionsQuery();
+    const [groupedSessions, setGroupedSessions] = useState<MentorSessionGroup[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [groupedError, setGroupedError] = useState<string | null>(null);
+    const [rescheduleSession, setRescheduleSession] = useState<MentorSession | null>(null);
+    const [rescheduleForm, setRescheduleForm] = useState<RescheduleFormState>({
+      platform: "zoom",
+    });
+    const [rescheduleSubmittingId, setRescheduleSubmittingId] = useState<string | null>(null);
+    const today = new Date();
+    const [rescheduleMonth, setRescheduleMonth] = useState(today.getMonth());
+    const [rescheduleYear, setRescheduleYear] = useState(today.getFullYear());
+    const [rescheduleSelectedDate, setRescheduleSelectedDate] = useState(today.getDate());
+    const [rescheduleMonthlyAvailabilitySlots, setRescheduleMonthlyAvailabilitySlots] = useState<any[]>([]);
+    const [rescheduleAvailabilityLoading, setRescheduleAvailabilityLoading] = useState(false);
+    const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState("");
 
-    const groupedError = error instanceof Error ? error.message : null;
+    const fetchGroupedSessions = useCallback(async () => {
+      const mentorId = getBrowserMentorId();
+      if (!mentorId) {
+        setGroupedSessions([]);
+        setRescheduleRequests([]);
+        return;
+      }
+
+      const [groupedRes, requestRes] = await Promise.all([
+        apiGetMentorMentoringSessionsGrouped(mentorId),
+        apiGetMentorRescheduleRequests(mentorId),
+      ]);
+
+      const groups = unwrapGroupedSessionsResponse(groupedRes)
+        .map(normalizeGroupedSession)
+        .filter(Boolean) as MentorSessionGroup[];
+      const requestPayload = requestRes?.data as any;
+      const requests = Array.isArray(requestPayload)
+        ? requestPayload
+        : Array.isArray(requestPayload?.data)
+          ? requestPayload.data
+          : [];
+
+      setGroupedSessions(groups);
+      setRescheduleRequests(requests);
+    }, []);
+
+    const openRescheduleDrawer = (session: MentorSession) => {
+      const sessionId = getRealSessionId(session);
+      if (!sessionId) {
+        alert("This session is not available for reschedule yet.");
+        return;
+      }
+
+      setRescheduleSession({ ...session, id: sessionId });
+      setRescheduleForm({
+        platform: getStringValue((session as any)?.platform, (session as any)?.meetingPlatform, "zoom"),
+      });
+      const now = new Date();
+      setRescheduleMonth(now.getMonth());
+      setRescheduleYear(now.getFullYear());
+      setRescheduleSelectedDate(now.getDate());
+      setRescheduleSelectedSlot("");
+      setRescheduleMonthlyAvailabilitySlots([]);
+    };
+
+    useEffect(() => {
+      if (!rescheduleSession) return;
+      const mentorId = getBrowserMentorId();
+      if (!mentorId) return;
+
+      let cancelled = false;
+      setRescheduleAvailabilityLoading(true);
+
+      void axiosInstance
+        .get(`/appointments/availability/${mentorId}/month`, {
+          params: { year: rescheduleYear, month: rescheduleMonth + 1 },
+        })
+        .then((response) => {
+          if (!cancelled) {
+            const raw = response.data?.data ?? response.data;
+            setRescheduleMonthlyAvailabilitySlots(Array.isArray(raw) ? raw : []);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setRescheduleMonthlyAvailabilitySlots([]);
+        })
+        .finally(() => {
+          if (!cancelled) setRescheduleAvailabilityLoading(false);
+        });
+
+      return () => {
+        cancelled = true;
+      };
+    }, [rescheduleSession, rescheduleMonth, rescheduleYear]);
+
+    const handleReschedulePrevMonth = () => {
+      setRescheduleSelectedSlot("");
+      if (rescheduleMonth === 0) {
+        setRescheduleMonth(11);
+        setRescheduleYear((year) => year - 1);
+      } else {
+        setRescheduleMonth((month) => month - 1);
+      }
+    };
+
+    const handleRescheduleNextMonth = () => {
+      setRescheduleSelectedSlot("");
+      if (rescheduleMonth === 11) {
+        setRescheduleMonth(0);
+        setRescheduleYear((year) => year + 1);
+      } else {
+        setRescheduleMonth((month) => month + 1);
+      }
+    };
+
+    const submitReschedule = async () => {
+      if (!rescheduleSession) return;
+
+      const sessionId = getRealSessionId(rescheduleSession);
+      if (!sessionId) {
+        alert("This session is not available for reschedule yet.");
+        return;
+      }
+
+      if (!rescheduleSelectedSlot) {
+        alert("Please select an available time slot.");
+        return;
+      }
+
+      try {
+        setRescheduleSubmittingId(sessionId);
+        await apiRescheduleMentoringSession(sessionId, {
+          scheduledDate: rescheduleSelectedSlot,
+          ...(rescheduleForm.platform ? { platform: rescheduleForm.platform } : {}),
+        });
+        alert("Session rescheduled successfully.");
+        setRescheduleSession(null);
+        await fetchGroupedSessions();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Failed to reschedule session.");
+      } finally {
+        setRescheduleSubmittingId(null);
+      }
+    };
 
     useEffect(() => {
         if (!groupedSessions.length) return;
@@ -44,15 +343,50 @@ export default function MentorMentoringSessionPage() {
         // If nothing selected (first load), auto-select the first pastor with sessions.
         setSelectedPastorId((prev) => (prev && groupedSessions.some((g) => g.pastorId === prev) ? prev : groupedSessions[0].pastorId));
     }, [groupedSessions, pastorIdFromQuery]);
+
     useEffect(() => {
-  const requests = JSON.parse(localStorage.getItem("missedSessionRescheduleRequests") || "[]");
-  setRescheduleRequests(requests);
-}, []);
+      let cancelled = false;
+
+      const loadGroupedSessions = async () => {
+        try {
+          setLoading(true);
+          setGroupedError(null);
+          await fetchGroupedSessions();
+        } catch (err) {
+          if (!cancelled) {
+            setGroupedSessions([]);
+            setRescheduleRequests([]);
+            setGroupedError(err instanceof Error ? err.message : "Failed to load mentoring sessions.");
+          }
+        } finally {
+          if (!cancelled) setLoading(false);
+        }
+      };
+
+      loadGroupedSessions();
+      return () => {
+        cancelled = true;
+      };
+    }, [fetchGroupedSessions]);
 
     // const handleViewDetails = (session: MentorSession) => {
     //     router.push(`/mentor/mentoring-session/${encodeURIComponent(session.id)}?pastorId=${encodeURIComponent(session.pastorId)}`);
     // };
  const handleViewDetails = (session: MentorSession) => {
+  const sessionId = String(session.id || "");
+  if (!sessionId || sessionId.startsWith("locked-") || sessionId.startsWith("unscheduled-")) {
+    alert("This session is not available yet.");
+    return;
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    console.debug("[mentor mentoring-session] opening detail route", {
+      routeSessionId: sessionId,
+      appointmentId: session.appointmentId || "",
+      usesAppointmentId: Boolean(session.appointmentId && sessionId === session.appointmentId),
+    });
+  }
+
   const params = new URLSearchParams({
     pastorId: session.pastorId,
     sessionNumber: String(session.sessionNumber),
@@ -62,7 +396,7 @@ export default function MentorMentoringSessionPage() {
   });
 
   router.push(
-    `/mentor/mentoring-session/${encodeURIComponent(session.id)}?${params.toString()}`
+    `/mentor/mentoring-session/${encodeURIComponent(sessionId)}?${params.toString()}`
   );
 };
 const buildAllSessions = (sessions: MentorSession[], pastorId: string) => {
@@ -73,6 +407,32 @@ const buildAllSessions = (sessions: MentorSession[], pastorId: string) => {
   ).length;
 
   const unlockedSessionNumber = Math.min(completedCount + 1, 10);
+
+  if (sorted.length >= 10) {
+    return sorted.map((session) => {
+      const sessionNumber = Number(session?.sessionNumber || (session as any)?.sessionNo || 0);
+
+      return {
+        ...session,
+        id: getStringValue((session as any)?._id, (session as any)?.sessionId, session?.id),
+        appointmentId: getStringValue(
+          session?.appointmentId,
+          (session as any)?.appointment?._id,
+          (session as any)?.appointment?.id,
+        ),
+        pastorId,
+        sessionNumber,
+        title: getStringValue(
+          session?.title,
+          SESSION_TITLES[sessionNumber - 1],
+          `Session ${sessionNumber}`,
+        ),
+        mentorNote: getStringValue(session?.mentorNote, session?.title, `Session ${sessionNumber}`),
+        status: getStringValue(session?.status, "LOCKED").toUpperCase(),
+        scheduledDate: getStringValue(session?.scheduledDate, (session as any)?.meetingDate, (session as any)?.date),
+      } as MentorSession & { status: string };
+    });
+  }
 
   return SESSION_TITLES.map((title, index) => {
     const sessionNumber = index + 1;
@@ -124,14 +484,13 @@ const status = isCompleted
         apiSession?.id ||
         `locked-${pastorId}-${sessionNumber}`,
       appointmentId:
-        apiSession?.appointmentId ||
-        `locked-${pastorId}-${sessionNumber}`,
+        apiSession?.appointmentId,
       pastorId,
       sessionNumber,
     //   title:
     //     apiSession?.title ||
     //     `Session ${sessionNumber}—${title}`,
-    title: `Session ${sessionNumber}—${title}`,
+    title: apiSession?.title || `Session ${sessionNumber}—${title}`,
       status,
     //   scheduledDate: isCompleted
     //     ? apiSession?.scheduledDate || ""
@@ -159,9 +518,16 @@ const allSessionsForPastor = useMemo(
 );
 
 const sortedSessions = allSessionsForPastor;
+    // const nextSessionId = getNextSessionId(
+    //     sortedSessions.map((s) => ({ id: s.id, status: s.status, scheduledDate: s.scheduledDate })),
+    // );
     const nextSessionId = getNextSessionId(
-        sortedSessions.map((s) => ({ id: s.id, status: s.status, scheduledDate: s.scheduledDate })),
-    );
+  sortedSessions.map((s) => ({
+    id: s.id,
+    status: s.status as any,
+    scheduledDate: s.scheduledDate,
+  })),
+);
 
 const getRescheduleRequestForSession = (session: any) =>
   rescheduleRequests.find(
@@ -173,6 +539,136 @@ const getRescheduleRequestForSession = (session: any) =>
     return (
         <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
             <MentorHeader showFullHeader />
+
+            {rescheduleSession ? (
+              <>
+                <div
+                  className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
+                  onClick={() => {
+                    if (!rescheduleSubmittingId) setRescheduleSession(null);
+                  }}
+                  aria-hidden
+                />
+                <div className="fixed right-0 top-0 z-50 h-full w-full border-l border-white/15 bg-[#041f35] text-white shadow-2xl sm:max-w-[480px] sm:w-[480px]">
+                  <div className="flex h-full flex-col p-6">
+                    <div className="mb-6 flex shrink-0 items-center justify-between">
+                      <div>
+                        <h2 className="flex items-center gap-2 text-lg font-semibold">
+                          <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
+                          Reschedule session
+                        </h2>
+                        <p className="mt-1 pl-7 text-sm font-medium text-[#8ec5eb]">
+                          Session {rescheduleSession.sessionNumber}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setRescheduleSession(null)}
+                        disabled={rescheduleSubmittingId != null}
+                        className="rounded-lg p-2 text-[#cde2f2] transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                        aria-label="Close"
+                      >
+                        <i className="fa-solid fa-xmark text-xl" />
+                      </button>
+                    </div>
+
+                    <div className="mb-6 flex-1 space-y-5 overflow-y-auto pr-3">
+                      <div className="rounded-xl border border-white/15 bg-white/5 p-4">
+                        <p className="mb-3 text-sm text-[#cde2f2]">Mentor Availability</p>
+                        {rescheduleAvailabilityLoading ? (
+                          <div className="flex justify-center py-8">
+                            <div className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-r-white" />
+                          </div>
+                        ) : (
+                          <AvailabilityCalendar
+                            mentorId={getBrowserMentorId()}
+                            currentMonth={rescheduleMonth}
+                            currentYear={rescheduleYear}
+                            selectedDate={rescheduleSelectedDate}
+                            onDateSelect={(day) => {
+                              setRescheduleSelectedDate(day);
+                              setRescheduleSelectedSlot("");
+                            }}
+                            onPrevMonth={handleReschedulePrevMonth}
+                            onNextMonth={handleRescheduleNextMonth}
+                            availabilitySlots={rescheduleMonthlyAvailabilitySlots}
+                            isLoading={rescheduleAvailabilityLoading}
+                          />
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="mb-3 block text-sm font-semibold text-[#cde2f2]">
+                          Available times on {new Date(rescheduleYear, rescheduleMonth, rescheduleSelectedDate).toLocaleDateString()}
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {(() => {
+                            const selectedDateSlots = rescheduleMonthlyAvailabilitySlots.find(
+                              (slot: any) => new Date(slot.date).getDate() === rescheduleSelectedDate,
+                            );
+                            const timeSlots = selectedDateSlots?.slots || [];
+                            if (timeSlots.length === 0) {
+                              return <p className="col-span-2 text-sm text-[#cde2f2]">No slots available on this date</p>;
+                            }
+                            return timeSlots.map((slot: any, index: number) => {
+                              const isoString = availabilitySlotToIso(selectedDateSlots.date, slot);
+                              const timeLabel = `${slot.startTime} ${slot.startPeriod}`;
+                              return (
+                                <button
+                                  key={`${timeLabel}-${index}`}
+                                  type="button"
+                                  onClick={() => setRescheduleSelectedSlot(isoString)}
+                                  className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition ${
+                                    rescheduleSelectedSlot === isoString
+                                      ? "border-blue-500 bg-blue-600 text-white"
+                                      : "border-white/20 text-white hover:bg-white/10"
+                                  }`}
+                                >
+                                  {timeLabel}
+                                </button>
+                              );
+                            });
+                          })()}
+                        </div>
+                      </div>
+
+                      <label className="block">
+                        <span className="text-sm font-semibold text-[#cde2f2]">Platform</span>
+                        <select
+                          value={rescheduleForm.platform}
+                          onChange={(event) => setRescheduleForm((prev) => ({ ...prev, platform: event.target.value }))}
+                          className={`${mentorSelectDark} mt-2 w-full`}
+                        >
+                          <option className="bg-[#062946]" value="zoom">Zoom</option>
+                          <option className="bg-[#062946]" value="google-meet">Google Meet</option>
+                          <option className="bg-[#062946]" value="teams">Microsoft Teams</option>
+                          <option className="bg-[#062946]" value="phone">Phone</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="flex shrink-0 justify-end gap-3 border-t border-white/10 pt-6">
+                      <button
+                        type="button"
+                        onClick={() => setRescheduleSession(null)}
+                        disabled={rescheduleSubmittingId != null}
+                        className="rounded-lg border border-white/20 px-4 py-2 text-xs text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={rescheduleSubmittingId === rescheduleSession.id}
+                        onClick={submitReschedule}
+                        className="rounded-lg bg-blue-600 px-6 py-2 text-xs font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        {rescheduleSubmittingId === rescheduleSession.id ? "Saving..." : "Save changes"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : null}
 
             {/* HERO SECTION */}
             <section
@@ -463,9 +959,7 @@ const filteredSessions = allSessions.filter((session) => {
 
     <button
       type="button"
-      onClick={() => {
-        // TODO: wire reschedule API/modal later
-      }}
+      onClick={() => openRescheduleDrawer(missedSession as MentorSession)}
      className="self-end rounded-lg border border-green-400/30 bg-green-500/20 px-3 py-1.5 text-xs font-semibold text-green-100 hover:bg-green-500/30"
     >
       Reschedule meeting
@@ -534,12 +1028,24 @@ const filteredSessions = allSessions.filter((session) => {
                                             {/* SESSIONS LIST */}
                                             {filteredSessions.length > 0 ? (
                                                 <div className="space-y-4">
-             {filteredSessions.map((session) => (
+             {filteredSessions.map((session, index) => {
+              const sessionId = getStringValue((session as any)?._id, (session as any)?.sessionId, session.id);
+              const sessionStatus = String(session.status || "").toUpperCase();
+              const isLockedSession = sessionStatus === "LOCKED";
+              const isUnavailable = isLockedSession || !sessionId;
+              const rescheduleRequest = getRescheduleRequestForSession(session);
+
+              return (
                                                         <div
-                                                            key={session.appointmentId}
+                                                            key={sessionId || `session-${session.sessionNumber}-${index}`}
                                                             className="group rounded-2xl border border-white/15 bg-white/5 backdrop-blur-sm transition hover:border-[#8ec5eb]/30 hover:bg-white/10"
                                                         >
-                                                            <button onClick={() => handleViewDetails(session)} className="w-full px-6 py-4 text-left">
+                                                            <button
+                                                              type="button"
+                                                              disabled={isUnavailable}
+                                                              onClick={() => handleViewDetails({ ...session, id: sessionId })}
+                                                              className={`w-full px-6 py-4 text-left ${isUnavailable ? "cursor-not-allowed opacity-75" : ""}`}
+                                                            >
                                                                 <div className="flex items-center justify-between gap-4">
                                                                     <div className="min-w-0 flex-1">
                                                                         <div className="flex items-center gap-2">
@@ -558,7 +1064,7 @@ const filteredSessions = allSessions.filter((session) => {
                                                                                 day: "numeric",
                                                                             })}{" "}
                                                                             · {formatSessionTime(session.scheduledDate) || "Time TBD"} */}
-                                                                            {String(session.status) === "LOCKED" || !session.scheduledDate
+                                                                            {sessionStatus === "LOCKED" || !session.scheduledDate
   ? "Locked"
   : `${new Date(session.scheduledDate).toLocaleDateString("en-US", {
       weekday: "short",
@@ -570,13 +1076,13 @@ const filteredSessions = allSessions.filter((session) => {
                                                                     </div>
                                                                     <div className="shrink-0 flex items-center gap-3">
                                                                         {/* <SessionStatusBadge status={session.status} compact /> */}
-                                                                        {String(session.status) === "LOCKED" ? (
+                                                                        {sessionStatus === "LOCKED" ? (
   <span className="rounded-md bg-white/10 px-3 py-1 text-xs font-bold text-white/55">
     LOCKED
   </span>
 ) : (
   <>
-  {getRescheduleRequestForSession(session) ? (
+  {rescheduleRequest ? (
     <span className="rounded-md border border-yellow-400/30 bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-100">
       RESCHEDULE REQUESTED
     </span>
@@ -589,9 +1095,20 @@ const filteredSessions = allSessions.filter((session) => {
                                                                     </div>
                                                                 </div>
                                                             </button>
+                                                            {rescheduleRequest && !isUnavailable ? (
+                                                              <div className="border-t border-white/10 px-6 py-3 text-right">
+                                                                <button
+                                                                  type="button"
+                                                                  onClick={() => openRescheduleDrawer({ ...session, id: sessionId })}
+                                                                  className="rounded-lg border border-green-400/30 bg-green-500/20 px-3 py-1.5 text-xs font-semibold text-green-100 hover:bg-green-500/30"
+                                                                >
+                                                                  Reschedule
+                                                                </button>
+                                                              </div>
+                                                            ) : null}
                                                         </div>
-  
-                                                    ))}
+              );
+                                                    })}
                                                 </div>
                                             ) : (
                                                 <div className="rounded-lg border border-white/10 bg-white/5 py-12 text-center">

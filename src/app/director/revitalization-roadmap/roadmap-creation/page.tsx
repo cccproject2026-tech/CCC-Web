@@ -565,11 +565,21 @@ export default function DirectorRoadmapCreationPage() {
     }
   }, [parent, roadmapType, nestedForSingle, nestedDetailDoc, urlSeedKey, isEditMode]);
 
-  useEffect(() => {
-    if (!saveFeedback) return;
-    const t = window.setTimeout(() => setSaveFeedback(null), 5000);
-    return () => window.clearTimeout(t);
-  }, [saveFeedback]);
+  // useEffect(() => {
+  //   if (!saveFeedback) return;
+  //   const t = window.setTimeout(() => setSaveFeedback(null), 5000);
+  //   return () => window.clearTimeout(t);
+  // }, [saveFeedback]);
+//   useEffect(() => {
+//   if (!saveFeedback) return;
+
+//   const t = window.setTimeout(() => {
+//     window.location.href = "/director/revitalization-roadmap";
+//   }, 900);
+
+//   return () => window.clearTimeout(t);
+// }, [saveFeedback]);
+
 
   useEffect(() => {
     return () => {
@@ -755,12 +765,17 @@ const libDesc =
       } else {
         await apiUpdateNestedRoadmapItem(roadmapId, effectiveNestedId, patchBody as any);
       }
+//       router.replace("/director/revitalization-roadmap");
+// return;
 
       setSaveFeedback(
         roadmapType === "phase"
           ? "The main roadmap (library) title and this phase are saved."
           : "Roadmap library will show this roadmap’s updated info.",
       );
+//       window.setTimeout(() => {
+//   router.replace("/director/revitalization-roadmap");
+// }, 800);
       bannerFileRef.current = null;
       setBannerFile(null);
       const res = await apiGetRoadmapById(roadmapId);
@@ -1332,6 +1347,14 @@ const libDesc =
 
   <div className="flex w-full flex-col-reverse gap-3 sm:w-auto sm:flex-row sm:justify-end"></div>
                 <div className="flex w-full flex-col-reverse gap-3 sm:w-auto sm:flex-row sm:justify-end">
+                 <button
+  type="button"
+  onClick={() => router.push("/director/revitalization-roadmap")}
+  className={`${directorBtnSecondary} w-full sm:w-auto`}
+  disabled={saving}
+>
+  Back to Roadmaps
+</button>
                   <button
                     type="button"
                     onClick={() => router.back()}

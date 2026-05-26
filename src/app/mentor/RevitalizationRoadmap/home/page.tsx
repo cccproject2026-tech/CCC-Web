@@ -122,12 +122,42 @@ function RevitalizationRoadmapHomeContent() {
     return formatStatus(raw);
   };
 
+  // const roadmapTaskCounts = (roadmap: any) => {
+  //   const p = roadmap?.progress;
+  //   const completed = Number(p?.completedSteps ?? 0);
+  //   const total = Number(p?.totalSteps ?? roadmap?.totalSteps ?? 0);
+  //   return { completed, total: Math.max(total, completed, 1) };
+  // };
   const roadmapTaskCounts = (roadmap: any) => {
-    const p = roadmap?.progress;
-    const completed = Number(p?.completedSteps ?? 0);
-    const total = Number(p?.totalSteps ?? roadmap?.totalSteps ?? 0);
-    return { completed, total: Math.max(total, completed, 1) };
+  const p = roadmap?.progress;
+
+  const childTasks = Array.isArray(roadmap?.roadmaps)
+    ? roadmap.roadmaps
+    : [];
+
+  const actualTotal = childTasks.length;
+
+  const completedFromChildren = childTasks.filter((task: any) => {
+    const status = String(
+      task?.progress?.status ?? task?.status ?? ""
+    ).toLowerCase();
+
+    return status.includes("complete");
+  }).length;
+
+  const completed = actualTotal > 0
+    ? completedFromChildren
+    : Number(p?.completedSteps ?? 0);
+
+  const total = actualTotal > 0
+    ? actualTotal
+    : Number(p?.totalSteps ?? roadmap?.totalSteps ?? 0);
+
+  return {
+    completed,
+    total: Math.max(total, completed, 1),
   };
+};
 
   const filteredRoadmaps = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();

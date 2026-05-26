@@ -13,8 +13,22 @@ function GuidelinesInner() {
   const mentorName = searchParams.get("mentorName")?.trim() || "";
   const meetingPlatform = searchParams.get("platform")?.trim() || "";
 
-  const surveyUrl = `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(assessmentId)}`;
-  const scheduleMeetingHref = `${surveyUrl}&readOnly=1&scheduleMeeting=1`;
+  // const surveyUrl = `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(assessmentId)}`;
+  // const scheduleMeetingHref = `${surveyUrl}&readOnly=1&scheduleMeeting=1`;
+  const roadmapId = searchParams.get("roadmapId")?.trim() || "";
+const taskId = searchParams.get("taskId")?.trim() || "";
+const parentId = searchParams.get("parentId")?.trim() || "";
+
+const surveyParams = new URLSearchParams({
+  assessmentId,
+});
+
+if (roadmapId) surveyParams.set("roadmapId", roadmapId);
+if (taskId) surveyParams.set("taskId", taskId);
+if (parentId) surveyParams.set("parentId", parentId);
+
+const surveyUrl = `/pastor/PastorSurveyCMA?${surveyParams.toString()}`;
+const scheduleMeetingHref = `${surveyUrl}&readOnly=1&scheduleMeeting=1`;
 
   return (
     <AssessmentGuidelinesClient
@@ -23,6 +37,8 @@ function GuidelinesInner() {
       meetingDate={meetingDate}
       mentorName={mentorName}
       meetingPlatform={meetingPlatform}
+      roadmapId={roadmapId}
+      taskId={taskId}
       answersUserId={null}
       staffReview={false}
       listHref="/pastor/Assessments"

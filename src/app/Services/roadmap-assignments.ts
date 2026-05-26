@@ -5,6 +5,8 @@ import type { RoadMapResponse, NestedRoadMapItem } from "./types/roadmaps.types"
 
 export type RoadmapAssignmentUi = {
   id: string;
+    parentDuration?: string;
+  parentCompletionTime?: string;
   parentRoadmapId: string;
   parentRoadmapName: string;
   title: string;
@@ -499,6 +501,8 @@ export function buildRoadmapAssignments(
           parentProgressStatus,
         }),
         months: rm.duration || "—",
+        parentDuration: rm.duration || "",
+parentCompletionTime: rm.duration || "",
         imageUrl: rm.imageUrl,
         meetings: rm.meetings,
       });
@@ -527,7 +531,10 @@ export function buildRoadmapAssignments(
           title: child.name,
           desc: child.roadMapDetails || child.description || "",
           status,
-          months: child.duration || rm.duration || "—",
+          // months: child.duration || rm.duration || "—",
+          months: rm.duration || "—",
+parentDuration: rm.duration || "",
+parentCompletionTime: rm.duration || "",
           imageUrl: child.imageUrl,
           meetings: child.meetings,
         });
@@ -583,7 +590,11 @@ export function collapseRoadmapAssignmentsToParents(items: RoadmapAssignmentUi[]
       title: name,
       desc: descFromNestedOnly,
       status: mergedStatus,
-      months: group[0]?.months || "—",
+      months:
+  group[0]?.parentDuration ||
+  group[0]?.parentCompletionTime ||
+  group[0]?.months ||
+  "—",
       imageUrl: img,
       meetings: firstMeeting ? [String(firstMeeting)] : group[0]?.meetings,
       hasNestedTasks: true,

@@ -397,6 +397,8 @@ function PastorSurveyCMAContent() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const searchParams = useSearchParams();
   const assessmentId = searchParams.get("assessmentId");
+  const routeRoadmapId = searchParams.get("roadmapId")?.trim() || "";
+  const routeTaskId = searchParams.get("taskId")?.trim() || "";
   const meetingId = searchParams.get("meetingId")?.trim() || "";
 const meetingDate = searchParams.get("meetingDate")?.trim() || "";
 const mentorName = searchParams.get("mentorName")?.trim() || "";
@@ -726,6 +728,15 @@ const confirmClearResponses = () => {
     setShowSubmitPopup(true);
     setTimeout(() => {
       setShowSubmitPopup(false);
+      if (assessmentId && routeRoadmapId && routeTaskId) {
+        const q = new URLSearchParams({
+          assessmentId,
+          roadmapId: routeRoadmapId,
+          taskId: routeTaskId,
+        });
+        router.push(`/pastor/Assessments/guidelines?${q.toString()}`);
+        return;
+      }
       router.push("/pastor/Assessments");
     }, 1800);
   };
@@ -800,7 +811,9 @@ const confirmClearResponses = () => {
   mentorId: selectedMentor,
   meetingDate: meetingDateIso,
   platform: "zoom",
-  notes: `Assessment meeting | assessmentId=${assessmentId || ""} | title=${assessmentTitle || "Assessment"}`,
+ notes: routeRoadmapId && routeTaskId
+  ? `Roadmap assessment meeting | assessmentId:${assessmentId || ""} | roadmapId:${routeRoadmapId} | taskId:${routeTaskId}`
+  : `Assessment meeting | assessmentId:${assessmentId || ""} | title:${assessmentTitle || "Assessment"}`,
 };
 
       const createRes = await apiCreateAppointment(payload);
@@ -1493,12 +1506,30 @@ const confirmClearResponses = () => {
               </div>
             )}
             <button
+              // onClick={() => {
+              //   setShowFinalPopup(false);
+              //   setShowMeetingDetails(false);
+              //   setShowMentorSidebar(false);
+              //   router.push("/pastor/Assessments");
+              // }}
               onClick={() => {
-                setShowFinalPopup(false);
-                setShowMeetingDetails(false);
-                setShowMentorSidebar(false);
-                router.push("/pastor/Assessments");
-              }}
+  setShowFinalPopup(false);
+  setShowMeetingDetails(false);
+  setShowMentorSidebar(false);
+
+  if (assessmentId && routeRoadmapId && routeTaskId) {
+    const q = new URLSearchParams({
+      assessmentId,
+      roadmapId: routeRoadmapId,
+      taskId: routeTaskId,
+    });
+
+    router.push(`/pastor/Assessments/guidelines?${q.toString()}`);
+    return;
+  }
+
+  router.push("/pastor/Assessments");
+}}
               className="w-full rounded-xl bg-[#8ec5eb] px-6 py-2 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2]"
             >
               Done

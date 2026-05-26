@@ -3,10 +3,17 @@
 import { useCallback, useEffect, useState, Suspense } from "react";
 import type { JSX } from "react";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { apiGetExtrasDocuments } from "@/app/Services/api";
+import { apiGetAppointments } from "@/app/Services/appointments.service";
+import { unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
+import {
+  apiGetUserAnswers,
+  apiGetSectionRecommendations,
+} from "@/app/Services/assessment.service";
 
+import { getStoredRecommendationsForPastorAssessment } from "@/app/utils/assessment-recommendations";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import UserProfile from "@/app/Assets/user-profile.png";
 
@@ -101,6 +108,66 @@ function formatDate(iso?: string) {
   }
 }
 
+function formatMeetingDate(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return String(iso);
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatMeetingTime(iso?: string) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function formatMeetingPlatform(platform?: string) {
+  const raw = String(platform ?? "").trim();
+  if (!raw) return "Not specified";
+  const normalized = raw.toLowerCase();
+  if (normalized === "google-meet" || normalized === "gmeet") return "Google Meet";
+  if (normalized === "zoom") return "Zoom";
+  if (normalized === "teams") return "Microsoft Teams";
+  if (normalized === "in-person") return "In person";
+  if (normalized === "phone") return "Phone";
+  return raw;
+}
+
+function formatMeetingStatus(status?: string) {
+  const raw = String(status ?? "").trim();
+  if (!raw) return "Not specified";
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+function readEntityId(value: unknown): string {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    return String(obj._id ?? obj.id ?? "").trim();
+  }
+  return String(value).trim();
+}
+
+function readAppointmentField(appt: Record<string, any>, key: string): string {
+  const metadata = appt.metadata || appt.meta || appt.context || {};
+  return String(appt[key] ?? metadata?.[key] ?? "").trim();
+}
+
+function notesContainToken(notes: string, key: string, value?: string | null): boolean {
+  const target = String(value ?? "").trim();
+  if (!target) return false;
+  return notes.includes(`${key}:${target}`) || notes.includes(`${key}=${target}`);
+}
+
 /** Long form for mentor task header, e.g. "May 20, 2026". */
 function formatDueHeadingDate(iso?: string) {
   if (!iso) return "";
@@ -123,6 +190,7 @@ function isRenderablePastorExtraRow(item: Record<string, unknown>): boolean {
 
 function TaskPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const taskId = searchParams.get("taskId");
   const roadmapId = searchParams.get("roadmapId");
   const userId = searchParams.get("userId");
@@ -139,6 +207,13 @@ function TaskPageContent() {
   Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]>
 >({});
   const [extrasLoading, setExtrasLoading] = useState(false);
+  const [assessmentTaskState, setAssessmentTaskState] = useState<{
+  assessmentId: string;
+  submitted: boolean;
+  hasCdp: boolean;
+} | null>(null);
+  const [assessmentMeeting, setAssessmentMeeting] = useState<Record<string, any> | null>(null);
+  const [assessmentMeetingLoading, setAssessmentMeetingLoading] = useState(false);
 
   const [comments, setComments] = useState<Record<string, unknown>[]>([]);
   const [queries, setQueries] = useState<Record<string, unknown>[]>([]);
@@ -356,6 +431,198 @@ function TaskPageContent() {
     cancelled = true;
   };
 }, [roadmapId, userId, taskId]);
+
+const resolveAssessmentIdFromTaskExtra = (extra: any): string | null => {
+  const direct = extra?.assessmentId;
+  if (typeof direct === "string" && direct.trim()) return direct.trim();
+
+  const pickId = (obj: any): string | null => {
+    if (!obj || typeof obj !== "object") return null;
+    const id = obj?._id ?? obj?.id ?? obj?.assessmentId;
+    return id ? String(id).trim() : null;
+  };
+
+  return (
+    pickId(extra?.assessment) ||
+    pickId(extra?.selectedAssessment) ||
+    null
+  );
+};
+
+const findAssessmentExtra = (items: any[] | undefined): any | null => {
+  if (!Array.isArray(items)) return null;
+
+  for (const item of items) {
+    const type = String(item?.type || "").toUpperCase();
+
+    if (type === "ASSESSMENT") return item;
+
+    const fromSections = findAssessmentExtra(item?.sections);
+    if (fromSections) return fromSections;
+
+    const fromCheckboxes = findAssessmentExtra(item?.checkboxes);
+    if (fromCheckboxes) return fromCheckboxes;
+  }
+
+  return null;
+};
+useEffect(() => {
+  if (!task || !userId) {
+    setAssessmentTaskState(null);
+    return;
+  }
+
+  const assessmentExtra = findAssessmentExtra((task as any)?.extras);
+  const assessmentId = assessmentExtra
+    ? resolveAssessmentIdFromTaskExtra(assessmentExtra)
+    : null;
+
+  if (!assessmentId) {
+    setAssessmentTaskState(null);
+    return;
+  }
+
+  let cancelled = false;
+
+  const loadAssessmentTaskState = async () => {
+    let submitted = false;
+    let hasCdp = getStoredRecommendationsForPastorAssessment(
+      userId,
+      assessmentId,
+    ).some((rec) => rec.sent === true);
+
+    try {
+      const answersRes = await apiGetUserAnswers(assessmentId, userId);
+      submitted = Boolean((answersRes?.data as any)?.data?._id);
+    } catch {
+      submitted = false;
+    }
+
+    try {
+      const recRes = await apiGetSectionRecommendations(assessmentId, userId);
+      const data: any = (recRes?.data as any)?.data ?? recRes?.data;
+
+      if (Array.isArray(data)) {
+        hasCdp =
+          hasCdp ||
+          data.some((row: any) => row?.sent === true || row?.status === "sent");
+      } else if (Array.isArray(data?.sections)) {
+        hasCdp =
+          hasCdp ||
+          data.sections.some((section: any) =>
+            Array.isArray(section?.recommendations) &&
+            section.recommendations.some(
+              (rec: any) => rec?.sent === true || rec?.status === "sent",
+            ),
+          );
+      }
+    } catch {
+      // keep stored CDP value
+    }
+
+    if (!cancelled) {
+      setAssessmentTaskState({
+        assessmentId,
+        submitted,
+        hasCdp,
+      });
+    }
+  };
+
+  void loadAssessmentTaskState();
+
+  return () => {
+    cancelled = true;
+  };
+}, [task, userId]);
+
+useEffect(() => {
+  if (!assessmentTaskState?.submitted || !userId) {
+    setAssessmentMeeting(null);
+    setAssessmentMeetingLoading(false);
+    return;
+  }
+
+  const mentorId = getMentorUserId();
+  if (!mentorId) {
+    setAssessmentMeeting(null);
+    setAssessmentMeetingLoading(false);
+    return;
+  }
+
+  let cancelled = false;
+
+  const loadAssessmentMeeting = async () => {
+    setAssessmentMeetingLoading(true);
+    try {
+      const res = await apiGetAppointments({
+        userId,
+        mentorId,
+        futureOnly: false,
+      });
+
+      const appointments = unwrapAppointmentsAxiosData(res) as Record<string, any>[];
+      const matches = appointments
+        .map((appt) => {
+          const status = String(appt?.status ?? "").toLowerCase();
+          if (status.includes("cancel")) return { appt, score: -1 };
+
+          const pastorId = readEntityId(appt?.userId) || readEntityId(appt?.user);
+          const appointmentMentorId = readEntityId(appt?.mentorId) || readEntityId(appt?.mentor);
+          if (pastorId && pastorId !== userId) return { appt, score: -1 };
+          if (appointmentMentorId && appointmentMentorId !== mentorId) return { appt, score: -1 };
+
+          const notes = String(appt?.notes ?? "");
+          let score = 0;
+
+          if (
+            readAppointmentField(appt, "assessmentId") === assessmentTaskState.assessmentId ||
+            notesContainToken(notes, "assessmentId", assessmentTaskState.assessmentId)
+          ) {
+            score += 10;
+          }
+
+          if (
+            roadmapId &&
+            (readAppointmentField(appt, "roadmapId") === roadmapId ||
+              notesContainToken(notes, "roadmapId", roadmapId))
+          ) {
+            score += 4;
+          }
+
+          if (
+            taskId &&
+            (readAppointmentField(appt, "taskId") === taskId ||
+              notesContainToken(notes, "taskId", taskId))
+          ) {
+            score += 4;
+          }
+
+          return { appt, score };
+        })
+        .filter((row) => row.score > 0)
+        .sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          const aTime = new Date(String(a.appt?.meetingDate ?? "")).getTime();
+          const bTime = new Date(String(b.appt?.meetingDate ?? "")).getTime();
+          return (Number.isNaN(bTime) ? 0 : bTime) - (Number.isNaN(aTime) ? 0 : aTime);
+        });
+
+      if (!cancelled) setAssessmentMeeting(matches[0]?.appt ?? null);
+    } catch (e) {
+      console.error("Failed to load assessment meeting", e);
+      if (!cancelled) setAssessmentMeeting(null);
+    } finally {
+      if (!cancelled) setAssessmentMeetingLoading(false);
+    }
+  };
+
+  void loadAssessmentMeeting();
+
+  return () => {
+    cancelled = true;
+  };
+}, [assessmentTaskState, userId, roadmapId, taskId]);
 
   const handleSendComment = async () => {
     if (!newComment.trim() || !roadmapId || !userId) return;
@@ -643,7 +910,13 @@ const renderableExtras = Array.from(latestExtrasMap.values());
 
 const isUpdatedResponse = allRenderableExtras.length > renderableExtras.length;
 
-const pastorHasNoResponses = !extrasLoading && renderableExtras.length === 0;
+// const pastorHasNoResponses = !extrasLoading && renderableExtras.length === 0;
+const pastorHasAssessmentResponse = assessmentTaskState?.submitted === true;
+
+const pastorHasNoResponses =
+  !extrasLoading &&
+  renderableExtras.length === 0 &&
+  !pastorHasAssessmentResponse;
                       
 const templateExtras = Array.isArray((task as any)?.extras)
   ? ((task as any).extras as Record<string, any>[])
@@ -950,6 +1223,124 @@ const renderTemplateExtra = (extra: Record<string, any>, idx: number): JSX.Eleme
   <h3 className="mb-4 text-lg font-semibold text-white">
     Pastor Tasks :
   </h3>
+) : null}
+{assessmentTaskState?.submitted ? (
+  <div className="mb-5 rounded-xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 p-5">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className="text-sm font-semibold text-white">
+          Assessment submitted
+        </p>
+        <p className="mt-1 text-xs text-[#cde2f2]/80">
+          This pastor completed the assessment linked to this roadmap task.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() =>
+            router.push(
+              `/mentor/MentorAssessments/result?assessmentId=${assessmentTaskState.assessmentId}&userId=${userId}&roadmapId=${roadmapId || ""}&taskId=${taskId || ""}`,
+            )
+          }
+          className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+        >
+          View Submitted Answers
+        </button>
+
+        <button
+          type="button"
+          onClick={() =>
+            router.push(
+              assessmentTaskState.hasCdp
+                ? `/mentor/MentorAssessments/result/cdp?assessmentId=${assessmentTaskState.assessmentId}&userId=${userId}&roadmapId=${roadmapId || ""}&taskId=${taskId || ""}`
+                : `/mentor/MentorAssessments/result?assessmentId=${assessmentTaskState.assessmentId}&userId=${userId}&roadmapId=${roadmapId || ""}&taskId=${taskId || ""}&editRecommendation=1`,
+            )
+          }
+          className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+        >
+          {assessmentTaskState.hasCdp ? "View CDP" : "Send CDP"}
+        </button>
+      </div>
+    </div>
+
+    <div className="mt-4 border-t border-white/10 pt-4">
+      {assessmentMeetingLoading ? (
+        <p className="text-xs text-[#cde2f2]/80">Loading meeting details...</p>
+      ) : assessmentMeeting ? (
+        <div>
+          <p className="mb-3 text-sm font-semibold text-white">Meeting scheduled</p>
+          <div className="grid gap-3 text-xs text-[#cde2f2] sm:grid-cols-2">
+            <div>
+              <p className="font-semibold uppercase tracking-wide text-[#8ec5eb]">Date</p>
+              <p className="mt-1">{formatMeetingDate(assessmentMeeting.meetingDate) || "Not specified"}</p>
+            </div>
+            <div>
+              <p className="font-semibold uppercase tracking-wide text-[#8ec5eb]">Time</p>
+              <p className="mt-1">{formatMeetingTime(assessmentMeeting.meetingDate) || "Not specified"}</p>
+            </div>
+            <div>
+              <p className="font-semibold uppercase tracking-wide text-[#8ec5eb]">Platform</p>
+              <p className="mt-1">{formatMeetingPlatform(assessmentMeeting.platform)}</p>
+            </div>
+            <div>
+              <p className="font-semibold uppercase tracking-wide text-[#8ec5eb]">Status</p>
+              <p className="mt-1">{formatMeetingStatus(assessmentMeeting.status)}</p>
+            </div>
+          </div>
+          {/* {assessmentMeeting.meetingLink || assessmentMeeting.zoomJoinUrl ? (
+            <a
+              href={assessmentMeeting.meetingLink || assessmentMeeting.zoomJoinUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[#8ec5eb] underline underline-offset-2"
+            >
+              <i className="fa-solid fa-arrow-up-right-from-square text-[10px]" />
+              Meeting link
+            </a>
+          ) : null} */}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+  <button
+    type="button"
+    onClick={() => {
+      const appointmentId = String(
+        assessmentMeeting._id ||
+          assessmentMeeting.id ||
+          assessmentMeeting.appointmentId ||
+          ""
+      );
+
+      if (!appointmentId) return;
+
+      router.push(`/mentor/MentorSchedule/${appointmentId}`);
+    }}
+    className="inline-flex items-center gap-2 rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+  >
+    <i className="fa-solid fa-calendar-check text-[11px]" />
+    View Meeting Details
+  </button>
+
+  {assessmentMeeting.meetingLink || assessmentMeeting.zoomJoinUrl ? (
+    <a
+      href={assessmentMeeting.meetingLink || assessmentMeeting.zoomJoinUrl}
+      target="_blank"
+      rel="noreferrer"
+      className="inline-flex items-center gap-2 text-xs font-semibold text-[#8ec5eb] underline underline-offset-2"
+    >
+      <i className="fa-solid fa-arrow-up-right-from-square text-[10px]" />
+      Meeting link
+    </a>
+  ) : null}
+</div>
+        </div>
+      ) : (
+        <p className="text-xs text-[#f5cc76]">
+          No meeting has been scheduled for this assessment yet.
+        </p>
+      )}
+    </div>
+  </div>
 ) : null}
 
                           {extrasLoading ? (

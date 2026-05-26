@@ -3,11 +3,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import MentorHeader from "@/app/Components/MentorHeader";
+import AvailabilityCalendar from "@/app/Components/AvailabilityCalendar";
+import { mentorSelectDark } from "@/app/Components/mentor/mentor-theme";
 import SessionStatusBadge from "@/app/Components/mentorship-sessions/SessionStatusBadge";
 import ConfirmModal from "@/app/Components/ui/ConfirmModal";
 import { useToast } from "@/app/Components/ui/Toast";
 import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
-import { apiGenerateTranscriptSummary, apiGetTranscriptSummary } from "@/app/Services/appointments.service";
+import { apiGenerateTranscriptSummary } from "@/app/Services/appointments.service";
+import axiosInstance from "@/app/Services/config/axios-instance";
+import { getMentorFromCookie } from "@/app/Services/utils/helpers";
+import {
+  apiCompleteMentoringSession,
+  apiGetMentoringSessionById,
+  apiGetMentoringSessionTranscriptSummary,
+  apiRescheduleMentoringSession,
+} from "@/app/Services/mentoring-sessions.service";
 import type { AppointmentResponse, TranscriptSummaryResponseDto } from "@/app/Services/types/appointments.types";
 import {
   appointmentPlatformLabel,
@@ -20,7 +30,6 @@ import {
 } from "@/app/utils/meetingLinkDetails";
 import { formatSessionTime, getNextSessionId } from "../utils/sessionFlow";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMentorSessionActions, useMentorSessionDetailQuery } from "../hooks/useMentorshipQueries";
 
 type TranscriptSummary = {
   appointmentId: string;
@@ -38,58 +47,183 @@ type TranscriptSummary = {
   cached?: boolean;
 };
 
+type RescheduleFormState = {
+  platform: string;
+};
+
+function getStringValue(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
+}
+
+function unwrapMentoringSessionResponse(res: any) {
+  const root = res?.data;
+  const payload = root?.data ?? root;
+  return payload?.session ?? payload?.mentoringSession ?? payload ?? null;
+}
+
+function getEmbeddedAppointment(session: any): AppointmentResponse | null {
+  const appointment = session?.appointment || session?.appointmentDetails || null;
+  return appointment && typeof appointment === "object" ? (appointment as AppointmentResponse) : null;
+}
+
+function getMentoringSessionId(session: any, fallback = "") {
+  return getStringValue(session?.id, session?._id, session?.sessionId, fallback);
+}
+
+function getSessionAppointmentId(session: any, appointment: AppointmentResponse | null = null) {
+  return getStringValue(
+    session?.appointmentId,
+    session?.appointment?._id,
+    session?.appointment?.id,
+    session?.appointmentDetails?._id,
+    session?.appointmentDetails?.id,
+    appointment?._id,
+    appointment?.id,
+  );
+}
+
+function convertTo24Hour(time12: string, period: string): string {
+  let [hours, minutes] = time12.split(":").map(Number);
+  if (period.toUpperCase() === "PM" && hours !== 12) hours += 12;
+  if (period.toUpperCase() === "AM" && hours === 12) hours = 0;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function availabilitySlotToIso(dateValue: string, slot: any) {
+  if (!dateValue || !slot?.startTime || !slot?.startPeriod) return "";
+  return new Date(`${dateValue.slice(0, 10)}T${convertTo24Hour(slot.startTime, slot.startPeriod)}`).toISOString();
+}
+
 export default function MentorMentoringSessionDetailPage() {
   const toast = useToast();
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const search = useSearchParams();
   const pastorIdFromQuery = search.get("pastorId") || "";
-  const sessionNumberFromQuery = Number(search.get("sessionNumber") || "");
-  const titleFromQuery = search.get("title") || "";
-const statusFromQuery = search.get("status") || "";
-const scheduledDateFromQuery = search.get("scheduledDate") || "";
 
   // const sessionId = decodeURIComponent(params.id);
-  const sessionId = decodeURIComponent(params.id);
-const isGeneratedSessionId = sessionId.startsWith("locked-");
+  const sessionId = decodeURIComponent(String(params.id || ""));
+const isGeneratedSessionId =
+  !sessionId || sessionId.startsWith("locked-") || sessionId.startsWith("unscheduled-");
   const queryClient = useQueryClient();
 
   const [confirm, setConfirm] = useState<{ kind: "complete" | "redo" } | null>(null);
+  const [actionLoading, setActionLoading] = useState<"complete" | null>(null);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleSubmitting, setRescheduleSubmitting] = useState(false);
+  const [rescheduleForm, setRescheduleForm] = useState<RescheduleFormState>({
+    platform: "zoom",
+  });
+  const today = new Date();
+  const [rescheduleMonth, setRescheduleMonth] = useState(today.getMonth());
+  const [rescheduleYear, setRescheduleYear] = useState(today.getFullYear());
+  const [rescheduleSelectedDate, setRescheduleSelectedDate] = useState(today.getDate());
+  const [rescheduleMonthlyAvailabilitySlots, setRescheduleMonthlyAvailabilitySlots] = useState<any[]>([]);
+  const [rescheduleAvailabilityLoading, setRescheduleAvailabilityLoading] = useState(false);
+  const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState("");
   const [tsData, setTsData] = useState<TranscriptSummary | null>(null);
   const [tsTab, setTsTab] = useState<"transcript" | "summary">("transcript");
-  // const detailQuery = useMentorSessionDetailQuery(sessionId, pastorIdFromQuery);
-  const detailQuery = useMentorSessionDetailQuery(
-  isGeneratedSessionId ? "" : sessionId,
-  pastorIdFromQuery
-);
-  const { completeMutation, redoMutation, actionLoading } = useMentorSessionActions(sessionId);
+  const detailQuery = useQuery({
+    queryKey: ["mentoring-session", sessionId],
+    enabled: Boolean(sessionId) && !isGeneratedSessionId,
+    retry: false,
+    queryFn: async () => {
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[mentor mentoring-session detail] fetching session", { sessionId });
+      }
+
+      const res = await apiGetMentoringSessionById(sessionId);
+      const session = unwrapMentoringSessionResponse(res);
+      if (!session) return null;
+      const appointment = getEmbeddedAppointment(session);
+      const sessionRecord = {
+        ...session,
+        id: getMentoringSessionId(session, sessionId),
+        appointmentId: getSessionAppointmentId(session, appointment),
+      };
+
+      return {
+        session: sessionRecord,
+        sessionsForPastor: [sessionRecord],
+        appointment,
+        pastorId: getStringValue(sessionRecord?.pastorId, sessionRecord?.userId, pastorIdFromQuery),
+      };
+    },
+  });
   const loading = detailQuery.isLoading;
   // const session = detailQuery.data?.session ?? null;
  const rawSession = detailQuery.data?.session ?? null;
 
-const fallbackSession =
-  isGeneratedSessionId && sessionNumberFromQuery
-    ? {
-        id: sessionId,
-        appointmentId: "",
-        pastorId: pastorIdFromQuery,
-        sessionNumber: sessionNumberFromQuery,
-        title: titleFromQuery || `Session ${sessionNumberFromQuery}`,
-        status: statusFromQuery || "LOCKED",
-        scheduledDate: scheduledDateFromQuery,
-      }
-    : null;
-
 const session =
   rawSession ||
-  detailQuery.data?.sessionsForPastor?.find(
-    (s) => Number(s.sessionNumber) === sessionNumberFromQuery
-  ) ||
-  fallbackSession ||
   null;
   const sessionsForPastor = detailQuery.data?.sessionsForPastor ?? [];
   const appointment = (detailQuery.data?.appointment ?? null) as AppointmentResponse | null;
   const pastorId = detailQuery.data?.pastorId ?? "";
+  const appointmentId = getSessionAppointmentId(session, appointment);
+
+  const rescheduleMentorId = useMemo(() => {
+    const mentor = getMentorFromCookie();
+    return getStringValue(
+      session?.mentorId,
+      session?.mentor?._id,
+      session?.mentor?.id,
+      mentor?.id,
+      mentor?._id,
+    );
+  }, [session]);
+
+  useEffect(() => {
+    if (!rescheduleOpen || !rescheduleMentorId) return;
+
+    let cancelled = false;
+    setRescheduleAvailabilityLoading(true);
+
+    void axiosInstance
+      .get(`/appointments/availability/${rescheduleMentorId}/month`, {
+        params: { year: rescheduleYear, month: rescheduleMonth + 1 },
+      })
+      .then((response) => {
+        if (!cancelled) {
+          const raw = response.data?.data ?? response.data;
+          setRescheduleMonthlyAvailabilitySlots(Array.isArray(raw) ? raw : []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRescheduleMonthlyAvailabilitySlots([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRescheduleAvailabilityLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rescheduleOpen, rescheduleMentorId, rescheduleMonth, rescheduleYear]);
+
+  const handleReschedulePrevMonth = () => {
+    setRescheduleSelectedSlot("");
+    if (rescheduleMonth === 0) {
+      setRescheduleMonth(11);
+      setRescheduleYear((year) => year - 1);
+    } else {
+      setRescheduleMonth((month) => month - 1);
+    }
+  };
+
+  const handleRescheduleNextMonth = () => {
+    setRescheduleSelectedSlot("");
+    if (rescheduleMonth === 11) {
+      setRescheduleMonth(0);
+      setRescheduleYear((year) => year + 1);
+    } else {
+      setRescheduleMonth((month) => month + 1);
+    }
+  };
 
   useEffect(() => {
     if (!detailQuery.error) return;
@@ -136,8 +270,8 @@ const session =
   }, [tsData?.transcript]);
 
   const transcriptQuery = useQuery({
-    queryKey: ["transcript-summary", String(session?.appointmentId ?? "")],
-    enabled: !!session?.appointmentId,
+    queryKey: ["transcript-summary", appointmentId],
+    enabled: !!appointmentId,
     staleTime: 10 * 60_000,
     refetchOnWindowFocus: false,
     retry: (failureCount, error) => {
@@ -147,10 +281,10 @@ const session =
       return failureCount < 1;
     },
     queryFn: async () => {
-      const appointmentId = String(session?.appointmentId ?? "").trim();
       if (!appointmentId) throw new Error("Missing appointment ID");
-      const res = await apiGetTranscriptSummary(appointmentId);
-      return (res.data?.data ?? res.data) as TranscriptSummaryResponseDto;
+      const res = await apiGetMentoringSessionTranscriptSummary(appointmentId);
+      const data = res.data as TranscriptSummaryResponseDto | { data?: TranscriptSummaryResponseDto };
+      return ("data" in data && data.data ? data.data : data) as TranscriptSummaryResponseDto;
     },
   });
 
@@ -183,8 +317,8 @@ const session =
 
   const transcriptMutation = useMutation({
     mutationFn: async (refresh: boolean) => {
-      if (!session?.appointmentId) throw new Error("Missing appointment ID");
-      const res = await apiGenerateTranscriptSummary(String(session.appointmentId), refresh);
+      if (!appointmentId) throw new Error("Missing appointment ID");
+      const res = await apiGenerateTranscriptSummary(appointmentId, refresh);
       return (res.data?.data ?? res.data) as TranscriptSummaryResponseDto;
     },
     onSuccess: (data) => {
@@ -197,7 +331,7 @@ const session =
         model: data.model,
         cached: data.cached,
       });
-      void queryClient.setQueryData(["transcript-summary", String(session?.appointmentId ?? "")], data);
+      void queryClient.setQueryData(["transcript-summary", appointmentId], data);
       toast.show({
         kind: "success",
         title: data.cached ? "Summary loaded from cache" : "Summary generated successfully",
@@ -211,7 +345,7 @@ const session =
   });
 
   const fetchTranscript = async (refresh: boolean) => {
-    if (!session?.appointmentId) {
+    if (!appointmentId) {
       toast.show({ kind: "error", title: "Missing appointment ID" });
       return;
     }
@@ -219,9 +353,63 @@ const session =
     await transcriptMutation.mutateAsync(refresh);
   };
 
+  const openRescheduleDrawer = () => {
+    const mentoringSessionId = getMentoringSessionId(session, sessionId);
+    if (!mentoringSessionId || mentoringSessionId.startsWith("locked-") || mentoringSessionId.startsWith("unscheduled-")) {
+      toast.show({ kind: "error", title: "Missing session info" });
+      return;
+    }
+
+    setRescheduleForm({
+      platform: getStringValue(session?.platform, session?.meetingPlatform, appointment?.platform, "zoom"),
+    });
+    const now = new Date();
+    setRescheduleMonth(now.getMonth());
+    setRescheduleYear(now.getFullYear());
+    setRescheduleSelectedDate(now.getDate());
+    setRescheduleSelectedSlot("");
+    setRescheduleMonthlyAvailabilitySlots([]);
+    setRescheduleOpen(true);
+  };
+
+  const submitReschedule = async () => {
+    const mentoringSessionId = getMentoringSessionId(session, sessionId);
+    if (!mentoringSessionId || mentoringSessionId.startsWith("locked-") || mentoringSessionId.startsWith("unscheduled-")) {
+      toast.show({ kind: "error", title: "Missing session info" });
+      return;
+    }
+
+    if (!rescheduleSelectedSlot) {
+      toast.show({ kind: "error", title: "Choose an available time slot" });
+      return;
+    }
+
+    try {
+      setRescheduleSubmitting(true);
+      await apiRescheduleMentoringSession(mentoringSessionId, {
+        scheduledDate: rescheduleSelectedSlot,
+        ...(rescheduleForm.platform ? { platform: rescheduleForm.platform } : {}),
+      });
+      toast.show({ kind: "success", title: "Session rescheduled" });
+      setRescheduleOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ["mentoring-session", sessionId] });
+      await detailQuery.refetch();
+    } catch (e) {
+      toast.show({ kind: "error", title: "Cannot reschedule session", subtitle: extractApiErrorMessage(e) });
+    } finally {
+      setRescheduleSubmitting(false);
+    }
+  };
+
   const runAction = async (kind: "complete" | "redo") => {
-    if (!session?.appointmentId) {
-      toast.show({ kind: "error", title: "Missing appointment/pastor info" });
+    if (kind === "redo") {
+      openRescheduleDrawer();
+      return;
+    }
+
+    const mentoringSessionId = getMentoringSessionId(session, sessionId);
+    if (!mentoringSessionId || mentoringSessionId.startsWith("locked-") || mentoringSessionId.startsWith("unscheduled-")) {
+      toast.show({ kind: "error", title: "Missing session info" });
       return;
     }
     if (!pastorId) {
@@ -229,19 +417,14 @@ const session =
       return;
     }
     try {
-      if (kind === "complete") {
-        await completeMutation.mutateAsync({ appointmentId: String(session.appointmentId) });
-        toast.show({ kind: "success", title: "Session completed" });
-      } else {
-        await redoMutation.mutateAsync({ appointmentId: String(session.appointmentId) });
-        toast.show({ kind: "success", title: "Redo scheduled" });
-        router.push(`/mentor/mentoring-session?pastorId=${encodeURIComponent(pastorId)}`);
-        return;
-      }
-      await queryClient.invalidateQueries({ queryKey: ["mentorship-sessions"] });
-      await queryClient.invalidateQueries({ queryKey: ["mentorship-session", sessionId] });
+      setActionLoading("complete");
+      await apiCompleteMentoringSession(mentoringSessionId);
+      toast.show({ kind: "success", title: "Session completed" });
+      await queryClient.invalidateQueries({ queryKey: ["mentoring-session", sessionId] });
     } catch (e) {
-      toast.show({ kind: "error", title: kind === "complete" ? "Cannot complete session" : "Cannot redo session", subtitle: extractApiErrorMessage(e) });
+      toast.show({ kind: "error", title: "Cannot complete session", subtitle: extractApiErrorMessage(e) });
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -250,6 +433,28 @@ const session =
       <div className="min-h-screen bg-[#062946] text-white font-[Albert_Sans]">
         <MentorHeader showFullHeader />
         <div className="mx-auto max-w-5xl px-4 md:px-8 py-10 text-white/70">Loading…</div>
+      </div>
+    );
+  }
+
+  if (isGeneratedSessionId) {
+    return (
+      <div className="min-h-screen bg-[#062946] text-white font-[Albert_Sans]">
+        <MentorHeader showFullHeader />
+        <div className="mx-auto max-w-5xl px-4 md:px-8 py-10">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+            <div className="text-lg font-semibold">This session is locked/not available yet</div>
+            <p className="mt-2 text-sm text-white/60">
+              Complete the earlier sessions before opening this session.
+            </p>
+            <button
+              className="mt-4 rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
+              onClick={() => router.push("/mentor/mentoring-session")}
+            >
+              Back
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -300,6 +505,136 @@ const session =
         busy={actionLoading != null}
       />
 
+      {rescheduleOpen ? (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
+            onClick={() => {
+              if (!rescheduleSubmitting) setRescheduleOpen(false);
+            }}
+            aria-hidden
+          />
+          <div className="fixed right-0 top-0 z-50 h-full w-full border-l border-white/15 bg-[#041f35] text-white shadow-2xl sm:max-w-[480px] sm:w-[480px]">
+            <div className="flex h-full flex-col p-6">
+              <div className="mb-6 flex shrink-0 items-center justify-between">
+                <div>
+                  <h2 className="flex items-center gap-2 text-lg font-semibold">
+                    <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
+                    Reschedule session
+                  </h2>
+                  <p className="mt-1 pl-7 text-sm font-medium text-[#8ec5eb]">
+                    Session {session.sessionNumber}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRescheduleOpen(false)}
+                  disabled={rescheduleSubmitting}
+                  className="rounded-lg p-2 text-[#cde2f2] transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  aria-label="Close"
+                >
+                  <i className="fa-solid fa-xmark text-xl" />
+                </button>
+              </div>
+
+              <div className="mb-6 flex-1 space-y-5 overflow-y-auto pr-3">
+                <div className="rounded-xl border border-white/15 bg-white/5 p-4">
+                  <p className="mb-3 text-sm text-[#cde2f2]">Mentor Availability</p>
+                  {rescheduleAvailabilityLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-r-white" />
+                    </div>
+                  ) : (
+                    <AvailabilityCalendar
+                      mentorId={rescheduleMentorId}
+                      currentMonth={rescheduleMonth}
+                      currentYear={rescheduleYear}
+                      selectedDate={rescheduleSelectedDate}
+                      onDateSelect={(day) => {
+                        setRescheduleSelectedDate(day);
+                        setRescheduleSelectedSlot("");
+                      }}
+                      onPrevMonth={handleReschedulePrevMonth}
+                      onNextMonth={handleRescheduleNextMonth}
+                      availabilitySlots={rescheduleMonthlyAvailabilitySlots}
+                      isLoading={rescheduleAvailabilityLoading}
+                    />
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-3 block text-sm font-semibold text-[#cde2f2]">
+                    Available times on {new Date(rescheduleYear, rescheduleMonth, rescheduleSelectedDate).toLocaleDateString()}
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(() => {
+                      const selectedDateSlots = rescheduleMonthlyAvailabilitySlots.find(
+                        (slot: any) => new Date(slot.date).getDate() === rescheduleSelectedDate,
+                      );
+                      const timeSlots = selectedDateSlots?.slots || [];
+                      if (timeSlots.length === 0) {
+                        return <p className="col-span-2 text-sm text-[#cde2f2]">No slots available on this date</p>;
+                      }
+                      return timeSlots.map((slot: any, index: number) => {
+                        const isoString = availabilitySlotToIso(selectedDateSlots.date, slot);
+                        const timeLabel = `${slot.startTime} ${slot.startPeriod}`;
+                        return (
+                          <button
+                            key={`${timeLabel}-${index}`}
+                            type="button"
+                            onClick={() => setRescheduleSelectedSlot(isoString)}
+                            className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition ${
+                              rescheduleSelectedSlot === isoString
+                                ? "border-blue-500 bg-blue-600 text-white"
+                                : "border-white/20 text-white hover:bg-white/10"
+                            }`}
+                          >
+                            {timeLabel}
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+                </div>
+
+                <label className="block">
+                  <span className="text-sm font-semibold text-[#cde2f2]">Platform</span>
+                  <select
+                    value={rescheduleForm.platform}
+                    onChange={(event) => setRescheduleForm((prev) => ({ ...prev, platform: event.target.value }))}
+                    className={`${mentorSelectDark} mt-2 w-full`}
+                  >
+                    <option className="bg-[#062946]" value="zoom">Zoom</option>
+                    <option className="bg-[#062946]" value="google-meet">Google Meet</option>
+                    <option className="bg-[#062946]" value="teams">Microsoft Teams</option>
+                    <option className="bg-[#062946]" value="phone">Phone</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="flex shrink-0 justify-end gap-3 border-t border-white/10 pt-6">
+                <button
+                  type="button"
+                  onClick={() => setRescheduleOpen(false)}
+                  disabled={rescheduleSubmitting}
+                  className="rounded-lg border border-white/20 px-4 py-2 text-xs text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={rescheduleSubmitting}
+                  onClick={submitReschedule}
+                  className="rounded-lg bg-blue-600 px-6 py-2 text-xs font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {rescheduleSubmitting ? "Saving..." : "Save changes"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
+
       <div className="mx-auto max-w-6xl px-4 md:px-8 py-10 space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
@@ -335,7 +670,7 @@ const session =
 
     <button
       type="button"
-      onClick={() => setConfirm({ kind: "redo" })}
+      onClick={openRescheduleDrawer}
       disabled={actionLoading != null}
       className="mt-3 rounded-lg border border-green-400/30 bg-green-500/20 px-3 py-1.5 text-xs font-semibold text-green-100 hover:bg-green-500/30"
     >
@@ -409,13 +744,13 @@ const session =
 
             <button
               type="button"
-              onClick={() => setConfirm({ kind: "redo" })}
+              onClick={openRescheduleDrawer}
               disabled={actionLoading != null}
               className={`rounded-xl px-4 py-2 text-sm font-semibold border bg-white/5 text-white/80 border-white/15 hover:bg-white/10 ${
                 actionLoading != null ? "opacity-60 cursor-not-allowed" : ""
               }`}
             >
-       {actionLoading === "redo" ? "Scheduling…" : "Schedule Repeat Session"}
+       Schedule Repeat Session
             </button>
 
             <a

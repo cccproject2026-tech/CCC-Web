@@ -7,13 +7,10 @@ import {
   directorPageContainer,
   directorPageRoot,
 } from "@/app/director/directorUi";
-import { apiGetAllUsers } from "@/app/Services/api";
-import { apiGetAssignedUsers } from "@/app/Services/users.service";
-import { apiGetAppointments } from "@/app/Services/appointments.service";
-import { apiGetMentorshipSessionsNormalized } from "@/app/Services/roadmaps.service";
+import { apiGetDirectorMentoringJourneys } from "@/app/Services/mentoring-sessions.service";
 
-type SessionStatus = "scheduled" | "completed" | "cancelled" | "missed";
-type JourneyStatus = "scheduled" | "completed" | "missed" | "in-progress";
+type SessionStatus = "scheduled" | "completed" | "cancelled" | "missed" | "locked";
+type JourneyStatus = "scheduled" | "completed" | "missed" | "in-progress" | "locked";
 type TabKey = "sessions" | "mentors" | "pastors";
 
 type DirectorMentor = {
@@ -42,6 +39,7 @@ type DirectorSession = {
   mentorId: string;
   status: SessionStatus;
   meetingDate: string;
+  locked?: boolean;
   platform: string;
   meetingLink?: string;
   summary: string;
@@ -66,7 +64,7 @@ const tabs: { key: TabKey; label: string }[] = [
   { key: "pastors", label: "Pastors Mentoring Sessions" },
 ];
 
-const statusFilters: ("all" | JourneyStatus)[] = ["all", "scheduled", "completed", "missed", "in-progress"];
+const statusFilters: ("all" | JourneyStatus)[] = ["all", "scheduled", "completed", "missed", "in-progress", "locked"];
 
 function initials(name: string) {
   return name
@@ -94,6 +92,7 @@ function statusBadgeClass(status: SessionStatus) {
   if (status === "completed") return "border-emerald-300/25 bg-emerald-500/15 text-emerald-100";
   if (status === "scheduled") return "border-[#8ec5eb]/30 bg-[#8ec5eb]/15 text-[#d9ebf8]";
   if (status === "missed") return "border-amber-300/30 bg-amber-500/15 text-amber-100";
+  if (status === "locked") return "border-white/15 bg-white/10 text-white/55";
   return "border-rose-300/30 bg-rose-500/15 text-rose-100";
 }
 
@@ -109,6 +108,7 @@ function journeyStatusBadgeClass(status: JourneyStatus) {
   if (status === "completed") return "border-emerald-300/25 bg-emerald-500/15 text-emerald-100";
   if (status === "scheduled") return "border-[#8ec5eb]/30 bg-[#8ec5eb]/15 text-[#d9ebf8]";
   if (status === "missed") return "border-amber-300/30 bg-amber-500/15 text-amber-100";
+  if (status === "locked") return "border-white/15 bg-white/10 text-white/55";
   return "border-white/15 bg-white/10 text-white/75";
 }
 
@@ -154,11 +154,11 @@ function unwrapUsersList(response: any): any[] {
   return [];
 }
 
-function unwrapAppointmentsList(response: any): any[] {
+function unwrapDirectorJourneysResponse(response: any): any[] {
   const data = response?.data?.data ?? response?.data;
   if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.appointments)) return data.appointments;
-  if (Array.isArray(response?.data?.appointments)) return response.data.appointments;
+  if (Array.isArray(data?.journeys)) return data.journeys;
+  if (Array.isArray(response?.data?.journeys)) return response.data.journeys;
   return [];
 }
 
@@ -174,12 +174,29 @@ function normalizeStatus(value: unknown, dateValue?: string): SessionStatus {
   if (status.includes("complete")) return "completed";
   if (status.includes("cancel")) return "cancelled";
   if (status.includes("miss")) return "missed";
+  if (status.includes("lock")) return "locked";
   if (dateValue && new Date(dateValue).getTime() < Date.now() && status === "scheduled") return "missed";
   return "scheduled";
 }
 
-function normalizeMentor(user: any): DirectorMentor {
-  const id = getUserId(user);
+function normalizeJourneyStatus(value: unknown): JourneyStatus {
+  const status = String(value || "").toLowerCase();
+  if (status.includes("complete")) return "completed";
+  if (status.includes("miss")) return "missed";
+  if (status.includes("schedule")) return "scheduled";
+  if (status.includes("lock")) return "locked";
+  return "in-progress";
+}
+
+function getPersonObject(...values: unknown[]) {
+  for (const value of values) {
+    if (value && typeof value === "object") return value as any;
+  }
+  return null;
+}
+
+function normalizeMentor(user: any, fallbackId = ""): DirectorMentor {
+  const id = getUserId(user) || fallbackId;
   return {
     id,
     name: getUserName(user, "Mentor"),
@@ -190,8 +207,8 @@ function normalizeMentor(user: any): DirectorMentor {
   };
 }
 
-function normalizePastor(user: any): DirectorPastor {
-  const id = getUserId(user);
+function normalizePastor(user: any, fallbackId = ""): DirectorPastor {
+  const id = getUserId(user) || fallbackId;
   const mentorId = getRefId(user?.mentorId) || getRefId(user?.assignedMentor) || getRefId(user?.mentor);
   return {
     id,
@@ -203,58 +220,92 @@ function normalizePastor(user: any): DirectorPastor {
   };
 }
 
-function normalizeAppointmentSession(appt: any, index: number): DirectorSession {
-  const meetingDate = getStringValue(appt?.meetingDate, appt?.date, appt?.scheduledAt, appt?.startTime, new Date().toISOString());
-  const pastorId = getRefId(appt?.userId) || getRefId(appt?.user) || getRefId(appt?.pastorId) || getRefId(appt?.pastor);
-  const mentorId = getRefId(appt?.mentorId) || getRefId(appt?.mentor);
+function normalizeJourneySession(
+  session: any,
+  journey: any,
+  pastor: DirectorPastor,
+  mentor: DirectorMentor | null,
+  index: number,
+): DirectorSession {
+  const meetingDate = getStringValue(session?.scheduledDate, session?.meetingDate, session?.date);
+  const status = normalizeStatus(session?.status, meetingDate);
   return {
-    id: getStringValue(appt?._id, appt?.id, `appointment-${index + 1}`),
-    sessionNumber: Number(appt?.sessionNumber || appt?.sessionNo || index + 1),
-    title: getStringValue(appt?.title, appt?.notes, `Mentoring Session ${index + 1}`),
-    pastorId,
-    mentorId,
-    status: normalizeStatus(appt?.status, meetingDate),
-    meetingDate,
-    platform: getStringValue(appt?.platform, appt?.meetingPlatform, "Platform not added"),
-    meetingLink: getStringValue(appt?.meetingLink, appt?.joinUrl, appt?.link, appt?.zoomJoinUrl),
-    summary: getStringValue(appt?.summary, appt?.notes, "Appointment session loaded from existing appointments API."),
-    aiTranscript: getStringValue(appt?.aiTranscript, appt?.transcriptSummary),
-  };
-}
-
-function normalizeMentorshipSession(session: any, pastor: DirectorPastor, index: number): DirectorSession {
-  const meetingDate = getStringValue(session?.scheduledDate, session?.meetingDate, session?.date, session?.createdAt, new Date().toISOString());
-  return {
-    id: getStringValue(session?.id, session?._id, `session-${pastor.id}-${index + 1}`),
+    id: getStringValue(session?.id, session?._id, session?.sessionId),
     sessionNumber: Number(session?.sessionNumber || session?.sessionNo || index + 1),
-    title: getStringValue(session?.title, session?.mentorNote, `Mentoring Session ${index + 1}`),
-    pastorId: pastor.id,
-    mentorId: getRefId(session?.mentorId) || pastor.mentorId,
-    status: normalizeStatus(session?.status, meetingDate),
+    title: getStringValue(session?.title, session?.mentorNote, `Session ${index + 1}`),
+    pastorId: getRefId(session?.pastorId) || getRefId(session?.userId) || pastor.id,
+    mentorId: getRefId(session?.mentorId) || mentor?.id || pastor.mentorId,
+    status,
     meetingDate,
-    platform: getStringValue(session?.platform, session?.meetingPlatform, session?.appointment?.platform, "Platform not added"),
-    meetingLink: getStringValue(session?.meetingLink, session?.joinUrl, session?.appointment?.meetingLink, session?.appointment?.zoomJoinUrl),
-    summary: getStringValue(session?.summary, session?.mentorNote, session?.pastorNote, "Mentorship session loaded from existing roadmap sessions API."),
+    locked: status === "locked",
+    platform: getStringValue(
+      session?.platform,
+      session?.meetingPlatform,
+      session?.appointment?.platform,
+      session?.appointmentDetails?.platform,
+      "Platform not added",
+    ),
+    meetingLink: getStringValue(
+      session?.meetingLink,
+      session?.joinUrl,
+      session?.link,
+      session?.appointment?.meetingLink,
+      session?.appointment?.zoomJoinUrl,
+      session?.appointmentDetails?.meetingLink,
+      session?.appointmentDetails?.zoomJoinUrl,
+    ),
+    summary: getStringValue(session?.summary, session?.mentorNote, session?.pastorNote, "Session details loaded from director journeys API."),
     aiTranscript: getStringValue(session?.aiTranscript, session?.transcriptSummary, session?.mentorshipInsights),
   };
 }
 
-function buildTemporarySessionsFromRealPeople(pastorRows: DirectorPastor[], mentorRows: DirectorMentor[]): DirectorSession[] {
-  // TODO: Replace this fallback when backend provides a director/all mentorship sessions endpoint.
-  return pastorRows.slice(0, 8).map((pastor, index) => {
-    const mentor = mentorRows.find((item) => item.id === pastor.mentorId) || mentorRows[index % Math.max(mentorRows.length, 1)];
-    return {
-      id: `temporary-session-${pastor.id || index}`,
-      sessionNumber: (index % 4) + 1,
-      title: `Mentoring Session ${(index % 4) + 1}`,
-      pastorId: pastor.id,
-      mentorId: mentor?.id || pastor.mentorId,
-      status: index % 3 === 0 ? "completed" : "scheduled",
-      meetingDate: new Date(Date.now() + (index + 1) * 86_400_000).toISOString(),
-      platform: "Platform not added",
-      summary: "Temporary frontend-only session row using real pastor and mentor names.",
-    };
-  });
+function normalizeDirectorJourney(journey: any): PastorJourney | null {
+  const pastorObject = getPersonObject(journey?.pastor, journey?.pastorDetails, journey?.user);
+  const mentorObject = getPersonObject(journey?.mentor, journey?.mentorDetails);
+  const pastorId = getRefId(journey?.pastorId) || getRefId(journey?.userId) || getUserId(pastorObject);
+  if (!pastorId) return null;
+
+  const mentorId = getRefId(journey?.mentorId) || getUserId(mentorObject);
+  const pastor = normalizePastor(
+    {
+      ...(pastorObject || {}),
+      id: pastorId,
+      mentorId,
+      churchName: journey?.churchName ?? pastorObject?.churchName,
+      church: journey?.church ?? pastorObject?.church,
+      city: journey?.city ?? pastorObject?.city,
+    },
+    pastorId,
+  );
+  const mentor = mentorId ? normalizeMentor({ ...(mentorObject || {}), id: mentorId }, mentorId) : null;
+  const sessions = (Array.isArray(journey?.sessions) ? journey.sessions : [])
+    .map((session: any, index: number) => normalizeJourneySession(session, journey, pastor, mentor, index))
+    .sort((a: DirectorSession, b: DirectorSession) => {
+      if (a.sessionNumber !== b.sessionNumber) return a.sessionNumber - b.sessionNumber;
+      return new Date(a.meetingDate || 0).getTime() - new Date(b.meetingDate || 0).getTime();
+    });
+  const completedCount = Number(
+    journey?.completedCount ??
+      sessions.filter((session: DirectorSession) => session.status === "completed").length,
+  );
+  const currentSession =
+    sessions.find((session: DirectorSession) => session.status === "missed" || session.status === "scheduled") ||
+    sessions.find((session: DirectorSession) => session.status !== "completed") ||
+    sessions[sessions.length - 1];
+  const currentSessionNumber = Number(journey?.currentSessionNumber || currentSession?.sessionNumber || 1);
+  const status = normalizeJourneyStatus(journey?.status || currentSession?.status);
+
+  return {
+    pastor,
+    mentor,
+    sessions,
+    currentSessionNumber,
+    currentSessionTitle: getStringValue(journey?.currentSessionTitle, currentSession?.title, `Session ${currentSessionNumber}`),
+    nextMeetingDate: getStringValue(journey?.scheduledDate, journey?.nextMeetingDate, currentSession?.meetingDate),
+    status: completedCount >= 10 ? "completed" : status,
+    completedCount,
+    progressPercent: Math.min(Math.round((completedCount / 10) * 100), 100),
+  };
 }
 
 export default function DirectorMentoringSessionPage() {
@@ -270,7 +321,7 @@ export default function DirectorMentoringSessionPage() {
   const [sessions, setSessions] = useState<DirectorSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [usedSessionFallback, setUsedSessionFallback] = useState(false);
+  const [journeyRows, setJourneyRows] = useState<PastorJourney[]>([]);
   const [selectedMentorId, setSelectedMentorId] = useState("");
   const [selectedPastorId, setSelectedPastorId] = useState("");
   const [modalSession, setModalSession] = useState<DirectorSession | null>(null);
@@ -282,75 +333,37 @@ export default function DirectorMentoringSessionPage() {
     const load = async () => {
       setLoading(true);
       setLoadError(null);
-      setUsedSessionFallback(false);
 
       try {
-        const [mentorRes, pastorRes, appointmentsRes] = await Promise.all([
-          apiGetAllUsers({ role: "mentor", roleMatch: "mixed", limit: 9999 }),
-          apiGetAllUsers({ role: "pastor", roleMatch: "mixed", limit: 9999 }),
-          apiGetAppointments({ futureOnly: false }),
-        ]);
+        const journeysRes = await apiGetDirectorMentoringJourneys();
+        const normalizedJourneys = unwrapDirectorJourneysResponse(journeysRes)
+          .map(normalizeDirectorJourney)
+          .filter(Boolean) as PastorJourney[];
 
-        const mentorRows = unwrapUsersList(mentorRes).map(normalizeMentor).filter((mentor) => mentor.id);
-        let pastorRows = unwrapUsersList(pastorRes).map(normalizePastor).filter((pastor) => pastor.id);
-
-        const assignedPairs = await Promise.allSettled(
-          mentorRows.map(async (mentor) => {
-            const assignedRes = await apiGetAssignedUsers(mentor.id);
-            const assignedIds = unwrapUsersList(assignedRes)
-              .map((user) => getUserId(user))
-              .filter(Boolean);
-            return { mentorId: mentor.id, assignedPastorIds: assignedIds };
-          }),
-        );
-
-        const mentorRowsWithAssignments = mentorRows.map((mentor) => {
-          const match = assignedPairs.find((result) => {
-            return result.status === "fulfilled" && result.value.mentorId === mentor.id;
+        const pastorRows = normalizedJourneys.map((journey) => journey.pastor);
+        const mentorMap = new Map<string, DirectorMentor>();
+        normalizedJourneys.forEach((journey) => {
+          if (!journey.mentor?.id) return;
+          const existing = mentorMap.get(journey.mentor.id);
+          mentorMap.set(journey.mentor.id, {
+            ...journey.mentor,
+            assignedPastorIds: Array.from(new Set([...(existing?.assignedPastorIds || []), journey.pastor.id])),
           });
-          const assignedPastorIds =
-            match && match.status === "fulfilled" ? match.value.assignedPastorIds : [];
-          return { ...mentor, assignedPastorIds };
         });
-
-        pastorRows = pastorRows.map((pastor) => {
-          if (pastor.mentorId) return pastor;
-          const assignedMentor = mentorRowsWithAssignments.find((mentor) => mentor.assignedPastorIds.includes(pastor.id));
-          return assignedMentor ? { ...pastor, mentorId: assignedMentor.id } : pastor;
-        });
-
-        let sessionRows: DirectorSession[] = [];
-        try {
-          // TODO: Replace this fan-out when backend provides GET mentoring sessions by director/all.
-          const perPastorResults = await Promise.allSettled(
-            pastorRows.map(async (pastor) => {
-              const rows = await apiGetMentorshipSessionsNormalized(pastor.id);
-              return rows.map((row, index) => normalizeMentorshipSession(row, pastor, index));
-            }),
-          );
-          sessionRows = perPastorResults.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
-        } catch {
-          sessionRows = [];
-        }
-
-        if (sessionRows.length === 0) {
-          const appointmentRows = unwrapAppointmentsList(appointmentsRes).map(normalizeAppointmentSession);
-          sessionRows = appointmentRows.filter((session) => session.pastorId || session.mentorId);
-        }
+        const mentorRows = Array.from(mentorMap.values());
+        const sessionRows = normalizedJourneys.flatMap((journey) => journey.sessions);
 
         if (cancelled) return;
-        if (sessionRows.length === 0) {
-          setUsedSessionFallback(true);
-          sessionRows = buildTemporarySessionsFromRealPeople(pastorRows, mentorRowsWithAssignments);
-        }
-        setMentors(mentorRowsWithAssignments);
+        setJourneyRows(normalizedJourneys);
+        setMentors(mentorRows);
         setPastors(pastorRows);
         setSessions(sessionRows);
-        setSelectedMentorId((prev) => prev || mentorRowsWithAssignments[0]?.id || "");
+        setSelectedMentorId((prev) => prev || mentorRows[0]?.id || "");
         setSelectedPastorId((prev) => prev || pastorRows[0]?.id || "");
       } catch (error) {
         if (cancelled) return;
         setLoadError(error instanceof Error ? error.message : "Failed to load director mentoring session data.");
+        setJourneyRows([]);
         setMentors([]);
         setPastors([]);
         setSessions([]);
@@ -369,6 +382,8 @@ export default function DirectorMentoringSessionPage() {
   const pastorById = useMemo(() => new Map(pastors.map((pastor) => [pastor.id, pastor])), [pastors]);
 
   const journeys = useMemo<PastorJourney[]>(() => {
+    if (journeyRows.length) return journeyRows;
+
     const sessionsByPastorId = sessions.reduce((groups, session) => {
       if (!session.pastorId) return groups;
       const pastorSessions = groups.get(session.pastorId) || [];
@@ -402,11 +417,6 @@ const completedCount = pastorSessions.filter(
 const sortedSessions = [...pastorSessions].sort(
   (a, b) => (a.sessionNumber || 0) - (b.sessionNumber || 0)
 );
-console.log(
-  "PASTOR SESSIONS RAW",
-  pastor.name,
-  sortedSessions
-);
 const activeJourneySession =
   sortedSessions.find(
     (session) =>
@@ -430,17 +440,6 @@ const currentSession =
 
 const currentSessionNumber =
   currentSession?.sessionNumber || 1;
-  console.log(
-  "Journey Debug",
-  pastor.name,
-  sortedSessions.map((s) => ({
-    session: s.sessionNumber,
-    status: s.status,
-  })),
-  "CURRENT:",
-  currentSession?.sessionNumber,
-  currentSession?.status
-);
 
 const latestSession =
   sortedSessions[sortedSessions.length - 1];
@@ -500,7 +499,7 @@ const status: JourneyStatus =
         progressPercent: Math.min(Math.round((completedCount / 10) * 100), 100),
       };
     });
-  }, [mentorById, pastors, sessions]);
+  }, [journeyRows, mentorById, pastors, sessions]);
 
   const filteredJourneys = useMemo(() => {
     const q = sessionSearch.trim().toLowerCase();
@@ -561,7 +560,7 @@ const filteredSelectedPastorSessions = selectedPastorSessions.filter((session) =
   return !q || session.title.toLowerCase().includes(q);
 });
   const analytics = [
-    { label: "Total Journeys", value: journeys.length, note: usedSessionFallback ? "Temporary session rows" : "Real frontend API data" },
+    { label: "Total Journeys", value: journeys.length, note: "Director journeys API" },
     { label: "Scheduled", value: journeys.filter((journey) => journey.status === "scheduled").length, note: "Current/next session scheduled" },
     { label: "Completed", value: journeys.filter((journey) => journey.status === "completed").length, note: "10 sessions completed" },
     { label: "Missed", value: journeys.filter((journey) => journey.status === "missed").length, note: "Needs follow-up" },
@@ -585,12 +584,16 @@ const filteredSelectedPastorSessions = selectedPastorSessions.filter((session) =
         items.map((session) => {
           const mentor = mentorById.get(session.mentorId);
           const pastor = pastorById.get(session.pastorId);
+          const isLocked = session.status === "locked" || session.locked;
           return (
             <button
               key={`${session.id}-${session.pastorId}-${session.mentorId}-${session.sessionNumber}`}
               type="button"
+              disabled={isLocked}
               onClick={() => setModalSession(session)}
-              className="w-full rounded-xl border border-white/10 bg-white/[0.04] p-4 text-left transition hover:border-[#8ec5eb]/35 hover:bg-white/[0.07]"
+              className={`w-full rounded-xl border border-white/10 bg-white/[0.04] p-4 text-left transition ${
+                isLocked ? "cursor-not-allowed opacity-75" : "hover:border-[#8ec5eb]/35 hover:bg-white/[0.07]"
+              }`}
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -628,19 +631,13 @@ const filteredSelectedPastorSessions = selectedPastorSessions.filter((session) =
       <main className={`${directorPageContainer} space-y-6 px-4 pb-10 sm:px-6 lg:px-10`}>
         {loading ? (
           <section className={`${directorGlassCard} p-6 text-sm text-white/65`}>
-            Loading mentors, pastors, assignments, appointments, and available mentorship sessions...
+            Loading director mentoring journeys...
           </section>
         ) : null}
 
         {loadError ? (
           <section className={`${directorGlassCard} border-red-400/25 bg-red-500/10 p-6 text-sm text-red-100`}>
             {loadError}
-          </section>
-        ) : null}
-
-        {usedSessionFallback ? (
-          <section className={`${directorGlassCard} border-amber-300/25 bg-amber-500/10 p-4 text-sm text-amber-100`}>
-            TODO: Backend needs a director/all mentoring sessions API. Temporary rows below use real mentor and pastor names.
           </section>
         ) : null}
 

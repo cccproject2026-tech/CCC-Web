@@ -175,14 +175,70 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   setProfileErrorMsg(null);
 };
 
+// const handleSaveProfile = async () => {
+//   if (!user?.id) {
+//     setProfileErrorMsg("Missing user id. Please login again.");
+//     return;
+//   }
+
+//   if (!selectedProfileFile) {
+//     setProfileErrorMsg("Please choose a profile picture first.");
+//     return;
+//   }
+
+//   const formData = new FormData();
+//   formData.append("file", selectedProfileFile);
+
+//   try {
+//     setIsProfileUploading(true);
+//     setProfileErrorMsg(null);
+
+//     const response = await apiUploadProfilePicture(user.id, formData);
+//     const json = response.data;
+
+//     if (!json.success) {
+//       setProfileErrorMsg(json.message || "Failed to upload profile picture.");
+//       return;
+//     }
+
+//     const newUrl: string | undefined = json.data?.profilePicture;
+
+//     if (newUrl) {
+//       setProfileImage(newUrl);
+
+//       const updatedUser: User = {
+//         ...user,
+//         profilePicture: newUrl,
+//       };
+
+//       setUser(updatedUser);
+
+//       if (typeof window !== "undefined") {
+//         setCookie("mentor", JSON.stringify(updatedUser));
+//       }
+//     }
+
+//     router.push("/mentor/home");
+//   } catch (err) {
+//     console.error("Upload error:", err);
+//     setProfileErrorMsg("Something went wrong. Please try again.");
+//   } finally {
+//     setIsProfileUploading(false);
+//   }
+// };
 const handleSaveProfile = async () => {
   if (!user?.id) {
     setProfileErrorMsg("Missing user id. Please login again.");
     return;
   }
 
+  if (!selectedProfileFile && documents.length > 0) {
+    router.push("/mentor/home");
+    return;
+  }
+
   if (!selectedProfileFile) {
-    setProfileErrorMsg("Please choose a profile picture first.");
+    setProfileErrorMsg("Please choose a profile picture or upload a document first.");
     return;
   }
 
@@ -201,7 +257,8 @@ const handleSaveProfile = async () => {
       return;
     }
 
-    const newUrl: string | undefined = json.data?.profilePicture;
+    const uploadedUrl: string | undefined = json.data?.profilePicture;
+    const newUrl = uploadedUrl ? `${uploadedUrl}?t=${Date.now()}` : undefined;
 
     if (newUrl) {
       setProfileImage(newUrl);
@@ -212,10 +269,7 @@ const handleSaveProfile = async () => {
       };
 
       setUser(updatedUser);
-
-      if (typeof window !== "undefined") {
-        setCookie("mentor", JSON.stringify(updatedUser));
-      }
+      setCookie("mentor", JSON.stringify(updatedUser));
     }
 
     router.push("/mentor/home");
@@ -226,7 +280,6 @@ const handleSaveProfile = async () => {
     setIsProfileUploading(false);
   }
 };
-
 
 
   // 🔹 Open document file picker
@@ -379,7 +432,7 @@ const handleSaveProfile = async () => {
             <i className="fa-solid fa-paperclip text-xs"></i>
             Upload documents
           </button>
-          <button
+          {/* <button
   type="button"
   onClick={handleSaveProfile}
   disabled={!hasProfileChanged || isProfileUploading}
@@ -390,6 +443,18 @@ const handleSaveProfile = async () => {
   }`}
 >
   {isProfileUploading ? "Saving..." : "Save"}
+</button> */}
+<button
+  type="button"
+  onClick={handleSaveProfile}
+  disabled={(!hasProfileChanged && documents.length === 0) || isProfileUploading || isDocUploading}
+  className={`mt-4 flex items-center justify-center gap-2 mx-auto text-sm font-semibold px-8 py-2 rounded-lg transition ${
+    (hasProfileChanged || documents.length > 0) && !isProfileUploading && !isDocUploading
+      ? "bg-[#f5cc76] text-[#062946] hover:bg-[#ffd98a]"
+      : "bg-white/20 text-white/50 cursor-not-allowed"
+  }`}
+>
+  {isProfileUploading || isDocUploading ? "Saving..." : "Save"}
 </button>
 
           {/* hidden file input for documents */}
