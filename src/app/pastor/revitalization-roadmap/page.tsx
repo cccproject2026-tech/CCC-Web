@@ -803,7 +803,16 @@ const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: s
   // item.months ||
   // "N/A",
   months: formatParentCompletionTime(item),
-        status: toUiStatus(item.status),
+        // status: toUiStatus(item.status),
+        status:
+  item.hasNestedTasks === true &&
+  Array.isArray((item as any).children) &&
+  (item as any).children.length > 0 &&
+  (item as any).children.every((task: any) =>
+    String(task.status ?? "").toLowerCase().includes("complete")
+  )
+    ? "Completed"
+    : toUiStatus(item.status),
         sessionDate: item.meetings?.[0] || "",
         imageUrl: resolveApiMediaUrl(item.imageUrl) || "",
         hasNestedTasks: item.hasNestedTasks === true,
