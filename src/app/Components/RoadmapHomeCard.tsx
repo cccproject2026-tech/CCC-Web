@@ -49,7 +49,12 @@ export default function RoadmapHomeCard({
 }: RoadmapHomeCardProps) {
   const [selectedDate, setSelectedDate] = useState("");
   const isMentor = variant === "mentor";
-
+const effectiveStatus =
+  taskCompleted &&
+  taskCompleted.total > 0 &&
+  taskCompleted.completed >= taskCompleted.total
+    ? "Completed"
+    : status;
   const hasRenderableImage =
     img != null &&
     (typeof img === "string"
@@ -58,7 +63,7 @@ export default function RoadmapHomeCard({
 
   const getStatusColor = () => {
     if (isMentor) {
-      switch (status) {
+      switch (effectiveStatus) {
         case "Not Started":
           return "bg-[#e6edff] text-[#1e40af]";
         case "In-progress":
@@ -71,7 +76,7 @@ export default function RoadmapHomeCard({
           return "bg-[#e6edff] text-[#1e40af]";
       }
     }
-    switch (status) {
+    switch (effectiveStatus){
       case "Not Started":
         return "bg-[#B8E6FF] text-[#0066CC]";
       case "In-progress":
@@ -93,7 +98,8 @@ export default function RoadmapHomeCard({
   const imgUnoptimized =
     typeof img === "string" && (img.startsWith("http://") || img.startsWith("https://"));
 
-  const showViewButton = Boolean(onViewClick && (isMentor || status !== "Completed"));
+  // const showViewButton = Boolean(onViewClick && (isMentor || status !== "Completed"));
+  const showViewButton = Boolean(onViewClick && (isMentor || effectiveStatus !== "Completed"));
 
   const handleCardClick = () => {
     if (onCardClick) {
@@ -172,12 +178,13 @@ export default function RoadmapHomeCard({
               <span
                 className={`inline-block rounded-lg px-3 py-1 text-[12px] font-semibold ${getStatusColor()}`}
               >
-                {status}
+                {/* {status} */}
+                {effectiveStatus}
               </span>
             </div>
 
             {/* Completed Dates - Only show for Completed status */}
-            {status === "Completed" && completedOn && lastUpdatedOn && (
+            {effectiveStatus === "Completed" && completedOn && lastUpdatedOn && (
               <div className="mb-4 space-y-2">
                 <div>
                   <p className={`text-[14px] font-semibold ${isMentor ? "text-[#d9ebf8]" : "font-bold text-black"}`}>
@@ -196,7 +203,7 @@ export default function RoadmapHomeCard({
 
             {/* Task Completion Progress - Show for In-progress and Over Due */}
             {taskCompleted &&
-              (status === "In-progress" || status === "Over Due") && (
+              (effectiveStatus === "In-progress" || effectiveStatus === "Over Due") && (
                 <div className="mb-4">
                   <div className="mb-2 flex items-center justify-between">
                     <p className={`text-[14px] font-semibold ${isMentor ? "text-[#d9ebf8]" : "font-bold text-black"}`}>
@@ -216,7 +223,7 @@ export default function RoadmapHomeCard({
                   </div>
                 </div>
               )}
-
+{/* 
             {isMentor && meetingInfo && (
               <div className="mb-4 rounded-xl border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 px-3 py-2.5">
                 <div className="mb-1 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide text-[#8ec5eb]">
@@ -228,7 +235,13 @@ export default function RoadmapHomeCard({
                   {meetingInfo.time ? <span className="text-[#cde2f2]/75"> at {meetingInfo.time}</span> : null}
                 </p>
               </div>
-            )}
+            )} */}
+            {isMentor && meetingInfo && (
+  <div className="mb-4 rounded-lg border border-yellow-300/35 bg-yellow-300/15 px-3 py-2 text-[13px] font-semibold text-yellow-100">
+    Meeting Scheduled : {meetingInfo.date}
+    {meetingInfo.time ? ` ${meetingInfo.time}` : ""}
+  </div>
+)}
 
             {/* Date Selector - Conditional */}
             {showDateSelector && status === "Not Started" && (

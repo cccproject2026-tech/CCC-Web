@@ -111,7 +111,23 @@ function roadmapFetchErrorMessage(err: unknown): string {
   }
   return raw || "Unable to fetch roadmap data from API.";
 }
+function safeString(v: unknown): string {
+  return typeof v === "string" ? v.trim() : v == null ? "" : String(v).trim();
+}
 
+function formatParentCompletionTime(item: any): string {
+  const fromParent =
+    safeString(item?.parentDuration) ||
+    safeString(item?.parentCompletionTime) ||
+    safeString(item?.duration) ||
+    safeString(item?.parent?.duration) ||
+    safeString(item?.parentRoadmap?.duration) ||
+    safeString(item?.roadmap?.duration);
+
+  if (fromParent) return fromParent;
+
+  return safeString(item?.months) || "N/A";
+}
 function tabKeyFromSearchParam(raw: string | null): TabKey | null {
   if (!raw) return null;
   const d = decodeURIComponent(raw)
@@ -781,7 +797,12 @@ const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: s
         description: item.desc || "No description",
         parentRoadmapName: item.parentRoadmapName || "Roadmap",
         parentRoadmapId: item.parentRoadmapId,
-        months: item.months || "N/A",
+  //  months:
+  // (item as any).parentDuration ||
+  // (item as any).parentCompletionTime ||
+  // item.months ||
+  // "N/A",
+  months: formatParentCompletionTime(item),
         status: toUiStatus(item.status),
         sessionDate: item.meetings?.[0] || "",
         imageUrl: resolveApiMediaUrl(item.imageUrl) || "",
@@ -851,24 +872,54 @@ const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: s
     return [...known].sort((a, b) => phaseSequenceIndex(a) - phaseSequenceIndex(b));
   }, [phases]);
 
-  const openPhaseRoute = useCallback(
-    (phase: PhaseCard) => {
-      if (phase.hasNestedTasks) {
-        router.push(`/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(phase.id)}`);
-        return;
-      }
-      const hasParent =
-        phase.parentRoadmapId &&
-        phase.parentRoadmapId.trim() !== "" &&
-        phase.parentRoadmapId !== phase.id;
-      const href = hasParent
-        ? `/pastor/jumpstart?id=${encodeURIComponent(phase.id)}&parentId=${encodeURIComponent(phase.parentRoadmapId!)}`
-        : `/pastor/jumpstart?id=${encodeURIComponent(phase.id)}`;
-      router.push(href);
-    },
-    [router],
-  );
+  // const openPhaseRoute = useCallback(
+  //   (phase: PhaseCard) => {
+  //     if (phase.hasNestedTasks) {
+  //       router.push(`/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(phase.id)}`);
+  //       return;
+  //     }
+  //     const hasParent =
+  //       phase.parentRoadmapId &&
+  //       phase.parentRoadmapId.trim() !== "" &&
+  //       phase.parentRoadmapId !== phase.id;
+  //     const href = hasParent
+  //       ? `/pastor/jumpstart?id=${encodeURIComponent(phase.id)}&parentId=${encodeURIComponent(phase.parentRoadmapId!)}`
+  //       : `/pastor/jumpstart?id=${encodeURIComponent(phase.id)}`;
+  //     router.push(href);
+  //   },
+  //   [router],
+  // );
+const openPhaseRoute = useCallback(
+  (phase: PhaseCard) => {
+    const isJumpStart = phaseSequenceIndex(phase) === 0;
 
+    const hasParent =
+      phase.parentRoadmapId &&
+      phase.parentRoadmapId.trim() !== "" &&
+      phase.parentRoadmapId !== phase.id;
+
+    const href = hasParent
+      ? `/pastor/jumpstart?id=${encodeURIComponent(
+          phase.id
+        )}&parentId=${encodeURIComponent(phase.parentRoadmapId!)}`
+      : `/pastor/jumpstart?id=${encodeURIComponent(phase.id)}`;
+
+    if (isJumpStart) {
+      router.push(href);
+      return;
+    }
+
+    if (phase.hasNestedTasks) {
+      router.push(
+        `/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(phase.id)}`
+      );
+      return;
+    }
+
+    router.push(href);
+  },
+  [router],
+);
   const handleViewPhase = useCallback(
     (phase: PhaseCard) => {
       openPhaseRoute(phase);

@@ -284,13 +284,15 @@ export default function DirectorRoadmapFormPage() {
   const [nestedItemTitle, setNestedItemTitle] = useState("");
   const [churchVerbiage, setChurchVerbiage] = useState("");
   const [descriptionVerbiage, setDescriptionVerbiage] = useState("");
+  const [taskDivision, setTaskDivision] = useState("");
+  const [taskCompletionTime, setTaskCompletionTime] = useState("");
   const [customFields, setCustomFields] = useState<any[]>([]);
   const [assessments, setAssessments] = useState<Array<{ id: string; name: string }>>([]);
 
   const [submitting, setSubmitting] = useState(false);
   /** Shown as fixed bottom toast; then navigate to library (replacing immediate `router.push` which hid the message). */
   const [saveToast, setSaveToast] = useState<string | null>(null);
-  const saveNavTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveNavTimerRef = useRef<number | null>(null);
 
   const goToAfterSavePage = useCallback(() => {
     if (roadmapType === "phase" && roadmapId) {
@@ -338,6 +340,15 @@ export default function DirectorRoadmapFormPage() {
   const heroImageSrc = !isEditMode
     ? bannerPreview || null
     : bannerPreview || (roadmapData.bannerImage?.trim() ? roadmapData.bannerImage : null);
+
+  const isPhaseTaskForm = roadmapType === "phase";
+  const parentDivisionOptions = useMemo(() => {
+    const raw = Array.isArray((parent as any)?.divisions) ? ((parent as any).divisions as unknown[]) : [];
+    return raw
+      .map((d) => safeString(d).trim())
+      .filter(Boolean)
+      .filter((d, idx, arr) => arr.findIndex((x) => x.toLowerCase() === d.toLowerCase()) === idx);
+  }, [parent]);
 
   // Mobile parity: transform extras <-> fields (subset of mobile renderers)
   const transformExtrasToFields = (extras: any[]): any[] => {
@@ -678,12 +689,21 @@ export default function DirectorRoadmapFormPage() {
         setParent(doc);
 
         /** New nested template: start with empty verbiage/description so directors fill them here (ignore URL carry-over). */
+        // if (!isEditMode) {
+        //   const fromUrlTitle = safeDecodeURIComponent(roadmapData.name.trim());
+        //   setNestedItemTitle(fromUrlTitle);
+        //   setChurchVerbiage("");
+        //   setDescriptionVerbiage("");
+        //   setTaskDivision("");
+        //   setTaskCompletionTime("");
+        //   setCustomFields([]);
         if (!isEditMode) {
-          const fromUrlTitle = safeDecodeURIComponent(roadmapData.name.trim());
-          setNestedItemTitle(fromUrlTitle);
-          setChurchVerbiage("");
-          setDescriptionVerbiage("");
-          setCustomFields([]);
+  setNestedItemTitle("");
+  setChurchVerbiage("");
+  setDescriptionVerbiage("");
+  setTaskDivision("");
+  setTaskCompletionTime("");
+  setCustomFields([]);
           if (roadmapData.bannerImage?.trim()) {
             setBannerPreview(roadmapData.bannerImage.trim());
             setBannerFile(null);
@@ -735,6 +755,20 @@ export default function DirectorRoadmapFormPage() {
         const ddesc = roadmapDetailText((nested as { description?: unknown } | null)?.description);
         setChurchVerbiage(rmd || "");
         setDescriptionVerbiage(ddesc || "");
+        setTaskDivision(
+          safeString(
+            (nested as any)?.division ||
+              (nested as any)?.phase ||
+              roadmapData.selectedDivision,
+          ),
+        );
+        setTaskCompletionTime(
+          safeString(
+            (nested as any)?.completionTime ||
+              (nested as any)?.duration ||
+              roadmapData.completionTime,
+          ),
+        );
         setCustomFields(transformExtrasToFields(((nested as any)?.extras || []) as any[]));
 
         // Mobile parity for banner: prefer param bannerImage; fall back to nested.imageUrl.
@@ -812,6 +846,7 @@ export default function DirectorRoadmapFormPage() {
     try {
       const hasNested = Array.isArray(parent.roadmaps) && parent.roadmaps.length > 0;
       const safeDuration =
+        taskCompletionTime.trim() ||
         roadmapData.completionTime ||
         safeString(
           (roadmapType === "phase" && nestedRoadmapId
@@ -833,7 +868,14 @@ export default function DirectorRoadmapFormPage() {
         description: descriptionVerbiage,
         duration: safeDuration,
         ...(bannerPreview && !bannerFile && bannerPreview.startsWith("http") ? { imageUrl: bannerPreview } : {}),
-        phase: roadmapData.selectedDivision || "All",
+        ...(isPhaseTaskForm && taskDivision.trim()
+          ? { division: taskDivision.trim(), phase: taskDivision.trim() }
+          : roadmapData.selectedDivision
+            ? { phase: roadmapData.selectedDivision }
+            : {}),
+        ...(isPhaseTaskForm && taskCompletionTime.trim()
+          ? { completionTime: taskCompletionTime.trim(), duration: taskCompletionTime.trim() }
+          : {}),
         status: "not started" as any,
         extras: extras as any,
       };
@@ -862,7 +904,7 @@ export default function DirectorRoadmapFormPage() {
       if (roadmapType === "phase") {
         if (!isEditMode) {
           await apiAddNestedRoadmapItem(roadmapId, nestedPayloadBase as any, bannerFile ?? undefined);
-          setSaveToast("Phase created successfully.");
+          setSaveToast("Task created successfully.");
           return;
         }
         if (!nestedRoadmapId) throw new Error("Missing nested roadmap id for phase save.");
@@ -874,7 +916,7 @@ export default function DirectorRoadmapFormPage() {
           status: existing?.status || "not started",
         };
         await apiUpdateNestedRoadmapItem(roadmapId, nestedRoadmapId, updatedOne, bannerFile ?? undefined);
-        setSaveToast("Phase updated successfully.");
+        setSaveToast("Task updated successfully.");
         return;
       }
     } catch (e: any) {
@@ -929,7 +971,7 @@ export default function DirectorRoadmapFormPage() {
               <div className={`${directorGlassCard} mb-6 p-4 text-sm text-red-200`}>{error}</div>
             ) : null}
             <div className={`${directorGlassCard} p-6 sm:p-8`}>
-              <div className="mb-8 flex flex-wrap items-center gap-3">
+              <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={() => router.back()}
@@ -937,6 +979,28 @@ export default function DirectorRoadmapFormPage() {
                 >
                   <i className="fa-solid fa-arrow-left mr-2 text-xs" /> Back
                 </button>
+
+                {isPhaseTaskForm && !viewOnly && parentDivisionOptions.length > 0 ? (
+                  <div className="ml-auto min-w-[220px]">
+                    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+                      Division
+                    </label>
+                    <select
+                      value={taskDivision}
+                      onChange={(e) => setTaskDivision(e.target.value)}
+                      className={`${directorInputClass} h-11 text-white`}
+                    >
+                      <option value="" style={{ color: "#111", backgroundColor: "#fff" }}>
+                        Select division
+                      </option>
+                      {parentDivisionOptions.map((division) => (
+                        <option key={division} value={division} style={{ color: "#111", backgroundColor: "#fff" }}>
+                          {division}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-8">
@@ -976,7 +1040,22 @@ export default function DirectorRoadmapFormPage() {
                     placeholder="e.g. Attend a Jump-start Session in your area"
                   />
                 </div>
-
+ {isPhaseTaskForm && !viewOnly ? (
+                  <div>
+                    <label className={directorLabelClass} htmlFor="task-completion-time">
+                      Completion Time
+                    </label>
+                    <input
+                      id="task-completion-time"
+                      type="text"
+                      value={taskCompletionTime}
+                      onChange={(e) => setTaskCompletionTime(e.target.value)}
+                      className={directorInputClass}
+                      autoComplete="off"
+                      placeholder="e.g. 2 weeks, 1 month"
+                    />
+                  </div>
+                ) : null}
                 <div>
                   <label className={directorLabelClass}>
                     Description {!viewOnly ? <span className="text-red-300">*</span> : null}
@@ -990,8 +1069,31 @@ export default function DirectorRoadmapFormPage() {
                     className={`${directorInputClass} min-h-[180px] resize-y ${viewOnly ? "cursor-default opacity-95" : ""}`}
                     placeholder="Numbered or free-form description for this step…"
                   />
-                  <h3 className="text-lg font-semibold text-white">Pastor Tasks :</h3>
+                  {/* <h3 className="text-lg font-semibold text-white">Pastor Tasks :</h3> */}
+                  <div className="space-y-1">
+  <h3 className="text-lg font-semibold text-white">Pastor Tasks :</h3>
+  <p className="text-sm text-white/60">
+    Choose a builder below and add the tasks for this phase.
+  </p>
+</div>
                 </div>
+
+                {/* {isPhaseTaskForm && !viewOnly ? (
+                  <div>
+                    <label className={directorLabelClass} htmlFor="task-completion-time">
+                      Completion Time
+                    </label>
+                    <input
+                      id="task-completion-time"
+                      type="text"
+                      value={taskCompletionTime}
+                      onChange={(e) => setTaskCompletionTime(e.target.value)}
+                      className={directorInputClass}
+                      autoComplete="off"
+                      placeholder="e.g. 2 weeks, 1 month"
+                    />
+                  </div>
+                ) : null} */}
                 
                 {/* <h3>Pastor Tasks :</h3> */}
 
