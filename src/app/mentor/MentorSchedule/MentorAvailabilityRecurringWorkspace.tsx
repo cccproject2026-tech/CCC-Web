@@ -123,6 +123,7 @@ export default function MentorAvailabilityRecurringWorkspace({
   onAvailabilitySaved,
 }: MentorAvailabilityRecurringWorkspaceProps) {
   const [weekRows, setWeekRows] = useState<WeekRow[]>(() => initialWeekRows());
+  const [selectedWeekdayIndex, setSelectedWeekdayIndex] = useState<number | null>(null);
   const [horizonDays, setHorizonDays] = useState(60);
   const [clearPersonalizations, setClearPersonalizations] = useState(false);
   const [confirmClearOpen, setConfirmClearOpen] = useState(false);
@@ -401,10 +402,50 @@ export default function MentorAvailabilityRecurringWorkspace({
   const todayYmd = localCalendarYmd(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
   const isViewingCurrentMonth = calYear === new Date().getFullYear() && calMonth === new Date().getMonth();
 
+const hydrateWeekdaySlotsFromMonth = (dayIndex: number) => {
+  setSelectedWeekdayIndex(dayIndex);
+
+  setWeekRows((prev) =>
+    prev.map((w) => {
+      if (w.dayIndexUtcSunday0 !== dayIndex) return w;
+      if (w.slots.length > 0) return { ...w, enabled: true };
+
+  //     const matchingMonthRow = monthRows.find((raw) => {
+  //       const row = raw as any;
+  //       const ymd = String(row?.date ?? row?.day ?? row?.calendarDate ?? "").slice(0, 10);
+  //       if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
+  //       return new Date(`${ymd}T12:00:00`).getDay() === dayIndex;
+  //     });
+
+  //     const c = matchingMonthRow
+  // ? classifyDayOccurrence(matchingMonthRow)
+  // : { unavailable: false, slots: [] };
+  const matchingMonthRow = monthRows.find((raw) => {
+  const row = raw as Record<string, unknown>;
+  const ymd = String(row.date ?? row.day ?? row.calendarDate ?? "").slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
+
+  return new Date(`${ymd}T12:00:00`).getDay() === dayIndex;
+});
+
+const c: { unavailable: boolean; slots: AppointmentAvailabilityTimeSlot[] } =
+  matchingMonthRow
+    ? classifyDayOccurrence(matchingMonthRow as any)
+    : { unavailable: false, slots: [] };
+      return {
+        ...w,
+        enabled: true,
+        slots: c.unavailable ? [] : c.slots.map((s) => ({ ...s })),
+      };
+    }),
+  );
+};
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-1 sm:px-0">
       {/* Page intro */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      {/* <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <div className="rounded-xl border border-[#8ec5eb]/20 bg-[#0a4066]/35 px-4 py-4 sm:px-5 sm:py-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex min-w-0 gap-3 sm:gap-4">
@@ -460,17 +501,89 @@ export default function MentorAvailabilityRecurringWorkspace({
             </li>
           </ul>
         </div>
-      </div>
+      </div> */}
+
+      {/* <div className="rounded-xl border border-white/12 bg-white/[0.05] px-5 py-4 text-white shadow-[0_12px_34px_rgba(0,0,0,0.12)]">
+  <div className="flex flex-wrap items-center gap-x-7 gap-y-3 text-[13px] text-[#cde2f2]/90">
+    <h3 className="mr-2 text-sm font-semibold text-white">
+      How availability works
+    </h3>
+
+    <span className="flex items-center gap-2">
+      <i className="fa-solid fa-check text-[#8ec5eb]" />
+      Set your availability for each day of the week.
+    </span>
+
+    <span className="flex items-center gap-2">
+      <i className="fa-solid fa-check text-[#8ec5eb]" />
+      Repeats automatically for the next 60 days.
+    </span>
+
+    <span className="flex items-center gap-2">
+      <i className="fa-solid fa-check text-[#8ec5eb]" />
+      Block or edit specific dates anytime.
+    </span>
+  </div>
+</div> */}
+<div className="rounded-2xl border border-[#8ec5eb]/55 bg-[linear-gradient(90deg,rgba(10,64,102,0.55),rgba(255,255,255,0.06))] px-6 py-6 text-white shadow-[0_0_0_1px_rgba(142,197,235,0.12),0_18px_45px_rgba(0,0,0,0.22)]">
+  <div className="flex flex-wrap items-center gap-x-7 gap-y-3 text-[13px] text-[#d9ebf8] lg:flex-nowrap">
+    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#8ec5eb]/25 text-[#8ec5eb] ring-1 ring-[#8ec5eb]/35">
+      <i className="fa-solid fa-circle-info text-base" aria-hidden />
+    </span>
+
+    <h3 className="shrink-0 text-base font-semibold text-white">
+      How availability works
+    </h3>
+
+    <span className="hidden h-9 w-px bg-white/10 lg:block" />
+
+    <span className="flex min-w-0 items-center gap-2">
+      <i className="fa-solid fa-check shrink-0 text-[#8ec5eb]" />
+      <span>Set your availability for each day of the week.</span>
+    </span>
+
+    <span className="hidden h-9 w-px bg-white/10 lg:block" />
+
+    <span className="flex min-w-0 items-center gap-2">
+      <i className="fa-solid fa-check shrink-0 text-[#8ec5eb]" />
+      <span>Repeats automatically for the next 60 days.</span>
+    </span>
+
+    <span className="hidden h-9 w-px bg-white/10 lg:block" />
+
+    <span className="flex min-w-0 items-center gap-2">
+      <i className="fa-solid fa-check shrink-0 text-[#8ec5eb]" />
+      <span>Block or edit specific dates anytime.</span>
+    </span>
+  </div>
+</div>
 
       <div className={`${mentorGlassCardFrost} p-5 sm:p-7 text-white shadow-[0_12px_40px_rgba(0,0,0,0.12)]`}>
         <div className="mb-5 flex flex-col gap-2 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-base font-semibold sm:text-[17px]">Weekly pattern</h3>
+          {/* <div>
+            <h3 className="text-base font-semibold sm:text-[17px]">
+  Step 1 — Set your weekly availability
+</h3>
             <p className="mt-1 text-[13px] text-[#cde2f2]/85">Choose which days you&apos;re open and add time windows.</p>
-          </div>
+          </div> */}
+          <div>
+  <div className="flex flex-wrap items-center gap-3">
+    <h3 className="text-base font-semibold sm:text-[17px]">
+      Step 1 — Set your weekly availability
+    </h3>
+
+    <span className="rounded-full border border-emerald-400/20 bg-emerald-400/15 px-3 py-1 text-[11px] font-semibold text-emerald-300">
+      Repeats for next 60 days
+    </span>
+  </div>
+
+  <p className="mt-1 text-[13px] text-[#cde2f2]/85">
+    Your time slots will repeat weekly for the next 60 days.
+  </p>
+</div>
         </div>
 
-        <div className="mb-6 rounded-xl border border-white/10 bg-black/20 p-4">
+        {/* <div className="mb-6 rounded-xl border border-white/10 bg-black/20 p-4">
           <label className="flex cursor-pointer items-start gap-3">
             <input
               type="checkbox"
@@ -484,9 +597,9 @@ export default function MentorAvailabilityRecurringWorkspace({
               confirm.
             </span>
           </label>
-        </div>
+        </div> */}
 
-        <details className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-[13px] text-[#cde2f2]/90 open:bg-white/[0.05]">
+        {/* <details className="mb-6 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-[13px] text-[#cde2f2]/90 open:bg-white/[0.05]">
           <summary className="cursor-pointer list-none font-medium text-[#8ec5eb] outline-none [&::-webkit-details-marker]:hidden">
             <span className="inline-flex items-center gap-2">
               <i className="fa-solid fa-globe text-xs opacity-90" aria-hidden />
@@ -510,9 +623,136 @@ export default function MentorAvailabilityRecurringWorkspace({
               </li>
             ))}
           </ul>
-        </details>
+        </details> */}
+<div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+  {weekRows.map((row) => {
+    const isSelected = selectedWeekdayIndex === row.dayIndexUtcSunday0;
 
-        <div className="space-y-4">
+    return (
+      <button
+        key={row.dayIndexUtcSunday0}
+        type="button"
+        // onClick={() => {
+        //   setSelectedWeekdayIndex(row.dayIndexUtcSunday0);
+
+        //   setWeekRows((prev) =>
+        //     prev.map((w) =>
+        //       w.dayIndexUtcSunday0 === row.dayIndexUtcSunday0
+        //         ? { ...w, enabled: true }
+        //         : w,
+        //     ),
+        //   );
+        // }}
+        onClick={() => hydrateWeekdaySlotsFromMonth(row.dayIndexUtcSunday0)}
+        className={`relative rounded-xl border px-4 py-4 text-center transition ${
+          isSelected
+            ? "border-[#139cff] bg-[#082f55]/80 text-white shadow-[0_0_22px_rgba(19,156,255,0.22)]"
+            : "border-white/12 bg-white/[0.04] text-[#cde2f2] hover:border-[#8ec5eb]/45 hover:bg-[#8ec5eb]/10"
+        }`}
+      >
+        <p className="text-sm font-semibold">{row.label}</p>
+
+        <p className={`mt-1 text-xs ${row.enabled ? "text-[#8ec5eb]" : "text-[#cde2f2]/75"}`}>
+          {row.enabled ? "Set" : "Not set"}
+        </p>
+
+        {/* {row.enabled && (
+          <p className="mt-2 rounded-full bg-emerald-400/15 px-2 py-1 text-[10px] font-semibold text-emerald-300">
+            Repeats weekly
+          </p>
+        )} */}
+
+        {isSelected && (
+          <span className="absolute -bottom-2 left-1/2 h-0 w-0 -translate-x-1/2 border-l-[8px] border-r-[8px] border-t-[8px] border-l-transparent border-r-transparent border-t-[#139cff]" />
+        )}
+      </button>
+    );
+  })}
+</div>
+
+{selectedWeekdayIndex !== null &&
+  weekRows
+    .filter((row) => row.dayIndexUtcSunday0 === selectedWeekdayIndex)
+    .map((row) => (
+      <div
+        key={`editor-${row.dayIndexUtcSunday0}`}
+        className="rounded-2xl border border-white/12 bg-white/[0.04] p-5"
+      >
+        <div className="mb-5 flex flex-wrap items-center gap-3">
+          <h4 className="text-base font-semibold text-white">
+            {row.label} availability
+          </h4>
+
+          <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-semibold text-emerald-300">
+            Applies every {row.label} up to 60 days
+          </span>
+        </div>
+
+        {row.slots.length === 0 && (
+          <p className="mb-4 rounded-xl border border-[#8ec5eb]/20 bg-[#8ec5eb]/10 px-4 py-3 text-[13px] text-[#cde2f2]">
+            No time slots added yet. Add a time slot for every {row.label}.
+          </p>
+        )}
+
+        <div className="space-y-3">
+          {row.slots.map((slot, idx) => (
+            <SlotRowEditor
+              key={idx}
+              slot={slot}
+              onPatch={(patch) =>
+                setWeekRows((prev) =>
+                  prev.map((w) => {
+                    if (w.dayIndexUtcSunday0 !== row.dayIndexUtcSunday0) return w;
+                    const nextSlots = [...w.slots];
+                    nextSlots[idx] = { ...nextSlots[idx], ...patch };
+                    return { ...w, slots: nextSlots };
+                  }),
+                )
+              }
+              onRemove={() =>
+                setWeekRows((prev) =>
+                  prev.map((w) =>
+                    w.dayIndexUtcSunday0 === row.dayIndexUtcSunday0
+                      ? { ...w, slots: w.slots.filter((_, j) => j !== idx) }
+                      : w,
+                  ),
+                )
+              }
+            />
+          ))}
+
+          <button
+            type="button"
+            onClick={() =>
+              setWeekRows((prev) =>
+                prev.map((w) =>
+                  w.dayIndexUtcSunday0 === row.dayIndexUtcSunday0
+                    ? {
+                        ...w,
+                        enabled: true,
+                        slots: [
+                          ...w.slots,
+                          {
+                            startTime: "9:00",
+                            startPeriod: "AM",
+                            endTime: "12:00",
+                            endPeriod: "PM",
+                          },
+                        ],
+                      }
+                    : w,
+                ),
+              )
+            }
+            className={`${mentorSecondaryCta} inline-flex items-center gap-2 px-4 py-2 text-[13px]`}
+          >
+            <i className="fa-solid fa-plus text-[11px]" aria-hidden />
+            Add another time slot
+          </button>
+        </div>
+      </div>
+    ))}
+        {/* <div className="space-y-4">
           {weekRows.map((row) => (
             <div
               key={row.dayIndexUtcSunday0}
@@ -598,7 +838,7 @@ export default function MentorAvailabilityRecurringWorkspace({
               )}
             </div>
           ))}
-        </div>
+        </div> */}
 
         {/* <div className="mt-8 flex flex-col gap-3 border-t border-white/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[12px] text-[#cde2f2]/70">
@@ -638,7 +878,7 @@ export default function MentorAvailabilityRecurringWorkspace({
             These defaults apply to all meetings unless you override a specific day on the calendar.
           </p>
         </div>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           <label className="block text-[13px] font-medium text-white">
             <span className="mb-1.5 block">Meeting length</span>
             <span className="mb-2 block text-[11px] font-normal text-[#cde2f2]/65">Each bookable slot must fit this duration</span>
@@ -647,23 +887,29 @@ export default function MentorAvailabilityRecurringWorkspace({
               value={String(meetingDuration)}
               onChange={(e) => setMeetingDuration(Number(e.target.value))}
             >
-              <option value="30">30 minutes</option>
+              <option value="30" disabled>30 minutes</option>
               <option value="60">60 minutes</option>
             </select>
           </label>
           <label className="block text-[13px] font-medium text-white">
             <span className="mb-1.5 block">Minimum notice</span>
             <span className="mb-2 block text-[11px] font-normal text-[#cde2f2]/65">Hours before someone can book</span>
-            <input
+            {/* <input
               type="number"
               min={1}
               max={168}
               value={minNoticeHours}
               onChange={(e) => setMinNoticeHours(Math.max(1, Math.min(168, Number(e.target.value) || 1)))}
               className={`${mentorSelectDark} w-full`}
-            />
+            /> */}
+            <input
+  type="number"
+  value={2}
+  disabled
+  className={`${mentorSelectDark} w-full cursor-not-allowed opacity-70`}
+/>
           </label>
-          <label className="block text-[13px] font-medium text-white">
+          {/* <label className="block text-[13px] font-medium text-white">
             <span className="mb-1.5 block">Meetings per day</span>
             <span className="mb-2 block text-[11px] font-normal text-[#cde2f2]/65">Maximum on one calendar day</span>
             <input
@@ -674,7 +920,7 @@ export default function MentorAvailabilityRecurringWorkspace({
               onChange={(e) => setMaxBookingsPerDay(Math.max(1, Number(e.target.value) || 1))}
               className={`${mentorSelectDark} w-full`}
             />
-          </label>
+          </label> */}
           <label className="block text-[13px] font-medium text-white">
             <span className="mb-1.5 block">Preferred meeting type</span>
             <span className="mb-2 block text-[11px] font-normal text-[#cde2f2]/65">Shown as your default choice</span>
@@ -716,7 +962,7 @@ export default function MentorAvailabilityRecurringWorkspace({
             </>
           )}
         </button> */}
-        <div className="mt-5 flex flex-wrap gap-3">
+        {/* <div className="mt-5 flex flex-wrap gap-3">
   <button
     type="button"
     disabled={settingsBusy}
@@ -751,6 +997,26 @@ export default function MentorAvailabilityRecurringWorkspace({
       <>
         <i className="fa-regular fa-floppy-disk mr-2" aria-hidden />
         Save repeating schedule
+      </>
+    )}
+  </button>
+</div> */}
+<div className="mt-6 flex justify-end border-t border-white/10 pt-5">
+  <button
+    type="button"
+    disabled={recurringBusy || docLoading}
+    onClick={() => void saveRecurring()}
+    className={`${mentorPrimaryCta} min-h-[44px] px-6 py-2.5 text-[14px] font-semibold`}
+  >
+    {recurringBusy ? (
+      <>
+        <i className="fa-solid fa-spinner fa-spin mr-2" aria-hidden />
+        Saving…
+      </>
+    ) : (
+      <>
+        <i className="fa-regular fa-floppy-disk mr-2" aria-hidden />
+        Save availability
       </>
     )}
   </button>
@@ -803,7 +1069,7 @@ export default function MentorAvailabilityRecurringWorkspace({
                 Select a future day to block
               </span>
             )}
-            <button
+            {/* <button
               type="button"
               disabled={monthLoading}
               onClick={() => {
@@ -813,7 +1079,7 @@ export default function MentorAvailabilityRecurringWorkspace({
               className={`${mentorSecondaryCta} text-[13px] disabled:pointer-events-none disabled:opacity-45`}
             >
               {blockSelectionMode ? "Cancel block" : "Block a day"}
-            </button>
+            </button> */}
             <button
               type="button"
               disabled={monthLoading || isViewingCurrentMonth}
@@ -1145,7 +1411,7 @@ function DayModal(props: {
         <div className="space-y-5 px-4 py-5 text-white sm:px-5">
           {!showEditors ? (
             <p className="text-[13px] leading-relaxed text-[#cde2f2]/90">
-              This entire day is turned off for booking. Use “Add meeting hours” below to reopen it, then save.
+This entire day is turned off for booking. Use “Open day for booking” below to make it available again.
             </p>
           ) : (
             <>
@@ -1210,10 +1476,24 @@ function DayModal(props: {
                   type="button"
                   disabled={busy}
                   className={`${mentorPrimaryCta} min-h-[44px] flex-[1_1_auto] px-5 text-[14px] font-semibold sm:min-w-[10rem]`}
+                  // onClick={() => {
+                  //   if (!validateSlots()) return;
+                  //   onSavePatch({ date: ymd, slots });
+                  // }}
                   onClick={() => {
-                    if (!validateSlots()) return;
-                    onSavePatch({ date: ymd, slots });
-                  }}
+  if (slots.length === 0) {
+    void run(async () => {
+      await apiMarkAvailabilityDayUnavailable(mentorId, ymd);
+      onToast("No meetings can be booked on this day.", "ok");
+      onClose();
+      await onReload();
+    });
+    return;
+  }
+
+  if (!validateSlots()) return;
+  onSavePatch({ date: ymd, slots });
+}}
                 >
                   {busy ? (
                     <>
@@ -1228,7 +1508,22 @@ function DayModal(props: {
                   )}
                 </button>
               )}
-              {classify.unavailable && (
+              {/* {classify.unavailable && (
+  <button
+    type="button"
+    disabled={busy}
+    className={`${mentorPrimaryCta} min-h-[44px] flex-[1_1_auto] px-5 text-[14px] font-semibold`}
+    onClick={() => {
+      onSlotsChange([
+        { startTime: "9:00", startPeriod: "AM", endTime: "12:00", endPeriod: "PM" },
+      ]);
+    }}
+  >
+    <i className="fa-solid fa-unlock mr-2" aria-hidden />
+    Unblock and add hours
+  </button>
+)} */}
+              {/* {classify.unavailable && (
                 <button
                   type="button"
                   disabled={busy}
@@ -1242,8 +1537,8 @@ function DayModal(props: {
                   <i className="fa-regular fa-clock mr-2" aria-hidden />
                   Add meeting hours
                 </button>
-              )}
-              {classify.unavailable && slots.length > 0 && (
+              )} */}
+              {classify.unavailable && (
                 <button
                   type="button"
                   disabled={busy}
@@ -1251,7 +1546,16 @@ function DayModal(props: {
                   onClick={() =>
                     void run(async () => {
                       if (!validateSlots()) return;
-                      await apiMarkAvailabilityDayAvailable(mentorId, { date: ymd, slots });
+                      // await apiMarkAvailabilityDayAvailable(mentorId, { date: ymd, slots });
+                     const slotsToOpen: AppointmentAvailabilityTimeSlot[] =
+  slots.length > 0
+    ? slots
+    : [{ startTime: "9:00", startPeriod: "AM", endTime: "12:00", endPeriod: "PM" }];
+
+await apiMarkAvailabilityDayAvailable(mentorId, {
+  date: ymd,
+  slots: slotsToOpen,
+});
                       onToast("This day is open for booking again.", "ok");
                       onClose();
                       await onReload();

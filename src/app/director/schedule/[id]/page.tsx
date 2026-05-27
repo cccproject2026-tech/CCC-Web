@@ -190,6 +190,23 @@ export default function DirectorAppointmentDetailPage() {
   const menteeProfileId = typeof appt.userId === "string" ? appt.userId : mentee?._id;
   const meetingDate = new Date(appt.meetingDate);
   const meetLink = appt.meetingLink || appt.zoomJoinUrl || "";
+  const zoomMeetingId = (() => {
+  const match = meetLink.match(/\/j\/(\d+)/);
+  return match?.[1]?.replace(/(\d{3})(\d{4})(\d+)/, "$1 $2 $3") || "";
+})();
+
+const zoomPasscode = (() => {
+  try {
+    return new URL(meetLink).searchParams.get("pwd") || "";
+  } catch {
+    return "";
+  }
+})();
+  const meetingStart = new Date(appt.meetingDate);
+const meetingEnd = appt.endTime ? new Date(appt.endTime as string) : new Date(meetingStart.getTime() + 60 * 60 * 1000);
+const now = new Date();
+
+const canJoinMeeting = now >= meetingStart && now <= meetingEnd;
   const isCompleted = String(appt.status).toLowerCase() === "completed";
 
   return (
@@ -315,7 +332,7 @@ export default function DirectorAppointmentDetailPage() {
           </div>
 
           {/* Meeting link */}
-          {meetLink ? (
+          {/* {meetLink ? (
             <div className="mt-4 flex items-center gap-2 rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/10 px-4 py-2.5">
               <i className="fa-solid fa-link shrink-0 text-[#8ec5eb]" />
               <a
@@ -345,7 +362,77 @@ export default function DirectorAppointmentDetailPage() {
             </div>
           ) : (
             <p className="mt-4 text-[12px] text-white/40">No meeting link recorded.</p>
-          )}
+          )} */}
+          {meetLink ? (
+  <div className="mt-4 rounded-xl border border-[#8ec5eb]/40 bg-[#8ec5eb]/10 px-4 py-3">
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+      <i className="fa-solid fa-link shrink-0 text-[#8ec5eb]" />
+
+      <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#8ec5eb]">
+        {meetLink}
+      </span>
+
+      <button
+  type="button"
+  onClick={() => navigator.share?.({ url: meetLink })}
+  className={`${directorBtnSecondary} min-h-[44px] min-w-[44px] px-3`}
+  title="Share link"
+>
+  <i className="fa-solid fa-share-nodes" />
+</button>
+
+<button
+  type="button"
+  onClick={() => {
+    navigator.clipboard.writeText(meetLink).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  }}
+  className={`${directorBtnSecondary} min-h-[44px] min-w-[44px] px-3`}
+  title="Copy link"
+>
+  <i className={linkCopied ? "fa-solid fa-check" : "fa-regular fa-copy"} />
+</button>
+
+<button
+  type="button"
+  disabled={!canJoinMeeting}
+  onClick={() => {
+    if (canJoinMeeting) window.open(meetLink, "_blank", "noopener,noreferrer");
+  }}
+  className={`${directorBtnPrimary} min-h-[44px] min-w-[86px] px-3 disabled:cursor-not-allowed disabled:opacity-45`}
+  title="Join meeting"
+>
+  <span className="flex items-center justify-center gap-2">
+    <i className="fa-solid fa-video" />
+    <span>Join</span>
+  </span>
+</button>
+    </div>
+
+    {/* <p className="mt-3 text-xs text-[#cde2f2]/70">
+      Passcode is included in the meeting link. Join Meeting unlocks only during the scheduled meeting time.
+    </p> */}
+    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+  <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+    <p className="text-[11px] text-white/50">Meeting ID</p>
+    <p className="text-sm font-medium text-white">
+      {zoomMeetingId || "Not available"}
+    </p>
+  </div>
+
+  <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+    <p className="text-[11px] text-white/50">Passcode</p>
+    <p className="text-sm font-medium text-white">
+      {zoomPasscode || "Included in meeting link"}
+    </p>
+  </div>
+</div>
+  </div>
+) : (
+  <p className="mt-4 text-[12px] text-white/40">No meeting link recorded.</p>
+)}
         </div>
 
         {/* ── Notes ────────────────────────────────────────────────────── */}
