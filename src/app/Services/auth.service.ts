@@ -10,6 +10,7 @@ import type {
   CheckOnboardingStatusRequest,
   CheckOnboardingStatusResponse,
 } from "./types/auth.types";
+import type { GoogleCalendarConnectionStatus } from "./types/users.types";
 
 // POST login through shared axios instance (same base/proxy as all web API calls)
 export const apiLogin = async (email: string, password: string) => {
@@ -83,6 +84,12 @@ export const apiGetGoogleCalendarAuthUrl = () =>
     "/auth/google",
     { suppress401Redirect: true },
   );
+
+/** GET `/google-calendar/status` — backend source of truth for connection health + sync metadata. */
+export const apiGetGoogleCalendarStatus = () =>
+  axiosInstance.get<GoogleCalendarConnectionStatus>("/google-calendar/status", {
+    suppress401Redirect: true,
+  });
 
 function pickOAuthUrl(record: Record<string, unknown>): string | null {
   const keys = ["url", "oauthUrl", "authUrl", "authorizationUrl", "redirectUrl", "link"] as const;
