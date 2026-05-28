@@ -199,6 +199,7 @@ const shouldOpenReschedule = searchParams.get("reschedule") === "1";
   const [calendarSlotSyncSkipped, setCalendarSlotSyncSkipped] = useState(false);
   const [calendarBusyStripped, setCalendarBusyStripped] = useState(0);
   const [calendarConnectBanners, setCalendarConnectBanners] = useState<string[]>([]);
+  const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
 
   // schedule drawer calendar state
   const today = new Date();
@@ -277,6 +278,7 @@ const shouldOpenReschedule = searchParams.get("reschedule") === "1";
 
     if (linked === "linked" || linked === "1") {
       setToastMessage("Google Calendar connected.");
+      setAvailabilityRefreshKey((prev) => prev + 1);
     } else if (linked === "error") {
       setToastMessage(reason ? `Google Calendar: ${reason}` : "Google Calendar linking failed.");
     } else {
@@ -1612,16 +1614,28 @@ useEffect(() => {
 
                   <div className="mb-4 flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-3">
                     <div className="flex flex-wrap items-center gap-3">
-                      <GoogleCalendarConnectButton label="Link my Google Calendar" />
+                      <GoogleCalendarConnectButton
+                        label="Link my Google Calendar"
+                        onConnectionSynced={() => setAvailabilityRefreshKey((prev) => prev + 1)}
+                        onStatusChange={(status) => setGoogleCalendarConnected(status === "connected")}
+                      />
                       <span className="text-[11px] leading-snug text-[#cde2f2]/75">
-                        Connect Google so busy times hide automatically and bookings create Calendar events after OAuth.
+                        {googleCalendarConnected
+                          ? "Google Calendar is active. Busy-time sync is enabled for scheduling."
+                          : "Connect Google so busy times hide automatically and bookings create Calendar events after OAuth."}
                       </span>
                     </div>
-                    {calendarConnectBanners.map((msg) => (
+                    {calendarConnectBanners
+                      .filter((msg) =>
+                        googleCalendarConnected
+                          ? !/link google calendar|avoid double-booking/i.test(msg)
+                          : true,
+                      )
+                      .map((msg) => (
                       <p key={msg.slice(0, 80)} className="text-[11px] text-amber-100/95">
                         {msg}
                       </p>
-                    ))}
+                      ))}
                   </div>
 
                   <div className="mb-6 grid grid-cols-2 gap-3">

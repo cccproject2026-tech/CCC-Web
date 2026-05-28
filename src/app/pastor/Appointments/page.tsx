@@ -67,29 +67,30 @@ import { filterSlotsAfter2Hours } from "@/app/Services/utils/helpers";
 
 
 export default function PastorAppointmentsPage() {
+  type AnyRecord = Record<string, any>;
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerStep, setDrawerStep] = useState<"mentor" | "schedule">("mentor");
   const [showPopup, setShowPopup] = useState(false);
   const [googleCalendarBookingHint, setGoogleCalendarBookingHint] = useState<string | null>(null);
   const [googleCalendarSyncWarnings, setGoogleCalendarSyncWarnings] = useState<string[]>([]);
   const [selectedTime, setSelectedTime] = useState("");
-  const [appointments, setAppointments] = useState([]);
-  const [appointmentsToday, setAppointmentsToday] = useState([]);
-  const [upcomingAppointments, setUpcomingAppointments] = useState([]);
-  const [mentors, setMentors] = useState([]);
-  const [filteredMentors, setFilteredMentors] = useState([]);
-  const [selectedMentor, setSelectedMentor] = useState(null);
+  const [appointments, setAppointments] = useState<AnyRecord[]>([]);
+  const [appointmentsToday, setAppointmentsToday] = useState<AnyRecord[]>([]);
+  const [upcomingAppointments, setUpcomingAppointments] = useState<AnyRecord[]>([]);
+  const [mentors, setMentors] = useState<AnyRecord[]>([]);
+  const [filteredMentors, setFilteredMentors] = useState<AnyRecord[]>([]);
+  const [selectedMentor, setSelectedMentor] = useState<AnyRecord | null>(null);
   const [search, setSearch] = useState("");
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState(today.getDate());
-  const [menuOpenId, setMenuOpenId] = useState(null);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [showReschedule, setShowReschedule] = useState(false);
-  const [appointmentToEdit, setAppointmentToEdit] = useState(null);
+  const [appointmentToEdit, setAppointmentToEdit] = useState<AnyRecord | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showCancelSuccess, setShowCancelSuccess] = useState(false);
-  const [appointmentToCancel, setAppointmentToCancel] = useState(null);
+  const [appointmentToCancel, setAppointmentToCancel] = useState<AnyRecord | null>(null);
   const [showChangeMode, setShowChangeMode] = useState(false);
   const [selectedMode, setSelectedMode] = useState("zoom");
   const [modeSuccess, setModeSuccess] = useState(false);
@@ -101,6 +102,7 @@ export default function PastorAppointmentsPage() {
   const [calendarSlotSyncSkipped, setCalendarSlotSyncSkipped] = useState(false);
   const [calendarBusyStripped, setCalendarBusyStripped] = useState(0);
   const [calendarConnectBanners, setCalendarConnectBanners] = useState<string[]>([]);
+  const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
   const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -140,6 +142,8 @@ const shouldOpenScheduleDrawer = searchParams.get("openSchedule") === "1";
 
     if (linked === "linked" || linked === "1") {
       showToast("Google Calendar connected.", 4500);
+      setAvailabilityRefreshKey((prev) => prev + 1);
+      void refreshAppointmentLists();
     } else if (linked === "error") {
       showToast(reason ? `Google Calendar: ${reason}` : "Google Calendar linking failed.", 6000);
     } else {
@@ -172,11 +176,11 @@ const shouldOpenScheduleDrawer = searchParams.get("openSchedule") === "1";
 
 
 
-  const getDaysInMonth = (month, year) => {
+  const getDaysInMonth = (month: number, year: number) => {
     return new Date(year, month + 1, 0).getDate();
   };
 
-  const getFirstDayOfMonth = (month, year) => {
+  const getFirstDayOfMonth = (month: number, year: number) => {
     return new Date(year, month, 1).getDay();
   };
 
@@ -373,7 +377,7 @@ useEffect(() => {
       `${firstName || ""} ${lastName || ""}`.trim() || fallback
     )}&background=173653&color=ffffff`;
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     const d = new Date(dateString);
     return d.toLocaleDateString("en-US", {
       day: "2-digit",
@@ -382,7 +386,7 @@ useEffect(() => {
     });
   };
 
-  const formatTime = (dateString) => {
+  const formatTime = (dateString: string) => {
     const d = new Date(dateString);
     return d.toLocaleTimeString("en-US", {
       hour: "numeric",
@@ -1071,7 +1075,7 @@ if (routeAssessmentId && routeRoadmapId && routeTaskId) {
 
                 {filteredAppointmentsForSelectedDate.map((appt) => {
                   const mentor = appt.mentor as { profilePicture?: string; firstName?: string; lastName?: string } | undefined;
-                  const icon = getModeIcon(appt.platform);
+                  const icon = getModeIcon(String(appt.platform ?? ""));
 
                   const dateObj = new Date(String(appt.meetingDate ?? ""));
                   const dateStr = dateObj.toLocaleDateString("en-US", {
@@ -1241,7 +1245,7 @@ if (routeAssessmentId && routeRoadmapId && routeTaskId) {
                               className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
                               onClick={() => {
                                 setAppointmentToEdit(appt);  // <-- VERY IMPORTANT
-                                setSelectedMode(appt.platform || "zoom");
+                                setSelectedMode(String(appt.platform ?? "zoom"));
                                 setShowChangeMode(true);
                                 setMenuOpenId(null);
                               }}
@@ -1378,7 +1382,7 @@ if (routeAssessmentId && routeRoadmapId && routeTaskId) {
                               className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
                               onClick={() => {
                                 setAppointmentToEdit(appt);
-                                setSelectedMode(appt.platform || "zoom");
+                                setSelectedMode(String(appt.platform ?? "zoom"));
                                 setShowChangeMode(true);
                                 setMenuOpenId(null);
                               }}
@@ -1815,16 +1819,28 @@ if (routeAssessmentId && routeRoadmapId && routeTaskId) {
 
                   <div className="my-4 flex flex-col gap-2 rounded-xl border border-white/15 bg-white/[0.04] p-3">
                     <div className="flex flex-wrap items-center gap-3">
-                      <GoogleCalendarConnectButton label="Link my Google Calendar" />
+                      <GoogleCalendarConnectButton
+                        label="Link my Google Calendar"
+                        onConnectionSynced={() => setAvailabilityRefreshKey((prev) => prev + 1)}
+                        onStatusChange={(status) => setGoogleCalendarConnected(status === "connected")}
+                      />
                       <span className="text-[11px] leading-snug text-[#cde2f2]/80">
-                        Connect your Google account (same CCC login identity) so we can read busy times when scheduling.
+                        {googleCalendarConnected
+                          ? "Google Calendar is connected. Busy-time sync is enabled while scheduling."
+                          : "Connect your Google account (same CCC login identity) so we can read busy times when scheduling."}
                       </span>
                     </div>
-                    {calendarConnectBanners.map((msg) => (
+                    {calendarConnectBanners
+                      .filter((msg) =>
+                        googleCalendarConnected
+                          ? !/link google calendar|avoid double-booking/i.test(msg)
+                          : true,
+                      )
+                      .map((msg) => (
                       <p key={msg.slice(0, 88)} className="text-[11px] text-amber-100/95">
                         {msg}
                       </p>
-                    ))}
+                      ))}
                   </div>
 
                   <label className={pastorFieldLabel} htmlFor="time-slot" style={{ marginTop: "1.5rem" }}>

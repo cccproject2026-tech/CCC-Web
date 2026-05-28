@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiGetGoogleCalendarAuthUrl, unwrapGoogleOAuthRedirectUrl } from "@/app/Services/auth.service";
 import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
 import { getCookie } from "@/app/utils/cookies";
@@ -11,6 +13,8 @@ type Props = {
   variant?: "dark" | "light";
   className?: string;
   label?: string;
+  onConnectionSynced?: () => void;
+  onStatusChange?: (status: GoogleCalendarStatus | null) => void;
 };
 
 /**
@@ -21,35 +25,66 @@ export default function GoogleCalendarConnectButton({
   variant = "dark",
   className = "",
   label = "Link Google Calendar",
+  onConnectionSynced,
+  onStatusChange,
 }: Props) {
+  const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const [pending, setPending] = useState(false);
+  const [syncingAfterRedirect, setSyncingAfterRedirect] = useState(false);
   const [errorHint, setErrorHint] = useState<string | null>(null);
-  const [calendarStatus, setCalendarStatus] = useState<GoogleCalendarStatus | null>(null);
 
   const hasSession = !!getCookie("accessToken")?.trim();
   const userId = (getCookie("userId") || "").trim();
 
+  const currentUserKey = useMemo(() => ["current-user", userId] as const, [userId]);
+  const googleStatusKey = useMemo(() => ["google-calendar-status", userId] as const, [userId]);
+  const { data: calendarStatus } = useQuery<GoogleCalendarStatus | null>({
+    queryKey: currentUserKey,
+    enabled: hasSession && !!userId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const res = await apiGetUserById(userId);
+      const user = unwrapUserResponse(res as { data?: unknown });
+      return user?.googleCalendarStatus ?? null;
+    },
+  });
+
   useEffect(() => {
+    onStatusChange?.(calendarStatus ?? null);
+  }, [calendarStatus, onStatusChange]);
+
+  useEffect(() => {
+    const linked = searchParams.get("googleCalendar");
+    if (!linked || !hasSession || !userId) return;
+    if (linked !== "linked" && linked !== "1") return;
+
     let cancelled = false;
-    const run = async () => {
-      if (!hasSession || !userId) return;
+    setSyncingAfterRedirect(true);
+    setErrorHint(null);
+
+    void (async () => {
       try {
-        const res = await apiGetUserById(userId);
-        const user = unwrapUserResponse(res as { data?: unknown });
-        const status = user?.googleCalendarStatus;
-        if (!cancelled && status) setCalendarStatus(status);
+        await queryClient.invalidateQueries({ queryKey: ["current-user"] });
+        await queryClient.invalidateQueries({ queryKey: currentUserKey });
+        await queryClient.invalidateQueries({ queryKey: ["mentor-availability"] });
+        await queryClient.invalidateQueries({ queryKey: ["google-calendar-status"] });
+        await queryClient.invalidateQueries({ queryKey: googleStatusKey });
+        await queryClient.refetchQueries({ queryKey: currentUserKey, exact: true });
+        onConnectionSynced?.();
       } catch {
-        // Non-fatal: keep button usable even if profile load fails.
+        // Keep the control usable even if refresh fails.
+      } finally {
+        if (!cancelled) setSyncingAfterRedirect(false);
       }
-    };
-    void run();
+    })();
+
     return () => {
       cancelled = true;
     };
-  }, [hasSession, userId]);
+  }, [searchParams, hasSession, userId, queryClient, currentUserKey, googleStatusKey, onConnectionSynced]);
 
   const statusCopy = useMemo(() => {
-    if (calendarStatus === "connected") return { icon: "✅", text: "Google Calendar Connected" };
     if (calendarStatus === "expired") return { icon: "⚠", text: "Reconnect Google Calendar" };
     if (calendarStatus === "error") return { icon: "⚠", text: "Calendar Connection Error" };
     if (calendarStatus === "disconnected") return { icon: "❌", text: "Calendar Disconnected" };
@@ -57,7 +92,7 @@ export default function GoogleCalendarConnectButton({
   }, [calendarStatus]);
 
   const dynamicLabel =
-    calendarStatus === "connected" || calendarStatus === "expired" || calendarStatus === "error"
+    calendarStatus === "expired" || calendarStatus === "error"
       ? "Reconnect Google Calendar"
       : label;
 
@@ -70,45 +105,84 @@ export default function GoogleCalendarConnectButton({
 
   return (
     <div className="inline-flex max-w-full flex-col gap-1">
-      <button
-        type="button"
-        disabled={pending}
-        onClick={async () => {
-          setErrorHint(null);
-          setPending(true);
-          try {
-            const res = await apiGetGoogleCalendarAuthUrl();
-            const url = unwrapGoogleOAuthRedirectUrl(res.data);
-            if (url) {
-              setCalendarStatus("connected");
-              window.location.assign(url);
-              return;
-            }
-            setErrorHint(
-              "Calendar linking is not ready: the server did not return a Google sign-in URL. Ask the backend team to confirm GET /auth/google.",
-            );
-          } catch (e) {
-            console.error(e);
-            const msg = extractApiErrorMessage(e);
-            const status = (e as { response?: { status?: number } })?.response?.status;
-            if (status === 401) {
-              setErrorHint("You need to be logged in first (session expired). Sign in again, then retry.");
-            } else if (status === 404) {
+      {calendarStatus === "connected" ? (
+        <div className={`inline-flex items-center gap-3 rounded-lg px-3 py-2 ${base} ${className}`} role="status" aria-live="polite">
+          <span className="inline-flex items-center gap-2 text-xs font-semibold">
+            <i className="fa-solid fa-check" aria-hidden />
+            Google Calendar Connected
+          </span>
+          <span className="text-[11px] text-[#cde2f2]/90">Busy time sync enabled</span>
+          <button
+            type="button"
+            onClick={async () => {
+              setErrorHint(null);
+              setPending(true);
+              try {
+                const res = await apiGetGoogleCalendarAuthUrl();
+                const url = unwrapGoogleOAuthRedirectUrl(res.data);
+                if (url) {
+                  window.location.assign(url);
+                  return;
+                }
+                setErrorHint(
+                  "Calendar linking is not ready: the server did not return a Google sign-in URL. Ask the backend team to confirm GET /auth/google.",
+                );
+              } catch (e) {
+                const msg = extractApiErrorMessage(e);
+                setErrorHint(msg);
+              } finally {
+                setPending(false);
+              }
+            }}
+            className="text-[11px] font-semibold text-[#8ec5eb] underline underline-offset-2 transition hover:text-white"
+          >
+            Reconnect
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          disabled={pending || syncingAfterRedirect}
+          onClick={async () => {
+            setErrorHint(null);
+            setPending(true);
+            try {
+              const res = await apiGetGoogleCalendarAuthUrl();
+              const url = unwrapGoogleOAuthRedirectUrl(res.data);
+              if (url) {
+                window.location.assign(url);
+                return;
+              }
               setErrorHint(
-                "GET /auth/google is not available on this API build (404). Backend must expose Google OAuth bootstrap.",
+                "Calendar linking is not ready: the server did not return a Google sign-in URL. Ask the backend team to confirm GET /auth/google.",
               );
-            } else {
-              setErrorHint(msg);
+            } catch (e) {
+              console.error(e);
+              const msg = extractApiErrorMessage(e);
+              const status = (e as { response?: { status?: number } })?.response?.status;
+              if (status === 401) {
+                setErrorHint("You need to be logged in first (session expired). Sign in again, then retry.");
+              } else if (status === 404) {
+                setErrorHint(
+                  "GET /auth/google is not available on this API build (404). Backend must expose Google OAuth bootstrap.",
+                );
+              } else {
+                setErrorHint(msg);
+              }
+            } finally {
+              setPending(false);
             }
-          } finally {
-            setPending(false);
-          }
-        }}
-        className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition disabled:opacity-60 ${base} ${className}`}
-      >
-        {pending ? <i className="fa-solid fa-spinner fa-spin" aria-hidden /> : <i className="fa-brands fa-google" aria-hidden />}
-        {pending ? "Opening Google…" : dynamicLabel}
-      </button>
+          }}
+          className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition disabled:opacity-60 ${base} ${className}`}
+        >
+          {pending || syncingAfterRedirect ? (
+            <i className="fa-solid fa-spinner fa-spin" aria-hidden />
+          ) : (
+            <i className="fa-brands fa-google" aria-hidden />
+          )}
+          {syncingAfterRedirect ? "Refreshing calendar status…" : pending ? "Opening Google…" : dynamicLabel}
+        </button>
+      )}
       {statusCopy ? (
         <p className="max-w-[min(420px,100%)] text-[11px] leading-snug text-[#fef3c7]">
           {statusCopy.icon} {statusCopy.text}
