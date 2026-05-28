@@ -228,6 +228,8 @@ if (!cancelled) setCompletedTaskDates(dateMap);
       duration: String(x.duration || ""),
       phase: String(x.phase || ""),
       imageUrl: typeof x.imageUrl === "string" ? x.imageUrl : "",
+      completedOn: String((x as any).completedOn || ""),
+updatedAt: String((x as any).updatedAt || ""),
     }));
     const query = q.trim().toLowerCase();
     if (!query) return list;
@@ -449,8 +451,11 @@ if (!cancelled) setCompletedTaskDates(dateMap);
         ) : (
           <div className="space-y-4">
             {items.map((it) => {
+              console.log("TASK", it);
               const isCompleted = completedTaskIds.has(String(it.id));
-              const completedDate = completedTaskUpdateDates[String(it.id)];
+              // const completedDate = completedTaskUpdateDates[String(it.id)];
+        const completedOnDate = (it as any).completedOn || "";
+const lastUpdatedDate = completedTaskUpdateDates[String(it.id)] || "";
               const imgSrc = resolveApiMediaUrl(it.imageUrl) || JumpStartBg.src;
               const imgUnopt = isRemoteImageSrc(imgSrc) || imgSrc.startsWith("blob:");
               return (
@@ -470,16 +475,23 @@ if (!cancelled) setCompletedTaskDates(dateMap);
                       <div className="absolute inset-0 bg-gradient-to-r from-black/25 to-transparent sm:from-black/20" />
                       {isCompleted ? (
   <div className="absolute bottom-3 left-3 rounded-lg border border-emerald-300/35 bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-100 shadow-md backdrop-blur-sm">
-    {/* Completed on:{" "}
-    {completedDate ? new Date(completedDate).toLocaleDateString() : "—"} */}
-    Completed on : N/A
-<br />
-Last Updated :{" "}
-{completedDate ? new Date(completedDate).toLocaleDateString(undefined, {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-}) : "—"}
+    Completed on :{" "}
+    {completedOnDate
+      ? new Date(completedOnDate).toLocaleDateString(undefined, {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : "N/A"}
+    <br />
+    Last Updated :{" "}
+    {lastUpdatedDate
+      ? new Date(lastUpdatedDate).toLocaleDateString(undefined, {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : "—"}
   </div>
 ) : null}
                     </div>

@@ -66,6 +66,8 @@ interface PhaseCard {
   sessionDate?: string;
   imageUrl?: string;
   hasNestedTasks?: boolean;
+  assignedAt?: string;
+createdBy?: string;
 }
 
 function phaseSequenceIndex(phase: PhaseCard): number {
@@ -688,9 +690,9 @@ const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: s
     name: r.name || r.title,
   }))
 );
-console.log("ROADMAP PROGRESS FIRST ROW", progressData?.roadmaps?.[0]);
-console.log("ROADMAP PROGRESS COMMUNITY ROWS", progressData?.roadmaps);
-      console.log("PROGRESS DATA", progressData);
+// console.log("ROADMAP PROGRESS FIRST ROW", progressData?.roadmaps?.[0]);
+// console.log("ROADMAP PROGRESS COMMUNITY ROWS", progressData?.roadmaps);
+//       console.log("PROGRESS DATA", progressData);
 
       const mergedRoadmaps =
         rawRoadmap && progressData
@@ -858,6 +860,28 @@ console.log("ROADMAP PROGRESS COMMUNITY ROWS", progressData?.roadmaps);
   //       hasNestedTasks: item.hasNestedTasks === true,
   //     }));
   const data: RoadmapAssignmentUi[] = await fetchRoadmapAssignmentsForUser(userId);
+//   const assignmentMetaByRoadmapId = new Map(
+//   data.map((item: any) => [
+//     String(item.roadMapId || item.roadmapId || item.id),
+//     item,
+//   ]),
+// );
+const assignmentMetaByRoadmapId = new Map<string, any>();
+
+data.forEach((item: any) => {
+  const ids = [
+    item.roadMapId,
+    item.roadmapId,
+    item.parentRoadmapId,
+    item.id,
+  ]
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
+
+  ids.forEach((id) => assignmentMetaByRoadmapId.set(id, item));
+});
+//   console.log("ROADMAP ASSIGNMENTS RAW:", data);
+// console.log("FIRST ROADMAP ASSIGNMENT:", data?.[0]);
 const progressRes = await apiGetUserProgress(userId);
 const progressData = (progressRes?.data?.data ?? progressRes?.data) as any;
 
@@ -915,7 +939,52 @@ children = unwrapNestedRoadmapsArray(mergedRoadmaps[0]);
 
       return String(derivedStatus).toLowerCase() === "completed";
     });
+// const assignmentMeta = assignmentMetaByRoadmapId.get(String(item.id));
+// const assignmentMeta =
+//   assignmentMetaByRoadmapId.get(String(item.id)) ||
+//   assignmentMetaByRoadmapId.get(String(item.parentRoadmapId));
+// const rawAssignment = data.find((assignment: any) => {
+// const rawAssignment = data.find((assignment: any) => {
+//   const rawIds = [
+//     assignment.roadMapId,
+//     assignment.roadmapId,
+//     assignment.parentRoadmapId,
+//     assignment.id,
+//   ].map((v) => String(v || "").trim());
 
+//   const cardIds = [
+//     item.id,
+//     item.parentRoadmapId,
+//   ].map((v) => String(v || "").trim());
+
+//   return cardIds.some((id) => id && rawIds.includes(id));
+// });
+const progressRoadmaps = Array.isArray(progressData?.roadmaps)
+  ? progressData.roadmaps
+  : Array.isArray(progressData)
+    ? progressData
+    : [];
+
+const rawAssignment = progressRoadmaps.find((assignment: any) => {
+  const rawIds = [
+    assignment.roadMapId,
+    assignment.roadmapId,
+    assignment.parentRoadmapId,
+    assignment.id,
+  ].map((v) => String(v || "").trim());
+
+  const cardIds = [
+    item.id,
+    item.parentRoadmapId,
+  ].map((v) => String(v || "").trim());
+
+  return cardIds.some((id) => id && rawIds.includes(id));
+});
+//   console.log("PHASE META CHECK:", {
+//   phaseId: item.id,
+//   parentRoadmapId: item.parentRoadmapId,
+//   assignmentMeta,
+// });
   return {
     id: item.id,
     title: item.title,
@@ -925,6 +994,23 @@ children = unwrapNestedRoadmapsArray(mergedRoadmaps[0]);
     months: formatParentCompletionTime(item),
     status: allTasksCompleted ? "Completed" : toUiStatus(item.status),
     sessionDate: item.meetings?.[0] || "",
+//     assignedAt: safeString((item as any).assignedAt),
+// createdBy: safeString((item as any).createdBy || (item as any).createdByName || "—"),
+// assignedAt: safeString(rawAssignment?.assignedAt),
+// createdBy: safeString(
+//   rawAssignment?.createdBy ||
+//   rawAssignment?.createdByName ||
+//   rawAssignment?.assignedByName ||
+//   "—"
+// ),
+assignedAt: safeString((rawAssignment as any)?.assignedAt),
+createdBy: safeString(
+  (rawAssignment as any)?.createdBy ||
+  (rawAssignment as any)?.createdByName ||
+  (rawAssignment as any)?.assignedByName ||
+  (rawAssignment as any)?.assignedBy ||
+  "—"
+),
     imageUrl: resolveApiMediaUrl(item.imageUrl) || "",
     // hasNestedTasks: item.hasNestedTasks === true,
     hasNestedTasks: item.hasNestedTasks === true || validChildren.length > 0,
@@ -1603,7 +1689,8 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
       return (
         <div
           key={`${phase.parentRoadmapId || "parent"}-${phase.id}`}
-          className={`${directorGlassCard} flex flex-col overflow-hidden sm:flex-row`}
+          // className={`${directorGlassCard} flex flex-col overflow-hidden sm:flex-row`}
+          className="group flex min-h-[230px] overflow-hidden rounded-3xl border border-white/15 bg-[linear-gradient(135deg,rgba(255,255,255,0.12),rgba(255,255,255,0.06))] shadow-[0_18px_50px_rgba(0,0,0,0.25)] transition hover:border-[#8ec5eb]/35 hover:bg-white/[0.09] sm:flex-row"
         >
           <div className="relative aspect-[16/10] max-h-52 w-full shrink-0 sm:aspect-auto sm:h-auto sm:max-h-none sm:min-h-[200px] sm:w-[42%] sm:max-w-[220px]">
             {img ? (
@@ -1652,10 +1739,49 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
                 </div>
               ) : null}
 
-              <p className="text-sm text-white/75">
+              {/* <p className="text-sm text-white/75">
                 Completion time{" "}
                 <span className="font-semibold text-white">{phase.months}</span>
-              </p>
+              </p> */}
+              <div className="mt-5 border-t border-white/10 pt-4">
+  <div className="grid gap-4 sm:grid-cols-3">
+    <div>
+      <p className="mb-1 flex items-center gap-2 text-xs font-bold text-white/60">
+        <i className="fa-regular fa-calendar text-[#8ec5eb]" />
+        Assigned on
+      </p>
+      <p className="text-[13px] font-semibold text-white">
+        {phase.assignedAt
+          ? new Date(phase.assignedAt).toLocaleDateString(undefined, {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })
+          : "—"}
+      </p>
+    </div>
+
+    <div>
+      <p className="mb-1 flex items-center gap-2 text-xs font-bold text-white/60">
+        <i className="fa-regular fa-user text-[#8ec5eb]" />
+        Created by
+      </p>
+      <p className="text-sm font-semibold text-white">
+        {phase.createdBy || "—"}
+      </p>
+    </div>
+
+    <div>
+      <p className="mb-1 flex items-center gap-2 text-xs font-bold text-white/60">
+        <i className="fa-regular fa-clock text-[#8ec5eb]" />
+        Completion time
+      </p>
+      <p className="text-sm font-semibold text-white">
+        {phase.months}
+      </p>
+    </div>
+  </div>
+</div>
             </div>
 
             <div className="flex border-t border-white/10 pt-3 sm:justify-end sm:border-0 sm:pt-0">
