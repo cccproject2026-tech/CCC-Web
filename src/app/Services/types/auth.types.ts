@@ -15,6 +15,8 @@ export interface LoginResponse {
     firstName: string;
     lastName: string;
     profilePicture?: string;
+    googleCalendarStatus?: "connected" | "disconnected" | "expired" | "error";
+    googleCalendarConnectedAt?: string;
   };
 }
 

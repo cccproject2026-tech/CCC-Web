@@ -116,6 +116,7 @@ function normalizeIntervals(raw: unknown): CalendarBusyPeriod[] {
 
 export type ParsedGoogleSide = {
   googleCalendarLinked: boolean | null;
+  googleCalendarStatus?: "connected" | "disconnected" | "expired" | "error";
   busyIntervals: CalendarBusyPeriod[];
 };
 
@@ -123,12 +124,21 @@ function parseGoogleSide(node: unknown): ParsedGoogleSide {
   const o = asRecord(node);
   if (!o) return { googleCalendarLinked: null, busyIntervals: [] };
   const linkedRaw = o.googleCalendarLinked ?? o.calendarLinked ?? o.linked;
+  const statusRaw = o.googleCalendarStatus;
   let googleCalendarLinked: boolean | null = null;
   if (typeof linkedRaw === "boolean") googleCalendarLinked = linkedRaw;
+  const googleCalendarStatus =
+    statusRaw === "connected" ||
+    statusRaw === "disconnected" ||
+    statusRaw === "expired" ||
+    statusRaw === "error"
+      ? statusRaw
+      : undefined;
 
   const busyRaw = o.busyIntervals ?? o.busy ?? o.busyPeriods ?? o.blocks;
   return {
     googleCalendarLinked,
+    googleCalendarStatus,
     busyIntervals: normalizeIntervals(busyRaw),
   };
 }
@@ -184,10 +194,14 @@ export function buildGoogleConnectBanners(
   participant: ParsedGoogleSide,
 ): string[] {
   const banners: string[] = [];
-  if (mentor.googleCalendarLinked === false) {
+  if (mentor.googleCalendarStatus === "expired" || mentor.googleCalendarStatus === "error") {
+    banners.push("Reconnect Google Calendar to avoid double-booking.");
+  } else if (mentor.googleCalendarLinked === false) {
     banners.push("Link Google Calendar to avoid double-booking.");
   }
-  if (participantMergedInRequest && participant.googleCalendarLinked === false) {
+  if (participantMergedInRequest && (participant.googleCalendarStatus === "expired" || participant.googleCalendarStatus === "error")) {
+    banners.push("Booking participant: reconnect Google Calendar to avoid double-booking.");
+  } else if (participantMergedInRequest && participant.googleCalendarLinked === false) {
     banners.push("Booking participant: link Google Calendar to avoid double-booking.");
   }
   return banners;

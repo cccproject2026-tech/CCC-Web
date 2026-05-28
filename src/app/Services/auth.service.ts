@@ -79,7 +79,10 @@ export const apiLogout = () =>
 
 /** GET `/auth/google` — returns OAuth URL. Send `Authorization: Bearer` only (no anonymous ?userId= flow). Optional ?userId is omitted here; backend derives user from JWT. */
 export const apiGetGoogleCalendarAuthUrl = () =>
-  axiosInstance.get<{ url?: string; data?: { url?: string }; success?: boolean }>("/auth/google");
+  axiosInstance.get<{ url?: string; data?: { url?: string }; success?: boolean }>(
+    "/auth/google",
+    { suppress401Redirect: true },
+  );
 
 function pickOAuthUrl(record: Record<string, unknown>): string | null {
   const keys = ["url", "oauthUrl", "authUrl", "authorizationUrl", "redirectUrl", "link"] as const;

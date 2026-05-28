@@ -162,7 +162,11 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const status = error?.response?.status;
-    const originalRequest = error.config as (AxiosError["config"] & { _retry?: boolean; skipAuth?: boolean }) | undefined;
+    const originalRequest = error.config as (AxiosError["config"] & {
+      _retry?: boolean;
+      skipAuth?: boolean;
+      suppress401Redirect?: boolean;
+    }) | undefined;
 
     // Attempt refresh flow on 401 (except auth endpoints / public routes)
     if (
@@ -223,7 +227,7 @@ axiosInstance.interceptors.response.use(
     }
 
     // Role redirect (kept) when not refreshable / refresh fails
-    if (status === 401 && typeof window !== "undefined") {
+    if (status === 401 && typeof window !== "undefined" && !originalRequest?.suppress401Redirect) {
       const path = window.location.pathname;
       const search = window.location.search || "";
       const ret = `${path}${search}`;

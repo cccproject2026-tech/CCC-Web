@@ -2,6 +2,7 @@
 
 export type UserRole = 'pastor' | 'mentor' | 'field-mentor' | 'director' | 'admin';
 export type UserStatus = 'active' | 'inactive' | 'pending' | 'completed';
+export type GoogleCalendarStatus = 'connected' | 'disconnected' | 'expired' | 'error';
 
 export interface UploadedDocument {
   fileName: string;
@@ -54,6 +55,10 @@ export interface UserResponse {
   fieldMentorInvitation?: FieldMentorInvitation;
   churchDetails?: ChurchDetails[];
   isEmailVerified?: boolean;
+  googleCalendarStatus?: GoogleCalendarStatus;
+  googleCalendarConnectedAt?: string;
+  googleCalendarLastSyncAt?: string;
+  googleCalendarEmail?: string;
   createdAt?: string;
   updatedAt?: string;
 }
