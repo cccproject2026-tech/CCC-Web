@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import DirectorHero from "../../DirectorHero";
+import { apiGetExtras } from "@/app/Services/roadmaps.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import {
   findNestedProgressForTask,
@@ -105,6 +106,7 @@ export default function DirectorPhaseListPage() {
   const [error, setError] = useState<string | null>(null);
   const [roadmap, setRoadmap] = useState<RoadmapDoc | null>(null);
   const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
+  const [completedTaskUpdateDates, setCompletedTaskDates] = useState<Record<string, string>>({});
   const [q, setQ] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -138,6 +140,7 @@ export default function DirectorPhaseListPage() {
 useEffect(() => {
   if (!pastorView || !pastorId || !roadmapId || !roadmap) {
     setCompletedTaskIds(new Set());
+    setCompletedTaskDates({});
     return;
   }
 
@@ -147,6 +150,8 @@ useEffect(() => {
     try {
       const res = await apiGetUserProgress(pastorId);
       const progress = unwrapProgressData(res);
+//       console.log("FULL USER PROGRESS RESPONSE:", res?.data);
+// console.log("UNWRAPPED PROGRESS:", progress);
 
       const parentRid = normalizeRoadmapId(
         roadmap._id ?? roadmapId,
@@ -160,6 +165,7 @@ useEffect(() => {
 
         const np = findNestedProgressForTask(progress, parentRid, taskId);
         if (!np) return;
+      
 
         const completed = Number(np.completedSteps ?? 0);
         const total = Number(np.totalSteps ?? 0);
@@ -174,9 +180,37 @@ useEffect(() => {
       });
 
       if (!cancelled) setCompletedTaskIds(ids);
+      const completedIds = Array.from(ids);
+
+const dateResults = await Promise.allSettled(
+  completedIds.map(async (taskId) => {
+    const extrasRes = await apiGetExtras(roadmapId, pastorId, taskId);
+    const body = (extrasRes?.data as any)?.data ?? extrasRes?.data;
+
+    return {
+      taskId,
+      date: String(body?.updatedAt || body?.createdAt || ""),
+    };
+  }),
+);
+
+const dateMap: Record<string, string> = {};
+
+dateResults.forEach((result) => {
+  if (result.status !== "fulfilled") return;
+  if (!result.value.date) return;
+
+  dateMap[result.value.taskId] = result.value.date;
+});
+
+if (!cancelled) setCompletedTaskDates(dateMap);
     } catch (err) {
       console.error("Failed to load pastor task progress", err);
-      if (!cancelled) setCompletedTaskIds(new Set());
+      // if (!cancelled) setCompletedTaskIds(new Set());
+      if (!cancelled) {
+  setCompletedTaskIds(new Set());
+  setCompletedTaskDates({});
+}
     }
   };
 
@@ -416,6 +450,7 @@ useEffect(() => {
           <div className="space-y-4">
             {items.map((it) => {
               const isCompleted = completedTaskIds.has(String(it.id));
+              const completedDate = completedTaskUpdateDates[String(it.id)];
               const imgSrc = resolveApiMediaUrl(it.imageUrl) || JumpStartBg.src;
               const imgUnopt = isRemoteImageSrc(imgSrc) || imgSrc.startsWith("blob:");
               return (
@@ -433,6 +468,20 @@ useEffect(() => {
                         unoptimized={imgUnopt}
                       />
                       <div className="absolute inset-0 bg-gradient-to-r from-black/25 to-transparent sm:from-black/20" />
+                      {isCompleted ? (
+  <div className="absolute bottom-3 left-3 rounded-lg border border-emerald-300/35 bg-emerald-500/20 px-3 py-1.5 text-xs font-semibold text-emerald-100 shadow-md backdrop-blur-sm">
+    {/* Completed on:{" "}
+    {completedDate ? new Date(completedDate).toLocaleDateString() : "—"} */}
+    Completed on : N/A
+<br />
+Last Updated :{" "}
+{completedDate ? new Date(completedDate).toLocaleDateString(undefined, {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+}) : "—"}
+  </div>
+) : null}
                     </div>
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col px-4 py-4 sm:px-6 sm:py-5">

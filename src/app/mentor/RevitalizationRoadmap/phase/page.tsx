@@ -14,7 +14,7 @@ import {
   mentorWarningPanel,
 } from "@/app/Components/mentor/mentor-theme";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
-import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
+import { apiGetRoadmapById, apiGetExtras } from "@/app/Services/roadmaps.service";
 import { apiGetUserById } from "@/app/Services/users.service";
 import { apiGetAppointments } from "@/app/Services/appointments.service";
 import { unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
@@ -201,6 +201,7 @@ function PhasePageContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [accessError, setAccessError] = useState<string | null>(null);
   const [taskMeetings, setTaskMeetings] = useState<Record<string, Record<string, any>>>({});
+const [taskUpdatedDates, setTaskUpdatedDates] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!userId) return;
@@ -365,6 +366,55 @@ function PhasePageContent() {
     };
   }, [roadmapId, userId, tasks]);
 
+  useEffect(() => {
+  if (!roadmapId || !userId || tasks.length === 0) {
+    setTaskUpdatedDates({});
+    return;
+  }
+
+  const completedTaskIds = tasks
+    .filter((task) => taskCardStatus(task) === "Completed")
+    .map((task) => resolveNestedTemplateItemId(task))
+    .filter(Boolean) as string[];
+
+  if (completedTaskIds.length === 0) {
+    setTaskUpdatedDates({});
+    return;
+  }
+
+  let cancelled = false;
+
+  const loadUpdatedDates = async () => {
+    const results = await Promise.allSettled(
+      completedTaskIds.map(async (taskId) => {
+        const res = await apiGetExtras(roadmapId, userId, taskId);
+        const body = (res?.data as any)?.data ?? res?.data;
+
+        return {
+          taskId,
+          updatedAt: String(body?.updatedAt || ""),
+        };
+      }),
+    );
+
+    const next: Record<string, string> = {};
+
+    results.forEach((result) => {
+      if (result.status !== "fulfilled") return;
+      if (!result.value.updatedAt) return;
+      next[result.value.taskId] = result.value.updatedAt;
+    });
+
+    if (!cancelled) setTaskUpdatedDates(next);
+  };
+
+  void loadUpdatedDates();
+
+  return () => {
+    cancelled = true;
+  };
+}, [roadmapId, userId, tasks]);
+
   const openTask = (taskId: string) => {
     if (!userId || !roadmapId) return;
     router.push(
@@ -485,6 +535,7 @@ function PhasePageContent() {
                 const { completed, total } = taskCounts(task);
                 const duration = task.duration != null ? `Months ${task.duration}` : "—";
                 const meeting = tid ? taskMeetings[tid] : null;
+                const updatedAt = tid ? taskUpdatedDates[tid] : "";
                 const blurb =
                   String(task.description ?? "").trim() ||
                   String((task as { roadMapDetails?: unknown }).roadMapDetails ?? "").trim();
@@ -511,6 +562,15 @@ function PhasePageContent() {
                           }
                         : undefined
                     }
+                    lastUpdatedDate={
+  updatedAt
+    ? new Date(updatedAt).toLocaleDateString(undefined, {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : undefined
+}
                     onViewClick={() => tid && openTask(tid)}
                     onCardClick={() => tid && openTask(tid)}
                   />

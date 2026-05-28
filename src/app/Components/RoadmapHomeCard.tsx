@@ -17,6 +17,7 @@ interface RoadmapHomeCardProps {
   // Optional fields for completed status
   completedOn?: string;
   lastUpdatedOn?: string;
+  lastUpdatedDate?: string;
   // Optional fields for task completion progress
   taskCompleted?: {
     completed: number;
@@ -43,6 +44,7 @@ export default function RoadmapHomeCard({
   onCardClick,
   completedOn,
   lastUpdatedOn,
+  lastUpdatedDate,
   taskCompleted,
   meetingInfo,
   showCheckmark = false,
@@ -135,6 +137,12 @@ const effectiveStatus =
             className="object-cover"
             unoptimized={!!imgUnoptimized}
           />
+          {effectiveStatus === "Completed" && (
+  <div className="absolute bottom-3 left-3 z-20 rounded-lg border border-white/20 bg-black/45 px-3 py-2 text-[11px] font-semibold leading-5 text-white shadow-md backdrop-blur-sm">
+    <p>Completed on : N/A</p>
+    <p>Last Updated : {lastUpdatedDate || lastUpdatedOn || "—"}</p>
+  </div>
+)}
           {/* Checkmark overlay for completed status - centered */}
           {showCheckmark && (
             <div className="absolute inset-0 flex items-center justify-center z-10">
@@ -184,7 +192,7 @@ const effectiveStatus =
             </div>
 
             {/* Completed Dates - Only show for Completed status */}
-            {effectiveStatus === "Completed" && completedOn && lastUpdatedOn && (
+            {/* {effectiveStatus === "Completed" && completedOn && lastUpdatedOn && (
               <div className="mb-4 space-y-2">
                 <div>
                   <p className={`text-[14px] font-semibold ${isMentor ? "text-[#d9ebf8]" : "font-bold text-black"}`}>
@@ -199,7 +207,13 @@ const effectiveStatus =
                   </p>
                 </div>
               </div>
-            )}
+            )} */}
+            {/* {effectiveStatus === "Completed" && (
+  <div className="mb-4 space-y-1 text-[12px] font-semibold text-[#cde2f2]">
+    <p>Completed on : N/A</p>
+    <p>Last Updated : {lastUpdatedDate || lastUpdatedOn || "—"}</p>
+  </div>
+)} */}
 
             {/* Task Completion Progress - Show for In-progress and Over Due */}
             {taskCompleted &&

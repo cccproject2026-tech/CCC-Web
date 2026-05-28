@@ -21,6 +21,7 @@ import {
 import HeroBg from "@/app/Assets/self-revitalization-hero.png";
 import PhaseImg from "@/app/Assets/phase-img.png";
 import { apiGetRoadmapById } from "@/app/Services/api";
+import { apiGetExtras } from "@/app/Services/roadmaps.service";
 import { apiGetAppointments } from "@/app/Services/appointments.service";
 import { unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
@@ -174,6 +175,7 @@ function SelfRevitalizationContent() {
   const [error, setError] = useState("");
   const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
   const [taskMeetings, setTaskMeetings] = useState<Record<string, Record<string, any>>>({});
+  const [taskUpdatedDates, setTaskUpdatedDates] = useState<Record<string, string>>({});
 
   const overridesStorageKey = useMemo(() => {
     const uid = String(sessionUserId || "").trim();
@@ -386,6 +388,55 @@ function SelfRevitalizationContent() {
     };
   }, [roadmapId, sessionUserId, nestedRoadmaps]);
 
+  useEffect(() => {
+  if (!roadmapId || !sessionUserId || nestedRoadmaps.length === 0) {
+    setTaskUpdatedDates({});
+    return;
+  }
+
+  const completedTaskIds = nestedRoadmaps
+    .filter((item) => taskStatusFromProgress(item) === "Completed")
+    .map((item) => resolveNestedTemplateItemId(item))
+    .filter(Boolean) as string[];
+
+  if (completedTaskIds.length === 0) {
+    setTaskUpdatedDates({});
+    return;
+  }
+
+  let cancelled = false;
+
+  const loadUpdatedDates = async () => {
+    const results = await Promise.allSettled(
+      completedTaskIds.map(async (taskId) => {
+        const res = await apiGetExtras(roadmapId, sessionUserId, taskId);
+        const body = (res?.data as any)?.data ?? res?.data;
+
+        return {
+          taskId,
+          updatedAt: String(body?.updatedAt || ""),
+        };
+      }),
+    );
+
+    const next: Record<string, string> = {};
+
+    results.forEach((result) => {
+      if (result.status !== "fulfilled") return;
+      if (!result.value.updatedAt) return;
+      next[result.value.taskId] = result.value.updatedAt;
+    });
+
+    if (!cancelled) setTaskUpdatedDates(next);
+  };
+
+  void loadUpdatedDates();
+
+  return () => {
+    cancelled = true;
+  };
+}, [roadmapId, sessionUserId, nestedRoadmaps, progressData, statusOverrides]);
+
   const divisions = useMemo(() => {
     const raw = nestedRoadmaps
       .map((item) => String(item?.division ?? item?.phase ?? "").trim())
@@ -560,7 +611,7 @@ function SelfRevitalizationContent() {
                   const resolvedImage = resolveApiMediaUrl(item.imageUrl) || "";
                   const imgSrc = isValidImageUrl(resolvedImage) ? resolvedImage : PhaseImg;
                   const status = taskStatusFromProgress(item);
-
+const updatedAt = taskId ? taskUpdatedDates[taskId] : "";
                   return (
                     <div
                       key={taskId || `task-${index}`}
@@ -584,6 +635,21 @@ function SelfRevitalizationContent() {
                             {status}
                           </span>
                         </div>
+                        {status === "Completed" ? (
+  <div className="absolute bottom-3 left-3 rounded-lg border border-white/20 bg-black/45 px-3 py-2 text-[11px] font-semibold leading-5 text-white shadow-md backdrop-blur-sm">
+    <p>Completed on : N/A</p>
+    <p>
+      Last Updated :{" "}
+      {updatedAt
+        ? new Date(updatedAt).toLocaleDateString(undefined, {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })
+        : "—"}
+    </p>
+  </div>
+) : null}
                       </div>
 
                       <div className="flex min-w-0 flex-1 flex-col justify-between gap-4 p-4 sm:p-5">
