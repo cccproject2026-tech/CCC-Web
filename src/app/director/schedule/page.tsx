@@ -451,6 +451,24 @@ function DirectorScheduleContent() {
     return () => { cancelled = true; };
   }, []);
 
+
+  const appointmentIdFromUrl = searchParams.get("appointmentId");
+
+useEffect(() => {
+  if (loading || !appointmentIdFromUrl || appointments.length === 0) return;
+
+  const match = appointments.find((appt) => {
+    const id = appointmentEntityId(appt);
+    return id === appointmentIdFromUrl;
+  });
+
+  if (!match) return;
+
+  const id = appointmentEntityId(match);
+  if (!id) return;
+
+  router.replace(`/director/schedule/${encodeURIComponent(id)}`);
+}, [appointmentIdFromUrl, appointments, loading, router]);
   // ── Fetch pastors ─────────────────────────────────────────────────────────────
   useEffect(() => {
     apiGetAllUsers({ role: "pastor", roleMatch: "mixed", limit: 9999 })

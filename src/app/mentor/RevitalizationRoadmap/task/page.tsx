@@ -466,6 +466,14 @@ const findAssessmentExtra = (items: any[] | undefined): any | null => {
 
   return null;
 };
+const hasCdpContent = (row: any) => {
+  if (!row) return false;
+  if (row.sent === true || row.status === "sent") return true;
+
+  return Object.values(row).some(
+    (value) => typeof value === "string" && value.trim().length > 0,
+  );
+};
 useEffect(() => {
   if (!task || !userId) {
     setAssessmentTaskState(null);
@@ -505,15 +513,17 @@ useEffect(() => {
       if (Array.isArray(data)) {
         hasCdp =
           hasCdp ||
-          data.some((row: any) => row?.sent === true || row?.status === "sent");
+          // data.some((row: any) => row?.sent === true || row?.status === "sent");
+          data.some((row: any) => hasCdpContent(row))
       } else if (Array.isArray(data?.sections)) {
         hasCdp =
           hasCdp ||
           data.sections.some((section: any) =>
             Array.isArray(section?.recommendations) &&
-            section.recommendations.some(
-              (rec: any) => rec?.sent === true || rec?.status === "sent",
-            ),
+            // section.recommendations.some(
+            //   (rec: any) => rec?.sent === true || rec?.status === "sent",
+            // ),
+            section.recommendations.some((rec: any) => hasCdpContent(rec))
           );
       }
     } catch {

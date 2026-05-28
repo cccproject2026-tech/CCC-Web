@@ -570,6 +570,15 @@ const hasRequiredUploads = useMemo(() => {
 
 // Prevent roadmap completion until required task submissions such as text fields,
 // text areas, and checkboxes are completed.
+const getAssessmentIdFromExtra = (extra: ExtraComponent): string | null => {
+  const fromShape = resolveAssessmentIdFromExtraShape(extra);
+  if (fromShape) return fromShape;
+  const fromNav = String(extra.navigateTo || "");
+  if (!fromNav) return null;
+  const q = /[?&]assessmentId=([^&]+)/i.exec(fromNav);
+  if (q?.[1]) return decodeURIComponent(q[1]).trim();
+  return null;
+};
 const hasRequiredSubmissions = useMemo(() => {
   const checkExtras = (
     items: ExtraComponent[] | undefined,
@@ -602,6 +611,12 @@ if (metaDateFields.has(normalizeMetaName(fieldKey))) {
       // if (extra.type === "ASSESSMENT") {
       //   if (!formData[fieldKey]) return false;
       // }
+      if (extra.type === "ASSESSMENT") {
+  const assessmentId = getAssessmentIdFromExtra(extra);
+  const state = assessmentId ? assessmentTaskState[assessmentId] : null;
+
+  if (!state?.submitted || !state?.hasCdp) return false;
+}
 
       if (extra.type === "TEXT_FIELD" || extra.type === "TEXT_AREA") {
   const value = formData[fieldKey];
@@ -625,7 +640,7 @@ if (extra.type === "DATE_PICKER") {
   };
 
   return checkExtras(templateExtras, "extra");
-}, [templateExtras, formData]);
+}, [templateExtras, formData, assessmentTaskState]);
 
   useEffect(() => {
     if (!nestedItemId) return;
@@ -1158,15 +1173,15 @@ if (extra.type === "DATE_PICKER") {
     });
   };
 
-  const getAssessmentIdFromExtra = (extra: ExtraComponent): string | null => {
-    const fromShape = resolveAssessmentIdFromExtraShape(extra);
-    if (fromShape) return fromShape;
-    const fromNav = String(extra.navigateTo || "");
-    if (!fromNav) return null;
-    const q = /[?&]assessmentId=([^&]+)/i.exec(fromNav);
-    if (q?.[1]) return decodeURIComponent(q[1]).trim();
-    return null;
-  };
+  // const getAssessmentIdFromExtra = (extra: ExtraComponent): string | null => {
+  //   const fromShape = resolveAssessmentIdFromExtraShape(extra);
+  //   if (fromShape) return fromShape;
+  //   const fromNav = String(extra.navigateTo || "");
+  //   if (!fromNav) return null;
+  //   const q = /[?&]assessmentId=([^&]+)/i.exec(fromNav);
+  //   if (q?.[1]) return decodeURIComponent(q[1]).trim();
+  //   return null;
+  // };
 
   const getAssessmentCheckboxKey = (extra: ExtraComponent): string | undefined => {
     const checkbox = extra.checkboxes?.find((cb) => cb.type === "CHECKBOX" && String(cb.name || "").trim());
@@ -1185,17 +1200,25 @@ if (extra.type === "DATE_PICKER") {
 //     );
 //   });
 // };
+// const getRoadmapAssessmentMeeting = (assessmentId: string) => {
+//   return appointments.find((appt: any) => {
+//     const notes = String(appt?.notes || "");
+//     const status = String(appt?.status || "").toLowerCase();
+
+//     return (
+//       !status.includes("cancel") &&
+//       notes.includes(`assessmentId:${assessmentId}`) &&
+//       notes.includes(`taskId:${nestedItemId || ""}`) &&
+//       notes.includes(`roadmapId:${roadmapId || ""}`)
+//     );
+//   });
+// };
 const getRoadmapAssessmentMeeting = (assessmentId: string) => {
   return appointments.find((appt: any) => {
     const notes = String(appt?.notes || "");
     const status = String(appt?.status || "").toLowerCase();
 
-    return (
-      !status.includes("cancel") &&
-      notes.includes(`assessmentId:${assessmentId}`) &&
-      notes.includes(`taskId:${nestedItemId || ""}`) &&
-      notes.includes(`roadmapId:${roadmapId || ""}`)
-    );
+    return !status.includes("cancel") && notes.includes(`assessmentId:${assessmentId}`);
   });
 };
 
@@ -1302,6 +1325,15 @@ const getRoadmapAssessmentMeeting = (assessmentId: string) => {
 
   return found;
 }, [templateExtras]);
+
+const hasCdpContent = (row: any) => {
+  if (!row) return false;
+  if (row.sent === true || row.status === "sent") return true;
+
+  return Object.values(row).some(
+    (value) => typeof value === "string" && value.trim().length > 0,
+  );
+};
 useEffect(() => {
   if (!userId || assessmentExtras.length === 0) {
     setAssessmentTaskState({});
@@ -1338,15 +1370,17 @@ useEffect(() => {
           if (Array.isArray(data)) {
             hasCdp =
               hasCdp ||
-              data.some((row: any) => row?.sent === true || row?.status === "sent");
+              // data.some((row: any) => row?.sent === true || row?.status === "sent");
+              data.some((row: any) => hasCdpContent(row));
           } else if (Array.isArray(data?.sections)) {
             hasCdp =
               hasCdp ||
               data.sections.some((section: any) =>
                 Array.isArray(section?.recommendations) &&
-                section.recommendations.some(
-                  (rec: any) => rec?.sent === true || rec?.status === "sent",
-                ),
+                // section.recommendations.some(
+                //   (rec: any) => rec?.sent === true || rec?.status === "sent",
+                // ),
+                section.recommendations.some((rec: any) => hasCdpContent(rec)),
               );
           }
         } catch {
@@ -1363,13 +1397,13 @@ useEffect(() => {
     if (!cancelled) {
   setAssessmentTaskState(next);
 
-  const hasCompletedCdp = Object.values(next).some(
-    (row) => row.submitted && row.hasCdp,
-  );
+  // const hasCompletedCdp = Object.values(next).some(
+  //   (row) => row.submitted && row.hasCdp,
+  // );
 
-  if (hasCompletedCdp) {
-    setStatusUiOverride("Completed");
-  }
+  // if (hasCompletedCdp) {
+  //   setStatusUiOverride("Completed");
+  // }
 }
   };
 
@@ -2394,7 +2428,7 @@ const scheduledMeeting = assessmentId
                 View Submitted Answers
               </button>
 
-              {state.hasCdp ? (
+              {/* {state.hasCdp ? (
                 <button
                   type="button"
                   onClick={() =>
@@ -2425,7 +2459,34 @@ const scheduledMeeting = assessmentId
 >
   {scheduledMeeting ? "View Meeting Details" : "Schedule Meeting"}
 </button>
-              )}
+              )} */}
+              {state.hasCdp && (
+              
+  <button
+    type="button"
+    onClick={() =>
+      router.push(
+       `/pastor/assessmentRecommendations?assessmentId=${encodeURIComponent(assessmentId || "")}`,
+        // `/pastor/Assessments/result/cdp?assessmentId=${assessmentId}&userId=${userId}&roadmapId=${roadmapId || ""}&taskId=${nestedItemId || ""}&parentId=${parentRoadmapId || ""}`,
+      )
+    }
+    className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+  >
+    View CDP
+  </button>
+)}
+
+<button
+  type="button"
+  onClick={() =>
+    scheduledMeeting
+      ? router.push(`/pastor/Appointments?appointmentId=${scheduledMeeting._id || scheduledMeeting.id}`)
+      : openAssessmentMeetingDrawer(extra)
+  }
+  className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+>
+  {scheduledMeeting ? "Meeting Details" : "Schedule Meeting"}
+</button>
             </div>
           </div>
         </div>

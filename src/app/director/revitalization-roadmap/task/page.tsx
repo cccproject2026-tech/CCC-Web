@@ -1721,6 +1721,35 @@ const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
   );
 };
 
+const readEntityId = (value: unknown): string => {
+  if (!value) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    return String(obj._id ?? obj.id ?? "").trim();
+  }
+  return String(value).trim();
+};
+
+const readAppointmentField = (appt: Record<string, any>, key: string): string => {
+  const metadata = appt.metadata || appt.meta || appt.context || {};
+  return String(appt[key] ?? metadata?.[key] ?? "").trim();
+};
+
+const notesContainToken = (notes: string, key: string, value?: string | null): boolean => {
+  const target = String(value ?? "").trim();
+  if (!target) return false;
+  return notes.includes(`${key}:${target}`) || notes.includes(`${key}=${target}`);
+};
+
+const unwrapAppointments = (res: any): any[] => {
+  const body = res?.data?.data ?? res?.data ?? [];
+  if (Array.isArray(body)) return body;
+  if (Array.isArray(body?.appointments)) return body.appointments;
+  if (Array.isArray(body?.data)) return body.data;
+  return [];
+};
+
 const renderTemplateExtra = (extra: Record<string, any>, idx: number): JSX.Element | null => {
   const type = String(extra.type ?? "").toUpperCase();
   const label = String(extra.name ?? "").trim();
@@ -1809,51 +1838,109 @@ if (type === "ASSESSMENT") {
 
   <button
     type="button"
+    // onClick={async () => {
+    //   try {
+    //     const assessmentId = String(
+    //       extra?.assessmentId ??
+    //         extra?.assessment?._id ??
+    //         extra?.assessment ??
+    //         extra?.selectedAssessment?._id ??
+    //         extra?.selectedAssessment ??
+    //         "",
+    //     ).trim();
+
+    //     if (!assessmentId || !userId) return;
+
+    //     const res = await apiGetAppointments({
+    //       userId,
+    //     });
+
+    //     const appointments =
+    //       ((res?.data as any)?.data ??
+    //         res?.data ??
+    //         []) as any[];
+
+    //     const match = appointments.find((appt) => {
+    //       const notes = String(appt?.notes || "");
+
+    //       return (
+    //         notes.includes(`assessmentId:${assessmentId}`) &&
+    //         notes.includes(`taskId:${taskId || ""}`) &&
+    //         notes.includes(`roadmapId:${roadmapId || ""}`)
+    //       );
+    //     });
+
+    //     const appointmentId = String(
+    //       match?._id ?? match?.id ?? "",
+    //     ).trim();
+
+    //     if (!appointmentId) return;
+
+    //     router.push(
+    //       `/director/schedule?appointmentId=${appointmentId}`,
+    //     );
+    //   } catch (err) {
+    //     console.error("Failed to open meeting details", err);
+    //   }
+    // }}
     onClick={async () => {
-      try {
-        const assessmentId = String(
-          extra?.assessmentId ??
-            extra?.assessment?._id ??
-            extra?.assessment ??
-            extra?.selectedAssessment?._id ??
-            extra?.selectedAssessment ??
-            "",
-        ).trim();
+  try {
+    const assessmentId = String(
+      extra?.assessmentId ??
+        extra?.assessment?._id ??
+        extra?.assessment ??
+        extra?.selectedAssessment?._id ??
+        extra?.selectedAssessment ??
+        "",
+    ).trim();
 
-        if (!assessmentId || !userId) return;
+    if (!assessmentId || !userId) return;
 
-        const res = await apiGetAppointments({
-          userId,
-        });
+    const res = await apiGetAppointments({
+      userId,
+      futureOnly: false,
+    });
 
-        const appointments =
-          ((res?.data as any)?.data ??
-            res?.data ??
-            []) as any[];
+    const appointments = unwrapAppointments(res);
 
-        const match = appointments.find((appt) => {
-          const notes = String(appt?.notes || "");
+    const match = appointments
+      .map((appt: any) => {
+        const status = String(appt?.status ?? "").toLowerCase();
+        if (status.includes("cancel")) return { appt, score: -1 };
 
-          return (
-            notes.includes(`assessmentId:${assessmentId}`) &&
-            notes.includes(`taskId:${taskId || ""}`) &&
-            notes.includes(`roadmapId:${roadmapId || ""}`)
-          );
-        });
+        const notes = String(appt?.notes ?? "");
+        let score = 0;
 
-        const appointmentId = String(
-          match?._id ?? match?.id ?? "",
-        ).trim();
+        if (
+          readAppointmentField(appt, "assessmentId") === assessmentId ||
+          notesContainToken(notes, "assessmentId", assessmentId)
+        ) score += 10;
 
-        if (!appointmentId) return;
+        if (
+          roadmapId &&
+          (readAppointmentField(appt, "roadmapId") === roadmapId ||
+            notesContainToken(notes, "roadmapId", roadmapId))
+        ) score += 4;
 
-        router.push(
-          `/director/schedule?appointmentId=${appointmentId}`,
-        );
-      } catch (err) {
-        console.error("Failed to open meeting details", err);
-      }
-    }}
+        if (
+          taskId &&
+          (readAppointmentField(appt, "taskId") === taskId ||
+            notesContainToken(notes, "taskId", taskId))
+        ) score += 4;
+
+        return { appt, score };
+      })
+      .filter((row) => row.score > 0)
+      .sort((a, b) => b.score - a.score)[0]?.appt;
+
+    const appointmentId = String(match?._id ?? match?.id ?? "").trim();
+    if (!appointmentId) return;
+
+    router.push(`/director/schedule?appointmentId=${encodeURIComponent(appointmentId)}`);
+  } catch (err) {
+    console.error("Failed to open meeting details", err);
+  }
+}}
     className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm text-white hover:bg-white/15"
   >
     View Meeting Details
@@ -1874,29 +1961,34 @@ if (type === "ASSESSMENT") {
 
         if (!assessmentId || !userId) return;
 
-        const res = await apiGetSectionRecommendations(
-          assessmentId,
-          userId,
-        );
+        // const res = await apiGetSectionRecommendations(
+        //   assessmentId,
+        //   userId,
+        // );
 
-        const recommendation =
-          (res?.data as any)?.data ?? res?.data;
+        // const recommendation =
+        //   (res?.data as any)?.data ?? res?.data;
 
-        const recommendationId = String(
-          recommendation?._id ??
-            recommendation?.id ??
-            "",
-        ).trim();
+        // const recommendationId = String(
+        //   recommendation?._id ??
+        //     recommendation?.id ??
+        //     "",
+        // ).trim();
 
-        if (!recommendationId) return;
+        // if (!recommendationId) return;
 
+        // router.push(
+        //   `/director/assessments/result?assessmentId=encodeURIComponent(
+        //     assessmentId,
+        //   )}&userId=${encodeURIComponent(
+        //     userId,
+        //   )}&viewCdp=1`,
+        // );
         router.push(
-          `/director/assessments/result?assessmentId=encodeURIComponent(
-            assessmentId,
-          )}&userId=${encodeURIComponent(
-            userId,
-          )}&viewCdp=1`,
-        );
+  `/director/assessments/result?assessmentId=${encodeURIComponent(
+    assessmentId,
+  )}&userId=${encodeURIComponent(userId)}&viewCdp=1`,
+);
       } catch (err) {
         console.error("Failed to open CDP", err);
       }
