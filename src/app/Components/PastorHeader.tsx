@@ -279,9 +279,17 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
   return (
     <header className="relative z-40 flex items-center justify-between border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md md:px-6 lg:px-10 font-[Albert_Sans]">
       {/* ✅ Left Logo */}
-      <div className="flex items-center gap-3">
+      {/* <div className="flex items-center gap-3">
         <Image src={Framelogo1} alt="Logo" width={26} height={26} />
-      </div>
+      </div> */}
+
+      <Link
+  href="/pastor/home"
+  className="flex items-center gap-3"
+  aria-label="Pastor Home"
+>
+  <Image src={Framelogo1} alt="Logo" width={26} height={26} />
+</Link>
 
       {/* ✅ Middle Nav Links */}
       {showFullHeader && (

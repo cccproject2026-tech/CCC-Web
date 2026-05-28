@@ -2795,7 +2795,12 @@ case "SECTION":
                         disabled={saving || !roadmapId || !userId}
                         className="rounded-md border border-white/30 bg-white/10 px-6 py-2 text-sm font-semibold text-white shadow transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {saving ? "Saving…" : "Save and continue"}
+                        {/* {saving ? "Saving…" : "Save and continue"} */}
+                        {saving
+  ? "Saving…"
+  : listAlignedStatus === "Completed"
+    ? "Resubmit Task"
+    : "Save and continue"}
                       </button>
                       {/* {listAlignedStatus !== "Completed" ? (
                         <button

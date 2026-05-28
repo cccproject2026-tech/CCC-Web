@@ -437,11 +437,30 @@ export default function InterestReceivedPage() {
   </div>
 )} */}
 
+{activeTab === "rejected" && (
+  <button
+    type="button"
+    onClick={() => {
+      const ok = window.confirm("Remove this rejected interest from the list?");
+      if (!ok) return;
+
+      setAllInterests((prev) =>
+        prev.filter((item) => item._id !== rowId),
+      );
+    }}
+    className="absolute right-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-xl border border-red-400/35 bg-red-500/10 text-red-100 transition hover:bg-red-500/20"
+    aria-label="Remove rejected interest"
+    title="Remove rejected interest"
+  >
+    <i className="fa-solid fa-trash" />
+  </button>
+)}
+
                     <div className="mb-4 flex items-start justify-between pr-8">
                       <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-xl border border-white/15 bg-[#8ec5eb]/15">
                         <i className="fa-solid fa-user text-2xl text-[#8ec5eb]" />
                       </div>
-                      <span className="text-[13px] font-medium text-white/55">
+                     <span className="mr-14 text-[13px] font-medium text-white/55">
                         {new Date(interest.createdAt).toLocaleDateString("en-GB", {
                           day: "2-digit",
                           month: "short",
