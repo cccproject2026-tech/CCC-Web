@@ -677,6 +677,20 @@ const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: s
       const body = rmRes.data as { data?: unknown };
       const rawRoadmap = body?.data ?? rmRes.data;
       const progressData = (progRes?.data?.data ?? progRes?.data) as any;
+     console.table(
+  (progressData?.roadmaps || []).map((r: any) => ({
+    roadmapId: r.roadmapId,
+    nestedRoadMapItemId: r.nestedRoadMapItemId,
+    nestedItemId: r.nestedItemId,
+    roadmapItemId: r.roadmapItemId,
+    taskId: r.taskId,
+    status: r.status,
+    name: r.name || r.title,
+  }))
+);
+console.log("ROADMAP PROGRESS FIRST ROW", progressData?.roadmaps?.[0]);
+console.log("ROADMAP PROGRESS COMMUNITY ROWS", progressData?.roadmaps);
+      console.log("PROGRESS DATA", progressData);
 
       const mergedRoadmaps =
         rawRoadmap && progressData
@@ -684,7 +698,33 @@ const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: s
           : [rawRoadmap];
 
       const mergedRoadmap = mergedRoadmaps[0];
-      const tasks = unwrapNestedRoadmapsArray(mergedRoadmap);
+      const tasks = unwrapNestedRoadmapsArray(mergedRoadmap).filter((task: any) => {
+  const taskId = resolveNestedTemplateItemId(task);
+  return taskId && taskId !== targetPhase.id;
+});
+      if (targetPhase.title.toLowerCase().includes("community")) {
+  console.table(
+    tasks.map((task: any) => {
+      const taskId = resolveNestedTemplateItemId(task);
+      const derivedStatus = taskId
+        ? deriveTaskStatusForList(progressData, {
+            parentRoadmapId: targetPhase.id,
+            taskId,
+            itemStatus: task.status != null ? String(task.status) : undefined,
+            endDate: typeof task.endDate === "string" ? task.endDate : undefined,
+          })
+        : "NO_TASK_ID";
+
+      return {
+        phaseId: targetPhase.id,
+        taskId,
+        name: task?.name || task?.title,
+        rawStatus: task?.status,
+        derivedStatus,
+      };
+    })
+  );
+}
 
       tasks.forEach((task: any) => {
         const nestedTaskId = resolveNestedTemplateItemId(task);
@@ -789,25 +829,108 @@ const loadRecommendedTask = useCallback(async (phaseList: PhaseCard[], userId: s
         return;
       }
 
-      const data: RoadmapAssignmentUi[] = await fetchRoadmapAssignmentsForUser(userId);
-      const parentCards = collapseRoadmapAssignmentsToParents(data);
-      const mappedPhases: PhaseCard[] = parentCards.map((item) => ({
-        id: item.id,
-        title: item.title,
-        description: item.desc || "No description",
-        parentRoadmapName: item.parentRoadmapName || "Roadmap",
-        parentRoadmapId: item.parentRoadmapId,
-  //  months:
-  // (item as any).parentDuration ||
-  // (item as any).parentCompletionTime ||
-  // item.months ||
-  // "N/A",
-  months: formatParentCompletionTime(item),
-        status: toUiStatus(item.status),
-        sessionDate: item.meetings?.[0] || "",
-        imageUrl: resolveApiMediaUrl(item.imageUrl) || "",
-        hasNestedTasks: item.hasNestedTasks === true,
-      }));
+  //     const data: RoadmapAssignmentUi[] = await fetchRoadmapAssignmentsForUser(userId);
+  //     const parentCards = collapseRoadmapAssignmentsToParents(data);
+  //     const mappedPhases: PhaseCard[] = parentCards.map((item) => ({
+  //       id: item.id,
+  //       title: item.title,
+  //       description: item.desc || "No description",
+  //       parentRoadmapName: item.parentRoadmapName || "Roadmap",
+  //       parentRoadmapId: item.parentRoadmapId,
+  // //  months:
+  // // (item as any).parentDuration ||
+  // // (item as any).parentCompletionTime ||
+  // // item.months ||
+  // // "N/A",
+  // months: formatParentCompletionTime(item),
+  //       // status: toUiStatus(item.status),
+  //       status:
+  // item.hasNestedTasks === true &&
+  // Array.isArray((item as any).children) &&
+  // (item as any).children.length > 0 &&
+  // (item as any).children.every((task: any) =>
+  //   String(task.status ?? "").toLowerCase().includes("complete")
+  // )
+  //   ? "Completed"
+  //   : toUiStatus(item.status),
+  //       sessionDate: item.meetings?.[0] || "",
+  //       imageUrl: resolveApiMediaUrl(item.imageUrl) || "",
+  //       hasNestedTasks: item.hasNestedTasks === true,
+  //     }));
+  const data: RoadmapAssignmentUi[] = await fetchRoadmapAssignmentsForUser(userId);
+const progressRes = await apiGetUserProgress(userId);
+const progressData = (progressRes?.data?.data ?? progressRes?.data) as any;
+
+const parentCards = collapseRoadmapAssignmentsToParents(data);
+
+// const mappedPhases: PhaseCard[] = parentCards.map((item) => {
+const mappedPhases: PhaseCard[] = await Promise.all(
+  parentCards.map(async (item) => {
+  // const children = Array.isArray((item as any).children)
+  //   ? (item as any).children
+  //   : [];
+  let children = Array.isArray((item as any).children)
+  ? (item as any).children
+  : [];
+
+if (item.hasNestedTasks === true) {
+  try {
+    // const rmRes = await apiGetRoadmapById(item.id);
+    // const body = rmRes.data as { data?: unknown };
+    // const rawRoadmap = body?.data ?? rmRes.data;
+    // children = unwrapNestedRoadmapsArray(rawRoadmap);
+    const rmRes = await apiGetRoadmapById(item.id);
+const body = rmRes.data as { data?: unknown };
+const rawRoadmap = body?.data ?? rmRes.data;
+
+const mergedRoadmaps =
+  rawRoadmap && progressData
+    ? mergeProgressOntoRoadmaps([rawRoadmap as never], progressData)
+    : [rawRoadmap];
+
+children = unwrapNestedRoadmapsArray(mergedRoadmaps[0]);
+  } catch {
+    children = [];
+  }
+}
+
+  const validChildren = children.filter((task: any) =>
+    Boolean(resolveNestedTemplateItemId(task))
+  );
+
+  // const allTasksCompleted =
+  //   item.hasNestedTasks === true &&
+  //   validChildren.length > 0 &&
+  const allTasksCompleted =
+  validChildren.length > 0 &&
+    validChildren.every((task: any) => {
+      const taskId = resolveNestedTemplateItemId(task);
+
+      const derivedStatus = deriveTaskStatusForList(progressData, {
+        parentRoadmapId: item.id,
+        taskId,
+        itemStatus: task.status != null ? String(task.status) : undefined,
+        endDate: typeof task.endDate === "string" ? task.endDate : undefined,
+      });
+
+      return String(derivedStatus).toLowerCase() === "completed";
+    });
+
+  return {
+    id: item.id,
+    title: item.title,
+    description: item.desc || "No description",
+    parentRoadmapName: item.parentRoadmapName || "Roadmap",
+    parentRoadmapId: item.parentRoadmapId,
+    months: formatParentCompletionTime(item),
+    status: allTasksCompleted ? "Completed" : toUiStatus(item.status),
+    sessionDate: item.meetings?.[0] || "",
+    imageUrl: resolveApiMediaUrl(item.imageUrl) || "",
+    // hasNestedTasks: item.hasNestedTasks === true,
+    hasNestedTasks: item.hasNestedTasks === true || validChildren.length > 0,
+  };
+  })
+);
 
       setPhases(mappedPhases);
       void loadRecommendedTask(mappedPhases, userId);

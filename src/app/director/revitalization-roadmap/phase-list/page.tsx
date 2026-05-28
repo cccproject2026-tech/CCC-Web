@@ -374,7 +374,16 @@ useEffect(() => {
               {/* <button type="button" onClick={goToCreatePhaseTask} className={`${directorBtnPrimary} !px-4 !py-2.5 !text-sm`}>
                 <i className="fa-solid fa-plus text-xs" /> Task
               </button> */}
-              {!pastorView ? (
+              {/* {!pastorView ? (
+  <button
+    type="button"
+    onClick={goToCreatePhaseTask}
+    className={`${directorBtnPrimary} !px-4 !py-2.5 !text-sm`}
+  >
+    <i className="fa-solid fa-plus text-xs" /> Task
+  </button>
+) : null} */}
+{!pastorView && roadmap?.type !== "single" ? (
   <button
     type="button"
     onClick={goToCreatePhaseTask}

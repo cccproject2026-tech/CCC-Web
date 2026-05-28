@@ -43,6 +43,16 @@ function unwrapRoadmap(res: unknown): RoadmapDoc | null {
 function safeString(v: unknown): string {
   return typeof v === "string" ? v : v == null ? "" : String(v);
 }
+function normalizeExtraName(v: unknown): string {
+  return safeString(v).trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function hasExtraCheckbox(extra: any, target: string): boolean {
+  return (
+    Array.isArray(extra?.checkboxes) &&
+    extra.checkboxes.some((cb: any) => normalizeExtraName(cb?.name) === normalizeExtraName(target))
+  );
+}
 
 /** Same as creation editor — APIs may return `roadMapDetails` as `string` or `{ en: "..." }`. */
 function roadmapDetailText(raw: unknown): string {
@@ -379,8 +389,12 @@ export default function DirectorRoadmapFormPage() {
             label: extra.name,
             date: extra.date || "",
             buttonName: extra.buttonName || "",
-            allowPastorSelect: Array.isArray(extra.checkboxes) && extra.checkboxes.some((cb: any) => cb.name === "Allow pastor to select Date"),
-            showOnCard: Array.isArray(extra.checkboxes) && extra.checkboxes.some((cb: any) => cb.name === "Show date on info card"),
+            // allowPastorSelect: Array.isArray(extra.checkboxes) && extra.checkboxes.some((cb: any) => cb.name === "Allow pastor to select Date"),
+            // showOnCard: Array.isArray(extra.checkboxes) && extra.checkboxes.some((cb: any) => cb.name === "Show date on info card"),
+            allowPastorSelect: hasExtraCheckbox(extra, "Allow pastor to select Date"),
+showOnCard:
+  hasExtraCheckbox(extra, "Show date on info card") ||
+  hasExtraCheckbox(extra, "Show on Card"),
           });
           break;
         case "ASSESSMENT":
@@ -439,8 +453,12 @@ export default function DirectorRoadmapFormPage() {
                   label: sectionExtra.name,
                   date: sectionExtra.date || "",
                   buttonName: sectionExtra.buttonName || "",
-                  allowPastorSelect: Array.isArray(sectionExtra.checkboxes) && sectionExtra.checkboxes.some((cb: any) => cb.name === "Allow pastor to select Date"),
-                  showOnCard: Array.isArray(sectionExtra.checkboxes) && sectionExtra.checkboxes.some((cb: any) => cb.name === "Show date on info card"),
+                  // allowPastorSelect: Array.isArray(sectionExtra.checkboxes) && sectionExtra.checkboxes.some((cb: any) => cb.name === "Allow pastor to select Date"),
+                  // showOnCard: Array.isArray(sectionExtra.checkboxes) && sectionExtra.checkboxes.some((cb: any) => cb.name === "Show date on info card"),
+                  allowPastorSelect: hasExtraCheckbox(sectionExtra, "Allow pastor to select Date"),
+showOnCard:
+  hasExtraCheckbox(sectionExtra, "Show date on info card") ||
+  hasExtraCheckbox(sectionExtra, "Show on Card"),
                 });
               } else if (sectionExtra.type === "ASSESSMENT") {
                 fields.push({
@@ -486,8 +504,10 @@ export default function DirectorRoadmapFormPage() {
   };
           case "datepicker": {
             const checkboxes = [
-              field.allowPastorSelect ? { type: "CHECKBOX", name: "Allow pastor to select Date", haveButton: false } : null,
-              field.showOnCard ? { type: "CHECKBOX", name: "Show date on info card", haveButton: false } : null,
+              // field.allowPastorSelect ? { type: "CHECKBOX", name: "Allow pastor to select Date", haveButton: false } : null,
+              // field.showOnCard ? { type: "CHECKBOX", name: "Show on Card", haveButton: false } : null,
+              field.allowPastorSelect ? { type: "CHECKBOX", name: "Allow pastor to select Date", checked: true, haveButton: true } : null,
+field.showOnCard ? { type: "CHECKBOX", name: "Show on Card", checked: true, haveButton: true } : null,
             ].filter(Boolean);
             return {
               type: "DATE_PICKER",
@@ -529,8 +549,10 @@ export default function DirectorRoadmapFormPage() {
                 if (nf.type === "checkbox_item") return { type: "CHECKBOX", name: nf.name || nf.label || "Check Box", haveButton: !!nf.haveButton, ...(nf.buttonName ? { buttonName: nf.buttonName } : {}) };
                 if (nf.type === "datepicker") {
                   const cbs = [
-                    nf.allowPastorSelect ? { type: "CHECKBOX", name: "Allow pastor to select Date", haveButton: false } : null,
-                    nf.showOnCard ? { type: "CHECKBOX", name: "Show date on info card", haveButton: false } : null,
+                    // nf.allowPastorSelect ? { type: "CHECKBOX", name: "Allow pastor to select Date", haveButton: false } : null,
+                    // nf.showOnCard ? { type: "CHECKBOX", name: "Show on Card", haveButton: false } : null,
+                    nf.allowPastorSelect ? { type: "CHECKBOX", name: "Allow pastor to select Date", checked: true, haveButton: true } : null,
+nf.showOnCard ? { type: "CHECKBOX", name: "Show on Card", checked: true, haveButton: true } : null,
                   ].filter(Boolean);
                   return { type: "DATE_PICKER", name: nf.label || "Date", ...(nf.date ? { date: String(nf.date).slice(0, 10) } : {}), ...(nf.buttonName ? { buttonName: nf.buttonName } : {}), ...(cbs.length ? { checkboxes: cbs } : {}) };
                 }
@@ -828,14 +850,30 @@ export default function DirectorRoadmapFormPage() {
       (roadmapType === "phase" || roadmapType === "single") &&
       !nestedItemTitle.trim()
     ) {
-      setError(roadmapType === "phase" ? "Please enter a phase name." : "Please enter a roadmap name.");
+      setError(roadmapType === "phase" ? "Please enter a task name." : "Please enter a roadmap name.");
       return;
     }
-
-    if (!churchVerbiage.trim() || !descriptionVerbiage.trim()) {
-      setError("Please fill in Roadmap Verbiage and Description.");
-      return;
-    }
+if (
+  roadmapType === "phase" &&
+  !isEditMode &&
+  parentDivisionOptions.length > 0 &&
+  !taskDivision.trim()
+) {
+  setError("Please select a division before creating this task.");
+  return;
+}
+    // if (!churchVerbiage.trim() || !descriptionVerbiage.trim()) {
+    //   setError("Please fill in Roadmap Verbiage and Description.");
+    //   return;
+    // }
+//     if (!churchVerbiage.trim() || (!isPhaseTaskForm && !descriptionVerbiage.trim())) {
+//   setError(isPhaseTaskForm ? "Please fill in Task Verbiage." : "Please fill in Roadmap Verbiage and Description.");
+//   return;
+// }
+if (!churchVerbiage.trim()) {
+  setError(isPhaseTaskForm ? "Please fill in Task Verbiage." : "Please fill in Roadmap Verbiage.");
+  return;
+}
 
     const extras = transformFieldsToExtras(customFields) as any[];
 
@@ -865,7 +903,9 @@ export default function DirectorRoadmapFormPage() {
           safeString(parent.name) ||
           "Roadmap",
         roadMapDetails: churchVerbiage.trim() || roadmapData.subheading || "",
-        description: descriptionVerbiage,
+        // description: descriptionVerbiage,
+        // description: isPhaseTaskForm ? churchVerbiage.trim() : descriptionVerbiage,
+        description: churchVerbiage.trim(),
         duration: safeDuration,
         ...(bannerPreview && !bannerFile && bannerPreview.startsWith("http") ? { imageUrl: bannerPreview } : {}),
         ...(isPhaseTaskForm && taskDivision.trim()
@@ -1007,7 +1047,7 @@ export default function DirectorRoadmapFormPage() {
                 {(roadmapType === "phase" || roadmapType === "single") && !viewOnly ? (
                   <div>
                     <label className={directorLabelClass} htmlFor="nested-item-title">
-                      {roadmapType === "phase" ? "Phase name" : "Roadmap name"}{" "}
+                      {roadmapType === "phase" ? "Task name" : "Roadmap name"}{" "}
                       <span className="text-red-300">*</span>
                     </label>
                     <p className="mb-2 text-xs text-white/50">
@@ -1022,23 +1062,54 @@ export default function DirectorRoadmapFormPage() {
                       onChange={(e) => setNestedItemTitle(e.target.value)}
                       className={directorInputClass}
                       autoComplete="off"
-                      placeholder={roadmapType === "phase" ? "e.g. Self Revitalization Phase" : "Roadmap title"}
+                      placeholder={roadmapType === "phase" ? "e.g. Prayer and Visitation Strategy" : "Roadmap title"}
                     />
                   </div>
                 ) : null}
 
                 <div>
-                  <label className={directorLabelClass}>
+                  {/* <label className={directorLabelClass}>
                     Roadmap Verbiage {!viewOnly ? <span className="text-red-300">*</span> : null}
-                  </label>
-                  <input
+                  </label> */}
+                  <label className={directorLabelClass}>
+  {roadmapType === "phase" ? "Task Verbiage" : "Roadmap Verbiage"}{" "}
+  {!viewOnly ? <span className="text-red-300">*</span> : null}
+</label>
+                  {/* <input
                     type="text"
                     value={churchVerbiage}
                     readOnly={viewOnly}
                     onChange={(e) => setChurchVerbiage(e.target.value)}
                     className={`${directorInputClass} ${viewOnly ? "cursor-default opacity-95" : ""}`}
                     placeholder="e.g. Attend a Jump-start Session in your area"
-                  />
+                  /> */}
+                  {/* {roadmapType === "phase" ? (
+  <textarea
+    value={churchVerbiage}
+    readOnly={viewOnly}
+    onChange={(e) => setChurchVerbiage(e.target.value)}
+    rows={5}
+    className={`${directorInputClass} min-h-[130px] resize-y ${viewOnly ? "cursor-default opacity-95" : ""}`}
+    placeholder="Enter task verbiage..."
+  />
+) : (
+  <input
+    type="text"
+    value={churchVerbiage}
+    readOnly={viewOnly}
+    onChange={(e) => setChurchVerbiage(e.target.value)}
+    className={`${directorInputClass} ${viewOnly ? "cursor-default opacity-95" : ""}`}
+    placeholder="e.g. Attend a Jump-start Session in your area"
+  />
+)} */}
+<textarea
+  value={churchVerbiage}
+  readOnly={viewOnly}
+  onChange={(e) => setChurchVerbiage(e.target.value)}
+  rows={5}
+  className={`${directorInputClass} min-h-[130px] resize-y ${viewOnly ? "cursor-default opacity-95" : ""}`}
+  placeholder={roadmapType === "phase" ? "Enter task verbiage..." : "Enter roadmap verbiage..."}
+/>
                 </div>
  {isPhaseTaskForm && !viewOnly ? (
                   <div>
@@ -1056,6 +1127,8 @@ export default function DirectorRoadmapFormPage() {
                     />
                   </div>
                 ) : null}
+                {/* {!isPhaseTaskForm ? ( */}
+                {false ? (
                 <div>
                   <label className={directorLabelClass}>
                     Description {!viewOnly ? <span className="text-red-300">*</span> : null}
@@ -1077,7 +1150,7 @@ export default function DirectorRoadmapFormPage() {
   </p>
 </div>
                 </div>
-
+) : null}
                 {/* {isPhaseTaskForm && !viewOnly ? (
                   <div>
                     <label className={directorLabelClass} htmlFor="task-completion-time">

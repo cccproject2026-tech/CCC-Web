@@ -579,9 +579,20 @@ const hasRequiredSubmissions = useMemo(() => {
 
     for (const extra of items) {
       const fieldKey = extra.name;
-const metaDateFields = new Set(["Allow pastor to select Date", "Show date on info card"]);
+// const metaDateFields = new Set(["Allow pastor to select Date", "Show date on info card"]);
 
-if (metaDateFields.has(fieldKey)) {
+// if (metaDateFields.has(fieldKey)) {
+//   continue;
+// }
+const normalizeMetaName = (value: unknown) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
+const metaDateFields = new Set(["allow pastor to select date", "show date on info card"]);
+
+if (metaDateFields.has(normalizeMetaName(fieldKey))) {
   continue;
 }
       if (extra.type === "CHECKBOX") {
@@ -1981,20 +1992,36 @@ if (!hasRequiredSubmissions) {
         );
 
       case "DATE_PICKER": {
-        const allowPastorSelect =
-          Array.isArray(extra.checkboxes) &&
-          extra.checkboxes.some((cb) => String((cb as ExtraComponent)?.name ?? "") === "Allow pastor to select Date");
+        // const allowPastorSelect =
+        //   Array.isArray(extra.checkboxes) &&
+        //   extra.checkboxes.some((cb) => String((cb as ExtraComponent)?.name ?? "") === "Allow pastor to select Date");
+        const normalizeMetaName = (value: unknown) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
+const allowPastorSelect =
+  Array.isArray(extra.checkboxes) &&
+  extra.checkboxes.some(
+    (cb) => normalizeMetaName((cb as ExtraComponent)?.name) === "allow pastor to select date",
+  );
         const defaultDate =
           typeof extra.date === "string" && extra.date.trim() ? extra.date.trim().slice(0, 10) : "";
         const value = String(formData[fieldKey] ?? defaultDate ?? "");
-        const metaNames = new Set(["Allow pastor to select Date", "Show date on info card"]);
-        const displayCheckboxes =
-          extra.checkboxes?.filter((cb) => !metaNames.has(String((cb as ExtraComponent)?.name ?? ""))) ?? [];
+        // const metaNames = new Set(["Allow pastor to select Date", "Show date on info card"]);
+        // const displayCheckboxes =
+        //   extra.checkboxes?.filter((cb) => !metaNames.has(String((cb as ExtraComponent)?.name ?? ""))) ?? [];
+        const metaNames = new Set(["allow pastor to select date", "show date on info card"]);
+const displayCheckboxes =
+  extra.checkboxes?.filter(
+    (cb) => !metaNames.has(normalizeMetaName((cb as ExtraComponent)?.name)),
+  ) ?? [];
 
         return (
           <div key={`${fieldKey}_${index}`} className="mb-5">
             <h4 className="text-sm font-semibold text-white mb-2">{extra.name}</h4>
-            {allowPastorSelect ? (
+            {/* {allowPastorSelect ? (
               <input
                 type="date"
                 value={value.slice(0, 10)}
@@ -2003,7 +2030,17 @@ if (!hasRequiredSubmissions) {
               />
             ) : defaultDate ? (
               <p className="mb-3 text-sm text-white/85">{formatDate(defaultDate)}</p>
-            ) : null}
+            ) : null} */}
+            {allowPastorSelect || !defaultDate ? (
+  <input
+    type="date"
+    value={value.slice(0, 10)}
+    onChange={(e) => handleInputChange(fieldKey, e.target.value)}
+    className="mb-3 w-full max-w-xs rounded-md border border-[#5A8DCB] bg-white/5 px-3 py-2 text-sm text-white [color-scheme:dark]"
+  />
+) : (
+  <p className="mb-3 text-sm text-white/85">{formatDate(defaultDate)}</p>
+)}
             {extra.buttonName ? (
               <button
                 type="button"
