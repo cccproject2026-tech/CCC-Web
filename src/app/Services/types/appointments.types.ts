@@ -38,6 +38,8 @@ export interface AppointmentResponse {
   platform: string;
   meetingLink?: string;
   status: string;
+  title?: string;
+  description?: string;
   notes?: string;
   zoomMeetingId?: string;
   zoomJoinUrl?: string;
@@ -63,6 +65,8 @@ export interface CreateAppointmentPayload {
   mentorId: string;
   meetingDate: string;         // ISO date string
   platform: string;
+  title?: string;
+  description?: string;
   meetingLink?: string;
   notes?: string;
   /** When backend supports calendar sync — creates attendee Google event(s). */

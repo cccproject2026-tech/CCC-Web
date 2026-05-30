@@ -972,8 +972,9 @@ function TaskPageContent() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"pastorResponse" | "comments" | "queries">("pastorResponse");
-
+  const [activeTab, setActiveTab] = useState<
+  "pastorResponse" | "previousSubmissions" | "comments" | "queries"
+>("pastorResponse");
   const [pastorExtrasRows, setPastorExtrasRows] = useState<Record<string, unknown>[]>([]);
   const [pastorUploadDocs, setPastorUploadDocs] = useState<
   Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]>
@@ -1346,7 +1347,109 @@ const phaseHref =
 
   const taskTitle = String(task?.name ?? "Task");
   const taskDescription = String(task?.description ?? (task as { roadMapDetails?: unknown })?.roadMapDetails ?? "");
+const buildVersionsFromExtras = (extras: Record<string, unknown>[]) => {
+  const versions: Record<string, unknown>[][] = [];
 
+  extras.forEach((item) => {
+    const type = String(item.type ?? "").toUpperCase();
+    const label = String(item.name ?? item.key ?? "").trim().toLowerCase();
+    if (!label) return;
+
+    let placed = false;
+
+    for (const version of versions) {
+      const alreadyHasField = version.some((row) => {
+        const rowType = String(row.type ?? "").toUpperCase();
+        const rowLabel = String(row.name ?? row.key ?? "").trim().toLowerCase();
+        return `${rowType}__${rowLabel}` === `${type}__${label}`;
+      });
+
+      if (!alreadyHasField) {
+        version.push(item);
+        placed = true;
+        break;
+      }
+    }
+
+    if (!placed) versions.push([item]);
+  });
+
+  return versions;
+};
+
+const allRenderableExtrasForHistory = pastorExtrasRows.filter(isRenderablePastorExtraRow);
+const submissionVersions = buildVersionsFromExtras(allRenderableExtrasForHistory);
+const previousSubmissionVersions = submissionVersions.slice(0, -1);
+
+const renderHistoryAnswerCard = (
+  item: Record<string, unknown>,
+  idx: number,
+): JSX.Element => {
+  const type = String(item.type ?? "").toUpperCase();
+  const label = String(item.name ?? item.key ?? `Item ${idx + 1}`);
+  const normalizedLabel = label.trim().toLowerCase();
+  const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
+
+  const value =
+    item.value !== undefined
+      ? item.value
+      : item.signatureData !== undefined
+        ? item.signatureData
+        : "";
+
+  if (type === "UPLOAD") {
+    return (
+      <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">{label}</p>
+
+        {uploadedFiles.length > 0 ? (
+          <div className="mt-3 space-y-2">
+            {uploadedFiles.map((file) => (
+              <div
+                key={`${file.fileUrl}-${file.fileName}`}
+                onClick={() => window.open(file.fileUrl, "_blank")}
+                className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-sm text-white hover:bg-white/[0.08]"
+              >
+                <i className="fa-solid fa-file text-blue-300" />
+                <span className="min-w-0 flex-1 truncate">{file.fileName}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-2 text-sm text-[#cde2f2]/70">Uploaded file saved.</p>
+        )}
+      </div>
+    );
+  }
+
+  if (
+    type === "SIGNATURE" &&
+    typeof value === "string" &&
+    (value.startsWith("http://") ||
+      value.startsWith("https://") ||
+      value.startsWith("data:image"))
+  ) {
+    return (
+      <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">{label}</p>
+        <img
+          src={value}
+          alt=""
+          className="mt-3 max-h-48 max-w-full rounded-lg border border-white/15 object-contain"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">{label}</p>
+      <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[#cde2f2]">
+        {typeof value === "boolean" ? (value ? "Yes" : "No") : String(value || "No answer submitted.")}
+      </p>
+    </div>
+  );
+};
   if (loading) {
     return (
       <div className={directorPageRoot}>
@@ -1424,6 +1527,17 @@ const phaseHref =
                     >
                       Pastor response
                     </button>
+                    <button
+  type="button"
+  onClick={() => setActiveTab("previousSubmissions")}
+  className={`w-full rounded-lg px-4 py-3 text-left text-sm font-semibold transition ${
+    activeTab === "previousSubmissions"
+      ? "border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-white"
+      : "text-[#cde2f2] hover:bg-white/10"
+  }`}
+>
+  Previous submissions
+</button>
                     <button
                       type="button"
                       onClick={() => setActiveTab("comments")}
@@ -2269,7 +2383,36 @@ if (type === "ASSESSMENT") {
                     })()}
                   </div>
                 )}
+{activeTab === "previousSubmissions" && (
+  <div className={`${glassPanel} p-6 sm:p-8`}>
+    <h2 className="mb-6 text-lg font-semibold text-white sm:text-xl">
+      Previous Submissions
+    </h2>
 
+    {previousSubmissionVersions.length === 0 ? (
+      <p className="py-10 text-center text-sm text-[#cde2f2]/80">
+        No previous submissions yet.
+      </p>
+    ) : (
+      <div className="space-y-6">
+        {previousSubmissionVersions.map((version, versionIndex) => (
+          <div
+            key={`previous-submission-${versionIndex}`}
+            className="rounded-2xl border border-white/12 bg-white/[0.05] p-5"
+          >
+            <h3 className="mb-4 text-base font-semibold text-white">
+              Submission #{versionIndex + 1}
+            </h3>
+
+            <div className="space-y-4">
+              {version.map((item, idx) => renderHistoryAnswerCard(item, idx))}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+)}
                 {activeTab === "comments" && (
                   <div className={`${glassPanel} p-6 sm:p-8`}>
                     <h2 className="mb-6 text-lg font-semibold text-white sm:text-xl">Comments</h2>

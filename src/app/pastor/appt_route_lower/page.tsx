@@ -80,6 +80,8 @@ export default function PastorAppointmentsPage() {
   const [selectedMode, setSelectedMode] = useState("zoom");
   const [modeSuccess, setModeSuccess] = useState(false);
   const [schedulePlatform, setSchedulePlatform] = useState("Zoom");
+  const [scheduleTitle, setScheduleTitle] = useState("");
+const [scheduleDescription, setScheduleDescription] = useState("");
   const [availableTimesForBooking, setAvailableTimesForBooking] = useState<any[]>([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
@@ -453,6 +455,13 @@ export default function PastorAppointmentsPage() {
 
   const handleSchedule = async () => {
     if (isScheduling) return;
+    const title = scheduleTitle.trim();
+const description = scheduleDescription.trim();
+
+if (!title) {
+  showToast("Please enter a meeting title.");
+  return;
+}
     const mid = selectedMentor?.id || selectedMentor?._id;
     if (!mid) {
       showToast("Please select a mentor");
@@ -484,14 +493,25 @@ export default function PastorAppointmentsPage() {
 
     setIsScheduling(true);
 
-    const payload = {
-      userId,
-      mentorId: String(mid),
-      meetingDate: meetingDateISO,
-      platform: uiMeetingModeToPlatform(schedulePlatform),
-      notes: "Mentorship session",
-    };
-
+    // const payload = {
+    //   userId,
+    //   mentorId: String(mid),
+    //   meetingDate: meetingDateISO,
+    //   platform: uiMeetingModeToPlatform(schedulePlatform),
+    //   notes: "Mentorship session",
+    // };
+const payload = {
+  userId,
+  mentorId: String(mid),
+  meetingDate: meetingDateISO,
+  platform: uiMeetingModeToPlatform(schedulePlatform),
+  title,
+  description,
+  notes: "Mentorship session",
+  googleCalendarSync: true,
+  googleCalendarTitle: title,
+  googleCalendarDescription: description || "Mentorship session",
+};
     try {
       await apiCreateAppointment(payload);
 
@@ -499,6 +519,8 @@ export default function PastorAppointmentsPage() {
       setDrawerOpen(false);
       setShowPopup(true);
       setSelectedTime("");
+      setScheduleTitle("");
+setScheduleDescription("");
       await refreshAppointmentLists();
     } catch (error) {
       console.error("Error scheduling appointment:", error);
@@ -1368,7 +1390,7 @@ export default function PastorAppointmentsPage() {
                 <p className="mt-1 text-xs text-[#cde2f2]/90">
                   {drawerStep === "mentor"
                     ? "Select who you would like to meet with."
-                    : "Pick a date, time, and platform."}
+                    : "Pick a date, time, and platform ."}
                 </p>
               </div>
               <button
@@ -1461,7 +1483,29 @@ export default function PastorAppointmentsPage() {
                     availabilitySlots={monthlyAvailabilitySlots}
                     isLoading={availabilityLoading}
                   />
+<label className={pastorFieldLabel} htmlFor="new-meeting-title" style={{ marginTop: "1.5rem" }}>
+  Meeting Title
+</label>
+<input
+  id="new-meeting-title"
+  type="text"
+  value={scheduleTitle}
+  onChange={(e) => setScheduleTitle(e.target.value)}
+  placeholder="Enter meeting title"
+  className="mb-4 w-full rounded-lg border border-[#8ec5eb]/35 bg-white/[0.06] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-[#8ec5eb]"
+/>
 
+<label className={pastorFieldLabel} htmlFor="new-meeting-description">
+  Meeting Description <span className="font-normal text-white/50">(optional)</span>
+</label>
+<textarea
+  id="new-meeting-description"
+  value={scheduleDescription}
+  onChange={(e) => setScheduleDescription(e.target.value)}
+  placeholder="Add meeting details"
+  rows={3}
+  className="mb-4 w-full resize-none rounded-lg border border-[#8ec5eb]/35 bg-white/[0.06] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-[#8ec5eb]"
+/>
                   <label className={pastorFieldLabel} htmlFor="time-slot" style={{ marginTop: "1.5rem" }}>
                     Select a time
                     <span className="ml-1 font-normal text-[#cde2f2]">

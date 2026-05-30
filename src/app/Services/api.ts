@@ -135,6 +135,11 @@ export {
   apiDeleteExtras,
   apiUploadExtrasDocuments,
   apiGetExtrasDocuments,
+  apiCreateRoadmapSubmission,
+  apiGetRoadmapSubmissions,
+  apiGetLatestRoadmapSubmission,
+  apiGetRoadmapSubmissionById,
+  apiUploadRoadmapSubmissionDocuments,
   apiDeleteExtrasDocumentBatch,
   apiDeleteExtrasDocumentFile,
   // Legacy aliases

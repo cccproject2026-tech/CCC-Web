@@ -56,6 +56,11 @@ import {
   apiUpdateExtras,
   apiUploadExtrasDocuments,
   apiGetExtrasDocuments,
+  // apiCreateRoadmapSubmission,
+  // apiGetRoadmapSubmissions,
+  // apiGetLatestRoadmapSubmission,
+  // apiGetRoadmapSubmissionById,
+  // apiUploadRoadmapSubmissionDocuments,
   apiGetComments,
   apiAddQuery,
   apiGetQueries,
@@ -172,6 +177,20 @@ interface ExtraComponent {
   sections?: ExtraComponent[];
 }
 
+interface RoadmapSubmission {
+  _id?: string;
+  id?: string;
+  submissionNumber?: number;
+  createdAt?: string;
+  extras?: Record<string, any>[];
+  isLocalFallback?: boolean;
+  uploadedDocuments?: {
+    uploadBatchId?: string;
+    name?: string;
+    files?: { fileName?: string; fileUrl?: string }[];
+  }[];
+}
+
 /** Director / API may send mixed-case or legacy type strings; jumpstart switch is strict. */
 function normalizeExtraType(raw: unknown): ExtraComponent["type"] {
   const t = String(raw ?? "").trim();
@@ -273,6 +292,16 @@ const UPLOAD_HINT_LINE =
 // const MAX_PASTOR_UPLOAD_BYTES = 25 * 1024 * 1024;
 const MAX_PASTOR_UPLOAD_BYTES = 10 * 1024 * 1024;
 
+function unwrapRoadmapSubmission(res: any): RoadmapSubmission | null {
+  const data = res?.data?.data ?? res?.data;
+  return data && typeof data === "object" && !Array.isArray(data) ? data : null;
+}
+
+function unwrapRoadmapSubmissionList(res: any): RoadmapSubmission[] {
+  const data = res?.data?.data ?? res?.data;
+  return Array.isArray(data) ? data : [];
+}
+
 function JumpStartContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -300,6 +329,16 @@ function JumpStartContent() {
   const [uploadedNowDocs, setUploadedNowDocs] = useState<
   Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]>
 >({});
+  const [isNewSubmissionMode, setIsNewSubmissionMode] = useState(false);
+  const [submissionHistory, setSubmissionHistory] = useState<RoadmapSubmission[]>([]);
+  const [localPreviousSubmissions, setLocalPreviousSubmissions] = useState<RoadmapSubmission[]>([]);
+  const combinedSubmissions = [...submissionHistory, ...localPreviousSubmissions];
+  const [latestSubmission, setLatestSubmission] = useState<RoadmapSubmission | null>(null);
+  const [selectedSubmission, setSelectedSubmission] = useState<RoadmapSubmission | null>(null);
+  const [submissionHistoryLoading, setSubmissionHistoryLoading] = useState(false);
+  const [startingNewSubmission, setStartingNewSubmission] = useState(false);
+  const previousFormDataRef = useRef<Record<string, any> | null>(null);
+  const previousSavedUploadDocsRef = useRef<typeof savedUploadDocs | null>(null);
   const [extrasExist, setExtrasExist] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -324,6 +363,8 @@ const [assessmentTaskState, setAssessmentTaskState] = useState<
   const [selectedMentor, setSelectedMentor] = useState<any>(null);
   const [selectedTime, setSelectedTime] = useState("");
   const [schedulePlatform, setSchedulePlatform] = useState("Zoom");
+  const [scheduleTitle, setScheduleTitle] = useState("");
+  const [scheduleDescription, setScheduleDescription] = useState("");
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState(today.getDate());
@@ -769,6 +810,97 @@ if (extra.type === "DATE_PICKER") {
   const scopedNestedId = nestedRoadMapItemIdForExtras;
   const queryNestedRoadMapItemId =
     parentRoadmapId && nestedItemId?.trim() ? nestedItemId.trim() : undefined;
+
+  // const refreshSubmissionHistory = useCallback(async (): Promise<RoadmapSubmission[]> => {
+  //   if (!roadmapId || !userId) return [];
+  //   setSubmissionHistoryLoading(true);
+  //   try {
+  //     const [historyResult, latestResult] = await Promise.allSettled([
+  //       apiGetRoadmapSubmissions(roadmapId, userId, scopedNestedId),
+  //       apiGetLatestRoadmapSubmission(roadmapId, userId, scopedNestedId),
+  //     ]);
+  //     const history =
+  //       historyResult.status === "fulfilled"
+  //         ? unwrapRoadmapSubmissionList(historyResult.value)
+  //         : [];
+  //     const latest =
+  //       latestResult.status === "fulfilled"
+  //         ? unwrapRoadmapSubmission(latestResult.value)
+  //         : null;
+  //     setSubmissionHistory(history);
+  //     setLatestSubmission(latest);
+  //     return history;
+  //   } catch {
+  //     setSubmissionHistory([]);
+  //     setLatestSubmission(null);
+  //     return [];
+  //   } finally {
+  //     setSubmissionHistoryLoading(false);
+  //   }
+  // }, [roadmapId, userId, scopedNestedId]);
+  const buildSubmissionHistoryFromExtras = (extras: any[] = []): RoadmapSubmission[] => {
+  const versions: RoadmapSubmission[] = [];
+
+  extras.forEach((extra) => {
+    const name = String(extra?.name ?? "").trim();
+    if (!name || String(extra?.type || "").toUpperCase() === "JUMPSTART_COMPLETE") return;
+
+    let placed = false;
+
+    for (const version of versions) {
+      const alreadyExists = version.extras?.some(
+        (item: any) => String(item?.name ?? "").trim() === name,
+      );
+
+      if (!alreadyExists) {
+        version.extras = [...(version.extras || []), extra];
+        placed = true;
+        break;
+      }
+    }
+
+    if (!placed) {
+      versions.push({
+        id: `extras-version-${versions.length + 1}`,
+        submissionNumber: versions.length + 1,
+        createdAt: extra?.createdAt ?? extra?.updatedAt ?? new Date().toISOString(),
+        extras: [extra],
+        isLocalFallback: true,
+      });
+    }
+  });
+
+  return versions;
+};
+
+const refreshSubmissionHistory = useCallback(async (): Promise<RoadmapSubmission[]> => {
+  if (!roadmapId || !userId) return [];
+
+  setSubmissionHistoryLoading(true);
+
+  try {
+    const res = await apiGetExtras(roadmapId, userId, scopedNestedId);
+    const data = res?.data?.data || res?.data;
+    const rows = Array.isArray(data?.extras) ? data.extras : [];
+    const history = buildSubmissionHistoryFromExtras(rows);
+
+    setSubmissionHistory(history);
+    setLatestSubmission(history[history.length - 1] ?? null);
+
+    return history;
+  } catch (error) {
+    console.warn("[Pastor Jumpstart] could not load extras history", error);
+    setSubmissionHistory([]);
+    setLatestSubmission(null);
+    return [];
+  } finally {
+    setSubmissionHistoryLoading(false);
+  }
+}, [roadmapId, userId, scopedNestedId]);
+
+  useEffect(() => {
+    void refreshSubmissionHistory();
+  }, [refreshSubmissionHistory]);
 
   const fetchComments = useCallback(async (showLoader = false) => {
     if (!roadmapId || !userId) return;
@@ -1243,6 +1375,13 @@ const getRoadmapAssessmentMeeting = (assessmentId: string) => {
   const handleScheduleAssessmentMeeting = async () => {
     if (isScheduling || !scheduleContext) return;
 
+    const title = scheduleTitle.trim();
+    const description = scheduleDescription.trim();
+    if (!title) {
+      showScheduleFeedback("Please enter a meeting title.");
+      return;
+    }
+
     const mentorId = String(selectedMentor?.id ?? selectedMentor?._id ?? "").trim();
     if (!mentorId) {
       showScheduleFeedback("Please select a mentor.");
@@ -1274,18 +1413,20 @@ const getRoadmapAssessmentMeeting = (assessmentId: string) => {
 
     setIsScheduling(true);
     try {
-      const mentorDisplay =
-        `${selectedMentor?.firstName ?? ""} ${selectedMentor?.lastName ?? ""}`.trim() || "Mentor";
+      const existingNotes =
+        `Roadmap assessment meeting | assessmentId:${scheduleContext.assessmentId} | roadmapId:${roadmapId || ""} | taskId:${nestedItemId || ""} | parentId:${parentRoadmapId || ""}`;
 
       const res = await apiCreateAppointment({
         userId,
         mentorId,
         meetingDate: meetingDateISO,
         platform: uiMeetingModeToPlatform(schedulePlatform),
-        notes: `Roadmap assessment meeting | assessmentId:${scheduleContext.assessmentId} | roadmapId:${roadmapId || ""} | taskId:${nestedItemId || ""} | parentId:${parentRoadmapId || ""}`,
+        title,
+        description,
+        notes: existingNotes,
         googleCalendarSync: true,
-        googleCalendarTitle: `Meeting - pastor & ${mentorDisplay}`,
-        googleCalendarDescription: `Scheduled in CCC - Platform: ${schedulePlatform}`,
+        googleCalendarTitle: title,
+        googleCalendarDescription: description || existingNotes,
       });
 
       const hint = googleCalendarSuccessHintFromCreateResponse(res?.data);
@@ -1296,6 +1437,8 @@ const getRoadmapAssessmentMeeting = (assessmentId: string) => {
       setAvailabilityRefreshKey((prev) => prev + 1);
       setDrawerOpen(false);
       setSelectedTime("");
+      setScheduleTitle("");
+      setScheduleDescription("");
       await refreshAppointmentLists();
       showScheduleFeedback(hint ?? "New appointment has been scheduled.");
     } catch (error) {
@@ -1432,6 +1575,148 @@ useEffect(() => {
 );
   };
 
+  const buildExtrasArray = (
+    values: Record<string, any>,
+    uploads: Record<string, File[]>,
+  ): Record<string, any>[] => {
+    const mergedForm: Record<string, any> = { ...values };
+    // Mobile parity: only UPLOAD extras become boolean flags.
+    // Do NOT overwrite SIGNATURE dataUrl with `true` (that breaks persistence + hydration).
+    Object.keys(uploads).forEach((key) => {
+      const extraDef = findExtraByFieldName(templateExtras, key);
+      if (extraDef?.type === "UPLOAD" && (uploads[key]?.length ?? 0) > 0) {
+        mergedForm[key] = true;
+      }
+    });
+
+    // Mobile parity: build extrasArray from Object.entries(formData), no name transforms.
+    return Object.entries(mergedForm).map(([name, value]) => {
+      const extraDef = findExtraByFieldName(templateExtras, name);
+      const type = extraDef
+        ? extraDef.type
+        : typeof value === "boolean"
+          ? "CHECKBOX"
+          : typeof value === "object" && value?.uri
+            ? "UPLOAD"
+            : name.toLowerCase().includes("date")
+              ? "DATE_PICKER"
+              : typeof value === "string" && value.length > 100
+                ? "TEXT_AREA"
+                : "TEXT_FIELD";
+      if (type === "SIGNATURE") {
+        return { type: "SIGNATURE", name, signatureData: value };
+      }
+      return { type, name, value: type === "UPLOAD" ? true : value };
+    });
+  };
+
+  // const handleBeginNewSubmission = async () => {
+  //   if (!roadmapId || !userId || startingNewSubmission) return;
+  //   setStartingNewSubmission(true);
+  //   setSaveFeedback(null);
+  //   try {
+  //     if (submissionHistory.length === 0) {
+  //       const extras = buildExtrasArray(formData, pendingUploadFiles);
+  //       try {
+  //         // await apiCreateRoadmapSubmission(roadmapId, {
+  //         //   userId,
+  //         //   roadMapId: roadmapId,
+  //         //   ...(scopedNestedId?.trim()
+  //         //     ? { nestedRoadMapItemId: scopedNestedId.trim() }
+  //         //     : {}),
+  //         //   extras,
+  //         // });
+  //       } catch (error) {
+  //         console.warn(
+  //           "[Pastor Jumpstart] could not preserve previous submission in backend; using local snapshot",
+  //           error,
+  //         );
+  //         try {
+  //           setLocalPreviousSubmissions((prev) => [
+  //             ...prev,
+  //             {
+  //               id: `local-${Date.now()}`,
+  //               submissionNumber:
+  //                 submissionHistory.length + localPreviousSubmissions.length + 1,
+  //               createdAt: new Date().toISOString(),
+  //               extras,
+  //               isLocalFallback: true,
+  //             },
+  //           ]);
+  //         } catch (localSnapshotError) {
+  //           console.warn(
+  //             "[Pastor Jumpstart] could not preserve previous submission locally",
+  //             localSnapshotError,
+  //           );
+  //           setSaveFeedback("Could not preserve previous submission.");
+  //           return;
+  //         }
+  //       }
+  //     }
+  //     await refreshSubmissionHistory();
+  //     previousFormDataRef.current = formData;
+  //     previousSavedUploadDocsRef.current = savedUploadDocs;
+  //     setFormData(buildDefaultFormDataFromTemplate());
+  //     setPendingUploadFiles({});
+  //     setUploadedNowDocs({});
+  //     setIsNewSubmissionMode(true);
+  //   } catch (error) {
+  //     console.warn("[Pastor Jumpstart] could not start new submission", error);
+  //     setSaveFeedback("Could not preserve previous submission.");
+  //   } finally {
+  //     setStartingNewSubmission(false);
+  //   }
+  // };
+  const handleBeginNewSubmission = async () => {
+  if (!roadmapId || !userId || startingNewSubmission) return;
+
+  setStartingNewSubmission(true);
+  setSaveFeedback(null);
+
+  try {
+    await refreshSubmissionHistory();
+
+    previousFormDataRef.current = formData;
+    previousSavedUploadDocsRef.current = savedUploadDocs;
+
+    setFormData(buildDefaultFormDataFromTemplate());
+    setPendingUploadFiles({});
+    setUploadedNowDocs({});
+    setIsNewSubmissionMode(true);
+    setActiveTab("overview");
+  } catch (error) {
+    console.warn("[Pastor Jumpstart] could not start new submission", error);
+    setSaveFeedback("Could not start new submission.");
+  } finally {
+    setStartingNewSubmission(false);
+  }
+};
+
+  const handleCancelNewSubmission = () => {
+    setFormData(previousFormDataRef.current ?? {});
+    setSavedUploadDocs(previousSavedUploadDocsRef.current ?? {});
+    setPendingUploadFiles({});
+    setUploadedNowDocs({});
+    setIsNewSubmissionMode(false);
+  };
+
+  // const openSubmissionDetail = async (submission: RoadmapSubmission) => {
+  //   const submissionId = String(submission._id ?? submission.id ?? "").trim();
+  //   if (!submissionId || submissionId.startsWith("local-")) {
+  //     setSelectedSubmission(submission);
+  //     return;
+  //   }
+  //   try {
+  //     const res = await apiGetRoadmapSubmissionById(submissionId);
+  //     setSelectedSubmission(unwrapRoadmapSubmission(res) ?? submission);
+  //   } catch {
+  //     setSelectedSubmission(submission);
+  //   }
+  // };
+  const openSubmissionDetail = async (submission: RoadmapSubmission) => {
+  setSelectedSubmission(submission);
+};
+
   const handleSave = async () => {
     if (!roadmapId || !userId || !roadmap) {
       setSaveFeedback("Sign in again or open this task from your roadmap.");
@@ -1458,33 +1743,7 @@ useEffect(() => {
         uploadKeys: Object.keys(pendingUploadFiles || {}).filter((k) => (pendingUploadFiles[k]?.length ?? 0) > 0),
       });
       await ensureJumpstartTriggered();
-      const mergedForm: Record<string, any> = { ...formData };
-      // Mobile parity: only UPLOAD extras become boolean flags.
-      // Do NOT overwrite SIGNATURE dataUrl with `true` (that breaks persistence + hydration).
-      Object.keys(pendingUploadFiles).forEach((k) => {
-        const extraDef = findExtraByFieldName(templateExtras, k);
-        if (extraDef?.type === "UPLOAD" && (pendingUploadFiles[k]?.length ?? 0) > 0) mergedForm[k] = true;
-      });
-
-      // Mobile parity: build extrasArray from Object.entries(formData), no name transforms.
-      const getExtraType = (fieldName: string, value: any): string => {
-        const extraDef = findExtraByFieldName(templateExtras, fieldName);
-        if (extraDef) return extraDef.type;
-
-        if (typeof value === "boolean") return "CHECKBOX";
-        if (typeof value === "object" && value?.uri) return "UPLOAD";
-        if (fieldName.toLowerCase().includes("date")) return "DATE_PICKER";
-        if (typeof value === "string" && value.length > 100) return "TEXT_AREA";
-        return "TEXT_FIELD";
-      };
-
-      const extrasArray = Object.entries(mergedForm).map(([name, value]) => {
-        const type = getExtraType(name, value);
-        if (type === "SIGNATURE") {
-          return { type: "SIGNATURE", name, signatureData: value };
-        }
-        return { type, name, value: type === "UPLOAD" ? true : value };
-      });
+      const extrasArray = buildExtrasArray(formData, pendingUploadFiles);
       console.log("[Pastor Jumpstart] Built extrasArray", {
         count: extrasArray.length,
         sample: extrasArray.slice(0, 10),
@@ -1496,7 +1755,42 @@ useEffect(() => {
         extras: extrasArray,
       };
       console.log("[Pastor Jumpstart] Extras payload (create/update)", createPayload);
-      if (extrasExist) {
+      // let usedLegacySubmissionFallback = false;
+      // if (isNewSubmissionMode) {
+      //   try {
+      //     const submissionRes = await apiCreateRoadmapSubmission(roadmapId, createPayload);
+      //     const submission = unwrapRoadmapSubmission(submissionRes);
+      //     const submissionId = String(submission?._id ?? submission?.id ?? "").trim();
+      //     if (!submissionId) throw new Error("Submission ID was not returned.");
+
+      //     for (const [fieldName, files] of Object.entries(pendingUploadFiles)) {
+      //       if (files?.length) {
+      //         await apiUploadRoadmapSubmissionDocuments(submissionId, files, fieldName);
+      //       }
+      //     }
+
+      //     setPendingUploadFiles({});
+      //     setUploadedNowDocs({});
+      //     setIsNewSubmissionMode(false);
+      //     await refreshSubmissionHistory();
+      //     setSaveSuccess(true);
+      //     setSaveFeedback("New submission saved.");
+      //     setTimeout(() => {
+      //       setSaveSuccess(false);
+      //       setSaveFeedback(null);
+      //     }, 1800);
+      //     return;
+      //   } catch (error) {
+      //     console.warn(
+      //       "[Pastor Jumpstart] submission API failed; falling back to legacy extras",
+      //       error,
+      //     );
+      //     usedLegacySubmissionFallback = true;
+      //   }
+      // }
+      const shouldPatchExtras = extrasExist || isNewSubmissionMode;
+
+      if (shouldPatchExtras) {
         try {
           const res = await apiUpdateExtras(roadmapId, userId, { extras: extrasArray }, scopedNestedId);
           console.log("[Pastor Jumpstart] PATCH /extras ok", res?.data);
@@ -1605,7 +1899,19 @@ setPendingUploadFiles({});
       await fetchQueries(undefined, false);
       setSaveSuccess(true);
       setSaveFeedback(extrasExist ? "Progress updated." : "Progress saved.");
-      await handleMarkComplete();
+      // if (isNewSubmissionMode && usedLegacySubmissionFallback) {
+      //   setIsNewSubmissionMode(false);
+      //   setSaveFeedback("New submission saved using legacy storage.");
+      // } else {
+      //   await handleMarkComplete();
+      // }
+      if (isNewSubmissionMode) {
+  setIsNewSubmissionMode(false);
+  await refreshSubmissionHistory();
+  setSaveFeedback("New submission saved.");
+} else {
+  await handleMarkComplete();
+}
       setTimeout(() => {
         setSaveSuccess(false);
         setSaveFeedback(null);
@@ -2632,6 +2938,11 @@ case "SECTION":
   const description = roadmap?.description || roadmap?.roadMapDetails || "";
   const extras = templateExtras;
   const phaseTag = typeof roadmap?.phase === "string" ? roadmap.phase.trim() : "";
+  const latestSubmissionNumber = Number(latestSubmission?.submissionNumber);
+  const nextSubmissionNumber =
+    Number.isFinite(latestSubmissionNumber) && latestSubmissionNumber > 0
+      ? latestSubmissionNumber + 1
+      : combinedSubmissions.length + 1;
 
   const heroCoverSrc =
     typeof roadmap.imageUrl === "string" &&
@@ -2682,35 +2993,60 @@ case "SECTION":
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[250px_1fr] lg:gap-10">
 
           {/* LEFT PANEL */}
-          <div className={`${directorGlassCard} flex h-fit w-full flex-col gap-2 p-3`}>
-            {[
-              { key: "overview", label: "Over View", count: 0 },
-              { key: "comments", label: "Comments", count: commentsCount },
-              { key: "queries", label: "Queries", count: queriesCount },
-            ].map((item) => (
+          <div className="flex h-fit w-full flex-col gap-4">
+            <div className={`${directorGlassCard} flex flex-col gap-2 p-3`}>
+              {[
+                { key: "overview", label: "Over View", count: 0 },
+                { key: "comments", label: "Comments", count: commentsCount },
+                { key: "queries", label: "Queries", count: queriesCount },
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => setActiveTab(item.key)}
+                  className={`flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
+                    activeTab === item.key
+                      ? "border-[#3498DB]/40 bg-[#3498DB]/15 text-white shadow-sm"
+                      : "border-transparent text-[#d9ebf8] hover:bg-white/10"
+                  }`}
+                >
+                  <span>{item.label}</span>
+                  {item.count > 0 ? (
+                    <span
+                      className={`rounded-full px-2 py-[1px] text-xs font-semibold ${
+                        activeTab === item.key
+                          ? "bg-[#0f4a76]/15 text-[#0f4a76]"
+                          : "bg-white/15 text-white"
+                      }`}
+                    >
+                      {item.count}
+                    </span>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+
+            <div className={`${directorGlassCard} p-4`}>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-white">Previous Submissions</h3>
+                <span className="rounded-full bg-white/15 px-2 py-[1px] text-xs font-semibold text-white">
+                  {combinedSubmissions.length}
+                </span>
+              </div>
+              <p className="mb-3 text-xs leading-relaxed text-[#cde2f2]/75">
+                {combinedSubmissions.length === 0
+                  ? "No previous submissions yet."
+                  : `${combinedSubmissions.length} saved submission${
+                      combinedSubmissions.length === 1 ? "" : "s"
+                    }.`}
+              </p>
               <button
-                key={item.key}
-                onClick={() => setActiveTab(item.key)}
-                className={`flex items-center justify-between rounded-lg border px-4 py-3 text-sm font-medium transition-all ${
-                  activeTab === item.key
-                    ? "border-[#3498DB]/40 bg-[#3498DB]/15 text-white shadow-sm"
-                    : "border-transparent text-[#d9ebf8] hover:bg-white/10"
-                }`}
+                type="button"
+                onClick={() => setActiveTab("history")}
+                className="text-left text-xs font-semibold text-[#aed6f1] underline underline-offset-2 transition hover:text-white"
               >
-                <span>{item.label}</span>
-                {item.count > 0 ? (
-                  <span
-                    className={`rounded-full px-2 py-[1px] text-xs font-semibold ${
-                      activeTab === item.key
-                        ? "bg-[#0f4a76]/15 text-[#0f4a76]"
-                        : "bg-white/15 text-white"
-                    }`}
-                  >
-                    {item.count}
-                  </span>
-                ) : null}
+                View previous submissions
               </button>
-            ))}
+            </div>
           </div>
 
           {/* RIGHT CONTENT */}
@@ -2733,6 +3069,17 @@ case "SECTION":
                     <i className="fa-solid fa-ellipsis-vertical"></i>
                   </button> */}
                 </div>
+
+                {isNewSubmissionMode && (
+                  <div className={`${directorGlassCard} mb-6 p-4`}>
+                    <p className="text-sm font-semibold text-white">
+                      New Submission #{nextSubmissionNumber}
+                    </p>
+                    <p className="mt-1 text-xs text-white/60">
+                      Complete the form and add a new signature before submitting.
+                    </p>
+                  </div>
+                )}
 
                 {description && (
                   <div className="mb-6 rounded-lg border border-white/20 bg-white/10 p-4">
@@ -2791,17 +3138,33 @@ case "SECTION":
                     <div className="flex flex-wrap justify-end gap-3">
                       <button
                         type="button"
-                        onClick={handleSave}
-                        disabled={saving || !roadmapId || !userId}
+                        onClick={
+                          listAlignedStatus === "Completed" && !isNewSubmissionMode
+                            ? handleBeginNewSubmission
+                            : handleSave
+                        }
+                        disabled={saving || startingNewSubmission || !roadmapId || !userId}
                         className="rounded-md border border-white/30 bg-white/10 px-6 py-2 text-sm font-semibold text-white shadow transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {/* {saving ? "Saving…" : "Save and continue"} */}
-                        {saving
+                        {saving || startingNewSubmission
   ? "Saving…"
+  : isNewSubmissionMode
+    ? "Submit New Submission"
   : listAlignedStatus === "Completed"
     ? "Resubmit Task"
     : "Save and continue"}
                       </button>
+                      {isNewSubmissionMode && (
+                        <button
+                          type="button"
+                          onClick={handleCancelNewSubmission}
+                          disabled={saving}
+                          className="rounded-md border border-white/25 bg-transparent px-6 py-2 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          Cancel
+                        </button>
+                      )}
                       {/* {listAlignedStatus !== "Completed" ? (
                         <button
                           type="button"
@@ -2820,6 +3183,164 @@ case "SECTION":
                     </div>
                   </div>
                 </div>
+              </>
+            )}
+
+            {activeTab === "history" && (
+              <>
+                <h2 className="mb-6 text-xl font-semibold">Previous Submissions</h2>
+                {submissionHistoryLoading ? (
+                  <div className="py-16 text-center text-sm text-white/60">
+                    Loading submissions...
+                  </div>
+                ) : selectedSubmission ? (
+                  <div className={`${directorGlassCard} p-5`}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSubmission(null)}
+                      className="mb-5 text-sm font-semibold text-[#aed6f1] transition hover:text-white"
+                    >
+                      <i className="fa-solid fa-arrow-left mr-2" />
+                      Back to submissions
+                    </button>
+                    <h3 className="mb-4 text-base font-semibold text-white">
+                      Submission #{selectedSubmission.submissionNumber ?? ""}
+                    </h3>
+                    <div className="space-y-3">
+                      {(selectedSubmission.extras ?? []).map((extra, index) => {
+                        const type = String(extra.type ?? "");
+                        const name = String(extra.name ?? `Field ${index + 1}`);
+                        if (type === "SIGNATURE" && extra.signatureData) {
+                          return (
+                            <div key={`${name}-${index}`} className="rounded-lg border border-white/15 bg-white/5 p-3">
+                              <p className="mb-2 text-xs font-semibold text-white/70">{name}</p>
+                              <img
+                                src={String(extra.signatureData)}
+                                alt={name}
+                                className="max-h-24 rounded bg-white"
+                              />
+                            </div>
+                          );
+                        }
+                        if (type === "CHECKBOX") {
+                          return (
+                            <div key={`${name}-${index}`} className="rounded-lg border border-white/15 bg-white/5 p-3 text-sm text-white/85">
+                              <i className={`fa-regular ${extra.value ? "fa-square-check" : "fa-square"} mr-2`} />
+                              {name}
+                            </div>
+                          );
+                        }
+                        // return (
+                        //   <div key={`${name}-${index}`} className="rounded-lg border border-white/15 bg-white/5 p-3">
+                        //     <p className="mb-1 text-xs font-semibold text-white/70">{name}</p>
+                        //     <p className="text-sm text-white/90">{String(extra.value ?? "")}</p>
+                        //   </div>
+                        // );
+                        const isUpload = type.toUpperCase() === "UPLOAD";
+// const filesForField =
+//   savedUploadDocs[name.toLowerCase()] ||
+//   savedUploadDocs[name] ||
+//   [];
+const allFilesForField =
+  savedUploadDocs[name.toLowerCase()] ||
+  savedUploadDocs[name] ||
+  [];
+
+const currentSubmissionNumber =
+  selectedSubmission?.submissionNumber ?? 1;
+
+const filesForField =
+  allFilesForField.length > 1
+    ? [allFilesForField[currentSubmissionNumber - 1]].filter(Boolean)
+    : allFilesForField;
+
+return (
+  <div key={`${name}-${index}`} className="rounded-lg border border-white/15 bg-white/5 p-3">
+    <p className="mb-1 text-xs font-semibold text-white/70">{name}</p>
+
+    {isUpload ? (
+      filesForField.length > 0 ? (
+        <div className="mt-2 space-y-2">
+          {filesForField.map((file, fileIndex) => (
+            <a
+              key={`${file.uploadBatchId}-${fileIndex}`}
+              href={file.fileUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-[#aed6f1] transition hover:bg-white/10 hover:text-white"
+            >
+              <i className="fa-solid fa-file" />
+              <span className="truncate">{file.fileName || "Uploaded file"}</span>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-white/70">Uploaded file saved.</p>
+      )
+    ) : (
+      <p className="text-sm text-white/90">{String(extra.value ?? "")}</p>
+    )}
+  </div>
+);
+                      })}
+                    </div>
+                    {(selectedSubmission.uploadedDocuments ?? []).some((batch) => batch.files?.length) && (
+                      <div className="mt-5">
+                        <h4 className="mb-3 text-sm font-semibold text-white">Uploaded documents</h4>
+                        <div className="space-y-2">
+                          {(selectedSubmission.uploadedDocuments ?? []).flatMap((batch) =>
+                            (batch.files ?? []).map((file, index) => (
+                              <a
+                                key={`${file.fileUrl ?? ""}-${index}`}
+                                href={file.fileUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-[#aed6f1] transition hover:bg-white/10 hover:text-white"
+                              >
+                                <i className="fa-solid fa-file" />
+                                {file.fileName || "Uploaded file"}
+                              </a>
+                            )),
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : combinedSubmissions.length === 0 ? (
+                  <div className={`${directorGlassCard} px-6 py-16 text-center`}>
+                    <i className="fa-regular fa-folder-open mb-4 block text-5xl text-white/40" />
+                    <p className="text-sm text-white/60">No previous submissions yet.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {combinedSubmissions.map((submission, index) => (
+                      <button
+                        type="button"
+                        key={submission._id ?? submission.id ?? index}
+                        onClick={() => void openSubmissionDetail(submission)}
+                        className={`${directorGlassCard} flex w-full items-center justify-between gap-3 p-4 text-left transition hover:bg-white/15`}
+                      >
+                        {/* <span className="text-sm font-semibold text-white">
+                          Submission #{submission.submissionNumber ?? index + 1}
+                        </span> */}
+                        <div className="flex items-center gap-2">
+  <p className="font-semibold text-white">
+    Submission #{submission.submissionNumber ?? index + 1}
+  </p>
+
+  {index === combinedSubmissions.length - 1 && (
+    <span className="rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-100">
+      Latest / Current
+    </span>
+  )}
+</div>
+                        <span className="text-xs text-white/60">
+                          {formatDate(submission.createdAt ?? "")}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </>
             )}
 
@@ -3212,6 +3733,30 @@ case "SECTION":
                       onNextMonth={handleNextMonth}
                       availabilitySlots={monthlyAvailabilitySlots}
                       isLoading={availabilityLoading}
+                    />
+
+                    <label className={pastorFieldLabel} htmlFor="new-meeting-title">
+                      Meeting Title
+                    </label>
+                    <input
+                      id="new-meeting-title"
+                      type="text"
+                      value={scheduleTitle}
+                      onChange={(e) => setScheduleTitle(e.target.value)}
+                      placeholder="Enter meeting title"
+                      className="mb-4 w-full rounded-lg border border-[#8ec5eb]/35 bg-white/[0.06] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-[#8ec5eb]"
+                    />
+
+                    <label className={pastorFieldLabel} htmlFor="new-meeting-description">
+                      Meeting Description <span className="font-normal text-white/50">(optional)</span>
+                    </label>
+                    <textarea
+                      id="new-meeting-description"
+                      value={scheduleDescription}
+                      onChange={(e) => setScheduleDescription(e.target.value)}
+                      placeholder="Add meeting details"
+                      rows={3}
+                      className="mb-4 w-full resize-none rounded-lg border border-[#8ec5eb]/35 bg-white/[0.06] px-3 py-2 text-sm text-white placeholder:text-white/40 focus:outline-none focus:ring-1 focus:ring-[#8ec5eb]"
                     />
 
                     <label className={pastorFieldLabel} htmlFor="time-slot" style={{ marginTop: "1.5rem" }}>

@@ -541,6 +541,47 @@ export const apiGetExtrasDocuments = (roadMapId: string, userId: string, nestedR
     params: cleanQueryIds(userId, nestedRoadMapItemId),
   });
 
+function roadmapSubmissionsRoot(roadMapId: string, nestedRoadMapItemId?: string): string {
+  return nestedRoadMapItemId
+    ? `/roadmaps/${roadMapId}/nested/${nestedRoadMapItemId}/submissions`
+    : `/roadmaps/${roadMapId}/submissions`;
+}
+
+// POST /roadmaps/:roadMapId[/nested/:nestedRoadMapItemId]/submissions
+export const apiCreateRoadmapSubmission = (roadMapId: string, payload: CreateExtrasPayload) =>
+  axiosInstance.post(roadmapSubmissionsRoot(roadMapId, payload.nestedRoadMapItemId), payload);
+
+// GET /roadmaps/:roadMapId[/nested/:nestedRoadMapItemId]/submissions?userId=&nestedRoadMapItemId=
+export const apiGetRoadmapSubmissions = (roadMapId: string, userId: string, nestedRoadMapItemId?: string) =>
+  axiosInstance.get(roadmapSubmissionsRoot(roadMapId, nestedRoadMapItemId), {
+    params: cleanQueryIds(userId, nestedRoadMapItemId),
+  });
+
+// GET /roadmaps/:roadMapId[/nested/:nestedRoadMapItemId]/submissions/latest?userId=&nestedRoadMapItemId=
+export const apiGetLatestRoadmapSubmission = (roadMapId: string, userId: string, nestedRoadMapItemId?: string) =>
+  axiosInstance.get(`${roadmapSubmissionsRoot(roadMapId, nestedRoadMapItemId)}/latest`, {
+    params: cleanQueryIds(userId, nestedRoadMapItemId),
+  });
+
+// GET /roadmaps/submissions/:submissionId
+export const apiGetRoadmapSubmissionById = (submissionId: string) =>
+  axiosInstance.get(`/roadmaps/submissions/${encodeURIComponent(submissionId)}`);
+
+// POST /roadmaps/submissions/:submissionId/documents?name=  (multipart)
+export const apiUploadRoadmapSubmissionDocuments = (
+  submissionId: string,
+  files: File[],
+  name?: string,
+) => {
+  const formData = new FormData();
+  files.forEach((file) => formData.append("files", file));
+  return axiosInstance.post(
+    `/roadmaps/submissions/${encodeURIComponent(submissionId)}/documents`,
+    formData,
+    { params: { ...(name && { name }) } },
+  );
+};
+
 // DELETE /roadmaps/:roadMapId/extras/documents?userId=&uploadBatchId=&nestedRoadMapItemId=
 export const apiDeleteExtrasDocumentBatch = (
   roadMapId: string,
