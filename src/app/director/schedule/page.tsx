@@ -320,6 +320,8 @@ function DirectorScheduleContent() {
   const [meetingDate, setMeetingDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
   const [selectedPlatform, setSelectedPlatform] = useState("zoom");
+  const [meetingTitle, setMeetingTitle] = useState("");
+const [meetingDescription, setMeetingDescription] = useState("");
   const [activeBookingRules, setActiveBookingRules] = useState<ActiveBookingRules>(DEFAULT_BOOKING_RULES);
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [calendarSlotSyncLoading, setCalendarSlotSyncLoading] = useState(false);
@@ -990,6 +992,13 @@ useEffect(() => {
       showToast(`Please select a ${scheduleRecipientType}`);
       return;
     }
+    const title = meetingTitle.trim();
+const description = meetingDescription.trim();
+
+if (!title) {
+  showToast("Please enter a meeting title");
+  return;
+}
     if (!meetingDate || !selectedSlot) {
       showToast("Please select date and time");
       return;
@@ -1086,11 +1095,19 @@ useEffect(() => {
         mentorId: directorId,
         meetingDate: scheduledIso,
         platform: uiMeetingModeToPlatform(selectedPlatform),
-        notes: "Scheduled by director",
-        googleCalendarSync: true,
-        googleCalendarTitle: `Meeting · director & ${recipientLabel}`,
-        googleCalendarDescription: `Scheduled in CCC · Platform: ${selectedPlatform}`,
-        initiatorRole: "director",
+        // notes: "Scheduled by director",
+        // googleCalendarSync: true,
+        // googleCalendarTitle: `Meeting · director & ${recipientLabel}`,
+        // googleCalendarDescription: `Scheduled in CCC · Platform: ${selectedPlatform}`,
+        // initiatorRole: "director",
+        title,
+description,
+notes: "Scheduled by director",
+googleCalendarSync: true,
+googleCalendarTitle: title,
+googleCalendarDescription:
+  description || `Scheduled in CCC · Platform: ${selectedPlatform}`,
+initiatorRole: "director",
       });
 
       const gHint = googleCalendarSuccessHintFromCreateResponse(res?.data);
@@ -1109,6 +1126,8 @@ useEffect(() => {
       setSelectedRecipient(null);
       setMeetingDate("");
       setSelectedSlot("");
+      setMeetingTitle("");
+setMeetingDescription("");
       setAvailabilityRefreshKey((k) => k + 1);
       showToast(
         (gHint ? `Meeting scheduled successfully. ${gHint}` : "Meeting scheduled successfully") +
@@ -2134,6 +2153,31 @@ useEffect(() => {
                           </p>
                           ))}
                       </div>
+                      <div className="mb-4">
+  <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+    Meeting Title
+  </label>
+  <input
+    type="text"
+    value={meetingTitle}
+    onChange={(e) => setMeetingTitle(e.target.value)}
+    placeholder="Enter meeting title"
+    className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-[#cde2f2]/55 outline-none transition focus:border-[#8ec5eb]/60 focus:bg-white/[0.13]"
+  />
+</div>
+
+<div className="mb-5">
+  <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+    Meeting Description <span className="font-normal text-[#cde2f2]/60">(optional)</span>
+  </label>
+  <textarea
+    value={meetingDescription}
+    onChange={(e) => setMeetingDescription(e.target.value)}
+    placeholder="Add meeting details"
+    rows={3}
+    className="w-full resize-none rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-[#cde2f2]/55 outline-none transition focus:border-[#8ec5eb]/60 focus:bg-[#ffffff21]"
+  />
+</div>
                       <p className="mb-2 text-sm text-[#cde2f2]">Available time slots</p>
                       {(calendarSlotSyncLoading || scheduleAvailabilityLoading) && (
                         <p className="mb-2 flex items-center gap-2 text-xs text-[#8ec5eb]">

@@ -175,24 +175,24 @@ export default function AssignMenteesModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-white rounded-xl max-w-md w-full shadow-2xl max-h-[90vh] flex flex-col">
+      <div className="w-full max-w-2xl max-h-[86vh] flex flex-col overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.96)_0%,rgba(7,34,56,0.98)_100%)] shadow-2xl backdrop-blur-xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+       <div className="flex items-center justify-between border-b border-white/15 px-6 py-5">
           <div>
-            <h2 className="text-[20px] font-bold text-gray-900">Assign New Mentee</h2>
+            <h2 className="text-xl font-bold text-white">Assign New Mentee</h2>
             {mentor && (
-              <p className="text-[13px] text-gray-500 mt-1">Assign to {mentor.name}</p>
+              <p className="mt-1 text-sm text-[#cde2f2]/80">Assign to {mentor.name}</p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white/70 hover:bg-white/15 hover:text-white transition"
           >
             <i className="fa-solid fa-xmark"></i>
           </button>
         </div>
 
-        <div className="p-6 flex-1 overflow-auto">
+        <div className="p-6 flex-1 overflow-y-auto">
           {/* Search */}
           <div className="mb-4">
             <div className="relative">
@@ -200,9 +200,9 @@ export default function AssignMenteesModal({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search by name or email..."
-                className="w-full px-4 py-2.5 pl-10 rounded-lg border border-gray-300 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+               className="w-full rounded-xl border border-white/15 bg-white/10 px-11 py-3 text-sm text-white placeholder:text-[#cde2f2]/55 outline-none focus:border-[#8ec5eb]/60 focus:bg-white/[0.13]" 
               />
-              <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+              <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[#8ec5eb]"></i>
             </div>
           </div>
 
@@ -247,12 +247,12 @@ export default function AssignMenteesModal({
 
           {/* People List */}
           {!loading && !error && filteredPeople.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {filteredPeople.map((person) => (
                 <div
                   key={person.id}
                   onClick={() => handlePersonSelect(person.id)}
-                  className="flex items-center gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 transition-all border border-gray-100"
+                  className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 cursor-pointer transition hover:bg-white/[0.1]"
                 >
                   <div
                     className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
@@ -276,14 +276,14 @@ export default function AssignMenteesModal({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-[15px] font-semibold text-gray-900 truncate">
+                      <p className="text-[15px] font-semibold text-white truncate">
                         {person.name}
                       </p>
-                      <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] font-medium">
+                      <span className="px-2 py-0.5 bg-[#8ec5eb]/15 text-[#8ec5eb] rounded text-[10px] font-medium">
                         {person.role}
                       </span>
                     </div>
-                    <p className="text-[12px] text-gray-500 truncate">{person.email}</p>
+                    <p className="text-[12px] text-[#cde2f2]/70 truncate">{person.email}</p>
                   </div>
                 </div>
               ))}
@@ -305,12 +305,12 @@ export default function AssignMenteesModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200">
-          <div className="text-[13px] text-gray-600 flex-1">
+        <div className="flex items-center justify-between border-t border-white/15 bg-[#061f35]/90 px-6 py-4">
+          <div className="text-[13px] text-[#cde2f2]/70 flex-1">
             {selectedPeople.length > 0 ? (
               <span>{getSelectedSummary()}</span>
             ) : (
-              <span className="text-gray-400">No items selected</span>
+              <span className="text-[#cde2f2]/50">No items selected</span>
             )}
           </div>
           <button

@@ -75,24 +75,24 @@ export default function ListMenteesModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-white rounded-xl max-w-md w-full shadow-2xl max-h-[90vh] flex flex-col">
+      <div className="w-full max-w-2xl max-h-[86vh] flex flex-col overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.96)_0%,rgba(7,34,56,0.98)_100%)] shadow-2xl backdrop-blur-xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+       <div className="flex items-center justify-between border-b border-white/15 px-6 py-5">
           <div>
-            <h2 className="text-[20px] font-bold text-gray-900">List of Mentees</h2>
+            <h2 className="text-xl font-bold text-white">List of Mentees</h2>
             {mentorName && (
-              <p className="text-[13px] text-gray-500 mt-1">Assigned to {mentorName}</p>
+              <p className="mt-1 text-sm text-[#cde2f2]/80">Assigned to {mentorName}</p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition"
+           className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white"
           >
             <i className="fa-solid fa-xmark"></i>
           </button>
         </div>
 
-        <div className="p-6 flex-1 overflow-auto">
+        <div className="flex-1 overflow-y-auto p-6">
           {/* Search */}
           <div className="mb-4">
             <div className="relative">
@@ -100,9 +100,9 @@ export default function ListMenteesModal({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search mentees..."
-                className="w-full px-4 py-2.5 pl-10 rounded-lg border border-gray-300 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full rounded-xl border border-white/15 bg-white/10 px-11 py-3 text-sm text-white placeholder:text-[#cde2f2]/55 outline-none transition focus:border-[#8ec5eb]/60 focus:bg-white/[0.13]"
               />
-              <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+              <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[#8ec5eb]"></i>
             </div>
           </div>
 
@@ -110,8 +110,8 @@ export default function ListMenteesModal({
           {loading && (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#2E3B8E] mb-3"></div>
-                <p className="text-gray-600 text-[14px]">Loading mentees...</p>
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-[#8ec5eb] mb-3"></div>
+                <p className="text-[14px] text-[#cde2f2]/75">Loading mentees...</p>
               </div>
             </div>
           )}
@@ -121,10 +121,10 @@ export default function ListMenteesModal({
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
                 <i className="fa-solid fa-circle-exclamation text-red-500 text-4xl mb-3"></i>
-                <p className="text-gray-900 font-medium text-[15px] mb-1">{error}</p>
+                <p className="mb-1 text-[15px] font-medium text-white">{error}</p>
                 <button
                   onClick={fetchAssignedUsers}
-                  className="text-[#2E3B8E] text-[14px] font-medium hover:underline"
+                  className="text-[14px] font-medium text-[#8ec5eb] hover:underline"
                 >
                   Try again
                 </button>
@@ -136,9 +136,9 @@ export default function ListMenteesModal({
           {!loading && !error && mentees.length === 0 && (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
-                <i className="fa-solid fa-users text-gray-300 text-5xl mb-3"></i>
-                <p className="text-gray-900 font-medium text-[15px] mb-1">No mentees assigned</p>
-                <p className="text-gray-500 text-[13px]">
+               <i className="fa-solid fa-users mb-3 text-5xl text-white/35"></i>
+<p className="mb-1 text-[15px] font-medium text-white">No mentees assigned</p>
+<p className="text-[13px] text-[#cde2f2]/70">
                   This mentor doesn't have any mentees yet
                 </p>
               </div>
@@ -147,13 +147,13 @@ export default function ListMenteesModal({
 
           {/* Mentees List */}
           {!loading && !error && filteredMentees.length > 0 && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {filteredMentees.map((mentee, index) => (
                 <div
                   key={mentee._id}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 hover:bg-gray-50 transition-all"
+                  className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 transition hover:bg-white/[0.1]"
                 >
-                  <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
+                  <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-full bg-white/10 ring-1 ring-white/15">
                     <Image
                       src={mentee.profilePicture || getRandomImage(index)}
                       alt={`${mentee.firstName} ${mentee.lastName}`}
@@ -164,26 +164,33 @@ export default function ListMenteesModal({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <p className="text-[15px] font-semibold text-gray-900 truncate">
+                      <p className="truncate text-[15px] font-semibold text-white">
                         {mentee.firstName} {mentee.lastName}
                       </p>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                      {/* <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                         mentee.status === 'active'
                           ? 'bg-green-100 text-green-700'
                           : mentee.status === 'pending'
                           ? 'bg-yellow-100 text-yellow-700'
                           : 'bg-gray-100 text-gray-700'
-                      }`}>
+                      }`}> */}
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+  mentee.status === "active"
+    ? "bg-emerald-400/15 text-emerald-200"
+    : mentee.status === "pending"
+    ? "bg-amber-400/15 text-amber-200"
+    : "bg-white/10 text-[#cde2f2]"
+}`}>
                         {mentee.status}
                       </span>
                     </div>
-                    <p className="text-[12px] text-gray-500 truncate">{mentee.email}</p>
+                    <p className="truncate text-[12px] text-[#cde2f2]/70">{mentee.email}</p>
                     {mentee.phoneNumber && (
-                      <p className="text-[12px] text-gray-400 truncate">{mentee.phoneNumber}</p>
+                      <p className="truncate text-[12px] text-[#cde2f2]/50">{mentee.phoneNumber}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-lg text-[11px] font-medium">
+                    <span className="rounded-lg bg-[#8ec5eb]/15 px-2.5 py-1 text-[11px] font-semibold text-[#8ec5eb]">
                       {mentee.role}
                     </span>
                   </div>
@@ -196,9 +203,9 @@ export default function ListMenteesModal({
           {!loading && !error && mentees.length > 0 && filteredMentees.length === 0 && (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
-                <i className="fa-solid fa-search text-gray-300 text-4xl mb-3"></i>
-                <p className="text-gray-900 font-medium text-[15px] mb-1">No results found</p>
-                <p className="text-gray-500 text-[13px]">
+               <i className="fa-solid fa-search mb-3 text-4xl text-white/35"></i>
+<p className="mb-1 text-[15px] font-medium text-white">No results found</p>
+<p className="text-[13px] text-[#cde2f2]/70">
                   Try searching with a different name or email
                 </p>
               </div>
@@ -207,19 +214,19 @@ export default function ListMenteesModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-6 border-t border-gray-200">
-          <div className="text-[13px] text-gray-600">
+        <div className="flex items-center justify-between border-t border-white/15 bg-[#061f35]/90 px-6 py-4">
+          <div className="text-[13px] text-[#cde2f2]/70">
             {mentees.length > 0 ? (
               <span>
                 {filteredMentees.length} of {mentees.length} mentee{mentees.length !== 1 ? 's' : ''}
               </span>
             ) : (
-              <span className="text-gray-400">No mentees</span>
+              <span className="text-[#cde2f2]/50">No mentees</span>
             )}
           </div>
           <button
             onClick={onClose}
-            className="px-6 py-2.5 bg-[#2E3B8E] text-white rounded-lg text-[14px] font-semibold hover:bg-[#1F2A6E] transition-all"
+            className="rounded-xl bg-[#8ec5eb] px-7 py-3 text-sm font-bold text-[#062946] transition hover:bg-[#a9d5f2]"
           >
             Close
           </button>

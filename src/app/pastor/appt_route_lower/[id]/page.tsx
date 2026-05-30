@@ -220,7 +220,17 @@ export default function PastorAppointmentDetailPage() {
   const meetingDate = new Date(appt.meetingDate);
   const meetLink = appt.meetingLink || appt.zoomJoinUrl || "";
   const isCompleted = String(appt.status).toLowerCase() === "completed";
+const zoomMeetingTopic =
+  (appt as any).zoomMeeting && typeof (appt as any).zoomMeeting.topic === "string"
+    ? (appt as any).zoomMeeting.topic.trim()
+    : "";
 
+const meetingTitle =
+  String((appt as any).title || "").trim() ||
+  zoomMeetingTopic ||
+  String(appt.notes || "").trim();
+
+const meetingDescription = String((appt as any).description || "").trim();
   return (
     <div className="min-h-screen bg-[#062946] font-[Albert_Sans] text-white">
       <PastorHeader />
@@ -349,7 +359,30 @@ export default function PastorAppointmentDetailPage() {
             <p className="mt-4 text-[12px] text-white/40">No meeting link available.</p>
           )}
         </div>
+{/* ── Meeting title / description ───────────────────────────────── */}
+{meetingTitle || meetingDescription ? (
+  <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+    {meetingTitle ? (
+      <>
+        <p className="mb-2 text-sm font-semibold text-[#8ec5eb]">
+          Meeting Title
+        </p>
+        <p className="text-sm text-white/90">{meetingTitle}</p>
+      </>
+    ) : null}
 
+    {meetingDescription ? (
+      <>
+        <p className="mb-2 mt-4 text-sm font-semibold text-[#8ec5eb]">
+          Meeting Description
+        </p>
+        <p className="whitespace-pre-wrap text-sm text-white/80">
+          {meetingDescription}
+        </p>
+      </>
+    ) : null}
+  </div>
+) : null}
         {/* ── Notes ──────────────────────────────────────────────────────── */}
         {appt.notes ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6">

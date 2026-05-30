@@ -55,37 +55,37 @@ export default function AssignMentorModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
-      <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-200 p-6">
-          <h3 className="text-[20px] font-bold text-gray-900">Assign New Mentor</h3>
+     <div className="flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.96)_0%,rgba(7,34,56,0.98)_100%)] shadow-2xl backdrop-blur-xl">
+        <div className="flex items-center justify-between border-b border-white/15 px-6 py-5">
+          <h3 className="text-xl font-bold text-white">Assign New Mentor</h3>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-[#2E3B8E] bg-white text-[#2E3B8E] transition hover:bg-[#2E3B8E]/10"
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white/70 transition hover:bg-white/15 hover:text-white"
             aria-label="Close"
           >
             <i className="fa-solid fa-xmark" />
           </button>
         </div>
 
-        <div className="border-b border-gray-200 p-6">
+        <div className="border-b border-white/15 px-6 py-5">
           <div className="relative">
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search"
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2.5 pl-10 pr-4 text-[14px] outline-none focus:border-[#2E3B8E]"
+              className="w-full rounded-xl border border-white/15 bg-white/10 py-3 pl-11 pr-4 text-sm text-white placeholder:text-[#cde2f2]/55 outline-none transition focus:border-[#8ec5eb]/60 focus:bg-white/[0.13]"
             />
-            <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400" />
+            <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#8ec5eb]" />
           </div>
         </div>
 
         <div className="flex-1 overflow-auto p-6">
           {loading ? (
             <div className="flex min-h-[200px] flex-col items-center justify-center gap-3 py-12">
-              <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#2E3B8E]/30 border-t-[#2E3B8E]" />
-              <p className="text-[13px] text-gray-600">Loading mentors…</p>
+              <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#8ec5eb]/30 border-t-[#8ec5eb]" />
+              <p className="text-[13px] text-[#cde2f2]/75">Loading mentors…</p>
             </div>
           ) : (
           <>
@@ -99,21 +99,23 @@ export default function AssignMentorModal({
                   onClick={() => toggleMentor(mentor.id)}
                   className={`relative rounded-xl border p-4 text-left transition ${
                     selected
-                      ? "border-[#2E3B8E] bg-[#f0f4ff] ring-1 ring-[#2E3B8E]/30"
-                      : "border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100"
+  ? "border-[#8ec5eb]/60 bg-[#8ec5eb]/15 ring-1 ring-[#8ec5eb]/35"
+  : "border-white/10 bg-white/[0.06] hover:border-[#8ec5eb]/35 hover:bg-white/[0.1]"
                   }`}
                 >
                   <span
-                    className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded border-2 border-[#2E3B8E] bg-white"
+                    className={`absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded border ${
+  selected ? "border-[#8ec5eb] bg-[#8ec5eb]" : "border-white/25 bg-white/10"
+}`}
                     aria-hidden
                   >
                     {selected ? (
-                      <i className="fa-solid fa-check text-xs text-[#2E3B8E]" />
+                      <i className="fa-solid fa-check text-xs text-[#062946]" />
                     ) : null}
                   </span>
 
                   <div className="flex gap-3 pr-8">
-                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-[#2E3B8E]">
+                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-white/10 ring-1 ring-white/15">
                       {mentor.img ? (
                         <Image
                           src={mentor.img}
@@ -130,9 +132,9 @@ export default function AssignMentorModal({
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h4 className="truncate text-[15px] font-bold text-gray-900">{mentor.name}</h4>
-                      <p className="text-[13px] capitalize text-gray-500">{mentor.role || "Mentor"}</p>
-                      <span className="mt-2 inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900">
+                      <h4 className="truncate text-[15px] font-bold text-white">{mentor.name}</h4>
+                      <p className="text-[13px] capitalize text-[#cde2f2]/70">{mentor.role || "Mentor"}</p>
+                      <span className="mt-2 inline-block rounded-full bg-amber-400/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-200">
                         {mentor.menteeCount} Mentors
                       </span>
                       <p className="mt-2 text-[13px] leading-snug">
@@ -154,7 +156,7 @@ export default function AssignMentorModal({
             })}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-gray-200 pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/15 pt-4">
             <p className="text-[13px] text-gray-600">
               {selectedMentors.length > 0
                 ? `${filteredMentors
@@ -170,7 +172,7 @@ export default function AssignMentorModal({
               type="button"
               onClick={handleConfirm}
               disabled={selectedMentors.length === 0}
-              className="rounded-lg bg-[#1F2A6E] px-6 py-2.5 text-[14px] font-semibold text-white transition-all hover:bg-[#2E3B8E] disabled:cursor-not-allowed disabled:bg-gray-300"
+              className="rounded-xl bg-[#8ec5eb] px-7 py-3 text-sm font-bold text-[#062946] transition hover:bg-[#a9d5f2] disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/40"
             >
               Assign Mentor
             </button>

@@ -190,6 +190,8 @@ const shouldOpenReschedule = searchParams.get("reschedule") === "1";
   const [meetingDate, setMeetingDate] = useState("");
   const [selectedSlot, setSelectedSlot] = useState("");
   const [selectedPlatform, setSelectedPlatform] = useState("zoom");
+  const [meetingTitle, setMeetingTitle] = useState("");
+const [meetingDescription, setMeetingDescription] = useState("");
   const [currentDate, setCurrentDate] = useState(new Date());
   const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
   const [isScheduling, setIsScheduling] = useState(false);
@@ -679,6 +681,14 @@ useEffect(() => {
       setTimeout(() => setToastMessage(null), 3000);
       return;
     }
+    const title = meetingTitle.trim();
+const description = meetingDescription.trim();
+
+if (!title) {
+  setToastMessage("Please enter a meeting title");
+  setTimeout(() => setToastMessage(null), 3000);
+  return;
+}
     if (!meetingDate || !selectedSlot) {
       setToastMessage("Please select date and time");
       setTimeout(() => setToastMessage(null), 3000);
@@ -762,11 +772,19 @@ useEffect(() => {
         mentorId: targetMentorId,
         meetingDate: proposedIso,
         platform: uiMeetingModeToPlatform(selectedPlatform),
-        notes: `Scheduled by mentor (${uiMeetingModeToPlatform(selectedPlatform)})`,
-        googleCalendarSync: true,
-        googleCalendarTitle: `Meeting · mentor & ${recipientLabel}`,
-        googleCalendarDescription: `Scheduled in CCC · Platform: ${selectedPlatform}`,
-        initiatorRole: "mentor",
+        // notes: `Scheduled by mentor (${uiMeetingModeToPlatform(selectedPlatform)})`,
+        // googleCalendarSync: true,
+        // googleCalendarTitle: `Meeting · mentor & ${recipientLabel}`,
+        // googleCalendarDescription: `Scheduled in CCC · Platform: ${selectedPlatform}`,
+        // initiatorRole: "mentor",
+        title,
+description,
+notes: `Scheduled by mentor (${uiMeetingModeToPlatform(selectedPlatform)})`,
+googleCalendarSync: true,
+googleCalendarTitle: title,
+googleCalendarDescription:
+  description || `Scheduled in CCC · Platform: ${selectedPlatform}`,
+initiatorRole: "mentor",
       });
 
       const gHint = googleCalendarSuccessHintFromCreateResponse(res?.data);
@@ -785,6 +803,8 @@ useEffect(() => {
       setSelectedRecipient(null);
       setMeetingDate("");
       setSelectedSlot("");
+      setMeetingTitle("");
+setMeetingDescription("");
       const warningSuffix =
         outcome.warnings.length > 0 ? ` Note: ${outcome.warnings.join(" · ")}` : "";
       setToastMessage(
@@ -1637,7 +1657,31 @@ useEffect(() => {
                       </p>
                       ))}
                   </div>
+<div className="mb-4">
+  <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+    Meeting Title
+  </label>
+  <input
+    type="text"
+    value={meetingTitle}
+    onChange={(e) => setMeetingTitle(e.target.value)}
+    placeholder="Enter meeting title"
+    className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-[#cde2f2]/55 outline-none transition focus:border-[#8ec5eb]/60 focus:bg-white/[0.13]"
+  />
+</div>
 
+<div className="mb-4">
+  <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+    Meeting Description <span className="font-normal text-[#cde2f2]/60">(optional)</span>
+  </label>
+  <textarea
+    value={meetingDescription}
+    onChange={(e) => setMeetingDescription(e.target.value)}
+    placeholder="Add meeting details"
+    rows={3}
+    className="w-full resize-none rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-[#cde2f2]/55 outline-none transition focus:border-[#8ec5eb]/60 focus:bg-white/[0.13]"
+  />
+</div>
                   <div className="mb-6 grid grid-cols-2 gap-3">
                     {(calendarSlotSyncLoading || scheduleAvailabilityLoading) && (
                       <p className="col-span-2 flex items-center gap-2 text-xs text-[#8ec5eb]">

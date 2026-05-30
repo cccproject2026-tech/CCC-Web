@@ -392,6 +392,18 @@ export default function MentorAppointmentDetailPage() {
   const st = normalizeAppointmentStatus(appt);
   const isCompleted = st === "completed";
 
+  const zoomMeetingTopic =
+  (appt as any).zoomMeeting && typeof (appt as any).zoomMeeting.topic === "string"
+    ? (appt as any).zoomMeeting.topic.trim()
+    : "";
+
+const meetingTitle =
+  String((appt as any).title || "").trim() ||
+  zoomMeetingTopic ||
+  String(appt.notes || "").trim();
+
+const meetingDescription = String((appt as any).description || "").trim();
+
   const meetingNumericId = String(appt.zoomMeetingId || "").replace(/\D/g, "") || zoomJoinNumericId(meetLink);
   const meetingIdDisplay = formatZoomMeetingIdDisplay(meetingNumericId);
   const zmPwd =
@@ -645,7 +657,29 @@ export default function MentorAppointmentDetailPage() {
             </p>
           </div>
         </div>
+{meetingTitle || meetingDescription ? (
+  <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+    {meetingTitle ? (
+      <>
+        <p className="mb-2 text-sm font-semibold text-[#8ec5eb]">
+          Meeting Title
+        </p>
+        <p className="text-sm text-white/90">{meetingTitle}</p>
+      </>
+    ) : null}
 
+    {meetingDescription ? (
+      <>
+        <p className="mb-2 mt-4 text-sm font-semibold text-[#8ec5eb]">
+          Meeting Description
+        </p>
+        <p className="whitespace-pre-wrap text-sm text-white/80">
+          {meetingDescription}
+        </p>
+      </>
+    ) : null}
+  </div>
+) : null}
         {appt.notes ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
             <p className="mb-3 text-sm font-semibold text-[#8ec5eb]">Notes</p>
