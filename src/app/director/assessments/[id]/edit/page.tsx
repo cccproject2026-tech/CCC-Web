@@ -445,17 +445,25 @@ const handleAddLayerToSelectedSection = () => {
       }
 
       const typeForApi: "CMA" | "PMP" = hasPreSurvey ? "CMA" : "PMP";
+      // const patchBody = {
+      //   name: name,
+      //   description: description.trim(),
+      //   type: typeForApi,
+      //   ...(hasPreSurvey && preSurveyPayload.length > 0 ? { preSurvey: preSurveyPayload } : {}),
+      // };
+      // try {
+      //   await apiPatchAssessment(assessment.id, patchBody);
+      // } catch (e) {
+      //   console.warn("PATCH /assessment (metadata) not applied:", e);
+      // }
       const patchBody = {
-        name: name,
-        description: description.trim(),
-        type: typeForApi,
-        ...(hasPreSurvey && preSurveyPayload.length > 0 ? { preSurvey: preSurveyPayload } : {}),
-      };
-      try {
-        await apiPatchAssessment(assessment.id, patchBody);
-      } catch (e) {
-        console.warn("PATCH /assessment (metadata) not applied:", e);
-      }
+  name,
+  description: description.trim(),
+  type: typeForApi,
+  preSurvey: hasPreSurvey ? preSurveyPayload : [],
+};
+console.log("ASSESSMENT PATCH BODY:", patchBody);
+await apiPatchAssessment(assessment.id, patchBody);
 
       await apiUpdateSections(assessment.id, buildSectionsPayload(modelSections));
       await apiUpdateInstructions(assessment.id, instructionLines);
@@ -1102,10 +1110,10 @@ const selectedSection = wizardSections[selectedSectionIndex] ?? wizardSections[0
           {/* Basics */}
 <div className="mb-6 rounded-xl border border-white/20 bg-white/5 p-5">
   <div className="mb-4">
-    <h3 className="font-semibold text-white">Basics</h3>
+    {/* <h3 className="font-semibold text-white">Basics</h3>
     <p className="mt-1 text-sm text-white/60">
       Update the assessment name and description shown in the list and detail views.
-    </p>
+    </p> */}
   </div>
 
   <div className="space-y-4">

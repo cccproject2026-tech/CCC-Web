@@ -385,6 +385,16 @@ useEffect(() => {
       year: "2-digit",
     });
   };
+  const getMeetingTitle = (appt: AnyRecord) => {
+  return String(
+    appt.title ||
+      appt.meetingTitle ||
+      appt.appointmentTitle ||
+      appt.metadata?.title ||
+      appt.notes?.title ||
+      ""
+  ).trim();
+};
 
   const formatTime = (dateString: string) => {
     const d = new Date(dateString);
@@ -1151,6 +1161,12 @@ if (routeAssessmentId && routeRoadmapId && routeTaskId) {
                             </span>
                           ) : null}
                         </div>
+                        {getMeetingTitle(appt) ? (
+  <p className="mb-2 text-xs font-semibold text-white">
+    <span className="text-[#8ec5eb]">Title:</span>{" "}
+    {getMeetingTitle(appt)}
+  </p>
+) : null}
 
                         {/* Mode — tap platform to open meeting details */}
                         <p className="mb-3 text-[11px] text-[#d9ebf8]">

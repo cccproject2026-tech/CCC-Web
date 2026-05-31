@@ -847,11 +847,34 @@ const renderHistoryAnswerCard = (
         <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
           {label}
         </p>
-        <img
+        {/* <img
           src={value}
           alt=""
           className="mt-3 max-h-48 max-w-full rounded-lg border border-white/15 object-contain"
-        />
+        /> */}
+        <div className="mt-3 inline-block">
+  <img
+    src={value}
+    alt=""
+    className="max-h-48 max-w-full rounded-lg border border-white/15 object-contain"
+  />
+
+  <button
+    type="button"
+    onClick={() => {
+      const link = document.createElement("a");
+      link.href = value;
+      link.download = `${label || "signature"}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }}
+    className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-3 py-2 text-xs font-semibold text-white hover:bg-[#8ec5eb]/25"
+  >
+    <i className="fa-solid fa-download" />
+    Download Signature
+  </button>
+</div>
       </div>
     );
   }
@@ -942,7 +965,7 @@ const renderHistoryAnswerCard = (
                     >
                       Pastor response
                     </button>
-                    <button
+                    {/* <button
   type="button"
   onClick={() => setActiveTab("previousSubmissions")}
   className={`w-full rounded-lg px-4 py-3 text-left text-sm font-semibold transition ${
@@ -952,6 +975,21 @@ const renderHistoryAnswerCard = (
   }`}
 >
   Previous submissions
+</button> */}
+<button
+  type="button"
+  onClick={() => setActiveTab("previousSubmissions")}
+  className={`flex w-full items-center justify-between rounded-lg px-4 py-3 text-left text-sm font-semibold transition ${
+    activeTab === "previousSubmissions"
+      ? "border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-white"
+      : "text-[#cde2f2] hover:bg-white/10"
+  }`}
+>
+  <span>Previous submissions</span>
+
+  <span className="rounded-full bg-[#e6edff] px-2 py-0.5 text-xs font-semibold text-[#1e40af]">
+    {previousSubmissionVersions.length}
+  </span>
 </button>
                     <button
                       type="button"
@@ -1265,11 +1303,34 @@ const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
           {label}
         </p>
         <div className="mt-3">
-          <img
+          {/* <img
             src={str}
             alt=""
             className="max-h-48 max-w-full rounded-lg border border-white/15 object-contain"
-          />
+          /> */}
+          <div className="mt-3 inline-block">
+  <img
+    src={str}
+    alt=""
+    className="max-h-48 max-w-full rounded-lg border border-white/15 object-contain"
+  />
+
+  <button
+    type="button"
+    onClick={async () => {
+      const link = document.createElement("a");
+      link.href = str;
+      link.download = `${label || "signature"}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }}
+    className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-3 py-2 text-xs font-semibold text-white hover:bg-[#8ec5eb]/25"
+  >
+    <i className="fa-solid fa-download" />
+    Download Signature
+  </button>
+</div>
         </div>
       </div>
     );
@@ -1348,7 +1409,7 @@ const renderTemplateExtra = (extra: Record<string, any>, idx: number): JSX.Eleme
                         <>
                           <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
                             <h2 className="text-lg font-semibold text-white sm:text-xl">
-  Current Submission :
+  Latest Submission :
 </h2>
                             {dueHeading ? (
                               <div className="flex shrink-0 items-center gap-2 text-sm font-medium text-[#cde2f2]">

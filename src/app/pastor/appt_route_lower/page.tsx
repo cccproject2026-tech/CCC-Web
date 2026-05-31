@@ -295,6 +295,16 @@ const [scheduleDescription, setScheduleDescription] = useState("");
       hour12: true,
     });
   };
+  const getMeetingTitle = (appt: any) => {
+  return String(
+    appt?.title ||
+      appt?.meetingTitle ||
+      appt?.appointmentTitle ||
+      appt?.metadata?.title ||
+      appt?.meta?.title ||
+      ""
+  ).trim();
+};
 
   useEffect(() => {
     async function fetchMentors() {
@@ -914,7 +924,12 @@ setScheduleDescription("");
                             Time: {timeStr}
                           </div>
                         </div>
-
+{getMeetingTitle(appt) ? (
+  <p className="mb-2 text-xs font-semibold text-white">
+    <span className="text-[#8ec5eb]"> Meeting Title:</span>{" "}
+    {getMeetingTitle(appt)}
+  </p>
+) : null}
                         {/* Mode */}
                         <p className="mb-3 text-[11px] text-[#d9ebf8]">
                           Mode:
@@ -1144,7 +1159,12 @@ setScheduleDescription("");
                             <span>Time: {formatTime(String(appt.meetingDate ?? ""))}</span>
                           </div>
                         </div>
-
+{getMeetingTitle(appt) ? (
+  <p className="mb-2 text-xs font-semibold text-white">
+    <span className="text-[#8ec5eb]"> Meeting Title:</span>{" "}
+    {getMeetingTitle(appt)}
+  </p>
+) : null}
                         <div className="flex items-end justify-between">
                           <div>
                             <p className="mb-2 text-xs text-[#d9ebf8]">
@@ -1236,7 +1256,12 @@ setScheduleDescription("");
                             <span>Time: {formatTime(String(appt.meetingDate ?? ""))}</span>
                           </div>
                         </div>
-
+{getMeetingTitle(appt) ? (
+  <p className="mb-2 text-xs font-semibold text-white">
+    <span className="text-[#8ec5eb]">Meeting Title:</span>{" "}
+    {getMeetingTitle(appt)}
+  </p>
+) : null}
                         <p className="mb-2 text-xs text-[#d9ebf8]">
                           Mode:{" "}
                           <span className="font-medium text-[#8ec5eb] underline underline-offset-2">

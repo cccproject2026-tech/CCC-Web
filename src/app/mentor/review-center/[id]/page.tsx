@@ -12,9 +12,12 @@ import {
 } from "@/app/Services/api";
 import {
   apiGetAssignedAssessments,
+  apiGetUserAnswers,
   flattenAssignedAssessmentRow,
   parseAssignedAssessmentsListBody,
 } from "@/app/Services/assessment.service";
+import { apiGetUserProgress } from "@/app/Services/progress.service";
+import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
 import {
   mentorGlassCardFrost,
@@ -29,6 +32,30 @@ type Pastor = {
   lastName?: string;
   name?: string;
   profilePicture?: string;
+};
+
+type WeeklyAssessmentSubmission = {
+  assessmentId: string;
+  assessmentName: string;
+  submittedAt: string;
+};
+
+const isWithinCurrentWeek = (value?: string) => {
+  if (!value) return false;
+
+  const submittedAt = new Date(value);
+  if (Number.isNaN(submittedAt.getTime())) return false;
+
+  const startOfWeek = new Date();
+  const day = startOfWeek.getDay();
+  const daysSinceMonday = day === 0 ? 6 : day - 1;
+  startOfWeek.setDate(startOfWeek.getDate() - daysSinceMonday);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  const startOfNextWeek = new Date(startOfWeek);
+  startOfNextWeek.setDate(startOfNextWeek.getDate() + 7);
+
+  return submittedAt >= startOfWeek && submittedAt < startOfNextWeek;
 };
 
 const attentionItems = [
@@ -170,11 +197,22 @@ export default function MentorReviewCenterDetailPage() {
   const [mentorName, setMentorName] = useState("Mentor");
   const [loading, setLoading] = useState(true);
   const [appointments, setAppointments] = useState<any[]>([]);
+  const [showTodayMeetings, setShowTodayMeetings] = useState(false);
+  const [showMissedMeetings, setShowMissedMeetings] = useState(false);
+  const [showRescheduledMeetings, setShowRescheduledMeetings] = useState(false);
+  const [showWeeklyAssessments, setShowWeeklyAssessments] = useState(false);
+const [showWeeklyRoadmaps, setShowWeeklyRoadmaps] = useState(false);
+const [meetingSort, setMeetingSort] = useState<"newest" | "oldest">("newest");
+const [weeklyAssessmentSubmissions, setWeeklyAssessmentSubmissions] = useState<
+  WeeklyAssessmentSubmission[]
+>([]);
+const [weeklyRoadmaps, setWeeklyRoadmaps] = useState<any[]>([]);
   const [assessmentStats, setAssessmentStats] = useState({
   completed: 0,
   total: 0,
   pendingReview: 0,
 });
+const [roadmapPercent, setRoadmapPercent] = useState(0);
 
   useEffect(() => {
     const mentor = getMentorFromCookie();
@@ -190,49 +228,131 @@ export default function MentorReviewCenterDetailPage() {
   }
 };
 
-const loadAssessmentStats = async () => {
+const loadProgressStats = async () => {
   try {
-    const res = await apiGetAssignedAssessments(String(pastorId));
-    const rows = parseAssignedAssessmentsListBody(res.data);
+    const [assignedRes, progressRes] = await Promise.all([
+      apiGetAssignedAssessments(String(pastorId)),
+      apiGetUserProgress(String(pastorId)),
+    ]);
+    const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
+    const progress = unwrapProgressData(progressRes);
+    // const rows = Array.isArray(progress?.assessments)
+    //   ? progress.assessments
+    //   : [];
+    // let completed = 0;
+    // let pendingReview = 0;
 
-    let completed = 0;
-    let pendingReview = 0;
+    // assignedRows.forEach((item) => {
+    //   const flat = flattenAssignedAssessmentRow(item);
+    //   if (!flat) return;
 
-    rows.forEach((item: any) => {
-      const flat: any = flattenAssignedAssessmentRow(item);
-      if (!flat) return;
+    //   const progressRow = rows.find(
+    //     (row) =>
+    //       String(row?.assessmentId ?? "") === flat.assessmentId ||
+    //       Boolean(
+    //         flat.assignmentId &&
+    //           row?.assignmentId &&
+    //           String(row.assignmentId) === flat.assignmentId,
+    //       ),
+    //   );
+    //   const status = String(progressRow?.status ?? "").toLowerCase().trim();
 
-      const status = String(
-        flat.status ??
-          flat.progressStatus ??
-          item?.status ??
-          item?.progressStatus ??
-          "",
-      )
-        .toLowerCase()
-        .trim();
+    //   if (status === "completed" || status === "reviewed") {
+    //     completed += 1;
+    //   }
+    //   if (status === "submitted") {
+    //     pendingReview += 1;
+    //   }
+    // });
+let completed = 0;
+let pendingReview = 0;
 
-      if (status === "completed" || status === "reviewed") {
-        completed += 1;
-      }
+assignedRows.forEach((item:any) => {
+  const flat: any  = flattenAssignedAssessmentRow(item);
+  if (!flat) return;
 
-      if (status === "submitted") {
-        pendingReview += 1;
-      }
-    });
+  const status = String(
+    flat.status ??
+      flat.progressStatus ??
+      item?.status ??
+      item?.progressStatus ??
+      "",
+  )
+    .toLowerCase()
+    .trim();
 
+  if (status === "completed" || status === "reviewed") {
+    completed += 1;
+  }
+
+  if (status === "submitted") {
+    pendingReview += 1;
+  }
+});
     setAssessmentStats({
       completed,
-      total: rows.length,
+      total: assignedRows.length,
       pendingReview,
     });
+
+    const weeklySubmissions = await Promise.all(
+      assignedRows.map(async (item) => {
+        const flat: any = flattenAssignedAssessmentRow(item);
+        if (!flat) return null;
+
+        try {
+          const answersRes = await apiGetUserAnswers(
+            flat.assessmentId,
+            String(pastorId),
+          );
+          const answerData = (answersRes.data as any)?.data;
+          if (!answerData?._id) return null;
+
+          const submittedAt =
+            answerData.submittedAt ||
+            answerData.createdAt ||
+            answerData.updatedAt;
+
+          if (!isWithinCurrentWeek(submittedAt)) return null;
+
+          return {
+            assessmentId: flat.assessmentId,
+            assessmentName: String(
+              flat.assessment?.name ??
+                flat.assessment?.title ??
+                flat.name ??
+                "Assessment",
+            ),
+            submittedAt: String(submittedAt),
+          };
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    setWeeklyAssessmentSubmissions(
+      weeklySubmissions
+        .filter((item): item is WeeklyAssessmentSubmission => Boolean(item))
+        .sort(
+          (a, b) =>
+            new Date(b.submittedAt).getTime() -
+            new Date(a.submittedAt).getTime(),
+        ),
+    );
+
+    setRoadmapPercent(
+      Math.min(100, Math.max(0, Number(progress?.overallRoadmapProgress ?? 0))),
+    );
   } catch (error) {
-    console.error("Failed to load assessment stats", error);
+    console.error("Failed to load pastor progress stats", error);
     setAssessmentStats({
       completed: 0,
       total: 0,
       pendingReview: 0,
     });
+    setWeeklyAssessmentSubmissions([]);
+    setRoadmapPercent(0);
   }
 };
 //     const loadAppointments = async () => {
@@ -299,7 +419,7 @@ if (mentorId) {
 }
 
 if (pastorId) {
-  void loadAssessmentStats();
+  void loadProgressStats();
 }
     if (!mentorId || !pastorId) {
       setLoading(false);
@@ -384,6 +504,57 @@ const assessmentCircleStyle = {
   const mentor = getMentorFromCookie();
 const mentorId = String(mentor?.id ?? mentor?._id ?? "");
 
+// const pastorAppointments = appointments.filter((appointment) => {
+//   const appointmentPastorId = String(
+//     appointment.userId ??
+//       appointment.user?._id ??
+//       appointment.user?.id ??
+//       "",
+//   );
+//   const isSameDay = (value?: string) => {
+//   if (!value) return false;
+
+//   const date = new Date(value);
+//   const today = new Date();
+
+//   return (
+//     date.getFullYear() === today.getFullYear() &&
+//     date.getMonth() === today.getMonth() &&
+//     date.getDate() === today.getDate()
+//   );
+// };
+
+// const todayMeetings = pastorAppointments
+//   .filter((appointment) => isSameDay(appointment.meetingDate))
+//   .sort((a, b) => getStartTime(a) - getStartTime(b));
+
+//   const appointmentMentorId = String(
+//     appointment.mentorId ??
+//       appointment.mentor?._id ??
+//       appointment.mentor?.id ??
+//       "",
+//   );
+
+//   return appointmentPastorId === String(pastorId) && appointmentMentorId === mentorId;
+// });
+// const now = Date.now();
+
+// const getStatus = (appointment: any) =>
+//   String(appointment.status ?? "").toLowerCase();
+
+// const getStartTime = (appointment: any) =>
+//   new Date(appointment.meetingDate ?? "").getTime();
+const now = Date.now();
+
+const getStatus = (appointment: any) =>
+  String(appointment.status ?? "").toLowerCase();
+
+const getStartTime = (appointment: any) =>
+  new Date(appointment.meetingDate ?? "").getTime();
+
+const getEndTime = (appointment: any) =>
+  new Date(appointment.endTime ?? appointment.meetingDate ?? "").getTime();
+
 const pastorAppointments = appointments.filter((appointment) => {
   const appointmentPastorId = String(
     appointment.userId ??
@@ -401,16 +572,45 @@ const pastorAppointments = appointments.filter((appointment) => {
 
   return appointmentPastorId === String(pastorId) && appointmentMentorId === mentorId;
 });
-const now = Date.now();
 
-const getStatus = (appointment: any) =>
-  String(appointment.status ?? "").toLowerCase();
+const isSameDay = (value?: string) => {
+  if (!value) return false;
 
-const getStartTime = (appointment: any) =>
-  new Date(appointment.meetingDate ?? "").getTime();
+  const date = new Date(value);
+  const today = new Date();
 
-const getEndTime = (appointment: any) =>
-  new Date(appointment.endTime ?? appointment.meetingDate ?? "").getTime();
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  );
+};
+
+const todayMeetings = pastorAppointments
+  .filter((appointment) => isSameDay(appointment.meetingDate))
+  .sort((a, b) => getStartTime(a) - getStartTime(b));
+
+const missedMeetings = pastorAppointments
+  .filter((appointment) => getStatus(appointment) === "missed")
+  .sort((a, b) => getStartTime(b) - getStartTime(a));
+
+const rescheduledMeetings = pastorAppointments
+  .filter((appointment) => getStatus(appointment) === "rescheduled")
+  .sort((a, b) => getStartTime(b) - getStartTime(a));
+
+if (
+  pastorAppointments.length > 0 &&
+  missedMeetings.length === 0 &&
+  rescheduledMeetings.length === 0
+) {
+  console.log(
+    "Review Center appointment statuses:",
+    [...new Set(pastorAppointments.map((appointment) => String(appointment.status)))],
+  );
+}
+
+// const getEndTime = (appointment: any) =>
+//   new Date(appointment.endTime ?? appointment.meetingDate ?? "").getTime();
 
 const isPastOrFinished = (appointment: any) => {
   const status = getStatus(appointment);
@@ -588,6 +788,189 @@ const daysUntil = (value?: string) => {
   return `In ${days} days`;
 };
 
+const renderMeetingModal = ({
+  title,
+  description,
+  meetings,
+  emptyText,
+  onClose,
+}: {
+  title: string;
+  description: string;
+  meetings: any[];
+  emptyText: string;
+  onClose: () => void;
+}) => {
+  const sortedMeetings = [...meetings].sort((a, b) => {
+    const diff = getStartTime(a) - getStartTime(b);
+    return meetingSort === "oldest" ? diff : -diff;
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+      <div className={`w-full max-w-xl p-5 ${mentorGlassCardFrost}`}>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-extrabold text-white">{title}</h3>
+            <p className="text-xs text-[#cde2f2]/65">{description}</p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <select
+              value={meetingSort}
+              onChange={(e) =>
+                setMeetingSort(e.target.value as "newest" | "oldest")
+              }
+              className="h-9 rounded-xl border border-white/15 bg-white/10 px-3 text-xs font-bold text-white outline-none [&>option]:bg-[#061f35]"
+            >
+              <option value="newest">Newest</option>
+              <option value="oldest">Oldest</option>
+            </select>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white hover:bg-white/15"
+            >
+              <i className="fa-solid fa-xmark" />
+            </button>
+          </div>
+        </div>
+
+        <div className="max-h-[224px] space-y-3 overflow-y-auto pr-1">
+          {sortedMeetings.length > 0 ? (
+            sortedMeetings.map((meeting) => (
+              <Link
+                key={meeting._id ?? meeting.id}
+                href={`/mentor/MentorSchedule/${meeting._id ?? meeting.id}`}
+                className="block rounded-2xl border border-white/10 bg-white/[0.05] p-4 transition hover:bg-white/[0.08]"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-extrabold text-white">
+                      {pastorName}
+                    </p>
+                    <p className="text-xs text-[#cde2f2]/65">Pastor</p>
+                  </div>
+
+                  <span className="rounded-lg border border-amber-300/35 bg-amber-400/15 px-2 py-1 text-[10px] font-bold uppercase text-amber-100">
+                    {String(meeting.status ?? "Scheduled")}
+                  </span>
+                </div>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                    <p className="text-[10px] text-[#cde2f2]/55">Date</p>
+                    <p className="text-xs font-bold text-white">
+                      {formatMeetingDate(meeting.meetingDate)}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                    <p className="text-[10px] text-[#cde2f2]/55">Time</p>
+                    <p className="text-xs font-bold text-white">
+                      {formatMeetingTime(meeting.meetingDate)} -{" "}
+                      {formatMeetingTime(meeting.endTime)}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="mt-3 text-xs font-semibold text-[#8ec5eb]">
+                  Mode: {meeting.mode ?? meeting.platform ?? "N/A"}
+                </p>
+              </Link>
+            ))
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-center">
+              <p className="text-sm font-semibold text-white">{emptyText}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// const renderMeetingModal = ({
+//   title,
+//   description,
+//   meetings,
+//   emptyText,
+//   onClose,
+// }: {
+//   title: string;
+//   description: string;
+//   meetings: any[];
+//   emptyText: string;
+//   onClose: () => void;
+// }) => (
+  
+//   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+//     <div className={`w-full max-w-xl p-5 ${mentorGlassCardFrost}`}>
+//       <div className="mb-4 flex items-center justify-between gap-3">
+//         <div>
+//           <h3 className="text-lg font-extrabold text-white">{title}</h3>
+//           <p className="text-xs text-[#cde2f2]/65">{description}</p>
+//         </div>
+//         <button
+//           type="button"
+//           onClick={onClose}
+//           className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white hover:bg-white/15"
+//         >
+//           <i className="fa-solid fa-xmark" />
+//         </button>
+//       </div>
+
+//       <div className="max-h-[224px] space-y-3 overflow-y-auto pr-1">
+//         {meetings.length > 0 ? (
+//           meetings.map((meeting) => (
+//             <Link
+//               key={meeting._id ?? meeting.id}
+//               href={`/mentor/MentorSchedule/${meeting._id ?? meeting.id}`}
+//               className="block rounded-2xl border border-white/10 bg-white/[0.05] p-4 transition hover:bg-white/[0.08]"
+//             >
+//               <div className="flex items-start justify-between gap-3">
+//                 <div>
+//                   <p className="text-sm font-extrabold text-white">{pastorName}</p>
+//                   <p className="text-xs text-[#cde2f2]/65">Pastor</p>
+//                 </div>
+//                 <span className="rounded-lg border border-amber-300/35 bg-amber-400/15 px-2 py-1 text-[10px] font-bold uppercase text-amber-100">
+//                   {String(meeting.status ?? "Scheduled")}
+//                 </span>
+//               </div>
+
+//               <div className="mt-3 grid gap-2 sm:grid-cols-2">
+//                 <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+//                   <p className="text-[10px] text-[#cde2f2]/55">Date</p>
+//                   <p className="text-xs font-bold text-white">
+//                     {formatMeetingDate(meeting.meetingDate)}
+//                   </p>
+//                 </div>
+//                 <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+//                   <p className="text-[10px] text-[#cde2f2]/55">Time</p>
+//                   <p className="text-xs font-bold text-white">
+//                     {formatMeetingTime(meeting.meetingDate)} -{" "}
+//                     {formatMeetingTime(meeting.endTime)}
+//                   </p>
+//                 </div>
+//               </div>
+
+//               <p className="mt-3 text-xs font-semibold text-[#8ec5eb]">
+//                 Mode: {meeting.mode ?? meeting.platform ?? "N/A"}
+//               </p>
+//             </Link>
+//           ))
+//         ) : (
+//           <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-center">
+//             <p className="text-sm font-semibold text-white">{emptyText}</p>
+//           </div>
+//         )}
+//       </div>
+//     </div>
+//   </div>
+// );
+
+
   return (
     <div className={mentorPageRoot}>
       <main className="relative z-10 mx-auto w-full max-w-[1180px] flex-1 px-4 py-5 sm:px-6">
@@ -649,12 +1032,11 @@ const daysUntil = (value?: string) => {
                 <div
                   className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
                   style={{
-                    background:
-                      "conic-gradient(#3498DB 62%, rgba(255,255,255,0.12) 0)",
+                    background: `conic-gradient(#3498DB ${roadmapPercent}%, rgba(255,255,255,0.12) 0)`,
                   }}
                 >
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0a2945] text-[11px] font-black text-white">
-                    62%
+                    {Math.round(roadmapPercent)}%
                   </div>
                 </div>
                 <div>
@@ -676,7 +1058,7 @@ const daysUntil = (value?: string) => {
                 </p>
               </div> */}
               <Link
-  href={`/mentor/MentorAssessments?userId=${encodeURIComponent(String(pastorId))}`}
+  href={`/mentor/MentorAssessments?menteeId=${encodeURIComponent(String(pastorId))}`}
   className="flex flex-col items-center justify-center border-b border-r border-white/10 p-3 text-center transition hover:bg-white/[0.05] sm:border-b-0"
 >
   <p className="text-[11px] text-[#cde2f2]/65">
@@ -777,11 +1159,26 @@ const daysUntil = (value?: string) => {
           </h2>
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {attentionItems.map((item) => (
+              // <button
+              //   key={item.title}
+              //   type="button"
+              //   className={`relative flex min-h-[132px] flex-col items-start p-3 text-left ${mentorGlassCardFrost}`}
+              // >
               <button
-                key={item.title}
-                type="button"
-                className={`relative flex min-h-[132px] flex-col items-start p-3 text-left ${mentorGlassCardFrost}`}
-              >
+  key={item.title}
+  type="button"
+  onClick={() => {
+    if (item.title === "Missed Meetings") setShowMissedMeetings(true);
+    if (item.title === "Rescheduled Meetings") {
+      setShowRescheduledMeetings(true);
+    }
+    if (item.title === "Today's Meetings") setShowTodayMeetings(true);
+    if (item.title === "New Assessment Submissions") {
+      setShowWeeklyAssessments(true);
+    }
+  }}
+  className={`relative flex min-h-[132px] flex-col items-start p-3 text-left ${mentorGlassCardFrost}`}
+>
                 <span
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${item.tone}`}
                 >
@@ -789,7 +1186,16 @@ const daysUntil = (value?: string) => {
                 </span>
                 <span className="mt-2 min-w-0 pr-3">
                   <span className="block text-xl font-black leading-none text-white">
-                    {item.count}
+                    {/* {item.count} */}
+                    {item.title === "Missed Meetings"
+                      ? missedMeetings.length
+                      : item.title === "Rescheduled Meetings"
+                        ? rescheduledMeetings.length
+                        : item.title === "Today's Meetings"
+                          ? todayMeetings.length
+                          : item.title === "New Assessment Submissions"
+                            ? weeklyAssessmentSubmissions.length
+                            : item.count}
                   </span>
                   <span className="mt-1.5 block text-[11px] font-bold leading-tight text-white">
                     {item.title}
@@ -912,6 +1318,162 @@ const daysUntil = (value?: string) => {
             ))}
           </div>
         </Panel>
+{showTodayMeetings && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+    <div className={`w-full max-w-xl p-5 ${mentorGlassCardFrost}`}>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-extrabold text-white">
+            Today’s Meetings
+          </h3>
+          <p className="text-xs text-[#cde2f2]/65">
+            {todayMeetings.length} meeting(s) scheduled today
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowTodayMeetings(false)}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white hover:bg-white/15"
+        >
+          <i className="fa-solid fa-xmark" />
+        </button>
+      </div>
+
+      <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+        {todayMeetings.length > 0 ? (
+          todayMeetings.map((meeting) => (
+            <Link
+              key={meeting._id ?? meeting.id}
+              href={`/mentor/MentorSchedule/${meeting._id ?? meeting.id}`}
+              className="block rounded-2xl border border-white/10 bg-white/[0.05] p-4 transition hover:bg-white/[0.08]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-extrabold text-white">
+                    {pastorName}
+                  </p>
+                  <p className="text-xs text-[#cde2f2]/65">Pastor</p>
+                </div>
+
+                <span className="rounded-lg border border-amber-300/35 bg-amber-400/15 px-2 py-1 text-[10px] font-bold uppercase text-amber-100">
+                  {String(meeting.status ?? "Scheduled")}
+                </span>
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                  <p className="text-[10px] text-[#cde2f2]/55">Date</p>
+                  <p className="text-xs font-bold text-white">
+                    {formatMeetingDate(meeting.meetingDate)}
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                  <p className="text-[10px] text-[#cde2f2]/55">Time</p>
+                  <p className="text-xs font-bold text-white">
+                    {formatMeetingTime(meeting.meetingDate)} –{" "}
+                    {formatMeetingTime(meeting.endTime)}
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-3 text-xs font-semibold text-[#8ec5eb]">
+                Mode: {meeting.mode ?? meeting.platform ?? "N/A"}
+              </p>
+            </Link>
+          ))
+        ) : (
+          <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-center">
+            <p className="text-sm font-semibold text-white">
+              No meetings today
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  </div>
+)}
+        {showMissedMeetings &&
+          renderMeetingModal({
+            title: "Missed Meetings",
+            description: `${missedMeetings.length} missed meeting(s)`,
+            meetings: missedMeetings,
+            emptyText: "No missed meetings",
+            onClose: () => setShowMissedMeetings(false),
+          })}
+        {showRescheduledMeetings &&
+          renderMeetingModal({
+            title: "Rescheduled Meetings",
+            description: `${rescheduledMeetings.length} rescheduled meeting(s)`,
+            meetings: rescheduledMeetings,
+            emptyText: "No rescheduled meetings",
+            onClose: () => setShowRescheduledMeetings(false),
+          })}
+        {showWeeklyAssessments && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+            <div className={`w-full max-w-xl p-5 ${mentorGlassCardFrost}`}>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-extrabold text-white">
+                    New Assessment Submissions
+                  </h3>
+                  <p className="text-xs text-[#cde2f2]/65">
+                    {weeklyAssessmentSubmissions.length} submission(s) this week
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowWeeklyAssessments(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white hover:bg-white/15"
+                >
+                  <i className="fa-solid fa-xmark" />
+                </button>
+              </div>
+
+              <div className="max-h-[224px] space-y-3 overflow-y-auto pr-1">
+                {weeklyAssessmentSubmissions.length > 0 ? (
+                  weeklyAssessmentSubmissions.map((submission) => (
+                    <div
+                      key={submission.assessmentId}
+                      className="rounded-2xl border border-white/10 bg-white/[0.05] p-4"
+                    >
+                      <p className="text-sm font-extrabold text-white">
+                        {submission.assessmentName}
+                      </p>
+                      <p className="mt-1 text-xs text-[#cde2f2]/65">
+                        Submitted{" "}
+                        {new Date(submission.submittedAt).toLocaleDateString(
+                          undefined,
+                          {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          },
+                        )}
+                      </p>
+                      <Link
+                        href={`/mentor/MentorAssessments/result?assessmentId=${encodeURIComponent(
+                          submission.assessmentId,
+                        )}&userId=${encodeURIComponent(String(pastorId))}`}
+                        className="mt-3 inline-flex text-xs font-bold text-[#8ec5eb] transition hover:text-white"
+                      >
+                        View Result
+                      </Link>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-center">
+                    <p className="text-sm font-semibold text-white">
+                      No assessment submissions this week
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

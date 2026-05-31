@@ -255,15 +255,31 @@ updatedAt: String((x as any).updatedAt || ""),
       /** Backend aligns with roadmap-form: nested phases are removed by PATCH parent `roadmaps` (no DELETE /nested). */
       const before = nestedRoadmapRows(roadmap);
       const remaining = before.filter((r) => String(r?._id ?? "") !== String(confirmDelete.id));
+      if (remaining.length === 0) {
+  setDeleteError(
+    "Cannot delete the last task from here. Backend is ignoring roadmaps: []. Ask backend for a clear nested roadmaps / delete nested roadmap endpoint."
+  );
+  return;
+}
       if (remaining.length === before.length) {
         setDeleteError("Could not find this task. Try refreshing the page.");
         return;
       }
+      // await apiUpdateRoadmap(roadmapId, {
+      //   name: String(roadmap.name || "").trim() || "Roadmap",
+      //   roadmaps: remaining,
+      //   ...(Array.isArray(roadmap.divisions) ? { divisions: roadmap.divisions } : {}),
+      // } as any);
       await apiUpdateRoadmap(roadmapId, {
-        name: String(roadmap.name || "").trim() || "Roadmap",
-        roadmaps: remaining,
-        ...(Array.isArray(roadmap.divisions) ? { divisions: roadmap.divisions } : {}),
-      } as any);
+  name: String(roadmap.name || "").trim() || "Roadmap",
+  roadmaps: remaining,
+  roadMapDetails: String((roadmap as any).roadMapDetails || ""),
+  status: String((roadmap as any).status || "not started"),
+  duration: String(roadmap.duration || ""),
+  imageUrl: String(roadmap.imageUrl || ""),
+  divisions: Array.isArray(roadmap.divisions) ? roadmap.divisions : ["All"],
+  haveNextedRoadMaps: remaining.length > 0,
+} as any);
       setConfirmDelete(null);
       const res = await apiGetRoadmapById(roadmapId);
       const doc = unwrapRoadmap(res.data);

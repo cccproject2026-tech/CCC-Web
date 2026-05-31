@@ -434,7 +434,7 @@ export default function DirectorAssessmentDetailPage() {
                           {sectionRecommendations.length > 0 ? (
                             <div className="mt-4 rounded-lg border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 p-4">
                               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
-                                Section Recommendations
+                                Customized Development Plan
                               </p>
                               <ul className="space-y-1.5">
                                 {sectionRecommendations.map((recommendation, recommendationIndex) => (

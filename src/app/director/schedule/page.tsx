@@ -153,7 +153,16 @@ function toLocalDateTimeInput(iso: string): string {
   const min = String(d.getMinutes()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
 }
-
+function getMeetingTitle(appt: any): string {
+  return String(
+    appt?.title ||
+      appt?.meetingTitle ||
+      appt?.appointmentTitle ||
+      appt?.metadata?.title ||
+      appt?.meta?.title ||
+      ""
+  ).trim();
+}
 function getPlatformIcon(platform?: string) {
   const value = String(platform || "").toLowerCase().trim();
 
@@ -1413,6 +1422,12 @@ setMeetingDescription("");
               </span>
             ) : null}
           </div>
+          {getMeetingTitle(appt) ? (
+  <p className="mt-2 text-[12px] font-semibold text-white">
+    <span className="text-[#8ec5eb]">Meeting title:</span>{" "}
+    {getMeetingTitle(appt)}
+  </p>
+) : null}
         </div>
       </div>
     );
@@ -1553,6 +1568,12 @@ setMeetingDescription("");
               </span>
             ) : null}
           </div>
+          {getMeetingTitle(appt) ? (
+  <p className="mt-2 text-[12px] font-semibold text-white">
+    <span className="text-[#8ec5eb]">Meeting title:</span>{" "}
+    {getMeetingTitle(appt)}
+  </p>
+) : null}
         </div>
       </div>
     );

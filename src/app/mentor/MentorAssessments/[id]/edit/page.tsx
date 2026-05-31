@@ -558,10 +558,10 @@ export default function MentorEditAssessmentPage() {
 
                 <div className="rounded-xl border border-white/20 bg-white/5 p-5 mb-6">
                   <div className="mb-4">
-                    <h3 className="text-white font-semibold">Basics</h3>
+                    {/* <h3 className="text-white font-semibold">Basics</h3>
                     <p className="mt-1 text-sm text-white/60">
                       Update the assessment name and description shown in the list and detail views.
-                    </p>
+                    </p> */}
                   </div>
 
                   <div className="space-y-4">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import Cookies from "js-cookie";
@@ -25,6 +25,7 @@ const getMentorFromCookie = () => {
 export default function MentorReviewCenterPage() {
   const [mentees, setMentees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     const mentor = getMentorFromCookie();
@@ -52,7 +53,20 @@ export default function MentorReviewCenterPage() {
 
     void run();
   }, []);
+const filteredMentees = useMemo(() => {
+  const query = search.trim().toLowerCase();
 
+  if (!query) return mentees;
+
+  return mentees.filter((mentee) => {
+    const name =
+      `${mentee.firstName ?? ""} ${mentee.lastName ?? ""}`.trim() ||
+      mentee.name ||
+      "";
+
+    return name.toLowerCase().includes(query);
+  });
+}, [mentees, search]);
   return (
     <div className={mentorPageRoot}>
       <main className="relative z-10 mx-auto w-full max-w-3xl flex-1 px-4 py-6">
@@ -81,12 +95,20 @@ export default function MentorReviewCenterPage() {
         <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.16em] text-[#cde2f2]/65">
           Your Pastors
         </p>
-
+<div className="relative mb-4">
+  <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-xs text-[#8ec5eb]" />
+  <input
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+    placeholder="Search pastor by name..."
+    className="w-full rounded-2xl border border-white/15 bg-white/[0.06] py-3 pl-9 pr-3 text-sm font-medium text-white outline-none placeholder:text-[#cde2f2]/45 focus:border-[#8ec5eb]/50 focus:bg-white/[0.08]"
+  />
+</div>
         {loading ? (
           <div className="flex justify-center py-14">
             <div className={mentorSpinner} />
           </div>
-        ) : mentees.length === 0 ? (
+        ) : filteredMentees.length === 0 ? (
           <div className={`p-6 text-center ${mentorGlassCardFrost}`}>
             <i className="fa-regular fa-user mb-3 text-3xl text-white/25" />
             <p className="text-sm font-semibold text-white">No assigned pastors</p>
@@ -96,7 +118,7 @@ export default function MentorReviewCenterPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {mentees.map((mentee) => {
+            {filteredMentees.map((mentee) => {
               const id = String(mentee._id ?? mentee.id ?? "");
               const name =
                 `${mentee.firstName ?? ""} ${mentee.lastName ?? ""}`.trim() ||

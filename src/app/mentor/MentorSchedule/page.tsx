@@ -164,6 +164,16 @@ function resolveOtherPerson(
   if (mentorObj && mentorObj._id !== mid && (mentorObj as any).id !== mid) return mentorObj;
   return undefined;
 }
+const getMeetingTitle = (appt: any) => {
+  return String(
+    appt?.title ||
+      appt?.meetingTitle ||
+      appt?.appointmentTitle ||
+      appt?.metadata?.title ||
+      appt?.meta?.title ||
+      ""
+  ).trim();
+};
 
 function MentorScheduleContent() {
   const searchParams = useSearchParams();
@@ -1220,7 +1230,12 @@ setMeetingDescription("");
                               </span>
                             ) : null}
                           </div>
-
+{getMeetingTitle(appt) ? (
+  <p className="mb-2 text-[12px] font-semibold text-white">
+    <span className="text-[#8ec5eb]">Meeting Title:</span>{" "}
+    {getMeetingTitle(appt)}
+  </p>
+) : null}
                           <p className="mb-2 text-[12px] text-[#cde2f2]">
                             Mode:{" "}
                             <span className="font-semibold text-[#8ec5eb]">{appt.platform}</span>
@@ -1393,6 +1408,12 @@ setMeetingDescription("");
                               </span>
                             ) : null}
                           </div>
+                          {getMeetingTitle(appt) ? (
+  <p className="mb-2 text-[12px] font-semibold text-white">
+    <span className="text-[#8ec5eb]">Meeting Title:</span>{" "}
+    {getMeetingTitle(appt)}
+  </p>
+) : null}
                           <p className="mb-2 text-[12px] text-[#cde2f2]">Mode: <span className="font-semibold text-[#8ec5eb]">{appt.platform}</span></p>
                           <button
                             type="button"
