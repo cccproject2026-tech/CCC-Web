@@ -13,7 +13,11 @@ import {
 } from "../directorUi";
 import { DirectorFilterSection } from "../ui";
 import SearchBar from "@/app/Components/SearchBar";
-import { apiGetAllInterests } from "@/app/Services/interests.service";
+// import { apiGetAllInterests } from "@/app/Services/interests.service";
+import {
+  apiDeleteInterestById,
+  apiGetAllInterests,
+} from "@/app/Services/interests.service";
 import { Interest, InterestStatus } from "@/app/Services/types";
 
 function normalizeInterestStatus(raw: unknown): InterestStatus {
@@ -81,6 +85,8 @@ export default function InterestReceivedPage() {
   const [loading, setLoading] = useState<boolean>(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [allInterests, setAllInterests] = useState<Interest[]>([]);
+  const [deleteInterestId, setDeleteInterestId] = useState<string | null>(null);
+const [isDeletingInterest, setIsDeletingInterest] = useState(false);
 
   /** Same approach as CCC-Director-Mobile: load full list once, then filter by tab/search/country client-side. */
   const groupedInterests = useMemo(() => {
@@ -233,6 +239,37 @@ export default function InterestReceivedPage() {
       setLoading(false);
     }
   }, []);
+//   const handleDeleteRejectedInterest = async (id: string) => {
+//   const ok = window.confirm("Remove this rejected interest from the list?");
+//   if (!ok) return;
+
+//   try {
+//     await apiDeleteInterestById(id);
+
+//     setAllInterests((prev) => prev.filter((item) => item._id !== id));
+//     setSelectedPastors((prev) => prev.filter((selectedId) => selectedId !== id));
+//   } catch (error) {
+//     console.error("Failed to delete interest", error);
+//     setFetchError(loadInterestsErrorMessage(error));
+//   }
+// };
+const handleDeleteRejectedInterest = async () => {
+  if (!deleteInterestId) return;
+
+  try {
+    setIsDeletingInterest(true);
+    await apiDeleteInterestById(deleteInterestId);
+
+    setAllInterests((prev) => prev.filter((item) => item._id !== deleteInterestId));
+    setSelectedPastors((prev) => prev.filter((selectedId) => selectedId !== deleteInterestId));
+    setDeleteInterestId(null);
+  } catch (error) {
+    console.error("Failed to delete interest", error);
+    setFetchError(loadInterestsErrorMessage(error));
+  } finally {
+    setIsDeletingInterest(false);
+  }
+};
 
   useEffect(() => {
     void loadInterests();
@@ -440,14 +477,7 @@ export default function InterestReceivedPage() {
 {activeTab === "rejected" && (
   <button
     type="button"
-    onClick={() => {
-      const ok = window.confirm("Remove this rejected interest from the list?");
-      if (!ok) return;
-
-      setAllInterests((prev) =>
-        prev.filter((item) => item._id !== rowId),
-      );
-    }}
+  onClick={() => setDeleteInterestId(rowId)}
     className="absolute right-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-xl border border-red-400/35 bg-red-500/10 text-red-100 transition hover:bg-red-500/20"
     aria-label="Remove rejected interest"
     title="Remove rejected interest"
@@ -551,6 +581,46 @@ export default function InterestReceivedPage() {
           )}
         </div>
       </section>
+      {deleteInterestId && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#021827]/75 px-4 backdrop-blur-sm">
+    <div className="w-full max-w-md rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.98)_0%,rgba(7,34,56,0.99)_100%)] p-6 text-white shadow-2xl">
+      <div className="mb-4 flex items-start gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-red-300/30 bg-red-500/15 text-red-200">
+          <i className="fa-solid fa-trash" />
+        </div>
+
+        <div>
+          <h3 className="text-lg font-bold text-white">
+            Remove rejected interest?
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-[#cde2f2]/75">
+            This will delete the rejected interest record from the list. This action cannot be undone.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6 flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={() => setDeleteInterestId(null)}
+          disabled={isDeletingInterest}
+          className="rounded-xl border border-white/15 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          onClick={() => void handleDeleteRejectedInterest()}
+          disabled={isDeletingInterest}
+          className="rounded-xl bg-red-500/85 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/40"
+        >
+          {isDeletingInterest ? "Removing..." : "Remove"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }

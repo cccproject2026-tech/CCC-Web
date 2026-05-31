@@ -489,7 +489,35 @@ const currentDate = new Date().toLocaleDateString("en-US", {
             </Link>
           </div>
         </section>
+        {/* Review Center */}
+        <section className="m-0">
+          <Link
+            href="/mentor/review-center"
+            prefetch
+            className={`flex flex-col gap-3 p-2.5 transition hover:bg-white/[0.08] sm:flex-row sm:items-center sm:justify-between sm:px-3 sm:py-2 ${mentorGlassCardFrost}`}
+          >
+            <div className="flex min-w-0 flex-1 items-start gap-2">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10">
+                <i className="fa-regular fa-clipboard text-xs text-[#8ec5eb]" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold tracking-tight text-white sm:text-base">
+                  Review Center
+                </h3>
+                <p className="mt-0.5 text-[10px] leading-snug text-white/55 sm:text-[11px]">
+                  Review pastor roadmaps, assessments, and submissions.
+                </p>
+              </div>
+            </div>
 
+            <span className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg border border-emerald-300/30 bg-emerald-400/15 px-3 py-1.5 text-[11px] font-bold text-emerald-100 sm:self-center">
+              <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-400 px-1.5 text-[10px] font-black text-[#062946]">
+                0
+              </span>
+              <i className="fa-solid fa-chevron-right text-[10px] text-emerald-100/80" />
+            </span>
+          </Link>
+        </section>
         {/* Quick Links — same card pattern as mobile (title row + four tiles); no extra subtitle */}
         <section className="m-0">
           <div className={`p-4 sm:p-5 ${mentorGlassCardFrost}`}>

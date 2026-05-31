@@ -6,7 +6,9 @@ import type {
   GetInterestsParams,
   DynamicField,
 } from "./types/interests.types";
-
+// delete api 
+export const apiDeleteInterestById = (id: string) =>
+  axiosInstance.delete(`/interests/by-id/${id}`);
 /**
  * POST /interests — public registration (no Bearer token).
  * Sending `Authorization` can make the API apply a different validation path and return 400.
