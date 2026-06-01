@@ -618,7 +618,7 @@ export default function IndividualProgressPage() {
                   className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {user?.fieldMentorInvitation
-                    ? "Invitation sent"
+                    ? " Field Mentor Invitation sent"
                     : isInvitingFieldMentor
                       ? "Sending invitation..."
                       : "Invite as Field Mentor"}
@@ -632,19 +632,30 @@ export default function IndividualProgressPage() {
                   className="rounded-lg border border-amber-300/40 bg-amber-400/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-400/25 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {user?.hasIssuedCertificate
-                    ? "Certificate issued"
+                    ? "Issue Certificate"
                     : isIssuingCertificate
                       ? "Issuing certificate..."
-                      : "Issue Certificate"}
+                      : "Issue Certificate First"}
                 </button>
               )}
-              <button
+              {/* <button
                 type="button"
                 onClick={() => setIsFinalCommentsModalOpen(true)}
                 className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
               >
                 {isCompleted ? "Send final comments" : "Add final comments"}
-              </button>
+              </button> */}
+              <button
+  type="button"
+  onClick={() => {
+    if (user?.hasCompleted) return;
+    setIsFinalCommentsModalOpen(true);
+  }}
+  disabled={Boolean(user?.hasCompleted)}
+  className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
+>
+  {user?.hasCompleted ? "Marked as completed" : hasComments ? "Send final comments" : "Add final comments"}
+</button>
             </div>
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div className={`p-6 sm:p-8 ${directorGlassCard}`}>

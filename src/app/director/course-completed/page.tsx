@@ -78,6 +78,9 @@ export default function CourseCompletedPage() {
               id: u.id ?? u._id,
               name: `${u.firstName} ${u.lastName}`,
               // img: u.profilePicture || [Mentor1, Mentor2, Mentor3][i % 3],
+              hasCompleted: Boolean(u.hasCompleted),
+hasIssuedCertificate: Boolean(u.hasIssuedCertificate),
+fieldMentorInvitation: u.fieldMentorInvitation,
               img:
   String(u.profilePicture || "").trim() ||
   getInitialsAvatar(`${u.firstName || ""} ${u.lastName || ""}`.trim(), "Pastor"),
@@ -102,13 +105,32 @@ export default function CourseCompletedPage() {
     fetchUsers();
   }, [query]);
 
+  // const data = useMemo(() => {
+  //   return users.filter(
+  //     (u) =>
+  //       u.status === activeTab &&
+  //       u.name.toLowerCase().includes(query.toLowerCase())
+  //   );
+  // }, [users, activeTab, query]);
   const data = useMemo(() => {
-    return users.filter(
-      (u) =>
-        u.status === activeTab &&
-        u.name.toLowerCase().includes(query.toLowerCase())
-    );
-  }, [users, activeTab, query]);
+  return users.filter((u: any) => {
+    const matchesSearch = u.name.toLowerCase().includes(query.toLowerCase());
+
+    if (activeTab === "completed") {
+      return matchesSearch && u.hasCompleted;
+    }
+
+    if (activeTab === "certificate_issued") {
+      return matchesSearch && u.hasIssuedCertificate;
+    }
+
+    if (activeTab === "invited") {
+      return matchesSearch && Boolean(u.fieldMentorInvitation);
+    }
+
+    return false;
+  });
+}, [users, activeTab, query]);
 
   const completedCount = users.filter(
     (u) => u.status === "completed"
@@ -364,10 +386,12 @@ export default function CourseCompletedPage() {
                 className="relative w-[120px] h-[120px] overflow-hidden rounded-xl bg-gray-100 flex-shrink-0 cursor-pointer"
               >
                 <Image
-                  src={p.img}
-                  alt={p.name}
-                  className="w-full h-full object-cover"
-                />
+  src={p.img}
+  alt={p.name}
+  width={120}
+  height={120}
+  className="h-full w-full object-cover"
+/>
                 {p.isNew && (
                   <span className="absolute top-2 left-2 px-2.5 py-1 bg-yellow-400 text-gray-900 rounded-md text-[11px] font-bold shadow-sm">
                     New
@@ -436,29 +460,48 @@ export default function CourseCompletedPage() {
               {/* Action Button */}
               <div className="self-end flex-shrink-0">
                 {activeTab === "completed" && (
-                  <button
-                    onClick={() => handleIssueCertificate(p.id)}
-                    className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:bg-[#8ec5eb]/30"
-                  >
-                    Issue Certificate
-                  </button>
+                <Link
+  href={`/director/mentees/profile/${p.id}`}
+  className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:bg-[#8ec5eb]/30"
+>
+  Issue Certificate
+</Link>
                 )}
-                {activeTab === "certificate_issued" && (
-                  <button
-                    onClick={() => handleInvite(p.id)}
-                    className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:bg-[#8ec5eb]/30"
-                  >
-                    Invite as Field Mentor
-                  </button>
-                )}
-                {activeTab === "invited" && (
+              {activeTab === "certificate_issued" && (
+  p.fieldMentorInvitation ? (
+    <button
+      type="button"
+      disabled
+      className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2.5 text-[13px] font-semibold text-white opacity-50 cursor-not-allowed"
+    >
+      Invitation sent
+    </button>
+  ) : (
+    <Link
+      href={`/director/mentees/profile/${p.id}`}
+      className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:bg-[#8ec5eb]/30"
+    >
+      Invite as Field Mentor
+    </Link>
+  )
+)}
+                {/* {activeTab === "invited" && (
                   <button
                     type="button"
                     className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:bg-[#8ec5eb]/30"
                   >
                     Invite as Field Mentor
                   </button>
-                )}
+                )} */}
+                {activeTab === "invited" && (
+  <button
+    type="button"
+    disabled
+    className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2.5 text-[13px] font-semibold text-white opacity-50 cursor-not-allowed"
+  >
+    Invitation sent
+  </button>
+)}
               </div>
             </div>
           ))}

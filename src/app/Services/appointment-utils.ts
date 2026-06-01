@@ -51,6 +51,7 @@ export function unwrapAppointmentsAxiosData(res: { data?: unknown } | null | und
 
 /** GET monthly availability — same unwrap as CMA scheduling (multiple API envelope shapes). */
 export function unwrapMonthlyAvailabilityPayload(availRes: { data?: unknown }): any[] {
+  if (Array.isArray(availRes?.data)) return availRes.data;
   const body = availRes?.data as Record<string, unknown> | undefined;
   if (!body) return [];
   const inner = body.data;
@@ -171,13 +172,13 @@ export function extractApiErrorMessage(err: unknown): string {
 
 export function parseSlotStartToIso(yyyyMmDd: string, slotLabel: string): string {
   const first = slotLabel.replace(/\u2013/g, "-").split("-")[0]?.trim() ?? "";
-  const match = first.match(/^(\d{1,2}):(\d{2})\s*(am|pm)/i);
+  const match = first.match(/^(\d{1,2}):(\d{2})(?:\s*(am|pm))?/i);
   if (!match) {
     return new Date(`${yyyyMmDd}T12:00:00`).toISOString();
   }
   let h = parseInt(match[1], 10);
   const min = match[2];
-  const ap = match[3].toUpperCase();
+  const ap = String(match[3] ?? "").toUpperCase();
   if (ap === "PM" && h !== 12) h += 12;
   if (ap === "AM" && h === 12) h = 0;
   const d = new Date(`${yyyyMmDd}T${String(h).padStart(2, "0")}:${min}:00`);

@@ -869,16 +869,21 @@ const handleListMentees = useCallback((mentor: Mentor) => {
             throw new Error("No mentor");
           }
           try {
-            const meetingDate = parseSlotStartToIso(
-              data.dateYmd,
-              data.timeSlot.replace(/\u2013/g, "-")
-            );
             await apiCreateAppointment({
               userId: directorId,
               mentorId: selectedMentor.id,
-              meetingDate,
+              meetingDate: parseSlotStartToIso(
+                data.dateYmd,
+                data.timeSlot.replace(/\u2013/g, "-")
+              ),
               platform: uiMeetingModeToPlatform(data.meetingOption),
-              notes: data.notes || "Scheduled from Director Mentors",
+              title: data.title,
+              description: data.description,
+              notes: data.description || "Scheduled from Director Mentors",
+              googleCalendarSync: true,
+              googleCalendarTitle: data.title,
+              googleCalendarDescription:
+                data.description || "Scheduled from Director Mentors",
             });
             setToast({ message: "Meeting scheduled successfully", type: "success" });
             setTimeout(() => setToast(null), 3000);

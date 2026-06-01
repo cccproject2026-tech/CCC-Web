@@ -1,14 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Image, { type StaticImageData } from "next/image";
-import { isRemoteImageSrc } from "@/app/utils/image";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { StaticImageData } from "next/image";
+import AvailabilityCalendar from "@/app/Components/AvailabilityCalendar";
+import {
+  apiGetMentorAppointments,
+  apiGetMonthlyAvailability,
+} from "@/app/Services/appointments.service";
+import {
+  formatAvailabilitySlotLabel,
+  meetingDateLocalYmd,
+  parseSlotStartToIso,
+  slotDateToYmd,
+  unwrapAppointmentsAxiosData,
+  unwrapMonthlyAvailabilityPayload,
+} from "@/app/Services/appointment-utils";
+import { filterSlotsAfter2Hours } from "@/app/Services/utils/helpers";
 
 export type ScheduleMeetingFormData = {
   dateYmd: string;
   timeSlot: string;
   meetingOption: string;
-  notes: string;
+  title: string;
+  description: string;
 };
 
 interface ScheduleMeetingModalProps {
@@ -23,47 +37,8 @@ interface ScheduleMeetingModalProps {
   } | null;
 }
 
-const TIME_SLOTS = [
-  "09:00 am - 10:00 am",
-  "11:00 am - 12:00 pm",
-  "01:00 pm - 02:00 pm",
-  "03:00 pm - 04:00 pm",
-  "05:00 pm - 06:00 pm",
-];
-
-/** Labels mapped by parent via `uiMeetingModeToPlatform` */
-const MEETING_OPTIONS = [
-  "Video Call",
-  "Phone Call",
-  "In-Person Meeting",
-  "Conference Room",
-];
-
-function pad2(n: number) {
-  return String(n).padStart(2, "0");
-}
-
-function toYmd(year: number, monthIndex0: number, day: number) {
-  return `${year}-${pad2(monthIndex0 + 1)}-${pad2(day)}`;
-}
-
-function generateCalendarDates(year: number, monthIndex0: number) {
-  const firstDay = new Date(year, monthIndex0, 1);
-  const lastDay = new Date(year, monthIndex0 + 1, 0);
-  const daysInMonth = lastDay.getDate();
-  const startingDayOfWeek = firstDay.getDay();
-  const dates: (number | null)[] = [];
-  for (let i = 0; i < startingDayOfWeek; i++) dates.push(null);
-  for (let day = 1; day <= daysInMonth; day++) dates.push(day);
-  return dates;
-}
-
-function isPastDay(year: number, monthIndex0: number, day: number): boolean {
-  const candidate = new Date(year, monthIndex0, day);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  candidate.setHours(0, 0, 0, 0);
-  return candidate < today;
+function selectedDateYmd(year: number, monthIndex0: number, day: number) {
+  return `${year}-${String(monthIndex0 + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
 export default function ScheduleMeetingModal({
@@ -72,74 +47,166 @@ export default function ScheduleMeetingModal({
   onConfirm,
   mentor,
 }: ScheduleMeetingModalProps) {
-  const [viewMonth, setViewMonth] = useState(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1);
-  });
-  const [selectedDateYmd, setSelectedDateYmd] = useState<string>("");
-  const [selectedTime, setSelectedTime] = useState<string>("");
-  const [meetingOption, setMeetingOption] = useState<string>("");
-  const [notes, setNotes] = useState<string>("");
+  const today = new Date();
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
+  const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const [selectedDate, setSelectedDate] = useState(today.getDate());
+  const [selectedTime, setSelectedTime] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [monthlySlots, setMonthlySlots] = useState<any[]>([]);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
-  ];
-
-  const y = viewMonth.getFullYear();
-  const m = viewMonth.getMonth();
-  const calendarDates = generateCalendarDates(y, m);
+  const mentorId = String(mentor?.id ?? "").trim();
+  const dateYmd = selectedDateYmd(currentYear, currentMonth, selectedDate);
 
   const resetForm = useCallback(() => {
-    setSelectedDateYmd("");
+    const now = new Date();
+    setCurrentMonth(now.getMonth());
+    setCurrentYear(now.getFullYear());
+    setSelectedDate(now.getDate());
     setSelectedTime("");
-    setMeetingOption("");
-    setNotes("");
+    setTitle("");
+    setDescription("");
+    setMonthlySlots([]);
+    setAppointments([]);
     setFormError(null);
-    const d = new Date();
-    setViewMonth(new Date(d.getFullYear(), d.getMonth(), 1));
   }, []);
 
   useEffect(() => {
-    if (isOpen) {
-      resetForm();
+    if (isOpen) resetForm();
+  }, [isOpen, resetForm, mentorId]);
+
+  useEffect(() => {
+    if (!isOpen || !mentorId) return;
+
+    let cancelled = false;
+
+    async function loadAvailability() {
+      setIsLoading(true);
+      try {
+        const [availabilityResult, appointmentsResult] = await Promise.allSettled([
+          apiGetMonthlyAvailability(mentorId, {
+            year: currentYear,
+            month: currentMonth + 1,
+          }),
+          apiGetMentorAppointments(mentorId),
+        ]);
+
+        if (cancelled) return;
+
+        setMonthlySlots(
+          availabilityResult.status === "fulfilled"
+            ? unwrapMonthlyAvailabilityPayload(availabilityResult.value)
+            : [],
+        );
+        setAppointments(
+          appointmentsResult.status === "fulfilled"
+            ? unwrapAppointmentsAxiosData(appointmentsResult.value)
+            : [],
+        );
+        if (availabilityResult.status === "rejected") {
+          setFormError("Unable to load mentor availability. Please try again.");
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
     }
-  }, [isOpen, resetForm]);
 
-  const goPrevMonth = () => {
-    setViewMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-  };
-  const goNextMonth = () => {
-    setViewMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    void loadAvailability();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, mentorId, currentMonth, currentYear]);
+
+  const availableTimes = useMemo(() => {
+    const dateSlot = monthlySlots.find((slot: any) => {
+      const ymd = slotDateToYmd(
+        slot?.date ?? slot?.day ?? slot?.calendarDate ?? slot?.meetingDate ?? slot?.dateString,
+      );
+      return ymd === dateYmd;
+    });
+
+    let times: string[] =
+      dateSlot?.slots?.map((slot: any) => formatAvailabilitySlotLabel(slot)).filter(Boolean) ?? [];
+    times = filterSlotsAfter2Hours(times, dateYmd);
+
+    const bookedStarts = appointments
+      .filter((appointment: any) => {
+        const status = String(appointment?.status ?? "").toLowerCase();
+        return (
+          !status.includes("cancel") &&
+          status !== "missed" &&
+          meetingDateLocalYmd(appointment?.meetingDate) === dateYmd
+        );
+      })
+      .map((appointment: any) => new Date(appointment.meetingDate).getTime())
+      .filter((timestamp: number) => !Number.isNaN(timestamp));
+
+    return times.filter((slot: string) => {
+      const slotStart = new Date(parseSlotStartToIso(dateYmd, slot)).getTime();
+      return !bookedStarts.some(
+        (bookedStart: number) => Math.abs(bookedStart - slotStart) < 30 * 60 * 1000,
+      );
+    });
+  }, [appointments, dateYmd, monthlySlots]);
+
+  const selectedDateHasRawAvailability = useMemo(
+    () =>
+      monthlySlots.some((slot: any) => {
+        const ymd = slotDateToYmd(
+          slot?.date ?? slot?.day ?? slot?.calendarDate ?? slot?.meetingDate ?? slot?.dateString,
+        );
+        return ymd === dateYmd && Array.isArray(slot?.slots) && slot.slots.length > 0;
+      }),
+    [dateYmd, monthlySlots],
+  );
+
+  useEffect(() => {
+    setSelectedTime("");
+  }, [dateYmd]);
+
+  const handlePrevMonth = () => {
+    const previous = new Date(currentYear, currentMonth - 1, 1);
+    setCurrentYear(previous.getFullYear());
+    setCurrentMonth(previous.getMonth());
+    setSelectedDate(1);
   };
 
-  const pickDay = (day: number | null) => {
-    if (day == null) return;
-    if (isPastDay(y, m, day)) return;
-    setSelectedDateYmd(toYmd(y, m, day));
-    setFormError(null);
+  const handleNextMonth = () => {
+    const next = new Date(currentYear, currentMonth + 1, 1);
+    setCurrentYear(next.getFullYear());
+    setCurrentMonth(next.getMonth());
+    setSelectedDate(1);
   };
 
   const handleSchedule = async () => {
-    if (!mentor) return;
-    if (!selectedDateYmd || !selectedTime || !meetingOption) {
-      setFormError("Please select a date, time, and meeting type.");
+    if (!selectedTime) {
+      setFormError("Please select an available time.");
       return;
     }
+    if (!title.trim()) {
+      setFormError("Please enter a meeting title.");
+      return;
+    }
+
     setIsSubmitting(true);
     setFormError(null);
     try {
       await onConfirm({
-        dateYmd: selectedDateYmd,
+        dateYmd,
         timeSlot: selectedTime,
-        meetingOption,
-        notes: notes.trim(),
+        meetingOption: "Zoom",
+        title: title.trim(),
+        description: description.trim(),
       });
       onClose();
     } catch {
-      // Parent toasts; keep modal open
+      // Parent displays the API error toast; keep the drawer open.
     } finally {
       setIsSubmitting(false);
     }
@@ -148,194 +215,140 @@ export default function ScheduleMeetingModal({
   if (!isOpen || !mentor) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex justify-end bg-black/50">
-      <div className="h-full w-full overflow-y-auto bg-white shadow-2xl animate-slide-left sm:w-[520px] md:w-[560px]">
-        <div className="flex items-center justify-between border-b border-gray-200 p-6">
-          <h2 className="text-[24px] font-bold text-gray-900">Schedule a Meeting</h2>
+    <div className="fixed inset-0 z-[100] flex">
+      <button
+        type="button"
+        className="absolute inset-0 bg-[#041f35]/70 backdrop-blur-sm"
+        onClick={onClose}
+        aria-label="Close schedule meeting drawer"
+      />
+
+      <div className="relative ml-auto flex h-full w-full max-w-[460px] flex-col border-l border-[#8ec5eb]/30 bg-[linear-gradient(180deg,rgba(10,52,88,0.97)_0%,rgba(4,28,48,0.99)_100%)] text-white shadow-[-20px_0_48px_rgba(2,12,28,0.65)]">
+        <div className="flex items-start justify-between gap-3 border-b border-white/15 px-6 py-5">
+          <div>
+            <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-[#8ec5eb]/90">
+              Schedule meeting
+            </p>
+            <h2 className="flex items-center gap-2 text-lg font-semibold text-white">
+              <i className="fa-regular fa-calendar text-[#8ec5eb]" />
+              {mentor.name}
+            </h2>
+            <p className="mt-1 text-xs text-[#cde2f2]/90">
+              Pick an available date and time for your Zoom meeting.
+            </p>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-100 transition-all hover:bg-gray-200"
+            className="shrink-0 rounded-lg p-2 text-[#d9ebf8] transition hover:bg-white/10 hover:text-white"
             aria-label="Close"
           >
-            <i className="fa-solid fa-xmark text-gray-600" />
+            <i className="fa-solid fa-xmark text-lg" />
           </button>
         </div>
 
-        <div className="p-6">
-          <div className="mb-6 text-center">
-            <div className="relative mx-auto mb-4 h-28 w-28 overflow-hidden rounded-full bg-gray-100">
-              <Image
-                src={mentor.img}
-                alt={mentor.name}
-                fill
-                className="object-cover"
-                unoptimized={
-                  typeof mentor.img === "string" && isRemoteImageSrc(mentor.img)
-                }
-                sizes="112px"
-              />
-            </div>
-            <h3 className="mb-2 text-[20px] font-bold text-gray-900">{mentor.name}</h3>
-            <div className="mb-4 flex items-center justify-center gap-2">
-              <span className="text-gray-600">Mentor</span>
-              <span className="rounded-full bg-green-100 px-3 py-1 text-[12px] font-semibold text-green-800">
-                {mentor.menteeCount} Mentees
-              </span>
-            </div>
-            <div className="mb-4 flex items-center justify-center gap-4 text-[18px] text-[#2E3B8E]">
-              <i className="fa-regular fa-envelope" aria-hidden />
-              <i className="fa-regular fa-comment" aria-hidden />
-              <i className="fa-brands fa-whatsapp" aria-hidden />
-              <i className="fa-solid fa-phone" aria-hidden />
-            </div>
-          </div>
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+          <label className="mb-1.5 block text-xs font-medium text-[#d9ebf8]">
+            Mentor Availability
+          </label>
+          <AvailabilityCalendar
+            mentorId={mentorId}
+            currentMonth={currentMonth}
+            currentYear={currentYear}
+            selectedDate={selectedDate}
+            onDateSelect={(day) => {
+              setSelectedDate(day);
+              setFormError(null);
+            }}
+            onPrevMonth={handlePrevMonth}
+            onNextMonth={handleNextMonth}
+            availabilitySlots={monthlySlots}
+            isLoading={isLoading}
+          />
 
-          <div className="mb-6">
-            <h4 className="mb-3 text-[16px] font-semibold text-gray-900">
-              Profile Information
-            </h4>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add notes for this meeting…"
-              className="h-28 w-full resize-none rounded-lg border border-gray-300 px-4 py-3 text-[14px] text-black placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div className="mb-6">
-            <h4 className="mb-4 flex items-center gap-2 text-[16px] font-semibold text-gray-900">
-              <i className="fa-regular fa-calendar text-[#2E3B8E]" />
-              Schedule a Meeting
-            </h4>
-
-            <div className="mb-6">
-              <h5 className="mb-3 text-[14px] font-semibold text-gray-700">
-                Select Available Date
-              </h5>
-              <div className="rounded-xl bg-gradient-to-b from-[#294597] to-[#0f356e] p-4 text-white">
-                <div className="mb-4 flex items-center justify-between">
-                  <button
-                    type="button"
-                    onClick={goPrevMonth}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/30 bg-white/10 transition-all hover:bg-white/20"
-                    aria-label="Previous month"
-                  >
-                    <i className="fa-solid fa-chevron-left text-white" />
-                  </button>
-                  <h6 className="text-[16px] font-semibold">
-                    {monthNames[m]} {y}
-                  </h6>
-                  <button
-                    type="button"
-                    onClick={goNextMonth}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/30 bg-white/10 transition-all hover:bg-white/20"
-                    aria-label="Next month"
-                  >
-                    <i className="fa-solid fa-chevron-right text-white" />
-                  </button>
-                </div>
-
-                <div className="mb-2 grid grid-cols-7 gap-1">
-                  {["S", "M", "T", "W", "T", "F", "S"].map((day, i) => (
-                    <div
-                      key={`${day}-${i}`}
-                      className="py-2 text-center text-[12px] font-semibold text-white/70"
-                    >
-                      {day}
-                    </div>
-                  ))}
-                </div>
-
-                <div className="grid grid-cols-7 gap-1">
-                  {calendarDates.map((date, index) => {
-                    const ymd = date != null ? toYmd(y, m, date) : "";
-                    const past = date != null && isPastDay(y, m, date);
-                    return (
-                      <button
-                        key={index}
-                        type="button"
-                        onClick={() => pickDay(date)}
-                        disabled={!date}
-                        className={`h-8 w-8 text-[12px] font-medium transition-all ${
-                          !date
-                            ? "invisible"
-                            : past
-                              ? "cursor-not-allowed text-white/25"
-                              : selectedDateYmd === ymd
-                                ? "rounded-lg bg-white text-[#2E3B8E]"
-                                : "rounded-lg text-white hover:bg-white/10"
-                        }`}
-                      >
-                        {date}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <h5 className="mb-3 text-[14px] font-semibold text-gray-700">Select a Time</h5>
-              <div className="grid grid-cols-2 gap-2">
-                {TIME_SLOTS.map((time) => (
-                  <button
-                    key={time}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTime(time);
-                      setFormError(null);
-                    }}
-                    className={`rounded-lg border px-3 py-2 text-[13px] font-medium transition-all ${
-                      selectedTime === time
-                        ? "border-[#2E3B8E] bg-[#2E3B8E] text-white"
-                        : "border-[#2E3B8E]/30 bg-white text-[#2E3B8E] hover:bg-[#f7f9ff]"
-                    }`}
-                  >
-                    {time}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <h5 className="mb-3 text-[14px] font-semibold text-gray-700">
-                Preferred Meeting Option
-              </h5>
-              <div className="relative">
-                <select
-                  value={meetingOption}
-                  onChange={(e) => {
-                    setMeetingOption(e.target.value);
+          <label className="mb-1.5 mt-6 block text-xs font-medium text-[#d9ebf8]">
+            Select a time
+          </label>
+          {isLoading ? (
+            <p className="mb-4 text-xs text-[#cde2f2]/85">Loading available times...</p>
+          ) : availableTimes.length === 0 ? (
+            <p className="mb-4 text-xs text-[#cde2f2]/85">
+              {selectedDateHasRawAvailability ? (
+                <>
+                  No bookable slots on this date.
+                  <br />
+                  This date has mentor availability, but no slots are currently eligible for booking
+                  due to scheduling rules. Please choose another date.
+                </>
+              ) : (
+                "No open slots on this date. Please try another day."
+              )}
+            </p>
+          ) : (
+            <div className="mb-5 grid grid-cols-2 gap-2 sm:gap-3">
+              {availableTimes.map((time) => (
+                <button
+                  key={time}
+                  type="button"
+                  onClick={() => {
+                    setSelectedTime(time);
                     setFormError(null);
                   }}
-                  className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-4 py-3 text-[14px] text-black focus:outline-none focus:ring-2 focus:ring-[#2E3B8E]"
+                  className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
+                    selectedTime === time
+                      ? "border-[#8ec5eb] bg-[#8ec5eb]/25 text-white"
+                      : "border-[#8ec5eb]/30 bg-[#8ec5eb]/10 text-white hover:bg-[#8ec5eb]/20"
+                  }`}
                 >
-                  <option value="">Select meeting option</option>
-                  {MEETING_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-                <i className="fa-solid fa-chevron-down pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400" />
-              </div>
+                  {time}
+                </button>
+              ))}
             </div>
+          )}
+
+          <label className="mb-1.5 block text-xs font-medium text-[#d9ebf8]">Platform</label>
+          <div className="mb-5 rounded-xl border border-white/20 bg-[#062946] px-3 py-2 text-sm text-white">
+            Zoom
           </div>
+
+          <label htmlFor="meeting-title" className="mb-1.5 block text-xs font-medium text-[#d9ebf8]">
+            Meeting Title <span className="text-[#8ec5eb]">*</span>
+          </label>
+          <input
+            id="meeting-title"
+            value={title}
+            onChange={(event) => {
+              setTitle(event.target.value);
+              setFormError(null);
+            }}
+            placeholder="Enter meeting title"
+            className="mb-5 w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-[#cde2f2]/60 focus:border-[#8ec5eb]/60"
+          />
+
+          <label htmlFor="meeting-description" className="mb-1.5 block text-xs font-medium text-[#d9ebf8]">
+            Meeting Description
+          </label>
+          <textarea
+            id="meeting-description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Add an optional description"
+            className="h-24 w-full resize-none rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-[#cde2f2]/60 focus:border-[#8ec5eb]/60"
+          />
+
+          {formError ? (
+            <p className="mt-4 text-sm font-medium text-[#f7c4c4]" role="alert">
+              {formError}
+            </p>
+          ) : null}
         </div>
 
-        {formError ? (
-          <p className="px-6 pb-2 text-sm font-medium text-red-600" role="alert">
-            {formError}
-          </p>
-        ) : null}
-
-        <div className="flex items-center justify-end gap-3 border-t border-gray-200 p-6">
+        <div className="flex justify-between gap-3 border-t border-white/15 px-6 py-4">
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="rounded-lg border border-[#2E3B8E] px-6 py-3 text-[14px] font-semibold text-[#2E3B8E] transition-all hover:bg-[#F2F5FF] disabled:opacity-50"
+            className="text-sm font-medium text-[#8ec5eb] transition hover:text-white disabled:opacity-60"
           >
             Cancel
           </button>
@@ -343,9 +356,9 @@ export default function ScheduleMeetingModal({
             type="button"
             onClick={() => void handleSchedule()}
             disabled={isSubmitting}
-            className="rounded-lg bg-[#2E3B8E] px-6 py-3 text-[14px] font-semibold text-white shadow-md transition-all hover:bg-[#243a8a] disabled:opacity-60"
+            className="rounded-lg bg-white px-5 py-2 text-sm font-semibold text-[#0f4a76] transition hover:bg-[#e7f1fa] disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {isSubmitting ? "Scheduling…" : "Schedule"}
+            {isSubmitting ? "Scheduling..." : "Schedule"}
           </button>
         </div>
       </div>

@@ -66,12 +66,19 @@ export const getMentorFromCookie = () => {
 
 export const filterSlotsAfter2Hours = (slots: string[], selectedDateISO: string) => {
     const now = new Date();
+    const [year, month, day] = selectedDateISO.split("-").map(Number);
 
     return slots.filter((slot) => {
         try {
-            const startTime = slot.split("–")[0].trim();
-
-            const slotDateTime = new Date(`${selectedDateISO} ${startTime}`);
+            const match = slot.trim().match(/^(\d{1,2}):(\d{2})(?:\s*(am|pm))?/i);
+            if (!match || !year || !month || !day) return false;
+            let hour = Number(match[1]);
+            const minute = Number(match[2]);
+            const period = String(match[3] ?? "").toLowerCase();
+            if (hour > 23 || minute > 59) return false;
+            if (period === "pm" && hour !== 12) hour += 12;
+            if (period === "am" && hour === 12) hour = 0;
+            const slotDateTime = new Date(year, month - 1, day, hour, minute);
 
             const minAllowedTime = new Date(now.getTime() + 2 * 60 * 60 * 1000);
 

@@ -71,6 +71,8 @@ export default function PastorAppointmentsPage() {
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState(today.getDate());
   const [menuOpenId, setMenuOpenId] = useState(null);
+//   const menuRef = useRef<HTMLDivElement | null>(null);
+// const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const [showReschedule, setShowReschedule] = useState(false);
   const [appointmentToEdit, setAppointmentToEdit] = useState(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -295,6 +297,11 @@ const [scheduleDescription, setScheduleDescription] = useState("");
       hour12: true,
     });
   };
+  const getInitials = (firstName?: string, lastName?: string, fallback = "U") => {
+  const first = String(firstName || "").trim()[0] || "";
+  const last = String(lastName || "").trim()[0] || "";
+  return (first + last || fallback).toUpperCase();
+};
   const getMeetingTitle = (appt: any) => {
   return String(
     appt?.title ||
@@ -465,8 +472,25 @@ const [scheduleDescription, setScheduleDescription] = useState("");
 
   const handleSchedule = async () => {
     if (isScheduling) return;
-    const title = scheduleTitle.trim();
+//     const title = scheduleTitle.trim();
+// const description = scheduleDescription.trim();
+
+// if (!title) {
+//   showToast("Please enter a meeting title.");
+//   return;
+// }
+const title = scheduleTitle.trim();
 const description = scheduleDescription.trim();
+
+if (availableTimesForBooking.length === 0) {
+  showToast("No available slots for this date. Please choose another date.");
+  return;
+}
+
+if (!selectedTime) {
+  showToast("Please select a time.");
+  return;
+}
 
 if (!title) {
   showToast("Please enter a meeting title.");
@@ -478,10 +502,10 @@ if (!title) {
       return;
     }
 
-    if (!selectedTime) {
-      showToast("Please select a time");
-      return;
-    }
+    // if (!selectedTime) {
+    //   showToast("Please select a time");
+    //   return;
+    // }
 
     const userId = getPastorUserId();
     if (!userId) {
@@ -664,10 +688,18 @@ setScheduleDescription("");
 
   const selectedCalendarYmd = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}`;
   const todayYmd = new Date().toLocaleDateString("en-CA");
+  // const filteredAppointmentsForSelectedDate = (appointments as Record<string, unknown>[]).filter((a) => {
+  //   if (!a?.meetingDate) return false;
+  //   return meetingDateLocalYmd(String(a.meetingDate)) === selectedCalendarYmd;
+  // });
   const filteredAppointmentsForSelectedDate = (appointments as Record<string, unknown>[]).filter((a) => {
-    if (!a?.meetingDate) return false;
-    return meetingDateLocalYmd(String(a.meetingDate)) === selectedCalendarYmd;
-  });
+  if (!a?.meetingDate) return false;
+
+  const status = String((a as any)?.status ?? "").toLowerCase();
+  if (status.includes("cancel")) return false;
+
+  return meetingDateLocalYmd(String(a.meetingDate)) === selectedCalendarYmd;
+});
 
   /** Next appointments tab: only meetings from now through end of the 7th calendar day (weekly window). */
   const filteredUpcoming = useMemo(() => {
@@ -676,12 +708,23 @@ setScheduleDescription("");
     weekEnd.setDate(weekEnd.getDate() + 7);
     weekEnd.setHours(23, 59, 59, 999);
     const weekEndMs = weekEnd.getTime();
+    // return (upcomingAppointments as Record<string, unknown>[]).filter((a) => {
+    //   if (!a?.meetingDate) return false;
+    //   const t = new Date(String(a.meetingDate)).getTime();
+    //   if (Number.isNaN(t)) return false;
+    //   return t >= nowMs - 60_000 && t <= weekEndMs;
+    // });
     return (upcomingAppointments as Record<string, unknown>[]).filter((a) => {
-      if (!a?.meetingDate) return false;
-      const t = new Date(String(a.meetingDate)).getTime();
-      if (Number.isNaN(t)) return false;
-      return t >= nowMs - 60_000 && t <= weekEndMs;
-    });
+  if (!a?.meetingDate) return false;
+
+  const status = String((a as any)?.status ?? "").toLowerCase();
+  if (status.includes("cancel")) return false;
+
+  const t = new Date(String(a.meetingDate)).getTime();
+  if (Number.isNaN(t)) return false;
+
+  return t >= nowMs - 60_000 && t <= weekEndMs;
+});
   }, [upcomingAppointments]);
 
   const filteredHistory = useMemo(() => {
@@ -726,11 +769,27 @@ setScheduleDescription("");
     }
   };
 
+const selectedDateHasRawAvailability = useMemo(() => {
+  const selectedYmd = new Date(
+    currentYear,
+    currentMonth,
+    selectedDate
+  ).toLocaleDateString("en-CA");
 
+  const daySlot = monthlyAvailabilitySlots.find((slot: any) => {
+    const ymd = slotDateToYmd(
+      slot?.date ?? slot?.day ?? slot?.calendarDate ?? slot?.meetingDate ?? slot?.dateString
+    );
+
+    return ymd === selectedYmd;
+  });
+
+  return Array.isArray(daySlot?.slots) && daySlot.slots.length > 0;
+}, [monthlyAvailabilitySlots, currentYear, currentMonth, selectedDate]);
 
 
   return (
-    <div className={pastorPageRoot}>
+    <div className={pastorPageRoot} onClick={() => setMenuOpenId(null)}>
       <PastorHeader showFullHeader={true} />
 
       <section
@@ -897,13 +956,26 @@ setScheduleDescription("");
 
                         {/* Mentor Row */}
                         <div className="flex items-center gap-3 mb-2">
-                          <Image
+                          {/* <Image
                             src={mentor?.profilePicture || UserProfile}
                             width={32}
                             height={32}
                             alt="mentor"
                             className="rounded-full"
-                          />
+                          /> */}
+                          {mentor?.profilePicture ? (
+  <Image
+    src={mentor.profilePicture}
+    width={32}
+    height={32}
+    alt="mentor"
+    className="h-8 w-8 rounded-full object-cover"
+  />
+) : (
+  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-[#173653] text-xs font-bold text-white">
+    {getInitials(mentor?.firstName, mentor?.lastName)}
+  </div>
+)}
                           <div>
                             <h4 className="text-sm font-semibold text-white">
                               {mentor?.firstName} {mentor?.lastName}
@@ -938,27 +1010,56 @@ setScheduleDescription("");
 
                         {/* Actions row */}
                         <div className="flex items-center">
-                          <div className="flex gap-4 text-sm text-[#8ec5eb]">
+                          {/* <div className="flex gap-4 text-sm text-[#8ec5eb]">
                             <a href={(appt.mentor as any)?.phoneNumber ? `tel:${(appt.mentor as any).phoneNumber}` : undefined} aria-label="Call mentor" className="hover:text-white transition"><i className="fa-solid fa-phone" /></a>
                             <a href={(appt.mentor as any)?.phoneNumber ? `sms:${(appt.mentor as any).phoneNumber}` : undefined} aria-label="Text mentor" className="hover:text-white transition"><i className="fa-regular fa-comment" /></a>
                             <a href={(appt.mentor as any)?.phoneNumber ? `https://wa.me/${String((appt.mentor as any).phoneNumber).replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-label="WhatsApp mentor" className="hover:text-white transition"><i className="fa-brands fa-whatsapp" /></a>
-                          </div>
+                          </div> */}
+                          <div className="flex gap-4 text-sm text-[#8ec5eb]">
+  <a
+    href={(appt.mentor as any)?.email ? `mailto:${(appt.mentor as any).email}` : undefined}
+    aria-label="Email mentor"
+    className="transition hover:text-white"
+  >
+    <i className="fa-regular fa-envelope" />
+  </a>
+
+  <button type="button" disabled className="cursor-not-allowed opacity-40">
+    <i className="fa-solid fa-phone" />
+  </button>
+
+  <button type="button" disabled className="cursor-not-allowed opacity-40">
+    <i className="fa-regular fa-comment" />
+  </button>
+
+  <button type="button" disabled className="cursor-not-allowed opacity-40">
+    <i className="fa-brands fa-whatsapp" />
+  </button>
+</div>
                         </div>
                       </div>
 
                       {/* 3 DOT MENU */}
                       <div className="absolute top-3 right-3">
                         <button
-                          onClick={() =>
-                            setMenuOpenId(menuOpenId === appointmentEntityId(appt) ? null : appointmentEntityId(appt))
-                          }
+  onClick={(e) => {
+    e.stopPropagation();
+    setMenuOpenId(
+      menuOpenId === appointmentEntityId(appt)
+        ? null
+        : appointmentEntityId(appt),
+    );
+  }}
                           className="text-[#d9ebf8] hover:text-white"
                         >
                           <i className="fa-solid fa-ellipsis-vertical"></i>
                         </button>
 
                         {menuOpenId === appointmentEntityId(appt) && (
-                          <div className="absolute right-0 top-9 z-[50] w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+
+                          <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-9 z-[50] w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
 
                             <button
                               type="button"
@@ -1064,20 +1165,31 @@ setScheduleDescription("");
                       style={menuOpenId === appointmentEntityId(appt) ? { overflow: "visible" } : undefined}
                     >
                       <div className="absolute right-3 top-3 z-20">
-                        <button
+                        {/* <button
                           type="button"
                           onClick={() =>
+
                             setMenuOpenId(
                               menuOpenId === appointmentEntityId(appt) ? null : appointmentEntityId(appt),
                             )
-                          }
+                          } */}
+                          <button
+  type="button"
+  onClick={(e) => {
+    e.stopPropagation();
+    setMenuOpenId(
+      menuOpenId === appointmentEntityId(appt) ? null : appointmentEntityId(appt),
+    );
+  }}
                           className="text-[#d9ebf8] hover:text-white"
                         >
                           <i className="fa-solid fa-ellipsis-vertical text-lg" />
                         </button>
 
                         {menuOpenId === appointmentEntityId(appt) && (
-                          <div className="absolute right-0 top-9 z-[50] w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                          <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-9 z-[50] w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
                             <button
                               type="button"
                               className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1133,13 +1245,26 @@ setScheduleDescription("");
 
                       <div className="flex w-full flex-col text-white">
                         <div className="mb-3 flex items-center gap-3">
-                          <Image
+                          {/* <Image
                             src={mentor?.profilePicture || UserProfile}
                             alt="Mentor"
                             width={32}
                             height={32}
                             className="rounded-full border border-white/30 md:h-9 md:w-9"
-                          />
+                          /> */}
+                          {mentor?.profilePicture ? (
+  <Image
+    src={mentor.profilePicture}
+    width={32}
+    height={32}
+    alt="mentor"
+    className="h-8 w-8 rounded-full object-cover"
+  />
+) : (
+  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-[#173653] text-xs font-bold text-white">
+    {getInitials(mentor?.firstName, mentor?.lastName)}
+  </div>
+)}
                           <div>
                             <h4 className="text-sm font-semibold">
                               {mentor?.firstName} {mentor?.lastName}
@@ -1174,11 +1299,32 @@ setScheduleDescription("");
                               </span>
                             </p>
 
-                            <div className="flex gap-4 text-sm text-[#cde2f2]">
+                            {/* <div className="flex gap-4 text-sm text-[#cde2f2]">
                               <a href={(appt.mentor as any)?.phoneNumber ? `tel:${(appt.mentor as any).phoneNumber}` : undefined} aria-label="Call mentor" className="opacity-80 hover:opacity-100 transition"><i className="fa-solid fa-phone" /></a>
                               <a href={(appt.mentor as any)?.phoneNumber ? `sms:${(appt.mentor as any).phoneNumber}` : undefined} aria-label="Text mentor" className="opacity-80 hover:opacity-100 transition"><i className="fa-regular fa-comment" /></a>
                               <a href={(appt.mentor as any)?.phoneNumber ? `https://wa.me/${String((appt.mentor as any).phoneNumber).replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-label="WhatsApp mentor" className="opacity-80 hover:opacity-100 transition"><i className="fa-brands fa-whatsapp" /></a>
-                            </div>
+                            </div> */}
+                            <div className="flex gap-4 text-sm text-[#8ec5eb]">
+  <a
+    href={(appt.mentor as any)?.email ? `mailto:${(appt.mentor as any).email}` : undefined}
+    aria-label="Email mentor"
+    className="transition hover:text-white"
+  >
+    <i className="fa-regular fa-envelope" />
+  </a>
+
+  <button type="button" disabled className="cursor-not-allowed opacity-40">
+    <i className="fa-solid fa-phone" />
+  </button>
+
+  <button type="button" disabled className="cursor-not-allowed opacity-40">
+    <i className="fa-regular fa-comment" />
+  </button>
+
+  <button type="button" disabled className="cursor-not-allowed opacity-40">
+    <i className="fa-brands fa-whatsapp" />
+  </button>
+</div>
                           </div>
                         </div>
                       </div>
@@ -1205,15 +1351,23 @@ setScheduleDescription("");
                       style={menuOpenId === appointmentEntityId(appt as any) ? { overflow: "visible" } : undefined}
                     >
                       <div className="absolute right-3 top-3 z-20">
-                        <button
-                          type="button"
-                          onClick={() => setMenuOpenId(menuOpenId === appointmentEntityId(appt as any) ? null : appointmentEntityId(appt as any))}
-                          className="text-[#d9ebf8] hover:text-white"
+                       <button
+  type="button"
+  onClick={(e) => {
+    e.stopPropagation();
+    setMenuOpenId(
+      menuOpenId === appointmentEntityId(appt as any)
+        ? null
+        : appointmentEntityId(appt as any),
+    );
+  }}
                         >
                           <i className="fa-solid fa-ellipsis-vertical text-lg" />
                         </button>
                         {menuOpenId === appointmentEntityId(appt as any) && (
-                          <div className="absolute right-0 top-9 z-[50] w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
+                          <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-9 z-[50] w-[220px] overflow-hidden rounded-xl border border-white/20 bg-[#0a3558]/95 py-1 text-sm text-[#d9ebf8] shadow-xl backdrop-blur-md">
                             <button
                               type="button"
                               className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1230,13 +1384,26 @@ setScheduleDescription("");
 
                       <div className="flex w-full flex-col text-white">
                         <div className="mb-3 flex items-center gap-3">
-                          <Image
+                          {/* <Image
                             src={mentor?.profilePicture || UserProfile}
                             alt="Mentor"
                             width={32}
                             height={32}
                             className="rounded-full border border-white/30 md:h-9 md:w-9"
-                          />
+                          /> */}
+                          {mentor?.profilePicture ? (
+  <Image
+    src={mentor.profilePicture}
+    width={32}
+    height={32}
+    alt="mentor"
+    className="h-8 w-8 rounded-full object-cover"
+  />
+) : (
+  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-white/30 bg-[#173653] text-xs font-bold text-white">
+    {getInitials(mentor?.firstName, mentor?.lastName)}
+  </div>
+)}
                           <div>
                             <h4 className="text-sm font-semibold">
                               {mentor?.firstName} {mentor?.lastName}
@@ -1544,11 +1711,34 @@ setScheduleDescription("");
                         Loading available times…
                       </div>
                     </div>
+                  // ) : availableTimesForBooking.length === 0 ? (
+                  //   <p className="mb-4 text-xs text-[#cde2f2]/85">
+                  //     No open slots on this date. Please try another day.
+                  //   </p>
+                  // ) : (
                   ) : availableTimesForBooking.length === 0 ? (
-                    <p className="mb-4 text-xs text-[#cde2f2]/85">
-                      No open slots on this date. Please try another day.
-                    </p>
-                  ) : (
+  selectedDateHasRawAvailability ? (
+    <div className="mb-4 rounded-lg border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-xs text-amber-100">
+      <p className="font-semibold">No bookable slots on this date.</p>
+      <p className="mt-1 text-amber-100/80">
+        This date has mentor availability, but no slots are currently eligible for booking due to scheduling rules. Please choose another date.
+      </p>
+    </div>
+  ) : (
+    // <p className="mb-4 text-xs text-[#cde2f2]/85">
+    //   No open slots on this date. Please try another day.
+    // </p>
+    <div className="mb-4 rounded-lg border border-amber-300/35 bg-amber-300/10 px-3 py-2 text-xs text-amber-100">
+  <p className="flex items-center gap-2 font-semibold">
+    <i className="fa-solid fa-triangle-exclamation" />
+    No available slots for this date.
+  </p>
+  <p className="mt-1 text-amber-100/80">
+    Please select another available date from the calendar.
+  </p>
+</div>
+  )
+) : (
                     <div className="mb-4 grid grid-cols-2 gap-2 sm:gap-3">
                       {availableTimesForBooking.map((t: any) => (
                         <button

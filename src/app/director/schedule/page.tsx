@@ -1660,7 +1660,7 @@ setMeetingDescription("");
                 <h3 className="text-[15px] font-semibold text-white">
                   My appointment history — {myAppointmentHistory.length} meeting{myAppointmentHistory.length === 1 ? "" : "s"}
                 </h3>
-                <p className="mt-1 text-xs text-[#cde2f2]/80">Past meetings where you were the attendee (for example, sessions with your mentor).</p>
+                {/* <p className="mt-1 text-xs text-[#cde2f2]/80">Past meetings where you were the attendee (for example, sessions with your mentor).</p> */}
                 {myAppointmentHistory.length === 0 ? (
                   <div className={`${directorGlassCard} mt-3 flex items-center justify-center p-8`}>
                     <p className="text-sm text-white/60">No past meetings in this category yet.</p>

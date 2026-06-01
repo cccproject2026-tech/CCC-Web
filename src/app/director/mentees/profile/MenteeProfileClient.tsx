@@ -25,6 +25,7 @@ import {
   apiDeleteUser,
   apiGetUserById,
   apiInviteFieldMentor,
+  apiIssueCertificate,
   apiUpdateUserById,
 } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
@@ -121,6 +122,15 @@ export default function MenteeProfileClient({ menteeId }: Props) {
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [inviteState, setInviteState] = useState<InviteState>("none");
+
+const [isIssueCertificateModalOpen, setIsIssueCertificateModalOpen] = useState(false);
+const [isCertificateSuccessModalOpen, setIsCertificateSuccessModalOpen] = useState(false);
+const [isIssuingCertificate, setIsIssuingCertificate] = useState(false);
+const [certificateNote, setCertificateNote] = useState(
+  "Congratulations on successfully completing the revitalization journey. Wishing you continued impact in your ministry!"
+);
+const [issuedCertificateId, setIssuedCertificateId] = useState("");
+
   const [progressOverallDone, setProgressOverallDone] = useState(false);
   const [userMarkedComplete, setUserMarkedComplete] = useState(false);
 
@@ -159,6 +169,21 @@ export default function MenteeProfileClient({ menteeId }: Props) {
 
       const user = userRes.data.data;
       const progress = unwrapProgressData(progressRes as { data: unknown }) as ProgressResponse | null;
+      const debugUser = user as any;
+
+console.log("Mentee profile certificate debug:", {
+  userId: menteeId,
+  name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim(),
+  hasCompleted: user.hasCompleted,
+  hasIssuedCertificate: user.hasIssuedCertificate,
+  fieldMentorInvitation: user.fieldMentorInvitation,
+  certificateUrl: debugUser.certificateUrl,
+  certificateFile: debugUser.certificateFile,
+  certificatePath: debugUser.certificatePath,
+  certificateId: debugUser.certificateId,
+  rawUser: user,
+  progress,
+});
       const interest = user?.interest;
 
       const marked =
@@ -298,6 +323,31 @@ export default function MenteeProfileClient({ menteeId }: Props) {
         };
     }
   }, [inviteState, personal.email, canInviteFieldMentor]);
+
+const handleIssueCertificate = async () => {
+  try {
+    setIsIssuingCertificate(true);
+
+    const issuedBy = getCookie("userId");
+    if (!issuedBy) {
+      setToast({ message: "Director session missing. Please login again.", variant: "error" });
+      return;
+    }
+
+    // UI kept now; backend generation can be wired here.
+    // await apiIssueCertificate(menteeId, issuedBy);
+
+    setIssuedCertificateId(`CCC-${new Date().getFullYear()}-${menteeId.slice(-6).toUpperCase()}`);
+    setInviteState("cert_issued");
+    setIsIssueCertificateModalOpen(false);
+    setIsCertificateSuccessModalOpen(true);
+  } catch (error) {
+    console.error("Issue certificate failed", error);
+    setToast({ message: "Failed to issue certificate.", variant: "error" });
+  } finally {
+    setIsIssuingCertificate(false);
+  }
+};
 
   const persistProfile = async () => {
     const churches: ChurchDetails[] = [];
@@ -524,7 +574,7 @@ export default function MenteeProfileClient({ menteeId }: Props) {
                   </div>
                 ) : null}
 
-                <button
+                {/* <button
                   type="button"
                   onClick={inviteButton.onClick}
                   disabled={inviteButton.disabled}
@@ -537,7 +587,28 @@ export default function MenteeProfileClient({ menteeId }: Props) {
                 >
                   <i className={inviteButton.icon} />
                   <span>{inviteButton.label}</span>
-                </button>
+                </button> */}
+                <div className="space-y-3">
+  <button
+    type="button"
+    onClick={() => setIsIssueCertificateModalOpen(true)}
+    disabled={!canInviteFieldMentor}
+    className={`${directorBtnPrimary} w-full justify-center disabled:cursor-not-allowed disabled:opacity-50`}
+  >
+    <i className="fa-solid fa-certificate" />
+    <span>Issue Certificate</span>
+  </button>
+
+  <button
+    type="button"
+    onClick={inviteButton.onClick}
+    disabled={inviteButton.disabled}
+    className={`${directorBtnPrimary} w-full justify-center disabled:cursor-not-allowed disabled:opacity-50`}
+  >
+    <i className={inviteButton.icon} />
+    <span>{inviteButton.label}</span>
+  </button>
+</div>
               </div>
             </aside>
 
@@ -711,7 +782,108 @@ export default function MenteeProfileClient({ menteeId }: Props) {
         icon="fa-regular fa-circle-xmark"
         iconColor="text-gray-600 bg-gray-100"
       />
+{isIssueCertificateModalOpen && (
+  <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 px-4">
+    <div className="w-full max-w-md rounded-2xl bg-white p-6 text-[#101828] shadow-2xl">
+      <div className="mb-5 flex items-start justify-between">
+        <h2 className="text-lg font-bold">Issue Completion Certificate</h2>
+        <button onClick={() => setIsIssueCertificateModalOpen(false)}>
+          <i className="fa-solid fa-xmark" />
+        </button>
+      </div>
 
+      <div className="space-y-4 text-sm">
+        <p><b>Pastor</b><br />{fullName}</p>
+        <p><b>Program</b><br />12-Month Mentoring Revitalization Program</p>
+        <p><b>Completion Date</b><br />{new Date().toLocaleDateString()}</p>
+        {/* <p><b>Certificate ID</b><br />CCC-{new Date().getFullYear()}-{menteeId.slice(-6).toUpperCase()}</p> */}
+
+        {/* <label className="block">
+          <span className="mb-2 block font-semibold">Personal Message (Optional)</span>
+          <textarea
+            value={certificateNote}
+            onChange={(e) => setCertificateNote(e.target.value)}
+            rows={4}
+            className="w-full rounded-lg border border-gray-200 p-3 text-sm"
+          />
+        </label> */}
+      </div>
+
+      <div className="mt-6 flex gap-3">
+        <button
+          type="button"
+          onClick={() => setIsIssueCertificateModalOpen(false)}
+          className="flex-1 rounded-lg border border-gray-300 px-4 py-3 font-semibold"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleIssueCertificate}
+          disabled={isIssuingCertificate}
+          className="flex-1 rounded-lg bg-[#08056b] px-4 py-3 font-semibold text-white disabled:opacity-60"
+        >
+          {isIssuingCertificate ? "Issuing..." : "Issue Certificate"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+{isCertificateSuccessModalOpen && (
+  <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 px-4">
+    <div className="w-full max-w-md rounded-2xl bg-white p-6 text-center text-[#101828] shadow-2xl">
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-500 text-white">
+        <i className="fa-solid fa-check text-2xl" />
+      </div>
+
+      <h2 className="text-lg font-bold">Certificate Issued Successfully!</h2>
+      <p className="mt-2 text-sm text-gray-600">
+        The completion certificate has been issued to {fullName}.
+      </p>
+
+      <div className="my-5 space-y-2 rounded-xl bg-gray-50 p-4 text-left text-sm">
+        <p><b>Certificate ID:</b> {issuedCertificateId}</p>
+        <p><b>Issued On:</b> {new Date().toLocaleString()}</p>
+        <p><b>Issued By:</b> Admin Director</p>
+      </div>
+
+      <div className="space-y-3">
+        <button
+          type="button"
+          onClick={() => setToast({ message: "View certificate integration pending.", variant: "success" })}
+          className="w-full rounded-lg bg-[#08056b] px-4 py-3 font-semibold text-white"
+        >
+          View Certificate
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setToast({ message: "Download PDF integration pending.", variant: "success" })}
+          className="w-full rounded-lg border border-gray-300 px-4 py-3 font-semibold"
+        >
+          Download PDF
+        </button>
+
+        {/* <button
+          type="button"
+          onClick={() => setToast({ message: "Email certificate integration pending.", variant: "success" })}
+          className="w-full rounded-lg border border-gray-300 px-4 py-3 font-semibold"
+        >
+          Email Certificate
+        </button> */}
+
+        <button
+          type="button"
+          onClick={() => setIsCertificateSuccessModalOpen(false)}
+          className="w-full text-sm font-semibold text-gray-500"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }
