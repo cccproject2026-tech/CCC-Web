@@ -188,13 +188,27 @@ function formatCreatedDate(value?: string): string | null {
 //     date.getFullYear() === today.getFullYear()
 //   );
 // }
+// function isTodayDate(value?: string): boolean {
+//   if (!value) return false;
+
+//   const submittedDay = value.slice(0, 10);
+//   const todayDay = new Date().toISOString().slice(0, 10);
+
+//   return submittedDay === todayDay;
+// }
 function isTodayDate(value?: string): boolean {
   if (!value) return false;
 
-  const submittedDay = value.slice(0, 10);
-  const todayDay = new Date().toISOString().slice(0, 10);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
 
-  return submittedDay === todayDay;
+  const today = new Date();
+
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  );
 }
 function toDateInputValue(value?: string): string {
   if (!value) return "";
@@ -583,19 +597,41 @@ assignedRows = [...assignedRows, ...missingFromAssignedApi];
                 ? appointmentsBody.data.data
                 : [];
           const appointmentById = new Map<string, any>();
+          // const appointmentsByAssessmentId = new Map<string, any[]>();
+          // for (const appt of appointmentsList) {
+          //   const id = String(appt?._id ?? appt?.id ?? "").trim();
+          //   if (id) appointmentById.set(id, appt);
+          //   const notes = String(appt?.notes ?? "");
+          //   const m = notes.match(/assessmentId=([^|\s]+)/i);
+          //   const linkedAssessmentId = String(m?.[1] || "").trim();
+          //   if (linkedAssessmentId) {
+          //     const prev = appointmentsByAssessmentId.get(linkedAssessmentId) || [];
+          //     prev.push(appt);
+          //     appointmentsByAssessmentId.set(linkedAssessmentId, prev);
+          //   }
+          // }
           const appointmentsByAssessmentId = new Map<string, any[]>();
-          for (const appt of appointmentsList) {
-            const id = String(appt?._id ?? appt?.id ?? "").trim();
-            if (id) appointmentById.set(id, appt);
-            const notes = String(appt?.notes ?? "");
-            const m = notes.match(/assessmentId=([^|\s]+)/i);
-            const linkedAssessmentId = String(m?.[1] || "").trim();
-            if (linkedAssessmentId) {
-              const prev = appointmentsByAssessmentId.get(linkedAssessmentId) || [];
-              prev.push(appt);
-              appointmentsByAssessmentId.set(linkedAssessmentId, prev);
-            }
-          }
+
+for (const appt of appointmentsList) {
+  const id = String(appt?._id ?? appt?.id ?? "").trim();
+  if (id) appointmentById.set(id, appt);
+
+  const notes = String(appt?.notes ?? "");
+  const metadata = appt?.metadata || appt?.meta || {};
+
+  const fromMetadata = String(metadata?.assessmentId ?? "").trim();
+
+  const fromNotes =
+    notes.match(/assessmentId\s*[:=]\s*([^|\s,]+)/i)?.[1]?.trim() || "";
+
+  const linkedAssessmentId = fromMetadata || fromNotes;
+
+  if (linkedAssessmentId) {
+    const prev = appointmentsByAssessmentId.get(linkedAssessmentId) || [];
+    prev.push(appt);
+    appointmentsByAssessmentId.set(linkedAssessmentId, prev);
+  }
+}
 
           const idStatusRows = assessmentProgress
             // .map((p: any) => ({
@@ -632,6 +668,9 @@ assignedRows = [...assignedRows, ...missingFromAssignedApi];
               const assessment = flat.assessment as any;
               const assessmentId = String(assessment?._id ?? assessment?.id ?? flat.assessmentId ?? "");
               if (!assessmentId) return null;
+              const fullAssessment = allAssessments.find(
+  (a: any) => String(a?._id ?? a?.id ?? "") === assessmentId,
+);
               const progressRow = statusByAssessmentId.get(assessmentId);
               const appointmentId = String(
                 (item as any)?.appointmentId ?? assessment?.appointmentId ?? "",
@@ -716,7 +755,27 @@ console.log("CDP CHECK:", {
   _id: assessmentId,
   id: assessmentId,
   _mentorHasSentCdp: hasSentCdp,
+_mentorCreatedAt:
+  (item as any)?.assignedAt ||
+  flat?.updatedAt ||
+  flat?.assignedAt ||
+  fullAssessment?.createdAt ||
+  assessment?.createdAt ||
+  fullAssessment?.updatedAt ||
+  assessment?.updatedAt,
 
+_mentorCreatedBy:
+  assessment?.createdByName ||
+  fullAssessment?.createdByName ||
+  (typeof assessment?.createdBy === "string" ? assessment.createdBy : "") ||
+  (typeof fullAssessment?.createdBy === "string" ? fullAssessment.createdBy : "") ||
+  assessment?.createdBy?.name ||
+  fullAssessment?.createdBy?.name ||
+  assessment?.createdBy?.email ||
+  fullAssessment?.createdBy?.email ||
+  assessment?.assignedByName ||
+  fullAssessment?.assignedByName ||
+  "Director",
 _mentorSubmittedAt:
   (progressRow as any)?.submittedAt ||
   (progressRow as any)?.completedAt ||
@@ -760,21 +819,64 @@ const assignedWithCdp = await Promise.all(
       //           section.recommendations.length > 0,
       //         )
       //       : false;
-      const hasBackendCdp =
+  //     const hasBackendCdp =
+  // Array.isArray(data)
+  //   ? data.some((rec: any) => rec?.sent === true || rec?.status === "sent")
+  //   : Array.isArray(data?.sections)
+  //     ? data.sections.some((section: any) =>
+  //         Array.isArray(section?.recommendations) &&
+  //         section.recommendations.some(
+  //           (rec: any) => rec?.sent === true || rec?.status === "sent",
+  //         ),
+  //       )
+  //     : false;
+const hasBackendCdp =
   Array.isArray(data)
-    ? data.some((rec: any) => rec?.sent === true || rec?.status === "sent")
+    ? data.some((rec: any) => {
+        const recs = Array.isArray(rec?.recommendations)
+          ? rec.recommendations.filter((x: any) => String(x || "").trim())
+          : [];
+
+        return (
+          rec?.sent === true ||
+          rec?.status === "sent" ||
+          recs.length > 0 ||
+          String(rec?.message || rec?.text || "").trim() !== ""
+        );
+      })
     : Array.isArray(data?.sections)
       ? data.sections.some((section: any) =>
           Array.isArray(section?.recommendations) &&
-          section.recommendations.some(
-            (rec: any) => rec?.sent === true || rec?.status === "sent",
-          ),
+          section.recommendations.some((rec: any) => {
+            if (typeof rec === "string") return rec.trim() !== "";
+            return (
+              rec?.sent === true ||
+              rec?.status === "sent" ||
+              String(rec?.message || rec?.text || "").trim() !== ""
+            );
+          }),
         )
       : false;
-
       return {
         ...assessment,
         _mentorHasSentCdp: assessment._mentorHasSentCdp || hasBackendCdp,
+//         _mentorCreatedAt:
+//   assessment?.createdAt ||
+//   assessment?.updatedAt ||
+//   assessment?._mentorSubmittedAt,
+
+// _mentorCreatedBy:
+//   assessment?.createdByName ||
+//   fullAssessment?.createdByName ||
+//   (typeof assessment?.createdBy === "string" ? assessment.createdBy : "") ||
+//   (typeof fullAssessment?.createdBy === "string" ? fullAssessment.createdBy : "") ||
+//   assessment?.createdBy?.name ||
+//   fullAssessment?.createdBy?.name ||
+//   assessment?.createdBy?.email ||
+//   fullAssessment?.createdBy?.email ||
+//   assessment?.assignedByName ||
+//   fullAssessment?.assignedByName ||
+//   "N/A",
       };
     } catch {
       return assessment;
@@ -1100,6 +1202,29 @@ console.log("ANSWER DATE CHECK:", {
   updatedAt: answerData.updatedAt,
   submittedAt: answerData.submittedAt,
 });
+let hasSentCdp = false;
+
+try {
+  const recRes = await apiGetSectionRecommendations(assessmentId, String(pastor.id));
+  const data: any = recRes.data?.data ?? recRes.data;
+
+  hasSentCdp = Array.isArray(data)
+    ? data.some((rec: any) => {
+        const recs = Array.isArray(rec?.recommendations)
+          ? rec.recommendations.filter((x: any) => String(x || "").trim())
+          : [];
+
+        return (
+          rec?.sent === true ||
+          rec?.status === "sent" ||
+          recs.length > 0 ||
+          String(rec?.message || rec?.text || "").trim() !== ""
+        );
+      })
+    : false;
+} catch {
+  hasSentCdp = false;
+}
           results.push({
             ...assessment,
             _id: assessmentId,
@@ -1115,7 +1240,7 @@ console.log("ANSWER DATE CHECK:", {
   //   String(pastor.id),
   //   assessmentId,
   // ).some((rec) => rec.sent === true),
-  _mentorHasSentCdp: false,
+  _mentorHasSentCdp: hasSentCdp,
           });
         } catch {
           // no answer found
@@ -2108,7 +2233,34 @@ assessment._mentorHasSentCdp
   >
     {assessmentStatusLabel(assessment._mentorAssignmentStatus)}
   </span>
+  
 )}
+{activeTab === "pastors" && selectedMenteeId ? (
+<div className="mt-3 grid grid-cols-1 gap-2 text-xs text-[#d9ebf8] sm:grid-cols-2">
+  <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+    <p className="text-[10px] text-[#d9ebf8]/65">Created at</p>
+    <p className="font-semibold text-white">
+      {assessment._mentorCreatedAt
+        ? new Date(assessment._mentorCreatedAt).toLocaleString("en-US", {
+            month: "short",
+            day: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          })
+        : "N/A"}
+    </p>
+  </div>
+
+  <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+    <p className="text-[10px] text-[#d9ebf8]/65">Created by</p>
+    <p className="font-semibold text-white">
+      {assessment._mentorCreatedBy || "N/A"}
+    </p>
+  </div>
+</div>
+) : null}
                               {assessment._mentorMeetingActive && (
   <div className="mt-4 max-w-xl rounded-xl border border-[#8ec5eb]/35 bg-[#173a55]/65 px-4 py-3">
     <div className="flex items-start justify-between gap-3">

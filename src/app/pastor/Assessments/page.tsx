@@ -347,7 +347,12 @@ if (allAssessmentsRes.status === "fulfilled") {
 
 const rawItem: any = item;
 const rawFlat: any = flat;
-
+console.log("ASSESSMENT META CHECK", {
+  title: assessment?.name,
+  rawItem,
+  rawFlat,
+  assessment,
+});
 const dueDate =
   rawFlat.dueDate ??
   rawFlat.deadline ??
@@ -390,13 +395,31 @@ const appointmentId = String(
   rawFlat.appointmentId ?? rawItem.appointmentId ?? rawFlat.assessment?.appointmentId ?? "",
 ).trim();
 
+// const linkedMeeting =
+//   (appointmentId
+//     ? appointmentsList.find((appointment: any) => String(appointment?._id ?? appointment?.id ?? "") === appointmentId)
+//     : null) ||
+//   appointmentsList.find((appointment: any) => {
+//     const notes = String(appointment?.notes ?? "");
+//     return notes.includes(`assessmentId=${aid}`);
+//   });
 const linkedMeeting =
   (appointmentId
-    ? appointmentsList.find((appointment: any) => String(appointment?._id ?? appointment?.id ?? "") === appointmentId)
+    ? appointmentsList.find(
+        (appointment: any) =>
+          String(appointment?._id ?? appointment?.id ?? "") === appointmentId,
+      )
     : null) ||
   appointmentsList.find((appointment: any) => {
     const notes = String(appointment?.notes ?? "");
-    return notes.includes(`assessmentId=${aid}`);
+    const metadata = appointment?.metadata || appointment?.meta || {};
+
+    return (
+      String(metadata?.assessmentId ?? "") === String(aid) ||
+      notes.includes(`assessmentId=${aid}`) ||
+      notes.includes(`assessmentId:${aid}`) ||
+      notes.includes(`assessmentId: ${aid}`)
+    );
   });
 
 const linkedMeetingId = linkedMeeting
@@ -483,7 +506,49 @@ return {
               desc: (assessment?.description as string) || "",
               status,
               dueDate: dueDate ? new Date(dueDate).toLocaleDateString() : "",
-              submittedAt: updatedAt ? new Date(updatedAt).toLocaleDateString() : undefined,
+//               submittedAt: (() => {
+//   const raw =
+//     rawFlat.submittedAt ??
+//     rawItem.submittedAt ??
+//     rawFlat.completedAt ??
+//     rawItem.completedAt ??
+//     rawFlat.updatedAt ??
+//     rawItem.updatedAt ??
+//     updatedAt;
+
+//   return raw ? new Date(raw).toLocaleString("en-US", {
+//     month: "short",
+//     day: "2-digit",
+//     year: "numeric",
+//     hour: "2-digit",
+//     minute: "2-digit",
+//     hour12: true,
+//   }) : undefined;
+// })(),
+submittedAt: (() => {
+  const answerData: any =
+    answersRes.status === "fulfilled" ? answersRes.value.data?.data : null;
+
+  const raw =
+    answerData?.submittedAt ??
+    answerData?.createdAt ??
+    answerData?.updatedAt ??
+    rawItem.assignedAt ??
+    rawFlat.updatedAt ??
+    rawItem.updatedAt ??
+    updatedAt;
+
+  return raw
+    ? new Date(raw).toLocaleString("en-US", {
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      })
+    : undefined;
+})(),
               completedAt:
                 status === "Completed" && hasScheduledMeeting && updatedAt
                   ? new Date(updatedAt).toLocaleDateString()
@@ -587,8 +652,8 @@ hasCdp,
     if (activeTab === "All") return matchesSearch;
     return a.status === activeTab && matchesSearch;
   });
-  const recommendedAssessment = filtered.find((item) => item.status !== "Completed");
-
+  // const recommendedAssessment = filtered.find((item) => item.status !== "Completed");
+const recommendedAssessment = filtered.find((item) => item.status === "Not Started");
   const getStatusColor = (status: string) => {
     switch (status) {
       case "Due":
@@ -844,6 +909,31 @@ hasCdp,
   {displayStatus}
 </span>
                       </div>
+                      <div className="mb-2 grid grid-cols-1 gap-2 text-xs text-[#d9ebf8] sm:grid-cols-2">
+  <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#8ec5eb]/15 text-[#8ec5eb]">
+      <i className="fa-regular fa-calendar-check text-xs" />
+    </span>
+    <div>
+      <p className="text-[10px] text-[#d9ebf8]/65">Assigned on</p>
+      <p className="font-semibold text-white">
+        {item.submittedAt || "N/A"}
+      </p>
+    </div>
+  </div>
+
+  <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#8ec5eb]/15 text-[#8ec5eb]">
+      <i className="fa-regular fa-user text-xs" />
+    </span>
+    <div>
+      <p className="text-[10px] text-[#d9ebf8]/65">Assigned by</p>
+      <p className="font-semibold text-white">
+        {item.createdBy || "N/A"}
+      </p>
+    </div>
+  </div>
+</div>
 {/* <div className="mb-3 space-y-1 text-xs text-[#d9ebf8]">
   <p>
     <span className="font-medium">Assigned by :</span>{" "}

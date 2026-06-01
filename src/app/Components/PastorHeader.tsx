@@ -153,13 +153,13 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
   const navLinks = [
     { name: "Home", path: "/pastor/home" },
     { name: "My Mentors", path: "/pastor/Mymentors" },
-    { name: "Revitalization Roadmap", path: "/pastor/revitalization-roadmap" },
+    { name: "Revitalization\nRoadmap", path: "/pastor/revitalization-roadmap" },
     { name: "Assessments", path: "/pastor/Assessments" },
     { name: "Progress", path: "/pastor/Myprogress" },
     { name: "Appointments", path: "/pastor/appointments" },
     { name: "Mentorship Sessions", path: "/pastor/mentoring-session" },
     { name: "Notes", path: "/pastor/notes" },
-    { name: "Voice Notes", path: "/pastor/voice-notes" },
+    { name: "Voice\nNotes", path: "/pastor/voice-notes" },
   ];
 
 
@@ -277,7 +277,8 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
   }, [searchQuery]);
 
   return (
-    <header className="relative z-40 flex items-center justify-between border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md md:px-6 lg:px-10 font-[Albert_Sans]">
+    // <header className="relative z-40 flex items-center justify-between border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md md:px-6 lg:px-10 font-[Albert_Sans]">
+    <header className="relative z-40 flex items-center gap-6 border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md md:px-6 lg:px-10 font-[Albert_Sans]">
       {/* ✅ Left Logo */}
       {/* <div className="flex items-center gap-3">
         <Image src={Framelogo1} alt="Logo" width={26} height={26} />
@@ -285,7 +286,9 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
 
       <Link
   href="/pastor/home"
-  className="flex items-center gap-3"
+  // className="flex items-center gap-3"
+  // className="flex w-[64px] shrink-0 items-center gap-3"
+  className="flex w-[44px] shrink-0 items-center justify-center"
   aria-label="Pastor Home"
 >
   <Image src={Framelogo1} alt="Logo" width={26} height={26} />
@@ -293,7 +296,9 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
 
       {/* ✅ Middle Nav Links */}
       {showFullHeader && (
-        <nav className="hidden lg:flex items-center gap-6">
+        // <nav className="hidden lg:flex items-center gap-6">
+      //  <nav className="hidden min-w-0 flex-1 items-center justify-center gap-5 lg:flex">
+      <nav className="hidden min-w-0 flex-1 items-center justify-start gap-6 lg:flex">
           {navLinks.map((link, index) => {
             const isActive =
               pathname === link.path ||
@@ -302,7 +307,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
               <a
                 key={index}
                 href={link.path}
-                className={`text-sm cursor-pointer transition-all duration-200 ${isActive
+                className={`max-w-[140px] text-center text-[13px] leading-tight xl:text-sm cursor-pointer transition-all duration-200 ${isActive
                   ? "font-semibold text-white"
                   : "text-white/80 hover:text-white"
                   }`}
@@ -315,7 +320,8 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
       )}
 
       {/* ✅ Right Icons */}
-      <div className="relative flex items-center gap-3 md:gap-5" ref={dropdownRef}>
+      {/* <div className="relative flex items-center gap-3 md:gap-5" ref={dropdownRef}> */}
+      <div className="relative flex w-[360px] shrink-0 items-center justify-end gap-3" ref={dropdownRef}>
         {/* Mobile Menu Button */}
         {showFullHeader && isClient && (
           <button

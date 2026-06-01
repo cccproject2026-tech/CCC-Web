@@ -721,12 +721,49 @@ export default function DirectorAssessmentResultPage() {
                 </div> */}
                 {(sections[activeSection]?.layers || []).map((layer: any, layerIndex: number) => {
                   const layerId = resolveLayerKey(layer, activeSection, layerIndex);
+                  const sectionId = String(
+  sections[activeSection]?._id ??
+    sections[activeSection]?.id ??
+    `section_${activeSection}`,
+);
+
+const cdpText =
+  mentorLayerCdp[layerId] ||
+  mentorLayerCdp[sectionId] ||
+  mentorLayerCdp[`layer_${activeSection}_${layerIndex}`] ||
+  "";
                   return (
                     <div key={layerId} className={`rounded-2xl border border-white/12 p-5 ${directorGlassCard}`}>
                       <h3 className="mb-3 text-base font-semibold text-white">
                         {layer?.question || layer?.title || "Question"}
                       </h3>
-
+{/* {mentorLayerCdp[layerId] ? (
+  <div className="mb-4 rounded-xl border border-emerald-300/25 bg-emerald-500/10 p-4">
+    <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-emerald-200">
+      Customized Development Plan
+    </p>
+    <p className="whitespace-pre-line text-sm leading-relaxed text-white/90">
+      {mentorLayerCdp[layerId]}
+    </p>
+  </div>
+) : null} */}
+{cdpText ? (
+  <div className="mb-4 flex justify-end">
+    <button
+      type="button"
+      onClick={() =>
+        router.push(
+          `/director/assessments/result/cdp?assessmentId=${encodeURIComponent(
+            assessmentId,
+          )}&userId=${encodeURIComponent(userId)}`,
+        )
+      }
+      className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+    >
+      Customized Development Plan
+    </button>
+  </div>
+) : null}
                       <div className="space-y-2">
                         {(layer?.choices || []).map((choice: any, ci: number) => {
                           const choiceKey = String(choice?._id ?? choice?.value ?? choice?.label ?? `c_${ci}`);

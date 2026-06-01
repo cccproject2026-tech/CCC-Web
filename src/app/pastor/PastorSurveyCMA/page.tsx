@@ -1487,12 +1487,12 @@ const confirmClearResponses = () => {
               <p className="font-medium">New Appointment has been Scheduled</p>
             </div>
             <div className="mb-4 flex items-center justify-center gap-3">
-              <button
+              {/* <button
                 onClick={() => setShowMeetingDetails((prev) => !prev)}
                 className="rounded-xl border border-white/30 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
               >
                 {showMeetingDetails ? "Hide Meeting Details" : "Meeting Details"}
-              </button>
+              </button> */}
             </div>
             {showMeetingDetails && (
               <div className="mb-4 rounded-xl border border-white/20 bg-white/10 p-4 text-left text-sm text-[#d8ecfa]">

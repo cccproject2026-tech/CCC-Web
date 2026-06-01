@@ -1789,10 +1789,14 @@ useEffect(() => {
       //   }
       // }
       const shouldPatchExtras = extrasExist || isNewSubmissionMode;
+      const updatePayload = {
+        extras: extrasArray,
+        ...(isNewSubmissionMode ? { isResubmitted: true } : {}),
+      };
 
       if (shouldPatchExtras) {
         try {
-          const res = await apiUpdateExtras(roadmapId, userId, { extras: extrasArray }, scopedNestedId);
+          const res = await apiUpdateExtras(roadmapId, userId, updatePayload, scopedNestedId);
           console.log("[Pastor Jumpstart] PATCH /extras ok", res?.data);
           try {
             const stored = await apiGetExtras(roadmapId, userId, scopedNestedId);
@@ -1827,7 +1831,7 @@ useEffect(() => {
         } catch (errSave) {
           // If extras already exist, update instead.
           console.warn("[Pastor Jumpstart] POST /extras failed; falling back to PATCH", errSave);
-          const res = await apiUpdateExtras(roadmapId, userId, { extras: extrasArray }, scopedNestedId);
+          const res = await apiUpdateExtras(roadmapId, userId, updatePayload, scopedNestedId);
           console.log("[Pastor Jumpstart] PATCH /extras ok (fallback)", res?.data);
           try {
             const stored = await apiGetExtras(roadmapId, userId, scopedNestedId);

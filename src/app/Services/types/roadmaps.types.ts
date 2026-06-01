@@ -258,6 +258,7 @@ export interface CreateExtrasPayload {
 
 export interface UpdateExtrasPayload {
   extras?: Record<string, any>[];
+  isResubmitted?: boolean;
 }
 
 export interface FileData {
@@ -283,4 +284,22 @@ export interface ExtrasResponse {
   uploadedDocuments?: ExtrasDocument[];
   createdAt: string;
   updatedAt: string;
+  submittedAt?: string;
+  resubmittedAt?: string;
+  submissionNumber?: number;
+  isResubmitted?: boolean;
+}
+
+export interface RoadmapSubmissionActivity {
+  submissionId?: string;
+  userId: string;
+  roadMapId: string;
+  nestedRoadMapItemId?: string;
+  parentRoadmapName?: string;
+  taskName?: string;
+  status?: string;
+  submissionNumber?: number;
+  submittedAt?: string;
+  resubmittedAt?: string;
+  isResubmission: boolean;
 }

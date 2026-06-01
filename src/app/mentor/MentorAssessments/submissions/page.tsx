@@ -12,6 +12,7 @@ import {
 import {
   apiGetAssessments,
   apiGetUserAnswers,
+  apiGetSectionRecommendations,
   parseAssessmentsListPayload,
 } from "@/app/Services/assessment.service";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
@@ -29,13 +30,27 @@ import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 //     date.getFullYear() === today.getFullYear()
 //   );
 // }
+// function isTodayDate(value?: string): boolean {
+//   if (!value) return false;
+
+//   const submittedDay = value.slice(0, 10);
+//   const todayDay = new Date().toISOString().slice(0, 10);
+
+//   return submittedDay === todayDay;
+// }
 function isTodayDate(value?: string): boolean {
   if (!value) return false;
 
-  const submittedDay = value.slice(0, 10);
-  const todayDay = new Date().toISOString().slice(0, 10);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
 
-  return submittedDay === todayDay;
+  const today = new Date();
+
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  );
 }
 
 function getAssessmentId(item: { _id?: string; id?: string }): string {
@@ -100,6 +115,51 @@ console.log("SUBMISSION DATE CHECK:", {
     answerData.updatedAt,
   ),
 });
+let hasSentCdp = false;
+
+try {
+  const recRes = await apiGetSectionRecommendations(assessmentId, pastorId);
+  const data: any = recRes.data?.data ?? recRes.data;
+
+  // hasSentCdp = Array.isArray(data)
+  //   ? data.some((rec: any) => rec?.sent === true || rec?.status === "sent")
+  //   : Array.isArray(data?.sections)
+  //     ? data.sections.some((section: any) =>
+  //         Array.isArray(section?.recommendations) &&
+  //         section.recommendations.some(
+  //           (rec: any) => rec?.sent === true || rec?.status === "sent",
+  //         ),
+  //       )
+  //     : false;
+  hasSentCdp = Array.isArray(data)
+  ? data.some((rec: any) => {
+      const recs = Array.isArray(rec?.recommendations)
+        ? rec.recommendations.filter((x: any) => String(x || "").trim())
+        : [];
+
+      return (
+        rec?.sent === true ||
+        rec?.status === "sent" ||
+        recs.length > 0 ||
+        String(rec?.message || rec?.text || "").trim() !== ""
+      );
+    })
+  : Array.isArray(data?.sections)
+    ? data.sections.some((section: any) =>
+        Array.isArray(section?.recommendations) &&
+        section.recommendations.some((rec: any) => {
+          if (typeof rec === "string") return rec.trim() !== "";
+          return (
+            rec?.sent === true ||
+            rec?.status === "sent" ||
+            String(rec?.message || rec?.text || "").trim() !== ""
+          );
+        }),
+      )
+    : false;
+} catch {
+  hasSentCdp = false;
+}
               results.push({
                 ...assessment,
                 _id: assessmentId,
@@ -109,6 +169,7 @@ console.log("SUBMISSION DATE CHECK:", {
   answerData.submittedAt ||
   answerData.createdAt ||
   answerData.updatedAt,
+  _mentorHasSentCdp: hasSentCdp,
               });
             } catch {
               // No submission for this pastor + assessment.
@@ -169,7 +230,7 @@ console.log("SUBMISSION DATE CHECK:", {
           View Result
         </button>
 
-        <button
+        {/* <button
           type="button"
           onClick={() =>
             router.push(
@@ -179,7 +240,20 @@ console.log("SUBMISSION DATE CHECK:", {
           className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
         >
           Send CDP
-        </button>
+        </button> */}
+        <button
+  type="button"
+  onClick={() =>
+    router.push(
+      assessment._mentorHasSentCdp
+        ? `/mentor/MentorAssessments/result/cdp?assessmentId=${assessment._id}&userId=${assessment.pastorId}`
+        : `/mentor/MentorAssessments/result?assessmentId=${assessment._id}&userId=${assessment.pastorId}&editRecommendation=1`,
+    )
+  }
+  className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+>
+  {assessment._mentorHasSentCdp ? "View CDP" : "Send CDP"}
+</button>
       </div>
     </div>
   );

@@ -138,6 +138,7 @@ export {
   apiCreateRoadmapSubmission,
   apiGetRoadmapSubmissions,
   apiGetLatestRoadmapSubmission,
+  apiGetRoadmapSubmissionActivity,
   apiGetRoadmapSubmissionById,
   apiUploadRoadmapSubmissionDocuments,
   apiDeleteExtrasDocumentBatch,

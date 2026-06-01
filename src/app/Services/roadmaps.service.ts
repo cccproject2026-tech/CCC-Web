@@ -11,6 +11,7 @@ import type {
   UpdatePastorQueryPayload,
   CreateExtrasPayload,
   UpdateExtrasPayload,
+  RoadmapSubmissionActivity,
 } from "./types/roadmaps.types";
 
 // Re-export all roadmap types so consumers can import from this file or from api.ts
@@ -46,6 +47,7 @@ export type {
   FileData,
   ExtrasDocument,
   ExtrasResponse,
+  RoadmapSubmissionActivity,
 } from "./types/roadmaps.types";
 
 // ─── Roadmap CRUD ─────────────────────────────────────────────────────────────
@@ -562,6 +564,18 @@ export const apiGetLatestRoadmapSubmission = (roadMapId: string, userId: string,
   axiosInstance.get(`${roadmapSubmissionsRoot(roadMapId, nestedRoadMapItemId)}/latest`, {
     params: cleanQueryIds(userId, nestedRoadMapItemId),
   });
+
+export const apiGetRoadmapSubmissionActivity = (
+  userId: string,
+  from: string,
+  to: string,
+) =>
+  axiosInstance.get<{ success: boolean; data: RoadmapSubmissionActivity[] }>(
+    "/roadmaps/submissions/activity",
+    {
+      params: { userId, from, to },
+    },
+  );
 
 // GET /roadmaps/submissions/:submissionId
 export const apiGetRoadmapSubmissionById = (submissionId: string) =>

@@ -9,7 +9,9 @@ import UserProfile from "@/app/Assets/user-profile.png";
 import {
   apiGetAssignedUsers,
   apiGetMentorAppointments,
+  apiGetRoadmapSubmissionActivity,
 } from "@/app/Services/api";
+import type { RoadmapSubmissionActivity } from "@/app/Services/roadmaps.service";
 import {
   apiGetAssignedAssessments,
   apiGetUserAnswers,
@@ -76,14 +78,14 @@ const attentionItems = [
   {
     icon: "fa-solid fa-rotate",
     title: "Pastor Resubmitted Tasks",
-    count: 15,
+    count: 0,
     description: "Tasks ready for another review",
     tone: "border-orange-300/30 bg-orange-400/15 text-orange-100",
   },
   {
     icon: "fa-solid fa-road",
     title: "New Roadmap Submissions",
-    count: 23,
+    count: 0,
     description: "Roadmap items awaiting review",
     tone: "border-sky-300/30 bg-sky-400/15 text-sky-100",
   },
@@ -201,12 +203,14 @@ export default function MentorReviewCenterDetailPage() {
   const [showMissedMeetings, setShowMissedMeetings] = useState(false);
   const [showRescheduledMeetings, setShowRescheduledMeetings] = useState(false);
   const [showWeeklyAssessments, setShowWeeklyAssessments] = useState(false);
-const [showWeeklyRoadmaps, setShowWeeklyRoadmaps] = useState(false);
+const [showWeeklyRoadmaps, setShowWeeklyRoadmaps] = useState<
+  "new" | "resubmitted" | null
+>(null);
 const [meetingSort, setMeetingSort] = useState<"newest" | "oldest">("newest");
 const [weeklyAssessmentSubmissions, setWeeklyAssessmentSubmissions] = useState<
   WeeklyAssessmentSubmission[]
 >([]);
-const [weeklyRoadmaps, setWeeklyRoadmaps] = useState<any[]>([]);
+const [weeklyRoadmaps, setWeeklyRoadmaps] = useState<RoadmapSubmissionActivity[]>([]);
   const [assessmentStats, setAssessmentStats] = useState({
   completed: 0,
   total: 0,
@@ -355,6 +359,22 @@ assignedRows.forEach((item:any) => {
     setRoadmapPercent(0);
   }
 };
+
+const loadRoadmapActivity = async () => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const res = await apiGetRoadmapSubmissionActivity(
+      String(pastorId),
+      today,
+      today,
+    );
+    const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+    setWeeklyRoadmaps(rows);
+  } catch (error) {
+    console.warn("Failed to load roadmap submission activity", error);
+    setWeeklyRoadmaps([]);
+  }
+};
 //     const loadAppointments = async () => {
 //       const loadAssessmentStats = async () => {
 //   try {
@@ -420,6 +440,7 @@ if (mentorId) {
 
 if (pastorId) {
   void loadProgressStats();
+  void loadRoadmapActivity();
 }
     if (!mentorId || !pastorId) {
       setLoading(false);
@@ -597,6 +618,15 @@ const missedMeetings = pastorAppointments
 const rescheduledMeetings = pastorAppointments
   .filter((appointment) => getStatus(appointment) === "rescheduled")
   .sort((a, b) => getStartTime(b) - getStartTime(a));
+
+const newRoadmapSubmissions = weeklyRoadmaps.filter(
+  (activity) => activity.isResubmission === false,
+);
+const pastorResubmittedTasks = weeklyRoadmaps.filter(
+  (activity) => activity.isResubmission === true,
+);
+const newSubmissionCount = newRoadmapSubmissions.length;
+const resubmittedCount = pastorResubmittedTasks.length;
 
 if (
   pastorAppointments.length > 0 &&
@@ -891,6 +921,16 @@ const renderMeetingModal = ({
   );
 };
 
+const roadmapModalItems =
+  showWeeklyRoadmaps === "resubmitted"
+    ? pastorResubmittedTasks
+    : newRoadmapSubmissions;
+
+const roadmapModalTitle =
+  showWeeklyRoadmaps === "resubmitted"
+    ? "Pastor Resubmitted Tasks"
+    : "New Roadmap Submissions";
+
 // const renderMeetingModal = ({
 //   title,
 //   description,
@@ -1172,6 +1212,12 @@ const renderMeetingModal = ({
     if (item.title === "Rescheduled Meetings") {
       setShowRescheduledMeetings(true);
     }
+    if (item.title === "Pastor Resubmitted Tasks") {
+      setShowWeeklyRoadmaps("resubmitted");
+    }
+    if (item.title === "New Roadmap Submissions") {
+      setShowWeeklyRoadmaps("new");
+    }
     if (item.title === "Today's Meetings") setShowTodayMeetings(true);
     if (item.title === "New Assessment Submissions") {
       setShowWeeklyAssessments(true);
@@ -1191,11 +1237,15 @@ const renderMeetingModal = ({
                       ? missedMeetings.length
                       : item.title === "Rescheduled Meetings"
                         ? rescheduledMeetings.length
-                        : item.title === "Today's Meetings"
-                          ? todayMeetings.length
-                          : item.title === "New Assessment Submissions"
-                            ? weeklyAssessmentSubmissions.length
-                            : item.count}
+                        : item.title === "Pastor Resubmitted Tasks"
+                          ? resubmittedCount
+                          : item.title === "New Roadmap Submissions"
+                            ? newSubmissionCount
+                            : item.title === "Today's Meetings"
+                              ? todayMeetings.length
+                              : item.title === "New Assessment Submissions"
+                                ? weeklyAssessmentSubmissions.length
+                                : item.count}
                   </span>
                   <span className="mt-1.5 block text-[11px] font-bold leading-tight text-white">
                     {item.title}
@@ -1410,6 +1460,101 @@ const renderMeetingModal = ({
             emptyText: "No rescheduled meetings",
             onClose: () => setShowRescheduledMeetings(false),
           })}
+        {showWeeklyRoadmaps && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+            <div className={`w-full max-w-xl p-5 ${mentorGlassCardFrost}`}>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-extrabold text-white">
+                    {roadmapModalTitle}
+                  </h3>
+                  <p className="text-xs text-[#cde2f2]/65">
+                    {roadmapModalItems.length} submission(s) today
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowWeeklyRoadmaps(null)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white hover:bg-white/15"
+                >
+                  <i className="fa-solid fa-xmark" />
+                </button>
+              </div>
+
+              <div className="max-h-[224px] space-y-3 overflow-y-auto pr-1">
+                {roadmapModalItems.length > 0 ? (
+                  roadmapModalItems.map((activity, index) => (
+                    // <div
+                    //   key={`${activity.submissionId ?? activity.roadMapId}-${index}`}
+                    //   className="rounded-2xl border border-white/10 bg-white/[0.05] p-4"
+                    // >
+                    <Link
+  key={`${activity.submissionId ?? activity.roadMapId}-${index}`}
+  href={`/mentor/RevitalizationRoadmap/task?userId=${encodeURIComponent(
+    String(pastorId),
+  )}&roadmapId=${encodeURIComponent(
+    activity.roadMapId,
+  )}${
+    activity.nestedRoadMapItemId
+      ? `&taskId=${encodeURIComponent(activity.nestedRoadMapItemId)}`
+      : ""
+  }`}
+  className="block rounded-2xl border border-white/10 bg-white/[0.05] p-4 transition hover:bg-white/[0.08]"
+>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          {/* <p className="text-sm font-extrabold text-white">
+                            {activity.taskName || "Roadmap Task"}
+                          </p>
+                          <p className="mt-1 text-xs text-[#cde2f2]/65">
+                            {activity.parentRoadmapName || "Roadmap"}
+                          </p> */}
+                          <p className="text-sm font-extrabold text-white">
+  {activity.taskName || "Roadmap Task"}
+</p>
+<p className="mt-1 text-xs text-[#cde2f2]/65">
+  Parent roadmap: {activity.parentRoadmapName || "Roadmap"}
+</p>
+{activity.nestedRoadMapItemId ? (
+  <p className="mt-1 text-[11px] font-semibold text-[#8ec5eb]">
+    Nested task
+  </p>
+) : null}
+                        </div>
+                        <span className="rounded-lg border border-amber-300/35 bg-amber-400/15 px-2 py-1 text-[10px] font-bold uppercase text-amber-100">
+                          {activity.status || "Submitted"}
+                        </span>
+                      </div>
+
+                      <div className="mt-3 text-xs text-[#cde2f2]/75">
+                        <p>Submission #{activity.submissionNumber ?? "N/A"}</p>
+                        <p className="mt-1">
+                          Submitted:{" "}
+                          {activity.submittedAt
+                            ? new Date(activity.submittedAt).toLocaleString()
+                            : "N/A"}
+                        </p>
+                        {activity.resubmittedAt ? (
+                          <p className="mt-1">
+                            Resubmitted:{" "}
+                            {new Date(activity.resubmittedAt).toLocaleString()}
+                          </p>
+                        ) : null}
+                      </div>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-center">
+                    <p className="text-sm font-semibold text-white">
+                      No roadmap submissions today
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         {showWeeklyAssessments && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
             <div className={`w-full max-w-xl p-5 ${mentorGlassCardFrost}`}>

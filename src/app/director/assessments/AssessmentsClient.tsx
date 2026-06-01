@@ -215,13 +215,40 @@ function countPastorsAssigned(item: any): number {
 //     return Array.isArray(recs) && recs.length > 0;
 //   });
 // }
+// function hasCdpPayload(body: any): boolean {
+//   const data = body?.data ?? body;
+
+//   if (Array.isArray(data)) {
+//     return data.some(
+//       (row) => row?.sent === true || row?.status === "sent",
+//     );
+//   }
+
+//   const sections = Array.isArray(data?.sections) ? data.sections : [];
+
+//   return sections.some((section: any) => {
+//     const recs = Array.isArray(section?.recommendations)
+//       ? section.recommendations
+//       : [];
+
+//     return recs.some(
+//       (rec: any) => rec?.sent === true || rec?.status === "sent",
+//     );
+//   });
+// }
 function hasCdpPayload(body: any): boolean {
   const data = body?.data ?? body;
 
   if (Array.isArray(data)) {
-    return data.some(
-      (row) => row?.sent === true || row?.status === "sent",
-    );
+    return data.some((row) => {
+      if (row?.sent === true || row?.status === "sent") return true;
+
+      const recs = Array.isArray(row?.recommendations)
+        ? row.recommendations
+        : [];
+
+      return recs.some((x: any) => String(x || "").trim() !== "");
+    });
   }
 
   const sections = Array.isArray(data?.sections) ? data.sections : [];
@@ -231,9 +258,14 @@ function hasCdpPayload(body: any): boolean {
       ? section.recommendations
       : [];
 
-    return recs.some(
-      (rec: any) => rec?.sent === true || rec?.status === "sent",
-    );
+    return recs.some((rec: any) => {
+      if (typeof rec === "string") return rec.trim() !== "";
+      return (
+        rec?.sent === true ||
+        rec?.status === "sent" ||
+        String(rec?.message || rec?.text || "").trim() !== ""
+      );
+    });
   });
 }
 function normalizeAssessmentStatus(raw: unknown): "not_started" | "submitted" | "completed" {
@@ -455,19 +487,41 @@ assignedRows = [...assignedRows, ...missingFromAssignedApi];
                   ? appointmentsBody.data.data
                   : [];
             const appointmentById = new Map<string, any>();
+            // const appointmentsByAssessmentId = new Map<string, any[]>();
+            // for (const appt of appointmentsList) {
+            //   const id = String(appt?._id ?? appt?.id ?? "").trim();
+            //   if (id) appointmentById.set(id, appt);
+            //   const notes = String(appt?.notes ?? "");
+            //   const m = notes.match(/assessmentId=([^|\s]+)/i);
+            //   const linkedAssessmentId = String(m?.[1] || "").trim();
+            //   if (linkedAssessmentId) {
+            //     const prev = appointmentsByAssessmentId.get(linkedAssessmentId) || [];
+            //     prev.push(appt);
+            //     appointmentsByAssessmentId.set(linkedAssessmentId, prev);
+            //   }
+            // }
             const appointmentsByAssessmentId = new Map<string, any[]>();
-            for (const appt of appointmentsList) {
-              const id = String(appt?._id ?? appt?.id ?? "").trim();
-              if (id) appointmentById.set(id, appt);
-              const notes = String(appt?.notes ?? "");
-              const m = notes.match(/assessmentId=([^|\s]+)/i);
-              const linkedAssessmentId = String(m?.[1] || "").trim();
-              if (linkedAssessmentId) {
-                const prev = appointmentsByAssessmentId.get(linkedAssessmentId) || [];
-                prev.push(appt);
-                appointmentsByAssessmentId.set(linkedAssessmentId, prev);
-              }
-            }
+
+for (const appt of appointmentsList) {
+  const id = String(appt?._id ?? appt?.id ?? "").trim();
+  if (id) appointmentById.set(id, appt);
+
+  const notes = String(appt?.notes ?? "");
+  const metadata = appt?.metadata || appt?.meta || {};
+
+  const fromMetadata = String(metadata?.assessmentId ?? "").trim();
+
+  const fromNotes =
+    notes.match(/assessmentId\s*[:=]\s*([^|\s,]+)/i)?.[1]?.trim() || "";
+
+  const linkedAssessmentId = fromMetadata || fromNotes;
+
+  if (linkedAssessmentId) {
+    const prev = appointmentsByAssessmentId.get(linkedAssessmentId) || [];
+    prev.push(appt);
+    appointmentsByAssessmentId.set(linkedAssessmentId, prev);
+  }
+}
             // const assigned = assignedRows
             //   .map((item) => {
             const assigned = (await Promise.all(
