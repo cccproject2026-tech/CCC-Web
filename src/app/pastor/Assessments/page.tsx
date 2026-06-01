@@ -1,7 +1,6 @@
 "use client";
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorSearchBar from "@/app/Components/pastor/PastorSearchBar";
@@ -768,11 +767,15 @@ const recommendedAssessment = filtered.find((item) => item.status === "Not Start
 
   const displayStatus = item.status;
   const primaryButtonText = item.button;
+  const isSubmittedLike =
+    item.status === "Submitted" || item.status === "Completed";
+  const meetingRequired = item.status === "Submitted" && !hasMeeting;
 
   return (
     <div
       key={item.id}
-      className={`relative flex overflow-hidden rounded-2xl border border-white/12 ${directorGlassCard} md:flex-row`}
+      // className={`relative flex overflow-hidden rounded-2xl border border-white/12 ${directorGlassCard} md:flex-row`}
+      className={`relative flex min-h-[300px] flex-col overflow-hidden rounded-2xl border border-white/12 ${directorGlassCard}`}
     >
                   <div className="options-menu-container absolute right-4 top-4 z-20">
                     <button
@@ -865,13 +868,13 @@ const recommendedAssessment = filtered.find((item) => item.status === "Not Start
                     ) : null}
                   </div> */}
 
-                  <div className="m-3 flex w-full flex-shrink-0 flex-col gap-1.5 md:m-3 md:w-[150px]">
-  <div className="relative h-[115px] w-full overflow-hidden rounded-lg md:h-[135px]">
+                  <div className="flex flex-1 flex-col gap-5 p-5 md:flex-row">
+                  <div className="relative h-[170px] w-full shrink-0 overflow-hidden rounded-xl md:h-[180px] md:w-[180px]">
     <Image
       src={item.imgUrl && !failedCardImageIds[item.id] ? item.imgUrl : FallbackAssessmentBanner}
       alt={item.title || "Assessment banner"}
       fill
-      sizes="(max-width: 768px) 100vw, 200px"
+      sizes="(max-width: 768px) 100vw, 180px"
       className="object-cover"
       onError={() => {
         if (!item.imgUrl) return;
@@ -887,29 +890,32 @@ const recommendedAssessment = filtered.find((item) => item.status === "Not Start
       </div>
     ) : null}
   </div>
-</div>
 
-                  <div className="flex flex-1 flex-col justify-between p-3">
-                    <div className="border-b border-white/12 pb-2.5">
-                      <h3 className="mb-1 text-[14px] font-semibold leading-tight text-white md:text-[16px]">
+                  <div className="flex min-w-0 flex-1 flex-col pr-8">
+                      <h3 className="text-base font-semibold leading-tight text-white">
                         {item.title}
                       </h3>
-                      <p className={`mb-2 ${pastorRoadmapDescription} ${item.meeting?.id ? "line-clamp-2" : ""}`}>
+                      <p className={`mt-2 ${pastorRoadmapDescription}`}>
                         {item.desc}
                       </p>
 
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className="text-xs font-medium text-[#d9ebf8]">Status</span>
+                      <div className="mt-4 flex flex-wrap items-center gap-3">
                         {/* <span
                           className={`rounded px-2 py-[2px] text-xs font-medium ${getStatusColor(item.status)}`}
                         >
                           {item.status}
                         </span> */}
-                        <span className={`w-fit rounded-md border px-3 py-1 text-xs font-semibold ${getStatusColor(displayStatus)}`}>
+<span className={`w-fit rounded-md border px-3 py-1 text-xs font-semibold ${getStatusColor(displayStatus)}`}>
   {displayStatus}
 </span>
+                        {meetingRequired ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-300/45 bg-amber-400/15 px-3 py-1 text-xs font-semibold text-amber-100">
+                            <i className="fa-solid fa-triangle-exclamation" />
+                            Mentor meeting required
+                          </span>
+                        ) : null}
                       </div>
-                      <div className="mb-2 grid grid-cols-1 gap-2 text-xs text-[#d9ebf8] sm:grid-cols-2">
+                      {/* <div className="mb-2 grid grid-cols-1 gap-2 text-xs text-[#d9ebf8] sm:grid-cols-2">
   <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2">
     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#8ec5eb]/15 text-[#8ec5eb]">
       <i className="fa-regular fa-calendar-check text-xs" />
@@ -933,7 +939,7 @@ const recommendedAssessment = filtered.find((item) => item.status === "Not Start
       </p>
     </div>
   </div>
-</div>
+</div> */}
 {/* <div className="mb-3 space-y-1 text-xs text-[#d9ebf8]">
   <p>
     <span className="font-medium">Assigned by :</span>{" "}
@@ -949,23 +955,15 @@ const recommendedAssessment = filtered.find((item) => item.status === "Not Start
                         <p className="mb-2 text-xs text-[#d9ebf8]">Due on : {item.dueDate}</p>
                       )} */}
 
-                      {item.status === "Submitted" && !item.meeting?.id && (
-                        <div className="mb-3">
-                          <p className="mb-2 text-xs text-amber-100/90">
-                            A mentor meeting is required. Schedule one when you are ready.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => router.push(getPastorScheduleMeetingHref(item.id))}
-                            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30 sm:w-auto"
-                          >
-                            <i className="fa-regular fa-calendar-plus" />
-                            Schedule meeting
-                          </button>
-                        </div>
-                      )}
+                      {meetingRequired ? (
+                        <p className="mt-3 text-xs text-amber-100/90">
+                          Schedule a mentor meeting when you are ready to discuss your submission.
+                        </p>
+                      ) : null}
+                  </div>
+                  </div>
 
-                      {item.meeting?.id && (
+                      {/* {item.meeting?.id && (
                         <div
                           role="link"
                           tabIndex={0}
@@ -1006,13 +1004,11 @@ const recommendedAssessment = filtered.find((item) => item.status === "Not Start
                             )}
                           </div>
                         </div>
-                      )}
+                      )} */}
 
                       {/* {item.status === "Completed" && (
                         <p className="mt-2 text-xs text-[#d9ebf8]">Completed on : {item.completedAt ?? item.submittedAt ?? item.dueDate}</p>
                       )} */}
-                    </div>
-
                     {/* <div className="mt-4 flex items-center justify-between gap-4">
                       <div className="grid grid-cols-3 gap-8 flex-1">
                         <div className="text-center">
@@ -1105,27 +1101,60 @@ const recommendedAssessment = filtered.find((item) => item.status === "Not Start
     {item.button}
   </button>
 </div> */}
-<div className="mt-4 flex flex-col gap-3">
-  <div className="flex justify-end">
-    {/* <button
+{/*  */}
+{/* <div className="mt-4 flex flex-col gap-3 border-t border-white/12 pt-4 lg:flex-row lg:items-center lg:justify-between"> */}
+<div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/12 px-5 py-4">
+  {/* <div className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2"> */}
+  <div className="flex flex-1 flex-col gap-4 sm:flex-row sm:items-center">
+    <div className="flex min-w-[190px] items-center gap-3">
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#8ec5eb]/15 text-[#8ec5eb]">
+        <i className="fa-regular fa-calendar-days text-sm" />
+      </span>
+      <div>
+        <p className="text-xs text-[#d9ebf8]/65">
+          {isSubmittedLike ? "Submitted on" : "Assigned on"}
+        </p>
+        <p className="text-sm font-semibold text-white">
+          {item.submittedAt || "N/A"}
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+  {/* <div className="flex flex-wrap justify-end gap-3"> */}
+  <div className="ml-auto flex shrink-0 flex-wrap justify-end gap-3">
+    {item.meeting?.id ? (
+      <button
+        type="button"
+        onClick={() =>
+          router.push(`/pastor/appointments/${encodeURIComponent(item.meeting!.id)}`)
+        }
+        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#8ec5eb]/45 bg-[#8ec5eb]/15 px-3 py-2 text-xs font-semibold text-[#d9ebf8] transition hover:bg-[#8ec5eb]/25"
+      >
+        <i className="fa-regular fa-calendar-check" />
+        Meeting details
+      </button>
+    ) : item.status === "Submitted" ? (
+      <button
+        type="button"
+        onClick={() => router.push(getPastorScheduleMeetingHref(item.id))}
+        className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#8ec5eb]/45 bg-[#8ec5eb]/15 px-3 py-2 text-xs font-semibold text-[#d9ebf8] transition hover:bg-[#8ec5eb]/25"
+      >
+        <i className="fa-regular fa-calendar-plus" />
+        Schedule meeting
+      </button>
+    ) : null}
+
+    <button
       type="button"
       onClick={() => router.push(getAssessmentPrimaryDestination(item))}
       className={`${pastorPrimaryCta} shrink-0 whitespace-nowrap px-4 text-xs md:px-5 md:text-sm`}
     >
-      {item.button}
-    </button> */}
-    <button
-  type="button"
-  onClick={() => {
-    router.push(getAssessmentPrimaryDestination(item));
-  }}
-  className={`${pastorPrimaryCta} shrink-0 whitespace-nowrap px-4 text-xs md:px-5 md:text-sm`}
->
-  {primaryButtonText}
-</button>
+      {primaryButtonText}
+    </button>
   </div>
 </div>
-                  </div>
                 </div>
                             );
             })}

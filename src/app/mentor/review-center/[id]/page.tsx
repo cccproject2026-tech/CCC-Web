@@ -149,6 +149,13 @@ const getDisplayName = (user: Pastor | null) =>
       "Pastor"
     : "Pastor";
 
+const formatLocalDate = (date: Date) =>
+  [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+
 function Panel({
   title,
   icon,
@@ -362,13 +369,14 @@ assignedRows.forEach((item:any) => {
 
 const loadRoadmapActivity = async () => {
   try {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = formatLocalDate(new Date());
     const res = await apiGetRoadmapSubmissionActivity(
       String(pastorId),
       today,
       today,
     );
     const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+    console.log("ROADMAP ACTIVITY RESPONSE", rows);
     setWeeklyRoadmaps(rows);
   } catch (error) {
     console.warn("Failed to load roadmap submission activity", error);
