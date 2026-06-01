@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Mentor1 from "../Assets/mentor1.png";
 import Mentor2 from "../Assets/mentor2.png";
@@ -31,6 +32,7 @@ export default function ListMenteesModal({
   mentorId,
   mentorName,
 }: ListMenteesModalProps) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [mentees, setMentees] = useState<Mentee[]>([]);
   const [loading, setLoading] = useState(false);
@@ -149,10 +151,19 @@ export default function ListMenteesModal({
           {!loading && !error && filteredMentees.length > 0 && (
             <div className="space-y-3">
               {filteredMentees.map((mentee, index) => (
-                <div
-                  key={mentee._id}
-                  className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 transition hover:bg-white/[0.1]"
-                >
+                // <div
+                //   key={mentee._id}
+                //   className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 transition hover:bg-white/[0.1]"
+                // >
+                <button
+  key={mentee._id}
+  type="button"
+  onClick={() => {
+    onClose();
+    router.push(`/director/mentees/profile/${encodeURIComponent(mentee._id)}`);
+  }}
+  className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 text-left transition hover:border-[#8ec5eb]/40 hover:bg-white/[0.1]"
+>
                   <div className="h-12 w-12 flex-shrink-0 overflow-hidden rounded-full bg-white/10 ring-1 ring-white/15">
                     <Image
                       src={mentee.profilePicture || getRandomImage(index)}
@@ -194,7 +205,7 @@ export default function ListMenteesModal({
                       {mentee.role}
                     </span>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}

@@ -120,22 +120,22 @@ export default function RemoveMenteesModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4">
-      <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-200 p-6">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+      <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-white/12 bg-[#071f35]/95 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/12 p-6">
           <div>
-            <h2 className="text-[20px] font-bold text-gray-900">Remove a Mentee</h2>
+            <h2 className="text-[20px] font-bold text-white">Remove a Mentee</h2>
             {mentorName ? (
-              <p className="mt-1 text-[13px] text-gray-500">From {mentorName}</p>
+              <p className="mt-1 text-[13px] text-[#cde2f2]/70">From {mentorName}</p>
             ) : null}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 transition hover:bg-gray-200"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/12 bg-white/10 transition hover:bg-white/15"
             aria-label="Close"
           >
-            <i className="fa-solid fa-xmark text-gray-600" />
+            <i className="fa-solid fa-xmark text-[#cde2f2]" />
           </button>
         </div>
 
@@ -146,29 +146,29 @@ export default function RemoveMenteesModal({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search mentees..."
-              className="w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-[14px] focus:outline-none focus:ring-2 focus:ring-[#2E3B8E]/30"
+              className="w-full rounded-lg border border-white/12 bg-white/[0.06] py-2.5 pl-10 pr-4 text-[14px] text-white placeholder:text-[#cde2f2]/45 focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/35"
             />
-            <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400" />
+            <i className="fa-solid fa-magnifying-glass pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-[#8ec5eb]" />
           </div>
 
           {loading ? (
             <div className="flex flex-col items-center justify-center gap-3 py-12">
-              <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#2E3B8E]/30 border-t-[#2E3B8E]" />
-              <p className="text-[13px] text-gray-600">Loading mentees…</p>
+              <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#8ec5eb]/30 border-t-[#8ec5eb]" />
+              <p className="text-[13px] text-[#cde2f2]">Loading mentees…</p>
             </div>
           ) : error ? (
             <div className="py-8 text-center">
-              <p className="mb-3 text-[15px] font-medium text-gray-900">{error}</p>
+              <p className="mb-3 text-[15px] font-medium text-white">{error}</p>
               <button
                 type="button"
                 onClick={() => void fetchMentees()}
-                className="text-[14px] font-semibold text-[#2E3B8E] hover:underline"
+                className="text-[14px] font-semibold text-[#8ec5eb] hover:underline"
               >
                 Try again
               </button>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="py-10 text-center text-[14px] text-gray-600">
+            <div className="py-10 text-center text-[14px] text-[#cde2f2]">
               {mentees.length === 0
                 ? "No mentees are assigned to this mentor yet."
                 : "No mentees match your search."}
@@ -186,20 +186,20 @@ export default function RemoveMenteesModal({
                     onClick={() => toggle(id)}
                     className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition ${
                       checked
-                        ? "border-[#2E3B8E] bg-[#f0f4ff] ring-1 ring-[#2E3B8E]/25"
-                        : "border-gray-100 hover:bg-gray-50"
+                        ? "border-[#8ec5eb] bg-[#8ec5eb]/15 ring-1 ring-[#8ec5eb]/25"
+                        : "border-white/10 bg-white/[0.05] hover:bg-white/[0.08]"
                     }`}
                   >
                     <span
                       className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
-                        checked ? "border-[#2E3B8E] bg-[#2E3B8E]" : "border-gray-300 bg-white"
+                        checked ? "border-[#8ec5eb] bg-[#8ec5eb]" : "border-white/30 bg-white/10"
                       }`}
                     >
                       {checked ? (
                         <i className="fa-solid fa-check text-[10px] text-white" />
                       ) : null}
                     </span>
-                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-gray-200">
+                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-full bg-white/10">
                       <Image
                         src={m.profilePicture || defaultImages[index % defaultImages.length]}
                         alt=""
@@ -210,10 +210,10 @@ export default function RemoveMenteesModal({
                       />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[15px] font-semibold text-gray-900">
+                      <p className="truncate text-[15px] font-semibold text-white">
                         {m.firstName} {m.lastName}
                       </p>
-                      <p className="truncate text-[12px] text-gray-500">{m.email}</p>
+                      <p className="truncate text-[12px] text-[#cde2f2]/65">{m.email}</p>
                     </div>
                   </button>
                 );
@@ -222,15 +222,15 @@ export default function RemoveMenteesModal({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 p-6">
-          <p className="text-[13px] text-gray-600">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/12 p-6">
+          <p className="text-[13px] text-[#cde2f2]/70">
             {selected.length > 0 ? `${selected.length} selected` : "Select mentees to remove"}
           </p>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-gray-200 px-5 py-2.5 text-[14px] font-semibold text-gray-700 transition hover:bg-gray-50"
+              className="rounded-lg border border-white/15 bg-white/5 px-5 py-2.5 text-[14px] font-semibold text-[#cde2f2] transition hover:bg-white/10"
             >
               Cancel
             </button>
@@ -238,7 +238,7 @@ export default function RemoveMenteesModal({
               type="button"
               disabled={selected.length === 0 || removing}
               onClick={() => void handleRemove()}
-              className="rounded-lg bg-red-600 px-5 py-2.5 text-[14px] font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-lg border border-red-400/45 bg-red-600 px-5 py-2.5 text-[14px] font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {removing ? "Removing…" : "Remove"}
             </button>

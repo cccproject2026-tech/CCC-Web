@@ -8,10 +8,10 @@ import PersonListCard from "@/app/Components/PersonListCard";
 import FeaturedAvatars, {
   FeaturedAvatarItem,
 } from "@/app/Components/FeaturedAvatars";
-import ConfirmModal from "@/app/Components/ConfirmModal";
 import ScheduleMeetingModal from "@/app/Components/ScheduleMeetingModal";
 import AssignMenteesModal from "@/app/Components/AssignMenteesModal";
 import ListMenteesModal from "@/app/Components/ListMenteesModal";
+import RemoveMenteesModal from "@/app/Components/RemoveMenteesModal";
 import MentorBg from "../../Assets/mentor-bg.png";
 import Mentor1 from "../../Assets/mentor1.png";
 import Mentor2 from "../../Assets/mentor2.png";
@@ -277,8 +277,10 @@ export default function MyMentorsPage() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [showRemoveModal, setShowRemoveModal] = useState(false);
   const [showListMenteesModal, setShowListMenteesModal] = useState(false);
+  const [removeMentorId, setRemoveMentorId] = useState<string | null>(null);
+  const [removeMentorName, setRemoveMentorName] = useState<string | null>(null);
+  const [isRemoveMenteesOpen, setIsRemoveMenteesOpen] = useState(false);
   const [selectedMentor, setSelectedMentor] = useState<Mentor | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
@@ -432,7 +434,7 @@ export default function MyMentorsPage() {
   const assignMenteeCountGen = useRef(0);
 
   useEffect(() => {
-    const ids = mentorAssignedFetchKey.split(",").filter(Boolean);
+    const ids = mentorAssignedFetchKey.split("|")[1]?.split(",").filter(Boolean) ?? [];
     if (ids.length === 0) return;
 
     const myGen = ++assignMenteeCountGen.current;
@@ -528,8 +530,9 @@ export default function MyMentorsPage() {
   }, []);
 
   const handleRemoveMentee = useCallback((mentor: Mentor) => {
-    setSelectedMentor(mentor);
-    setShowRemoveModal(true);
+    setRemoveMentorId(mentor.id);
+    setRemoveMentorName(mentor.name);
+    setIsRemoveMenteesOpen(true);
   }, []);
 
   // const handleListMentees = useCallback((mentor: Mentor) => {
@@ -543,6 +546,81 @@ const handleListMentees = useCallback((mentor: Mentor) => {
   setSelectedMentor(mentor);
   setShowListMenteesModal(true);
 }, []);
+
+  const refreshMentors = useCallback(async () => {
+    try {
+      const search = debouncedQuery.length > 0 ? debouncedQuery : undefined;
+      if (activeFilter === "Field Mentor") {
+        const [list, feat] = await Promise.all([
+          fetchFieldMentorPage({
+            search,
+            page: currentPage,
+            limit: PAGE_SIZE,
+          }),
+          fetchFieldMentorPage({
+            search,
+            page: 1,
+            limit: FEATURED_THUMB_LIMIT,
+          }),
+        ]);
+        setAllMentors(
+          list.users.map((u: any, i: number) => convertUserToMentor(u, i))
+        );
+        setTotalCount(list.total);
+        setTotalPages(list.totalPages);
+        setFeaturedMentors(
+          feat.users.map((u: any, i: number) => convertUserToMentor(u, i))
+        );
+      } else if (activeFilter === "Mentors") {
+        const [list, feat] = await Promise.all([
+          fetchMentorOnlyPage({
+            search,
+            page: currentPage,
+            limit: PAGE_SIZE,
+          }),
+          fetchMentorOnlyPage({
+            search,
+            page: 1,
+            limit: FEATURED_THUMB_LIMIT,
+          }),
+        ]);
+        setAllMentors(
+          list.users.map((u: any, i: number) => convertUserToMentor(u, i))
+        );
+        setTotalCount(list.total);
+        setTotalPages(list.totalPages);
+        setFeaturedMentors(
+          feat.users.map((u: any, i: number) => convertUserToMentor(u, i))
+        );
+      } else {
+        const [listRes, featRes] = await Promise.all([
+          buildMentorListRequest(activeFilter, {
+            search,
+            page: currentPage,
+            limit: PAGE_SIZE,
+          }),
+          buildMentorListRequest(activeFilter, {
+            search,
+            page: 1,
+            limit: FEATURED_THUMB_LIMIT,
+          }),
+        ]);
+        const { users, total, totalPages: tp } = listRes.data.data;
+        setAllMentors(
+          users.map((u: any, i: number) => convertUserToMentor(u, i))
+        );
+        setTotalCount(total);
+        setTotalPages(tp);
+        const featUsers = featRes.data.data.users;
+        setFeaturedMentors(
+          featUsers.map((u: any, i: number) => convertUserToMentor(u, i))
+        );
+      }
+      setMentorMenteeHydrateNonce((n) => n + 1);
+    } catch (error) {
+      console.error("Error refreshing mentors:", error);
+    }
+  }, [activeFilter, currentPage, debouncedQuery]);
 
   const getMentorOptions = (mentor: Mentor) => [
     {
@@ -569,13 +647,13 @@ const handleListMentees = useCallback((mentor: Mentor) => {
       color: "text-[#8ec5eb]",
       onClick: () => handleScheduleMeeting(mentor),
     },
-    {
-      icon: "fa-regular fa-pen-to-square",
-      label: "Edit Profile",
-      color: "text-[#8ec5eb]",
-      onClick: () =>
-        router.push(`/director/mentors/profile/edit?id=${mentor.id}`),
-    },
+    // {
+    //   icon: "fa-regular fa-pen-to-square",
+    //   label: "Edit Profile",
+    //   color: "text-[#8ec5eb]",
+    //   onClick: () =>
+    //     router.push(`/director/mentors/profile/edit?id=${encodeURIComponent(mentor.id)}`),
+    // },
   ];
 
   return (
@@ -832,83 +910,7 @@ const handleListMentees = useCallback((mentor: Mentor) => {
         onSuccess={(message) => {
           setToast({ message, type: 'success' });
           setTimeout(() => setToast(null), 3000);
-          // Refresh list + featured thumbnails (mentee counts)
-          const fetchMentors = async () => {
-            try {
-              const search =
-                debouncedQuery.length > 0 ? debouncedQuery : undefined;
-              if (activeFilter === "Field Mentor") {
-                const [list, feat] = await Promise.all([
-                  fetchFieldMentorPage({
-                    search,
-                    page: currentPage,
-                    limit: PAGE_SIZE,
-                  }),
-                  fetchFieldMentorPage({
-                    search,
-                    page: 1,
-                    limit: FEATURED_THUMB_LIMIT,
-                  }),
-                ]);
-                setAllMentors(
-                  list.users.map((u: any, i: number) => convertUserToMentor(u, i))
-                );
-                setTotalCount(list.total);
-                setTotalPages(list.totalPages);
-                setFeaturedMentors(
-                  feat.users.map((u: any, i: number) => convertUserToMentor(u, i))
-                );
-              } else if (activeFilter === "Mentors") {
-                const [list, feat] = await Promise.all([
-                  fetchMentorOnlyPage({
-                    search,
-                    page: currentPage,
-                    limit: PAGE_SIZE,
-                  }),
-                  fetchMentorOnlyPage({
-                    search,
-                    page: 1,
-                    limit: FEATURED_THUMB_LIMIT,
-                  }),
-                ]);
-                setAllMentors(
-                  list.users.map((u: any, i: number) => convertUserToMentor(u, i))
-                );
-                setTotalCount(list.total);
-                setTotalPages(list.totalPages);
-                setFeaturedMentors(
-                  feat.users.map((u: any, i: number) => convertUserToMentor(u, i))
-                );
-              } else {
-                const [listRes, featRes] = await Promise.all([
-                  buildMentorListRequest(activeFilter, {
-                    search,
-                    page: currentPage,
-                    limit: PAGE_SIZE,
-                  }),
-                  buildMentorListRequest(activeFilter, {
-                    search,
-                    page: 1,
-                    limit: FEATURED_THUMB_LIMIT,
-                  }),
-                ]);
-                const { users, total, totalPages: tp } = listRes.data.data;
-                setAllMentors(
-                  users.map((u: any, i: number) => convertUserToMentor(u, i))
-                );
-                setTotalCount(total);
-                setTotalPages(tp);
-                const featUsers = featRes.data.data.users;
-                setFeaturedMentors(
-                  featUsers.map((u: any, i: number) => convertUserToMentor(u, i))
-                );
-              }
-              setMentorMenteeHydrateNonce((n) => n + 1);
-            } catch (error) {
-              console.error("Error refreshing mentors:", error);
-            }
-          };
-          fetchMentors();
+          void refreshMentors();
         }}
         onError={(message) => {
           setToast({ message, type: 'error' });
@@ -922,20 +924,20 @@ const handleListMentees = useCallback((mentor: Mentor) => {
       />
 
       {/* Remove Mentee Modal */}
-      <ConfirmModal
-        isOpen={showRemoveModal}
-        onClose={() => setShowRemoveModal(false)}
-        onConfirm={() => {
-          setToast({ message: "Mentee Removed Successfully", type: 'success' });
+      <RemoveMenteesModal
+        isOpen={isRemoveMenteesOpen}
+        onClose={() => setIsRemoveMenteesOpen(false)}
+        mentorId={removeMentorId}
+        mentorName={removeMentorName}
+        onSuccess={(message) => {
+          setToast({ message, type: 'success' });
+          setTimeout(() => setToast(null), 3000);
+          void refreshMentors();
+        }}
+        onError={(message) => {
+          setToast({ message, type: 'error' });
           setTimeout(() => setToast(null), 3000);
         }}
-        title="Remove a Mentee"
-        message={`Remove a mentee from ${selectedMentor?.name}. This action cannot be undone.`}
-        confirmText="Remove"
-        cancelText="Cancel"
-        confirmColor="bg-red-600 hover:bg-red-700"
-        icon="fa-solid fa-user-minus"
-        iconColor="text-red-500 bg-red-100"
       />
 
       {/* List Mentees Modal */}

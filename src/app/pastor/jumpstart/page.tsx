@@ -75,6 +75,7 @@ import {
 import {
   deriveTaskStatusForList,
   normalizeRoadmapId,
+  resolveNestedTemplateItemId,
   unwrapNestedRoadmapsArray,
   unwrapProgressData,
   type RoadmapAssignmentUi,
@@ -122,6 +123,21 @@ function extractRoadmapDocumentFromResponse(res: { data?: unknown }): Record<str
   const doc = unwrap(res?.data);
   if (doc == null || typeof doc !== "object" || Array.isArray(doc)) return null;
   return doc as Record<string, unknown>;
+}
+
+/** Nested task containers vary across backend versions. */
+function unwrapNestedTaskRows(doc: Record<string, unknown> | null): Record<string, any>[] {
+  if (!doc) return [];
+
+  for (const key of ["roadmaps", "nestedRoadmaps", "children"]) {
+    const raw = doc[key];
+    if (Array.isArray(raw)) return raw as Record<string, any>[];
+    if (raw && typeof raw === "object" && Array.isArray((raw as { items?: unknown }).items)) {
+      return (raw as { items: Record<string, any>[] }).items;
+    }
+  }
+
+  return unwrapNestedRoadmapsArray(doc).map((row) => row as Record<string, any>);
 }
 
 /** Same labels as revitalization-roadmap list (progress-derived). */
@@ -305,9 +321,13 @@ function unwrapRoadmapSubmissionList(res: any): RoadmapSubmission[] {
 function JumpStartContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nestedItemId = searchParams.get("id")?.trim() || null;
-  const parentRoadmapId = searchParams.get("parentId")?.trim() || null;
+  const idParam = searchParams.get("id")?.trim() || null;
+  const taskIdParam = searchParams.get("taskId")?.trim() || null;
+  const parentIdParam = searchParams.get("parentId")?.trim() || null;
+  const parentRoadmapId = parentIdParam || (taskIdParam ? idParam : null);
+  const nestedItemId = taskIdParam || idParam;
   // When coming from SelfRevitalizationPhasePage: id=nestedItemId, parentId=parentRoadmapId
+  // Also accept id=parentRoadmapId&taskId=nestedItemId from direct links.
   // For extras/comments/queries the roadmapId is always the parent roadmap ID
   const roadmapId = parentRoadmapId || nestedItemId;
 
@@ -686,6 +706,7 @@ if (extra.type === "DATE_PICKER") {
   useEffect(() => {
     if (!nestedItemId) return;
     const fetchRoadmap = async () => {
+      let redirectingToNestedTask = false;
       try {
         setLoading(true);
         setRoadmapLoadError(null);
@@ -703,9 +724,10 @@ if (extra.type === "DATE_PICKER") {
             try {
               const parentRes = await apiGetRoadmapById(parentRoadmapId);
               const parentDoc = extractRoadmapDocumentFromResponse(parentRes) as any;
-              const fromParent = unwrapNestedRoadmapsArray(parentDoc).find(
+              const fromParent = unwrapNestedTaskRows(parentDoc).find(
                 (r: any) =>
-                  normalizeRoadmapId(r?._id ?? r?.id) === normalizeRoadmapId(nestedItemId),
+                  normalizeRoadmapId(resolveNestedTemplateItemId(r)) ===
+                  normalizeRoadmapId(nestedItemId),
               );
               if (fromParent && Array.isArray(fromParent.extras) && fromParent.extras.length > 0) {
                 data = { ...(data || {}), extras: fromParent.extras };
@@ -717,12 +739,44 @@ if (extra.type === "DATE_PICKER") {
         } else {
           const res = await apiGetRoadmapById(nestedItemId);
           data = extractRoadmapDocumentFromResponse(res);
+          console.log("PASTOR JUMPSTART ROADMAP DATA", data);
+
+          const nestedTasks = unwrapNestedTaskRows(data);
+          if (nestedTasks.length > 0) {
+            const selectedTask =
+              nestedTasks.find((task) => {
+                const taskId = resolveNestedTemplateItemId(task);
+                if (!taskId) return false;
+                return (
+                  deriveTaskStatusForList(progressData, {
+                    parentRoadmapId: nestedItemId,
+                    taskId,
+                    itemStatus:
+                      typeof task.status === "string" ? task.status : undefined,
+                    endDate:
+                      typeof task.endDate === "string" ? task.endDate : undefined,
+                  }) !== "Completed"
+                );
+              }) ?? nestedTasks[0];
+            console.log("SELECTED TASK", selectedTask);
+
+            const selectedTaskId = resolveNestedTemplateItemId(selectedTask);
+            if (selectedTaskId) {
+              redirectingToNestedTask = true;
+              router.replace(
+                `/pastor/jumpstart?id=${encodeURIComponent(selectedTaskId)}&parentId=${encodeURIComponent(nestedItemId)}`,
+              );
+              return;
+            }
+          }
         }
         if (!data) {
           setRoadmap(null);
           setRoadmapLoadError("This task could not be loaded.");
           return;
         }
+        console.log("PASTOR JUMPSTART ROADMAP DATA", data);
+        console.log("SELECTED TASK", data);
         setRoadmap(data);
       } catch (err) {
         console.error("Failed to fetch roadmap", err);
@@ -732,11 +786,11 @@ if (extra.type === "DATE_PICKER") {
             "Couldn't load this task. Open it again from the revitalization roadmap.",
         );
       } finally {
-        setLoading(false);
+        if (!redirectingToNestedTask) setLoading(false);
       }
     };
     fetchRoadmap();
-  }, [nestedItemId, parentRoadmapId]);
+  }, [nestedItemId, parentRoadmapId, progressData, router]);
 
   // Load saved extras + merge task defaults (mobile-style: name / key / signatureData)
   useEffect(() => {
@@ -1249,9 +1303,10 @@ const refreshSubmissionHistory = useCallback(async (): Promise<RoadmapSubmission
           try {
             const parentRes = await apiGetRoadmapById(parentRoadmapId);
             const parentDoc = extractRoadmapDocumentFromResponse(parentRes) as any;
-            const fromParent = unwrapNestedRoadmapsArray(parentDoc).find(
+            const fromParent = unwrapNestedTaskRows(parentDoc).find(
               (r: any) =>
-                normalizeRoadmapId(r?._id ?? r?.id) === normalizeRoadmapId(nestedItemId),
+                normalizeRoadmapId(resolveNestedTemplateItemId(r)) ===
+                normalizeRoadmapId(nestedItemId),
             );
             if (fromParent && Array.isArray(fromParent.extras) && fromParent.extras.length > 0) {
               data = { ...(data || {}), extras: fromParent.extras } as any;

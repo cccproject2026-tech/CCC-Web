@@ -643,7 +643,7 @@ export default function IndividualProgressPage() {
                 onClick={() => setIsFinalCommentsModalOpen(true)}
                 className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
               >
-                {isCompleted ? "View final comments" : "Add final comments"}
+                {isCompleted ? "Send final comments" : "Add final comments"}
               </button>
             </div>
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

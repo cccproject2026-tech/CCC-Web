@@ -413,12 +413,12 @@ export default function MentorProfilePage() {
                         <i className="fa-regular fa-trash-can" />
                         Delete
                       </button>
-                      <button
+                      {/* <button
                         type="button"
                         onClick={() =>
                           router.push(
                             id
-                              ? `/director/mentors/profile/${id}/edit`
+                              ? `/director/mentors/profile/edit?id=${encodeURIComponent(String(id))}`
                               : "/director/mentors/profile/edit",
                           )
                         }
@@ -426,7 +426,7 @@ export default function MentorProfilePage() {
                       >
                         <i className="fa-regular fa-pen-to-square" />
                         Edit profile
-                      </button>
+                      </button> */}
                     </div>
                   }
                   personal={{

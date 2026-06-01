@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import AppHero from "@/app/Components/Hero/AppHero";import ConfirmModal from "@/app/Components/ConfirmModal";
+import AppHero from "@/app/Components/Hero/AppHero";
+import ConfirmModal from "@/app/Components/ConfirmModal";
 import ProfileForm, { ChurchInfo, OtherInfo, PersonalInfo } from "@/app/Components/ProfileForm";
 import ProfileSidebarCard from "@/app/Components/ProfileSidebarCard";
 import MentorBg from "@/app/Assets/mentor-bg.png";
@@ -223,15 +224,17 @@ function MentorProfileContent() {
                     <i className="fa-regular fa-trash-can"></i>
                     Delete Profile
                   </button>
-                  <button
+                  {/* <button
                     onClick={() =>
-                      router.push(`/director/mentors/profile/edit?id=${mentorId}`)
+                      router.push(
+                        `/director/mentors/profile/edit?id=${encodeURIComponent(String(mentorId))}`,
+                      )
                     }
                     className="px-4 py-2 bg-white border-2 border-blue-600 text-blue-600 rounded-lg text-[13px] font-semibold hover:bg-blue-50 transition-all flex items-center gap-2"
                   >
                     <i className="fa-regular fa-pen-to-square"></i>
                     Edit Profile
-                  </button>
+                  </button> */}
                 </div>
               }
               personal={personal}
@@ -277,7 +280,8 @@ function MentorProfileContent() {
           className="fixed inset-0 z-40"
           onClick={() => setShowOptionsMenu(false)}
         ></div>
-      )}    </div>
+      )}
+    </div>
   );
 }
 

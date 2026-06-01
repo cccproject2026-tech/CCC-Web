@@ -239,7 +239,7 @@ function EditMentorProfileContent() {
       setToast("Failed to save changes");
       setTimeout(() => setToast(null), 4000);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -451,35 +451,35 @@ function EditMentorProfileContent() {
       />
 
       {showDocsModal ? (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
-          <div className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-              <h3 className="text-lg font-bold text-gray-900">Documents</h3>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 px-4 backdrop-blur-sm">
+          <div className="max-h-[85vh] w-full max-w-lg overflow-hidden rounded-2xl border border-white/12 bg-[#071f35]/95 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/12 px-5 py-4">
+              <h3 className="text-lg font-bold text-white">Documents</h3>
               <button
                 type="button"
                 onClick={() => setShowDocsModal(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200"
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/12 bg-white/10 transition hover:bg-white/15"
                 aria-label="Close"
               >
-                <i className="fa-solid fa-xmark text-gray-600" />
+                <i className="fa-solid fa-xmark text-[#cde2f2]" />
               </button>
             </div>
             <div className="max-h-[60vh] overflow-auto p-5">
               {documents.length === 0 ? (
-                <p className="py-10 text-center text-sm text-gray-600">No documents on file.</p>
+                <p className="py-10 text-center text-sm text-[#cde2f2]/75">No documents on file.</p>
               ) : (
                 <div className="space-y-2">
                   {documents.map((doc) => (
                     <div
                       key={doc.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-gray-50 p-3"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.05] p-3"
                     >
                       <div className="min-w-0 flex items-center gap-3">
                         <i className="fa-regular fa-file-pdf shrink-0 text-xl text-red-500" />
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-gray-900">{doc.name}</p>
+                          <p className="truncate text-sm font-semibold text-white">{doc.name}</p>
                           {doc.size ? (
-                            <p className="text-xs text-gray-500">{doc.size}</p>
+                            <p className="text-xs text-[#cde2f2]/65">{doc.size}</p>
                           ) : null}
                         </div>
                       </div>
@@ -487,7 +487,7 @@ function EditMentorProfileContent() {
                         <button
                           type="button"
                           onClick={() => handleDownload(doc.name)}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-blue-600 hover:bg-gray-100"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 text-[#8ec5eb] transition hover:bg-[#8ec5eb]/20"
                           aria-label="Download"
                         >
                           <i className="fa-solid fa-download text-xs" />
@@ -495,7 +495,7 @@ function EditMentorProfileContent() {
                         <button
                           type="button"
                           onClick={() => setShowDeleteDocConfirm(doc.id)}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white text-red-600 hover:bg-red-50"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-red-400/35 bg-red-500/10 text-red-300 transition hover:bg-red-500/20"
                           aria-label="Remove"
                         >
                           <i className="fa-regular fa-trash-can text-xs" />

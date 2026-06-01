@@ -744,10 +744,10 @@ setScheduleDescription("");
       >
         <div className={pastorHeroOverlay} />
         <div className="relative z-10">
-          <p className={pastorEyebrowPill}>
+          {/* <p className={pastorEyebrowPill}>
             <span className={pastorEyebrowDot} />
             Leadership Support Network
-          </p>
+          </p> */}
           <h1 className="text-2xl sm:text-3xl font-semibold">Appointments</h1>
           <p className="mt-2 max-w-xl text-sm text-[#d9ebf8] md:text-base">
             Manage your scheduled sessions and upcoming mentor meetings.
