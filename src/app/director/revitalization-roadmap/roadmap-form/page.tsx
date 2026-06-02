@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isAxiosError } from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
 import DirectorHero from "../../DirectorHero";
 import {
@@ -192,7 +193,7 @@ function RoadmapFieldPreview({ f }: { f: Record<string, any> }) {
               />
               Allow Pastor to Select Date
             </label>
-            <label className="flex cursor-default items-center gap-2.5 text-sm text-white/90">
+            {/* <label className="flex cursor-default items-center gap-2.5 text-sm text-white/90">
               <input
                 type="checkbox"
                 checked={!!f.showOnCard}
@@ -201,7 +202,7 @@ function RoadmapFieldPreview({ f }: { f: Record<string, any> }) {
                 className="h-4 w-4 accent-[#8ec5eb]"
               />
               Show on Card
-            </label>
+            </label> */}
           </div>
         </div>
       );
@@ -233,7 +234,7 @@ function RoadmapFieldPreview({ f }: { f: Record<string, any> }) {
       return (
         <label className="flex cursor-default items-center gap-2.5 text-sm text-white/90">
           <input type="checkbox" readOnly className="h-4 w-4 accent-[#8ec5eb]" />
-          {f.name || "—"}
+          {f.checkboxLabel || f.name || "—"}
         </label>
       );
     case "text_display":
@@ -416,8 +417,7 @@ export default function DirectorRoadmapFormPage() {
             id: fieldId,
             type: "checkbox_item",
             name: extra.name,
-            haveButton: !!extra.haveButton,
-            buttonName: extra.buttonName || "",
+            checkboxLabel: extra.checkboxLabel || extra.label || extra.name,
           });
           break;
         case "TEXT_DISPLAY":
@@ -450,7 +450,12 @@ export default function DirectorRoadmapFormPage() {
   allowedFileTypes: sectionExtra.allowedFileTypes || ["image", "document", "video"],
 });
               else if (sectionExtra.type === "TEXT_DISPLAY") fields.push({ ...base, type: "text_display", name: sectionExtra.name });
-              else if (sectionExtra.type === "CHECKBOX") fields.push({ ...base, type: "checkbox_item", name: sectionExtra.name, haveButton: !!sectionExtra.haveButton, buttonName: sectionExtra.buttonName || "" });
+              else if (sectionExtra.type === "CHECKBOX") fields.push({
+                ...base,
+                type: "checkbox_item",
+                name: sectionExtra.name,
+                checkboxLabel: sectionExtra.checkboxLabel || sectionExtra.label || sectionExtra.name,
+              });
               else if (sectionExtra.type === "DATE_PICKER") {
                 fields.push({
                   ...base,
@@ -542,7 +547,13 @@ field.showOnCard ? { type: "CHECKBOX", name: "Show on Card", checked: true, have
             };
           }
           case "checkbox_item":
-            return { type: "CHECKBOX", name: field.name || field.label || "Check Box", haveButton: !!field.haveButton, ...(field.buttonName ? { buttonName: field.buttonName } : {}) };
+            return {
+              type: "CHECKBOX",
+              name: field.name || field.label || "Check Box",
+              checkboxLabel: field.checkboxLabel || field.name || field.label || "Check Box",
+              haveButton: false,
+              buttonName: "",
+            };
           case "text_display":
             return { type: "TEXT_DISPLAY", name: field.name || field.label || "" };
           case "digital_signature":
@@ -558,7 +569,13 @@ field.showOnCard ? { type: "CHECKBOX", name: "Show on Card", checked: true, have
                 if (nf.type === "textarea") return { type: "TEXT_AREA", name: nf.label || "Text Area", ...(nf.placeholder ? { placeHolder: nf.placeholder } : {}) };
                 if (nf.type === "upload") return { type: "UPLOAD", name: nf.buttonLabel || "Upload" };
                 if (nf.type === "text_display") return { type: "TEXT_DISPLAY", name: nf.name || nf.label || "" };
-                if (nf.type === "checkbox_item") return { type: "CHECKBOX", name: nf.name || nf.label || "Check Box", haveButton: !!nf.haveButton, ...(nf.buttonName ? { buttonName: nf.buttonName } : {}) };
+                if (nf.type === "checkbox_item") return {
+                  type: "CHECKBOX",
+                  name: nf.name || nf.label || "Check Box",
+                  checkboxLabel: nf.checkboxLabel || nf.name || nf.label || "Check Box",
+                  haveButton: false,
+                  buttonName: "",
+                };
                 if (nf.type === "datepicker") {
                   const cbs = [
                     // nf.allowPastorSelect ? { type: "CHECKBOX", name: "Allow pastor to select Date", haveButton: false } : null,
@@ -646,9 +663,6 @@ field.showOnCard ? { type: "CHECKBOX", name: "Show on Card", checked: true, have
         return null;
       case "checkbox_item":
         if (!String(fieldDraft.name ?? "").trim()) return "Name is required.";
-        if (fieldDraft.haveButton && !String(fieldDraft.buttonName ?? "").trim()) {
-          return "Button name is required when \"Have button\" is enabled.";
-        }
         return null;
       case "text_display":
         if (!String(fieldDraft.name ?? "").trim()) return "Text is required.";
@@ -727,6 +741,7 @@ field.showOnCard ? { type: "CHECKBOX", name: "Show on Card", checked: true, have
       try {
         const res = await apiGetRoadmapById(roadmapId);
         const doc = unwrapRoadmap(res.data);
+        console.log("DIRECTOR ROADMAP GET PARENT RESPONSE", doc);
         if (cancelled) return;
         setParent(doc);
 
@@ -770,6 +785,7 @@ field.showOnCard ? { type: "CHECKBOX", name: "Show on Card", checked: true, have
             const nRes = await apiGetNestedRoadmapItem(roadmapId, nestedRoadmapId);
             if (!cancelled) {
               fromNestedGet = unwrapNestedRoadmapItem(nRes.data);
+              console.log("DIRECTOR ROADMAP GET NESTED RESPONSE", fromNestedGet);
             }
           } catch (e) {
             console.error(e);
@@ -785,6 +801,8 @@ field.showOnCard ? { type: "CHECKBOX", name: "Show on Card", checked: true, have
           fromList && fromNestedGet
             ? { ...fromList, ...fromNestedGet }
             : fromNestedGet ?? fromList ?? null;
+        console.log("DIRECTOR ROADMAP EDIT NESTED MERGED", nested);
+        console.log("DIRECTOR ROADMAP EDIT EXTRAS FROM API", (nested as any)?.extras || []);
         const nTitle =
           (nested as { name?: string; title?: string } | null)?.name ||
           (nested as { name?: string; title?: string } | null)?.title;
@@ -811,7 +829,9 @@ field.showOnCard ? { type: "CHECKBOX", name: "Show on Card", checked: true, have
               roadmapData.completionTime,
           ),
         );
-        setCustomFields(transformExtrasToFields(((nested as any)?.extras || []) as any[]));
+        const fieldsFromExtras = transformExtrasToFields(((nested as any)?.extras || []) as any[]);
+        console.log("DIRECTOR ROADMAP EDIT FIELDS FROM EXTRAS", fieldsFromExtras);
+        setCustomFields(fieldsFromExtras);
 
         // Mobile parity for banner: prefer param bannerImage; fall back to nested.imageUrl.
         const img = roadmapData.bannerImage || safeString((nested as any)?.imageUrl || "");
@@ -896,6 +916,7 @@ if (!churchVerbiage.trim()) {
 }
 
     const extras = transformFieldsToExtras(customFields) as any[];
+    console.log("DIRECTOR ROADMAP EXTRAS BEFORE SAVE", extras);
 
     if (!roadmapId) return;
     if (!parent) return;
@@ -975,11 +996,16 @@ if (!churchVerbiage.trim()) {
           meetings: existing?.meetings || [],
           status: existing?.status || "not started",
         };
+        console.log("DIRECTOR ROADMAP UPDATED ONE", updatedOne);
         await apiUpdateNestedRoadmapItem(roadmapId, nestedRoadmapId, updatedOne, bannerFile ?? undefined);
         setSaveToast("Task updated successfully.");
         return;
       }
     } catch (e: any) {
+      if (isAxiosError(e)) {
+        console.error("ROADMAP SAVE 400 RESPONSE", e.response?.data);
+        console.error("ROADMAP SAVE 400 STATUS", e.response?.status);
+      }
       console.error(e);
       setError(e?.response?.data?.message || e?.message || "Failed to save roadmap.");
     } finally {
@@ -1534,7 +1560,7 @@ if (!churchVerbiage.trim()) {
                         />
                         Allow Pastor to Select Date
                       </label>
-                      <label className="inline-flex items-center gap-2 text-sm text-white/80">
+                      {/* <label className="inline-flex items-center gap-2 text-sm text-white/80">
                         <input
                           type="checkbox"
                           checked={!!fieldDraft.showOnCard}
@@ -1542,7 +1568,7 @@ if (!churchVerbiage.trim()) {
                           className="h-4 w-4 accent-[#8ec5eb]"
                         />
                         Show on Card
-                      </label>
+                      </label> */}
                     </div>
                   </>
                 ) : null}
@@ -1598,26 +1624,17 @@ if (!churchVerbiage.trim()) {
                         className={directorInputClass}
                       />
                     </div>
-                    <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-3">
-                      {/* <label className="inline-flex items-center gap-2 text-sm text-white/80">
-                        <input
-                          type="checkbox"
-                          checked={!!fieldDraft.haveButton}
-                          onChange={(e) => setFieldDraft((p) => ({ ...p, haveButton: e.target.checked }))}
-                          className="h-4 w-4 accent-[#8ec5eb]"
-                        />
-                        Have button
-                      </label> */}
-                      {fieldDraft.haveButton ? (
-                        <div className="w-full sm:w-auto sm:flex-1">
-                          <input
-                            value={fieldDraft.buttonName ?? ""}
-                            onChange={(e) => setFieldDraft((p) => ({ ...p, buttonName: e.target.value }))}
-                            className={directorInputClass}
-                            placeholder="Button name"
-                          />
-                        </div>
-                      ) : null}
+                    <div className="sm:col-span-2">
+                      <label className="mb-1.5 block text-xs font-medium text-white/70">Checkbox Label</label>
+                      <input
+                        value={fieldDraft.checkboxLabel ?? ""}
+                        onChange={(e) => {
+                          setFieldDraft((p) => ({ ...p, checkboxLabel: e.target.value }));
+                          if (fieldModalError) setFieldModalError(null);
+                        }}
+                        className={directorInputClass}
+                        placeholder={fieldDraft.name || "Text shown beside the checkbox"}
+                      />
                     </div>
                   </>
                 ) : null}

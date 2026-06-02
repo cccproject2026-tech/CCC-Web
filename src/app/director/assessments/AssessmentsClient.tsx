@@ -327,6 +327,8 @@ function AssessmentsPageContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const assignUserFromQuery = searchParams.get("assignUser");
+  const tabFromQuery = searchParams.get("tab");
+const pastorIdFromQuery = searchParams.get("pastorId");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedAssessments, setSelectedAssessments] = useState<string[]>([]);
@@ -345,13 +347,19 @@ function AssessmentsPageContent() {
   const [listRefetchKey, setListRefetchKey] = useState(0);
   const [featuredItems, setFeaturedItems] = useState<FeaturedAvatarItem[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(false);
-  const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(assignUserFromQuery);
+  // const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(assignUserFromQuery);
+  const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(
+  pastorIdFromQuery || assignUserFromQuery
+);
   const [assignDueDate, setAssignDueDate] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name_asc" | "name_desc">("newest");
   const [statusFilter, setStatusFilter] = useState<"all" | "not_started" | "submitted" | "completed">("all");
-  const [activeTab, setActiveTab] = useState<
+//   const [activeTab, setActiveTab] = useState<
+//   "assessments" | "mentors" | "pastors"
+// >("assessments");
+const [activeTab, setActiveTab] = useState<
   "assessments" | "mentors" | "pastors"
->("assessments");
+>(tabFromQuery === "pastors" ? "pastors" : "assessments");
 
 const [selectedMentorId, setSelectedMentorId] = useState<string | null>(null);
 const [selectedMentorName, setSelectedMentorName] = useState("");
@@ -751,7 +759,8 @@ useEffect(() => {
   }, [pathname]);
 
   useEffect(() => {
-    if (!assignUserFromQuery) return;
+    // if (!assignUserFromQuery) return;
+     if (!assignUserFromQuery || pastorIdFromQuery) return;
     if (lastAssignBootstrap.current === assignUserFromQuery) return;
     lastAssignBootstrap.current = assignUserFromQuery;
     setSelectedMenteeId(assignUserFromQuery);

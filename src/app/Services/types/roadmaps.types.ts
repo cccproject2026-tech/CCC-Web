@@ -35,7 +35,9 @@ export interface TextDisplayExtra {
 export interface CheckboxExtra {
   type: 'CHECKBOX';
   name: string;
-  haveButton: boolean;
+  checkboxLabel?: string;
+  label?: string;
+  haveButton?: boolean;
   checked?: boolean;
   buttonName?: string;
 }

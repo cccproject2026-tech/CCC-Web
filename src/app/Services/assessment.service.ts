@@ -256,7 +256,14 @@ export const apiAssignAssessmentViaModule = (assessmentId: string, payload: Assi
 export const apiDeleteAssessments = (ids: string[]) =>
   axiosInstance.delete<{ success: boolean; message: string }>("/assessment", { data: { ids } });
 
-// PATCH /assessment/:id/instructions — optional: name, description, type, preSurvey
+// PATCH /assessment/:id - main assessment update.
+export const apiPatchAssessmentMain = (assessmentId: string, body: UpdateAssessmentPayload) =>
+  axiosInstance.patch<{ success: boolean; data: AssessmentResponse }>(
+    `/assessment/${assessmentId}`,
+    body,
+  );
+
+// PATCH /assessment/:id/instructions - legacy metadata path kept for existing callers.
 export const apiPatchAssessment = (assessmentId: string, body: UpdateAssessmentPayload) =>
   axiosInstance.patch<{ success: boolean; data: AssessmentResponse }>(
     `/assessment/${assessmentId}/instructions`,

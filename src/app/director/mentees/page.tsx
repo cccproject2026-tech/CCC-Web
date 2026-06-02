@@ -609,7 +609,8 @@ export default function MenteesPage() {
       color: "text-[#8ec5eb]",
       onClick: () =>
         router.push(
-          `/director/assessments?assignUser=${encodeURIComponent(menteeId)}`
+          // `/director/assessments?assignUser=${encodeURIComponent(menteeId)}`
+          `/director/assessments?tab=pastors&pastorId=${encodeURIComponent(menteeId)}`
         ),
     },
     // {

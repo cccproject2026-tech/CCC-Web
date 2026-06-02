@@ -114,12 +114,15 @@ function appendNestedRoadmapItemToFormData(
   }
 
   const appendExtraFields = (base: string, extra: Record<string, unknown>) => {
+    const type = String(extra.type ?? "");
     if (extra.type != null) formData.append(`${base}[type]`, String(extra.type));
     if (extra.name != null) formData.append(`${base}[name]`, String(extra.name));
+    if (extra.checkboxLabel) formData.append(`${base}[checkboxLabel]`, String(extra.checkboxLabel));
+    if (extra.label) formData.append(`${base}[label]`, String(extra.label));
     if (extra.placeHolder) formData.append(`${base}[placeHolder]`, String(extra.placeHolder));
-    if (extra.buttonName) formData.append(`${base}[buttonName]`, String(extra.buttonName));
+    if (extra.buttonName !== undefined) formData.append(`${base}[buttonName]`, String(extra.buttonName));
     if (extra.haveButton !== undefined) formData.append(`${base}[haveButton]`, String(extra.haveButton));
-    if (String(extra.type) === "DATE_PICKER") {
+    if (type === "DATE_PICKER") {
       if (extra.date) formData.append(`${base}[date]`, String(extra.date));
       if (extra.allowPastorSelect !== undefined) {
         formData.append(`${base}[allowPastorSelect]`, String(extra.allowPastorSelect));
@@ -128,7 +131,7 @@ function appendNestedRoadmapItemToFormData(
         formData.append(`${base}[showOnCard]`, String(extra.showOnCard));
       }
     }
-    if (String(extra.type) === "ASSESSMENT" && extra.assessmentId) {
+    if (type === "ASSESSMENT" && extra.assessmentId) {
       formData.append(`${base}[assessmentId]`, String(extra.assessmentId));
     }
     const checkboxes = extra.checkboxes;
@@ -139,9 +142,11 @@ function appendNestedRoadmapItemToFormData(
         const cbBase = `${base}[checkboxes][${j}]`;
         if (c.type != null) formData.append(`${cbBase}[type]`, String(c.type));
         if (c.name != null) formData.append(`${cbBase}[name]`, String(c.name));
+        if (c.checkboxLabel) formData.append(`${cbBase}[checkboxLabel]`, String(c.checkboxLabel));
+        if (c.label) formData.append(`${cbBase}[label]`, String(c.label));
         if (c.haveButton !== undefined) formData.append(`${cbBase}[haveButton]`, String(c.haveButton));
         if (c.checked !== undefined) formData.append(`${cbBase}[checked]`, String(c.checked));
-        if (c.buttonName) formData.append(`${cbBase}[buttonName]`, String(c.buttonName));
+        if (c.buttonName !== undefined) formData.append(`${cbBase}[buttonName]`, String(c.buttonName));
       });
     }
     const sections = extra.sections;
@@ -155,6 +160,8 @@ function appendNestedRoadmapItemToFormData(
 
   const extras = p.extras;
   if (Array.isArray(extras) && extras.length) {
+    const serializedExtras = extras;
+    console.log("ROADMAP SERIALIZED EXTRAS", serializedExtras);
     extras.forEach((extra, i) => {
       if (!extra || typeof extra !== "object") return;
       const e = extra as Record<string, unknown>;
@@ -201,12 +208,15 @@ function appendRoadmapWritePayloadToFormData(
     });
   }
   const appendExtraFields = (base: string, extra: Record<string, unknown>) => {
-    formData.append(`${base}[type]`, String(extra.type ?? ""));
+    const type = String(extra.type ?? "");
+    formData.append(`${base}[type]`, type);
     formData.append(`${base}[name]`, String(extra.name ?? ""));
+    if (extra.checkboxLabel) formData.append(`${base}[checkboxLabel]`, String(extra.checkboxLabel));
+    if (extra.label) formData.append(`${base}[label]`, String(extra.label));
     if (extra.placeHolder) formData.append(`${base}[placeHolder]`, String(extra.placeHolder));
-    if (extra.buttonName) formData.append(`${base}[buttonName]`, String(extra.buttonName));
+    if (extra.buttonName !== undefined) formData.append(`${base}[buttonName]`, String(extra.buttonName));
     if (extra.haveButton !== undefined) formData.append(`${base}[haveButton]`, String(extra.haveButton));
-    if (String(extra.type) === "DATE_PICKER") {
+    if (type === "DATE_PICKER") {
       if (extra.date) formData.append(`${base}[date]`, String(extra.date));
       if (extra.allowPastorSelect !== undefined) {
         formData.append(`${base}[allowPastorSelect]`, String(extra.allowPastorSelect));
@@ -215,7 +225,7 @@ function appendRoadmapWritePayloadToFormData(
         formData.append(`${base}[showOnCard]`, String(extra.showOnCard));
       }
     }
-    if (String(extra.type) === "ASSESSMENT" && extra.assessmentId) {
+    if (type === "ASSESSMENT" && extra.assessmentId) {
       formData.append(`${base}[assessmentId]`, String(extra.assessmentId));
     }
     const checkboxes = extra.checkboxes;
@@ -226,9 +236,11 @@ function appendRoadmapWritePayloadToFormData(
         const cBase = `${base}[checkboxes][${k}]`;
         if (c.type != null) formData.append(`${cBase}[type]`, String(c.type));
         if (c.name != null) formData.append(`${cBase}[name]`, String(c.name));
+        if (c.checkboxLabel) formData.append(`${cBase}[checkboxLabel]`, String(c.checkboxLabel));
+        if (c.label) formData.append(`${cBase}[label]`, String(c.label));
         if (c.haveButton !== undefined) formData.append(`${cBase}[haveButton]`, String(c.haveButton));
         if (c.checked !== undefined) formData.append(`${cBase}[checked]`, String(c.checked));
-        if (c.buttonName) formData.append(`${cBase}[buttonName]`, String(c.buttonName));
+        if (c.buttonName !== undefined) formData.append(`${cBase}[buttonName]`, String(c.buttonName));
       });
     }
     const sections = extra.sections;
@@ -240,6 +252,8 @@ function appendRoadmapWritePayloadToFormData(
     }
   };
   if (Array.isArray(p.extras) && p.extras.length) {
+    const serializedExtras = p.extras;
+    console.log("ROADMAP SERIALIZED EXTRAS", serializedExtras);
     p.extras.forEach((extra, i) => {
       appendExtraFields(`extras[${i}]`, extra as unknown as Record<string, unknown>);
     });
@@ -256,6 +270,10 @@ function appendRoadmapWritePayloadToFormData(
         formData.append(`${b}[roadMapDetails]`, item.roadMapDetails.trim());
       }
       const nestedExtras = item.extras ?? [];
+      if (nestedExtras.length) {
+        const serializedExtras = nestedExtras;
+        console.log("ROADMAP SERIALIZED EXTRAS", serializedExtras);
+      }
       nestedExtras.forEach((extra, j) => {
         appendExtraFields(`roadmaps[${i}][extras][${j}]`, extra as unknown as Record<string, unknown>);
       });
@@ -314,12 +332,15 @@ export const apiGetNestedRoadmapItem = (roadMapId: string, nestedItemId: string)
 
 // POST /roadmaps/:roadMapId/nested  (multipart/form-data when image provided)
 export const apiAddNestedRoadmapItem = (roadMapId: string, payload: NestedRoadMapItem, image?: File) => {
+  console.log("ROADMAP ADD NESTED PAYLOAD SENT TO API", payload);
   if (image) {
+    console.log("ROADMAP ADD NESTED REQUEST MODE", "multipart");
     const formData = new FormData();
     formData.append('image', image);
     appendNestedRoadmapItemToFormData(formData, payload);
     return axiosInstance.post(`/roadmaps/${roadMapId}/nested`, formData);
   }
+  console.log("ROADMAP ADD NESTED REQUEST MODE", "json");
   return axiosInstance.post(`/roadmaps/${roadMapId}/nested`, payload);
 };
 
@@ -330,12 +351,15 @@ export const apiUpdateNestedRoadmapItem = (
   payload: UpdateNestedRoadMapItemPayload,
   image?: File,
 ) => {
+  console.log("ROADMAP UPDATE NESTED PAYLOAD SENT TO API", payload);
   if (image || shouldUseMultipartForNestedPatch(payload)) {
+    console.log("ROADMAP UPDATE NESTED REQUEST MODE", "multipart");
     const formData = new FormData();
     if (image) formData.append("image", image);
     appendNestedRoadmapItemToFormData(formData, payload);
     return axiosInstance.patch(`/roadmaps/${roadMapId}/nested/${nestedItemId}`, formData);
   }
+  console.log("ROADMAP UPDATE NESTED REQUEST MODE", "json");
   return axiosInstance.patch(`/roadmaps/${roadMapId}/nested/${nestedItemId}`, payload);
 };
 

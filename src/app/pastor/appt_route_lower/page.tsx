@@ -194,41 +194,97 @@ const [scheduleDescription, setScheduleDescription] = useState("");
     const userId = getPastorUserId();
     if (!userId) return [];
     try {
-      const [scheduleResult, upcomingResult] = await Promise.allSettled([
-        apiGetUserSchedule(userId),
-        apiGetAppointments({ userId, futureOnly: true }),
-      ]);
-      const scheduleData =
-        scheduleResult.status === "fulfilled" ? unwrapAppointmentsAxiosData(scheduleResult.value) : [];
-      setAppointments(scheduleData);
+      // const [scheduleResult, upcomingResult] = await Promise.allSettled([
+      //   apiGetUserSchedule(userId),
+      //   apiGetAppointments({ userId, futureOnly: true }),
+      // ]);
+      // const scheduleData =
+      //   scheduleResult.status === "fulfilled" ? unwrapAppointmentsAxiosData(scheduleResult.value) : [];
+      // setAppointments(scheduleData);
+      const [scheduleResult, appointmentsResult] = await Promise.allSettled([
+  apiGetUserSchedule(userId),
+  apiGetAppointments({ userId, futureOnly: false }),
+]);
+
+const scheduleData =
+  scheduleResult.status === "fulfilled"
+    ? unwrapAppointmentsAxiosData(scheduleResult.value)
+    : [];
+
+const allAppointmentsData =
+  appointmentsResult.status === "fulfilled"
+    ? unwrapAppointmentsAxiosData(appointmentsResult.value)
+    : [];
+
+const mergedById = new Map<string, any>();
+
+[...scheduleData, ...allAppointmentsData].forEach((appt: any) => {
+  const id = appointmentEntityId(appt);
+  if (id) mergedById.set(id, appt);
+});
+
+const mergedAppointments = Array.from(mergedById.values());
+
+setAppointments(mergedAppointments);
 
       const todayYmd = new Date().toLocaleDateString("en-CA");
+      // setAppointmentsToday(
+      //   scheduleData.filter((a: any) => {
+      //     if (!a?.meetingDate) return false;
+      //     return meetingDateLocalYmd(String(a.meetingDate)) === todayYmd;
+      //   }) as any,
+      // );
       setAppointmentsToday(
-        scheduleData.filter((a: any) => {
-          if (!a?.meetingDate) return false;
-          return meetingDateLocalYmd(String(a.meetingDate)) === todayYmd;
-        }) as any,
-      );
+  // scheduleData.filter((a: any) => {
+  mergedAppointments.filter((a: any) => {
+    if (!a?.meetingDate) return false;
 
-      if (upcomingResult.status === "fulfilled") {
-        const upcomingData = unwrapAppointmentsAxiosData(upcomingResult.value);
-        const nowMs = Date.now();
-        const upcomingSorted = upcomingData
-          .filter((a: any) => {
-            if (!a?.meetingDate) return false;
-            const t = new Date(a.meetingDate).getTime();
-            return !Number.isNaN(t) && t >= nowMs - 60_000;
-          })
-          .sort(
-            (a: any, b: any) =>
-              new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
-          );
-        setUpcomingAppointments((upcomingSorted.length ? upcomingSorted : upcomingData) as any);
-      } else {
-        setUpcomingAppointments([] as any);
-      }
+    const status = String(a?.status ?? "").toLowerCase();
+    if (status.includes("cancel")) return false;
 
-      return scheduleData;
+    return meetingDateLocalYmd(String(a.meetingDate)) === todayYmd;
+  }) as any,
+);
+
+      // if (upcomingResult.status === "fulfilled") {
+      //   const upcomingData = unwrapAppointmentsAxiosData(upcomingResult.value);
+      //   const nowMs = Date.now();
+      //   const upcomingSorted = upcomingData
+      //     .filter((a: any) => {
+      //       if (!a?.meetingDate) return false;
+      //       const t = new Date(a.meetingDate).getTime();
+      //       return !Number.isNaN(t) && t >= nowMs - 60_000;
+      //     })
+      //     .sort(
+      //       (a: any, b: any) =>
+      //         new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
+      //     );
+      //   setUpcomingAppointments((upcomingSorted.length ? upcomingSorted : upcomingData) as any);
+      // } else {
+      //   setUpcomingAppointments([] as any);
+      // }
+
+      const nowMs = Date.now();
+
+const upcomingSorted = mergedAppointments
+  .filter((a: any) => {
+    if (!a?.meetingDate) return false;
+
+    const status = String(a?.status ?? "").toLowerCase();
+    if (status.includes("cancel")) return false;
+
+    const endMs = getAppointmentEndMs(a);
+    return !Number.isNaN(endMs) && endMs >= nowMs - 60_000;
+  })
+  .sort(
+    (a: any, b: any) =>
+      new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
+  );
+
+setUpcomingAppointments(upcomingSorted as any);
+
+      // return scheduleData;
+      return mergedAppointments;
     } catch (err) {
       console.error("Error fetching appointments:", err);
     }
@@ -288,6 +344,27 @@ const [scheduleDescription, setScheduleDescription] = useState("");
       year: "2-digit",
     });
   };
+  const getAppointmentEndMs = (appt: any) => {
+  const startMs = new Date(String(appt?.meetingDate ?? "")).getTime();
+  if (Number.isNaN(startMs)) return NaN;
+
+  const endCandidates = [
+    appt?.endDate,
+    appt?.endTime,
+    appt?.meetingEndDate,
+    appt?.meetingEndTime,
+    appt?.scheduledEndDate,
+  ];
+
+  for (const value of endCandidates) {
+    if (typeof value === "string" && value.trim()) {
+      const endMs = new Date(value).getTime();
+      if (!Number.isNaN(endMs)) return endMs;
+    }
+  }
+
+  return startMs + 60 * 60 * 1000; // default 1 hour meeting
+};
 
   const formatTime = (dateString) => {
     const d = new Date(dateString);
@@ -723,7 +800,10 @@ setScheduleDescription("");
   const t = new Date(String(a.meetingDate)).getTime();
   if (Number.isNaN(t)) return false;
 
-  return t >= nowMs - 60_000 && t <= weekEndMs;
+  // return t >= nowMs - 60_000 && t <= weekEndMs;
+  const endMs = getAppointmentEndMs(a);
+
+return endMs >= nowMs - 60_000 && t <= weekEndMs;
 });
   }, [upcomingAppointments]);
 
@@ -734,7 +814,9 @@ setScheduleDescription("");
         const raw = String(a.meetingDate ?? "");
         if (!raw) return false;
         const t = new Date(raw).getTime();
-        return !Number.isNaN(t) && t < nowMs;
+        // return !Number.isNaN(t) && t < nowMs;
+        const endMs = getAppointmentEndMs(a);
+return !Number.isNaN(endMs) && endMs < nowMs;
       })
       .sort(
         (a, b) =>

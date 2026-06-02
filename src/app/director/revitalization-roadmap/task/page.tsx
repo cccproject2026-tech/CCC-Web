@@ -1381,15 +1381,41 @@ const allRenderableExtrasForHistory = pastorExtrasRows.filter(isRenderablePastor
 const submissionVersions = buildVersionsFromExtras(allRenderableExtrasForHistory);
 const previousSubmissionVersions = submissionVersions.slice(0, -1);
 
+// const renderHistoryAnswerCard = (
+//   item: Record<string, unknown>,
+//   idx: number,
+// ): JSX.Element => {
 const renderHistoryAnswerCard = (
   item: Record<string, unknown>,
   idx: number,
+  versionIndex: number,
 ): JSX.Element => {
   const type = String(item.type ?? "").toUpperCase();
   const label = String(item.name ?? item.key ?? `Item ${idx + 1}`);
-  const normalizedLabel = label.trim().toLowerCase();
-  const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
+  // const normalizedLabel = label.trim().toLowerCase();
+  // const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
+const normalizedLabel = label.trim().toLowerCase();
 
+const allUploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
+
+const batchIds = Array.from(
+  new Set(allUploadedFiles.map((file) => file.uploadBatchId).filter(Boolean)),
+);
+
+const currentUploadBatchId = String(
+  item.uploadBatchId ??
+    item.uploadBatchID ??
+    item.batchId ??
+    item.documentBatchId ??
+    item.uploadBatch ??
+    ""
+).trim();
+
+const targetBatchId = currentUploadBatchId || batchIds[versionIndex] || "";
+
+const uploadedFiles = targetBatchId
+  ? allUploadedFiles.filter((file) => file.uploadBatchId === targetBatchId)
+  : [];
   const value =
     item.value !== undefined
       ? item.value
@@ -1651,8 +1677,44 @@ const renderAnswerCard = (
   // pastorUploadDocs[label.trim()] ??
   // pastorUploadDocs[label.trim().toLowerCase()] ??
   // [];
-  const normalizedLabel = label.trim().toLowerCase();
-const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
+//   const normalizedLabel = label.trim().toLowerCase();
+// const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
+// const normalizedLabel = label.trim().toLowerCase();
+
+// const currentUploadBatchId = String(
+//   item.uploadBatchId ??
+//     item.uploadBatchID ??
+//     item.batchId ??
+//     item.documentBatchId ??
+//     ""
+// ).trim();
+
+// const allUploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
+
+// const uploadedFiles = currentUploadBatchId
+//   ? allUploadedFiles.filter((file) => file.uploadBatchId === currentUploadBatchId)
+//   : allUploadedFiles.slice(-1);
+const normalizedLabel = label.trim().toLowerCase();
+
+const currentUploadBatchId = String(
+  item.uploadBatchId ??
+    item.uploadBatchID ??
+    item.batchId ??
+    item.documentBatchId ??
+    item.uploadBatch ??
+    ""
+).trim();
+
+const allUploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
+
+const latestBatchId =
+  currentUploadBatchId ||
+  allUploadedFiles[allUploadedFiles.length - 1]?.uploadBatchId ||
+  "";
+
+const uploadedFiles = latestBatchId
+  ? allUploadedFiles.filter((file) => file.uploadBatchId === latestBatchId)
+  : [];
   const sig = item.signatureData !== undefined ? item.signatureData : undefined;
   const val = item.value !== undefined ? item.value : sig;
 
@@ -2405,7 +2467,8 @@ if (type === "ASSESSMENT") {
             </h3>
 
             <div className="space-y-4">
-              {version.map((item, idx) => renderHistoryAnswerCard(item, idx))}
+              {/* {version.map((item, idx) => renderHistoryAnswerCard(item, idx))} */}
+              {version.map((item, idx) => renderHistoryAnswerCard(item, idx, versionIndex))}
             </div>
           </div>
         ))}

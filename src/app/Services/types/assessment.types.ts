@@ -73,6 +73,7 @@ export interface AssessmentResponse {
   type?: AssessmentType;
   bannerImage?: string;
   sections: Section[];
+  preSurvey?: CreatePreSurveyEntryPayload[];
   preSurveyQuestions?: PreSurveyQuestion[];
   assignments?: AssessmentAssigned[];
   createdAt?: string;

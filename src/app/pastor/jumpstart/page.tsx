@@ -187,10 +187,11 @@ interface ExtraComponent {
   navigateTo?: string;
   placeHolder?: string;
   buttonName?: string;
+  checkboxLabel?: string;
+  label?: string;
   date?: string;
   allowPastorSelect?: boolean;
   showOnCard?: boolean;
-  haveButton?: boolean;
   checkboxes?: ExtraComponent[];
   sections?: ExtraComponent[];
 }
@@ -779,6 +780,7 @@ if (extra.type === "DATE_PICKER") {
         }
         console.log("PASTOR JUMPSTART ROADMAP DATA", data);
         console.log("SELECTED TASK", data);
+        console.log("PASTOR ROADMAP EXTRAS", data?.extras);
         setRoadmap(data);
       } catch (err) {
         console.error("Failed to fetch roadmap", err);
@@ -2693,25 +2695,19 @@ const displayCheckboxes =
       }
 
       case "CHECKBOX":
+        console.log("PASTOR CHECKBOX EXTRA", extra);
         return (
-          <div key={`${fieldKey}_${index}`} className="mb-4 flex items-start justify-between gap-4">
-            <label className="flex items-start gap-2 text-sm text-white/90 cursor-pointer">
+          <div key={`${fieldKey}_${index}`} className="mb-4">
+            <h4 className="mb-2 text-sm font-semibold text-white">{extra.name}</h4>
+            <label className="flex cursor-pointer items-start gap-2 text-sm text-white/90">
               <input
                 type="checkbox"
                 checked={!!formData[fieldKey]}
                 onChange={(e) => handleInputChange(fieldKey, e.target.checked)}
-                className="mt-[3px] accent-[#103C8C] w-4 h-4"
+                className="mt-[3px] h-4 w-4 accent-[#103C8C]"
               />
-              <span>{extra.name}</span>
+              <span>{extra.checkboxLabel || extra.label || extra.name}</span>
             </label>
-            {extra.haveButton && extra.buttonName && (
-              <button
-                type="button"
-                className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-5 py-2 rounded-md shadow shrink-0"
-              >
-                {extra.buttonName}
-              </button>
-            )}
           </div>
         );
 

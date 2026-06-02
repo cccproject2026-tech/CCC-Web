@@ -17,9 +17,7 @@ import {
 import AssessmentBg from "../../../../Assets/assessment-bg.png";
 import {
   apiGetAssessmentById,
-  apiPatchAssessment,
-  apiUpdateInstructions,
-  apiUpdateSections,
+  apiPatchAssessmentMain,
   apiUploadAssessmentBanner,
   formatAssessmentApiErrorMessage,
   parseAssessmentDetailPayload,
@@ -98,6 +96,38 @@ export default function ViewEditAssessmentPage() {
   const [selectedSectionIndex, setSelectedSectionIndex] = useState(0);
 const [isEditMode, setIsEditMode] = useState(false);
 
+  const applyAssessmentDetail = useCallback((raw: NonNullable<ReturnType<typeof parseAssessmentDetailPayload>>) => {
+    const mapped = mapAssessmentFromApi(raw);
+    const preRows = preSurveyFromApiDetail(raw);
+    setAssessment({
+      id: String(mapped.id ?? (raw as { _id?: string })._id ?? params.id),
+      name: mapped.name,
+      description: mapped.description,
+      type: mapped.type,
+      bannerImage: mapped.bannerImage,
+    });
+    setAssessmentName(mapped.name || "");
+    setDescription(mapped.description || "");
+    setHasPreSurvey(
+      String(mapped.type || "").toUpperCase() === "CMA" &&
+        preRows.some((r) => r.text.trim().length > 0),
+    );
+    setInstructions(
+      mapped.instructions.length > 0
+        ? mapped.instructions.map((i: { text: string }) => i.text)
+        : [""],
+    );
+    setWizardSections(
+      mapped.sections.length > 0
+        ? mapped.sections.map(sectionToDirectorEditWizard)
+        : [newDirectorEditSection()],
+    );
+    setSelectedSectionIndex(0);
+    setPreSurveyRows(preRows);
+    const mUrl = resolveApiMediaUrl(mapped.bannerImage) || "";
+    setBannerPreview(mUrl || null);
+  }, [params.id]);
+
   const scrollToId = useCallback((id: string) => {
     if (typeof document === "undefined") return;
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -125,33 +155,7 @@ const [isEditMode, setIsEditMode] = useState(false);
           setLoadError(true);
           return;
         }
-        const mapped = mapAssessmentFromApi(raw);
-        setAssessment({
-          id: String(mapped.id ?? (raw as { _id?: string })._id ?? params.id),
-          name: mapped.name,
-          description: mapped.description,
-          type: mapped.type,
-          bannerImage: mapped.bannerImage,
-        });
-        setAssessmentName(mapped.name || "");
-        setDescription(mapped.description || "");
-        setHasPreSurvey(
-          (mapped.type as string) === "CMA" || preSurveyFromApiDetail(raw).some((r) => r.text.trim().length > 0),
-        );
-        setInstructions(
-          mapped.instructions.length > 0
-            ? mapped.instructions.map((i: { text: string }) => i.text)
-            : [""],
-        );
-        setWizardSections(
-          mapped.sections.length > 0
-            ? mapped.sections.map(sectionToDirectorEditWizard)
-            : [newDirectorEditSection()],
-        );
-        setSelectedSectionIndex(0);
-        setPreSurveyRows(preSurveyFromApiDetail(raw));
-        const mUrl = resolveApiMediaUrl(mapped.bannerImage) || "";
-        if (mUrl) setBannerPreview(mUrl);
+        applyAssessmentDetail(raw);
       } catch (error) {
         console.error("Failed to fetch assessment", error);
         setLoadError(true);
@@ -159,7 +163,7 @@ const [isEditMode, setIsEditMode] = useState(false);
     };
 
     void fetchAssessment();
-  }, [params?.id]);
+  }, [applyAssessmentDetail, params?.id]);
 
   useEffect(() => {
     return () => {
@@ -405,13 +409,15 @@ const handleAddLayerToSelectedSection = () => {
       focusField(`director-choice-${invalidChoice.sectionIdx}-${invalidChoice.layerIdx}-${invalidChoice.choiceIdx}`);
       return;
     }
+    const existingType = String(assessment.type || "").toUpperCase();
+    const isCmaAssessment = existingType === "CMA";
     const preSurveyPayload = buildPreSurveyPayloadForDirectorCreate(preSurveyRows);
-    if (hasPreSurvey && preSurveyPayload.length === 0) {
+    if (isCmaAssessment && hasPreSurvey && preSurveyPayload.length === 0) {
       showToast("Pre-survey is on — add at least one question with some text, or turn pre-survey off.");
       focusField("director-presurvey-question-0");
       return;
     }
-    const firstEmptyPreSurveyIdx = hasPreSurvey
+    const firstEmptyPreSurveyIdx = isCmaAssessment && hasPreSurvey
       ? preSurveyRows.findIndex((row) => row.text.trim().length === 0)
       : -1;
     if (firstEmptyPreSurveyIdx !== -1) {
@@ -444,29 +450,25 @@ const handleAddLayerToSelectedSection = () => {
         setBannerPreview(newUrl ? resolveApiMediaUrl(newUrl) || newUrl : null);
       }
 
-      const typeForApi: "CMA" | "PMP" = hasPreSurvey ? "CMA" : "PMP";
-      // const patchBody = {
-      //   name: name,
-      //   description: description.trim(),
-      //   type: typeForApi,
-      //   ...(hasPreSurvey && preSurveyPayload.length > 0 ? { preSurvey: preSurveyPayload } : {}),
-      // };
-      // try {
-      //   await apiPatchAssessment(assessment.id, patchBody);
-      // } catch (e) {
-      //   console.warn("PATCH /assessment (metadata) not applied:", e);
-      // }
+      const typeForApi: "CMA" | "PMP" = isCmaAssessment ? "CMA" : "PMP";
       const patchBody = {
-  name,
-  description: description.trim(),
-  type: typeForApi,
-  preSurvey: hasPreSurvey ? preSurveyPayload : [],
-};
-console.log("ASSESSMENT PATCH BODY:", patchBody);
-await apiPatchAssessment(assessment.id, patchBody);
+        name,
+        description: description.trim(),
+        type: typeForApi,
+        sections: buildSectionsPayload(modelSections),
+        instructions: instructionLines,
+        ...(isCmaAssessment
+          ? { preSurvey: hasPreSurvey ? preSurveyPayload : [] }
+          : {}),
+      };
 
-      await apiUpdateSections(assessment.id, buildSectionsPayload(modelSections));
-      await apiUpdateInstructions(assessment.id, instructionLines);
+      console.log("DIRECTOR ASSESSMENT PATCH BODY:", patchBody);
+      await apiPatchAssessmentMain(assessment.id, patchBody);
+
+      const freshRes = await apiGetAssessmentById(assessment.id);
+      const freshRawBody = (freshRes.data as { data?: unknown })?.data ?? freshRes.data;
+      const freshRaw = parseAssessmentDetailPayload(freshRawBody);
+      if (freshRaw) applyAssessmentDetail(freshRaw);
 
       router.refresh();
       setSaveSuccess(true);
@@ -479,6 +481,7 @@ await apiPatchAssessment(assessment.id, patchBody);
     }
   };
 const selectedSection = wizardSections[selectedSectionIndex] ?? wizardSections[0];
+  const isCmaAssessment = String(assessment?.type || "").toUpperCase() === "CMA";
   const displayBanner = bannerFile
     ? bannerPreview
     : bannerPreview || (assessment ? resolveApiMediaUrl(assessment.bannerImage) || "" : "") || null;
@@ -1384,6 +1387,7 @@ const selectedSection = wizardSections[selectedSectionIndex] ?? wizardSections[0
             ) : null}
           </div> */}
           {/* Pre Survey */}
+{isCmaAssessment ? (
 <div className="mb-6 rounded-xl border border-white/20 bg-white/5 p-5">
   <div className="mb-4">
     <span className="mb-2 block text-sm font-semibold text-[#cde2f2]">
@@ -1475,6 +1479,7 @@ const selectedSection = wizardSections[selectedSectionIndex] ?? wizardSections[0
     </div>
   ) : null}
 </div>
+) : null}
 
           {/* Edit / Layer buttons */}
           {/* <div className="mb-6 border-t border-white/20" />
