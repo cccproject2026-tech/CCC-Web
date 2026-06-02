@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { getCookie } from "@/app/utils/cookies";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Doughnut, Bar } from "react-chartjs-2";
@@ -18,10 +18,7 @@ import {
 import DirectorHero from "../../DirectorHero";
 import { directorGlassCard, directorInputClass, directorPageRoot } from "../../directorUi";
 import ProgressBg from "../../../Assets/progress-bg.jpg";
-import Card1 from "../../../Assets/card1.png";
-import Card2 from "../../../Assets/card2.png";
-import Card3 from "../../../Assets/card3.png";
-import Card4 from "../../../Assets/card4.png";
+import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import {
   apiAddFinalComment,
   apiGetUserProgress,
@@ -35,12 +32,24 @@ import {
   unwrapCertificate,
   type CertificateRecord,
 } from "@/app/Services/certificates.service";
-import type {
-  ProgressAssessment,
-  ProgressResponse,
-  ProgressRoadmap,
-  UserResponse,
-} from "@/app/Services/types";
+import {
+  buildRoadmapAssignments,
+  collapseRoadmapAssignmentsToParents,
+  fetchMergedRoadmapsForAssignedUser,
+  normalizeRoadmapId,
+  resolveNestedTemplateItemId,
+  unwrapNestedRoadmapsArray,
+} from "@/app/Services/roadmap-assignments";
+import {
+  apiGetAssessments,
+  apiGetAssignedAssessments,
+  apiGetSectionRecommendations,
+  apiGetUserAnswers,
+  flattenAssignedAssessmentRow,
+  parseAssignedAssessmentsListBody,
+} from "@/app/Services/assessment.service";
+import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
+import type { ProgressResponse, UserResponse } from "@/app/Services/types";
 
 // Register Chart.js components
 ChartJS.register(
@@ -54,23 +63,29 @@ ChartJS.register(
 );
 
 interface RoadmapCardProps {
-  image: any;
+  imageUrl?: string | null;
   title: string;
   description: string;
   status: "Completed" | "In-progress" | "Not Started" | "Over Due";
   completedDate?: string;
-  tasksCompleted?: string; // e.g., "06/08"
-  completionTime?: string; // e.g., "Months 1-2"
+  completedSteps: number;
+  totalSteps: number;
+  progressPercentage: number;
+  completionTime?: string;
+  onClick: () => void;
 }
 
 function RoadmapProgressCard({
-  image,
+  imageUrl,
   title,
   description,
   status,
   completedDate,
-  tasksCompleted,
+  completedSteps,
+  totalSteps,
+  progressPercentage,
   completionTime,
+  onClick,
 }: RoadmapCardProps) {
   const getStatusBadgeStyle = () => {
     switch (status) {
@@ -87,19 +102,24 @@ function RoadmapProgressCard({
     }
   };
 
-  const taskPct =
-    tasksCompleted && tasksCompleted.includes("/")
-      ? (() => {
-          const [a, b] = tasksCompleted.split("/").map((x) => parseInt(x, 10));
-          if (!b || Number.isNaN(a) || Number.isNaN(b)) return 0;
-          return Math.min(100, Math.round((a / b) * 100));
-        })()
-      : 0;
-
   return (
-    <div className={`flex overflow-hidden rounded-2xl border border-white/12 ${directorGlassCard}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex overflow-hidden rounded-2xl border border-white/12 text-left transition hover:border-[#8ec5eb]/40 ${directorGlassCard}`}
+    >
       <div className="relative w-1/3 shrink-0">
-        <Image src={image} alt={title} width={200} height={200} className="h-full w-full object-cover" />
+        {imageUrl ? (
+          <Image
+            src={imageUrl}
+            alt={title}
+            fill
+            className="object-cover"
+            unoptimized={isRemoteImageSrc(imageUrl)}
+          />
+        ) : (
+          <ApiImagePlaceholder className="h-full min-h-[220px] w-full" />
+        )}
         {status === "Completed" && (
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <div className="relative h-14 w-14">
@@ -123,62 +143,92 @@ function RoadmapProgressCard({
           {status === "Completed" && completedDate && (
             <span className="text-xs text-white/70">Completed on: {completedDate}</span>
           )}
-          {tasksCompleted && (
-            <div className="flex flex-col gap-1">
-              <div className="h-2 w-full rounded-full bg-white/15">
-                <div className="h-2 rounded-full bg-[#8ec5eb]/80" style={{ width: `${taskPct}%` }} />
-              </div>
-              <span className="text-xs text-white/55">Tasks: {tasksCompleted}</span>
+          <div className="flex flex-col gap-1">
+            <div className="h-2 w-full rounded-full bg-white/15">
+              <div
+                className="h-2 rounded-full bg-[#8ec5eb]/80"
+                style={{ width: `${progressPercentage}%` }}
+              />
             </div>
-          )}
+            <div className="flex items-center justify-between gap-3 text-xs text-white/55">
+              <span>Tasks: {completedSteps}/{totalSteps}</span>
+              <span>{progressPercentage}%</span>
+            </div>
+          </div>
           {completionTime && <span className="text-xs text-white/70">Completion time: {completionTime}</span>}
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
 interface SurveyCardProps {
-  image: any;
+  imageUrl?: string | null;
   title: string;
   description: string;
-  status: "Completed" | "Remaining";
+  status: "Completed" | "Submitted" | "Remaining";
   submittedDate?: string;
   dueDate?: string;
-  onButtonClick?: () => void;
+  onViewResult?: () => void;
+  onViewCdp?: () => void;
 }
 
 function SurveyProgressCard({
-  image,
+  imageUrl,
   title,
   description,
   status,
   submittedDate,
   dueDate,
-  onButtonClick,
+  onViewResult,
+  onViewCdp,
 }: SurveyCardProps) {
   return (
     <div className={`flex overflow-hidden rounded-2xl border border-white/12 ${directorGlassCard}`}>
       <div className="relative w-1/3 shrink-0">
-        <Image src={image} alt={title} width={200} height={200} className="h-full w-full object-cover" />
+        {imageUrl ? (
+          <Image
+            src={imageUrl}
+            alt={title}
+            fill
+            className="object-cover"
+            unoptimized={isRemoteImageSrc(imageUrl)}
+          />
+        ) : (
+          <ApiImagePlaceholder className="h-full min-h-[220px] w-full" />
+        )}
       </div>
       <div className="flex flex-1 flex-col justify-between p-5">
         <div>
           <h3 className="mb-2 text-lg font-semibold text-white">{title}</h3>
           <p className="mb-4 text-sm text-white/65">{description}</p>
+          <span className="w-fit rounded-md border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 px-3 py-1 text-xs font-semibold text-[#cde9f7]">
+            Status: {status}
+          </span>
         </div>
         <div className="flex flex-col gap-3">
-          {status === "Completed" && (
+          <div className="flex flex-wrap gap-2">
+          {onViewResult && (
             <button
               type="button"
-              onClick={onButtonClick}
+              onClick={onViewResult}
               className="w-fit rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
             >
-              Customized development plans
+              View Result
             </button>
           )}
+          {onViewCdp && (
+            <button
+              type="button"
+              onClick={onViewCdp}
+              className="w-fit rounded-lg border border-emerald-300/45 bg-emerald-400/15 px-5 py-2 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-400/25"
+            >
+              View CDP
+            </button>
+          )}
+          </div>
           <span className="text-xs text-white/55">
-            {status === "Completed" ? `Submitted: ${submittedDate}` : `Due: ${dueDate}`}
+            {submittedDate ? `Submitted: ${submittedDate}` : `Due: ${dueDate || "N/A"}`}
           </span>
         </div>
       </div>
@@ -186,21 +236,88 @@ function SurveyProgressCard({
   );
 }
 
-function mapRoadmapStatus(rm: ProgressRoadmap): RoadmapCardProps["status"] {
-  const s = (rm.status || "").toLowerCase().replace(/\s+/g, "_");
-  if (s === "completed" || s === "complete") return "Completed";
+function mapRoadmapStatus(status: unknown): RoadmapCardProps["status"] {
+  const s = String(status || "").toLowerCase().replace(/\s+/g, "_");
+  if (s.includes("complete")) return "Completed";
   if (s === "overdue" || s === "over_due") return "Over Due";
-  if (s === "in_progress" || s === "in-progress" || s === "inprogress") return "In-progress";
+  if (s === "due" || s.includes("progress")) return "In-progress";
   return "Not Started";
 }
 
-function mapAssessmentStatus(as: ProgressAssessment): SurveyCardProps["status"] {
-  const s = (as.status || "").toLowerCase();
-  if (s === "completed" || s === "complete") return "Completed";
-  return "Remaining";
+function isRoadmapComplete(row: Record<string, unknown>): boolean {
+  const totalSteps = Math.max(0, Number(row.totalSteps ?? 0));
+  const completedSteps = Math.max(0, Number(row.completedSteps ?? 0));
+  return (
+    mapRoadmapStatus(row.status) === "Completed" ||
+    (totalSteps > 0 && completedSteps >= totalSteps) ||
+    Number(row.progressPercentage ?? 0) >= 100
+  );
+}
+
+function roadmapPercentage(row: Record<string, unknown>): number {
+  const totalSteps = Math.max(0, Number(row.totalSteps ?? 0));
+  const completedSteps = Math.max(0, Number(row.completedSteps ?? 0));
+  const raw =
+    totalSteps > 0
+      ? (completedSteps / totalSteps) * 100
+      : Number(row.progressPercentage ?? 0);
+  return Math.min(100, Math.max(0, Math.round(raw)));
+}
+
+function formatDateShort(raw: unknown): string | undefined {
+  if (typeof raw !== "string" || !raw.trim()) return undefined;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return undefined;
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
+function hasCdpInRecommendationsPayload(body: unknown): boolean {
+  const walk = (node: unknown, parentSent = false): boolean => {
+    if (!node) return false;
+    if (Array.isArray(node)) return node.some((item) => walk(item, parentSent));
+    if (typeof node !== "object") return false;
+    const row = node as Record<string, unknown>;
+    const sentRaw = row.sent ?? row.isSent ?? row.status;
+    const isSent =
+      parentSent ||
+      sentRaw === true ||
+      String(sentRaw ?? "").trim().toLowerCase() === "sent";
+    const message = String(row.message ?? row.text ?? row.cdp ?? row.mentorCdp ?? "").trim();
+    const recommendations = Array.isArray(row.recommendations)
+      ? row.recommendations.some((value) => String(value ?? "").trim())
+      : false;
+    if (isSent && (message || recommendations)) return true;
+    return (
+      walk(row.data, isSent) ||
+      walk(row.sections, isSent) ||
+      walk(row.recommendations, isSent) ||
+      walk(row.layers, isSent)
+    );
+  };
+  return walk(body);
+}
+
+function hasCdpInAnswerPayload(body: unknown): boolean {
+  const root = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+  return sections.some((section: any) => {
+    const sectionRecommendations = Array.isArray(section?.recommendations)
+      ? section.recommendations.some((value: unknown) => String(value ?? "").trim())
+      : false;
+    const layerRecommendations = Array.isArray(section?.layers)
+      ? section.layers.some(
+          (layer: any) =>
+            Array.isArray(layer?.recommendations) &&
+            layer.recommendations.some((value: unknown) => String(value ?? "").trim()),
+        )
+      : false;
+    return sectionRecommendations || layerRecommendations;
+  });
 }
 
 export default function IndividualProgressPage() {
+  const router = useRouter();
   const params = useParams();
   const rawId = params?.userId;
   const userId =
@@ -218,6 +335,10 @@ export default function IndividualProgressPage() {
   const [roadmapFilter, setRoadmapFilter] = useState<"All" | "Completed" | "Remaining">("All");
   const [surveyFilter, setSurveyFilter] = useState<"All" | "Completed" | "Remaining">("All");
   const [progressData, setProgressData] = useState<ProgressResponse | null>(null);
+  const [roadmaps, setRoadmaps] = useState<Record<string, unknown>[]>([]);
+  const [assessments, setAssessments] = useState<Record<string, unknown>[]>([]);
+  const [roadmapsLoading, setRoadmapsLoading] = useState(false);
+  const [assessmentsLoading, setAssessmentsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<UserResponse | null>(null);
   const [certificate, setCertificate] = useState<CertificateRecord | null>(null);
@@ -229,6 +350,7 @@ export default function IndividualProgressPage() {
   const [directorId, setDirectorId] = useState<string>("");
   const canInviteFieldMentor = Boolean(directorId && user?.email && user?.hasCompleted);
   const hasCertificate = hasRealCertificate(certificate);
+  const assignedContentLoading = roadmapsLoading || assessmentsLoading;
 
   useEffect(() => {
     const storedUserId = getCookie("userId");
@@ -269,6 +391,196 @@ export default function IndividualProgressPage() {
       setFinalComments(progressData.finalComments[0].comment);
     }
   }, [progressData]);
+
+  useEffect(() => {
+    if (!userId || !progressData) return;
+    let cancelled = false;
+
+    const loadRoadmaps = async () => {
+      setRoadmapsLoading(true);
+      try {
+        const roadmapDocs = await fetchMergedRoadmapsForAssignedUser(userId);
+        const assignments = buildRoadmapAssignments(roadmapDocs, progressData);
+        const parents = collapseRoadmapAssignmentsToParents(assignments);
+        const mapped = parents.map((parent) => {
+          const parentId = String(parent.parentRoadmapId || parent.id);
+          const tasks = assignments.filter(
+            (assignment) => String(assignment.parentRoadmapId || assignment.id) === parentId,
+          );
+          const progressRow = progressData?.roadmaps?.find(
+            (row) => String(row.roadMapId) === parentId,
+          );
+          const hasNestedTasks = parent.hasNestedTasks === true;
+          const totalSteps = hasNestedTasks
+            ? tasks.length
+            : Math.max(0, Number(progressRow?.totalSteps ?? 0));
+          const completedSteps = hasNestedTasks
+            ? tasks.filter((task) => mapRoadmapStatus(task.status) === "Completed").length
+            : Math.max(0, Number(progressRow?.completedSteps ?? 0));
+          const progressPercentage =
+            totalSteps > 0
+              ? (completedSteps / totalSteps) * 100
+              : Number(progressRow?.progressPercentage ?? 0);
+          const roadmapDoc = roadmapDocs.find(
+            (roadmap) =>
+              normalizeRoadmapId(roadmap._id ?? (roadmap as { id?: unknown }).id) === parentId,
+          );
+          const nestedRoadmaps = unwrapNestedRoadmapsArray(roadmapDoc);
+          const roadmapType = String(roadmapDoc?.type || "").toLowerCase();
+          const isSingleRoadmap =
+            roadmapType === "single" ||
+            roadmapType.includes("jump");
+          const isPhaseRoadmap =
+            !isSingleRoadmap &&
+            (roadmapType === "phase" ||
+              roadmapDoc?.haveNextedRoadMaps === true ||
+              nestedRoadmaps.length > 0 ||
+              parent.hasNestedTasks === true);
+          const taskId =
+            resolveNestedTemplateItemId(nestedRoadmaps[0]) ||
+            String(tasks[0]?.id || "");
+
+          return {
+            id: parentId,
+            title: parent.title || parent.parentRoadmapName || "Roadmap",
+            description: parent.desc || tasks.find((task) => task.desc)?.desc || "",
+            status: parent.status,
+            completedSteps,
+            totalSteps,
+            progressPercentage,
+            completionTime: parent.months,
+            imageUrl: resolveApiMediaUrl(parent.imageUrl),
+            isPhaseRoadmap,
+            taskId,
+          };
+        });
+
+        console.log("Track progress roadmaps", mapped);
+        if (!cancelled) setRoadmaps(mapped);
+      } catch (error) {
+        console.error("Failed to load track progress roadmaps", error);
+        if (!cancelled) setRoadmaps([]);
+      } finally {
+        if (!cancelled) setRoadmapsLoading(false);
+      }
+    };
+
+    void loadRoadmaps();
+    return () => {
+      cancelled = true;
+    };
+  }, [progressData, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    let cancelled = false;
+
+    const loadAssessments = async () => {
+      setAssessmentsLoading(true);
+      try {
+        const [assignedRes, allAssessmentsRes] = await Promise.all([
+          apiGetAssignedAssessments(userId),
+          apiGetAssessments().catch(() => null),
+        ]);
+        let assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
+        const allBody = allAssessmentsRes?.data as { data?: unknown } | unknown[] | undefined;
+        const allAssessments = Array.isArray(allBody)
+          ? allBody
+          : Array.isArray(allBody?.data)
+            ? allBody.data
+            : [];
+        const existingIds = new Set(
+          assignedRows
+            .map((row) => flattenAssignedAssessmentRow(row)?.assessmentId)
+            .filter(Boolean),
+        );
+        const missingRows = allAssessments
+          .map((assessment: any) => {
+            const assignment = Array.isArray(assessment?.assignments)
+              ? assessment.assignments.find(
+                  (row: any) => String(row?.userId) === String(userId),
+                )
+              : null;
+            return assignment ? { assessment, ...assignment } : null;
+          })
+          .filter((row: unknown) => {
+            const id = flattenAssignedAssessmentRow(row)?.assessmentId;
+            return id && !existingIds.has(id);
+          });
+        assignedRows = [...assignedRows, ...missingRows];
+
+        const mapped = (
+          await Promise.all(
+            assignedRows.map(async (row) => {
+              const flat = flattenAssignedAssessmentRow(row);
+              if (!flat) return null;
+              const progressRow = progressData?.assessments?.find(
+                (item) =>
+                  String(item.assessmentId) === flat.assessmentId ||
+                  Boolean(
+                    flat.assignmentId &&
+                      item.assignmentId &&
+                      String(item.assignmentId) === flat.assignmentId,
+                  ),
+              );
+              const [answersRes, recommendationsRes] = await Promise.allSettled([
+                apiGetUserAnswers(flat.assessmentId, userId),
+                apiGetSectionRecommendations(flat.assessmentId, userId),
+              ]);
+              const answerData =
+                answersRes.status === "fulfilled"
+                  ? (answersRes.value.data as { data?: Record<string, unknown> })?.data
+                  : undefined;
+              const hasResult = Boolean(answerData?._id);
+              const hasCdp =
+                (answersRes.status === "fulfilled" &&
+                  hasCdpInAnswerPayload(answersRes.value.data)) ||
+                (recommendationsRes.status === "fulfilled" &&
+                  hasCdpInRecommendationsPayload(recommendationsRes.value.data));
+              const progressStatus = String(progressRow?.status || "").toLowerCase();
+              const submitted =
+                hasResult ||
+                progressStatus === "submitted" ||
+                progressStatus === "completed" ||
+                progressStatus === "reviewed";
+
+              return {
+                id: flat.assessmentId,
+                title: String(flat.assessment.name || flat.assessment.title || "Assessment"),
+                description: String(flat.assessment.description || ""),
+                imageUrl: resolveApiMediaUrl(
+                  flat.assessment.bannerImage || flat.assessment.imageUrl || flat.assessment.image,
+                ),
+                status: hasCdp ? "Completed" : submitted ? "Submitted" : "Remaining",
+                hasResult,
+                hasCdp,
+                submittedDate: formatDateShort(
+                  answerData?.submittedAt ||
+                    answerData?.createdAt ||
+                    answerData?.updatedAt ||
+                    flat.updatedAt,
+                ),
+                dueDate: formatDateShort(flat.dueDate),
+              };
+            }),
+          )
+        ).filter((row) => row != null) as Record<string, unknown>[];
+
+        console.log("Track progress assessments", mapped);
+        if (!cancelled) setAssessments(mapped);
+      } catch (error) {
+        console.error("Failed to load track progress assessments", error);
+        if (!cancelled) setAssessments([]);
+      } finally {
+        if (!cancelled) setAssessmentsLoading(false);
+      }
+    };
+
+    void loadAssessments();
+    return () => {
+      cancelled = true;
+    };
+  }, [progressData, userId]);
 
   useEffect(() => {
     if (!completionMessage && !inviteMessage && !certificateMessage) {
@@ -384,27 +696,6 @@ export default function IndividualProgressPage() {
     }
   };
 
-  const roadmapCards =
-    progressData?.roadmaps?.map((rm) => ({
-      id: rm.roadMapId,
-      image: Card1,
-      title: "Roadmap",
-      description: "Revitalization roadmap",
-      status: mapRoadmapStatus(rm),
-      tasksCompleted: rm.totalSteps > 0 ? `${rm.completedSteps}/${rm.totalSteps}` : undefined,
-    })) ?? [];
-
-  const surveyCards =
-    progressData?.assessments?.map((as) => ({
-      id: as.assessmentId,
-      image: Card2,
-      title: "Assessment",
-      description: "Assessment progress",
-      status: mapAssessmentStatus(as),
-      submittedDate: mapAssessmentStatus(as) === "Completed" ? "Submitted" : undefined,
-      dueDate: mapAssessmentStatus(as) === "Remaining" ? "Pending" : undefined,
-    })) ?? [];
-
   const roadmapPct =
     progressData && progressData.totalRoadmaps > 0
       ? Math.round((progressData.completedRoadmaps / progressData.totalRoadmaps) * 100)
@@ -512,19 +803,19 @@ export default function IndividualProgressPage() {
   };
 
   // Filter roadmap cards
-  const filteredRoadmapCards = roadmapCards.filter((card) => {
+  const filteredRoadmapCards = roadmaps.filter((card) => {
     if (roadmapFilter === "All") return true;
-    if (roadmapFilter === "Completed") return card.status === "Completed";
-    if (roadmapFilter === "Remaining")
-      return card.status !== "Completed";
+    if (roadmapFilter === "Completed") return isRoadmapComplete(card);
+    if (roadmapFilter === "Remaining") return !isRoadmapComplete(card);
     return true;
   });
 
   // Filter survey cards
-  const filteredSurveyCards = surveyCards.filter((card) => {
+  const filteredSurveyCards = assessments.filter((card) => {
+    const completed = card.status === "Completed" || card.status === "Submitted";
     if (surveyFilter === "All") return true;
-    if (surveyFilter === "Completed") return card.status === "Completed";
-    if (surveyFilter === "Remaining") return card.status === "Remaining";
+    if (surveyFilter === "Completed") return completed;
+    if (surveyFilter === "Remaining") return !completed;
     return true;
   });
 
@@ -781,14 +1072,43 @@ export default function IndividualProgressPage() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {assignedContentLoading && filteredRoadmapCards.length === 0 ? (
+                <p className="col-span-full text-sm text-white/65">Loading assigned roadmaps...</p>
+              ) : null}
+              {!assignedContentLoading && filteredRoadmapCards.length === 0 ? (
+                <p className="col-span-full text-sm text-white/65">No roadmaps to show for this filter.</p>
+              ) : null}
               {filteredRoadmapCards.map((card) => (
                 <RoadmapProgressCard
-                  key={card.id}
-                  image={card.image}
-                  title={card.title}
-                  description={card.description}
-                  status={card.status}
-                  tasksCompleted={card.tasksCompleted}
+                  key={String(card.id)}
+                  imageUrl={typeof card.imageUrl === "string" ? card.imageUrl : null}
+                  title={String(card.title || "Roadmap")}
+                  description={String(card.description || "No description available.")}
+                  status={isRoadmapComplete(card) ? "Completed" : mapRoadmapStatus(card.status)}
+                  completedSteps={Math.max(0, Number(card.completedSteps ?? 0))}
+                  totalSteps={Math.max(0, Number(card.totalSteps ?? 0))}
+                  progressPercentage={roadmapPercentage(card)}
+                  completionTime={typeof card.completionTime === "string" ? card.completionTime : undefined}
+                  onClick={() => {
+                    const roadmapId = String(card.id || "");
+                    if (!roadmapId) return;
+                    if (card.isPhaseRoadmap) {
+                      router.push(
+                        `/director/revitalization-roadmap/phase?userId=${encodeURIComponent(userId)}&roadmapId=${encodeURIComponent(roadmapId)}`,
+                      );
+                      return;
+                    }
+                    const taskId = String(card.taskId || "");
+                    if (taskId) {
+                      router.push(
+                        `/director/revitalization-roadmap/task?roadmapId=${encodeURIComponent(roadmapId)}&userId=${encodeURIComponent(userId)}&taskId=${encodeURIComponent(taskId)}&mode=view`,
+                      );
+                      return;
+                    }
+                    router.push(
+                      `/director/revitalization-roadmap/roadmap-form?roadmapId=${encodeURIComponent(roadmapId)}&type=single&isEditMode=true&viewOnly=true`,
+                    );
+                  }}
                 />
               ))}
             </div>
@@ -815,16 +1135,41 @@ export default function IndividualProgressPage() {
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {assignedContentLoading && filteredSurveyCards.length === 0 ? (
+                <p className="col-span-full text-sm text-white/65">Loading assigned assessments...</p>
+              ) : null}
+              {!assignedContentLoading && filteredSurveyCards.length === 0 ? (
+                <p className="col-span-full text-sm text-white/65">No assessments to show for this filter.</p>
+              ) : null}
               {filteredSurveyCards.map((card) => (
                 <SurveyProgressCard
-                  key={card.id}
-                  image={card.image}
-                  title={card.title}
-                  description={card.description}
-                  status={card.status}
-                  submittedDate={'submittedDate' in card ? card.submittedDate : undefined}
-                  dueDate={'dueDate' in card ? card.dueDate : undefined}
-                  onButtonClick={() => console.log("Customized Development Plans clicked")}
+                  key={String(card.id)}
+                  imageUrl={typeof card.imageUrl === "string" ? card.imageUrl : null}
+                  title={String(card.title || "Assessment")}
+                  description={String(card.description || "No description available.")}
+                  status={
+                    card.status === "Completed" || card.status === "Submitted"
+                      ? card.status
+                      : "Remaining"
+                  }
+                  submittedDate={typeof card.submittedDate === "string" ? card.submittedDate : undefined}
+                  dueDate={typeof card.dueDate === "string" ? card.dueDate : undefined}
+                  onViewResult={
+                    card.hasResult
+                      ? () =>
+                          router.push(
+                            `/director/assessments/result?assessmentId=${encodeURIComponent(String(card.id))}&userId=${encodeURIComponent(userId)}`,
+                          )
+                      : undefined
+                  }
+                  onViewCdp={
+                    card.hasCdp
+                      ? () =>
+                          router.push(
+                            `/director/assessments/result/cdp?assessmentId=${encodeURIComponent(String(card.id))}&userId=${encodeURIComponent(userId)}`,
+                          )
+                      : undefined
+                  }
                 />
               ))}
             </div>
