@@ -49,6 +49,14 @@ export {
   apiGetMergedAvailabilityRange,
 } from './appointments.service';
 
+// Certificates
+export {
+  apiIssueCertificate,
+  apiGetUserCertificate,
+  hasRealCertificate,
+  unwrapCertificate,
+} from './certificates.service';
+
 // ─── Interests ────────────────────────────────────────────────────────────────
 export {
   apiCreateInterest,
@@ -78,7 +86,6 @@ export {
   apiUpdateUserById,
   apiDeleteUser,
   apiMarkUserCompleted,
-  apiIssueCertificate,
   apiAssignUsers,
   apiRemoveAssignedUsers,
   apiGetAssignedUsers,

@@ -4,12 +4,18 @@ import { useEffect, useState } from "react";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { getCookie } from "@/app/utils/cookies";
 import { apiGetUserById } from "@/app/Services/api";
+import {
+  apiGetUserCertificate,
+  hasRealCertificate,
+  unwrapCertificate,
+  type CertificateRecord,
+} from "@/app/Services/certificates.service";
 import { useRouter } from "next/navigation";
 
 export default function PastorCertificatesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [certificates, setCertificates] = useState<any[]>([]);
+  const [certificate, setCertificate] = useState<CertificateRecord | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldMentorState, setFieldMentorState] = useState<
     "not_eligible" | "eligible" | "invited" | "field_mentor"
@@ -29,18 +35,18 @@ export default function PastorCertificatesPage() {
 
         const res = await apiGetUserById(userId);
         const userData = res.data?.data || {};
-        const certList = Array.isArray(userData?.certificates)
-          ? userData.certificates
-          : userData?.hasIssuedCertificate
-            ? [{ title: "CCC Completion Certificate", status: "Issued" }]
-            : [];
-        setCertificates(certList);
+        const certificateRes = await apiGetUserCertificate(userId).catch((error) => {
+          if (error?.response?.status === 404) return null;
+          throw error;
+        });
+        const loadedCertificate = unwrapCertificate(certificateRes);
+        setCertificate(loadedCertificate);
 
         if ((userData.role || "").toLowerCase().includes("field")) {
           setFieldMentorState("field_mentor");
         } else if (userData.fieldMentorInvitation) {
           setFieldMentorState("invited");
-        } else if (userData.hasIssuedCertificate || certList.length > 0) {
+        } else if (hasRealCertificate(loadedCertificate)) {
           setFieldMentorState("eligible");
         } else {
           setFieldMentorState("not_eligible");
@@ -92,19 +98,51 @@ export default function PastorCertificatesPage() {
           <div className="mt-6 rounded-xl border border-white/15 bg-white/5 p-4">
             {loading && <p className="text-sm text-[#cde2f2]">Loading certificates...</p>}
             {!loading && error && <p className="text-sm text-[#ffb2b2]">{error}</p>}
-            {!loading && !error && certificates.length === 0 && (
+            {!loading && !error && !hasRealCertificate(certificate) && (
               <p className="text-sm text-[#cde2f2]">No certificates issued yet.</p>
             )}
-            {!loading && !error && certificates.length > 0 && (
-              <div className="space-y-2">
-                {certificates.map((cert: any, index) => (
-                  <div key={cert._id || cert.id || index} className="flex items-center justify-between rounded-lg border border-white/15 bg-white/5 px-4 py-3">
-                    <div>
-                      <p className="text-sm font-semibold text-white">{cert.title || cert.name || "Certificate"}</p>
-                      <p className="text-xs text-[#cde2f2]">{cert.issuedAt ? new Date(cert.issuedAt).toLocaleDateString() : cert.status || "Issued"}</p>
-                    </div>
+            {!loading && !error && hasRealCertificate(certificate) && certificate && (
+              <div className="rounded-xl border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 p-5">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-lg font-semibold text-white">
+                      {String(certificate.programName || "CCC Completion Certificate")}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-emerald-300">Issued</p>
                   </div>
-                ))}
+                  <i className="fa-solid fa-certificate text-3xl text-[#8ec5eb]" aria-hidden />
+                </div>
+
+                <div className="mt-5 grid gap-3 text-sm text-[#d9ebf8] sm:grid-cols-2">
+                  <p><span className="font-semibold text-white">Certificate ID:</span> {certificate.certificateId}</p>
+                  <p><span className="font-semibold text-white">Date Received:</span> {certificate.issuedAt ? new Date(certificate.issuedAt).toLocaleDateString() : "N/A"}</p>
+                  <p><span className="font-semibold text-white">Completed On:</span> {certificate.completionDate ? new Date(String(certificate.completionDate)).toLocaleDateString() : "N/A"}</p>
+                  <p><span className="font-semibold text-white">Assigned Mentor:</span> {String(certificate.mentorName || "N/A")}</p>
+                  <p><span className="font-semibold text-white">Issued By:</span> {String(certificate.issuedByName || certificate.directorName || "Director")}</p>
+                </div>
+
+                <p className="mt-5 text-sm leading-relaxed text-[#cde2f2]">
+                  Congratulations on completing the 12-Month Mentoring Revitalization Program. You can view or download your certificate anytime.
+                </p>
+
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => window.open(String(certificate.certificateUrl || certificate.pdfUrl), "_blank", "noopener,noreferrer")}
+                    disabled={!certificate.certificateUrl && !certificate.pdfUrl}
+                    className="rounded-lg bg-[#8ec5eb] px-4 py-2.5 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2] disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    View Certificate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.open(String(certificate.pdfUrl || certificate.certificateUrl), "_blank", "noopener,noreferrer")}
+                    disabled={!certificate.pdfUrl && !certificate.certificateUrl}
+                    className="rounded-lg border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Download PDF
+                  </button>
+                </div>
               </div>
             )}
           </div>

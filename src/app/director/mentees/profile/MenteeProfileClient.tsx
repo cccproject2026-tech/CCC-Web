@@ -25,9 +25,15 @@ import {
   apiDeleteUser,
   apiGetUserById,
   apiInviteFieldMentor,
-  apiIssueCertificate,
   apiUpdateUserById,
 } from "@/app/Services/users.service";
+import {
+  apiGetUserCertificate,
+  apiIssueCertificate,
+  hasRealCertificate,
+  unwrapCertificate,
+  type CertificateRecord,
+} from "@/app/Services/certificates.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { updateInterestByEmail } from "@/app/Services/pastor.service";
@@ -36,12 +42,11 @@ import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 import type { ChurchDetails } from "@/app/Services/types/interests.types";
 import type { ProgressResponse } from "@/app/Services/types/progress.types";
 
-type InviteState = "none" | "invited" | "accepted" | "cert_issued";
+type InviteState = "none" | "invited" | "accepted";
 
 type ToastState = { message: string; variant: "success" | "error" } | null;
 
 const deriveInviteState = (user: any): InviteState => {
-  if (user.hasIssuedCertificate) return "cert_issued";
   const invite = user.fieldMentorInvitation;
   if (!invite) return "none";
   if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) return "none";
@@ -129,7 +134,8 @@ const [isIssuingCertificate, setIsIssuingCertificate] = useState(false);
 const [certificateNote, setCertificateNote] = useState(
   "Congratulations on successfully completing the revitalization journey. Wishing you continued impact in your ministry!"
 );
-const [issuedCertificateId, setIssuedCertificateId] = useState("");
+const [certificate, setCertificate] = useState<CertificateRecord | null>(null);
+const [completionDate, setCompletionDate] = useState<string | undefined>();
 
   const [progressOverallDone, setProgressOverallDone] = useState(false);
   const [userMarkedComplete, setUserMarkedComplete] = useState(false);
@@ -189,6 +195,20 @@ console.log("Mentee profile certificate debug:", {
       const marked =
         user.hasCompleted === true ||
         String(user.status ?? "").toLowerCase() === "completed";
+      let loadedCertificate: CertificateRecord | null = null;
+      if (marked) {
+        try {
+          loadedCertificate = unwrapCertificate(
+            await with429Retries(() => apiGetUserCertificate(menteeId)),
+          );
+        } catch (error) {
+          if (!isAxiosError(error) || error.response?.status !== 404) {
+            console.error("Failed to fetch certificate", error);
+          }
+        }
+      }
+      setCertificate(loadedCertificate);
+      setCompletionDate(user.completedAt);
       setProgressOverallDone(Boolean(progress?.overallCompleted));
       setUserMarkedComplete(marked);
 
@@ -250,6 +270,18 @@ console.log("Mentee profile certificate debug:", {
   useEffect(() => {
     void loadProfile();
   }, [loadProfile]);
+
+  useEffect(() => {
+    if (
+      !loading &&
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("issueCertificate") === "1" &&
+      userMarkedComplete &&
+      !hasRealCertificate(certificate)
+    ) {
+      setIsIssueCertificateModalOpen(true);
+    }
+  }, [certificate, loading, userMarkedComplete]);
 
   useEffect(() => {
     if (!toast) return;
@@ -314,13 +346,6 @@ console.log("Mentee profile certificate debug:", {
           onClick: () => {},
           disabled: true,
         };
-      case "cert_issued":
-        return {
-          icon: "fa-solid fa-certificate",
-          label: "Certificate issued",
-          onClick: () => {},
-          disabled: true,
-        };
     }
   }, [inviteState, personal.email, canInviteFieldMentor]);
 
@@ -334,11 +359,18 @@ const handleIssueCertificate = async () => {
       return;
     }
 
-    // UI kept now; backend generation can be wired here.
-    // await apiIssueCertificate(menteeId, issuedBy);
-
-    setIssuedCertificateId(`CCC-${new Date().getFullYear()}-${menteeId.slice(-6).toUpperCase()}`);
-    setInviteState("cert_issued");
+    const response = await apiIssueCertificate({
+      userId: menteeId,
+      issuedBy,
+      programName: "12-Month Mentoring Revitalization Program",
+      completionDate,
+      personalMessage: certificateNote.trim(),
+    });
+    const issuedCertificate = unwrapCertificate(response);
+    if (!hasRealCertificate(issuedCertificate)) {
+      throw new Error("Certificate response did not include a generated certificate file.");
+    }
+    setCertificate(issuedCertificate);
     setIsIssueCertificateModalOpen(false);
     setIsCertificateSuccessModalOpen(true);
   } catch (error) {
@@ -589,15 +621,35 @@ const handleIssueCertificate = async () => {
                   <span>{inviteButton.label}</span>
                 </button> */}
                 <div className="space-y-3">
+  {/* {hasRealCertificate(certificate) ? (
+    <button
+      type="button"
+      disabled
+      className={`${directorBtnPrimary} w-full justify-center disabled:cursor-not-allowed disabled:opacity-50`}
+    >
+      <i className="fa-solid fa-certificate" />
+      <span>Certificate issued</span>
+    </button>
+  ) : userMarkedComplete ? ( */}
+  {hasRealCertificate(certificate) ? (
   <button
     type="button"
-    onClick={() => setIsIssueCertificateModalOpen(true)}
-    disabled={!canInviteFieldMentor}
-    className={`${directorBtnPrimary} w-full justify-center disabled:cursor-not-allowed disabled:opacity-50`}
+    onClick={() => setIsCertificateSuccessModalOpen(true)}
+    className={`${directorBtnPrimary} w-full justify-center`}
   >
     <i className="fa-solid fa-certificate" />
-    <span>Issue Certificate</span>
+    <span>Certificate issued</span>
   </button>
+) : userMarkedComplete ? (
+    <button
+      type="button"
+      onClick={() => setIsIssueCertificateModalOpen(true)}
+      className={`${directorBtnPrimary} w-full justify-center disabled:cursor-not-allowed disabled:opacity-50`}
+    >
+      <i className="fa-solid fa-certificate" />
+      <span>Issue Certificate</span>
+    </button>
+  ) : null}
 
   <button
     type="button"
@@ -795,10 +847,10 @@ const handleIssueCertificate = async () => {
       <div className="space-y-4 text-sm">
         <p><b>Pastor</b><br />{fullName}</p>
         <p><b>Program</b><br />12-Month Mentoring Revitalization Program</p>
-        <p><b>Completion Date</b><br />{new Date().toLocaleDateString()}</p>
+        <p><b>Completion Date</b><br />{completionDate ? new Date(completionDate).toLocaleDateString() : "Not recorded"}</p>
         {/* <p><b>Certificate ID</b><br />CCC-{new Date().getFullYear()}-{menteeId.slice(-6).toUpperCase()}</p> */}
 
-        {/* <label className="block">
+        <label className="block">
           <span className="mb-2 block font-semibold">Personal Message (Optional)</span>
           <textarea
             value={certificateNote}
@@ -806,7 +858,7 @@ const handleIssueCertificate = async () => {
             rows={4}
             className="w-full rounded-lg border border-gray-200 p-3 text-sm"
           />
-        </label> */}
+        </label>
       </div>
 
       <div className="mt-6 flex gap-3">
@@ -843,24 +895,26 @@ const handleIssueCertificate = async () => {
       </p>
 
       <div className="my-5 space-y-2 rounded-xl bg-gray-50 p-4 text-left text-sm">
-        <p><b>Certificate ID:</b> {issuedCertificateId}</p>
-        <p><b>Issued On:</b> {new Date().toLocaleString()}</p>
-        <p><b>Issued By:</b> Admin Director</p>
+        <p><b>Certificate ID:</b> {certificate?.certificateId || "Not recorded"}</p>
+        <p><b>Issued On:</b> {certificate?.issuedAt ? new Date(certificate.issuedAt).toLocaleString() : "Not recorded"}</p>
+        <p><b>Issued By:</b> {certificate?.issuedByName || "Director"}</p>
       </div>
 
       <div className="space-y-3">
         <button
           type="button"
-          onClick={() => setToast({ message: "View certificate integration pending.", variant: "success" })}
-          className="w-full rounded-lg bg-[#08056b] px-4 py-3 font-semibold text-white"
+          onClick={() => window.open(certificate?.certificateUrl, "_blank", "noopener,noreferrer")}
+          disabled={!certificate?.certificateUrl}
+          className="w-full rounded-lg bg-[#08056b] px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           View Certificate
         </button>
 
         <button
           type="button"
-          onClick={() => setToast({ message: "Download PDF integration pending.", variant: "success" })}
-          className="w-full rounded-lg border border-gray-300 px-4 py-3 font-semibold"
+          onClick={() => window.open(certificate?.pdfUrl || certificate?.certificateUrl, "_blank", "noopener,noreferrer")}
+          disabled={!certificate?.pdfUrl && !certificate?.certificateUrl}
+          className="w-full rounded-lg border border-gray-300 px-4 py-3 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
         >
           Download PDF
         </button>

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { getCookie } from "@/app/utils/cookies";
 import { useParams } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { Doughnut, Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -27,7 +28,13 @@ import {
   apiMarkProgramComplete,
   unwrapUserProgressDetail,
 } from "@/app/Services/progress.service";
-import { apiGetUserById, apiInviteFieldMentor, apiIssueCertificate, unwrapUserResponse } from "@/app/Services/users.service";
+import { apiGetUserById, apiInviteFieldMentor, unwrapUserResponse } from "@/app/Services/users.service";
+import {
+  apiGetUserCertificate,
+  hasRealCertificate,
+  unwrapCertificate,
+  type CertificateRecord,
+} from "@/app/Services/certificates.service";
 import type {
   ProgressAssessment,
   ProgressResponse,
@@ -204,7 +211,6 @@ export default function IndividualProgressPage() {
   const [hasComments, setHasComments] = useState(false);
   const [isMarkingProgramComplete, setIsMarkingProgramComplete] = useState(false);
   const [isInvitingFieldMentor, setIsInvitingFieldMentor] = useState(false);
-  const [isIssuingCertificate, setIsIssuingCertificate] = useState(false);
   const [completionMessage, setCompletionMessage] = useState<string | null>(null);
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
   const [certificateMessage, setCertificateMessage] = useState<string | null>(null);
@@ -214,6 +220,7 @@ export default function IndividualProgressPage() {
   const [progressData, setProgressData] = useState<ProgressResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<UserResponse | null>(null);
+  const [certificate, setCertificate] = useState<CertificateRecord | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const userName = user
     ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim()
@@ -221,9 +228,7 @@ export default function IndividualProgressPage() {
   const isCompleted = progressData?.overallCompleted ?? false;
   const [directorId, setDirectorId] = useState<string>("");
   const canInviteFieldMentor = Boolean(directorId && user?.email && user?.hasCompleted);
-  const canIssueCertificate = Boolean(
-    directorId && userId && !user?.hasIssuedCertificate && user?.hasCompleted,
-  );
+  const hasCertificate = hasRealCertificate(certificate);
 
   useEffect(() => {
     const storedUserId = getCookie("userId");
@@ -235,9 +240,19 @@ export default function IndividualProgressPage() {
     setLoading(true);
     setLoadError(null);
     Promise.all([apiGetUserById(userId), apiGetUserProgress(userId)])
-      .then(([userRes, progressRes]) => {
-        setUser(unwrapUserResponse(userRes));
+      .then(async ([userRes, progressRes]) => {
+        const loadedUser = unwrapUserResponse(userRes);
+        setUser(loadedUser);
         setProgressData(unwrapUserProgressDetail(progressRes));
+        if (loadedUser?.hasCompleted) {
+          try {
+            setCertificate(unwrapCertificate(await apiGetUserCertificate(userId)));
+          } catch {
+            setCertificate(null);
+          }
+        } else {
+          setCertificate(null);
+        }
       })
       .catch((e) => {
         console.error(e);
@@ -366,33 +381,6 @@ export default function IndividualProgressPage() {
       setInviteMessage(typeof message === "string" ? message : "Failed to send the field mentor invitation.");
     } finally {
       setIsInvitingFieldMentor(false);
-    }
-  };
-
-  const handleIssueCertificate = async () => {
-    if (!userId || !directorId) {
-      setCertificateMessage("Director session is missing. Sign in again and retry certificate issuance.");
-      return;
-    }
-
-    try {
-      setIsIssuingCertificate(true);
-      setCertificateMessage(null);
-      setCompletionMessage(null);
-      setInviteMessage(null);
-      const response = await apiIssueCertificate(userId, directorId);
-      const userRes = await apiGetUserById(userId);
-      setUser(unwrapUserResponse(userRes));
-      setCertificateMessage(response.data?.message || "Certificate issued successfully.");
-    } catch (error) {
-      console.error("Failed to issue certificate", error);
-      const message =
-        error && typeof error === "object" && "response" in error
-          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setCertificateMessage(typeof message === "string" ? message : "Failed to issue certificate.");
-    } finally {
-      setIsIssuingCertificate(false);
     }
   };
 
@@ -624,19 +612,23 @@ export default function IndividualProgressPage() {
                       : "Invite as Field Mentor"}
                 </button>
               )}
-              {(user?.hasIssuedCertificate || canIssueCertificate) && (
+              {user?.hasCompleted && (
+                hasCertificate ? (
                 <button
                   type="button"
-                  onClick={handleIssueCertificate}
-                  disabled={isIssuingCertificate || Boolean(user?.hasIssuedCertificate) || !canIssueCertificate}
+                  disabled
                   className="rounded-lg border border-amber-300/40 bg-amber-400/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-400/25 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {user?.hasIssuedCertificate
-                    ? "Issue Certificate"
-                    : isIssuingCertificate
-                      ? "Issuing certificate..."
-                      : "Issue Certificate First"}
+                  Certificate issued
                 </button>
+                ) : (
+                  <Link
+                    href={`/director/mentees/profile/${encodeURIComponent(userId)}?issueCertificate=1`}
+                    className="rounded-lg border border-amber-300/40 bg-amber-400/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-400/25"
+                  >
+                    Issue Certificate
+                  </Link>
+                )
               )}
               {/* <button
                 type="button"

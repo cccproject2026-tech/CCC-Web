@@ -11,6 +11,12 @@ import Mentor2 from "../../Assets/mentor2.png";
 import Mentor3 from "../../Assets/mentor3.png";
 import { Mentee } from "../mentees/page";
 import { apiGetAllUsers } from "@/app/Services/users.service";
+import {
+  apiGetUserCertificate,
+  hasRealCertificate,
+  unwrapCertificate,
+  type CertificateRecord,
+} from "@/app/Services/certificates.service";
 
 interface Person {
   id: number;
@@ -36,6 +42,11 @@ interface CourseUser {
   status: "completed" | "certificate_issued" | "invited";
   invitationDate?: string;
   response?: "Accepted" | "Waiting" | "Not Interested";
+  isNew?: boolean;
+  hasCompleted: boolean;
+  hasRealCertificate: boolean;
+  certificate: CertificateRecord | null;
+  fieldMentorInvitation?: any;
 }
 function getInitialsAvatar(name: string, fallback = "User") {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(
@@ -62,14 +73,52 @@ export default function CourseCompletedPage() {
         const res = await apiGetAllUsers({
           role: "pastor",
           search: query || undefined,
+          limit: 1000,
         });
 
-        const mapped: CourseUser[] = res.data.data.users
-          .map((u: any, i: number) => {
+        const rawUsers = res.data.data.users as any[];
+        const usersExposeCertificateData = rawUsers.some(
+          (u) =>
+            "certificate" in u ||
+            "certificates" in u ||
+            "certificateId" in u ||
+            "certificateUrl" in u ||
+            "pdfUrl" in u,
+        );
+
+        const mapped = await Promise.all(
+          
+          rawUsers.map(async (u: any): Promise<CourseUser | null> => {
+            if (String(u.id ?? u._id) === "6a16f84e20398e8c5c5167f7") {
+  console.log("Course completed Henry check:", {
+    id: u.id ?? u._id,
+    name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim(),
+    hasCompleted: u.hasCompleted,
+    completedAt: u.completedAt,
+    status: u.status,
+    progress: u.progress,
+    overallProgress: u.overallProgress,
+    hasIssuedCertificate: u.hasIssuedCertificate,
+    certificate: u.certificate,
+    raw: u,
+  });
+}
+            let certificate = unwrapCertificate(u);
+            if (u.hasCompleted && !usersExposeCertificateData) {
+              try {
+                certificate = unwrapCertificate(
+                  await apiGetUserCertificate(String(u.id ?? u._id)),
+                );
+              } catch {
+                certificate = null;
+              }
+            }
+            
+            const hasCertificate = hasRealCertificate(certificate);
             let status: CourseUser["status"] | null = null;
 
             if (u.fieldMentorInvitation) status = "invited";
-            else if (u.hasIssuedCertificate) status = "certificate_issued";
+            else if (hasCertificate) status = "certificate_issued";
             else if (u.hasCompleted) status = "completed";
 
             if (!status) return null;
@@ -79,7 +128,8 @@ export default function CourseCompletedPage() {
               name: `${u.firstName} ${u.lastName}`,
               // img: u.profilePicture || [Mentor1, Mentor2, Mentor3][i % 3],
               hasCompleted: Boolean(u.hasCompleted),
-hasIssuedCertificate: Boolean(u.hasIssuedCertificate),
+              hasRealCertificate: hasCertificate,
+              certificate,
 fieldMentorInvitation: u.fieldMentorInvitation,
               img:
   String(u.profilePicture || "").trim() ||
@@ -91,10 +141,10 @@ fieldMentorInvitation: u.fieldMentorInvitation,
                 : undefined,
               response: u.fieldMentorInvitation ? "Waiting" : undefined,
             };
-          })
-          .filter(Boolean);
+          }),
+        );
 
-        setUsers(mapped as CourseUser[]);
+        setUsers(mapped.filter((user): user is CourseUser => user !== null));
       } catch (e) {
         console.error("Failed to fetch users", e);
       } finally {
@@ -117,11 +167,11 @@ fieldMentorInvitation: u.fieldMentorInvitation,
     const matchesSearch = u.name.toLowerCase().includes(query.toLowerCase());
 
     if (activeTab === "completed") {
-      return matchesSearch && u.hasCompleted;
+      return matchesSearch && u.hasCompleted && !u.hasRealCertificate;
     }
 
     if (activeTab === "certificate_issued") {
-      return matchesSearch && u.hasIssuedCertificate;
+      return matchesSearch && u.hasRealCertificate;
     }
 
     if (activeTab === "invited") {
@@ -461,7 +511,7 @@ fieldMentorInvitation: u.fieldMentorInvitation,
               <div className="self-end flex-shrink-0">
                 {activeTab === "completed" && (
                 <Link
-  href={`/director/mentees/profile/${p.id}`}
+  href={`/director/mentees/profile/${p.id}?issueCertificate=1`}
   className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:bg-[#8ec5eb]/30"
 >
   Issue Certificate

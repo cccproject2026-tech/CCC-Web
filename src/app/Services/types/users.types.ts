@@ -52,6 +52,8 @@ export interface UserResponse {
   /** Set when the pastor is marked complete (mentor/director) or program completed. */
   hasCompleted?: boolean;
   hasIssuedCertificate?: boolean;
+  completedAt?: string;
+  certificates?: Array<Record<string, unknown>>;
   profilePicture?: string;
   assignedId?: string[];
   phoneNumber?: string;

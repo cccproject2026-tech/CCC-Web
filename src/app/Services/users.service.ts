@@ -52,13 +52,6 @@ export const apiDeleteUser = (userId: string) =>
 export const apiMarkUserCompleted = (userId: string) =>
   axiosInstance.patch<{ success: boolean; data: UserResponse }>(`/users/${userId}/mark-completed`);
 
-// POST /users/:id/issue-certificate
-export const apiIssueCertificate = (userId: string, issuedBy: string) =>
-  axiosInstance.post<{ success: boolean; message: string; data: UserResponse }>(
-    `/users/${userId}/issue-certificate`,
-    { issuedBy },
-  );
-
 // ─── Assign / Remove ──────────────────────────────────────────────────────────
 
 // POST /users/:userId/assign  body: { assignedId: string[] }
