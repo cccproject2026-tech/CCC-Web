@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -15,6 +15,7 @@ import {
   directorToastClass,
 } from "@/app/director/directorUi";
 import ConfirmModal from "@/app/Components/ConfirmModal";
+import CertificatePreview, { downloadCertificatePreviewPdf } from "@/app/Components/CertificatePreview";
 import ProfileForm from "@/app/Components/ProfileForm";
 import type { PersonalInfo, ChurchInfo, OtherInfo } from "@/app/Components/ProfileForm";
 
@@ -130,12 +131,15 @@ export default function MenteeProfileClient({ menteeId }: Props) {
 
 const [isIssueCertificateModalOpen, setIsIssueCertificateModalOpen] = useState(false);
 const [isCertificateSuccessModalOpen, setIsCertificateSuccessModalOpen] = useState(false);
+const [isCertificatePreviewModalOpen, setIsCertificatePreviewModalOpen] = useState(false);
+const [downloadCertificateWhenPreviewOpens, setDownloadCertificateWhenPreviewOpens] = useState(false);
 const [isIssuingCertificate, setIsIssuingCertificate] = useState(false);
 const [certificateNote, setCertificateNote] = useState(
   "Congratulations on successfully completing the revitalization journey. Wishing you continued impact in your ministry!"
 );
 const [certificate, setCertificate] = useState<CertificateRecord | null>(null);
 const [completionDate, setCompletionDate] = useState<string | undefined>();
+const certificatePreviewRef = useRef<HTMLDivElement | null>(null);
 
   const [progressOverallDone, setProgressOverallDone] = useState(false);
   const [userMarkedComplete, setUserMarkedComplete] = useState(false);
@@ -380,6 +384,27 @@ const handleIssueCertificate = async () => {
     setIsIssuingCertificate(false);
   }
 };
+
+const handleDownloadCertificatePreview = () =>
+  downloadCertificatePreviewPdf(
+    certificatePreviewRef.current,
+    certificate?.certificateId,
+    certificate?.pdfUrl || certificate?.certificateUrl,
+  );
+
+const requestCertificatePreviewDownload = () => {
+  setDownloadCertificateWhenPreviewOpens(true);
+  setIsCertificatePreviewModalOpen(true);
+};
+
+useEffect(() => {
+  if (!isCertificatePreviewModalOpen || !downloadCertificateWhenPreviewOpens) return;
+  const timer = window.setTimeout(() => {
+    setDownloadCertificateWhenPreviewOpens(false);
+    void handleDownloadCertificatePreview();
+  }, 0);
+  return () => window.clearTimeout(timer);
+}, [downloadCertificateWhenPreviewOpens, isCertificatePreviewModalOpen]);
 
   const persistProfile = async () => {
     const churches: ChurchDetails[] = [];
@@ -903,8 +928,15 @@ const handleIssueCertificate = async () => {
       <div className="space-y-3">
         <button
           type="button"
-          onClick={() => window.open(certificate?.certificateUrl, "_blank", "noopener,noreferrer")}
-          disabled={!certificate?.certificateUrl}
+          onClick={() => setIsCertificatePreviewModalOpen(true)}
+          className="w-full rounded-lg border border-[#08056b] px-4 py-3 font-semibold text-[#08056b]"
+        >
+          Preview Certificate
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setIsCertificatePreviewModalOpen(true)}
           className="w-full rounded-lg bg-[#08056b] px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           View Certificate
@@ -912,7 +944,7 @@ const handleIssueCertificate = async () => {
 
         <button
           type="button"
-          onClick={() => window.open(certificate?.pdfUrl || certificate?.certificateUrl, "_blank", "noopener,noreferrer")}
+          onClick={requestCertificatePreviewDownload}
           disabled={!certificate?.pdfUrl && !certificate?.certificateUrl}
           className="w-full rounded-lg border border-gray-300 px-4 py-3 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -934,6 +966,49 @@ const handleIssueCertificate = async () => {
         >
           Close
         </button>
+      </div>
+    </div>
+  </div>
+)}
+{isCertificatePreviewModalOpen && certificate && (
+  <div
+    className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 px-4 py-6"
+    role="dialog"
+    aria-modal="true"
+    onClick={() => setIsCertificatePreviewModalOpen(false)}
+  >
+    <div
+      className="max-h-[90vh] w-full max-w-6xl overflow-auto rounded-2xl bg-white p-4 shadow-2xl"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="sticky top-0 z-10 mb-3 flex items-center justify-between bg-white px-2 py-1">
+        <h2 className="font-bold text-[#101828]">Certificate Preview</h2>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void handleDownloadCertificatePreview()}
+            disabled={!certificate?.pdfUrl && !certificate?.certificateUrl}
+            className="rounded-lg border border-[#08056b] px-3 py-2 text-sm font-semibold text-[#08056b] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Download PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsCertificatePreviewModalOpen(false)}
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
+            aria-label="Close certificate preview"
+          >
+            <i className="fa-solid fa-xmark" />
+          </button>
+        </div>
+      </div>
+      <div ref={certificatePreviewRef}>
+        <CertificatePreview
+          pastorName={certificate.pastorName || fullName}
+          completionDate={certificate.completionDate || completionDate}
+          certificateId={certificate.certificateId}
+          duration={certificate.duration}
+        />
       </div>
     </div>
   </div>

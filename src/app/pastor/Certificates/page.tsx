@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PastorHeader from "@/app/Components/PastorHeader";
+import CertificatePreview, { downloadCertificatePreviewPdf } from "@/app/Components/CertificatePreview";
 import { getCookie } from "@/app/utils/cookies";
 import { apiGetUserById } from "@/app/Services/api";
 import {
@@ -16,10 +17,14 @@ export default function PastorCertificatesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [certificate, setCertificate] = useState<CertificateRecord | null>(null);
+  const [pastorName, setPastorName] = useState("Pastor");
+  const [showCertificatePreview, setShowCertificatePreview] = useState(false);
+  const [downloadCertificateWhenPreviewOpens, setDownloadCertificateWhenPreviewOpens] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldMentorState, setFieldMentorState] = useState<
     "not_eligible" | "eligible" | "invited" | "field_mentor"
   >("not_eligible");
+  const certificatePreviewRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const fetchCertificates = async () => {
@@ -35,6 +40,11 @@ export default function PastorCertificatesPage() {
 
         const res = await apiGetUserById(userId);
         const userData = res.data?.data || {};
+        setPastorName(
+          [userData.firstName, userData.lastName].filter(Boolean).join(" ").trim() ||
+            (userData as { name?: string }).name ||
+            "Pastor",
+        );
         const certificateRes = await apiGetUserCertificate(userId).catch((error) => {
           if (error?.response?.status === 404) return null;
           throw error;
@@ -61,6 +71,27 @@ export default function PastorCertificatesPage() {
 
     fetchCertificates();
   }, []);
+
+  const handleDownloadCertificatePreview = () =>
+    downloadCertificatePreviewPdf(
+      certificatePreviewRef.current,
+      certificate?.certificateId,
+      certificate?.pdfUrl || certificate?.certificateUrl,
+    );
+
+  const requestCertificatePreviewDownload = () => {
+    setDownloadCertificateWhenPreviewOpens(true);
+    setShowCertificatePreview(true);
+  };
+
+  useEffect(() => {
+    if (!showCertificatePreview || !downloadCertificateWhenPreviewOpens) return;
+    const timer = window.setTimeout(() => {
+      setDownloadCertificateWhenPreviewOpens(false);
+      void handleDownloadCertificatePreview();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [downloadCertificateWhenPreviewOpens, showCertificatePreview]);
 
   return (
     <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_20%_12%,rgba(141,211,243,0.18),transparent_38%),linear-gradient(180deg,#041f35_0%,#062946_100%)] text-white">
@@ -128,15 +159,21 @@ export default function PastorCertificatesPage() {
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row">
                   <button
                     type="button"
-                    onClick={() => window.open(String(certificate.certificateUrl || certificate.pdfUrl), "_blank", "noopener,noreferrer")}
-                    disabled={!certificate.certificateUrl && !certificate.pdfUrl}
+                    onClick={() => setShowCertificatePreview(true)}
+                    className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/15 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+                  >
+                    Preview Certificate
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowCertificatePreview(true)}
                     className="rounded-lg bg-[#8ec5eb] px-4 py-2.5 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     View Certificate
                   </button>
                   <button
                     type="button"
-                    onClick={() => window.open(String(certificate.pdfUrl || certificate.certificateUrl), "_blank", "noopener,noreferrer")}
+                    onClick={requestCertificatePreviewDownload}
                     disabled={!certificate.pdfUrl && !certificate.certificateUrl}
                     className="rounded-lg border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -148,6 +185,50 @@ export default function PastorCertificatesPage() {
           </div>
         </div>
       </main>
+
+      {showCertificatePreview && certificate && (
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 px-4 py-6"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowCertificatePreview(false)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-6xl overflow-auto rounded-2xl bg-white p-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 z-10 mb-3 flex items-center justify-between bg-white px-2 py-1">
+              <h2 className="font-bold text-[#062946]">Certificate Preview</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleDownloadCertificatePreview()}
+                  disabled={!certificate?.pdfUrl && !certificate?.certificateUrl}
+                  className="rounded-lg border border-[#062946] px-3 py-2 text-sm font-semibold text-[#062946] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Download PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCertificatePreview(false)}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
+                  aria-label="Close certificate preview"
+                >
+                  <i className="fa-solid fa-xmark" />
+                </button>
+              </div>
+            </div>
+            <div ref={certificatePreviewRef}>
+              <CertificatePreview
+                pastorName={certificate.pastorName || pastorName}
+                completionDate={certificate.completionDate}
+                certificateId={certificate.certificateId}
+                duration={certificate.duration}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
