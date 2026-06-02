@@ -1481,7 +1481,7 @@ setMeetingDescription("");
                     <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" />
                     View Details
                   </button>
-                  {sched ? (
+                  {/* {sched ? (
                     <button
                       type="button"
                       className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1490,13 +1490,23 @@ setMeetingDescription("");
                       <i className="fa-regular fa-user-clock mr-2 text-amber-200" />
                       Mark as missed
                     </button>
-                  ) : null}
-                  {sched ? (
+                  ) : null} */}
+                  {/* {sched ? (
                   <button type="button" className="w-full px-4 py-2.5 text-left transition hover:bg-white/10" onClick={() => openRescheduleModal(appt)}>
                     <i className="fa-regular fa-calendar mr-2 text-[#8ec5eb]" />
                     Reschedule meeting
                   </button>
-                  ) : null}
+                  ) : null} */}
+                  {selectedDateView === "my" && sched ? (
+  <button
+    type="button"
+    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+    onClick={() => openRescheduleModal(appt)}
+  >
+    <i className="fa-regular fa-calendar mr-2 text-[#8ec5eb]" />
+    Reschedule meeting
+  </button>
+) : null}
                   {sched ? (
                   <button type="button" className="w-full px-4 py-2.5 text-left transition hover:bg-white/10" onClick={() => handleCancelAppointment(appt)}>
                     <i className="fa-regular fa-circle-xmark mr-2 text-red-300" />

@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { apiGetDocuments } from "@/app/Services/api";
 import Image from "next/image";
 import Link from "next/link";
 import { isAxiosError } from "axios";
@@ -32,6 +33,11 @@ type AssignedMenteeRow = {
   name: string;
   church: string;
   progress: number;
+};
+type MentorDocumentRow = {
+  name: string;
+  url: string;
+  uploadedAt?: string;
 };
 
 function normalizeAssignedIds(user: any): string[] {
@@ -70,6 +76,7 @@ export default function MentorProfilePage() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [assignedMentees, setAssignedMentees] = useState<AssignedMenteeRow[]>([]);
   const [assignedIds, setAssignedIds] = useState<string[]>([]);
+  const [mentorDocuments, setMentorDocuments] = useState<MentorDocumentRow[]>([]);
 
   const [mentorData, setMentorData] = useState({
     firstName: "",
@@ -126,6 +133,50 @@ export default function MentorProfilePage() {
       if (!silent) setLoading(true);
       const res = await apiGetUserById(id);
       const user = res.data.data;
+     try {
+  const docsRes = await apiGetDocuments(String(user?._id ?? user?.id ?? id));
+  const docs = Array.isArray(docsRes.data?.data) ? docsRes.data.data : [];
+
+  setMentorDocuments(
+    docs
+      .map((doc: any) => ({
+        name: String(doc.fileName ?? doc.name ?? "Document"),
+        url: String(doc.fileUrl ?? ""),
+        uploadedAt: doc.uploadedAt ?? doc.createdAt ?? doc.updatedAt ?? undefined,
+      }))
+      .filter((doc: MentorDocumentRow) => Boolean(doc.url)),
+  );
+} catch (docErr) {
+  console.error("Failed to load mentor documents", docErr);
+  setMentorDocuments([]);
+}
+// setMentorDocuments(
+//   docs
+//     .map((doc: any) => {
+//       const url =
+//         doc.url ??
+//         doc.fileUrl ??
+//         doc.documentUrl ??
+//         doc.path ??
+//         "";
+
+//       return {
+//         name:
+//           doc.name ??
+//           doc.fileName ??
+//           doc.originalName ??
+//           doc.title ??
+//           "Document",
+//         url: String(url),
+//         uploadedAt:
+//           doc.uploadedAt ??
+//           doc.createdAt ??
+//           doc.updatedAt ??
+//           undefined,
+//       };
+//     })
+//     .filter((doc: MentorDocumentRow) => doc.url)
+// );
       const interest = user?.interest;
       const ids = normalizeAssignedIds(user);
       setAssignedIds(ids);
@@ -395,6 +446,60 @@ export default function MentorProfilePage() {
                   <i className="fa-solid fa-user-plus" />
                   <span>Assign mentees</span>
                 </button>
+                <div className="mt-6 border-t border-white/10 pt-6">
+  <h4 className="mb-3 text-[13px] font-semibold text-white/85">
+    Documents
+  </h4>
+
+  {mentorDocuments.length === 0 ? (
+    <p className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-4 text-center text-[13px] text-white/55">
+      No documents uploaded.
+    </p>
+  ) : (
+    <div className="space-y-3">
+      {mentorDocuments.map((doc, index) => (
+        <div
+          key={`${doc.url}-${index}`}
+          className="rounded-xl border border-white/10 bg-white/[0.05] p-3"
+        >
+          <p className="break-words text-[13px] font-semibold text-white">
+            {doc.name}
+          </p>
+
+          {doc.uploadedAt ? (
+            <p className="mt-1 text-[11px] text-white/45">
+              Uploaded{" "}
+              {new Date(doc.uploadedAt).toLocaleDateString(undefined, {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}
+            </p>
+          ) : null}
+
+          <div className="mt-3 flex gap-2">
+            <a
+              href={doc.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-3 py-2 text-center text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+            >
+              View
+            </a>
+
+            <a
+              href={doc.url}
+              download
+              className="flex-1 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-center text-xs font-semibold text-white transition hover:bg-white/15"
+            >
+              Download
+            </a>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
               </div>
             </aside>
 

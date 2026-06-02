@@ -391,10 +391,15 @@ export default function DirectorRoadmapFormPage() {
             buttonName: extra.buttonName || "",
             // allowPastorSelect: Array.isArray(extra.checkboxes) && extra.checkboxes.some((cb: any) => cb.name === "Allow pastor to select Date"),
             // showOnCard: Array.isArray(extra.checkboxes) && extra.checkboxes.some((cb: any) => cb.name === "Show date on info card"),
-            allowPastorSelect: hasExtraCheckbox(extra, "Allow pastor to select Date"),
-showOnCard:
-  hasExtraCheckbox(extra, "Show date on info card") ||
-  hasExtraCheckbox(extra, "Show on Card"),
+            allowPastorSelect:
+              typeof extra.allowPastorSelect === "boolean"
+                ? extra.allowPastorSelect
+                : hasExtraCheckbox(extra, "Allow pastor to select Date"),
+            showOnCard:
+              typeof extra.showOnCard === "boolean"
+                ? extra.showOnCard
+                : hasExtraCheckbox(extra, "Show date on info card") ||
+                  hasExtraCheckbox(extra, "Show on Card"),
           });
           break;
         case "ASSESSMENT":
@@ -455,10 +460,15 @@ showOnCard:
                   buttonName: sectionExtra.buttonName || "",
                   // allowPastorSelect: Array.isArray(sectionExtra.checkboxes) && sectionExtra.checkboxes.some((cb: any) => cb.name === "Allow pastor to select Date"),
                   // showOnCard: Array.isArray(sectionExtra.checkboxes) && sectionExtra.checkboxes.some((cb: any) => cb.name === "Show date on info card"),
-                  allowPastorSelect: hasExtraCheckbox(sectionExtra, "Allow pastor to select Date"),
-showOnCard:
-  hasExtraCheckbox(sectionExtra, "Show date on info card") ||
-  hasExtraCheckbox(sectionExtra, "Show on Card"),
+                  allowPastorSelect:
+                    typeof sectionExtra.allowPastorSelect === "boolean"
+                      ? sectionExtra.allowPastorSelect
+                      : hasExtraCheckbox(sectionExtra, "Allow pastor to select Date"),
+                  showOnCard:
+                    typeof sectionExtra.showOnCard === "boolean"
+                      ? sectionExtra.showOnCard
+                      : hasExtraCheckbox(sectionExtra, "Show date on info card") ||
+                        hasExtraCheckbox(sectionExtra, "Show on Card"),
                 });
               } else if (sectionExtra.type === "ASSESSMENT") {
                 fields.push({
@@ -513,6 +523,8 @@ field.showOnCard ? { type: "CHECKBOX", name: "Show on Card", checked: true, have
               type: "DATE_PICKER",
               name: field.label || "Date",
               ...(field.date ? { date: String(field.date).slice(0, 10) } : {}),
+              allowPastorSelect: !!field.allowPastorSelect,
+              showOnCard: !!field.showOnCard,
               ...(field.buttonName ? { buttonName: field.buttonName } : {}),
               ...(checkboxes.length ? { checkboxes } : {}),
             };
@@ -552,9 +564,17 @@ field.showOnCard ? { type: "CHECKBOX", name: "Show on Card", checked: true, have
                     // nf.allowPastorSelect ? { type: "CHECKBOX", name: "Allow pastor to select Date", haveButton: false } : null,
                     // nf.showOnCard ? { type: "CHECKBOX", name: "Show on Card", haveButton: false } : null,
                     nf.allowPastorSelect ? { type: "CHECKBOX", name: "Allow pastor to select Date", checked: true, haveButton: true } : null,
-nf.showOnCard ? { type: "CHECKBOX", name: "Show on Card", checked: true, haveButton: true } : null,
+                    nf.showOnCard ? { type: "CHECKBOX", name: "Show on Card", checked: true, haveButton: true } : null,
                   ].filter(Boolean);
-                  return { type: "DATE_PICKER", name: nf.label || "Date", ...(nf.date ? { date: String(nf.date).slice(0, 10) } : {}), ...(nf.buttonName ? { buttonName: nf.buttonName } : {}), ...(cbs.length ? { checkboxes: cbs } : {}) };
+                  return {
+                    type: "DATE_PICKER",
+                    name: nf.label || "Date",
+                    ...(nf.date ? { date: String(nf.date).slice(0, 10) } : {}),
+                    allowPastorSelect: !!nf.allowPastorSelect,
+                    showOnCard: !!nf.showOnCard,
+                    ...(nf.buttonName ? { buttonName: nf.buttonName } : {}),
+                    ...(cbs.length ? { checkboxes: cbs } : {}),
+                  };
                 }
                 if (nf.type === "assessment") {
                   const cbs = [
@@ -1402,7 +1422,14 @@ if (!churchVerbiage.trim()) {
                       disabled={submitting}
                       className={`${directorBtnPrimary} border border-white/25 px-8 disabled:opacity-60`}
                     >
-                      {submitting ? "Creating…" : "Create"}
+                      {/* {submitting ? "Creating…" : "Create"} */}
+                      {submitting
+  ? isEditMode
+    ? "Saving…"
+    : "Creating…"
+  : isEditMode
+    ? "Save"
+    : "Create"}
                     </button>
                   </div>
                 ) : null}

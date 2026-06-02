@@ -36,6 +36,7 @@ export interface CheckboxExtra {
   type: 'CHECKBOX';
   name: string;
   haveButton: boolean;
+  checked?: boolean;
   buttonName?: string;
 }
 
@@ -48,6 +49,8 @@ export interface DatePickerExtra {
   type: 'DATE_PICKER';
   name: string;
   date?: string;
+  allowPastorSelect?: boolean;
+  showOnCard?: boolean;
   checkboxes?: CheckboxExtra[];
   buttonName?: string;
 }

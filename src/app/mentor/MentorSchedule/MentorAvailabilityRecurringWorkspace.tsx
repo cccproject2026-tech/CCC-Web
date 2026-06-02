@@ -747,7 +747,7 @@ const c: { unavailable: boolean; slots: AppointmentAvailabilityTimeSlot[] } =
             className={`${mentorSecondaryCta} inline-flex items-center gap-2 px-4 py-2 text-[13px]`}
           >
             <i className="fa-solid fa-plus text-[11px]" aria-hidden />
-            Add another time slot
+            Add time slot
           </button>
         </div>
       </div>

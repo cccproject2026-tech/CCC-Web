@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiGetDocuments } from "@/app/Services/api";
 import Image from "next/image";
 import Link from "next/link";
 import { isAxiosError } from "axios";
@@ -248,17 +249,36 @@ console.log("Mentee profile certificate debug:", {
       setInterests(interest?.interests?.join("\n") ?? "");
       setComments(interest?.comments ?? "");
 
-      setDocuments(
-        user.uploadedDocuments?.map((doc: any, i: number) => ({
-          id: doc._id ?? String(i),
-          name: doc.fileName ?? "Document",
-          size:
-            typeof doc.fileSize === "number"
-              ? `${(doc.fileSize / 1024).toFixed(1)} KB`
-              : "",
-          url: doc.fileUrl,
-        })) ?? [],
-      );
+      // setDocuments(
+      //   user.uploadedDocuments?.map((doc: any, i: number) => ({
+      //     id: doc._id ?? String(i),
+      //     name: doc.fileName ?? "Document",
+      //     size:
+      //       typeof doc.fileSize === "number"
+      //         ? `${(doc.fileSize / 1024).toFixed(1)} KB`
+      //         : "",
+      //     url: doc.fileUrl,
+      //   })) ?? [],
+      // );
+      try {
+  const docsRes = await apiGetDocuments(menteeId);
+  const docs = Array.isArray(docsRes.data?.data) ? docsRes.data.data : [];
+
+  setDocuments(
+    docs.map((doc: any, i: number) => ({
+      id: String(doc._id ?? doc.id ?? i),
+      name: doc.fileName ?? doc.name ?? "Document",
+      size:
+        typeof doc.fileSize === "number"
+          ? `${(doc.fileSize / 1024).toFixed(1)} KB`
+          : "",
+      url: doc.fileUrl ?? "",
+    })),
+  );
+} catch (docErr) {
+  console.error("Failed to load mentee documents", docErr);
+  setDocuments([]);
+}
     } catch (err) {
       console.error("Failed to fetch mentee profile", err);
       if (isAxiosError(err) && err.response?.status === 429) {
@@ -613,7 +633,7 @@ useEffect(() => {
                   </div>
                 </div>
 
-                {documents.length > 0 ? (
+                {/* {documents.length > 0 ? ( */}
                   <div className="mb-6">
                     <button
                       type="button"
@@ -629,7 +649,7 @@ useEffect(() => {
                       </span>
                     </button>
                   </div>
-                ) : null}
+                {/* ) : null} */}
 
                 {/* <button
                   type="button"
@@ -756,8 +776,83 @@ useEffect(() => {
           </div>
         </div>
       </section>
+{showDocs && (
+  <div
+    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+    role="dialog"
+    aria-modal="true"
+    onClick={() => setShowDocs(false)}
+  >
+    <div
+      className={`max-h-[80vh] w-full max-w-lg overflow-hidden rounded-2xl p-6 shadow-2xl ${directorGlassCard}`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="mb-5 flex items-center justify-between border-b border-white/10 pb-4">
+        <h3 className="text-lg font-bold text-white">Documents</h3>
+        <button
+          type="button"
+          onClick={() => setShowDocs(false)}
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-white"
+          aria-label="Close"
+        >
+          <i className="fa-solid fa-xmark" />
+        </button>
+      </div>
 
-      {showDocs && (
+      {documents.length === 0 ? (
+        <p className="rounded-xl border border-white/10 bg-white/[0.05] px-4 py-6 text-center text-sm text-white/55">
+          No documents uploaded.
+        </p>
+      ) : (
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+          {documents.map((d) => (
+            <div
+              key={d.id}
+              className="rounded-xl border border-white/10 bg-white/[0.05] p-4"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-[#8ec5eb]">
+                  <i className="fa-regular fa-file-lines" />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="break-words text-sm font-semibold text-white">
+                    {d.name}
+                  </p>
+                  {d.size ? (
+                    <p className="mt-1 text-xs text-white/45">{d.size}</p>
+                  ) : null}
+                </div>
+              </div>
+
+              {d.url ? (
+                <div className="mt-4 flex gap-2">
+                  <a
+                    href={d.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-3 py-2 text-center text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/25"
+                  >
+                    View
+                  </a>
+
+                  <a
+                    href={d.url}
+                    download={d.name}
+                    className="flex-1 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-center text-xs font-semibold text-white transition hover:bg-white/15"
+                  >
+                    Download
+                  </a>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+)}
+      {/* {showDocs && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4"
           role="dialog"
@@ -804,7 +899,7 @@ useEffect(() => {
             </ul>
           </div>
         </div>
-      )}
+      )} */}
 
       {toast && (
         <div className="fixed left-1/2 top-20 z-[110] max-w-[min(90vw,28rem)] -translate-x-1/2 animate-fade-in">

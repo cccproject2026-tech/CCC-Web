@@ -188,6 +188,8 @@ interface ExtraComponent {
   placeHolder?: string;
   buttonName?: string;
   date?: string;
+  allowPastorSelect?: boolean;
+  showOnCard?: boolean;
   haveButton?: boolean;
   checkboxes?: ExtraComponent[];
   sections?: ExtraComponent[];
@@ -2412,11 +2414,15 @@ if (!hasRequiredSubmissions) {
     .toLowerCase()
     .replace(/\s+/g, " ");
 
-const allowPastorSelect =
+const legacyAllowPastorSelect =
   Array.isArray(extra.checkboxes) &&
   extra.checkboxes.some(
     (cb) => normalizeMetaName((cb as ExtraComponent)?.name) === "allow pastor to select date",
   );
+const allowPastorSelect =
+  typeof extra.allowPastorSelect === "boolean"
+    ? extra.allowPastorSelect
+    : legacyAllowPastorSelect;
         const defaultDate =
           typeof extra.date === "string" && extra.date.trim() ? extra.date.trim().slice(0, 10) : "";
         const value = String(formData[fieldKey] ?? defaultDate ?? "");
@@ -2442,16 +2448,19 @@ const displayCheckboxes =
             ) : defaultDate ? (
               <p className="mb-3 text-sm text-white/85">{formatDate(defaultDate)}</p>
             ) : null} */}
-            {allowPastorSelect || !defaultDate ? (
-  <input
-    type="date"
-    value={value.slice(0, 10)}
-    onChange={(e) => handleInputChange(fieldKey, e.target.value)}
-    className="mb-3 w-full max-w-xs rounded-md border border-[#5A8DCB] bg-white/5 px-3 py-2 text-sm text-white [color-scheme:dark]"
-  />
-) : (
-  <p className="mb-3 text-sm text-white/85">{formatDate(defaultDate)}</p>
-)}
+            <input
+              type="date"
+              value={value.slice(0, 10)}
+              disabled={!allowPastorSelect}
+              onChange={(e) => {
+                if (allowPastorSelect) handleInputChange(fieldKey, e.target.value);
+              }}
+              className={`mb-3 w-full max-w-xs rounded-md border border-[#5A8DCB] px-3 py-2 text-sm text-white [color-scheme:dark] ${
+                allowPastorSelect
+                  ? "bg-white/5 focus:outline-none focus:ring-1 focus:ring-[#00B3FF]"
+                  : "cursor-not-allowed bg-white/10 opacity-80"
+              }`}
+            />
             {extra.buttonName ? (
               <button
                 type="button"

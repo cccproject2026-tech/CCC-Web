@@ -113,49 +113,52 @@ function appendNestedRoadmapItemToFormData(
     });
   }
 
+  const appendExtraFields = (base: string, extra: Record<string, unknown>) => {
+    if (extra.type != null) formData.append(`${base}[type]`, String(extra.type));
+    if (extra.name != null) formData.append(`${base}[name]`, String(extra.name));
+    if (extra.placeHolder) formData.append(`${base}[placeHolder]`, String(extra.placeHolder));
+    if (extra.buttonName) formData.append(`${base}[buttonName]`, String(extra.buttonName));
+    if (extra.haveButton !== undefined) formData.append(`${base}[haveButton]`, String(extra.haveButton));
+    if (String(extra.type) === "DATE_PICKER") {
+      if (extra.date) formData.append(`${base}[date]`, String(extra.date));
+      if (extra.allowPastorSelect !== undefined) {
+        formData.append(`${base}[allowPastorSelect]`, String(extra.allowPastorSelect));
+      }
+      if (extra.showOnCard !== undefined) {
+        formData.append(`${base}[showOnCard]`, String(extra.showOnCard));
+      }
+    }
+    if (String(extra.type) === "ASSESSMENT" && extra.assessmentId) {
+      formData.append(`${base}[assessmentId]`, String(extra.assessmentId));
+    }
+    const checkboxes = extra.checkboxes;
+    if (Array.isArray(checkboxes) && checkboxes.length) {
+      checkboxes.forEach((cb, j) => {
+        if (!cb || typeof cb !== "object") return;
+        const c = cb as Record<string, unknown>;
+        const cbBase = `${base}[checkboxes][${j}]`;
+        if (c.type != null) formData.append(`${cbBase}[type]`, String(c.type));
+        if (c.name != null) formData.append(`${cbBase}[name]`, String(c.name));
+        if (c.haveButton !== undefined) formData.append(`${cbBase}[haveButton]`, String(c.haveButton));
+        if (c.checked !== undefined) formData.append(`${cbBase}[checked]`, String(c.checked));
+        if (c.buttonName) formData.append(`${cbBase}[buttonName]`, String(c.buttonName));
+      });
+    }
+    const sections = extra.sections;
+    if (Array.isArray(sections) && sections.length) {
+      sections.forEach((sec, j) => {
+        if (!sec || typeof sec !== "object") return;
+        appendExtraFields(`${base}[sections][${j}]`, sec as Record<string, unknown>);
+      });
+    }
+  };
+
   const extras = p.extras;
   if (Array.isArray(extras) && extras.length) {
     extras.forEach((extra, i) => {
       if (!extra || typeof extra !== "object") return;
       const e = extra as Record<string, unknown>;
-      const b = `extras[${i}]`;
-      if (e.type != null) formData.append(`${b}[type]`, String(e.type));
-      if (e.name != null) formData.append(`${b}[name]`, String(e.name));
-      if (e.placeHolder) formData.append(`${b}[placeHolder]`, String(e.placeHolder));
-      if (e.buttonName) formData.append(`${b}[buttonName]`, String(e.buttonName));
-      if (e.haveButton !== undefined) formData.append(`${b}[haveButton]`, String(e.haveButton));
-      if (String(e.type) === "ASSESSMENT" && e.assessmentId) {
-        formData.append(`${b}[assessmentId]`, String(e.assessmentId));
-      }
-      // If backend supports nested checkbox lists on certain extras, send them with bracket paths.
-      const checkboxes = e.checkboxes;
-      if (Array.isArray(checkboxes) && checkboxes.length) {
-        checkboxes.forEach((cb, j) => {
-          if (!cb || typeof cb !== "object") return;
-          const c = cb as Record<string, unknown>;
-          const cbBase = `${b}[checkboxes][${j}]`;
-          if (c.type != null) formData.append(`${cbBase}[type]`, String(c.type));
-          if (c.name != null) formData.append(`${cbBase}[name]`, String(c.name));
-          if (c.haveButton !== undefined) formData.append(`${cbBase}[haveButton]`, String(c.haveButton));
-          if (c.buttonName) formData.append(`${cbBase}[buttonName]`, String(c.buttonName));
-        });
-      }
-      const sections = e.sections;
-      if (Array.isArray(sections) && sections.length) {
-        sections.forEach((sec, j) => {
-          if (!sec || typeof sec !== "object") return;
-          const s = sec as Record<string, unknown>;
-          const secBase = `${b}[sections][${j}]`;
-          if (s.type != null) formData.append(`${secBase}[type]`, String(s.type));
-          if (s.name != null) formData.append(`${secBase}[name]`, String(s.name));
-          if (s.placeHolder) formData.append(`${secBase}[placeHolder]`, String(s.placeHolder));
-          if (s.buttonName) formData.append(`${secBase}[buttonName]`, String(s.buttonName));
-          if (s.haveButton !== undefined) formData.append(`${secBase}[haveButton]`, String(s.haveButton));
-          if (String(s.type) === "ASSESSMENT" && s.assessmentId) {
-            formData.append(`${secBase}[assessmentId]`, String(s.assessmentId));
-          }
-        });
-      }
+      appendExtraFields(`extras[${i}]`, e);
     });
   }
 }
@@ -197,18 +200,48 @@ function appendRoadmapWritePayloadToFormData(
       formData.append(`divisions[${i}]`, d);
     });
   }
+  const appendExtraFields = (base: string, extra: Record<string, unknown>) => {
+    formData.append(`${base}[type]`, String(extra.type ?? ""));
+    formData.append(`${base}[name]`, String(extra.name ?? ""));
+    if (extra.placeHolder) formData.append(`${base}[placeHolder]`, String(extra.placeHolder));
+    if (extra.buttonName) formData.append(`${base}[buttonName]`, String(extra.buttonName));
+    if (extra.haveButton !== undefined) formData.append(`${base}[haveButton]`, String(extra.haveButton));
+    if (String(extra.type) === "DATE_PICKER") {
+      if (extra.date) formData.append(`${base}[date]`, String(extra.date));
+      if (extra.allowPastorSelect !== undefined) {
+        formData.append(`${base}[allowPastorSelect]`, String(extra.allowPastorSelect));
+      }
+      if (extra.showOnCard !== undefined) {
+        formData.append(`${base}[showOnCard]`, String(extra.showOnCard));
+      }
+    }
+    if (String(extra.type) === "ASSESSMENT" && extra.assessmentId) {
+      formData.append(`${base}[assessmentId]`, String(extra.assessmentId));
+    }
+    const checkboxes = extra.checkboxes;
+    if (Array.isArray(checkboxes) && checkboxes.length) {
+      checkboxes.forEach((cb, k) => {
+        if (!cb || typeof cb !== "object") return;
+        const c = cb as Record<string, unknown>;
+        const cBase = `${base}[checkboxes][${k}]`;
+        if (c.type != null) formData.append(`${cBase}[type]`, String(c.type));
+        if (c.name != null) formData.append(`${cBase}[name]`, String(c.name));
+        if (c.haveButton !== undefined) formData.append(`${cBase}[haveButton]`, String(c.haveButton));
+        if (c.checked !== undefined) formData.append(`${cBase}[checked]`, String(c.checked));
+        if (c.buttonName) formData.append(`${cBase}[buttonName]`, String(c.buttonName));
+      });
+    }
+    const sections = extra.sections;
+    if (Array.isArray(sections) && sections.length) {
+      sections.forEach((section, k) => {
+        if (!section || typeof section !== "object") return;
+        appendExtraFields(`${base}[sections][${k}]`, section as Record<string, unknown>);
+      });
+    }
+  };
   if (Array.isArray(p.extras) && p.extras.length) {
     p.extras.forEach((extra, i) => {
-      const b = `extras[${i}]`;
-      formData.append(`${b}[type]`, String(extra.type));
-      formData.append(`${b}[name]`, String(extra.name));
-      const e = extra as unknown as Record<string, unknown>;
-      if (e.placeHolder) formData.append(`${b}[placeHolder]`, String(e.placeHolder));
-      if (e.buttonName) formData.append(`${b}[buttonName]`, String(e.buttonName));
-      if (e.haveButton !== undefined) formData.append(`${b}[haveButton]`, String(e.haveButton));
-      if (String(extra.type) === "ASSESSMENT" && e.assessmentId) {
-        formData.append(`${b}[assessmentId]`, String(e.assessmentId));
-      }
+      appendExtraFields(`extras[${i}]`, extra as unknown as Record<string, unknown>);
     });
   }
   if (Array.isArray(p.roadmaps) && p.roadmaps.length) {
@@ -224,16 +257,7 @@ function appendRoadmapWritePayloadToFormData(
       }
       const nestedExtras = item.extras ?? [];
       nestedExtras.forEach((extra, j) => {
-        const e = `roadmaps[${i}][extras][${j}]`;
-        formData.append(`${e}[type]`, String(extra.type));
-        formData.append(`${e}[name]`, String(extra.name));
-        const ex = extra as unknown as Record<string, unknown>;
-        if (ex.placeHolder) formData.append(`${e}[placeHolder]`, String(ex.placeHolder));
-        if (ex.buttonName) formData.append(`${e}[buttonName]`, String(ex.buttonName));
-        if (ex.haveButton !== undefined) formData.append(`${e}[haveButton]`, String(ex.haveButton));
-        if (String(extra.type) === "ASSESSMENT" && ex.assessmentId) {
-          formData.append(`${e}[assessmentId]`, String(ex.assessmentId));
-        }
+        appendExtraFields(`roadmaps[${i}][extras][${j}]`, extra as unknown as Record<string, unknown>);
       });
     });
   }
