@@ -39,18 +39,29 @@ function isHttpUrl(u?: string): boolean {
   return !!u && (u.startsWith("http://") || u.startsWith("https://"));
 }
 
+// type Mentee = {
+//   _id: string;
+//   firstName: string;
+//   lastName: string;
+//   email: string;
+//   role: string;
+//   profileInfo?: string;
+//   profilePicture?: string;
+//   country?: string;
+//   progress: number;
+// };
 type Mentee = {
   _id: string;
   firstName: string;
   lastName: string;
   email: string;
+  phoneNumber?: string;
   role: string;
   profileInfo?: string;
   profilePicture?: string;
   country?: string;
   progress: number;
 };
-
 function matchesQuery(haystack: string, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
@@ -127,6 +138,7 @@ useEffect(() => {
             email: u.email,
             role: u.role,
             profileInfo: u.profileInfo,
+            phoneNumber: u.phoneNumber || u.phone || u.mobileNumber || "",
             // profilePicture: u.profilePicture,
             // progress: found?.progress ?? 0,
             profilePicture: u.profilePicture,
@@ -434,9 +446,12 @@ progress: found?.progress ?? 0,
                           <h3 className="mb-1 text-base font-semibold text-white md:text-[17px]">
                             {mentee.firstName} {mentee.lastName}
                           </h3>
-                          <p className="mb-3 text-sm text-[#cde2f2]">
+                          {/* <p className="mb-3 text-sm text-[#cde2f2]">
                             {mentee.profileInfo || mentee.role || "Pastor"}
-                          </p>
+                          </p> */}
+                          <p className="mb-3 max-w-[360px] truncate text-sm text-[#cde2f2]">
+  {mentee.profileInfo || mentee.role || "Pastor"}
+</p>
                           <div className="mb-3 inline-flex w-fit items-center rounded-full bg-[#8ec5eb]/15 px-3 py-1 text-xs font-semibold text-[#8ec5eb]">
   Phase :&nbsp;
 </div>
@@ -466,17 +481,38 @@ progress: found?.progress ?? 0,
       <i className="fa-regular fa-envelope" />
     </a>
 
-    <span className="cursor-not-allowed opacity-40">
-      <i className="fa-regular fa-comment-dots" />
-    </span>
+   <a
+  href={mentee.phoneNumber ? `sms:${String(mentee.phoneNumber).replace(/[^\d+]/g, "")}` : undefined}
+  onClick={(e) => e.stopPropagation()}
+  className="transition hover:text-white"
+  title="Message"
+>
+  <i className="fa-regular fa-comment-dots" />
+</a>
 
-    <span className="cursor-not-allowed opacity-40">
-      <i className="fa-brands fa-whatsapp" />
-    </span>
+<a
+  href={
+    mentee.phoneNumber
+      ? `https://wa.me/${String(mentee.phoneNumber).replace(/[^\d]/g, "")}`
+      : undefined
+  }
+  target="_blank"
+  rel="noopener noreferrer"
+  onClick={(e) => e.stopPropagation()}
+  className="transition hover:text-white"
+  title="WhatsApp"
+>
+  <i className="fa-brands fa-whatsapp" />
+</a>
 
-    <span className="cursor-not-allowed opacity-40">
-      <i className="fa-solid fa-phone" />
-    </span>
+<a
+  href={mentee.phoneNumber ? `tel:${String(mentee.phoneNumber).replace(/[^\d+]/g, "")}` : undefined}
+  onClick={(e) => e.stopPropagation()}
+  className="transition hover:text-white"
+  title="Call"
+>
+  <i className="fa-solid fa-phone" />
+</a>
   </div>
 
   <span className={mentorPrimaryCtaDashboard}>View roadmaps</span>
@@ -535,9 +571,9 @@ progress: found?.progress ?? 0,
                           <p className="line-clamp-3 text-sm text-[#cde2f2]">
                             {roadmap.roadMapDetails || roadmap.description || "—"}
                           </p>
-                          <p className="mt-3 text-xs text-[#d9ebf8]">
+                          {/* <p className="mt-3 text-xs text-[#d9ebf8]">
                             Steps: {roadmap.totalSteps ?? roadmap.roadmaps?.length ?? "—"}
-                          </p>
+                          </p> */}
    {/* <div className="mt-auto flex justify-end pt-4"> */}
    <div className="absolute bottom-4 right-5">
   <button

@@ -1,6 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import axiosInstance from "@/app/Services/config/axios-instance";
 import HeroBg from "@/app/Assets/hero-bg.png";
 import MapImg from "@/app/Assets/map-view.png";
 import Mentor1 from "@/app/Assets/mentor1.png";
@@ -47,7 +48,7 @@ function textMatchesQuery(text: string, query: string): boolean {
 }
 
 export default function MyMenteesPage() {
-  const [filter, setFilter] = useState<"All" | "In-Progress" | "Completed">("In-Progress");
+  const [filter, setFilter] = useState<"All" | "In-Progress" | "Completed">("All");
   // const [sortBy, setSortBy] = useState("Phase");
   const [sortBy, setSortBy] = useState("Newly Added");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -224,6 +225,43 @@ const mapped = menteeUsers.map((u: any, i: number) => {
   }, [mentees, filter, sortBy, searchQuery]);
 const openMenteeDrawer = async (mentee: any) => {
   setSelectedMentee(mentee);
+  try {
+  const searchValue = mentee.email || mentee.name;
+  const interestRes = await axiosInstance.get(
+    `/interests?search=${encodeURIComponent(searchValue)}`
+  );
+
+  const interests = Array.isArray(interestRes.data?.data)
+    ? interestRes.data.data
+    : [];
+
+  const matchedInterest = interests.find((item: any) => {
+    const interestUserId = String(item?.user?._id ?? item?.userId ?? "");
+    const sameUser = interestUserId && interestUserId === String(mentee.id);
+
+    const sameEmail =
+      item?.email &&
+      mentee.email &&
+      String(item.email).toLowerCase() === String(mentee.email).toLowerCase();
+
+    return sameUser || sameEmail;
+  });
+
+  if (matchedInterest) {
+    setSelectedMentee({
+      ...mentee,
+      ...matchedInterest,
+      id: mentee.id,
+      name: mentee.name,
+      img: mentee.img,
+      role: mentee.role,
+      status: mentee.status || matchedInterest.status,
+      interest: matchedInterest,
+    });
+  }
+} catch (error) {
+  console.error("Failed to load interest details", error);
+}
   setProfileDrawerOpen(true);
   setDrawerDocuments([]);
   setDrawerDocsLoading(true);
@@ -247,10 +285,16 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
     return;
   }
 
+  // if (action === "roadmap") {
+  //   router.push(`/mentor/revitalization-roadmap?userId=${encodeURIComponent(mentee.id)}`);
+  //   return;
+  // }
   if (action === "roadmap") {
-    router.push(`/mentor/revitalization-roadmap?userId=${encodeURIComponent(mentee.id)}`);
-    return;
-  }
+  router.push(
+    `/mentor/RevitalizationRoadmap/home?userId=${encodeURIComponent(mentee.id)}`
+  );
+  return;
+}
 
   if (action === "assessments") {
     router.push(`/mentor/MentorAssessments?menteeId=${encodeURIComponent(mentee.id)}`);
@@ -341,7 +385,7 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
                       // className="rounded-full border-2 border-[#8ec5eb]/50 object-cover shadow-md"
                       className="h-16 w-16 rounded-full border-2 border-[#8ec5eb]/50 object-cover shadow-md"
                     />
-                    <div className="absolute -bottom-0.5 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#062946] bg-emerald-400" />
+                    {/* <div className="absolute -bottom-0.5 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#062946] bg-emerald-400" /> */}
                   </div>
                   <p className="mt-2 w-[72px] truncate text-center text-xs text-[#cde2f2]">{mentee.name}</p>
                 </button>
@@ -479,9 +523,13 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
       openMenteeDrawer(mentee);
     }
   }}
-  className={`${mentorGlassCardRoadmap} relative w-full cursor-pointer flex-col items-stretch gap-4 p-5 text-left sm:flex-row sm:items-center sm:gap-6`}
+  // className={`${mentorGlassCardRoadmap} relative w-full cursor-pointer flex-col items-stretch gap-4 p-5 text-left sm:flex-row sm:items-center sm:gap-6`}
+  className={`${mentorGlassCardRoadmap} relative w-full cursor-pointer flex-col items-stretch gap-4 overflow-visible p-5 text-left sm:flex-row sm:items-center sm:gap-6 ${
+  openCardMenuId === mentee.id ? "z-50" : "z-0"
+}`}
 >
-                      <div className="absolute right-4 top-4 z-20">
+                      {/* <div className="absolute right-4 top-4 z-20"> */}
+  <div className="absolute right-4 top-4 z-[80]">
   <button
     type="button"
     onClick={(e) => {
@@ -496,7 +544,8 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
   {openCardMenuId === mentee.id && (
     <div
       onClick={(e) => e.stopPropagation()}
-      className="absolute right-0 top-11 z-30 w-56 overflow-hidden rounded-xl border border-white/15 bg-[#062946] shadow-2xl"
+      // className="absolute right-0 top-11 z-30 w-56 overflow-hidden rounded-xl border border-white/15 bg-[#062946] shadow-2xl"
+      className="absolute right-0 top-11 z-[90] w-56 overflow-hidden rounded-xl border border-white/15 bg-[#062946] shadow-2xl"
     >
       <button
         type="button"
@@ -560,12 +609,59 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
                           </div>
                         </div>
                         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                          <div className="flex shrink-0 gap-4 text-[#8ec5eb]">
+                          {/* <div className="flex shrink-0 gap-4 text-[#8ec5eb]">
                             <i className="fa-regular fa-envelope pointer-events-none" aria-hidden />
                             <i className="fa-regular fa-comment pointer-events-none" aria-hidden />
                             <i className="fa-solid fa-phone pointer-events-none" aria-hidden />
                             <i className="fa-brands fa-whatsapp pointer-events-none" aria-hidden />
-                          </div>
+                          </div> */}
+                          <div className="flex shrink-0 gap-4 text-[#8ec5eb]">
+  <a
+    href={mentee.email ? `mailto:${mentee.email}` : undefined}
+    onClick={(e) => e.stopPropagation()}
+    className="transition hover:text-white"
+    title="Email"
+  >
+    <i className="fa-regular fa-envelope" aria-hidden />
+  </a>
+
+<a
+  href={
+    mentee.phoneNumber
+      ? `sms:${String(mentee.phoneNumber).replace(/[^\d+]/g, "")}`
+      : undefined
+  }
+  onClick={(e) => e.stopPropagation()}
+  className="transition hover:text-white"
+  title="Message"
+>
+  <i className="fa-regular fa-comment" aria-hidden />
+</a>
+
+  <a
+    href={mentee.phoneNumber ? `tel:${mentee.phoneNumber}` : undefined}
+    onClick={(e) => e.stopPropagation()}
+    className="transition hover:text-white"
+    title="Call"
+  >
+    <i className="fa-solid fa-phone" aria-hidden />
+  </a>
+
+  <a
+    href={
+      mentee.phoneNumber
+        ? `https://wa.me/${String(mentee.phoneNumber).replace(/[^\d]/g, "")}`
+        : undefined
+    }
+    target="_blank"
+    rel="noopener noreferrer"
+    onClick={(e) => e.stopPropagation()}
+    className="transition hover:text-white"
+    title="WhatsApp"
+  >
+    <i className="fa-brands fa-whatsapp" aria-hidden />
+  </a>
+</div>
                           {mentee.progress === 100 && (
                             <span className="rounded-lg bg-[#8ec5eb]/20 px-3 py-1 text-xs font-medium text-[#8ec5eb]">
                               Completed
@@ -655,6 +751,53 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
 </p> */}
 <p><span className="text-white/50">Role:</span> {selectedMentee.role || "—"}</p>
 <p><span className="text-white/50">Status:</span> {selectedMentee.status || "—"}</p>
+  </div>
+</div>
+<div className="mt-6 rounded-2xl border border-white/15 bg-white/5 p-5">
+  <h4 className="mb-4 text-base font-semibold">Church Information</h4>
+
+  {selectedMentee.churchDetails?.length ? (
+    <div className="space-y-4 text-sm">
+      {selectedMentee.churchDetails.map((church: any, index: number) => (
+        <div key={index} className="space-y-2 rounded-xl border border-white/10 bg-white/[0.04] p-4">
+          <p><span className="text-white/50">Church:</span> {church.churchName || "—"}</p>
+          <p><span className="text-white/50">Phone:</span> {church.churchPhone || "—"}</p>
+          <p><span className="text-white/50">Website:</span> {church.churchWebsite || "—"}</p>
+          <p><span className="text-white/50">Address:</span> {church.churchAddress || "—"}</p>
+          <p><span className="text-white/50">Location:</span> {[church.city, church.state, church.country].filter(Boolean).join(", ") || "—"}</p>
+          <p><span className="text-white/50">Zip:</span> {church.zipCode || "—"}</p>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <p className="text-sm text-white/60">No church information available.</p>
+  )}
+</div>
+
+<div className="mt-6 rounded-2xl border border-white/15 bg-white/5 p-5">
+  <h4 className="mb-4 text-base font-semibold">Interest Details</h4>
+
+  <div className="space-y-3 text-sm">
+    <p><span className="text-white/50">Title:</span> {selectedMentee.title || "—"}</p>
+    <p><span className="text-white/50">Conference:</span> {selectedMentee.conference || "—"}</p>
+    <p><span className="text-white/50">Years in Ministry:</span> {selectedMentee.yearsInMinistry || "—"}</p>
+    <p><span className="text-white/50">Community Projects:</span> {selectedMentee.currentCommunityProjects || "—"}</p>
+    <p><span className="text-white/50">Comments:</span> {selectedMentee.comments || "—"}</p>
+
+    <div>
+      <span className="text-white/50">Interests:</span>
+      {selectedMentee.interests?.length ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {selectedMentee.interests.map((item: string) => (
+            <span key={item} className="rounded-full border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 px-3 py-1 text-xs text-[#8ec5eb]">
+              {item}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <span> —</span>
+      )}
+    </div>
   </div>
 </div>
       <div className="mt-6 rounded-2xl border border-white/15 bg-white/5 p-5">

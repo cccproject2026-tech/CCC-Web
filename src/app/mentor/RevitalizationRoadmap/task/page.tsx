@@ -1493,38 +1493,72 @@ const renderTemplateExtra = (extra: Record<string, any>, idx: number): JSX.Eleme
       {assessmentMeetingLoading ? (
         <p className="text-xs text-[#cde2f2]/80">Loading meeting details...</p>
       ) : assessmentMeeting ? (
-        <div>
-          <p className="mb-3 text-sm font-semibold text-white">Meeting scheduled</p>
-          <div className="grid gap-3 text-xs text-[#cde2f2] sm:grid-cols-2">
-            <div>
-              <p className="font-semibold uppercase tracking-wide text-[#8ec5eb]">Date</p>
-              <p className="mt-1">{formatMeetingDate(assessmentMeeting.meetingDate) || "Not specified"}</p>
-            </div>
-            <div>
-              <p className="font-semibold uppercase tracking-wide text-[#8ec5eb]">Time</p>
-              <p className="mt-1">{formatMeetingTime(assessmentMeeting.meetingDate) || "Not specified"}</p>
-            </div>
-            <div>
-              <p className="font-semibold uppercase tracking-wide text-[#8ec5eb]">Platform</p>
-              <p className="mt-1">{formatMeetingPlatform(assessmentMeeting.platform)}</p>
-            </div>
-            <div>
-              <p className="font-semibold uppercase tracking-wide text-[#8ec5eb]">Status</p>
-              <p className="mt-1">{formatMeetingStatus(assessmentMeeting.status)}</p>
-            </div>
-          </div>
-          {/* {assessmentMeeting.meetingLink || assessmentMeeting.zoomJoinUrl ? (
-            <a
-              href={assessmentMeeting.meetingLink || assessmentMeeting.zoomJoinUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[#8ec5eb] underline underline-offset-2"
-            >
-              <i className="fa-solid fa-arrow-up-right-from-square text-[10px]" />
-              Meeting link
-            </a>
-          ) : null} */}
-          <div className="mt-4 flex flex-wrap items-center gap-3">
+//         <div>
+//           <p className="mb-3 text-sm font-semibold text-white">Meeting scheduled</p>
+//           <div className="grid gap-3 text-xs text-[#cde2f2] sm:grid-cols-2">
+//             <div>
+//               <p className="font-semibold uppercase tracking-wide text-[#8ec5eb]">Date</p>
+//               <p className="mt-1">{formatMeetingDate(assessmentMeeting.meetingDate) || "Not specified"}</p>
+//             </div>
+//             <div>
+//               <p className="font-semibold uppercase tracking-wide text-[#8ec5eb]">Time</p>
+//               <p className="mt-1">{formatMeetingTime(assessmentMeeting.meetingDate) || "Not specified"}</p>
+//             </div>
+//             <div>
+//               <p className="font-semibold uppercase tracking-wide text-[#8ec5eb]">Platform</p>
+//               <p className="mt-1">{formatMeetingPlatform(assessmentMeeting.platform)}</p>
+//             </div>
+//             <div>
+//               <p className="font-semibold uppercase tracking-wide text-[#8ec5eb]">Status</p>
+//               <p className="mt-1">{formatMeetingStatus(assessmentMeeting.status)}</p>
+//             </div>
+//           </div>
+//           {/* {assessmentMeeting.meetingLink || assessmentMeeting.zoomJoinUrl ? (
+//             <a
+//               href={assessmentMeeting.meetingLink || assessmentMeeting.zoomJoinUrl}
+//               target="_blank"
+//               rel="noreferrer"
+//               className="mt-3 inline-flex items-center gap-2 text-xs font-semibold text-[#8ec5eb] underline underline-offset-2"
+//             >
+//               <i className="fa-solid fa-arrow-up-right-from-square text-[10px]" />
+//               Meeting link
+//             </a>
+//           ) : null} */}
+//           <div className="mt-4 flex flex-wrap items-center gap-3">
+//   <button
+//     type="button"
+//     onClick={() => {
+//       const appointmentId = String(
+//         assessmentMeeting._id ||
+//           assessmentMeeting.id ||
+//           assessmentMeeting.appointmentId ||
+//           ""
+//       );
+
+//       if (!appointmentId) return;
+
+//       router.push(`/mentor/MentorSchedule/${appointmentId}`);
+//     }}
+//     className="inline-flex items-center gap-2 rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+//   >
+//     <i className="fa-solid fa-calendar-check text-[11px]" />
+//     View Meeting Details
+//   </button>
+
+//   {assessmentMeeting.meetingLink || assessmentMeeting.zoomJoinUrl ? (
+//     <a
+//       href={assessmentMeeting.meetingLink || assessmentMeeting.zoomJoinUrl}
+//       target="_blank"
+//       rel="noreferrer"
+//       className="inline-flex items-center gap-2 text-xs font-semibold text-[#8ec5eb] underline underline-offset-2"
+//     >
+//       <i className="fa-solid fa-arrow-up-right-from-square text-[10px]" />
+//       Meeting link
+//     </a>
+//   ) : null}
+// </div>
+//         </div>
+<div>
   <button
     type="button"
     onClick={() => {
@@ -1544,20 +1578,7 @@ const renderTemplateExtra = (extra: Record<string, any>, idx: number): JSX.Eleme
     <i className="fa-solid fa-calendar-check text-[11px]" />
     View Meeting Details
   </button>
-
-  {assessmentMeeting.meetingLink || assessmentMeeting.zoomJoinUrl ? (
-    <a
-      href={assessmentMeeting.meetingLink || assessmentMeeting.zoomJoinUrl}
-      target="_blank"
-      rel="noreferrer"
-      className="inline-flex items-center gap-2 text-xs font-semibold text-[#8ec5eb] underline underline-offset-2"
-    >
-      <i className="fa-solid fa-arrow-up-right-from-square text-[10px]" />
-      Meeting link
-    </a>
-  ) : null}
 </div>
-        </div>
       ) : (
         <p className="text-xs text-[#f5cc76]">
           No meeting has been scheduled for this assessment yet.

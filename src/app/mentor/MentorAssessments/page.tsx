@@ -512,10 +512,18 @@ export default function MentorAssessments() {
   const deepLinkAssessmentId = (searchParams.get("assessmentId") || "").trim();
   const deepLinkOpenRecommendation = searchParams.get("openRecommendation") === "1";
 
+  // useEffect(() => {
+  //   if (!deepLinkMenteeId) return;
+  //   setSelectedMenteeId((prev) => (prev === deepLinkMenteeId ? prev : deepLinkMenteeId));
+  // }, [deepLinkMenteeId]);
   useEffect(() => {
-    if (!deepLinkMenteeId) return;
-    setSelectedMenteeId((prev) => (prev === deepLinkMenteeId ? prev : deepLinkMenteeId));
-  }, [deepLinkMenteeId]);
+  if (!deepLinkMenteeId) return;
+
+  setActiveTab("pastors");
+  setSelectedMenteeId((prev) =>
+    prev === deepLinkMenteeId ? prev : deepLinkMenteeId
+  );
+}, [deepLinkMenteeId]);
 
   const [formTitle, setFormTitle] = useState("");
   const [formDesc, setFormDesc] = useState("");

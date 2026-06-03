@@ -960,22 +960,56 @@ const refreshSubmissionHistory = useCallback(async (): Promise<RoadmapSubmission
     void refreshSubmissionHistory();
   }, [refreshSubmissionHistory]);
 
+  // const fetchComments = useCallback(async (showLoader = false) => {
+  //   if (!roadmapId || !userId) return;
+  //   if (showLoader) setCommentsLoading(true);
+  //   try {
+  //     const res = await apiGetComments(roadmapId, userId);
+  //     const thread = res.data?.data || res.data;
+  //     const list = Array.isArray(thread?.comments) ? thread.comments : [];
+  //     setComments(list);
+  //     setCommentsCount(list.length);
+  //   } catch {
+  //     setComments([]);
+  //     setCommentsCount(0);
+  //   } finally {
+  //     if (showLoader) setCommentsLoading(false);
+  //   }
+  // }, [roadmapId, userId, scopedNestedId]);
   const fetchComments = useCallback(async (showLoader = false) => {
-    if (!roadmapId || !userId) return;
-    if (showLoader) setCommentsLoading(true);
-    try {
-      const res = await apiGetComments(roadmapId, userId);
-      const thread = res.data?.data || res.data;
-      const list = Array.isArray(thread?.comments) ? thread.comments : [];
-      setComments(list);
-      setCommentsCount(list.length);
-    } catch {
-      setComments([]);
-      setCommentsCount(0);
-    } finally {
-      if (showLoader) setCommentsLoading(false);
-    }
-  }, [roadmapId, userId, scopedNestedId]);
+  if (!roadmapId || !userId) return;
+  if (showLoader) setCommentsLoading(true);
+
+  try {
+    const res = await apiGetComments(roadmapId, userId);
+    const thread = res.data?.data || res.data;
+    const list = Array.isArray(thread?.comments) ? thread.comments : [];
+
+    const currentTaskId = String(queryNestedRoadMapItemId || nestedItemId || "");
+
+    const scopedComments = currentTaskId
+      ? list.filter((comment: any) => {
+          const commentTaskId = String(
+            comment?.nestedRoadMapItemId ??
+              comment?.nestedItemId ??
+              comment?.taskId ??
+              comment?.roadmapItemId ??
+              ""
+          );
+
+          return commentTaskId === currentTaskId;
+        })
+      : [];
+
+    setComments(scopedComments);
+    setCommentsCount(scopedComments.length);
+  } catch {
+    setComments([]);
+    setCommentsCount(0);
+  } finally {
+    if (showLoader) setCommentsLoading(false);
+  }
+}, [roadmapId, userId, queryNestedRoadMapItemId, nestedItemId]);
   const fetchQueries = useCallback(async (status?: string, showLoader = false) => {
     if (!roadmapId || !userId) return;
     if (showLoader) setQueriesLoading(true);

@@ -159,7 +159,8 @@ const effectiveStatus =
       </div>
 
       {/* Right Content Section - 55-60% width */}
-      <div className={`relative flex flex-1 flex-col px-5 py-5 sm:px-6 ${isMentor ? "" : ""}`}>
+      {/* <div className={`relative flex flex-1 flex-col px-5 py-5 sm:px-6 ${isMentor ? "" : ""}`}> */}
+      <div className={`relative flex min-w-0 flex-1 flex-col px-5 py-5 sm:px-6 ${isMentor ? "" : ""}`}>
         <div className="flex h-full flex-col">
           {/* Top Content Section */}
           <div className="flex-1">
@@ -171,11 +172,18 @@ const effectiveStatus =
             </h3>
 
             {/* Description */}
-            <p
+            {/* <p
               className={`mb-4 line-clamp-3 text-[13px] leading-relaxed sm:text-[14px] ${isMentor ? "text-[#cde2f2]" : "text-[#808080]"}`}
             >
               {description}
-            </p>
+            </p> */}
+            <p
+  className={`mb-4 truncate text-[13px] sm:text-[14px] ${
+    isMentor ? "text-[#cde2f2]" : "text-[#808080]"
+  }`}
+>
+  {description}
+</p>
 
             {/* Status - Horizontal layout: Label | Separator | Badge */}
             <div className="mb-4 flex items-center gap-2">

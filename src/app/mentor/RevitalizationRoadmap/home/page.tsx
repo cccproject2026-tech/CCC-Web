@@ -306,7 +306,7 @@ const roadmapCardStatus = (roadmap: any) => {
               ) : null}
             </div>
 
-            <div className="relative shrink-0">
+            {/* <div className="relative shrink-0">
               <button
                 ref={buttonRef}
                 type="button"
@@ -342,7 +342,7 @@ const roadmapCardStatus = (roadmap: any) => {
                   </div>
                 </div>
               )}
-            </div>
+            </div> */}
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">

@@ -441,7 +441,7 @@ const [mappingLoading, setMappingLoading] = useState(false);
 const [mappingMenteesLoading, setMappingMenteesLoading] = useState(false);
 const [selectedMappingMentorId, setSelectedMappingMentorId] = useState("");
 const [mappingMentorSearch, setMappingMentorSearch] = useState("");
-
+const [selectedMappingMentorName, setSelectedMappingMentorName] = useState("");
 const [showCdpModal, setShowCdpModal] = useState(false);
 const [cdpPastors, setCdpPastors] = useState<any[]>([]);
 const [cdpAssessments, setCdpAssessments] = useState<any[]>([]);
@@ -1477,14 +1477,30 @@ const openMonthlyAppointmentsModal = async () => {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    const thisMonthAppointments = list
-      .filter((appointment) => {
-        const meetingDate = new Date(appointment.meetingDate);
-        return (
-          meetingDate.getMonth() === currentMonth &&
-          meetingDate.getFullYear() === currentYear
-        );
-      })
+    // const thisMonthAppointments = list
+    //   .filter((appointment) => {
+    //     const meetingDate = new Date(appointment.meetingDate);
+    //     return (
+    //       meetingDate.getMonth() === currentMonth &&
+    //       meetingDate.getFullYear() === currentYear
+    //     );
+    //   })
+    const startOfToday = new Date(
+  now.getFullYear(),
+  now.getMonth(),
+  now.getDate()
+);
+
+const thisMonthAppointments = list
+  .filter((appointment) => {
+    const meetingDate = new Date(appointment.meetingDate);
+
+    return (
+      meetingDate >= startOfToday &&
+      meetingDate.getMonth() === currentMonth &&
+      meetingDate.getFullYear() === currentYear
+    );
+  })
       .sort(
         (a, b) =>
           new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime()
@@ -1554,6 +1570,15 @@ setMappingMentorSearch("");
 const loadMenteesForMentor = async (mentorId: string) => {
   try {
     setSelectedMappingMentorId(mentorId);
+    const selectedMentor = mappingMentors.find(
+  (mentor) => String(mentor._id ?? mentor.id ?? "") === mentorId
+);
+
+setSelectedMappingMentorName(
+  `${selectedMentor?.firstName ?? ""} ${selectedMentor?.lastName ?? ""}`.trim() ||
+    selectedMentor?.email ||
+    "This mentor"
+);
     setMappingMenteesLoading(true);
     setMappingMentees([]);
 
@@ -3672,9 +3697,14 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                         onClick={() => {
                           if (!appointmentId) return;
                           setShowMonthlyAppointmentsModal(false);
+                          // router.push(
+                          //   `/director/schedule/${encodeURIComponent(appointmentId)}`
+                          // );
                           router.push(
-                            `/director/schedule/${encodeURIComponent(appointmentId)}`
-                          );
+  `/director/schedule/${encodeURIComponent(
+    appointmentId
+  )}?returnTo=${encodeURIComponent("/director/home")}`
+);
                         }}
                         className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/25 disabled:cursor-not-allowed disabled:opacity-50"
                       >
@@ -3701,7 +3731,10 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
       <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4">
         <div>
           <h3 className="text-lg font-semibold text-white">
-            {selectedMappingMentorId ? "Assigned Mentees" : "Mentor-Mentee Mapping"}
+            {/* {selectedMappingMentorId ? "Assigned Mentees" : "Mentor-Mentee Mapping"} */}
+            {selectedMappingMentorId
+  ? `${selectedMappingMentorName || "This mentor"}'s Assigned Mentees`
+  : "Mentor-Mentee Mapping"}
           </h3>
           <p className="mt-1 text-sm text-white/60">
             {selectedMappingMentorId
@@ -3716,6 +3749,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
       type="button"
       onClick={() => {
         setSelectedMappingMentorId("");
+        setSelectedMappingMentorName("");
         setMappingMentees([]);
       }}
       className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
@@ -3727,11 +3761,17 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
 
   <button
     type="button"
+    // onClick={() => {
+    //   setShowMentorMenteeModal(false);
+    //   setSelectedMappingMentorId("");
+    //   setMappingMentees([]);
+    // }}
     onClick={() => {
-      setShowMentorMenteeModal(false);
-      setSelectedMappingMentorId("");
-      setMappingMentees([]);
-    }}
+  setShowMentorMenteeModal(false);
+  setSelectedMappingMentorId("");
+  setSelectedMappingMentorName("");
+  setMappingMentees([]);
+}}
     className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
     aria-label="Close"
   >
@@ -3819,12 +3859,18 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
             <>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8ec5eb]">
+                  {/* <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8ec5eb]">
                     Assigned Mentees
                   </p>
                   <h4 className="mt-1 text-base font-semibold text-white">
                     Selected mentor
-                  </h4>
+                  </h4> */}
+                  {/* <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8ec5eb]">
+  This mentor&apos;s assigned mentees
+</p> */}
+<h4 className="mt-1 text-base font-semibold text-white">
+  {selectedMappingMentorName || "Selected mentor"}
+</h4>
                 </div>
 
                 {/* <button
@@ -3857,10 +3903,20 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                       "Unnamed mentee";
 
                     return (
-                      <div
-                        key={menteeId}
-                        className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 shadow-sm"
-                      >
+                      // <div
+                      //   key={menteeId}
+                      //   className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 shadow-sm"
+                      // >
+                      <button
+  type="button"
+  key={menteeId}
+  onClick={() => {
+    if (!menteeId) return;
+    setShowMentorMenteeModal(false);
+    router.push(`/director/mentees/profile/${encodeURIComponent(menteeId)}`);
+  }}
+  className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 text-left shadow-sm transition hover:border-[#8ec5eb]/45 hover:bg-[#173653]/90"
+>
                         {/* <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
                           <i className="fa-solid fa-user" />
                         </span> */}
@@ -3874,7 +3930,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                             {mentee.email ?? "Mentee"}
                           </span>
                         </span>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>

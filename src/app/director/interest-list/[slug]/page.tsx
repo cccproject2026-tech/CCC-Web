@@ -8,7 +8,11 @@ import DirectorHero from "../../DirectorHero";
 import MentorBg from "../../../Assets/mentor-bg.png";
 import Mentor1 from "../../../Assets/mentor1.png";
 import { apiGetInterestById, apiUpdateInterestStatus } from "@/app/Services/interests.service";
-import { apiAssignUsers, apiGetAllUsers } from "@/app/Services/users.service";
+import {
+  apiAssignUsers,
+  apiGetAllUsers,
+  apiGetAssignedUsers,
+} from "@/app/Services/users.service";
 import type { ChurchDetails } from "@/app/Services/types/interests.types";
 import type { Interest } from "@/app/Services/types";
 import { directorGlassCard, directorPageRoot } from "../../directorUi";
@@ -51,7 +55,7 @@ const [assignUsers, setAssignUsers] = useState<any[]>([]);
 const [assignLoading, setAssignLoading] = useState(false);
 const [selectedAssignUserId, setSelectedAssignUserId] = useState<string>("");
 const [assignError, setAssignError] = useState<string | null>(null);
-
+const [hasAssignedMentor, setHasAssignedMentor] = useState(false);
 
   const [interestData, setInterestData] = useState<Interest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -83,6 +87,111 @@ const [assignError, setAssignError] = useState<string | null>(null);
 
     fetchInterest();
   }, [slug]);
+
+//   useEffect(() => {
+//   if (!interestData?.userId) return;
+
+//   const checkAssignedMentor = async () => {
+//     try {
+//       const res = await apiGetAssignedUsers(interestData.userId);
+//       const assignedUsers = Array.isArray(res?.data?.data) ? res.data.data : [];
+
+//       const hasMentor = assignedUsers.some((user: any) => {
+//         const role = String(
+//           user?.role ??
+//             user?.assignedUser?.role ??
+//             user?.user?.role ??
+//             ""
+//         )
+//           .toLowerCase()
+//           .trim();
+
+//         return role === "mentor";
+//       });
+
+//       setHasAssignedMentor(hasMentor);
+//     } catch (error) {
+//       console.error("Failed to check assigned mentor", error);
+//       setHasAssignedMentor(false);
+//     }
+//   };
+
+//   checkAssignedMentor();
+// }, [interestData?.userId]);
+// useEffect(() => {
+//   if (!interestData?.userId) return;
+
+//   const userId = String(interestData.userId);
+
+//   const checkAssignedMentor = async () => {
+//     try {
+//       const res = await apiGetAssignedUsers(userId);
+//       const assignedUsers = Array.isArray(res?.data?.data) ? res.data.data : [];
+
+//       const hasMentor = assignedUsers.some((user: any) => {
+//         const role = String(
+//           user?.role ??
+//             user?.assignedUser?.role ??
+//             user?.user?.role ??
+//             ""
+//         )
+//           .toLowerCase()
+//           .trim();
+
+//         return role === "mentor";
+//       });
+
+//       setHasAssignedMentor(hasMentor);
+// //     } catch (error) {
+// //       console.error("Failed to check assigned mentor", error);
+// //       setHasAssignedMentor(false);
+// //     }
+// //   };
+
+// //   checkAssignedMentor();
+// // }, [interestData?.userId]);
+// } catch (error: any) {
+//   if (error?.response?.status !== 404) {
+//     console.error("Failed to check assigned mentor", error);
+//   }
+
+//   setHasAssignedMentor(false);
+// }, [interestData?.userId]);
+useEffect(() => {
+  if (!interestData?.userId) return;
+
+  const userId = String(interestData.userId);
+
+  const checkAssignedMentor = async () => {
+    try {
+      const res = await apiGetAssignedUsers(userId);
+      const assignedUsers = Array.isArray(res?.data?.data) ? res.data.data : [];
+
+      const hasMentor = assignedUsers.some((user: any) => {
+        const role = String(
+          user?.role ??
+            user?.assignedUser?.role ??
+            user?.user?.role ??
+            ""
+        )
+          .toLowerCase()
+          .trim();
+
+        return role === "mentor";
+      });
+
+      setHasAssignedMentor(hasMentor);
+    } catch (error: any) {
+      if (error?.response?.status !== 404) {
+        console.error("Failed to check assigned mentor", error);
+      }
+
+      setHasAssignedMentor(false);
+    }
+  };
+
+  checkAssignedMentor();
+}, [interestData?.userId]);
 
     const isMentorInterest = String(interestData?.title ?? "")
     .toLowerCase()
@@ -334,6 +443,9 @@ const handleAssign = async () => {
   // .includes("mentor");
 
 const assignButtonLabel = isMentorInterest ? "Assign to Mentee" : "Assign to Mentor";
+const canShowAssignButton =
+  (interestData.status === "accepted" || interestData.status === "pending") &&
+  !hasAssignedMentor;
 const assignSuccessMessage = isMentorInterest
   ? "Interest assigned to mentee successfully"
   : "Interest assigned to mentor successfully";
@@ -531,7 +643,8 @@ const assignModalDescription = isMentorInterest
   <i className="fa-solid fa-user-plus text-[11px]" />
   {assignButtonLabel}
 </button> */}
-{interestData.status === "accepted" && (
+{/* {interestData.status === "accepted" && ( */}
+{canShowAssignButton && (
   <button
     type="button"
     onClick={() => {
@@ -872,7 +985,7 @@ const assignModalDescription = isMentorInterest
           key={userId}
           className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/15 bg-white/5 px-3 py-3 transition hover:bg-white/10"
         >
-          <input
+          {/* <input
             type="radio"
             name="assignUser"
             value={userId}
@@ -880,7 +993,49 @@ const assignModalDescription = isMentorInterest
             onChange={() => setSelectedAssignUserId(userId)}
             className="accent-[#8ec5eb]"
           />
-          <div className="min-w-0">
+          <div className="min-w-0"> */}
+          <input
+  type="radio"
+  name="assignUser"
+  value={userId}
+  checked={selectedAssignUserId === userId}
+  onChange={() => setSelectedAssignUserId(userId)}
+  className="accent-[#8ec5eb]"
+/>
+
+{/* <Image
+  src={
+    user.profilePicture ||
+    user.profileImage ||
+    user.avatar ||
+    Mentor1
+  }
+  alt={fullName}
+  width={38}
+  height={38}
+  className="h-9 w-9 shrink-0 rounded-full border border-white/15 object-cover"
+/> */}
+{user.profilePicture || user.profileImage || user.avatar ? (
+  <Image
+    src={user.profilePicture || user.profileImage || user.avatar}
+    alt={fullName}
+    width={38}
+    height={38}
+    className="h-9 w-9 shrink-0 rounded-full border border-white/15 object-cover"
+  />
+) : (
+  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-[#173653] text-xs font-bold uppercase text-[#8ec5eb]">
+    {`${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}` ||
+      fullName
+        .split(" ")
+        .map((part: string) => part[0])
+        .join("")
+        .slice(0, 2) ||
+      "U"}
+  </div>
+)}
+
+<div className="min-w-0">
             <p className="truncate font-medium text-white">{fullName}</p>
             <p className="truncate text-xs text-[#cde2f2]/70">
               {user.email ?? (isMentorInterest ? "Pastor" : "Mentor")}

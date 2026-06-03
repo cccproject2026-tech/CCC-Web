@@ -199,6 +199,9 @@ function PhasePageContent() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<{ firstName?: string; lastName?: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<
+  "all" | "not_started" | "in_progress" | "completed"
+>("all");
   const [accessError, setAccessError] = useState<string | null>(null);
   const [taskMeetings, setTaskMeetings] = useState<Record<string, Record<string, any>>>({});
 const [taskUpdatedDates, setTaskUpdatedDates] = useState<Record<string, string>>({});
@@ -432,15 +435,37 @@ const [taskUpdatedDates, setTaskUpdatedDates] = useState<Record<string, string>>
 
   const phaseName = String(phase?.name ?? "Phase");
 
+  // const filteredTasks = useMemo(() => {
+  //   const q = searchQuery.trim().toLowerCase();
+  //   if (!q) return tasks;
+  //   return tasks.filter((t) => {
+  //     const blob =
+  //       `${t.name ?? ""} ${t.description ?? ""} ${(t as { roadMapDetails?: unknown }).roadMapDetails ?? ""}`.toLowerCase();
+  //     return blob.includes(q);
+  //   });
+  // }, [tasks, searchQuery]);
+
   const filteredTasks = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return tasks;
-    return tasks.filter((t) => {
-      const blob =
-        `${t.name ?? ""} ${t.description ?? ""} ${(t as { roadMapDetails?: unknown }).roadMapDetails ?? ""}`.toLowerCase();
-      return blob.includes(q);
-    });
-  }, [tasks, searchQuery]);
+  const q = searchQuery.trim().toLowerCase();
+
+  return tasks.filter((t) => {
+    const blob =
+      `${t.name ?? ""} ${t.description ?? ""} ${
+        (t as { roadMapDetails?: unknown }).roadMapDetails ?? ""
+      }`.toLowerCase();
+
+    const matchesSearch = !q || blob.includes(q);
+    const status = taskCardStatus(t);
+
+    const matchesStatus =
+      statusFilter === "all" ||
+      (statusFilter === "not_started" && status === "Not Started") ||
+      (statusFilter === "in_progress" && status === "In-progress") ||
+      (statusFilter === "completed" && status === "Completed");
+
+    return matchesSearch && matchesStatus;
+  });
+}, [tasks, searchQuery, statusFilter]);
 
   if (loading) {
     return (
@@ -503,7 +528,7 @@ const [taskUpdatedDates, setTaskUpdatedDates] = useState<Record<string, string>>
             </p>
           )}
 
-          <div className="mb-8 max-w-md">
+          {/* <div className="mb-8 max-w-md">
             <MentorSearchBar
               value={searchQuery}
               onChange={setSearchQuery}
@@ -512,7 +537,34 @@ const [taskUpdatedDates, setTaskUpdatedDates] = useState<Record<string, string>>
               showClear={!!roadmapId}
               disabled={!roadmapId}
             />
-          </div>
+          </div> */}
+          <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+  <div className="w-full md:max-w-md">
+    <MentorSearchBar
+      value={searchQuery}
+      onChange={setSearchQuery}
+      placeholder="Search tasks…"
+      aria-label="Search tasks"
+      showClear={!!roadmapId}
+      disabled={!roadmapId}
+    />
+  </div>
+
+  <select
+    value={statusFilter}
+    onChange={(e) =>
+      setStatusFilter(
+        e.target.value as "all" | "not_started" | "in_progress" | "completed"
+      )
+    }
+    className="h-12 rounded-xl border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white outline-none transition hover:bg-white/15 md:w-[220px] [&>option]:bg-[#0d1f33] [&>option]:text-white"
+  >
+    <option value="all">Sort by</option>
+    <option value="not_started">Not Started</option>
+    <option value="in_progress">In-progress</option>
+    <option value="completed">Completed</option>
+  </select>
+</div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
             {roadmapId && tasks.length === 0 && (

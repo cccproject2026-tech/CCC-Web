@@ -212,7 +212,8 @@ const [meetingDescription, setMeetingDescription] = useState("");
   const [calendarBusyStripped, setCalendarBusyStripped] = useState(0);
   const [calendarConnectBanners, setCalendarConnectBanners] = useState<string[]>([]);
   const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
-
+const [historySearch, setHistorySearch] = useState("");
+const [historyDate, setHistoryDate] = useState("");
   // schedule drawer calendar state
   const today = new Date();
   const [scheduleMonth, setScheduleMonth] = useState(today.getMonth());
@@ -591,12 +592,34 @@ useEffect(() => {
       return normalizeAppointmentStatus(a) === "missed";
     })
     .sort((a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime());
+  // const appointmentHistory = appointments
+  //   .filter((a) => {
+  //     const ms = new Date(a.meetingDate).getTime();
+  //     return ms < Date.now() || normalizeAppointmentStatus(a) === "missed";
+  //   })
+  //   .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
   const appointmentHistory = appointments
-    .filter((a) => {
-      const ms = new Date(a.meetingDate).getTime();
-      return ms < Date.now() || normalizeAppointmentStatus(a) === "missed";
-    })
-    .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
+  .filter((a) => {
+    const ms = new Date(a.meetingDate).getTime();
+    return ms < Date.now() || normalizeAppointmentStatus(a) === "missed";
+  })
+  .filter((a) => {
+    const otherPerson = resolveOtherPerson(a, mentorId);
+    const name = `${otherPerson?.firstName ?? ""} ${otherPerson?.lastName ?? ""}`.toLowerCase();
+    const role = String(otherPerson?.role ?? "").toLowerCase();
+    const title = getMeetingTitle(a).toLowerCase();
+    const platform = String(a.platform ?? "").toLowerCase();
+    const q = historySearch.trim().toLowerCase();
+
+    const matchesSearch =
+      !q || name.includes(q) || role.includes(q) || title.includes(q) || platform.includes(q);
+
+    const apptDate = new Date(a.meetingDate).toISOString().slice(0, 10);
+    const matchesDate = !historyDate || apptDate === historyDate;
+
+    return matchesSearch && matchesDate;
+  })
+  .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
   const historyPageSize = 10;
   const totalHistoryPages = Math.max(1, Math.ceil(appointmentHistory.length / historyPageSize));
   const pagedAppointmentHistory = appointmentHistory.slice(
@@ -767,7 +790,7 @@ if (!title) {
 
     setIsScheduling(true);
 
-    let mentorToastDismissMs = 3000;
+    let mentorToastDismissMs = 4000;
 
     try {
       const recipientLabel =
@@ -797,13 +820,14 @@ googleCalendarDescription:
 initiatorRole: "mentor",
       });
 
-      const gHint = googleCalendarSuccessHintFromCreateResponse(res?.data);
-      const outcome = extractGoogleCalendarCreateOutcome(res?.data);
-      if (gHint) mentorToastDismissMs = 7000;
-      if (outcome.warnings.length) {
-        mentorToastDismissMs = Math.max(mentorToastDismissMs, 9000);
-      }
-
+      // const gHint = googleCalendarSuccessHintFromCreateResponse(res?.data);
+      // const outcome = extractGoogleCalendarCreateOutcome(res?.data);
+      // if (gHint) mentorToastDismissMs = 7000;
+      // if (outcome.warnings.length) {
+      //   mentorToastDismissMs = Math.max(mentorToastDismissMs, 9000);
+      // }
+const outcome = extractGoogleCalendarCreateOutcome(res?.data);
+const hasCalendarWarning = outcome.warnings.length > 0;
       setAvailableSlots((prev) => prev.filter((s) => s !== selectedSlot));
       setAvailabilityRefreshKey((prev) => prev + 1);
       const refresh = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: false });
@@ -815,12 +839,17 @@ initiatorRole: "mentor",
       setSelectedSlot("");
       setMeetingTitle("");
 setMeetingDescription("");
-      const warningSuffix =
-        outcome.warnings.length > 0 ? ` Note: ${outcome.warnings.join(" · ")}` : "";
+      // const warningSuffix =
+      //   outcome.warnings.length > 0 ? ` Note: ${outcome.warnings.join(" · ")}` : "";
+      // setToastMessage(
+      //   (gHint ? `Appointment created. ${gHint}` : "Appointment created successfully") +
+      //     warningSuffix,
+      // );
       setToastMessage(
-        (gHint ? `Appointment created. ${gHint}` : "Appointment created successfully") +
-          warningSuffix,
-      );
+  hasCalendarWarning
+    ? "Appointment created successfully. For calendar sync details, visit Availability."
+    : "Appointment created successfully."
+);
     } catch (error) {
       console.error("Failed to create appointment", error);
       setToastMessage("Failed to create appointment");
@@ -1271,7 +1300,7 @@ setMeetingDescription("");
                                     View details
                                   </button>
 
-                                  {sched ? (
+                                  {/* {sched ? (
                                     <button
                                       type="button"
                                       className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1280,7 +1309,7 @@ setMeetingDescription("");
                                       <i className="fa-regular fa-user-clock mr-2 text-amber-200" />
                                       Mark as missed
                                     </button>
-                                  ) : null}
+                                  ) : null} */}
 
                                   {sched ? (
                                   <button
@@ -1304,7 +1333,7 @@ setMeetingDescription("");
                                   </button>
                                   ) : null}
 
-                                  {sched ? (
+                                  {/* {sched ? (
                                   <button
                                     type="button"
                                     className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
@@ -1319,7 +1348,7 @@ setMeetingDescription("");
                                     <i className="fa-regular fa-clock mr-2 text-[#cde2f2]" />
                                     Change meeting mode
                                   </button>
-                                  ) : null}
+                                  ) : null} */}
                                 </div>
                               )}
                             </div>
@@ -1335,6 +1364,31 @@ setMeetingDescription("");
 
           {mentorId && !loading && activeTab === "Appointment History" && (
             <div className="flex flex-col gap-5">
+              <div className={`${mentorFilterPanel} flex flex-col gap-3 md:flex-row md:items-center md:justify-between`}>
+  <div className="relative w-full md:max-w-md">
+    <i className="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#8ec5eb]" />
+    <input
+      type="text"
+      value={historySearch}
+      onChange={(e) => {
+        setHistorySearch(e.target.value);
+        setHistoryPage(1);
+      }}
+      placeholder="Search history by name, title, role, or platform..."
+      className="w-full rounded-xl border border-white/15 bg-white/10 py-3 pl-11 pr-4 text-sm text-white placeholder:text-[#cde2f2]/70 outline-none focus:border-[#8ec5eb]/60"
+    />
+  </div>
+
+  <input
+    type="date"
+    value={historyDate}
+    onChange={(e) => {
+      setHistoryDate(e.target.value);
+      setHistoryPage(1);
+    }}
+    className={mentorDateInputDark}
+  />
+</div>
               <h3 className="text-[15px] font-semibold text-white">
                 Appointment history — {appointmentHistory.length} meeting{appointmentHistory.length === 1 ? "" : "s"}
               </h3>

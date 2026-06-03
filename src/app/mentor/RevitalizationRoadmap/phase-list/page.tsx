@@ -314,13 +314,22 @@ export default function MentorPhaseListPage() {
                         {it.desc}
                       </p>
                     ) : null}
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {/* <div className="mt-3 flex flex-wrap items-center gap-2">
                       <span className="text-[13px] font-semibold text-white/80">Status</span>
                       <div className="h-3.5 w-px bg-white/25" />
                       <span className="inline-block rounded-lg border border-[#8ec5eb]/35 bg-[#8ec5eb]/15 px-3 py-1 text-[12px] font-semibold text-[#8ec5eb]">
                         Not Started
                       </span>
-                    </div>
+                    </div> */}
+                    {!pastorView ? (
+  <div className="mt-3 flex flex-wrap items-center gap-2">
+    <span className="text-[13px] font-semibold text-white/80">Status</span>
+    <div className="h-3.5 w-px bg-white/25" />
+    <span className="inline-block rounded-lg border border-[#8ec5eb]/35 bg-[#8ec5eb]/15 px-3 py-1 text-[12px] font-semibold text-[#8ec5eb]">
+      Not Started
+    </span>
+  </div>
+) : null}
                     <div className="mt-3 text-[13px] text-white/85 sm:text-[14px]">
                       <p>
                         <span className="font-semibold text-white/90">Completion time</span>{" "}
