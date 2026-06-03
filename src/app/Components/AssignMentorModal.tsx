@@ -29,7 +29,8 @@ export default function AssignMentorModal({
   loading = false,
 }: AssignMentorModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedMentors, setSelectedMentors] = useState<string[]>([]);
+  // const [selectedMentors, setSelectedMentors] = useState<string[]>([]);
+  const [selectedMentor, setSelectedMentor] = useState<string>("");
 
   if (!isOpen) return null;
 
@@ -37,17 +38,26 @@ export default function AssignMentorModal({
     m.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
+  // const toggleMentor = (id: string) => {
+  //   setSelectedMentors((prev) =>
+  //     prev.includes(id) ? prev.filter((mid) => mid !== id) : [...prev, id],
+  //   );
+  // };
   const toggleMentor = (id: string) => {
-    setSelectedMentors((prev) =>
-      prev.includes(id) ? prev.filter((mid) => mid !== id) : [...prev, id],
-    );
-  };
+  setSelectedMentor((prev) => (prev === id ? "" : id));
+};
 
+  // const handleConfirm = () => {
+  //   onConfirm(selectedMentors);
+  //   setSelectedMentors([]);
+  //   onClose();
+  // };
   const handleConfirm = () => {
-    onConfirm(selectedMentors);
-    setSelectedMentors([]);
-    onClose();
-  };
+  if (!selectedMentor) return;
+  onConfirm([selectedMentor]);
+  setSelectedMentor("");
+  onClose();
+};
 
   const loginDisplay = (m: Mentor) => m.loginDate ?? "Not Started yet";
   const loginIsNotStarted = (m: Mentor) =>
@@ -91,7 +101,8 @@ export default function AssignMentorModal({
           <>
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredMentors.map((mentor) => {
-              const selected = selectedMentors.includes(mentor.id);
+              // const selected = selectedMentors.includes(mentor.id);
+              const selected = selectedMentor === mentor.id;
               return (
                 <button
                   key={mentor.id}
@@ -157,7 +168,7 @@ export default function AssignMentorModal({
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-4 border-t border-white/15 pt-4">
-            <p className="text-[13px] text-gray-600">
+            {/* <p className="text-[13px] text-gray-600">
               {selectedMentors.length > 0
                 ? `${filteredMentors
                     .filter((m) => selectedMentors.includes(m.id))
@@ -167,11 +178,16 @@ export default function AssignMentorModal({
                     selectedMentors.length > 3 ? ` and ${selectedMentors.length - 3} others` : ""
                   }`
                 : "No mentors selected"}
-            </p>
+            </p> */}
+            <p className="text-[13px] text-gray-600">
+  {selectedMentor
+    ? filteredMentors.find((m) => m.id === selectedMentor)?.name
+    : "No mentor selected"}
+</p>
             <button
               type="button"
               onClick={handleConfirm}
-              disabled={selectedMentors.length === 0}
+              disabled={!selectedMentor}
               className="rounded-xl bg-[#8ec5eb] px-7 py-3 text-sm font-bold text-[#062946] transition hover:bg-[#a9d5f2] disabled:cursor-not-allowed disabled:bg-white/20 disabled:text-white/40"
             >
               Assign Mentor

@@ -1021,12 +1021,49 @@ function TaskPageContent() {
   const fetchComments = useCallback(async () => {
     if (!roadmapId || !userId) return;
     try {
-      const res = await apiGetComments(roadmapId, userId);
-      setComments(unwrapCommentsFromResponse(res));
+      // const res = await apiGetComments(roadmapId, userId);
+      // setComments(unwrapCommentsFromResponse(res));
+const res = await apiGetComments(roadmapId, userId);
+
+const all = unwrapCommentsFromResponse(res);
+
+const hasScopedIds = all.some((c: any) =>
+  Boolean(c.nestedRoadMapItemId ?? c.nestedItemId ?? c.taskId ?? c.roadmapItemId)
+);
+
+// const scoped = hasScopedIds
+//   ? all.filter((c: any) => {
+//       const cTaskId = String(
+//         c.nestedRoadMapItemId ??
+//           c.nestedItemId ??
+//           c.taskId ??
+//           c.roadmapItemId ??
+//           ""
+//       );
+
+//       return cTaskId === String(taskId);
+//     })
+//   : all;
+const scoped = hasScopedIds
+  ? all.filter((c: any) => {
+      const cTaskId = String(
+        c.nestedRoadMapItemId ??
+          c.nestedItemId ??
+          c.taskId ??
+          c.roadmapItemId ??
+          ""
+      );
+
+      return cTaskId === String(taskId);
+    })
+  : [];
+
+setComments(scoped);
     } catch {
       setComments([]);
     }
-  }, [roadmapId, userId]);
+  // }, [roadmapId, userId]);
+  }, [roadmapId, userId, taskId]);
 
   const fetchQueries = useCallback(async () => {
     if (!roadmapId || !userId) return;
@@ -1236,11 +1273,18 @@ setQueries(scoped);
     }
 
     try {
-      await apiAddComment(roadmapId, {
-        text: newComment.trim(),
-        userId,
-        mentorId,
-      });
+      // await apiAddComment(roadmapId, {
+      //   text: newComment.trim(),
+      //   userId,
+      //   mentorId,
+      // });
+  await apiAddComment(roadmapId, {
+  text: newComment.trim(),
+  userId,
+  mentorId,
+  nestedRoadMapItemId: taskId,
+  taskId,
+} as any);
       setNewComment("");
       await fetchComments();
     } catch (err) {

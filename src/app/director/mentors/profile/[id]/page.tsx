@@ -33,6 +33,8 @@ type AssignedMenteeRow = {
   name: string;
   church: string;
   progress: number;
+  image?: string | null;
+
 };
 type MentorDocumentRow = {
   name: string;
@@ -112,7 +114,9 @@ export default function MentorProfilePage() {
           church,
           progress: Math.round(
             typeof u.progressPercentage === "number" ? u.progressPercentage : 0,
+            
           ),
+          image: u.profilePicture ?? null,
         };
       });
       const withProgress = await rowsWithProgress(baseRows);
@@ -336,6 +340,14 @@ export default function MentorProfilePage() {
             {/* Sidebar */}
             <aside className="w-full shrink-0 lg:max-w-[320px]">
               <div className={`p-6 sm:p-8 ${directorGlassCard}`}>
+                <button
+  type="button"
+  onClick={() => router.back()}
+  className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-[#8ec5eb] transition hover:bg-white/15"
+  aria-label="Back"
+>
+  <i className="fa-solid fa-arrow-left" />
+</button>
                 <div className="mb-6 flex flex-col items-center">
                   <div className="mb-4 h-[140px] w-[140px] overflow-hidden rounded-full border border-white/20 bg-white/10">
                     <Image
@@ -351,10 +363,10 @@ export default function MentorProfilePage() {
                     {fullName || "—"}
                   </h3>
                   <p className="mt-1 text-[13px] capitalize text-white/65">{mentorData.role}</p>
-                  <div className="mt-2 flex items-center gap-1.5 text-[12px] text-[#8ec5eb]/90">
+                  {/* <div className="mt-2 flex items-center gap-1.5 text-[12px] text-[#8ec5eb]/90">
                     <i className="fa-solid fa-award" />
                     <span className="capitalize">{mentorTitle || mentorData.role}</span>
-                  </div>
+                  </div> */}
                 </div>
 
                 <div className="mb-6 flex items-center justify-center gap-4 border-b border-white/10 pb-6 text-lg text-[#8ec5eb]">
@@ -580,10 +592,37 @@ export default function MentorProfilePage() {
                         key={mentee.id}
                         className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.05] p-4 transition hover:border-white/20 hover:bg-white/[0.08] sm:flex-row sm:items-center sm:justify-between"
                       >
-                        <div className="min-w-0 flex-1">
+                        {/* <div className="min-w-0 flex-1">
                           <h4 className="text-[15px] font-semibold text-white">{mentee.name}</h4>
                           <p className="text-[13px] text-white/55">{mentee.church}</p>
-                        </div>
+                        </div> */}
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+  <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/15 bg-[#173653] text-sm font-bold text-white">
+    {mentee.image ? (
+      <Image
+        src={mentee.image}
+        alt={mentee.name}
+        width={48}
+        height={48}
+        unoptimized={isRemoteImageSrc(mentee.image)}
+        className="h-full w-full object-cover"
+      />
+    ) : (
+      mentee.name
+        .split(" ")
+        .map((p) => p[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase()
+    )}
+  </div>
+
+  <div className="min-w-0">
+    <h4 className="truncate text-[15px] font-semibold text-white">
+      {mentee.name}
+    </h4>
+  </div>
+</div>
                         <div className="flex flex-wrap items-center gap-4 sm:justify-end">
                           <div className="text-left sm:text-right">
                             <p className="text-[11px] uppercase tracking-wide text-white/45">

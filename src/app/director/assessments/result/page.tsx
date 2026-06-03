@@ -708,6 +708,23 @@ export default function DirectorAssessmentResultPage() {
               </aside>
 
               <section className="space-y-5">
+                {Object.values(mentorLayerCdp).some((v) => String(v || "").trim()) ? (
+  <div className="flex justify-end">
+    <button
+      type="button"
+      onClick={() =>
+        router.push(
+          `/director/assessments/result/cdp?assessmentId=${encodeURIComponent(
+            assessmentId
+          )}&userId=${encodeURIComponent(userId)}`
+        )
+      }
+      className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+    >
+      Customized Development Plan
+    </button>
+  </div>
+) : null}
                 {/* CDP send action intentionally disabled for Director for now.
                     Keep this block commented to restore quickly when needed.
                 <div className="flex justify-end">
@@ -747,7 +764,7 @@ const cdpText =
     </p>
   </div>
 ) : null} */}
-{cdpText ? (
+{/* {cdpText ? (
   <div className="mb-4 flex justify-end">
     <button
       type="button"
@@ -763,7 +780,7 @@ const cdpText =
       Customized Development Plan
     </button>
   </div>
-) : null}
+) : null} */}
                       <div className="space-y-2">
                         {(layer?.choices || []).map((choice: any, ci: number) => {
                           const choiceKey = String(choice?._id ?? choice?.value ?? choice?.label ?? `c_${ci}`);

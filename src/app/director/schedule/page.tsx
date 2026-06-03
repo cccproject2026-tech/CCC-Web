@@ -1138,11 +1138,12 @@ initiatorRole: "director",
       setMeetingTitle("");
 setMeetingDescription("");
       setAvailabilityRefreshKey((k) => k + 1);
-      showToast(
-        (gHint ? `Meeting scheduled successfully. ${gHint}` : "Meeting scheduled successfully") +
-          (outcome.warnings.length > 0 ? ` Note: ${outcome.warnings.join(" · ")}` : ""),
-        successToastMs,
-      );
+      // showToast(
+      //   (gHint ? `Meeting scheduled successfully. ${gHint}` : "Meeting scheduled successfully") +
+      //     (outcome.warnings.length > 0 ? ` Note: ${outcome.warnings.join(" · ")}` : ""),
+      //   successToastMs,
+      // );
+      showToast("Meeting scheduled successfully.");
     } catch (e) {
       showToast(extractApiErrorMessage(e) || "Failed to schedule meeting");
     } finally {

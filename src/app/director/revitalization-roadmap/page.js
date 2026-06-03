@@ -440,6 +440,7 @@ const [pastorSearch, setPastorSearch] = useState("");
   const [pastorProgressDetails, setPastorProgressDetails] = useState([]);
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [filterPastorId, setFilterPastorId] = useState("all");
+  const [deleteConfirmRoadmap, setDeleteConfirmRoadmap] = useState(null);
   const [selectedPastorModalId, setSelectedPastorModalId] = useState(null);
   const [activeTab, setActiveTab] = useState("library");
   // const [roadmapSubmissionView, setRoadmapSubmissionView] = useState("today");
@@ -846,9 +847,15 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
     const rm = row?.raw || {};
     // const t = String(rm.type || "").toLowerCase();
     // const isPhaseLibrary = t === "phase" || t.includes("phase");
-    const isPhaseLibrary =
-  Array.isArray(rm?.roadmaps) &&
-  rm.roadmaps.length > 0;
+  //   const isPhaseLibrary =
+  // Array.isArray(rm?.roadmaps) &&
+  // rm.roadmaps.length > 0;
+  const roadmapType = String(rm?.type || row?.raw?.type || "").toLowerCase();
+
+const isPhaseLibrary =
+  roadmapType === "phase" ||
+  roadmapType.includes("phase") ||
+  Array.isArray(rm?.roadmaps);
     const roadmapId = row?.id;
     if (!roadmapId) return;
 
@@ -1929,14 +1936,23 @@ const filteredMentorList = useMemo(() => {
 
     <button
       type="button"
-      onClick={async () => {
-        for (const id of selectedRoadmapIds) {
-          await handleDeleteRoadmap(id);
-        }
+      // onClick={async () => {
+      //   for (const id of selectedRoadmapIds) {
+      //     await handleDeleteRoadmap(id);
+      //   }
 
-        setSelectedRoadmapIds([]);
-        setSelectMode(false);
-      }}
+      //   setSelectedRoadmapIds([]);
+      //   setSelectMode(false);
+      // }}
+      onClick={() => {
+  const firstSelected = roadmapLibrary.find(
+    (r) => r.id === selectedRoadmapIds[0]
+  );
+
+  if (firstSelected) {
+    setDeleteConfirmRoadmap(firstSelected);
+  }
+}}
       className={`${directorBtnSecondary} !px-4 !py-2.5 !text-[13px]`}
     >
       Delete selected
@@ -2379,10 +2395,14 @@ const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director
                                     </button> */}
                                     <button
                                       type="button"
+                                      // onClick={() => {
+                                      //   setShowOptionsMenu(null);
+                                      //   handleDeleteRoadmap(roadmap.id);
+                                      // }}
                                       onClick={() => {
-                                        setShowOptionsMenu(null);
-                                        handleDeleteRoadmap(roadmap.id);
-                                      }}
+  setShowOptionsMenu(null);
+  setDeleteConfirmRoadmap(roadmap);
+}}
                                       className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-red-200 hover:bg-red-500/10"
                                     >
                                       <i className="fa-solid fa-trash" aria-hidden />
@@ -3079,6 +3099,44 @@ document.body
           })}
         </div>
       )}
+    </div>
+  </div>
+) : null}
+{deleteConfirmRoadmap ? (
+  <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 px-4">
+    <div className="w-full max-w-md rounded-2xl border border-white/15 bg-[#061f35] p-6 shadow-xl">
+      <h2 className="text-lg font-bold text-white">Delete roadmap?</h2>
+
+      <p className="mt-3 text-sm text-white/70">
+        Are you sure you want to delete{" "}
+        <span className="font-semibold text-white">
+          {deleteConfirmRoadmap.title}
+        </span>
+        ? This action cannot be undone.
+      </p>
+
+      <div className="mt-6 flex justify-end gap-3">
+        <button
+          type="button"
+          onClick={() => setDeleteConfirmRoadmap(null)}
+          className={directorBtnSecondary}
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          onClick={async () => {
+            await handleDeleteRoadmap(deleteConfirmRoadmap.id);
+            setDeleteConfirmRoadmap(null);
+            setSelectedRoadmapIds([]);
+            setSelectMode(false);
+          }}
+          className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+        >
+          Delete
+        </button>
+      </div>
     </div>
   </div>
 ) : null}

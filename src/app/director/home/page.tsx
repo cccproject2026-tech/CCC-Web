@@ -2996,7 +2996,7 @@ if (route) {
 
           <button
             type="button"
-            onClick={() => router.push("/director/invite-field-mentor")}
+            onClick={() => router.push("/director/course-completed")}
             className={`flex w-full flex-col items-start justify-between gap-4 rounded-xl p-6 text-left text-white sm:flex-row sm:items-center sm:p-8 ${directorGlassCard} ${directorGlassCardHover}`}
           >
             <div className="flex items-center gap-3">
@@ -3483,11 +3483,16 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                       if (!pastorId) return;
 
                       setShowPastorRoadmapModal(false);
+                      // router.push(
+                      //   `/director/pastor-assignments?assignUser=${encodeURIComponent(
+                      //     pastorId
+                      //   )}`
+                      // );
                       router.push(
-                        `/director/pastor-assignments?assignUser=${encodeURIComponent(
-                          pastorId
-                        )}`
-                      );
+  `/director/revitalization-roadmap?tab=pastor&pastorId=${encodeURIComponent(
+    pastorId
+  )}&returnTo=${encodeURIComponent("/director/home")}`
+);
                     }}
                    className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 text-left shadow-sm transition hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
                   >
@@ -3625,7 +3630,19 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                     className="rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 shadow-sm"
                   >
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
+                      {/* <div className="min-w-0"> */}
+                      <div className="flex min-w-0 items-start gap-3">
+  <QuickLinkAvatar
+    person={
+      (appointment as any).user ||
+      (typeof (appointment as any).userId === "object"
+        ? (appointment as any).userId
+        : null) ||
+      (appointment as any).participant
+    }
+  />
+
+  <div className="min-w-0">
                         <h4 className="truncate text-sm font-semibold text-white">
                           {attendeeName}
                         </h4>
@@ -3648,7 +3665,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
 
                         </div>
                       </div>
-
+</div>
                       <button
                         type="button"
                         disabled={!appointmentId}

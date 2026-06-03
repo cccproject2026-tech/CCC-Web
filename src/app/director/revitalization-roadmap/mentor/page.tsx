@@ -210,12 +210,35 @@ const mentorId = searchParams.get("mentorId") || "";
 
                     <div className="flex min-w-0 flex-1 flex-col">
                       <h3 className="truncate text-base font-bold text-white">{name}</h3>
-                      <p className="mt-1 truncate text-sm text-white/60">
+                      {/* <p className="mt-1 truncate text-sm text-white/60">
                         {pastor?.email || "No email available"}
                       </p>
                       <p className="mt-1 truncate text-sm text-white/55">
                         {pastor?.phoneNumber || pastor?.phone || "No phone available"}
-                      </p>
+                      </p> */}
+                      <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-white/60">
+{(() => {
+  const profileInfo =
+    [
+      pastor?.profileInformation,
+      pastor?.profileInfo,
+      pastor?.about,
+      pastor?.bio,
+      pastor?.description,
+      pastor?.ministryExperience,
+      pastor?.churchName,
+    ]
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean)
+      .join(" · ") || "No profile information available";
+
+  return (
+    <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-white/60">
+      {profileInfo}
+    </p>
+  );
+})()}
+</p>
                       <div className="absolute right-4 top-4">
   <button
     type="button"

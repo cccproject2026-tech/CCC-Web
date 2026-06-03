@@ -37,7 +37,16 @@ export default function ListMenteesModal({
   const [mentees, setMentees] = useState<Mentee[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+useEffect(() => {
+  if (!isOpen) return;
 
+  const previousOverflow = document.body.style.overflow;
+  document.body.style.overflow = "hidden";
+
+  return () => {
+    document.body.style.overflow = previousOverflow;
+  };
+}, [isOpen]);
   const defaultImages = [Mentor1, Mentor2, Mentor3];
 
   useEffect(() => {

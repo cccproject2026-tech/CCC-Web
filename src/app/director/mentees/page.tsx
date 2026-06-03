@@ -22,6 +22,7 @@ import {
   apiGetAllUsers,
   apiGetAssignedUsers,
   apiGetUserById,
+  apiRemoveAssignedUsers,
   unwrapUserResponse,
 } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
@@ -189,10 +190,11 @@ function buildMenteeListParams(
     search,
     page,
     limit,
+    status: "accepted",
   };
   if (activeTab === "active") {
     params.hasCompleted = false;
-    params.status = "accepted";
+    // params.status = "accepted";
   } else if (activeTab === "completed") {
     params.hasCompleted = true;
   }
@@ -233,7 +235,7 @@ export default function MenteesPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [activeTab, setActiveTab] = useState<"all" | "active" | "completed">(
-    "active"
+    "all"
   );
   const [sortKey, setSortKey] = useState<MenteeSortKey>({ kind: "latest" });
   const [showSortMenu, setShowSortMenu] = useState(false);
@@ -246,18 +248,34 @@ export default function MenteesPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [showAssignedMentorsModal, setShowAssignedMentorsModal] = useState(false);
   const [selectedMentee, setSelectedMentee] = useState<string | null>(null);
   const [mentors, setMentors] = useState<Mentor[]>([]);
   const [mentorsLoading, setMentorsLoading] = useState(false);
+  const [assignedMentorList, setAssignedMentorList] = useState<Mentor[]>([]);
 
   /* ---------------- LOAD ASSIGNED USERS ---------------- */
 
   const loadAssignedUsers = async (menteeId: string) => {
     const res = await apiGetAssignedUsers(menteeId);
 
-    const assignedIds = res.data.data.map(
-      (u: any) => u.id ?? u._id
-    );
+    // const assignedIds = res.data.data.map(
+    //   (u: any) => u.id ?? u._id
+    // );
+    const assignedUsers = res.data.data ?? [];
+
+const assignedIds = assignedUsers.map((u: any) => u.id ?? u._id);
+
+setAssignedMentorList(
+  assignedUsers.map((u: any): Mentor => ({
+    id: u.id ?? u._id,
+    name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim(),
+    role: u.role ?? "Mentor",
+    menteeCount: Array.isArray(u.assignedId) ? u.assignedId.length : 0,
+    img: profileImageForUser(u),
+    loginDate: formatUserLastLoginDisplay(u),
+  }))
+);
 
     setMentees((prev) =>
       prev.map((m) =>
@@ -509,29 +527,53 @@ export default function MenteesPage() {
 
   /* ---------------- REMOVE ---------------- */
 
+  // const handleRemoveMentors = async (mentorIdsToRemove: string[]) => {
+  //   if (!selectedMentee) return;
+
+  //   const mentee = mentees.find((m) => m.id === selectedMentee);
+  //   if (!mentee?.assignedLoaded) return;
+
+  //   const updated = mentee.assignedId.filter(
+  //     (id) => !mentorIdsToRemove.includes(id)
+  //   );
+
+  //   await apiAssignUsers(selectedMentee, updated);
+
+  //   setMentees((prev) =>
+  //     prev.map((m) =>
+  //       m.id === selectedMentee
+  //         ? { ...m, assignedId: updated }
+  //         : m
+  //     )
+  //   );
+
+  //   setShowRemoveModal(false);
+  //   setToast("Mentors removed successfully");
+  // };
   const handleRemoveMentors = async (mentorIdsToRemove: string[]) => {
-    if (!selectedMentee) return;
+  if (!selectedMentee || mentorIdsToRemove.length === 0) return;
 
-    const mentee = mentees.find((m) => m.id === selectedMentee);
-    if (!mentee?.assignedLoaded) return;
+  const mentee = mentees.find((m) => m.id === selectedMentee);
+  if (!mentee?.assignedLoaded) return;
 
-    const updated = mentee.assignedId.filter(
-      (id) => !mentorIdsToRemove.includes(id)
-    );
+  await apiRemoveAssignedUsers(selectedMentee, mentorIdsToRemove);
 
-    await apiAssignUsers(selectedMentee, updated);
+  const updated = mentee.assignedId.filter(
+    (id) => !mentorIdsToRemove.includes(id)
+  );
 
-    setMentees((prev) =>
-      prev.map((m) =>
-        m.id === selectedMentee
-          ? { ...m, assignedId: updated }
-          : m
-      )
-    );
+  setMentees((prev) =>
+    prev.map((m) =>
+      m.id === selectedMentee
+        ? { ...m, assignedId: updated }
+        : m
+    )
+  );
 
-    setShowRemoveModal(false);
-    setToast("Mentors removed successfully");
-  };
+  setShowRemoveModal(false);
+  setToast("Mentor removed successfully");
+  setTimeout(() => setToast(null), 3000);
+};
 
   /* ---------------- DERIVED ---------------- */
 
@@ -599,9 +641,14 @@ export default function MenteesPage() {
       label: "Revitalization Roadmap",
       color: "text-[#8ec5eb]",
       onClick: () =>
-        router.push(
-          `/director/pastor-assignments?assignUser=${encodeURIComponent(menteeId)}`
-        ),
+        // router.push(
+        //   `/director/pastor-assignments?assignUser=${encodeURIComponent(menteeId)}`
+        // ),
+  router.push(
+  `/director/revitalization-roadmap?tab=pastor&pastorId=${encodeURIComponent(
+    menteeId
+  )}&returnTo=${encodeURIComponent("/director/mentees")}`
+)
     },
     {
       icon: "fa-solid fa-clipboard-check",
@@ -627,7 +674,7 @@ export default function MenteesPage() {
   onClick: async () => {
     setSelectedMentee(menteeId);
     await loadAssignedUsers(menteeId);
-    setShowRemoveModal(true);
+    setShowAssignedMentorsModal(true);
   },
 },
     {
@@ -1147,7 +1194,65 @@ export default function MenteesPage() {
         mentors={assignedMentors}
         loading={mentorsLoading}
       />
+      {showAssignedMentorsModal && (
+  <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
+    <div className="w-full max-w-3xl rounded-2xl border border-white/15 bg-[#062946] p-6 shadow-2xl">
+      <div className="mb-5 flex items-center justify-between">
+        <h3 className="text-xl font-bold text-white">Assigned Mentors</h3>
+        <button
+          type="button"
+          onClick={() => setShowAssignedMentorsModal(false)}
+          className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white"
+        >
+          <i className="fa-solid fa-xmark" />
+        </button>
+      </div>
 
+      {/* {assignedMentors.length === 0 ? (
+        <p className="text-white/70">No mentors assigned.</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {assignedMentors.map((mentor) => ( */}
+          {assignedMentorList.length === 0 ? (
+  <p className="text-white/70">No mentors assigned.</p>
+) : (
+  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    {assignedMentorList.map((mentor) => (
+            <button
+              key={mentor.id}
+              type="button"
+              onClick={() =>
+                router.push(`/director/mentors/profile/${mentor.id}`)
+              }
+              className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/[0.06] p-4 text-left hover:bg-white/[0.1]"
+            >
+              <img
+                src={typeof mentor.img === "string" ? mentor.img : ""}
+                alt=""
+                className="h-14 w-14 rounded-xl object-cover"
+              />
+              <div>
+                <h4 className="font-bold text-white">{mentor.name}</h4>
+                <p className="text-sm text-white/60">{mentor.role || "Mentor"}</p>
+                <p className="mt-1 text-xs text-[#8ec5eb]">View profile</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+)}
+{toast && (
+  <div className="fixed right-6 top-6 z-[100] animate-fade-in">
+    <div className="flex items-center gap-3 rounded-xl border border-white/15 bg-[#041f35]/95 px-6 py-4 shadow-2xl backdrop-blur-md">
+      <i className="fa-solid fa-circle-check text-xl text-emerald-400" />
+      <span className="text-[15px] font-semibold text-white">
+        {toast}
+      </span>
+    </div>
+  </div>
+)}
       {(showSortMenu) && (
         <div
           className="fixed inset-0 z-40"

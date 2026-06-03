@@ -95,7 +95,7 @@ function applyMenteeCountToMentor(m: Mentor, count: number): Mentor {
   return {
     ...m,
     menteeCount: count,
-    description: `${m.role} with ${count} assigned ${w}`,
+    description: "",
   };
 }
 
@@ -133,7 +133,8 @@ const img =
     id: user.id || user._id,
     name: `${user.firstName} ${user.lastName}`,
     role: user.role,
-    description: `${user.role} with ${nAssigned} assigned ${menteeWord}`,
+    // description: `${user.role} with ${nAssigned} assigned ${menteeWord}`,
+    description: "",
     img,
     menteeCount: nAssigned,
     isFeatured: false,
@@ -272,7 +273,7 @@ function buildMentorListRequest(
 export default function MyMentorsPage() {
   const router = useRouter();
   const [query, setQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState("Mentors");
+  const [activeFilter, setActiveFilter] = useState("All");
   const [sortBy, setSortBy] = useState("Least Mentees");
   const [showSortMenu, setShowSortMenu] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState(false);

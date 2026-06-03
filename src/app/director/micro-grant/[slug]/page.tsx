@@ -9,7 +9,9 @@ import RoadmapJumpStartBg from "@/app/Assets/roadmap-jump-start-bg.jpg";
 import Mentor2 from "@/app/Assets/mentor2.png";
 
 import {
-  loadMicroGrantDetailBySlug,
+  getMicroGrantByUserId,
+unwrapMicroGrantWithUser,
+  // loadMicroGrantDetailBySlug,
   normalizeMicroGrantSupportingDocs,
   updateMicroGrantStatus,
 } from "@/app/Services/microGrand.service";
@@ -34,8 +36,14 @@ const router = useRouter();
 
     const fetchData = async () => {
       try {
-        const payload = await loadMicroGrantDetailBySlug(userId);
-        setData(payload);
+        // const payload = await loadMicroGrantDetailBySlug(userId);
+        // setData(payload);
+        const res = await getMicroGrantByUserId(userId);
+const payload = unwrapMicroGrantWithUser(res);
+console.log("DIRECTOR MICRO RAW:", res.data);
+console.log("DIRECTOR MICRO PAYLOAD:", payload);
+console.log("DIRECTOR MICRO ANSWERS:", payload?.application?.answers);
+setData(payload);
       } catch (err) {
         console.error("Failed to load application", err);
       } finally {
@@ -109,6 +117,9 @@ const router = useRouter();
   }
 
   const answers = data.application.answers ?? {};
+  console.log("MICRO GRANT DETAIL:", data);
+console.log("MICRO GRANT ANSWERS:", data.application.answers);
+console.log("MICRO GRANT FORM:", data.application.formId);
   const supportingDocs = normalizeMicroGrantSupportingDocs(data.application.supportingDocs);
 
   /* ---------- right card (same design, dynamic) ---------- */

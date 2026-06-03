@@ -384,7 +384,7 @@ export default function PersonListCard({
           )}
         </div>
 
-        <div className={iconRowClass}>
+        {/* <div className={iconRowClass}>
           {mailto ? (
             <a
               href={mailto}
@@ -439,7 +439,35 @@ export default function PersonListCard({
           >
             <i className={`fa-solid fa-phone ${iconPhone}`} />
           </IconLink>
-        </div>
+        </div> */}
+        <div className={iconRowClass}>
+  {mailto ? (
+    <a
+      href={mailto}
+      className={iconWrapperBase}
+      aria-label={`Send email to ${name}`}
+      title={`Email ${emailTrim}`}
+    >
+      <i className={`fa-regular fa-envelope ${iconLg}`} />
+    </a>
+  ) : (
+    <span className={`${iconWrapperBase} cursor-not-allowed opacity-40`}>
+      <i className={`fa-regular fa-envelope ${iconLg}`} />
+    </span>
+  )}
+
+  <span className={`${iconWrapperBase} cursor-not-allowed opacity-40`}>
+    <i className={`fa-regular fa-comment-dots ${iconLg}`} />
+  </span>
+
+  <span className={`${iconWrapperBase} cursor-not-allowed opacity-40`}>
+    <i className={`fa-brands fa-whatsapp ${iconLg}`} />
+  </span>
+
+  <span className={`${iconWrapperBase} cursor-not-allowed opacity-40`}>
+    <i className={`fa-solid fa-phone ${iconPhone}`} />
+  </span>
+</div>
       </div>
 
       {actionButton && (
