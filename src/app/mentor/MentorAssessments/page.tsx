@@ -2244,86 +2244,89 @@ assessment._mentorHasSentCdp
   
 )}
 {activeTab === "pastors" && selectedMenteeId ? (
-<div className="mt-3 grid grid-cols-1 gap-2 text-xs text-[#d9ebf8] sm:grid-cols-2">
-  <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-    <p className="text-[10px] text-[#d9ebf8]/65">Created at</p>
-    <p className="font-semibold text-white">
-      {assessment._mentorCreatedAt
-        ? new Date(assessment._mentorCreatedAt).toLocaleString("en-US", {
-            month: "short",
-            day: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true,
-          })
-        : "N/A"}
-    </p>
-  </div>
-
-  <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-    <p className="text-[10px] text-[#d9ebf8]/65">Created by</p>
-    <p className="font-semibold text-white">
-      {assessment._mentorCreatedBy || "N/A"}
-    </p>
-  </div>
-</div>
-) : null}
-                              {assessment._mentorMeetingActive && (
-  <div className="mt-4 max-w-xl rounded-xl border border-[#8ec5eb]/35 bg-[#173a55]/65 px-4 py-3">
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <p className="text-sm font-bold text-white">
-          Meeting <span className="font-medium text-white/65">(tap for details)</span>
-          <span className="ml-2 font-medium text-[#cde2f2]">
-            {assessment._mentorMeetingDateLabel || "Meeting scheduled"}
-          </span>
-          <span className="mx-2 text-white/35">|</span>
-          <span className="font-semibold text-[#8ec5eb]">zoom</span>
+  <div className={`mt-3 grid grid-cols-1 gap-2 text-xs text-[#d9ebf8] ${assessment._mentorMeetingActive ? "sm:grid-cols-[minmax(140px,180px)_1fr]" : "sm:max-w-[180px]"}`}>
+    <div className="flex flex-col gap-2">
+      <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+        <p className="text-[10px] text-[#d9ebf8]/65">Created By</p>
+        <p className="truncate font-semibold text-white">
+          {assessment._mentorCreatedBy || "N/A"}
         </p>
-
-        <button
-          type="button"
-          onClick={() => router.push(`/mentor/MentorSchedule/${assessment._mentorAppointmentId}`)}
-          className="mt-3 rounded-lg border border-[#8ec5eb]/35 bg-white/5 px-4 py-2 text-xs font-semibold text-[#8ec5eb] transition hover:bg-[#8ec5eb]/15"
-        >
-          Join link
-        </button>
       </div>
 
-      <div className="options-menu-container relative shrink-0">
-        <button
-          type="button"
-          onClick={() =>
-            setShowDropdown(
-              showDropdown === `meeting-${assessment._id}` ? null : `meeting-${assessment._id}`,
-            )
-          }
-          className="flex h-7 w-7 items-center justify-center rounded-full text-white/70 hover:bg-white/10"
-        >
-          <i className="fa-solid fa-ellipsis-vertical" />
-        </button>
-
-        {showDropdown === `meeting-${assessment._id}` && (
-          <div className="absolute right-0 z-50 mt-2 w-40 rounded-xl border border-white/15 bg-[#041f35] py-2 shadow-xl">
-            <button
-              type="button"
-              onClick={() => {
-                setShowDropdown(null);
-                router.push(
-  `/mentor/MentorSchedule?appointmentId=${assessment._mentorAppointmentId}&reschedule=1`,
-);
-              }}
-              className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-semibold text-white/90 hover:bg-white/10"
-            >
-              Reschedule
-            </button>
-          </div>
-        )}
+      <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+        <p className="text-[10px] text-[#d9ebf8]/65">Created At</p>
+        <p className="font-semibold text-white">
+          {formatCreatedDate(assessment._mentorCreatedAt) || "N/A"}
+        </p>
       </div>
     </div>
+
+    {assessment._mentorMeetingActive && (
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => router.push(`/mentor/MentorSchedule/${assessment._mentorAppointmentId}`)}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          router.push(`/mentor/MentorSchedule/${assessment._mentorAppointmentId}`);
+        }}
+        className="relative flex min-h-[92px] w-full flex-col justify-center rounded-lg border border-[#8ec5eb]/35 bg-[#173a55]/65 px-4 py-3 text-left transition hover:bg-[#1c4564]/75"
+      >
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8ec5eb]">Meeting</p>
+        <p className="mt-1 pr-9 text-sm font-bold text-white">
+          {assessment._mentorMeetingDateLabel || "Meeting scheduled"}
+        </p>
+        <p className="mt-1 text-xs font-semibold text-[#8ec5eb]">Zoom</p>
+
+        <div className="options-menu-container absolute right-3 top-3">
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowDropdown(
+                showDropdown === `meeting-${assessment._id}` ? null : `meeting-${assessment._id}`,
+              );
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" && e.key !== " ") return;
+              e.preventDefault();
+              e.stopPropagation();
+              setShowDropdown(
+                showDropdown === `meeting-${assessment._id}` ? null : `meeting-${assessment._id}`,
+              );
+            }}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-white/70 hover:bg-white/10"
+            aria-label="Meeting options"
+          >
+            <i className="fa-solid fa-ellipsis-vertical" />
+          </span>
+
+          {showDropdown === `meeting-${assessment._id}` && (
+            <div
+              className="absolute right-0 z-50 mt-2 w-40 rounded-xl border border-white/15 bg-[#041f35] py-2 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDropdown(null);
+                  router.push(
+  `/mentor/MentorSchedule?appointmentId=${assessment._mentorAppointmentId}&reschedule=1`,
+);
+                }}
+                className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-semibold text-white/90 hover:bg-white/10"
+              >
+                Reschedule
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )}
   </div>
-)}
+) : null}
                             </div>
                           </div>
                         </div>

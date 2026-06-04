@@ -76,13 +76,12 @@ export default function RevitalizationRoadmapPage() {
 const searchParams = useSearchParams();
 
 const [activeTab, setActiveTab] = useState(
-  searchParams.get("tab") === "Library" ? "Library" : "Pastor"
+  searchParams.get("tab") === "Pastor" ? "Pastor" : "Library"
 );
 
 useEffect(() => {
-  if (searchParams.get("tab") === "Library") {
-    setActiveTab("Library");
-  }
+  const tab = searchParams.get("tab");
+  if (tab === "Pastor" || tab === "Library") setActiveTab(tab);
 }, [searchParams]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"default" | "progress">("default");

@@ -26,6 +26,7 @@ interface RoadmapHomeCardProps {
   meetingInfo?: {
     date: string;
     time: string;
+    onReschedule?: () => void;
   };
   // Show checkmark overlay on image
   showCheckmark?: boolean;
@@ -50,6 +51,7 @@ export default function RoadmapHomeCard({
   showCheckmark = false,
 }: RoadmapHomeCardProps) {
   const [selectedDate, setSelectedDate] = useState("");
+  const [meetingMenuOpen, setMeetingMenuOpen] = useState(false);
   const isMentor = variant === "mentor";
 const effectiveStatus =
   taskCompleted &&
@@ -114,6 +116,17 @@ const effectiveStatus =
     if (onViewClick) {
       onViewClick();
     }
+  };
+
+  const handleMeetingMenuClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMeetingMenuOpen((open) => !open);
+  };
+
+  const handleRescheduleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMeetingMenuOpen(false);
+    meetingInfo?.onReschedule?.();
   };
 
   return (
@@ -259,9 +272,38 @@ const effectiveStatus =
               </div>
             )} */}
             {isMentor && meetingInfo && (
-  <div className="mb-4 rounded-lg border border-yellow-300/35 bg-yellow-300/15 px-3 py-2 text-[13px] font-semibold text-yellow-100">
-    Meeting Scheduled : {meetingInfo.date}
-    {meetingInfo.time ? ` ${meetingInfo.time}` : ""}
+  <div
+    className="relative mb-4 flex items-center justify-between gap-2 rounded-lg border border-yellow-300/35 bg-yellow-300/15 px-3 py-2 text-[13px] font-semibold text-yellow-100"
+    onClick={(e) => e.stopPropagation()}
+  >
+    <span className="min-w-0 truncate">
+      Meeting Scheduled : {meetingInfo.date}
+      {meetingInfo.time ? ` ${meetingInfo.time}` : ""}
+    </span>
+    {meetingInfo.onReschedule ? (
+      <div className="relative shrink-0" data-roadmap-meeting-menu>
+        <button
+          type="button"
+          onClick={handleMeetingMenuClick}
+          className="flex h-7 w-7 items-center justify-center rounded-md text-yellow-50 transition hover:bg-yellow-200/15"
+          aria-label="Meeting actions"
+          aria-expanded={meetingMenuOpen}
+        >
+          <i className="fa-solid fa-ellipsis-vertical text-xs" aria-hidden />
+        </button>
+        {meetingMenuOpen ? (
+          <div className="absolute right-0 top-full z-30 mt-2 w-44 overflow-hidden rounded-lg border border-white/15 bg-[#062946] py-1 text-left shadow-xl">
+            <button
+              type="button"
+              onClick={handleRescheduleClick}
+              className="block w-full px-3 py-2 text-left text-xs font-semibold text-white transition hover:bg-white/10"
+            >
+              Reschedule meeting
+            </button>
+          </div>
+        ) : null}
+      </div>
+    ) : null}
   </div>
 )}
 

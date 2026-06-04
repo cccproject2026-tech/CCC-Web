@@ -188,6 +188,19 @@ function isRenderablePastorExtraRow(item: Record<string, unknown>): boolean {
   return t !== "" && t !== "JUMPSTART_COMPLETE";
 }
 
+type PastorUploadFile = {
+  fileName: string;
+  fileUrl: string;
+  uploadBatchId: string;
+  submissionNumber?: number;
+  submittedAt?: string;
+  resubmittedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  groupKey: string;
+  groupOrder: number;
+};
+
 function TaskPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -208,7 +221,7 @@ function TaskPageContent() {
   const [pastorExtrasRows, setPastorExtrasRows] = useState<Record<string, unknown>[]>([]);
   const [selectedPreviousSubmissionIndex, setSelectedPreviousSubmissionIndex] = useState<number | null>(null);
   const [pastorUploadDocs, setPastorUploadDocs] = useState<
-  Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]>
+  Record<string, PastorUploadFile[]>
 >({});
   const [extrasLoading, setExtrasLoading] = useState(false);
   const [assessmentTaskState, setAssessmentTaskState] = useState<{
@@ -401,12 +414,24 @@ function TaskPageContent() {
       const list = (res?.data?.data || res?.data) as any[];
       const batches = Array.isArray(list) ? list : [];
 
-      const byName: Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]> = {};
+      const byName: Record<string, PastorUploadFile[]> = {};
 
-      batches.forEach((b: any) => {
+      batches.forEach((b: any, batchIndex: number) => {
         const name = String(b?.name ?? "").trim().toLowerCase();
         const batchId = String(b?.uploadBatchId ?? "").trim();
         const files = Array.isArray(b?.files) ? b.files : [];
+        const rawSubmissionNumber = Number(b?.submissionNumber ?? b?.submissionNo ?? b?.version);
+        const submissionNumber = Number.isFinite(rawSubmissionNumber) ? rawSubmissionNumber : undefined;
+        const submittedAt = String(b?.submittedAt ?? b?.submissionAt ?? "").trim() || undefined;
+        const resubmittedAt = String(b?.resubmittedAt ?? b?.resubmissionAt ?? "").trim() || undefined;
+        const createdAt = String(b?.createdAt ?? "").trim() || undefined;
+        const updatedAt = String(b?.updatedAt ?? "").trim() || undefined;
+        const groupKey =
+          submissionNumber !== undefined
+            ? `submission:${submissionNumber}`
+            : resubmittedAt || submittedAt || createdAt || updatedAt || batchId
+              ? `time:${resubmittedAt || submittedAt || createdAt || updatedAt || batchId}`
+              : `batch:${batchIndex}`;
 
         if (!name || !files.length) return;
 
@@ -415,6 +440,13 @@ function TaskPageContent() {
             fileName: String(f?.fileName ?? "").trim(),
             fileUrl: String(f?.fileUrl ?? "").trim(),
             uploadBatchId: batchId,
+            submissionNumber,
+            submittedAt,
+            resubmittedAt,
+            createdAt,
+            updatedAt,
+            groupKey,
+            groupOrder: batchIndex,
           }))
           .filter((f: any) => f.fileName && f.fileUrl);
 
@@ -789,17 +821,97 @@ const buildVersionsFromExtras = (extras: Record<string, unknown>[]) => {
   return versions;
 };
 
+const readUploadGroupKeyFromExtra = (item: Record<string, unknown>): string => {
+  const rawSubmissionNumber = Number(item.submissionNumber ?? item.submissionNo ?? item.version);
+  if (Number.isFinite(rawSubmissionNumber)) return `submission:${rawSubmissionNumber}`;
+
+  const timeKey = String(
+    item.resubmittedAt ??
+      item.resubmissionAt ??
+      item.submittedAt ??
+      item.submissionAt ??
+      item.createdAt ??
+      item.updatedAt ??
+      "",
+  ).trim();
+  if (timeKey) return `time:${timeKey}`;
+
+  const batchKey = String(
+    item.uploadBatchId ??
+      item.uploadBatchID ??
+      item.batchId ??
+      item.documentBatchId ??
+      item.uploadBatch ??
+      "",
+  ).trim();
+  return batchKey ? `time:${batchKey}` : "";
+};
+
+const getUploadGroupsForLabel = (label: string) => {
+  const allUploadedFiles = pastorUploadDocs[label] ?? [];
+  const groups = new Map<string, PastorUploadFile[]>();
+
+  allUploadedFiles.forEach((file) => {
+    const key = file.groupKey || file.uploadBatchId || `${file.fileUrl}-${file.fileName}`;
+    groups.set(key, [...(groups.get(key) || []), file]);
+  });
+
+  return Array.from(groups.entries())
+    .map(([groupKey, files]) => ({ groupKey, files }))
+    .sort((a, b) => {
+      const aFirst = a.files[0];
+      const bFirst = b.files[0];
+      const aSubmission = aFirst?.submissionNumber;
+      const bSubmission = bFirst?.submissionNumber;
+      if (aSubmission !== undefined || bSubmission !== undefined) {
+        return Number(aSubmission ?? -Infinity) - Number(bSubmission ?? -Infinity);
+      }
+
+      const aTime = new Date(
+        aFirst?.resubmittedAt || aFirst?.submittedAt || aFirst?.createdAt || aFirst?.updatedAt || "",
+      ).getTime();
+      const bTime = new Date(
+        bFirst?.resubmittedAt || bFirst?.submittedAt || bFirst?.createdAt || bFirst?.updatedAt || "",
+      ).getTime();
+      if (!Number.isNaN(aTime) || !Number.isNaN(bTime)) {
+        return (Number.isNaN(aTime) ? 0 : aTime) - (Number.isNaN(bTime) ? 0 : bTime);
+      }
+
+      return Number(aFirst?.groupOrder ?? 0) - Number(bFirst?.groupOrder ?? 0);
+    });
+};
+
+const getUploadedFilesForSubmission = (
+  label: string,
+  item: Record<string, unknown>,
+  fallbackGroupIndex: number,
+  preferLatest = false,
+) => {
+  const groups = getUploadGroupsForLabel(label);
+  if (groups.length === 0) return [];
+
+  const itemGroupKey = readUploadGroupKeyFromExtra(item);
+  if (itemGroupKey) {
+    const matched = groups.find((group) => group.groupKey === itemGroupKey);
+    if (matched) return matched.files;
+  }
+
+  const fallbackIndex = preferLatest ? groups.length - 1 : fallbackGroupIndex;
+  return groups[Math.max(0, Math.min(fallbackIndex, groups.length - 1))]?.files ?? [];
+};
+
 const allRenderableExtrasForHistory = pastorExtrasRows.filter(isRenderablePastorExtraRow);
 const submissionVersions = buildVersionsFromExtras(allRenderableExtrasForHistory);
 const previousSubmissionVersions = submissionVersions.slice(0, -1);
 const renderHistoryAnswerCard = (
   item: Record<string, unknown>,
   idx: number,
+  versionIndex: number,
 ): JSX.Element => {
   const type = String(item.type ?? "").toUpperCase();
   const label = String(item.name ?? item.key ?? `Item ${idx + 1}`);
   const normalizedLabel = label.trim().toLowerCase();
-  const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
+  const uploadedFiles = getUploadedFilesForSubmission(normalizedLabel, item, versionIndex);
 
   const value =
     item.value !== undefined
@@ -1142,7 +1254,7 @@ const renderAnswerCard = (
   // pastorUploadDocs[label.trim().toLowerCase()] ??
   // [];
   const normalizedLabel = label.trim().toLowerCase();
-const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
+const uploadedFiles = getUploadedFilesForSubmission(normalizedLabel, item, 0, true);
   const sig = item.signatureData !== undefined ? item.signatureData : undefined;
   const val = item.value !== undefined ? item.value : sig;
 
@@ -1781,7 +1893,7 @@ const renderTemplateExtra = (extra: Record<string, any>, idx: number): JSX.Eleme
             </h3>
 
             <div className="space-y-4">
-              {version.map((item, idx) => renderHistoryAnswerCard(item, idx))}
+              {version.map((item, idx) => renderHistoryAnswerCard(item, idx, versionIndex))}
             </div>
           </div>
         ))}

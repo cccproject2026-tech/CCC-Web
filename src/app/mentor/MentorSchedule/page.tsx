@@ -15,6 +15,7 @@ import MentorAvailabilityRecurringWorkspace from "@/app/mentor/MentorSchedule/Me
 import MentorFilterTabGroup from "@/app/Components/mentor/MentorFilterTabGroup";
 import AvailabilityCalendar from "@/app/Components/AvailabilityCalendar";
 import GoogleCalendarConnectButton from "@/app/Components/GoogleCalendarConnectButton";
+import MentorRescheduleAppointmentDrawer from "@/app/Components/mentor/MentorRescheduleAppointmentDrawer";
 import {
   mentorBodyText,
   mentorDateInputDark,
@@ -36,7 +37,6 @@ import {
   apiCancelAppointment,
   apiCreateAppointment,
   apiGetWeeklyAvailability,
-  apiRescheduleAppointment,
   apiMarkAppointmentMissed,
 } from "@/app/Services/appointments.service";
 import axiosInstance from "@/app/Services/config/axios-instance";
@@ -225,16 +225,6 @@ const [historyDate, setHistoryDate] = useState("");
   // reschedule state
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [rescheduleTarget, setRescheduleTarget] = useState<Appointment | null>(null);
-  const [rescheduleRecipientType, setRescheduleRecipientType] = useState<"director" | "pastor" | null>(null);
-  const [rescheduleMonth, setRescheduleMonth] = useState(today.getMonth());
-  const [rescheduleYear, setRescheduleYear] = useState(today.getFullYear());
-  const [rescheduleSelectedDate, setRescheduleSelectedDate] = useState(today.getDate());
-  const [rescheduleMonthlyAvailabilitySlots, setRescheduleMonthlyAvailabilitySlots] = useState<any[]>([]);
-  const [rescheduleAvailabilityLoading, setRescheduleAvailabilityLoading] = useState(false);
-  const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState("");
-  const [rescheduleDateTime, setRescheduleDateTime] = useState("");
-  const [reschedulePlatform, setReschedulePlatform] = useState("zoom");
-  const [isRescheduling, setIsRescheduling] = useState(false);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -631,78 +621,6 @@ useEffect(() => {
     setHistoryPage((prev) => Math.min(prev, totalHistoryPages));
   }, [totalHistoryPages]);
 
-  // ── Fetch availability for reschedule calendar (director only) ──────────────────
-  useEffect(() => {
-    if (!isRescheduleModalOpen || !rescheduleTarget) return;
-
-    const fetchAvailability = async () => {
-      if (rescheduleRecipientType === "director") {
-        // Fetch director's availability
-        const directorId = (rescheduleTarget.mentor as any)?._id || (rescheduleTarget.mentor as any)?.id;
-        if (!directorId) {
-          console.warn("No director ID available for reschedule");
-          return;
-        }
-
-        setRescheduleAvailabilityLoading(true);
-        try {
-          const url = `/appointments/availability/${directorId}/month`;
-          const params = { year: rescheduleYear, month: rescheduleMonth + 1 };
-          console.log("Fetching director availability for reschedule:", { url, params, directorId });
-
-          const response = await axiosInstance.get(url, { params });
-          console.log("Director availability response:", response.data);
-
-          if (response.data?.data) {
-            console.log("Setting rescheduleMonthlyAvailabilitySlots with:", response.data.data);
-            setRescheduleMonthlyAvailabilitySlots(response.data.data);
-          } else {
-            console.warn("No data in director availability response:", response.data);
-            setRescheduleMonthlyAvailabilitySlots([]);
-          }
-        } catch (e) {
-          console.error("Failed to fetch director availability for reschedule:", e);
-          setRescheduleMonthlyAvailabilitySlots([]);
-        } finally {
-          setRescheduleAvailabilityLoading(false);
-        }
-      } else if (rescheduleRecipientType === "pastor") {
-        // Fetch mentor's own availability for pastor reschedule
-        if (!mentorId) {
-          console.warn("No mentorId available for reschedule");
-          return;
-        }
-
-        setScheduleAvailabilityLoading(true);
-        try {
-          const url = `/appointments/availability/${mentorId}/month`;
-          const params = { year: rescheduleYear, month: rescheduleMonth + 1 };
-          console.log("Fetching mentor availability for pastor reschedule:", { url, params, mentorId });
-
-          const response = await axiosInstance.get(url, { params });
-          console.log("Mentor availability response:", response.data);
-
-          if (response.data?.data) {
-            console.log("Setting scheduleMonthlyAvailabilitySlots with:", response.data.data);
-            setScheduleMonthlyAvailabilitySlots(response.data.data);
-          } else {
-            console.warn("No data in mentor availability response:", response.data);
-            setScheduleMonthlyAvailabilitySlots([]);
-          }
-        } catch (e) {
-          console.error("Failed to fetch mentor availability for pastor reschedule:", e);
-          setScheduleMonthlyAvailabilitySlots([]);
-        } finally {
-          setScheduleAvailabilityLoading(false);
-        }
-      } else {
-        console.warn("Unknown rescheduleRecipientType:", rescheduleRecipientType);
-      }
-    };
-
-    fetchAvailability();
-  }, [isRescheduleModalOpen, rescheduleTarget, rescheduleRecipientType, rescheduleYear, rescheduleMonth, mentorId]);
-
   const toIsoFromDateAndSlot = (dateStr: string, slot: string) => {
     return parseSlotStartToIso(dateStr, slot.replace(/\u2013/g, "-"));
   };
@@ -922,100 +840,8 @@ setMeetingDescription("");
   // ── Open reschedule modal ──────────────────────────────────────────────────────
   const openRescheduleModal = (appt: Appointment) => {
     setRescheduleTarget(appt);
-    setReschedulePlatform(String(appt.platform || "zoom").toLowerCase());
     setShowMenu(null);
-
-    // Determine recipient type (director or pastor)
-    const recipientRole = (appt.mentor as any)?.role || (appt.user as any)?.role || "pastor";
-    const isDirector = recipientRole?.toLowerCase().includes("director");
-    setRescheduleRecipientType(isDirector ? "director" : "pastor");
-
-    // Reset states
-    const today = new Date();
-    setRescheduleMonth(today.getMonth());
-    setRescheduleYear(today.getFullYear());
-    setRescheduleSelectedDate(today.getDate());
-    setRescheduleSelectedSlot("");
-    setRescheduleDateTime("");
-    setRescheduleMonthlyAvailabilitySlots([]);
-    setScheduleMonthlyAvailabilitySlots([]);
     setIsRescheduleModalOpen(true);
-  };
-
-  // ── Reschedule calendar navigation ─────────────────────────────────────────────
-  const handleReschedulePrevMonth = () => {
-    if (rescheduleMonth === 0) {
-      setRescheduleMonth(11);
-      setRescheduleYear(rescheduleYear - 1);
-    } else {
-      setRescheduleMonth(rescheduleMonth - 1);
-    }
-  };
-
-  const handleRescheduleNextMonth = () => {
-    if (rescheduleMonth === 11) {
-      setRescheduleMonth(0);
-      setRescheduleYear(rescheduleYear + 1);
-    } else {
-      setRescheduleMonth(rescheduleMonth + 1);
-    }
-  };
-
-  // ── Handle reschedule appointment ──────────────────────────────────────────────
-  const handleRescheduleAppointment = async () => {
-    const appt = rescheduleTarget;
-    const id = appt ? appointmentEntityId(appt) : "";
-    if (!id || !mentorId) return;
-
-    // Validate based on recipient type
-    if (rescheduleRecipientType === "director") {
-      if (!rescheduleSelectedSlot) {
-        setToastMessage("Please select an available time slot");
-        setTimeout(() => setToastMessage(null), 3000);
-        return;
-      }
-    } else {
-      if (!rescheduleDateTime) {
-        setToastMessage("Please select date and time");
-        setTimeout(() => setToastMessage(null), 3000);
-        return;
-      }
-    }
-
-    if (isRescheduling) return;
-    setIsRescheduling(true);
-
-    try {
-      const newDate = rescheduleRecipientType === "director"
-        ? rescheduleSelectedSlot
-        : rescheduleDateTime;
-
-      // Extract startTime/startPeriod from the resolved ISO
-      const _d = new Date(newDate);
-      const _h24 = _d.getHours();
-      const _min = _d.getMinutes();
-      const startPeriod = _h24 < 12 ? "AM" : "PM";
-      const _h12 = _h24 % 12 === 0 ? 12 : _h24 % 12;
-      const startTime = `${_h12}:${String(_min).padStart(2, "0")}`;
-
-      await apiRescheduleAppointment(id, {
-        newDate,
-        startTime,
-        startPeriod,
-        platform: reschedulePlatform as any,
-      });
-      const refresh = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: false });
-      setAppointments(unwrapAppointmentsAxiosData(refresh));
-      setIsRescheduleModalOpen(false);
-      setRescheduleTarget(null);
-      setToastMessage("Appointment rescheduled successfully");
-    } catch (e) {
-      console.error(e);
-      setToastMessage(extractApiErrorMessage(e) || "Failed to reschedule appointment");
-    } finally {
-      setIsRescheduling(false);
-    }
-    setTimeout(() => setToastMessage(null), 3000);
   };
 
   return (
@@ -1828,274 +1654,24 @@ setMeetingDescription("");
         </>
       )}
 
-      {/* ── Reschedule Drawer (Right Side) ── */}
-      {isRescheduleModalOpen && rescheduleTarget && (
-        <>
-          <div
-            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
-            onClick={() => { if (!isRescheduling) setIsRescheduleModalOpen(false); }}
-            aria-hidden
-          />
-          <div className="fixed right-0 top-0 z-50 h-full w-full border-l border-white/15 bg-[#041f35] text-white shadow-2xl sm:max-w-[480px] sm:w-[480px]">
-            {/* ── Director: Show availability calendar ── */}
-            {rescheduleRecipientType === "director" ? (
-              <div className="flex h-full flex-col p-6">
-                <div className="mb-6 flex items-center justify-between shrink-0">
-                  <div>
-                    <h2 className="flex items-center gap-2 text-lg font-semibold">
-                      <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
-                      Reschedule meeting
-                    </h2>
-                    {((rescheduleTarget.user as any)?.firstName || (rescheduleTarget.user as any)?.lastName) && (
-                      <p className="mt-1 text-sm text-[#8ec5eb] font-medium pl-7">
-                        {[(rescheduleTarget.user as any)?.firstName, (rescheduleTarget.user as any)?.lastName].filter(Boolean).join(" ")}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsRescheduleModalOpen(false)}
-                    className="rounded-lg p-2 text-[#cde2f2] transition hover:bg-white/10 hover:text-white"
-                    aria-label="Close"
-                  >
-                    <i className="fa-solid fa-xmark text-xl" />
-                  </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto pr-3 mb-6">
-                  {/* Next Availability Info */}
-                  {rescheduleMonthlyAvailabilitySlots.length > 0 && (
-                    <div className="mb-6 rounded-xl border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 p-4">
-                      <p className="text-xs text-[#cde2f2] font-semibold mb-2">Next Available</p>
-                      <p className="text-sm font-medium text-[#8ec5eb]">
-                        {rescheduleMonthlyAvailabilitySlots[0]?.date && rescheduleMonthlyAvailabilitySlots[0]?.times?.[0]
-                          ? `${new Date(rescheduleMonthlyAvailabilitySlots[0].date).toLocaleDateString()} at ${rescheduleMonthlyAvailabilitySlots[0].times[0]}`
-                          : "No availability found"}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="mb-6 rounded-xl border border-white/15 bg-white/5 p-4">
-                    <p className="mb-3 text-sm text-[#cde2f2]">Director Availability</p>
-                    {rescheduleAvailabilityLoading ? (
-                      <div className="flex justify-center py-8">
-                        <div className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-r-white" />
-                      </div>
-                    ) : (
-                      <AvailabilityCalendar
-                        mentorId={(rescheduleTarget.mentor as any)?._id || (rescheduleTarget.mentor as any)?.id || ""}
-                        currentMonth={rescheduleMonth}
-                        currentYear={rescheduleYear}
-                        selectedDate={rescheduleSelectedDate}
-                        onDateSelect={setRescheduleSelectedDate}
-                        onPrevMonth={handleReschedulePrevMonth}
-                        onNextMonth={handleRescheduleNextMonth}
-                        availabilitySlots={rescheduleMonthlyAvailabilitySlots}
-                        isLoading={rescheduleAvailabilityLoading}
-                      />
-                    )}
-                  </div>
-
-                  {/* Time slots for selected date */}
-                  <div className="mb-6">
-                    <label className="block text-sm text-[#cde2f2] font-semibold mb-3">
-                      Available times on {new Date(rescheduleYear, rescheduleMonth, rescheduleSelectedDate).toLocaleDateString()}
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {(() => {
-                        const selectedDateSlots = rescheduleMonthlyAvailabilitySlots.find(
-                          (slot: any) => new Date(slot.date).getDate() === rescheduleSelectedDate
-                        );
-
-                        // Filter to only hourly slots (ending with :00)
-                        const timeSlots = (selectedDateSlots?.slots || []).filter(
-                          (slot: any) => slot.startTime.endsWith(":00")
-                        );
-
-                        if (timeSlots.length === 0) {
-                          return <p className="text-sm text-[#cde2f2]">No slots available on this date</p>;
-                        }
-
-                        return timeSlots.map((slot: any, idx: number) => {
-                          const timeLabel = `${slot.startTime} ${slot.startPeriod}`;
-                          const isoString = new Date(`${selectedDateSlots.date}T${convertTo24Hour(slot.startTime, slot.startPeriod)}`).toISOString();
-
-                          return (
-                            <button
-                              key={idx}
-                              onClick={() => setRescheduleSelectedSlot(isoString)}
-                              className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition ${rescheduleSelectedSlot === isoString
-                                ? "bg-blue-600 text-white border-blue-500"
-                                : "border-white/20 text-white hover:bg-white/10"
-                                }`}
-                            >
-                              {timeLabel}
-                            </button>
-                          );
-                        });
-                      })()}
-                    </div>
-                  </div>
-
-                  {/* Platform selector */}
-                  <select
-                    value={reschedulePlatform}
-                    onChange={(e) => setReschedulePlatform(e.target.value)}
-                    className={`${mentorSelectDark} w-full`}
-                  >
-                    <option className="bg-[#062946]" value="zoom">Zoom</option>
-                    {/* <option className="bg-[#062946]" value="google-meet">Google Meet</option>
-                    <option className="bg-[#062946]" value="teams">Microsoft Teams</option>
-                    <option className="bg-[#062946]" value="phone">Phone</option>
-                    <option className="bg-[#062946]" value="in-person">In person</option> */}
-                  </select>
-                </div>
-
-                <div className="flex justify-end gap-3 shrink-0 border-t border-white/10 pt-6">
-                  <button
-                    type="button"
-                    className="px-4 py-2 rounded-lg border border-white/20 text-xs text-white transition hover:bg-white/10"
-                    onClick={() => setIsRescheduleModalOpen(false)}
-                    disabled={isRescheduling}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className={`px-6 py-2 rounded-lg bg-blue-600 text-xs font-medium text-white transition ${isRescheduling ? "cursor-not-allowed opacity-70" : "hover:bg-blue-700"}`}
-                    onClick={handleRescheduleAppointment}
-                    disabled={isRescheduling}
-                  >
-                    {isRescheduling ? "Saving..." : "Save changes"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              /* ── Pastor: Show simple datetime input ── */
-              <div className="flex h-full flex-col p-6">
-                <div className="mb-6 flex items-center justify-between shrink-0">
-                  <div>
-                    <h2 className="flex items-center gap-2 text-lg font-semibold">
-                      <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
-                      Reschedule meeting
-                    </h2>
-                    {((rescheduleTarget.user as any)?.firstName || (rescheduleTarget.user as any)?.lastName) && (
-                      <p className="mt-1 text-sm text-[#8ec5eb] font-medium pl-7">
-                        {[(rescheduleTarget.user as any)?.firstName, (rescheduleTarget.user as any)?.lastName].filter(Boolean).join(" ")}
-                      </p>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsRescheduleModalOpen(false)}
-                    className="rounded-lg p-2 text-[#cde2f2] transition hover:bg-white/10 hover:text-white"
-                    aria-label="Close"
-                  >
-                    <i className="fa-solid fa-xmark text-xl" />
-                  </button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto pr-3 mb-6">
-                  <div className="mb-6 rounded-xl border border-white/15 bg-white/5 p-4">
-                    <p className="mb-3 text-sm text-[#cde2f2]">Mentor Availability</p>
-                    {scheduleAvailabilityLoading ? (
-                      <div className="flex justify-center py-8">
-                        <div className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-r-white" />
-                      </div>
-                    ) : (
-                      <AvailabilityCalendar
-                        mentorId={mentorId || ""}
-                        currentMonth={rescheduleMonth}
-                        currentYear={rescheduleYear}
-                        selectedDate={rescheduleSelectedDate}
-                        onDateSelect={setRescheduleSelectedDate}
-                        onPrevMonth={handleReschedulePrevMonth}
-                        onNextMonth={handleRescheduleNextMonth}
-                        availabilitySlots={scheduleMonthlyAvailabilitySlots}
-                        isLoading={scheduleAvailabilityLoading}
-                      />
-                    )}
-                  </div>
-
-                  {/* Time slots for selected date */}
-                  <div className="mb-6">
-                    <label className="block text-sm text-[#cde2f2] font-semibold mb-3">
-                      Available times on {new Date(rescheduleYear, rescheduleMonth, rescheduleSelectedDate).toLocaleDateString()}
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {(() => {
-                        const selectedDateSlots = scheduleMonthlyAvailabilitySlots.find(
-                          (slot: any) => new Date(slot.date).getDate() === rescheduleSelectedDate
-                        );
-
-                        // Filter to only hourly slots (ending with :00)
-                        const timeSlots = (selectedDateSlots?.slots || []).filter(
-                          (slot: any) => slot.startTime.endsWith(":00")
-                        );
-
-                        if (timeSlots.length === 0) {
-                          return <p className="text-sm text-[#cde2f2]">No slots available on this date</p>;
-                        }
-
-                        return timeSlots.map((slot: any, idx: number) => {
-                          const timeLabel = `${slot.startTime} ${slot.startPeriod}`;
-                          const isoString = new Date(`${selectedDateSlots.date}T${convertTo24Hour(slot.startTime, slot.startPeriod)}`).toISOString();
-
-                          return (
-                            <button
-                              key={idx}
-                              onClick={() => setRescheduleDateTime(isoString)}
-                              className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition ${rescheduleDateTime === isoString
-                                ? "bg-blue-600 text-white border-blue-500"
-                                : "border-white/20 text-white hover:bg-white/10"
-                                }`}
-                            >
-                              {timeLabel}
-                            </button>
-                          );
-                        });
-                      })()}
-                    </div>
-                  </div>
-
-                  {/* Platform selector */}
-                  <select
-                    value={reschedulePlatform}
-                    onChange={(e) => setReschedulePlatform(e.target.value)}
-                    className={`${mentorSelectDark} w-full`}
-                  >
-                    <option className="bg-[#062946]" value="zoom">Zoom</option>
-                    {/* <option className="bg-[#062946]" value="google-meet">Google Meet</option>
-                    <option className="bg-[#062946]" value="teams">Microsoft Teams</option>
-                    <option className="bg-[#062946]" value="phone">Phone</option>
-                    <option className="bg-[#062946]" value="in-person">In person</option> */}
-                  </select>
-                </div>
-
-                <div className="flex justify-end gap-3 shrink-0 border-t border-white/10 pt-6">
-                  <button
-                    type="button"
-                    className="px-4 py-2 rounded-lg border border-white/20 text-xs text-white transition hover:bg-white/10"
-                    onClick={() => setIsRescheduleModalOpen(false)}
-                    disabled={isRescheduling}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className={`px-6 py-2 rounded-lg bg-blue-600 text-xs font-medium text-white transition ${isRescheduling ? "cursor-not-allowed opacity-70" : "hover:bg-blue-700"}`}
-                    onClick={handleRescheduleAppointment}
-                    disabled={isRescheduling}
-                  >
-                    {isRescheduling ? "Saving..." : "Save changes"}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
-
+      <MentorRescheduleAppointmentDrawer
+        open={isRescheduleModalOpen}
+        appointment={rescheduleTarget}
+        mentorId={mentorId}
+        onClose={() => {
+          setIsRescheduleModalOpen(false);
+          setRescheduleTarget(null);
+        }}
+        onSuccess={async () => {
+          if (!mentorId) return;
+          const refresh = await apiGetAppointments({ userId: mentorId, mentorId, futureOnly: false });
+          setAppointments(unwrapAppointmentsAxiosData(refresh));
+        }}
+        onToast={(message) => {
+          setToastMessage(message);
+          setTimeout(() => setToastMessage(null), 3000);
+        }}
+      />
       {toastMessage ? (
         <div
           className="fixed bottom-6 right-4 z-[60] max-w-md rounded-2xl border border-white/20 bg-[#0a3558]/95 px-5 py-4 shadow-2xl backdrop-blur-md sm:right-8"

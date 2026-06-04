@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 import RoadmapHomeCard from "@/app/Components/RoadmapHomeCard";
+import MentorRescheduleAppointmentDrawer from "@/app/Components/mentor/MentorRescheduleAppointmentDrawer";
 import MentorSearchBar from "@/app/Components/mentor/MentorSearchBar";
 import {
   mentorContainer,
@@ -18,6 +19,7 @@ import { apiGetRoadmapById, apiGetExtras } from "@/app/Services/roadmaps.service
 import { apiGetUserById } from "@/app/Services/users.service";
 import { apiGetAppointments } from "@/app/Services/appointments.service";
 import { unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
+import type { Appointment } from "@/app/Services/types";
 import MentorHeader from "@/app/Components/MentorHeader";
 import DirectorHero from "@/app/director/DirectorHero";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
@@ -204,6 +206,9 @@ function PhasePageContent() {
 >("all");
   const [accessError, setAccessError] = useState<string | null>(null);
   const [taskMeetings, setTaskMeetings] = useState<Record<string, Record<string, any>>>({});
+  const [taskMeetingsRefreshKey, setTaskMeetingsRefreshKey] = useState(0);
+  const [rescheduleTarget, setRescheduleTarget] = useState<Appointment | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 const [taskUpdatedDates, setTaskUpdatedDates] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -266,7 +271,7 @@ const [taskUpdatedDates, setTaskUpdatedDates] = useState<Record<string, string>>
           phaseDoc?._id ?? phaseDoc?.id ?? roadmap?._id ?? roadmap?.id ?? roadmapId,
         );
         let nestedList: Record<string, unknown>[] = phaseDoc
-          ? (unwrapNestedRoadmapsArray(phaseDoc as { roadmaps?: unknown }) as Record<string, unknown>[])
+          ? (unwrapNestedRoadmapsArray(phaseDoc as { roadmaps?: unknown }) as unknown as Record<string, unknown>[])
           : [];
 
         if (progress && parentRid && nestedList.length > 0) {
@@ -367,7 +372,7 @@ const [taskUpdatedDates, setTaskUpdatedDates] = useState<Record<string, string>>
     return () => {
       cancelled = true;
     };
-  }, [roadmapId, userId, tasks]);
+  }, [roadmapId, userId, tasks, taskMeetingsRefreshKey]);
 
   useEffect(() => {
   if (!roadmapId || !userId || tasks.length === 0) {
@@ -611,6 +616,7 @@ const [taskUpdatedDates, setTaskUpdatedDates] = useState<Record<string, string>>
                         ? {
                             date: formatMeetingDate(meeting.meetingDate),
                             time: formatMeetingTime(meeting.meetingDate),
+                            onReschedule: () => setRescheduleTarget(meeting as Appointment),
                           }
                         : undefined
                     }
@@ -631,6 +637,33 @@ const [taskUpdatedDates, setTaskUpdatedDates] = useState<Record<string, string>>
           </div>
         </div>
       </main>
+
+      <MentorRescheduleAppointmentDrawer
+        open={Boolean(rescheduleTarget)}
+        appointment={rescheduleTarget}
+        mentorId={getMentorUserId()}
+        onClose={() => setRescheduleTarget(null)}
+        onSuccess={() => {
+          setRescheduleTarget(null);
+          setTaskMeetingsRefreshKey((key) => key + 1);
+        }}
+        onToast={(message) => {
+          setToastMessage(message);
+          setTimeout(() => setToastMessage(null), 3000);
+        }}
+      />
+
+      {toastMessage ? (
+        <div
+          className="fixed bottom-6 right-4 z-[60] max-w-md rounded-2xl border border-white/20 bg-[#0a3558]/95 px-5 py-4 shadow-2xl backdrop-blur-md sm:right-8"
+          role="status"
+        >
+          <div className="flex items-start gap-3">
+            <i className="fa-solid fa-circle-info mt-0.5 text-lg text-[#8ec5eb]" aria-hidden />
+            <p className="text-[15px] font-medium leading-snug text-white">{toastMessage}</p>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
