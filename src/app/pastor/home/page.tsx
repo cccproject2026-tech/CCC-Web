@@ -17,7 +17,10 @@ import UserProfile from "../../Assets/user-profile.png";
 import { useRouter } from "next/navigation";
 import { getUpcomingAppointments, getUserAppointments } from "@/app/Services/pastor.service";
 import { apiGetAssignedUsers, apiGetRoadmapsByUser } from "@/app/Services/api";
-import { unwrapRoadmapsList } from "@/app/Services/roadmap-assignments";
+import {
+  unwrapRoadmapsList,
+  mergeProgressOntoRoadmaps,
+} from "@/app/Services/roadmap-assignments";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import axiosInstance from "@/app/Services/config/axios-instance";
 import {
@@ -392,11 +395,24 @@ const [assignedMentorLoading, setAssignedMentorLoading] = useState(false);
   const refreshRoadmapsAndProgress = useCallback(async () => {
     if (!pastorUserId) return;
     try {
-      const res = await apiGetRoadmapsByUser(pastorUserId);
-      const list = unwrapRoadmapsList(res as unknown as { data: unknown });
-      setRoadmapsFull(list);
+      // const res = await apiGetRoadmapsByUser(pastorUserId);
+      // const list = unwrapRoadmapsList(res as unknown as { data: unknown });
+      // setRoadmapsFull(list);
+      const [res, progressRes] = await Promise.all([
+  apiGetRoadmapsByUser(pastorUserId),
+  apiGetUserProgress(pastorUserId),
+]);
 
-      const mapped = list.map((item: any) => {
+const list = unwrapRoadmapsList(res as unknown as { data: unknown });
+const progressData = unwrapProgressData(progressRes);
+
+const mergedList =
+  progressData ? mergeProgressOntoRoadmaps(list as never[], progressData) : list;
+
+setRoadmapsFull(mergedList);
+
+      // const mapped = list.map((item: any) => {
+      const mapped = mergedList.map((item: any) => {
         const rawStatus = String(item?.status ?? "")
           .trim()
           .toLowerCase()

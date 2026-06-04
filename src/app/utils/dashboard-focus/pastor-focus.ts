@@ -18,6 +18,7 @@ type RoadmapDoc = {
   _id?: string;
   id?: string;
   name?: string;
+  status?: string;
   roadmaps?: NestedTask[];
 };
 
@@ -102,7 +103,21 @@ const compareRoadmapTasksForFocus = (a: TaskWithRoadmap, b: TaskWithRoadmap) => 
 };
 
 const isRoadmapTaskInFocus = (task: NestedTask) => normalizeNestedTaskStatus(task.status) !== "completed";
+function isRoadmapPhaseCompleted(roadmap: RoadmapDoc): boolean {
+  const children = Array.isArray(roadmap.roadmaps) ? roadmap.roadmaps : [];
 
+  if (normalizeNestedTaskStatus(roadmap.status) === "completed") {
+    return true;
+  }
+
+  if (children.length === 0) {
+    return false;
+  }
+
+  return children.every(
+    (task) => normalizeNestedTaskStatus(task.status) === "completed"
+  );
+}
 function formatDateTime(value?: string | null) {
   if (!value) return "";
   const date = new Date(value);
@@ -256,14 +271,40 @@ export async function loadPastorFocusSections(input: PastorFocusInput): Promise<
     typeof a === "object" && a ? (a as Record<string, unknown>) : {},
   );
 
-  const flattenedTasks: TaskWithRoadmap[] = roadmaps.flatMap((roadmap) =>
+  // const flattenedTasks: TaskWithRoadmap[] = roadmaps.flatMap((roadmap) =>
+  //   (roadmap.roadmaps || []).map((task) => ({
+  //     ...task,
+  //     roadmapId: String(roadmap._id ?? roadmap.id ?? ""),
+  //     roadmapName: String(roadmap.name ?? "Roadmap"),
+  //   })),
+  // );
+  console.log(
+  roadmaps.map((r) => ({
+    name: r.name,
+    status: r.status,
+  }))
+);
+  // const flattenedTasks: TaskWithRoadmap[] = roadmaps
+  // .filter(
+  //   (roadmap) =>
+  //     normalizeNestedTaskStatus(roadmap.status) !== "completed"
+  // )
+  // .flatMap((roadmap) =>
+  //   (roadmap.roadmaps || []).map((task) => ({
+  //     ...task,
+  //     roadmapId: String(roadmap._id ?? roadmap.id ?? ""),
+  //     roadmapName: String(roadmap.name ?? "Roadmap"),
+  //   })),
+  // );
+const flattenedTasks: TaskWithRoadmap[] = roadmaps
+  .filter((roadmap) => !isRoadmapPhaseCompleted(roadmap))
+  .flatMap((roadmap) =>
     (roadmap.roadmaps || []).map((task) => ({
       ...task,
       roadmapId: String(roadmap._id ?? roadmap.id ?? ""),
       roadmapName: String(roadmap.name ?? "Roadmap"),
     })),
   );
-
   const roadmapItems: DashboardFocusItem[] = flattenedTasks
     .filter((task) => isRoadmapTaskInFocus(task))
     .sort(compareRoadmapTasksForFocus)

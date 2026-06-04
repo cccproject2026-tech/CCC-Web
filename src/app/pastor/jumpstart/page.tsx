@@ -71,6 +71,7 @@ import {
   apiUpdateRoadmap,
   apiUpdatePastorQuery,
   apiDeletePastorQuery,
+  apiDeleteExtrasDocumentFile,
 } from "@/app/Services/api";
 import {
   deriveTaskStatusForList,
@@ -1398,6 +1399,26 @@ const refreshSubmissionHistory = useCallback(async (): Promise<RoadmapSubmission
     });
   };
 
+  const handleDeleteSavedUpload = async (
+    fieldKey: string,
+    file: { fileName: string; fileUrl: string; uploadBatchId: string },
+  ) => {
+    if (!roadmapId || !userId || !file.uploadBatchId || !file.fileUrl) return;
+
+    await apiDeleteExtrasDocumentFile(roadmapId, userId, file.uploadBatchId, file.fileUrl, scopedNestedId);
+
+    setSavedUploadDocs((prev) => {
+      const key = String(fieldKey).trim().toLowerCase();
+      const row = (prev[key] ?? []).filter(
+        (item) => item.uploadBatchId !== file.uploadBatchId || item.fileUrl !== file.fileUrl,
+      );
+      const next = { ...prev };
+      if (row.length) next[key] = row;
+      else delete next[key];
+      return next;
+    });
+  };
+
   // const getAssessmentIdFromExtra = (extra: ExtraComponent): string | null => {
   //   const fromShape = resolveAssessmentIdFromExtraShape(extra);
   //   if (fromShape) return fromShape;
@@ -2543,9 +2564,9 @@ const displayCheckboxes =
           <h5 className="text-sm font-semibold text-white">
             Required reference files
           </h5>
-          <p className="mt-1 text-xs leading-relaxed text-white/60">
+          {/* <p className="mt-1 text-xs leading-relaxed text-white/60">
             Please check and review the reference files below before uploading your work.
-          </p>
+          </p> */}
         </div>
       </div>
 
@@ -2629,10 +2650,9 @@ const displayCheckboxes =
 
               <button
                 type="button"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
-                  setSaveFeedback("Delete API is not connected yet.");
-                  setTimeout(() => setSaveFeedback(null), 3000);
+                  await handleDeleteSavedUpload(fieldKey, f);
                 }}
                 className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/10 text-red-300 hover:bg-red-500/15"
                 title="Delete"
@@ -3207,7 +3227,7 @@ case "SECTION":
                       >
                         <i className="fa-regular fa-clipboard text-[15px]" />
                       </span>
-                      {roadmap?.type === "single" ? "Form" : "Tasks"}
+                      {roadmap?.type === "single" ? "Form" : "Task(s)"}
                     </h3>
                     <div>{extras.map((extra, i) => renderExtraComponent(extra, i, "extra"))}</div>
                   </div>

@@ -79,6 +79,8 @@ function mapRowToMentor(row: unknown): Mentor | null {
     role: String(u.role ?? "Mentor"),
     email: String(u.email ?? "").trim(),
     profileInfo: bio,
+    phone: String(u.phone ?? u.mobile ?? u.mobileNumber ?? u.contactNumber ?? ""),
+phoneNumber: String(u.phoneNumber ?? ""),
      profilePicture: String(u.profilePicture ?? u.avatar ?? u.image ?? ""),
   };
 }
@@ -617,7 +619,8 @@ if (raw && typeof raw === "object" && ("_id" in raw || "id" in raw)) {
             {filteredMentors.map((mentor, i) => {
               // const img = mentorImages[i % mentorImages.length];
               const img = getMentorImage(mentor, mentorImages[i % mentorImages.length]);
-
+const phone = mentor.phoneNumber || mentor.phone;
+const whatsappPhone = phone?.replace(/[^\d+]/g, "");
               return isListView ? (
                 /* -----------------------------------------
                     LIST VIEW CARD
@@ -736,11 +739,8 @@ setScheduleDrawerOpen(true);
                     </p> */}
 
                     <div className="flex justify-between items-center mt-4">
-                      <div className="flex gap-4 text-[#8ec5eb] text-sm">
-                        {/* <i className="fa-regular fa-envelope"></i>
-                        <i className="fa-regular fa-comment"></i>
-                        <i className="fa-solid fa-phone"></i>
-                        <i className="fa-brands fa-whatsapp"></i> */}
+                      {/* <div className="flex gap-4 text-[#8ec5eb] text-sm">
+                  
                         <a
   href={mentor.email ? `mailto:${mentor.email}` : undefined}
   onClick={(e) => e.stopPropagation()}
@@ -752,7 +752,62 @@ setScheduleDrawerOpen(true);
 <i className="fa-regular fa-comment opacity-40 cursor-not-allowed"></i>
 <i className="fa-solid fa-phone opacity-40 cursor-not-allowed"></i>
 <i className="fa-brands fa-whatsapp opacity-40 cursor-not-allowed"></i>
-                      </div>
+                      </div> */}
+                      <div className="flex gap-4 text-[#8ec5eb] text-sm">
+  {mentor.email ? (
+    <a
+      href={`mailto:${mentor.email}`}
+      onClick={(e) => e.stopPropagation()}
+      className="hover:text-white"
+      title="Email"
+    >
+      <i className="fa-regular fa-envelope" />
+    </a>
+  ) : (
+    <i className="fa-regular fa-envelope opacity-40 cursor-not-allowed" />
+  )}
+
+  {mentor.email ? (
+    <a
+      href={`mailto:${mentor.email}?subject=Message to ${mentor.firstName}`}
+      onClick={(e) => e.stopPropagation()}
+      className="hover:text-white"
+      title="Message"
+    >
+      <i className="fa-regular fa-comment" />
+    </a>
+  ) : (
+    <i className="fa-regular fa-comment opacity-40 cursor-not-allowed" />
+  )}
+
+  {phone ? (
+    <a
+      href={`tel:${phone}`}
+      onClick={(e) => e.stopPropagation()}
+      className="hover:text-white"
+      title="Call"
+    >
+      <i className="fa-solid fa-phone" />
+    </a>
+  ) : (
+    <i className="fa-solid fa-phone opacity-40 cursor-not-allowed" />
+  )}
+
+  {whatsappPhone ? (
+    <a
+      href={`https://wa.me/${whatsappPhone.replace("+", "")}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className="hover:text-white"
+      title="WhatsApp"
+    >
+      <i className="fa-brands fa-whatsapp" />
+    </a>
+  ) : (
+    <i className="fa-brands fa-whatsapp opacity-40 cursor-not-allowed" />
+  )}
+</div>
 
                       <button className="w-8 h-8 border border-white/35 rounded flex items-center justify-center hover:bg-white/15 hover:text-white transition">
                         <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>

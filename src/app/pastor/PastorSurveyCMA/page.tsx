@@ -433,6 +433,8 @@ const meetingPlatform = searchParams.get("platform")?.trim() || "";
   const [availability, setAvailability] = useState<any[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedTime, setSelectedTime] = useState<string>("");
+  const [scheduleTitle, setScheduleTitle] = useState("");
+  const [scheduleDescription, setScheduleDescription] = useState("");
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
@@ -581,6 +583,8 @@ const meetingPlatform = searchParams.get("platform")?.trim() || "";
   setAvailability([]);
   setSelectedDate("");
   setSelectedTime("");
+  setScheduleTitle("");
+  setScheduleDescription("");
   setAvailableTimes([]);
 }, [shouldOpenScheduleMeeting, loading]);
 
@@ -784,6 +788,14 @@ const confirmClearResponses = () => {
       return;
     }
 
+    const trimmedTitle = scheduleTitle.trim();
+    const trimmedDescription = scheduleDescription.trim();
+    if (!trimmedTitle) {
+      setToast("Please enter a meeting title.");
+      setTimeout(() => setToast(null), 3000);
+      return;
+    }
+
     const uid = resolveCookieUserId();
     if (!uid) {
       setToast("Unable to identify your account. Please sign in again.");
@@ -806,14 +818,20 @@ const confirmClearResponses = () => {
       //   platform: "zoom",
       //   notes: "Initial mentorship session to review progress.",
       // };
+      const notes = routeRoadmapId && routeTaskId
+        ? `Roadmap assessment meeting | assessmentId:${assessmentId || ""} | roadmapId:${routeRoadmapId} | taskId:${routeTaskId}`
+        : `Assessment meeting | assessmentId:${assessmentId || ""} | title:${assessmentTitle || "Assessment"}`;
       const payload = {
   userId: uid,
   mentorId: selectedMentor,
   meetingDate: meetingDateIso,
   platform: "zoom",
- notes: routeRoadmapId && routeTaskId
-  ? `Roadmap assessment meeting | assessmentId:${assessmentId || ""} | roadmapId:${routeRoadmapId} | taskId:${routeTaskId}`
-  : `Assessment meeting | assessmentId:${assessmentId || ""} | title:${assessmentTitle || "Assessment"}`,
+  title: trimmedTitle,
+  description: trimmedDescription,
+  notes,
+  googleCalendarSync: true,
+  googleCalendarTitle: trimmedTitle,
+  googleCalendarDescription: trimmedDescription || notes,
 };
 
       const createRes = await apiCreateAppointment(payload);
@@ -832,7 +850,7 @@ const confirmClearResponses = () => {
           });
         } catch (progressErr) {
           console.error("Failed to mark assessment as completed after meeting", progressErr);
-          setToast("Meeting scheduled, but failed to mark assessment as completed. Please refresh.");
+          // setToast("Meeting scheduled, but failed to mark assessment as completed. Please refresh.");
           setTimeout(() => setToast(null), 5000);
         }
       }
@@ -954,6 +972,8 @@ const confirmClearResponses = () => {
   onClick={() => {
     setShowMentorSidebar(true);
     setMentorStep(1);
+    setScheduleTitle("");
+    setScheduleDescription("");
   }}
   className="w-full max-w-[520px] rounded-2xl border border-yellow-300/45 bg-[linear-gradient(135deg,rgba(250,204,21,0.18)_0%,rgba(245,158,11,0.12)_45%,rgba(15,74,118,0.28)_100%)] px-5 py-4 text-left shadow-[0_18px_45px_rgba(245,158,11,0.22)] backdrop-blur-md transition hover:border-yellow-300/65 hover:bg-yellow-400/20"
 >
@@ -1234,6 +1254,8 @@ const confirmClearResponses = () => {
                     type="button"
                     onClick={() => {
                       setShowMentorSidebar(false);
+                      setScheduleTitle("");
+                      setScheduleDescription("");
                       router.push("/pastor/Assessments");
                     }}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/5 text-[#d8ecfa] transition hover:bg-white/10 hover:text-white"
@@ -1294,6 +1316,8 @@ const confirmClearResponses = () => {
                     type="button"
                     onClick={() => {
                       setShowMentorSidebar(false);
+                      setScheduleTitle("");
+                      setScheduleDescription("");
                       router.push("/pastor/Assessments");
                     }}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-white/20 bg-white/5 text-[#d8ecfa] transition hover:bg-white/10 hover:text-white"
@@ -1307,6 +1331,34 @@ const confirmClearResponses = () => {
                     Scheduling meeting with {mentors.find(m => (m._id || m.id) === selectedMentor)?.name || mentors.find(m => (m._id || m.id) === selectedMentor)?.firstName + " " + mentors.find(m => (m._id || m.id) === selectedMentor)?.lastName || "Selected Mentor"}
                   </p>
                 )}
+
+                <div className="mb-6">
+                  <label htmlFor="assessment-meeting-title" className="block text-sm font-medium mb-3 text-white">
+                    Meeting Title
+                  </label>
+                  <input
+                    id="assessment-meeting-title"
+                    type="text"
+                    value={scheduleTitle}
+                    onChange={(e) => setScheduleTitle(e.target.value)}
+                    placeholder="Enter meeting title"
+                    className="w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/45 outline-none transition focus:border-[#8ec5eb]/60 focus:ring-2 focus:ring-[#8ec5eb]/25"
+                  />
+                </div>
+
+                <div className="mb-6">
+                  <label htmlFor="assessment-meeting-description" className="block text-sm font-medium mb-3 text-white">
+                    Meeting Description <span className="font-normal text-white/50">(optional)</span>
+                  </label>
+                  <textarea
+                    id="assessment-meeting-description"
+                    value={scheduleDescription}
+                    onChange={(e) => setScheduleDescription(e.target.value)}
+                    placeholder="Add meeting details"
+                    rows={3}
+                    className="w-full resize-none rounded-xl border border-white/20 bg-white/5 px-3 py-2.5 text-sm text-white placeholder:text-white/45 outline-none transition focus:border-[#8ec5eb]/60 focus:ring-2 focus:ring-[#8ec5eb]/25"
+                  />
+                </div>
                 
                 {/* Calendar Section */}
                 <div className="mb-6">
@@ -1516,6 +1568,8 @@ const confirmClearResponses = () => {
   setShowFinalPopup(false);
   setShowMeetingDetails(false);
   setShowMentorSidebar(false);
+  setScheduleTitle("");
+  setScheduleDescription("");
 
   if (assessmentId && routeRoadmapId && routeTaskId) {
     const q = new URLSearchParams({

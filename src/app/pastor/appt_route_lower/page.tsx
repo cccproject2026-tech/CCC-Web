@@ -224,7 +224,15 @@ const mergedById = new Map<string, any>();
 });
 
 const mergedAppointments = Array.from(mergedById.values());
-
+console.table(
+  mergedAppointments.map((a: any) => ({
+    id: appointmentEntityId(a),
+    status: a.status,
+    meetingDate: a.meetingDate,
+    mentorId: a.mentor?._id ?? a.mentor?.id ?? a.mentorId,
+    title: a.title,
+  }))
+);
 setAppointments(mergedAppointments);
 
       const todayYmd = new Date().toLocaleDateString("en-CA");
@@ -344,6 +352,10 @@ setUpcomingAppointments(upcomingSorted as any);
       year: "2-digit",
     });
   };
+  const isBlockingAppointmentStatus = (status: unknown) => {
+  const s = String(status ?? "").trim().toLowerCase();
+  return !s.includes("cancel") && s !== "missed" && s !== "rescheduled";
+};
   const getAppointmentEndMs = (appt: any) => {
   const startMs = new Date(String(appt?.meetingDate ?? "")).getTime();
   if (Number.isNaN(startMs)) return NaN;
@@ -512,17 +524,26 @@ setUpcomingAppointments(upcomingSorted as any);
         const bookedMs = (appointments as any[])
           .filter((a: any) => {
             const apptMentorId = String(a.mentor?._id ?? a.mentor?.id ?? a.mentorId ?? "");
-            const status = String(a.status ?? "").toLowerCase();
-            return (
-              apptMentorId === mentorIdStr &&
-              !status.includes("cancel") &&
-              typeof a.meetingDate === "string" &&
-              a.meetingDate.startsWith(selectedYmd)
-            );
+            // const status = String(a.status ?? "").toLowerCase();
+            // return (
+            //   apptMentorId === mentorIdStr &&
+            //   !status.includes("cancel") &&
+            //   typeof a.meetingDate === "string" &&
+            //   a.meetingDate.startsWith(selectedYmd)
+            // );
+            const status = a.status;
+return (
+  apptMentorId === mentorIdStr &&
+  isBlockingAppointmentStatus(status) &&
+  typeof a.meetingDate === "string" &&
+  a.meetingDate.startsWith(selectedYmd)
+);
           })
           .map((a: any) => new Date(a.meetingDate).getTime())
           .filter((ms: number) => !Number.isNaN(ms));
-
+console.log("RAW AVAILABILITY TIMES BEFORE FILTER", times);
+console.log("BOOKED APPOINTMENT MS", bookedMs);
+console.log("ALL APPOINTMENTS FOR FILTER", appointments);
         times = times.filter((label: string) => {
           const slotMs = new Date(parseSlotStartToIso(selectedYmd, label)).getTime();
           return !bookedMs.some((bMs: number) => Math.abs(bMs - slotMs) < 30 * 60 * 1000);
@@ -593,10 +614,16 @@ if (!title) {
     const yyyyMmDd = new Date(currentYear, currentMonth, selectedDate).toLocaleDateString("en-CA");
     const meetingDateISO = parseSlotStartToIso(yyyyMmDd, selectedTime);
     const proposedMs = new Date(meetingDateISO).getTime();
+    // const hasOverlap = (appointments as any[]).some((a: any) => {
+    //   const t = new Date(String(a.meetingDate ?? "")).getTime();
+    //   return !Number.isNaN(t) && Math.abs(t - proposedMs) < 60 * 60 * 1000;
+    // });
     const hasOverlap = (appointments as any[]).some((a: any) => {
-      const t = new Date(String(a.meetingDate ?? "")).getTime();
-      return !Number.isNaN(t) && Math.abs(t - proposedMs) < 60 * 60 * 1000;
-    });
+  if (!isBlockingAppointmentStatus(a.status)) return false;
+
+  const t = new Date(String(a.meetingDate ?? "")).getTime();
+  return !Number.isNaN(t) && Math.abs(t - proposedMs) < 60 * 60 * 1000;
+});
     if (hasOverlap) {
       showToast("This time slot overlaps with an existing appointment.");
       return;
@@ -633,6 +660,7 @@ const payload = {
       setScheduleTitle("");
 setScheduleDescription("");
       await refreshAppointmentLists();
+      setAvailabilityRefreshKey((prev) => prev + 1);
     } catch (error) {
       console.error("Error scheduling appointment:", error);
       showToast("Failed to schedule appointment.");
@@ -838,6 +866,7 @@ return !Number.isNaN(endMs) && endMs < nowMs;
 
     setShowCancelConfirm(false);
     const freshList = await refreshAppointmentLists();
+    setAvailabilityRefreshKey((prev) => prev + 1);
     const stillActive = freshList?.find(
       (a: any) =>
         appointmentEntityId(a) === id &&
