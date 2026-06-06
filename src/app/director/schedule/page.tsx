@@ -281,6 +281,9 @@ function DirectorScheduleContent() {
   const [historyMyPage, setHistoryMyPage] = useState(1);
   const [historyHostedPage, setHistoryHostedPage] = useState(1);
 
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<"all" | "completed" | "missed">("all");
+const [historyDateFilter, setHistoryDateFilter] = useState("");
+const [historySearch, setHistorySearch] = useState("");
   // director identity
   const [directorId, setDirectorId] = useState<string | null>(null);
   const [directorIdentity, setDirectorIdentity] = useState<{
@@ -310,7 +313,8 @@ function DirectorScheduleContent() {
   const [rescheduleMonthlyAvailabilitySlots, setRescheduleMonthlyAvailabilitySlots] = useState<any[]>([]);
   const [rescheduleAvailabilityLoading, setRescheduleAvailabilityLoading] = useState(false);
   const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState("");
-
+const [rescheduleTitle, setRescheduleTitle] = useState("");
+const [rescheduleDescription, setRescheduleDescription] = useState("");
   // calendar (Appointments tab)
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedAppointmentDate, setSelectedAppointmentDate] = useState(() => localYmdToday());
@@ -939,15 +943,54 @@ useEffect(() => {
       })
       .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
   }, [appointments, directorId]);
+const filterHistoryAppointments = (list: AppointmentResponse[]) => {
+  return list.filter((appt) => {
+    const status = String(appt.status || "").toLowerCase();
 
+    if (historyStatusFilter === "missed" && status !== "missed") {
+      return false;
+    }
+
+    // Your rule: if it is not missed, treat it as completed.
+    if (historyStatusFilter === "completed" && status === "missed") {
+      return false;
+    }
+
+    if (historyDateFilter) {
+      const apptDate = localYmdFromMs(new Date(appt.meetingDate).getTime());
+      if (apptDate !== historyDateFilter) return false;
+    }
+const q = historySearch.trim().toLowerCase();
+
+if (q) {
+  const mentor = appt.mentor ?? (typeof appt.mentorId === "object" ? appt.mentorId : undefined);
+  const pastor = appt.user ?? (typeof appt.userId === "object" ? appt.userId : undefined);
+
+  const mentorName = labelPerson(mentor, "");
+  const pastorName = labelPerson(pastor, "");
+
+  const haystack = `${mentorName} ${pastorName}`.toLowerCase();
+
+  if (!haystack.includes(q)) return false;
+}
+    return true;
+  });
+};
+
+const filteredMyAppointmentHistory = filterHistoryAppointments(myAppointmentHistory);
+const filteredHostedAppointmentHistory = filterHistoryAppointments(hostedAppointmentHistory);
   const historyPageSize = 10;
-  const totalMyHistoryPages = Math.max(1, Math.ceil(myAppointmentHistory.length / historyPageSize));
-  const totalHostedHistoryPages = Math.max(1, Math.ceil(hostedAppointmentHistory.length / historyPageSize));
-  const pagedMyHistory = myAppointmentHistory.slice(
+  // const totalMyHistoryPages = Math.max(1, Math.ceil(myAppointmentHistory.length / historyPageSize));
+  // const totalHostedHistoryPages = Math.max(1, Math.ceil(hostedAppointmentHistory.length / historyPageSize));
+  // const pagedMyHistory = myAppointmentHistory.slice(
+  const totalMyHistoryPages = Math.max(1, Math.ceil(filteredMyAppointmentHistory.length / historyPageSize));
+const totalHostedHistoryPages = Math.max(1, Math.ceil(filteredHostedAppointmentHistory.length / historyPageSize));
+const pagedMyHistory = filteredMyAppointmentHistory.slice(
     (historyMyPage - 1) * historyPageSize,
     historyMyPage * historyPageSize,
   );
-  const pagedHostedHistory = hostedAppointmentHistory.slice(
+  // const pagedHostedHistory = hostedAppointmentHistory.slice(
+  const pagedHostedHistory = filteredHostedAppointmentHistory.slice(
     (historyHostedPage - 1) * historyPageSize,
     historyHostedPage * historyPageSize,
   );
@@ -1224,6 +1267,8 @@ setMeetingDescription("");
     setRescheduleSelectedSlot("");
     setRescheduleMonthlyAvailabilitySlots([]);
     setIsRescheduleModalOpen(true);
+    setRescheduleTitle(getMeetingTitle(appt));
+setRescheduleDescription(String((appt as any).description || ""));
   };
 
   // ── Reschedule calendar navigation ───────────────────────────────────────────
@@ -1285,12 +1330,30 @@ setMeetingDescription("");
       const _h12 = _h24 % 12 === 0 ? 12 : _h24 % 12;
       const startTime = `${_h12}:${String(_min).padStart(2, "0")}`;
 
-      await apiRescheduleAppointment(id, {
-        newDate,
-        startTime,
-        startPeriod,
-        platform: reschedulePlatform as any,
-      });
+      // await apiRescheduleAppointment(id, {
+      //   newDate,
+      //   startTime,
+      //   startPeriod,
+      //   platform: reschedulePlatform as any,
+      // });
+      const title = rescheduleTitle.trim();
+const description = rescheduleDescription.trim();
+
+if (!title) {
+  showToast("Please enter a meeting title");
+  return;
+}
+
+await apiRescheduleAppointment(id, {
+  newDate,
+  startTime,
+  startPeriod,
+  platform: reschedulePlatform as any,
+  title,
+  description,
+  googleCalendarTitle: title,
+  googleCalendarDescription: description,
+});
       const refresh = await apiGetAppointments({ futureOnly: false });
       const list = unwrapAppointmentsAxiosData(refresh).sort(
         (a: any, b: any) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
@@ -1668,6 +1731,58 @@ setMeetingDescription("");
           {!loading && activeTab === "Appointment History" && (
             <div className="flex flex-col gap-10">
               <div>
+                <input
+  type="text"
+  value={historySearch}
+  onChange={(e) => {
+    setHistorySearch(e.target.value);
+    setHistoryMyPage(1);
+    setHistoryHostedPage(1);
+  }}
+  placeholder="Search mentor or pastor..."
+  className={`${directorDateInput} max-w-[260px]`}
+/>
+                <div className="mb-5 flex flex-wrap items-center justify-end gap-3">
+  <select
+    value={historyStatusFilter}
+    onChange={(e) => {
+      setHistoryStatusFilter(e.target.value as "all" | "completed" | "missed");
+      setHistoryMyPage(1);
+      setHistoryHostedPage(1);
+    }}
+    className={`${directorSelectDark} max-w-[180px]`}
+  >
+    <option value="all">All</option>
+    <option value="completed">Completed</option>
+    <option value="missed">Missed</option>
+  </select>
+
+  <input
+    type="date"
+    value={historyDateFilter}
+    max={localYmdToday()}
+    onChange={(e) => {
+      setHistoryDateFilter(e.target.value);
+      setHistoryMyPage(1);
+      setHistoryHostedPage(1);
+    }}
+    className={`${directorDateInput} max-w-[180px]`}
+  />
+
+  {historyDateFilter && (
+    <button
+      type="button"
+      onClick={() => {
+        setHistoryDateFilter("");
+        setHistoryMyPage(1);
+        setHistoryHostedPage(1);
+      }}
+      className={directorBtnSecondary}
+    >
+      Clear date
+    </button>
+  )}
+</div>
                 <h3 className="text-[15px] font-semibold text-white">
                   My appointment history — {myAppointmentHistory.length} meeting{myAppointmentHistory.length === 1 ? "" : "s"}
                 </h3>
@@ -2356,6 +2471,31 @@ setMeetingDescription("");
                   />
 
                   {/* Time slots for selected date */}
+                  <div className="space-y-3">
+  <div>
+    <label className="mb-1 block text-sm font-semibold text-[#cde2f2]">
+      Meeting Title <span className="text-red-300">*</span>
+    </label>
+    <input
+      value={rescheduleTitle}
+      onChange={(e) => setRescheduleTitle(e.target.value)}
+      className={directorDateInput}
+      placeholder="Enter meeting title"
+    />
+  </div>
+
+  <div>
+    <label className="mb-1 block text-sm font-semibold text-[#cde2f2]">
+      Description
+    </label>
+    <textarea
+      value={rescheduleDescription}
+      onChange={(e) => setRescheduleDescription(e.target.value)}
+      className={`${directorDateInput} min-h-[90px] resize-none`}
+      placeholder="Enter description"
+    />
+  </div>
+</div>
                   <p className="text-sm mt-5 mb-2 font-medium text-[#d9ebf8]">Select a Time</p>
                   {rescheduleAvailabilityLoading ? (
                     <div className="flex justify-center py-4">

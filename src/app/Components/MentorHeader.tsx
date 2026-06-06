@@ -192,17 +192,25 @@ setNotificationList(newestFirst);
     { icon: <BellOff size={18} className="text-[#0f4a76]" />, label: "Turn Off Notifications", active: true },
     { icon: <UserX size={18} className="text-gray-400" />, label: "Change Mentor", active: false },
   ];
-
+const isLoginPage = pathname === "/mentor/login";
+const logoHref = isLoginPage ? "/" : "/mentor/home";
   return (
     <header className="relative z-50 flex items-center justify-between border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md md:px-6 lg:px-10 font-[Albert_Sans]">
       {/* ✅ Left Logo */}
       {/* <div className="flex items-center gap-3">
         <Image src={Framelogo1} alt="Logo" width={26} height={26} />
       </div> */}
-      <Link
+      {/* <Link
   href="/mentor/home"
   className="flex items-center gap-3"
   aria-label="Mentor Home"
+>
+  <Image src={Framelogo1} alt="Logo" width={26} height={26} />
+</Link> */}
+<Link
+  href={logoHref}
+  className="flex items-center gap-3 cursor-pointer"
+  aria-label={isLoginPage ? "Landing Page" : "Mentor Home"}
 >
   <Image src={Framelogo1} alt="Logo" width={26} height={26} />
 </Link>

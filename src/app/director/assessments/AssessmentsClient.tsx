@@ -129,6 +129,33 @@ function formatCreatedDate(value?: string): string | null {
   });
 }
 
+function formatCreatedBy(value: unknown): string {
+  if (!value) return "Director";
+
+  if (typeof value === "string") {
+    return value.trim() || "Director";
+  }
+
+  if (typeof value === "object") {
+    const row = value as {
+      firstName?: string;
+      lastName?: string;
+      name?: string;
+      email?: string;
+      role?: string;
+    };
+
+    const fullName = `${row.firstName ?? ""} ${row.lastName ?? ""}`.trim();
+
+    if (fullName) return fullName;
+    if (row.name?.trim()) return row.name.trim();
+    if (row.email?.trim()) return row.email.trim();
+    if (row.role?.trim()) return row.role.trim();
+  }
+
+  return "Director";
+}
+
 function formatMeetingDateTime(value?: string): string | null {
   if (!value) return null;
   const date = new Date(value);
@@ -394,6 +421,7 @@ const [mentorPastorRows, setMentorPastorRows] = useState<any[]>([]);
         const mapped: AssessmentCardRow[] = [];
         for (const item of list) {
           const rawItem = item as {
+            
             _id?: unknown;
             id?: unknown;
             bannerImage?: unknown;
@@ -405,6 +433,12 @@ const [mentorPastorRows, setMentorPastorRows] = useState<any[]>([]);
             createdBy?: unknown;
             pastorsAssigned?: unknown;
           };
+          console.log("Assessment creator debug:", {
+  title: rawItem.name || rawItem.title,
+  createdBy: rawItem.createdBy,
+  createdByType: typeof rawItem.createdBy,
+  fullItem: rawItem,
+});
           const rawId = rawItem._id ?? rawItem.id;
           const id = rawId != null && String(rawId).trim() !== "" ? String(rawId) : "";
           if (!id) continue;
@@ -422,7 +456,8 @@ const [mentorPastorRows, setMentorPastorRows] = useState<any[]>([]);
             image: resolved,
             type: rawItem.type,
             createdOn: typeof rawItem.createdAt === "string" ? rawItem.createdAt : undefined,
-            createdBy: typeof rawItem.createdBy === "string" ? rawItem.createdBy : undefined,
+            // createdBy: typeof rawItem.createdBy === "string" ? rawItem.createdBy : undefined,
+            createdBy: formatCreatedBy(rawItem.createdBy),
             pastorsAssigned: countPastorsAssigned(rawItem),
           });
         }
@@ -616,7 +651,8 @@ return {
                   progressStatus,
                   dueDate: resolvedDueDate,
                   createdOn: detailObj.createdAt,
-                  createdBy: detailObj.createdBy,
+                  // createdBy: detailObj.createdBy,
+                  createdBy: formatCreatedBy(detailObj.createdBy),
                   pastorsAssigned: countPastorsAssigned(flat.assessment),
                   appointmentId: resolvedAppointmentId || undefined,
                   meetingDateLabel: formatMeetingDateTime(appt?.meetingDate) || undefined,

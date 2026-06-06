@@ -739,13 +739,24 @@ const progressStatus = progressRow?.status || "not_started";
 
 let normalizedStatus: MentorAssessmentStatus = "not_started";
 
-if (hasSentCdp) {
+// if (hasSentCdp) {
+//   normalizedStatus = "completed";
+// } else if (
+//   hasSubmittedAnswers ||
+//   progressStatus === "submitted" ||
+//   progressStatus === "completed" 
+  
+// ) {
+//   normalizedStatus = "submitted";
+// }
+const hasMeetingDetails = Boolean(resolvedAppointmentId || appt?.meetingDate);
+
+if (hasMeetingDetails && hasSentCdp) {
   normalizedStatus = "completed";
 } else if (
   hasSubmittedAnswers ||
   progressStatus === "submitted" ||
-  progressStatus === "completed" 
-  
+  progressStatus === "completed"
 ) {
   normalizedStatus = "submitted";
 }
@@ -838,36 +849,62 @@ const assignedWithCdp = await Promise.all(
   //         ),
   //       )
   //     : false;
-const hasBackendCdp =
+  const hasBackendCdp =
   Array.isArray(data)
-    ? data.some((rec: any) => {
-        const recs = Array.isArray(rec?.recommendations)
-          ? rec.recommendations.filter((x: any) => String(x || "").trim())
-          : [];
-
-        return (
-          rec?.sent === true ||
-          rec?.status === "sent" ||
-          recs.length > 0 ||
-          String(rec?.message || rec?.text || "").trim() !== ""
-        );
-      })
+    ? data.some((rec: any) => rec?.sent === true || rec?.status === "sent")
     : Array.isArray(data?.sections)
       ? data.sections.some((section: any) =>
           Array.isArray(section?.recommendations) &&
-          section.recommendations.some((rec: any) => {
-            if (typeof rec === "string") return rec.trim() !== "";
-            return (
-              rec?.sent === true ||
-              rec?.status === "sent" ||
-              String(rec?.message || rec?.text || "").trim() !== ""
-            );
-          }),
+          section.recommendations.some(
+            (rec: any) =>
+              typeof rec === "object" &&
+              (rec?.sent === true || rec?.status === "sent"),
+          ),
         )
       : false;
-      return {
-        ...assessment,
-        _mentorHasSentCdp: assessment._mentorHasSentCdp || hasBackendCdp,
+// const hasBackendCdp =
+//   Array.isArray(data)
+//     ? data.some((rec: any) => {
+//         const recs = Array.isArray(rec?.recommendations)
+//           ? rec.recommendations.filter((x: any) => String(x || "").trim())
+//           : [];
+
+//         return (
+//           rec?.sent === true ||
+//           rec?.status === "sent" ||
+//           recs.length > 0 ||
+//           String(rec?.message || rec?.text || "").trim() !== ""
+//         );
+//       })
+//     : Array.isArray(data?.sections)
+//       ? data.sections.some((section: any) =>
+//           Array.isArray(section?.recommendations) &&
+//           section.recommendations.some((rec: any) => {
+//             if (typeof rec === "string") return rec.trim() !== "";
+//             return (
+//               rec?.sent === true ||
+//               rec?.status === "sent" ||
+//               String(rec?.message || rec?.text || "").trim() !== ""
+//             );
+//           }),
+//         )
+//       : false;
+const finalHasCdp = assessment._mentorHasSentCdp || hasBackendCdp;
+const hasMeetingDetails = Boolean(
+  assessment._mentorAppointmentId || assessment._mentorMeetingDate
+);
+
+return {
+  ...assessment,
+  _mentorHasSentCdp: finalHasCdp,
+  _mentorAssignmentStatus:
+    hasMeetingDetails && finalHasCdp
+      ? "completed"
+      : assessment._mentorAssignmentStatus,
+};
+      // return {
+      //   ...assessment,
+      //   _mentorHasSentCdp: assessment._mentorHasSentCdp || hasBackendCdp,
 //         _mentorCreatedAt:
 //   assessment?.createdAt ||
 //   assessment?.updatedAt ||
@@ -885,7 +922,7 @@ const hasBackendCdp =
 //   assessment?.assignedByName ||
 //   fullAssessment?.assignedByName ||
 //   "N/A",
-      };
+      // };
     } catch {
       return assessment;
     }
@@ -1921,7 +1958,7 @@ try {
 {activeTab === "all" && !selectedMenteeId && (
   <section className={`${mentorFilterPanel} mb-6 p-5`}>
     <div className="mb-4 flex items-center justify-between gap-4">
-      <div>
+      {/* <div>
         <h3 className="text-lg font-semibold text-white">
           {submissionView === "today" ? "Today's Submissions" : "Previous Submissions"}
         </h3>
@@ -1933,7 +1970,20 @@ try {
         >
           View all
         </button>
-      </div>
+      </div> */}
+      <div className="flex flex-wrap items-center gap-3">
+  <h3 className="text-lg font-semibold text-white">
+    {submissionView === "today" ? "Today's Submissions" : "Previous Submissions"}
+  </h3>
+
+  <button
+    type="button"
+    onClick={() => router.push("/mentor/MentorAssessments/submissions")}
+    className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-1.5 text-sm font-semibold text-[#b9e2ff] transition hover:bg-[#8ec5eb]/25"
+  >
+    View all
+  </button>
+</div>
 
       {/* <button
         type="button"
@@ -2191,7 +2241,7 @@ assessment._mentorHasSentCdp
 
                       <div className="flex flex-col gap-0 p-0">
                         {/* Row 1: Image + Title + Description */}
-                        <div className="flex gap-4 p-6 pb-4">
+                        <div className="flex gap-5 p-6">
                           <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
                             {(() => {
                               const cardImageSrc = getCardImageSrc(assessment);
@@ -2243,8 +2293,12 @@ assessment._mentorHasSentCdp
   </span>
   
 )}
+                            </div>
+                          </div>
+                        </div>
+
 {activeTab === "pastors" && selectedMenteeId ? (
-  <div className={`mt-3 grid grid-cols-1 gap-2 text-xs text-[#d9ebf8] ${assessment._mentorMeetingActive ? "sm:grid-cols-[minmax(140px,180px)_1fr]" : "sm:max-w-[180px]"}`}>
+  <div className="grid grid-cols-1 gap-3 border-t border-white/10 px-6 py-4 text-xs text-[#d9ebf8] sm:grid-cols-[220px_1fr]">
     <div className="flex flex-col gap-2">
       <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
         <p className="text-[10px] text-[#d9ebf8]/65">Created By</p>
@@ -2271,7 +2325,8 @@ assessment._mentorHasSentCdp
           e.preventDefault();
           router.push(`/mentor/MentorSchedule/${assessment._mentorAppointmentId}`);
         }}
-        className="relative flex min-h-[92px] w-full flex-col justify-center rounded-lg border border-[#8ec5eb]/35 bg-[#173a55]/65 px-4 py-3 text-left transition hover:bg-[#1c4564]/75"
+        // className="relative flex min-h-[92px] w-full flex-col justify-center rounded-lg border border-[#8ec5eb]/35 bg-[#173a55]/65 px-4 py-3 text-left transition hover:bg-[#1c4564]/75"
+        className="relative flex min-h-[116px] w-full flex-col justify-center rounded-lg border border-[#8ec5eb]/35 bg-[#173a55]/65 px-5 py-4 text-left transition hover:bg-[#1c4564]/75"
       >
         <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8ec5eb]">Meeting</p>
         <p className="mt-1 pr-9 text-sm font-bold text-white">
@@ -2327,9 +2382,6 @@ assessment._mentorHasSentCdp
     )}
   </div>
 ) : null}
-                            </div>
-                          </div>
-                        </div>
                         
 
                         {selectedMenteeId ? (

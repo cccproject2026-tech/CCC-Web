@@ -930,11 +930,16 @@ export default function IndividualProgressPage() {
               </button> */}
               <button
   type="button"
+  // onClick={() => {
+  //   if (user?.hasCompleted) return;
+  //   setIsFinalCommentsModalOpen(true);
+  // }}
+  // disabled={Boolean(user?.hasCompleted)}
   onClick={() => {
-    if (user?.hasCompleted) return;
-    setIsFinalCommentsModalOpen(true);
-  }}
-  disabled={Boolean(user?.hasCompleted)}
+  if ((progressData?.overallProgress ?? 0) < 100 || user?.hasCompleted) return;
+  setIsFinalCommentsModalOpen(true);
+}}
+disabled={(progressData?.overallProgress ?? 0) < 100 || Boolean(user?.hasCompleted)}
   className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
 >
   {user?.hasCompleted ? "Marked as completed" : hasComments ? "Send final comments" : "Add final comments"}

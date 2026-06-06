@@ -275,7 +275,8 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
-
+const isLoginPage = pathname === "/pastor/login";
+const logoHref = isLoginPage ? "/" : "/pastor/home";
   return (
     // <header className="relative z-40 flex items-center justify-between border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md md:px-6 lg:px-10 font-[Albert_Sans]">
     <header className="relative z-40 flex items-center gap-6 border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md md:px-6 lg:px-10 font-[Albert_Sans]">
@@ -284,12 +285,20 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
         <Image src={Framelogo1} alt="Logo" width={26} height={26} />
       </div> */}
 
-      <Link
+      {/* <Link
   href="/pastor/home"
   // className="flex items-center gap-3"
   // className="flex w-[64px] shrink-0 items-center gap-3"
   className="flex w-[44px] shrink-0 items-center justify-center"
   aria-label="Pastor Home"
+>
+  <Image src={Framelogo1} alt="Logo" width={26} height={26} />
+</Link> */}
+
+<Link
+  href={logoHref}
+  className="flex w-[44px] shrink-0 items-center justify-center cursor-pointer"
+  aria-label={isLoginPage ? "Landing Page" : "Pastor Home"}
 >
   <Image src={Framelogo1} alt="Logo" width={26} height={26} />
 </Link>
