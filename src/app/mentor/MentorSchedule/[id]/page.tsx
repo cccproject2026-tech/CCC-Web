@@ -167,37 +167,117 @@ export default function MentorAppointmentDetailPage() {
     const run = async () => {
       try {
         setLoading(true);
-        let found: AppointmentResponse | null = null;
+        // let found: AppointmentResponse | null = null;
 
-        try {
-          const res = await apiGetAppointmentById(apptId);
-          const body = (res.data as { data?: AppointmentResponse })?.data ?? (res.data as unknown as AppointmentResponse);
-          if (body && (body as AppointmentResponse).meetingDate) found = body as AppointmentResponse;
-        } catch {
-          found = null;
-        }
+        // try {
+        //   const res = await apiGetAppointmentById(apptId);
+        //   const body = (res.data as { data?: AppointmentResponse })?.data ?? (res.data as unknown as AppointmentResponse);
+        //   if (body && (body as AppointmentResponse).meetingDate) found = body as AppointmentResponse;
+        // } catch {
+        //   found = null;
+        // }
 
-        if (!found) {
-          const mentorCookie = Cookies.get("mentor");
-          if (!mentorCookie) throw new Error("Mentor information not found");
-          const mentorData = JSON.parse(decodeURIComponent(mentorCookie));
-          const mentorId = String(mentorData?.id ?? mentorData?._id ?? "").trim();
-          if (!mentorId) throw new Error("Mentor ID not found");
+        // if (!found) {
+//         let found: AppointmentResponse | null = null;
 
-          // const res = await apiGetMentorSchedule(mentorId);
-          // const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
-          const res = await apiGetAppointments({
-  userId: mentorId,
-  mentorId,
-  futureOnly: false,
-});
 
-const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
-          found =
-            list.find((a) => appointmentEntityId(a) === apptId) ??
-            list.find((a) => String((a as { _id?: string; id?: string })._id ?? (a as { id?: string }).id) === apptId) ??
-            null;
-        }
+
+// try {
+//   const cached = sessionStorage.getItem("mentorSelectedAppointment");
+//   if (cached) {
+//     const parsed = JSON.parse(cached) as AppointmentResponse;
+//     if (appointmentEntityId(parsed) === apptId) {
+//       found = parsed;
+//     }
+//   }
+// } catch {
+//   found = null;
+// }
+
+// if (!found) {
+//   // keep your API fetch fallback here
+// }
+        
+// const mentorCookie = Cookies.get("mentor");
+// if (!mentorCookie) throw new Error("Mentor information not found");
+
+// const mentorData = JSON.parse(decodeURIComponent(mentorCookie));
+// const mentorId = String(mentorData?.id ?? mentorData?._id ?? "").trim();
+// if (!mentorId) throw new Error("Mentor ID not found");
+
+// try {
+//   const res = await apiGetAppointments({
+//     userId: mentorId,
+//     mentorId,
+//     futureOnly: false,
+//   });
+
+//   const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
+
+//   found =
+//     list.find((a) => appointmentEntityId(a) === apptId) ??
+//     list.find((a) => String((a as any)._id ?? (a as any).id) === apptId) ??
+//     null;
+// } catch {
+//   found = null;
+// }
+
+// if (!found) {
+//           const mentorCookie = Cookies.get("mentor");
+//           if (!mentorCookie) throw new Error("Mentor information not found");
+//           const mentorData = JSON.parse(decodeURIComponent(mentorCookie));
+//           const mentorId = String(mentorData?.id ?? mentorData?._id ?? "").trim();
+//           if (!mentorId) throw new Error("Mentor ID not found");
+
+//           // const res = await apiGetMentorSchedule(mentorId);
+//           // const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
+//           const res = await apiGetAppointments({
+//   userId: mentorId,
+//   mentorId,
+//   futureOnly: false,
+// });
+
+// const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
+//           found =
+//             list.find((a) => appointmentEntityId(a) === apptId) ??
+//             list.find((a) => String((a as { _id?: string; id?: string })._id ?? (a as { id?: string }).id) === apptId) ??
+//             null;
+//         }
+let found: AppointmentResponse | null = null;
+
+try {
+  const cached = sessionStorage.getItem("mentorSelectedAppointment");
+  if (cached) {
+    const parsed = JSON.parse(cached) as AppointmentResponse;
+    if (appointmentEntityId(parsed) === apptId) {
+      found = parsed;
+    }
+  }
+} catch {
+  found = null;
+}
+
+if (!found) {
+  const mentorCookie = Cookies.get("mentor");
+  if (!mentorCookie) throw new Error("Mentor information not found");
+
+  const mentorData = JSON.parse(decodeURIComponent(mentorCookie));
+  const mentorId = String(mentorData?.id ?? mentorData?._id ?? "").trim();
+  if (!mentorId) throw new Error("Mentor ID not found");
+
+  const res = await apiGetAppointments({
+    userId: mentorId,
+    mentorId,
+    futureOnly: false,
+  });
+
+  const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
+
+  found =
+    list.find((a) => appointmentEntityId(a) === apptId) ??
+    list.find((a) => String((a as any)._id ?? (a as any).id) === apptId) ??
+    null;
+}
 
         setAppt(found);
       } catch (e) {
@@ -378,20 +458,45 @@ const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
     );
   }
 
-  const mentorPerson = unwrapPerson(appt.mentor, appt.mentorId);
-  const menteePerson = unwrapPerson(appt.user, appt.userId);
+  // const mentorPerson = unwrapPerson(appt.mentor, appt.mentorId);
+  // const menteePerson = unwrapPerson(appt.user, appt.userId);
+const mentorCookie = Cookies.get("mentor");
+const currentMentorData = mentorCookie
+  ? JSON.parse(decodeURIComponent(mentorCookie))
+  : null;
 
+const currentMentorId = String(
+  currentMentorData?.id ?? currentMentorData?._id ?? ""
+).trim();
+
+const userPerson = unwrapPerson(appt.user, appt.userId);
+const appointmentMentorPerson = unwrapPerson(appt.mentor, appt.mentorId);
+
+const mentorPerson =
+  userPerson &&
+  (String(userPerson._id) === currentMentorId || String((userPerson as any).id) === currentMentorId)
+    ? userPerson
+    : appointmentMentorPerson;
+
+const otherPerson =
+  userPerson &&
+  (String(userPerson._id) === currentMentorId || String((userPerson as any).id) === currentMentorId)
+    ? appointmentMentorPerson
+    : userPerson;
   const mentorName =
     `${mentorPerson?.firstName ?? ""} ${mentorPerson?.lastName ?? ""}`.trim() ||
     mentorPerson?.email ||
     "Mentor";
   const menteeName =
-    `${menteePerson?.firstName ?? ""} ${menteePerson?.lastName ?? ""}`.trim() ||
-    menteePerson?.email ||
+    `${otherPerson?.firstName ?? ""} ${otherPerson?.lastName ?? ""}`.trim() ||
+    otherPerson?.email ||
     "Mentee";
+    const menteeRole = String(otherPerson?.role || "User");
+const menteeRoleLabel =
+  menteeRole.charAt(0).toUpperCase() + menteeRole.slice(1).toLowerCase();
 
   const mentorPic = String(mentorPerson?.profilePicture || "").trim() || UserProfile.src;
-  const menteePic = String(menteePerson?.profilePicture || "").trim() || UserProfile.src;
+  const menteePic = String(otherPerson?.profilePicture || "").trim() || UserProfile.src;
 
   const meetingDate = new Date(appt.meetingDate);
   const startMs = meetingWindow.startMs;
@@ -479,13 +584,17 @@ const meetingDescription = String((appt as any).description || "").trim();
                   className="h-[52px] w-[52px] rounded-full border border-white/20 object-cover"
                 />
                 <div>
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-[#8ec5eb]/90">
+                  {/* <p className="text-[11px] font-medium uppercase tracking-wide text-[#8ec5eb]/90">
                     Mentee (Pastor)
                   </p>
                   <p className="text-base font-semibold text-white">{menteeName}</p>
                   {menteePerson?.role ? (
                     <p className="text-[12px] capitalize text-[#cde2f2]/85">{String(menteePerson.role)}</p>
-                  ) : null}
+                  ) : null} */}
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-[#8ec5eb]/90">
+  {menteeRoleLabel}
+</p>
+<p className="text-base font-semibold text-white">{menteeName}</p>
                 </div>
               </div>
             </div>

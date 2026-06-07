@@ -1106,7 +1106,12 @@ const isCancelled = status === "cancelled" || status === "canceled";
                                   <button
                                     type="button"
                                     className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
-                                    onClick={() => { setShowMenu(null); router.push(`/mentor/MentorSchedule/${encodeURIComponent(appointmentEntityId(appt))}`); }}
+                                    // onClick={() => { setShowMenu(null); router.push(`/mentor/MentorSchedule/${encodeURIComponent(appointmentEntityId(appt))}`); }}
+                                    onClick={() => {
+  setShowMenu(null);
+  sessionStorage.setItem("mentorSelectedAppointment", JSON.stringify(appt));
+  router.push(`/mentor/MentorSchedule/${encodeURIComponent(appointmentEntityId(appt))}`);
+}}
                                   >
                                     <i className="fa-regular fa-eye mr-2 text-[#8ec5eb]" />
                                     View details
