@@ -985,6 +985,8 @@ setMeetingDescription("");
                     const apptKey = appointmentEntityId(appt) || String(index);
                     const missed = isAppointmentMissed(appt);
                     const sched = isAppointmentScheduled(appt);
+                    const status = normalizeAppointmentStatus(appt);
+const isCancelled = status === "cancelled" || status === "canceled";
                     const otherPerson = resolveOtherPerson(appt, mentorId);
                     const displayName = otherPerson
                       ? `${otherPerson.firstName ?? ""} ${otherPerson.lastName ?? ""}`.trim() || "Unknown"
@@ -1054,11 +1056,20 @@ setMeetingDescription("");
                                 hour12: true,
                               })}
                             </div>
-                            {missed ? (
+                            {/* {missed ? (
                               <span className="rounded-lg border border-amber-400/40 bg-amber-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-100">
                                 Missed
                               </span>
-                            ) : null}
+                            ) : null} */}
+                            {isCancelled ? (
+  <span className="rounded-lg border border-red-400/40 bg-red-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-red-100">
+    Cancelled
+  </span>
+) : missed ? (
+  <span className="rounded-lg border border-amber-400/40 bg-amber-500/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-100">
+    Missed
+  </span>
+) : null}
                           </div>
 {getMeetingTitle(appt) ? (
   <p className="mb-2 text-[12px] font-semibold text-white">

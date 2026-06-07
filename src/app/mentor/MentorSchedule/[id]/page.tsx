@@ -13,7 +13,8 @@ import {
 } from "@/app/Services/appointment-utils";
 import {
   apiGetAppointmentById,
-  apiGetMentorSchedule,
+  // apiGetMentorSchedule,
+    apiGetAppointments,
   apiGenerateTranscriptSummary,
   apiPostAppointmentJoin,
   apiUpdateAppointment,
@@ -183,8 +184,15 @@ export default function MentorAppointmentDetailPage() {
           const mentorId = String(mentorData?.id ?? mentorData?._id ?? "").trim();
           if (!mentorId) throw new Error("Mentor ID not found");
 
-          const res = await apiGetMentorSchedule(mentorId);
-          const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
+          // const res = await apiGetMentorSchedule(mentorId);
+          // const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
+          const res = await apiGetAppointments({
+  userId: mentorId,
+  mentorId,
+  futureOnly: false,
+});
+
+const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
           found =
             list.find((a) => appointmentEntityId(a) === apptId) ??
             list.find((a) => String((a as { _id?: string; id?: string })._id ?? (a as { id?: string }).id) === apptId) ??
