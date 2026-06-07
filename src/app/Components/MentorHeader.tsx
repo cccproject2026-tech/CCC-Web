@@ -14,6 +14,7 @@ import UserProfile from "../Assets/user-profile.png";
 import {
   Clipboard,
   FileText,
+    ClipboardCheck,
   FileWarning,
   UserRound,
   User,
@@ -174,6 +175,7 @@ setNotificationList(newestFirst);
   const profileMenu = [
     { icon: <User size={18} />, label: "Profile", path: "/mentor/profile" },
     { icon: <Award size={18} />, label: "Certificates", path: "/mentor/certificates" },
+      { icon: <ClipboardCheck size={18} />, label: "Review Center", path: "/mentor/review-center" },
     // { icon: <Clipboard size={18} />, label: "Mentorship Sessions", path: "/mentor/mentoring-session" },
     // { icon: <File size={18} />, label: "Assignments", path: "/mentor/assignments" },
     { icon: <Trophy size={18} />, label: "Micro Grant", path: "/mentor/micro-grant" },

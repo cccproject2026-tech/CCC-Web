@@ -511,12 +511,15 @@ const currentDate = new Date().toLocaleDateString("en-US", {
               </div>
             </div>
 
-            <span className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg border border-emerald-300/30 bg-emerald-400/15 px-3 py-1.5 text-[11px] font-bold text-emerald-100 sm:self-center">
+            {/* <span className="inline-flex shrink-0 items-center gap-2 self-start rounded-lg border border-emerald-300/30 bg-emerald-400/15 px-3 py-1.5 text-[11px] font-bold text-emerald-100 sm:self-center">
               <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-400 px-1.5 text-[10px] font-black text-[#062946]">
                 0
               </span>
               <i className="fa-solid fa-chevron-right text-[10px] text-emerald-100/80" />
-            </span>
+            </span> */}
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center self-start rounded-lg border border-emerald-300/30 bg-emerald-400/15 text-emerald-100 sm:self-center">
+  <i className="fa-solid fa-chevron-right text-sm text-emerald-100/90" />
+</span>
           </Link>
         </section>
         {/* Quick Links — same card pattern as mobile (title row + four tiles); no extra subtitle */}

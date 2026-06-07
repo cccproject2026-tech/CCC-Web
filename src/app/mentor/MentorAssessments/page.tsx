@@ -945,10 +945,16 @@ return {
             search: searchTerm || undefined,
           });
           const parsed = parseAssessmentsListPayload(res.data);
+          // const withMenteeCounts = parsed.map((item: any) => ({
+          //   ...item,
+          //   menteeAssigned: countMenteesAssigned(item),
+          // }));
           const withMenteeCounts = parsed.map((item: any) => ({
-            ...item,
-            menteeAssigned: countMenteesAssigned(item),
-          }));
+  ...item,
+  createdOn: item.createdOn || item.createdAt || item.updatedAt,
+  createdBy: item.createdBy || item.createdByName || "Director",
+  menteeAssigned: countMenteesAssigned(item),
+}));
           setAssessments(withMenteeCounts);
         }
       } catch (err) {

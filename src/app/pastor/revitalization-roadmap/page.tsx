@@ -889,10 +889,12 @@ const parentCards = collapseRoadmapAssignmentsToParents(data);
 
 // const mappedPhases: PhaseCard[] = parentCards.map((item) => {
 const mappedPhases: PhaseCard[] = await Promise.all(
+  
   parentCards.map(async (item) => {
   // const children = Array.isArray((item as any).children)
   //   ? (item as any).children
   //   : [];
+  let fullRoadmap: any = null;
   let children = Array.isArray((item as any).children)
   ? (item as any).children
   : [];
@@ -906,6 +908,7 @@ if (item.hasNestedTasks === true) {
     const rmRes = await apiGetRoadmapById(item.id);
 const body = rmRes.data as { data?: unknown };
 const rawRoadmap = body?.data ?? rmRes.data;
+fullRoadmap = rawRoadmap;
 
 const mergedRoadmaps =
   rawRoadmap && progressData
@@ -988,7 +991,15 @@ const rawAssignment = progressRoadmaps.find((assignment: any) => {
   return {
     id: item.id,
     title: item.title,
-    description: item.desc || "No description",
+    // description: item.desc || "No description",
+    description:
+  safeString((item as any).desc) ||
+  safeString((item as any).description) ||
+  safeString((item as any).roadMapDetails) ||
+  safeString(fullRoadmap?.description) ||
+  safeString(fullRoadmap?.roadMapDetails) ||
+  safeString(fullRoadmap?.subheading) ||
+  "No description",
     parentRoadmapName: item.parentRoadmapName || "Roadmap",
     parentRoadmapId: item.parentRoadmapId,
     months: formatParentCompletionTime(item),
@@ -1011,7 +1022,18 @@ createdBy: safeString(
   (rawAssignment as any)?.assignedBy ||
   "—"
 ),
-    imageUrl: resolveApiMediaUrl(item.imageUrl) || "",
+    // imageUrl: resolveApiMediaUrl(item.imageUrl) || "",
+    imageUrl:
+  resolveApiMediaUrl(
+    safeString((item as any).imageUrl) ||
+      safeString((item as any).bannerImage) ||
+      safeString(fullRoadmap?.imageUrl) ||
+      safeString(fullRoadmap?.bannerImage) ||
+      safeString(fullRoadmap?.image) ||
+      safeString(fullRoadmap?.roadmaps?.[0]?.imageUrl) ||
+      safeString(fullRoadmap?.roadmaps?.[0]?.bannerImage) ||
+      safeString(fullRoadmap?.roadmaps?.[0]?.image)
+  ) || "",
     // hasNestedTasks: item.hasNestedTasks === true,
     hasNestedTasks: item.hasNestedTasks === true || validChildren.length > 0,
   };

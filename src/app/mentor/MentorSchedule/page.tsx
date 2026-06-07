@@ -214,6 +214,7 @@ const [meetingDescription, setMeetingDescription] = useState("");
   const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
 const [historySearch, setHistorySearch] = useState("");
 const [historyDate, setHistoryDate] = useState("");
+const [historyStatusFilter, setHistoryStatusFilter] = useState<"all" | "completed" | "missed">("all");
   // schedule drawer calendar state
   const today = new Date();
   const [scheduleMonth, setScheduleMonth] = useState(today.getMonth());
@@ -606,8 +607,13 @@ useEffect(() => {
 
     const apptDate = new Date(a.meetingDate).toISOString().slice(0, 10);
     const matchesDate = !historyDate || apptDate === historyDate;
+    const normalizedStatus = normalizeAppointmentStatus(a);
+    const matchesStatus =
+      historyStatusFilter === "all" ||
+      (historyStatusFilter === "missed" && normalizedStatus === "missed") ||
+      (historyStatusFilter === "completed" && normalizedStatus !== "missed");
 
-    return matchesSearch && matchesDate;
+    return matchesSearch && matchesDate && matchesStatus;
   })
   .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
   const historyPageSize = 10;
@@ -1214,6 +1220,19 @@ setMeetingDescription("");
     }}
     className={mentorDateInputDark}
   />
+
+  <select
+    value={historyStatusFilter}
+    onChange={(e) => {
+      setHistoryStatusFilter(e.target.value as "all" | "completed" | "missed");
+      setHistoryPage(1);
+    }}
+    className={mentorSelectDark}
+  >
+    <option value="all">All</option>
+    <option value="completed">Completed</option>
+    <option value="missed">Missed</option>
+  </select>
 </div>
               <h3 className="text-[15px] font-semibold text-white">
                 Appointment history — {appointmentHistory.length} meeting{appointmentHistory.length === 1 ? "" : "s"}

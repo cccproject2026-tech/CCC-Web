@@ -204,7 +204,19 @@ function PastorProgressPageContent() {
   const filteredRoadmaps = roadmaps.filter((r) => roadmapMatchesFilter(r, roadmapFilter));
 
   const filteredAssessments = assessments.filter((a) => assessmentMatchesFilter(a, surveyFilter));
+useEffect(() => {
+  const section = searchParams.get("section");
+  if (!section || loading) return;
 
+  const timeout = window.setTimeout(() => {
+    document.getElementById(section)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, 300);
+
+  return () => window.clearTimeout(timeout);
+}, [searchParams, loading, filteredRoadmaps.length, filteredAssessments.length]);
   if (loading) {
     return (
       <div className={mentorPageRoot}>
@@ -273,7 +285,7 @@ function PastorProgressPageContent() {
                     Individual — Roadmap, Assessments
                   </h2>
                   <div className="flex shrink-0 flex-wrap gap-2">
-                    {!isCompleted ? (
+                    {/* {!isCompleted ? (
                       <button
                         type="button"
                         onClick={() => setIsDrawerOpen(true)}
@@ -281,7 +293,20 @@ function PastorProgressPageContent() {
                       >
                         Add final comments
                       </button>
-                    ) : (
+                    ) : ( */}
+                    {!isCompleted ? (
+  <button
+    type="button"
+    disabled={(progress?.overallProgress ?? 0) < 100}
+    onClick={() => {
+      if ((progress?.overallProgress ?? 0) < 100) return;
+      setIsDrawerOpen(true);
+    }}
+    className="rounded-xl bg-[#8ec5eb] px-4 py-2 text-xs font-semibold text-[#062946] transition hover:bg-[#b8daf2] disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    Add final comments
+  </button>
+) : (
                       <button
                         type="button"
                         onClick={() => {
@@ -301,7 +326,7 @@ function PastorProgressPageContent() {
           )}
 
           {/* Roadmaps */}
-          <section className="mb-12">
+          <section id="roadmaps" className="mb-12 scroll-mt-28">
             <div className="mb-5 flex flex-col gap-4">
               <h2 className="text-base font-bold text-white sm:text-lg">Revitalization Roadmap Progress</h2>
               <ProgressFilterSegmented active={roadmapFilter} setActive={setRoadmapFilter} />
@@ -330,15 +355,15 @@ function PastorProgressPageContent() {
           </section>
 
           {/* Surveys */}
-          <section className="pb-8">
+          <section id="assessments" className="pb-8 scroll-mt-28">
             <div className="mb-5 flex flex-col gap-4">
-              <h2 className="text-base font-bold text-white sm:text-lg">Survey progress</h2>
+              <h2 className="text-base font-bold text-white sm:text-lg">Assessment progress</h2>
               <ProgressFilterSegmented active={surveyFilter} setActive={setSurveyFilter} />
             </div>
 
             {filteredAssessments.length === 0 ? (
               <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-[#cde2f2]">
-                No surveys to show for this filter.
+                No Assessments to show for this filter.
               </p>
             ) : (
               <div className="grid gap-6 md:grid-cols-2 md:gap-8">
@@ -605,7 +630,7 @@ function MentorAssessmentProgressCard({ assessment, onOpen }: { assessment: any;
             onClick={onOpen}
             className="rounded-lg bg-[#8ec5eb]/20 px-4 py-1.5 text-[12px] font-semibold text-[#8ec5eb] transition hover:bg-[#8ec5eb]/30"
           >
-            Open survey (read-only)
+            Open Assessment (read-only)
           </button>
         </div>
         <div className="mt-3 flex justify-between text-[12px] text-[#8ec5eb]/80">

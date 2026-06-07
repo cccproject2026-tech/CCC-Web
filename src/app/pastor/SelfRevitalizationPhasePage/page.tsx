@@ -705,7 +705,7 @@ const updatedAt = taskId ? taskUpdatedDates[taskId] : "";
   href={jumpHref}
   className={`${directorBtnPrimary} !px-5 !py-2.5 !text-sm no-underline`}
 >
-  {status === "Not Started" ? "Start" : "View"}
+  {status === "Completed" ? "View" : "Start"}
 </Link>
                           ) : (
                             <button
@@ -713,7 +713,8 @@ const updatedAt = taskId ? taskUpdatedDates[taskId] : "";
                               disabled
                               className={`${directorBtnPrimary} !px-5 !py-2.5 !text-sm disabled:cursor-not-allowed disabled:opacity-50`}
                             >
-                              {status === "Not Started" ? "Start" : "View"}
+                              {/* {status === "Not Started" ? "Start" : "View"} */}
+                              {status === "Completed" ? "View" : "Start"}
                             </button>
                           )}
                         </div>

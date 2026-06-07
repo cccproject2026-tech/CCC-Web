@@ -22,12 +22,25 @@ import {
 } from "@/app/Components/mentor/mentor-theme";
 import {
   apiGetOverallProgress,
+  apiGetUserProgress,
   extractUserIdFromOverallProgressRow,
   unwrapOverallProgressList,
 } from "@/app/Services/progress.service";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 import { isRemoteImageSrc } from "@/app/utils/image";
+import {
+  apiGetAssignedAssessments,
+  apiGetAssessments,
+  flattenAssignedAssessmentRow,
+  parseAssignedAssessmentsListBody,
+  parseAssessmentsListPayload,
+} from "@/app/Services/assessment.service";
+import {
+  collapseRoadmapAssignmentsToParents,
+  fetchRoadmapAssignmentsForUser,
+  unwrapProgressData,
+} from "@/app/Services/roadmap-assignments";
 
 function numFromApi(v: unknown): number {
   if (typeof v === "number" && !Number.isNaN(v)) return v;
@@ -38,6 +51,108 @@ const getInitialsAvatar = (name: string) =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(
     name || "User"
   )}&background=173653&color=ffffff`;
+
+function normalizeProgressStatus(raw: unknown): string {
+  return String(raw || "").toLowerCase().replace(/\s+/g, "_");
+}
+
+function isCompletedAssessmentStatus(raw: unknown): boolean {
+  const status = normalizeProgressStatus(raw);
+  return status === "completed" || status === "reviewed";
+}
+
+function assessmentIdFromItem(item: unknown): string {
+  const flat = flattenAssignedAssessmentRow(item);
+  return String(flat?.assessmentId || "").trim();
+}
+
+function buildAssignedAssessmentRowsForUser(
+  assignedBody: unknown,
+  allAssessments: any[],
+  userId: string,
+): unknown[] {
+  let rows = parseAssignedAssessmentsListBody(assignedBody);
+
+  const assignmentRows = allAssessments
+    .map((assessment: any) => {
+      const assignment = Array.isArray(assessment?.assignments)
+        ? assessment.assignments.find((row: any) => String(row?.userId) === String(userId))
+        : null;
+
+      if (!assignment) return null;
+
+      return {
+        assessment,
+        assessmentId: assessment?._id || assessment?.id,
+        assignmentId: assignment?._id,
+        dueDate: assignment?.dueDate,
+        assignedDueDate: assignment?.dueDate,
+        updatedAt: assignment?.assignedAt || assessment?.updatedAt,
+      };
+    })
+    .filter(Boolean);
+
+  const existingIds = new Set(rows.map(assessmentIdFromItem).filter(Boolean));
+  const missingRows = assignmentRows.filter((item: any) => {
+    const id = String(item?.assessmentId || "").trim();
+    return id && !existingIds.has(id);
+  });
+
+  rows = [...rows, ...missingRows];
+  return rows;
+}
+
+function countAssignedAssessments(rows: unknown[], progressData: any): { done: number; total: number } {
+  const uniqueIds = rows.map(assessmentIdFromItem).filter(Boolean);
+  const assignedIds = [...new Set(uniqueIds)];
+  const assessmentProgress = Array.isArray(progressData?.assessments) ? progressData.assessments : [];
+
+  const completedIds = new Set<string>();
+  for (const id of assignedIds) {
+    const progressRow = assessmentProgress.find(
+      (row: any) => String(row?.assessmentId ?? "") === id,
+    );
+    if (isCompletedAssessmentStatus(progressRow?.status)) {
+      completedIds.add(id);
+    }
+  }
+
+  return {
+    done: completedIds.size,
+    total: assignedIds.length,
+  };
+}
+
+async function getPastorProgressCounts(userId: string, allAssessments: any[]) {
+  const [roadmapResult, assignedAssessmentsResult, progressResult] = await Promise.allSettled([
+    fetchRoadmapAssignmentsForUser(userId),
+    apiGetAssignedAssessments(userId),
+    apiGetUserProgress(userId),
+  ]);
+
+  const parentRoadmaps =
+    roadmapResult.status === "fulfilled"
+      ? collapseRoadmapAssignmentsToParents(roadmapResult.value)
+      : [];
+  const roadmapDone = parentRoadmaps.filter(
+    (roadmap) => String(roadmap.status || "").toLowerCase() === "completed",
+  ).length;
+
+  const progressData =
+    progressResult.status === "fulfilled" ? unwrapProgressData(progressResult.value) : null;
+  const assignedRows =
+    assignedAssessmentsResult.status === "fulfilled"
+      ? buildAssignedAssessmentRowsForUser(assignedAssessmentsResult.value.data, allAssessments, userId)
+      : buildAssignedAssessmentRowsForUser([], allAssessments, userId);
+  const assessmentCounts = countAssignedAssessments(assignedRows, progressData);
+
+  return {
+    roadmapDone,
+    roadmapTotal: parentRoadmaps.length,
+    assessmentDone: assessmentCounts.done,
+    assessmentTotal: assessmentCounts.total,
+  };
+}
 
 export default function TrackProgressPage() {
   const [filter, setFilter] = useState<"All" | "In-Progress" | "Completed">("All");
@@ -65,8 +180,18 @@ export default function TrackProgressPage() {
         const res = await apiGetAssignedUsers(String(mentorId));
         const users = Array.isArray(res.data?.data) ? res.data.data : [];
 
-        const overallRes = await apiGetOverallProgress();
-        const rows = unwrapOverallProgressList(overallRes as unknown as { data?: unknown });
+        const [overallRes, allAssessmentsRes] = await Promise.allSettled([
+          apiGetOverallProgress(),
+          apiGetAssessments(),
+        ]);
+        if (overallRes.status !== "fulfilled") {
+          throw overallRes.reason;
+        }
+        const allAssessments =
+          allAssessmentsRes.status === "fulfilled"
+            ? parseAssessmentsListPayload(allAssessmentsRes.value.data)
+            : [];
+        const rows = unwrapOverallProgressList(overallRes.value as unknown as { data?: unknown });
         const byUserId = new Map<string, Record<string, unknown>>();
         for (const row of rows) {
           const rowObj = row as unknown as Record<string, unknown>;
@@ -75,14 +200,16 @@ export default function TrackProgressPage() {
           byUserId.set(userId, rowObj);
         }
 
-        const results = users
-          .map((u: any) => {
+        const results = (
+          await Promise.all(
+            users.map(async (u: any) => {
             const uid = u._id ?? u.id;
             if (uid == null || String(uid).trim() === "") {
               return null;
             }
             const id = String(uid);
             const row = byUserId.get(id);
+            const counts = await getPastorProgressCounts(id, allAssessments);
             return {
               id,
               name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Pastor",
@@ -92,13 +219,14 @@ export default function TrackProgressPage() {
   u.profilePicture ||
   getInitialsAvatar(`${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()),
               progress: Math.min(100, Math.max(0, numFromApi(row?.overallProgress ?? row?.overall_progress))),
-              roadmapDone: numFromApi(row?.completedRoadmaps ?? row?.completed_roadmaps),
-              roadmapTotal: numFromApi(row?.totalRoadmaps ?? row?.total_roadmaps),
-              assessmentDone: numFromApi(row?.completedAssessments ?? row?.completed_assessments),
-              assessmentTotal: numFromApi(row?.totalAssessments ?? row?.total_assessments),
+              roadmapDone: counts.roadmapDone,
+              roadmapTotal: counts.roadmapTotal,
+              assessmentDone: counts.assessmentDone,
+              assessmentTotal: counts.assessmentTotal,
             };
           })
-          .filter((p): p is NonNullable<typeof p> => p != null && Boolean(p.id));
+          )
+        ).filter((p): p is NonNullable<typeof p> => p != null && Boolean(p.id));
 
         setPastors(results);
       } catch (err) {
@@ -226,20 +354,60 @@ export default function TrackProgressPage() {
 
                     {/* Roadmap & Assessment stats */}
                     <div className="mt-2 flex flex-wrap gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-md border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 px-2.5 py-1 text-[11px] font-medium text-[#cde2f2]">
+                      {/* <span className="inline-flex items-center gap-1.5 rounded-md border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 px-2.5 py-1 text-[11px] font-medium text-[#cde2f2]">
                         <i className="fa-solid fa-map-signs text-[#8ec5eb]" aria-hidden />
                         Roadmaps&nbsp;
                         <span className="font-bold text-white tabular-nums">
                           {pastor.roadmapDone}/{pastor.roadmapTotal}
                         </span>
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 rounded-md border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 px-2.5 py-1 text-[11px] font-medium text-[#cde2f2]">
+                      </span> */}
+                      <button
+  type="button"
+  // onClick={(e) => {
+  //   e.stopPropagation();
+  //   router.push(`/mentor/MentorProgress?userId=${pastor.id}#roadmaps`);
+  // }}
+  onMouseDown={(e) => e.stopPropagation()}
+onClick={(e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  router.push(`/mentor/MentorProgress?userId=${pastor.id}&section=roadmaps`);
+}}
+  className="inline-flex items-center gap-1.5 rounded-md border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 px-2.5 py-1 text-[11px] font-medium text-[#cde2f2] transition hover:bg-[#8ec5eb]/20"
+>
+  <i className="fa-solid fa-map-signs text-[#8ec5eb]" aria-hidden />
+  Roadmaps&nbsp;
+  <span className="font-bold text-white tabular-nums">
+    {pastor.roadmapDone}/{pastor.roadmapTotal}
+  </span>
+</button>
+                      {/* <span className="inline-flex items-center gap-1.5 rounded-md border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 px-2.5 py-1 text-[11px] font-medium text-[#cde2f2]">
                         <i className="fa-solid fa-clipboard-list text-[#8ec5eb]" aria-hidden />
-                        Surveys&nbsp;
+                        Assessments&nbsp;
                         <span className="font-bold text-white tabular-nums">
                           {pastor.assessmentDone}/{pastor.assessmentTotal}
                         </span>
-                      </span>
+                      </span> */}
+                      <button
+  type="button"
+  // onClick={(e) => {
+  //   e.stopPropagation();
+  //   router.push(`/mentor/MentorProgress?userId=${pastor.id}#assessments`);
+  // }}
+  onMouseDown={(e) => e.stopPropagation()}
+onClick={(e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  router.push(`/mentor/MentorProgress?userId=${pastor.id}&section=assessments`);
+}}
+  className="inline-flex items-center gap-1.5 rounded-md border border-[#8ec5eb]/25 bg-[#8ec5eb]/10 px-2.5 py-1 text-[11px] font-medium text-[#cde2f2] transition hover:bg-[#8ec5eb]/20"
+>
+  <i className="fa-solid fa-clipboard-list text-[#8ec5eb]" aria-hidden />
+  Assessments&nbsp;
+  <span className="font-bold text-white tabular-nums">
+    {pastor.assessmentDone}/{pastor.assessmentTotal}
+  </span>
+</button>
                     </div>
 
                     <div className="mt-4">
