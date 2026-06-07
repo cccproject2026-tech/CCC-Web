@@ -56,7 +56,7 @@ const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
       }
 
       const res = await apiGetUserById(String(mid));
-      // const data = res.data?.data as Record<string, unknown> | undefined;
+
       const data = res.data?.data as unknown as Record<string, unknown> | undefined;
       if (data) {
         setProfile(data);
@@ -144,32 +144,7 @@ if (!allowedTypes.includes(file.type)) {
       const interest = (form.interest as Record<string, unknown>) || {};
       const email = form.email as string | undefined;
 
-      // const payload = {
-      //   firstName: form.firstName as string | undefined,
-      //   lastName: form.lastName as string | undefined,
-      //   phoneNumber: interest.phoneNumber as string | undefined,
-      //   title: interest.title as string | undefined,
-      //   yearsInMinistry: interest.yearsInMinistry as string | undefined,
-      //   conference: interest.conference as string | undefined,
-      //   profileInfo: interest.profileInfo as string | undefined,
-      //   bio: interest.profileInfo as string | undefined,
-      //   churchDetails: (Array.isArray(interest.churchDetails) ? interest.churchDetails : []) as ChurchDetails[],
-      // };
-//       const profileInfoValue = String(interest.profileInfo ?? form.bio ?? "");
 
-// const payload = {
-//   firstName: form.firstName as string | undefined,
-//   lastName: form.lastName as string | undefined,
-//   phoneNumber: interest.phoneNumber as string | undefined,
-//   title: interest.title as string | undefined,
-//   yearsInMinistry: interest.yearsInMinistry as string | undefined,
-//   conference: interest.conference as string | undefined,
-//   currentCommunityProjects: interest.currentCommunityProjects as string | undefined,
-//   bio: profileInfoValue,
-//   churchDetails: (Array.isArray(interest.churchDetails)
-//     ? interest.churchDetails
-//     : []) as ChurchDetails[],
-// };
 
 const profileInfoValue = String(interest.profileInfo ?? form.bio ?? "");
 
@@ -177,22 +152,7 @@ const churchDetailsPayload = (Array.isArray(interest.churchDetails)
   ? interest.churchDetails
   : []) as ChurchDetails[];
 
-// const payload = {
-//   firstName: form.firstName as string | undefined,
-//   lastName: form.lastName as string | undefined,
-//   phoneNumber: interest.phoneNumber as string | undefined,
-//   title: interest.title as string | undefined,
-//   yearsInMinistry: interest.yearsInMinistry as string | undefined,
-//   conference: interest.conference as string | undefined,
-//   currentCommunityProjects: interest.currentCommunityProjects as string | undefined,
-//   bio: profileInfoValue,
 
-//   churchDetails: churchDetailsPayload,
-
-//   interest: {
-//     churchDetails: churchDetailsPayload,
-//   },
-// } as any;
 
 const userPayload = {
   firstName: form.firstName as string | undefined,

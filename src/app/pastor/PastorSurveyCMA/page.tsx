@@ -397,9 +397,8 @@ const mentorName = searchParams.get("mentorName")?.trim() || "";
 const meetingPlatform = searchParams.get("platform")?.trim() || "";
   const reviewUserId = (searchParams.get("userId") || "").trim();
   const [scheduledMeeting, setScheduledMeeting] = useState(false);
-  // const shouldOpenScheduleMeeting = searchParams.get("scheduleMeeting") === "1";
-  // const shouldOpenScheduleMeeting =
-  // searchParams.get("scheduleMeeting") === "1" && readOnlySelf;
+
+
   /** Mentor opened a review link: ?viewOnly=1&userId=<pastorId> */
   const viewOnlyParam =
     searchParams.get("viewOnly") === "1" ||
@@ -803,13 +802,7 @@ const confirmClearResponses = () => {
         return;
       }
 
-      // const payload = {
-      //   userId: uid,
-      //   mentorId: selectedMentor,
-      //   meetingDate: meetingDateIso,
-      //   platform: "zoom",
-      //   notes: "Initial mentorship session to review progress.",
-      // };
+  
       const notes = routeRoadmapId && routeTaskId
         ? `Roadmap assessment meeting | assessmentId:${assessmentId || ""} | roadmapId:${routeRoadmapId} | taskId:${routeTaskId}`
         : `Assessment meeting | assessmentId:${assessmentId || ""} | title:${assessmentTitle || "Assessment"}`;

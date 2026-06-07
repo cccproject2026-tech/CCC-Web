@@ -192,11 +192,7 @@ export async function loadMentorFocusSections(input: MentorFocusInput): Promise<
  
 
   const otherMeetings: DashboardFocusItem[] = apptRecords
-    // .filter((apt) => {
-    //   const md = appointmentMeetingDate(apt);
-    //   if (!md) return false;
-    //   return md.split("T")[0] !== todayDateOnlyISO;
-    // })
+ 
     .filter((apt) => {
   const md = appointmentMeetingDate(apt);
   if (!md) return false;
@@ -208,8 +204,7 @@ export async function loadMentorFocusSections(input: MentorFocusInput): Promise<
     .slice(0, MAX_ITEMS_PER_SECTION)
     .map((apt) => {
       const md = appointmentMeetingDate(apt);
-      // const uid = String(apt.userId ?? "");
-      // const pastorName = menteeNameById.get(uid) ?? "Pastor";
+
       const uid = String(
   apt.userId ??
     apt.pastorId ??
@@ -231,28 +226,7 @@ const directName =
         )}`.trim()
       : "";
 
-// const pastorName = directName || menteeNameById.get(uid) || "Pastor";
 
-//       return {
-//         id: `mentor-other-meeting-${String(apt.id ?? apt._id ?? md)}`,
-//         title: "Upcoming meeting",
-//         description: `Meeting starts ${formatDateTime(md)}.`,
-//         meta: `${pastorName} • ${String(apt.platform ?? "")}`,
-//         href: "/mentor/MentorSchedule",
-//       };
-// const pastorName = directName || menteeNameById.get(uid) || "Pastor";
-// const appointmentId = String(apt.id ?? apt._id ?? "");
-
-// return {
-//   id: `mentor-other-meeting-${String(apt.id ?? apt._id ?? md)}`,
-//   title: "Upcoming meeting",
-//   description: `Meeting starts ${formatDateTime(md)}.`,
-//   meta: `${pastorName} • ${String(apt.platform ?? "")}`,
-//   href: appointmentId
-  
-//   ? `/mentor/MentorSchedule/${encodeURIComponent(appointmentId)}`
-//   : "/mentor/MentorSchedule",
-// };
 const pastorName = directName || menteeNameById.get(uid) || "Pastor";
 const appointmentId = String(apt.id ?? apt._id ?? "");
 

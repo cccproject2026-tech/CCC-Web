@@ -101,7 +101,7 @@ const todayOnlySections = useMemo(() => {
           </button>
         </div>
 
-        {/* <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3 sm:px-5 sm:py-4"> */}
+      
        <div className="max-h-[420px] min-h-0 flex-1 overflow-y-auto px-4 py-3 pr-2 sm:px-5 sm:py-4 sm:pr-3">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center gap-3 py-16 text-[#cde2f2]">

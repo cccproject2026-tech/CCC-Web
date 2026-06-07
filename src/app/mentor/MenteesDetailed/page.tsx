@@ -49,7 +49,7 @@ function textMatchesQuery(text: string, query: string): boolean {
 
 export default function MyMenteesPage() {
   const [filter, setFilter] = useState<"All" | "In-Progress" | "Completed">("All");
-  // const [sortBy, setSortBy] = useState("Phase");
+
   const [sortBy, setSortBy] = useState("Newly Added");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [searchQuery, setSearchQuery] = useState("");
@@ -93,23 +93,7 @@ const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
         const raw = res.data?.data;
         const menteeUsers = Array.isArray(raw) ? raw : [];
 
-//         const mapped = menteeUsers.map((u: any, i: number) => ({
-//           id: String(u.id ?? u._id ?? ""),
-//           name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Mentee",
-//           role: u.role ?? "",
-//           desc: "Assigned mentee in mentoring program",
-//           // img: u.profilePicture || IMAGE_POOL[i % IMAGE_POOL.length],
-//           img: u.profilePicture || getInitialsAvatar(`${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()),
-//           progress: 0,
-//           createdAt: u.createdAt,
-//           email: u.email,
-// phoneNumber: u.phoneNumber,
-// title: u.title,
-// churchDetails: u.churchDetails,
-// country: u.country,
-// state: u.state,
-// city: u.city,
-//         }));
+
 const mapped = menteeUsers.map((u: any, i: number) => {
   console.log("RAW MENTEE USER:", u);
 

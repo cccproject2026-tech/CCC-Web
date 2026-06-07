@@ -980,16 +980,16 @@ if (q) {
 const filteredMyAppointmentHistory = filterHistoryAppointments(myAppointmentHistory);
 const filteredHostedAppointmentHistory = filterHistoryAppointments(hostedAppointmentHistory);
   const historyPageSize = 10;
-  // const totalMyHistoryPages = Math.max(1, Math.ceil(myAppointmentHistory.length / historyPageSize));
-  // const totalHostedHistoryPages = Math.max(1, Math.ceil(hostedAppointmentHistory.length / historyPageSize));
-  // const pagedMyHistory = myAppointmentHistory.slice(
+
+
+
   const totalMyHistoryPages = Math.max(1, Math.ceil(filteredMyAppointmentHistory.length / historyPageSize));
 const totalHostedHistoryPages = Math.max(1, Math.ceil(filteredHostedAppointmentHistory.length / historyPageSize));
 const pagedMyHistory = filteredMyAppointmentHistory.slice(
     (historyMyPage - 1) * historyPageSize,
     historyMyPage * historyPageSize,
   );
-  // const pagedHostedHistory = hostedAppointmentHistory.slice(
+
   const pagedHostedHistory = filteredHostedAppointmentHistory.slice(
     (historyHostedPage - 1) * historyPageSize,
     historyHostedPage * historyPageSize,

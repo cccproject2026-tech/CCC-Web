@@ -60,9 +60,7 @@ const [hasProfileChanged, setHasProfileChanged] = useState(false);
           const parsed = JSON.parse(stored) as Record<string, unknown>;
           const normalized = normalizeUserCookieForClient(parsed) as User;
           setUser(normalized);
-          // if (normalized.profilePicture) {
-          //   setProfileImage(normalized.profilePicture);
-          // }
+     
           if (normalized.profilePicture) {
   setProfileImage(normalized.profilePicture);
   router.replace("/pastor/home");

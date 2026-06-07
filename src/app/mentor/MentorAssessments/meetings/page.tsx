@@ -178,7 +178,7 @@ pastorName:
           }),
         );
 
-        // const assessmentRows = rows.filter((row) => row.assessmentId);
+
  const assessmentRows = rows.filter((row) => Boolean(row.assessmentId)) as MeetingRow[];
 
         if (!cancelled) setMeetings(assessmentRows);

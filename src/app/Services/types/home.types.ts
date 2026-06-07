@@ -48,19 +48,7 @@ export type NotificationModule =
   | 'microgrant'
   | 'interests'
   | 'general';
-// export type NotificationModule =
-//   | 'appointments'
-//   | 'appointment'
-//   | 'APPOINTMENT'
-//   | 'roadmaps'
-//   | 'roadmap'
-//   | 'assessments'
-//   | 'assessment'
-//   | 'microgrant'
-//   | 'microGrant'
-//   | 'interest'
-//   | 'interests'
-//   | 'general';
+
 
 export interface NotificationItem {
   _id: string;

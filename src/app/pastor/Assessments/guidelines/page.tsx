@@ -13,8 +13,7 @@ function GuidelinesInner() {
   const mentorName = searchParams.get("mentorName")?.trim() || "";
   const meetingPlatform = searchParams.get("platform")?.trim() || "";
 
-  // const surveyUrl = `/pastor/PastorSurveyCMA?assessmentId=${encodeURIComponent(assessmentId)}`;
-  // const scheduleMeetingHref = `${surveyUrl}&readOnly=1&scheduleMeeting=1`;
+
   const roadmapId = searchParams.get("roadmapId")?.trim() || "";
 const taskId = searchParams.get("taskId")?.trim() || "";
 const parentId = searchParams.get("parentId")?.trim() || "";

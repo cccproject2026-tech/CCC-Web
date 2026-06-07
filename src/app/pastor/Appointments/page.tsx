@@ -297,12 +297,7 @@ const shouldOpenScheduleDrawer = searchParams.get("openSchedule") === "1";
   useEffect(() => {
     refreshAppointmentLists();
   }, []);
-//   useEffect(() => {
-//   if (searchParams.get("openSchedule") === "1") {
-//     setDrawerOpen(true);
-//     setDrawerStep("mentor");
-//   }
-// }, [searchParams]);
+
 useEffect(() => {
   const open = searchParams.get("openSchedule") === "1";
   console.log("openSchedule:", searchParams.get("openSchedule"));
@@ -342,14 +337,7 @@ useEffect(() => {
 
 
 
-  // const getModeIcon = (mode) => {
-  //   if (!mode) return DuoIcon;
-  //   const m = mode.toLowerCase();
-  //   if (m === "duo") return DuoIcon;
-  //   if (m === "google meet" || m === "meet") return MeetIcon;
-  //   if (m === "zoom") return MeetIcon;
-  //   return DuoIcon;
-  // };
+
   const getModeIcon = (mode?: string) => {
     const m = String(mode || "").toLowerCase().trim();
 

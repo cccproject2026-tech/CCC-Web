@@ -410,16 +410,7 @@ const hydrateWeekdaySlotsFromMonth = (dayIndex: number) => {
       if (w.dayIndexUtcSunday0 !== dayIndex) return w;
       if (w.slots.length > 0) return { ...w, enabled: true };
 
-  //     const matchingMonthRow = monthRows.find((raw) => {
-  //       const row = raw as any;
-  //       const ymd = String(row?.date ?? row?.day ?? row?.calendarDate ?? "").slice(0, 10);
-  //       if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
-  //       return new Date(`${ymd}T12:00:00`).getDay() === dayIndex;
-  //     });
 
-  //     const c = matchingMonthRow
-  // ? classifyDayOccurrence(matchingMonthRow)
-  // : { unavailable: false, slots: [] };
   const matchingMonthRow = monthRows.find((raw) => {
   const row = raw as Record<string, unknown>;
   const ymd = String(row.date ?? row.day ?? row.calendarDate ?? "").slice(0, 10);

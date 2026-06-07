@@ -111,13 +111,7 @@ export interface MarkAppointmentMissedPayload {
   reason?: string;
 }
 
-// export interface RescheduleAppointmentPayload {
-//   newDate: string;       // ISO datetime string
-//   startTime: string;     // e.g. "3:00"
-//   startPeriod: string;   // "AM" | "PM"
-//   platform?: AppointmentPlatform;
-//   meetingLink?: string;
-// }
+
 export interface RescheduleAppointmentPayload {
   newDate: string;
   startTime: string;

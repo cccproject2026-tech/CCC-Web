@@ -305,7 +305,7 @@ const pastorIdFromQuery = searchParams.get("pastorId");
   const [listRefetchKey, setListRefetchKey] = useState(0);
   const [featuredItems, setFeaturedItems] = useState<FeaturedAvatarItem[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(false);
-  // const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(assignUserFromQuery);
+
   const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(
   pastorIdFromQuery || assignUserFromQuery
 );
@@ -477,8 +477,7 @@ for (const appt of appointmentsList) {
     appointmentsByAssessmentId.set(linkedAssessmentId, prev);
   }
 }
-            // const assigned = assignedRows
-            //   .map((item) => {
+         
             const assigned = (await Promise.all(
   assignedRows.map(async (item) => {
                 const flat = flattenAssignedAssessmentRow(item);
@@ -702,14 +701,14 @@ useEffect(() => {
   }, [pathname]);
 
   useEffect(() => {
-    // if (!assignUserFromQuery) return;
+
      if (!assignUserFromQuery || pastorIdFromQuery) return;
     if (lastAssignBootstrap.current === assignUserFromQuery) return;
     lastAssignBootstrap.current = assignUserFromQuery;
     setSelectedMenteeId(assignUserFromQuery);
     setSelectedUsers([assignUserFromQuery]);
     setIsSelectionMode(true);
-    // setToast("Select assessments, then tap Assigned to.");
+  
     setToast("Select assessments, then tap Assign.");
     const t = setTimeout(() => setToast(null), 4500);
     return () => clearTimeout(t);

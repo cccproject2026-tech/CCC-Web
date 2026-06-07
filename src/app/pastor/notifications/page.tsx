@@ -20,8 +20,7 @@ export default function NotificationsPage() {
         if (!userId) return;
 
         const res = await getNotifications(userId);
-        // const list = unwrapNotificationsList(res);
-        // setNotifications(list);
+      
         const list = unwrapNotificationsList(res);
 const newestFirst = [...list].reverse();
 

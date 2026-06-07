@@ -328,9 +328,7 @@ const mentorId = searchParams.get("mentorId") || "";
   <button
     type="button"
     onClick={() =>
-      // router.push(
-      //   `/director/revitalization-roadmap?tab=pastor&pastorId=${encodeURIComponent(pastorId)}`
-      // )
+   
       router.push(
   `/director/revitalization-roadmap?tab=pastor&pastorId=${encodeURIComponent(
     pastorId

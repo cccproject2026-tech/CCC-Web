@@ -30,9 +30,9 @@ export default function NotificationsPage() {
       setLoading(true);
       setError(null);
       try {
-        // const res = await getNotification(uid);
+
         const res = await getNotification({ role: "director" });
-        // const list = unwrapNotificationsList(res);
+
         // if (!cancelled) setItems(list);
         const list = unwrapNotificationsList(res);
 const newestFirst = [...list].reverse();

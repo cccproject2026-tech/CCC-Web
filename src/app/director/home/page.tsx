@@ -55,7 +55,7 @@ import {
   flattenAssignedAssessmentRow,
   parseAssignedAssessmentsListBody,
 } from "@/app/Services/assessment.service";
-// import { unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
+
 import {
   appointmentEntityId,
   unwrapAppointmentsAxiosData,
@@ -372,7 +372,7 @@ export default function DirectorHome() {
   const [resolvedUserId, setResolvedUserId] = useState<string>("");
 
   const [activeTab, setActiveTab] = useState<"mentors" | "pastors">("mentors");
-  // const [fullName, setFullName] = useState("");
+
   const [firstName, setFirstName] = useState("");
 const [lastName, setLastName] = useState("");
   const [userForm, setUserForm] = useState({
@@ -555,7 +555,7 @@ useEffect(() => {
       if (typeof raw === "string" && raw.trim()) {
         return { id, name, img: (resolveApiMediaUrl(raw) ?? raw) as string, kind };
       }
-      // return { id, name, img: pool[i % pool.length], kind };
+  
       return { id, name, img: getInitialsAvatar(fn, ln, kind === "pastor" ? "Pastor" : "Mentor"), kind };
     };
     try {
@@ -598,7 +598,7 @@ const { users: fmu } =
       const interleaved: typeof mentors = [];
 
       const maxL = Math.max(mentors.length, pastors.length, fieldMentors.length);
-      // const maxL = Math.max(mentors.length, pastors.length);
+     
 
 for (let i = 0; i < maxL; i++) {
   if (i < pastors.length) interleaved.push(pastors[i]);
@@ -687,7 +687,7 @@ for (let i = 0; i < maxL; i++) {
   const fetchMentors = useCallback(async () => {
     try {
       setMentorsLoading(true);
-      // const response = await apiGetMentors({ limit: 4, roleMatch: "mixed" });
+ response = await apiGetMentors({ limit: 4, roleMatch: "mixed" });
       const response = await apiGetAllUsers({
   role: "mentor",
   roleMatch: "mixed",
@@ -707,7 +707,7 @@ for (let i = 0; i < maxL; i++) {
   const fetchPastors = useCallback(async () => {
     try {
       setPastorsLoading(true);
-      // const response = await apiGetPastors({ limit: 4, roleMatch: "mixed" });
+ response = await apiGetPastors({ limit: 4, roleMatch: "mixed" });
       const response = await apiGetAllUsers({
   role: "pastor",
   roleMatch: "mixed",
@@ -729,12 +729,11 @@ for (let i = 0; i < maxL; i++) {
       const uid = resolvedUserId;
 
       const results = await Promise.allSettled([
-        // apiGetTodaysAppointments(uid || undefined),
+     
         apiGetAppointments({ futureOnly: true }),
         apiGetAllInterests({ status: 'new' }),
         
-        // apiGetMentors({ limit: 4, roleMatch: "mixed" }),
-        // apiGetPastors({ limit: 4, roleMatch: "mixed" }),
+   
       apiGetAllUsers({ role: "mentor", roleMatch: "mixed", page: 1, limit: 20, t: Date.now() }),
 apiGetAllUsers({ role: "pastor", roleMatch: "mixed", page: 1, limit: 20, t: Date.now() }),
         
@@ -783,8 +782,8 @@ setAppointmentsLoading(false);
 
 
 if (results[1].status === "fulfilled" && results[1].value) {
-  // const intRes = results[1].value;
-  // const body: any = intRes?.data;
+
+
   const intRes: any = results[1].value;
 const body: any = intRes?.data;
   const raw: any = body?.data;
@@ -838,13 +837,13 @@ setInterestsLoading(false);
       }
 
       let progressRows: UserOverallProgress[] = [];
-      // if (results[7].status === "fulfilled") {
+     
       if (results[7].status === "fulfilled" && results[7].value) {
-        // progressRows = unwrapOverallProgressList(results[7].value);
+
         const progressRes: any = results[7].value;
 progressRows = unwrapOverallProgressList(progressRes);
       } else {
-        // console.warn("Error fetching overall progress (mentor/pastor):", results[7].reason);
+      
         console.warn("Error fetching overall progress (mentor/pastor):", (results[7] as any).reason);
       }
 
@@ -881,10 +880,9 @@ progressRows = unwrapOverallProgressList(progressRes);
         setUser(null);
       }
 
-      // Completed-course count (pastors marked completed)
-      // if (results[6].status === 'fulfilled') {
+    
       if (results[6].status === "fulfilled" && results[6].value) {
-        // const body = results[6].value.data?.data;
+
         const completedRes: any = results[6].value;
 const body = completedRes?.data?.data;
         const total =
@@ -971,14 +969,10 @@ const body = completedRes?.data?.data;
   const handleAddUser = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // const nameParts = fullName.trim().split(/\s+/);
-    // const firstName = nameParts[0] || "";
-    // const lastName = nameParts.slice(1).join(" ") || "";
 
-    // if (!firstName) {
-    //   alert("Please enter a full name");
-    //   return;
-    // }
+
+
+
     const trimmedFirstName = firstName.trim();
 const trimmedLastName = lastName.trim();
 
@@ -992,7 +986,7 @@ if (!trimmedLastName) {
   return;
 }
 
-    // const userData: CreateUserDto = {
+
     //   firstName,
     //   lastName,
     //   email: userForm.email,
@@ -1008,7 +1002,7 @@ if (!trimmedLastName) {
     try {
       setAddUserLoading(true);
       await apiCreateUser(userData);
-      // setFullName("");
+ 
       setFirstName("");
 setLastName("");
       setUserForm({ email: "", role: "" });
@@ -1030,27 +1024,10 @@ setLastName("");
   const currentData = useMemo(() => activeTab === "mentors" ? mentors : pastors, [activeTab, mentors, pastors]);
   const currentLoading = useMemo(() => activeTab === "mentors" ? mentorsLoading : pastorsLoading, [activeTab, mentorsLoading, pastorsLoading]);
 
-//   const formatAppointment = useCallback((appointment: Appointment) => {
-//     const p = (appointment.platform || "").toLowerCase();
-//  const platformIcon =
-//   p === "zoom" || p.includes("zoom")
-//     ? ZoomIcon
-//     : p === "gmeet" || p === "google-meet" || p.includes("google")
-//       ? MeetIcon
-//       : DuoIcon;
-//     const mentorName = appointment.mentor
-//       ? `${appointment.mentor.firstName || ''} ${appointment.mentor.lastName || ''}`.trim()
-//       : 'Mentor';
-//     const mentorRole = appointment.mentor?.role || 'mentor';
-//     const meetingDate = new Date(appointment.meetingDate);
-//     const meetingTime = meetingDate.toLocaleTimeString('en-US', {
-//       hour: '2-digit',
-//       minute: '2-digit',
-//       hour12: true
-//     });
 
-//     return { platformIcon, mentorName, mentorRole, meetingDate, meetingTime };
-//   }, []);
+
+
+
 const formatAppointment = useCallback((appointment: Appointment) => {
   const p = (appointment.platform || "").toLowerCase();
 
@@ -1061,8 +1038,8 @@ const formatAppointment = useCallback((appointment: Appointment) => {
         ? MeetIcon
         : DuoIcon;
 
-  // const mentor = appointment.mentor;
-  // const attendee = appointment.user;
+
+
   const mentor =
   appointment.mentor ??
   (typeof (appointment as any).mentorId === "object"
@@ -1152,8 +1129,7 @@ const attendee =
         ? mentorsData.users
         : [];
 
-    // setQuickAssignPastors(pastorsList);
-    // setQuickAssignMentors(mentorsList);
+
     const [hydratedPastors, hydratedMentors] = await Promise.all([
   hydrateUsersWithProfilePictures(pastorsList),
   hydrateUsersWithProfilePictures(mentorsList),
@@ -1290,18 +1266,6 @@ const handleQuickAssignMentor = async () => {
     selectedMentor?.email ||
     "Mentor";
 
-  // try {
-  //   setQuickAssignSaving(true);
-
-  //   await apiAssignUsers(selectedQuickPastorId, [selectedQuickMentorId]);
-
-  //   setShowQuickAssignModal(false);
-  //   setSelectedQuickPastorId("");
-  //   setSelectedQuickMentorId("");
-
-  //   setQuickAssignToast(`${mentorName} assigned to ${pastorName} successfully.`);
-  //   setTimeout(() => setQuickAssignToast(null), 3500);
-  // } catch (error) {
   try {
   setQuickAssignSaving(true);
 
@@ -1379,7 +1343,7 @@ const openPastorsRoadmapModal = async () => {
         ? data.users
         : [];
 
-    // setRoadmapPastors(pastorsList);
+  
     setRoadmapPastors(await hydrateUsersWithProfilePictures(pastorsList));
   } catch (error) {
     console.error("Failed to load pastors for roadmap", error);
@@ -1405,14 +1369,8 @@ const openMonthlyAppointmentsModal = async () => {
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    // const thisMonthAppointments = list
-    //   .filter((appointment) => {
-    //     const meetingDate = new Date(appointment.meetingDate);
-    //     return (
-    //       meetingDate.getMonth() === currentMonth &&
-    //       meetingDate.getFullYear() === currentYear
-    //     );
-    //   })
+
+  
     const startOfToday = new Date(
   now.getFullYear(),
   now.getMonth(),
@@ -1485,7 +1443,7 @@ setMappingMentorSearch("");
         ? data.users
         : [];
 
-    // setMappingMentors(mentorsList);
+
     setMappingMentors(await hydrateUsersWithProfilePictures(mentorsList));
   } catch (error) {
     console.error("Failed to load mentors", error);
@@ -1546,7 +1504,7 @@ setCdpPastorSearch("");
         ? data.users
         : [];
 
-    // setCdpPastors(pastorsList);
+
     setCdpPastors(await hydrateUsersWithProfilePictures(pastorsList));
   } catch (error) {
     console.error("Failed to load pastors for CDP", error);
@@ -1577,10 +1535,10 @@ const loadCdpAssessmentsForPastor = async (pastor: any) => {
 
     const completedWithCdp = rows
       .map((item: any) => {
-        // const flat = flattenAssignedAssessmentRow(item);
-        // if (!flat) return null;
 
-        // const assessment: any = flat.assessment ?? {};
+    
+
+
         const flatRaw = flattenAssignedAssessmentRow(item);
 if (!flatRaw) return null;
 
@@ -1614,10 +1572,8 @@ const assessment: any = flat.assessment ?? {};
           Boolean(item?.recommendation) ||
           Boolean(item?.recommendations);
 
-        // const isCompleted =
-        //   status === "completed" ||
-        //   status === "reviewed" ||
-        //   status === "submitted";
+
+     
         const hasRecommendations =
   Array.isArray(assessment?.sections) &&
   assessment.sections.some((section: any) =>
@@ -1780,30 +1736,9 @@ const selectedAssignMentorName =
               <p className="text-xs text-white/60 sm:text-sm">{formattedDate}</p>
             </div>
 
-            {/* <button
-              type="button"
-              onClick={() => router.push("/director/profile")}
-              className="mt-4 flex w-full max-w-sm items-center gap-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-left backdrop-blur-md transition hover:bg-white/15 lg:mt-0 lg:w-auto"
-            >
-              <Image
-                src={UserProfile}
-                alt=""
-                width={48}
-                height={48}
-                className="rounded-full border-2 border-white/30"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-white">{displayName}</p>
-              </div>
-            </button> */}
+    
             <div className="mt-4 flex w-full max-w-sm items-center gap-4 rounded-2xl border border-white/20 bg-white/10 p-4 text-left backdrop-blur-md lg:mt-0 lg:w-auto">
-  {/* <Image
-    src={UserProfile}
-    alt=""
-    width={48}
-    height={48}
-    className="rounded-full border-2 border-white/30"
-  /> */}
+
   <Image
   src={
     getPersonProfilePicture(user) ||
@@ -1824,75 +1759,7 @@ const selectedAssignMentorName =
       </section>
 
       {/* Continue watching */}
-      {/* <section className="mt-10 flex flex-col items-start justify-between gap-10 py-10 lg:flex-row">
-        <div className="flex flex-col justify-center lg:w-1/4">
-          <h2 className="mb-4 text-3xl font-semibold leading-tight text-white">
-            Continue <br /> Watching{" "}
-            <span className="text-[#8ec5eb] underline decoration-[#8ec5eb]/40 decoration-2 underline-offset-4">
-              Course
-            </span>
-          </h2>
-        </div>
-
-        <div className="relative w-full lg:w-3/4">
-          <Swiper
-            modules={[Navigation, Pagination]}
-            spaceBetween={24}
-            slidesPerView={3}
-            pagination={{ clickable: true }}
-            loop={mediaList.length > 3}
-            className="pb-12 [&_.swiper-pagination-bullet]:bg-white/40 [&_.swiper-pagination-bullet-active]:bg-[#8ec5eb]"
-            breakpoints={{
-              0: { slidesPerView: 1 },
-              768: { slidesPerView: 2 },
-              1024: { slidesPerView: 3 },
-            }}
-          >
-            {mediaList.map((item) => (
-              <SwiperSlide key={item._id}>
-                <div className={`overflow-hidden rounded-xl text-left ${directorGlassCard} ${directorGlassCardHover}`}>
-                  <div className="relative">
-                    <Image
-                      src={getMediaThumbnail(item)}
-                      alt={item.heading || "Media thumbnail"}
-                      width={400}
-                      height={200}
-                      className="h-[160px] w-full object-cover sm:h-[180px]"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                      <button
-                        type="button"
-                        className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 transition hover:scale-110"
-                      >
-                        <i className="fa-solid fa-play text-sm text-[#0f4a76]" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="p-4">
-                    <p className="mb-1 text-xs font-semibold text-[#8ec5eb]">
-                      {item.subheading || "Introduction"}
-                    </p>
-                    <h4 className="mb-1 text-sm font-semibold text-white">{item.heading}</h4>
-                    <p className="mb-3 text-xs leading-snug text-white/65">{item.description}</p>
-                    <div className="flex items-center justify-between text-xs text-white/50">
-                      <span>
-                        {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ""}
-                      </span>
-                      <button
-                        type="button"
-                        className="rounded-md border border-[#8ec5eb]/50 p-[6px] text-[#8ec5eb] transition hover:bg-[#8ec5eb]/15"
-                      >
-                        <i className="fa-solid fa-arrow-up-right-from-square text-[10px]" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </SwiperSlide>
-            ))}
-          </Swiper>
-        </div>
-      </section> */}
-
+    
       {/* Today's Appointments + New Interests */}
 <section className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
   {/* Today's Appointments */}
@@ -1920,14 +1787,10 @@ const selectedAssignMentorName =
       </div>
     ) : (
       <div className="h-[455px] space-y-4 overflow-y-auto pr-3 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-white/5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#8ec5eb]/35 hover:[&::-webkit-scrollbar-thumb]:bg-[#8ec5eb]/55">
-        {/* {appointments.slice(0, 2).map((appointment) => {
-          const { platformIcon, mentorName, mentorRole, meetingTime } =
-            formatAppointment(appointment);
-
-          return ( */}
+       
           {appointments.map((appointment) => {
             const appointmentId = appointmentEntityId(appointment);
-  // const { platformIcon, meetingTime } = formatAppointment(appointment);
+
 const {
   platformIcon,
   mentorName,
@@ -1936,30 +1799,11 @@ const {
   attendeeRole,
   meetingTime,
 } = formatAppointment(appointment);
-  // const mentor =
-  //   appointment.mentor ??
-  //   (typeof (appointment as any).mentorId === "object"
-  //     ? (appointment as any).mentorId
-  //     : undefined);
 
-  // const attendee =
-  //   appointment.user ??
-  //   (typeof (appointment as any).userId === "object"
-  //     ? (appointment as any).userId
-  //     : undefined);
 
-  // const mentorName =
-  //   `${mentor?.firstName ?? ""} ${mentor?.lastName ?? ""}`.trim() ||
-  //   mentor?.email ||
-  //   "Director";
 
-  // const attendeeName =
-  //   `${attendee?.firstName ?? ""} ${attendee?.lastName ?? ""}`.trim() ||
-  //   attendee?.email ||
-  //   "Participant";
 
-  // const attendeeRole = attendee?.role || "Pastor";
-  // const attendeeEmail = attendee?.email || "";
+
   const attendeeEmail =
   appointment.user?.email ||
   ((appointment as any).userId && typeof (appointment as any).userId === "object"
@@ -1982,20 +1826,12 @@ const {
                 </div>
 
                 <div className="min-w-0 flex-1">
-                  {/* <h4 className="text-sm font-semibold text-white">
-                    {mentorName}
-                  </h4>
-
-                  <p className="mt-0.5 text-xs capitalize text-white/60">
-                    {mentorRole}
-                  </p> */}
+              
                   <h4 className="text-sm font-semibold text-white">
   {mentorName}
 </h4>
 
-{/* <p className="mt-0.5 text-xs capitalize text-white/60">
-  Director
-</p> */}
+
 <p className="mt-0.5 text-xs capitalize text-white/60">
   {mentorRole}
 </p>
@@ -2009,10 +1845,7 @@ const {
 </p>
 
                   <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-                    {/* <span className="rounded-lg border border-emerald-400/25 bg-emerald-500/10 px-2 py-1 text-emerald-100">
-                      <i className="fa-solid fa-circle mr-1 text-[7px]" />
-                      In discussion
-                    </span> */}
+                
                     <span className="rounded-lg border border-emerald-400/25 bg-emerald-500/10 px-2 py-1 text-emerald-100">
   <i className="fa-solid fa-circle mr-1 text-[7px]" />
   {appointment.status
@@ -2026,11 +1859,7 @@ const {
                     </span>
                   </div>
 
-                  {/* <div className="mt-2 flex gap-4 text-sm text-white/70">
-                    <i className="fa-solid fa-phone" />
-                    <i className="fa-regular fa-comment" />
-                    <i className="fa-brands fa-whatsapp" />
-                  </div> */}
+             
          <div className="mt-2 flex gap-4 text-sm text-white/70">
   <button
     type="button"
@@ -2079,13 +1908,7 @@ const {
 </div>
                 </div>
 
-                {/* <button
-                  type="button"
-                  onClick={() => router.push("/director/schedule")}
-                  className="self-end rounded-lg border border-white/20 bg-white/10 px-5 py-2 text-xs font-semibold text-white transition hover:bg-white/15"
-                >
-                  Details
-                </button> */}
+              
                 <button
   type="button"
   disabled={!appointmentId}
@@ -2155,20 +1978,7 @@ const {
                 {interest.title || "No title"}
               </p>
             </div>
-{/* 
-            <div className="flex items-center gap-4 text-[#8ec5eb]">
-              <button type="button" className="hover:opacity-80" aria-label="Email">
-                <i className="fa-solid fa-envelope text-sm" />
-              </button>
 
-              <button type="button" className="hover:opacity-80" aria-label="Chat">
-                <i className="fa-regular fa-comment text-sm" />
-              </button>
-
-              <button type="button" className="hover:opacity-80" aria-label="Call">
-                <i className="fa-solid fa-phone text-sm" />
-              </button>
-            </div> */}
 
          <div className="flex items-center gap-4 text-[#8ec5eb]">
   <button
@@ -2221,167 +2031,10 @@ const {
 </section>
 
       {/* Today's Appointments */}
-      {/* <section className="relative mt-10 overflow-hidden py-10">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold sm:text-xl">Today&apos;s Appointments</h2>
-          <Link
-            href="/director/schedule"
-            className="text-sm font-medium text-[#8ec5eb] hover:text-[#b8ddf5]"
-          >
-            See all
-          </Link>
-        </div>
-
-        {appointmentsLoading ? (
-          <p className="text-sm text-white/55">Loading appointments…</p>
-        ) : appointments.length === 0 ? (
-          <div className={`p-8 text-center text-sm text-white/55 ${directorGlassCard}`}>
-            No appointments scheduled for today.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
-            {appointments.slice(0, 2).map((appointment) => {
-              const { platformIcon, mentorName, mentorRole, meetingDate, meetingTime } =
-                formatAppointment(appointment);
-
-              return (
-                <div
-                  key={appointment.id}
-                  className={`flex flex-col gap-4 p-5 sm:flex-row sm:items-center ${directorGlassCard}`}
-                >
-                  <div className="flex shrink-0 justify-center sm:justify-start">
-                    <div className="flex h-[100px] w-[100px] items-center justify-center rounded-2xl border border-white/15 bg-white/10 sm:h-[120px] sm:w-[120px]">
-                      <Image
-                        src={platformIcon}
-                        alt={appointment.platform}
-                        className="h-12 w-12 sm:h-14 sm:w-14"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="min-w-0 flex-1 text-center sm:text-left">
-                    <div className="mb-3 flex items-center justify-center gap-3 sm:justify-start">
-                      {appointment.mentor?.profilePicture ? (
-                        <Image
-                          src={appointment.mentor.profilePicture}
-                          alt={mentorName}
-                          width={40}
-                          height={40}
-                          unoptimized={isRemoteImageSrc(
-                            appointment.mentor.profilePicture,
-                          )}
-                          className="rounded-full border border-white/30"
-                        />
-                      ) : (
-                        <Image src={UserProfile} alt="User" width={40} height={40} className="rounded-full border border-white/30" />
-                      )}
-                      <div>
-                        <h4 className="font-semibold text-white">{mentorName}</h4>
-                        <p className="text-xs capitalize text-white/60">{mentorRole}</p>
-                      </div>
-                    </div>
-
-                    <div className="mb-3 flex flex-wrap justify-center gap-2 text-xs sm:justify-start">
-                      <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-white/85">
-                        <i className="fa-regular fa-calendar mr-1 text-[#e3d247]" />
-                        {meetingDate.toLocaleDateString()}
-                      </span>
-                      <span className="rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-white/85">
-                        <i className="fa-regular fa-clock mr-1 text-[#5ee0d0]" />
-                        {meetingTime}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col items-center justify-between gap-3 sm:flex-row sm:items-end">
-                      <div>
-                        <div className="mt-2 flex gap-4 text-sm text-white/80">
-                          <i className="fa-solid fa-phone" />
-                          <i className="fa-regular fa-comment" />
-                          <i className="fa-brands fa-whatsapp" />
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => router.push("/director/schedule")}
-                        className="rounded-lg border border-white/20 bg-white/10 px-5 py-2 text-sm text-white transition hover:bg-white/15"
-                      >
-                        Details
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section> */}
+ 
 
       {/* New Interests Section */}
-      {/* <section className="mt-10 py-10">
-        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-2 lg:gap-12">
-          <div>
-            <h2 className="mb-4 text-2xl font-semibold sm:text-3xl md:text-[32px]">New Interests</h2>
-            <p className="mb-6 text-base leading-relaxed text-white/70">
-              Review the details of the newly submitted interest and take the
-              next steps to guide and support the process effectively.
-            </p>
-            <button
-              type="button"
-              onClick={() => router.push("/director/interest-list")}
-              className="rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-8 py-3 font-semibold text-white transition hover:bg-[#8ec5eb]/25"
-            >
-              See All
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {interestsLoading ? (
-              <div className="py-8 text-center text-white/55">Loading interests…</div>
-            ) : interests.length === 0 ? (
-              <div className={`py-8 text-center text-sm text-white/55 ${directorGlassCard}`}>No new interests</div>
-            ) : (
-              interests.slice(0, 4).map((interest) => (
-                <div
-                  key={interest._id}
-                  className={`flex flex-col items-start justify-between gap-4 rounded-xl p-4 sm:flex-row sm:items-center sm:p-5 ${directorGlassCard}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-[50px] w-[50px] items-center justify-center rounded-full border border-white/15 bg-[#8ec5eb]/20">
-                      <i className="fa-solid fa-user text-xl text-[#8ec5eb]" />
-                    </div>
-                    <div>
-                      <h4 className="text-base font-semibold text-white">
-                        {interest.firstName} {interest.lastName}
-                      </h4>
-                      <p className="text-sm text-white/55">{interest.title || "No title"}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex w-full items-center justify-end gap-3 sm:w-auto">
-                    <button type="button" className="text-[#8ec5eb] hover:opacity-80">
-                      <i className="fa-solid fa-envelope text-lg" />
-                    </button>
-                    <button type="button" className="text-[#8ec5eb] hover:opacity-80">
-                      <i className="fa-regular fa-comment text-lg" />
-                    </button>
-                    <button type="button" className="text-[#8ec5eb] hover:opacity-80">
-                      <i className="fa-solid fa-phone text-lg" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/director/interest-list/${interest._id}`)}
-                      className="rounded-md border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-4 py-2 text-sm font-medium text-white transition hover:bg-[#8ec5eb]/25 sm:px-6"
-                    >
-                      View
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </section> */}
+ 
 
       {/* Add User Section */}
      
@@ -2486,12 +2139,7 @@ const {
         Quick Links
       </h2>
 
-      {/* <button
-        type="button"
-        className="text-xs font-semibold text-[#8ec5eb] hover:text-[#b8ddf5]"
-      >
-        See all
-      </button> */}
+     
     </div>
 
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-5">
@@ -2499,36 +2147,7 @@ const {
         <button
           key={item.title}
           type="button"
-          // onClick={() => router.push(item.route)}
-//   onClick={() => {
 
-//   if (item.title === "Assign Mentors") {
-//     void openQuickAssignMentors();
-//     return;
-//   }
-
-//   if (item.title === "Pastors Roadmap") {
-//     void openPastorsRoadmapModal();
-//     return;
-//   }
-//     if (item.title === "Monthly Appointments") {
-//     void openMonthlyAppointmentsModal();
-//     return;
-//   }
-// if (item.title === "Mentor-Mentee Mapping") {
-//   void openMentorMenteeMappingModal();
-//   return;
-// }
-// if (item.title === "Customized Development Plan") {
-//   void openCdpModal();
-//   return;
-// }
-// if ((link as any).action === "assignMentee") {
-//   openAssignMenteeModal();
-//   return;
-// }
-//   router.push(item.route);
-// }}
 onClick={() => {
   if (item.title === "Assign Mentors") {
     void openQuickAssignMentors();
@@ -2629,8 +2248,7 @@ if (route) {
                 const personId = (person as any).id || person._id;
                 const menteeCount = person.assignedId?.length || person.menteeCount || 0;
                 const isMentor = activeTab === "mentors";
-                // return (
-                //   <MentorCard
+             
                 return (
  <div key={personId} className="w-[300px]  shrink-0">
   <MentorCard
@@ -3069,19 +2687,7 @@ if (route) {
             />
           </div>
         )}
-        {/* <p className="mt-3 text-center text-xs text-white/50">
-          Live data: refetches when you return to this tab, every 5 minutes, and when you press refresh.
-          Showing up to {MAX_NETWORK_MAP_MARKERS} people. For GPS-accurate pins, add coordinates in your
-          API.
-        </p> */}
-        {/* <div className="mt-2 flex flex-wrap items-center justify-center gap-4 text-xs text-white/55">
-          <span>
-            <span className="inline-block h-2.5 w-2.5 rounded-full ring-2 ring-[#8ec5eb]/90" /> Mentor
-          </span>
-          <span>
-            <span className="inline-block h-2.5 w-2.5 rounded-full ring-2 ring-[#5ee0d0]/90" /> Pastor
-          </span>
-        </div> */}
+      
       </section>
            {showQuickAssignModal && (
   <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b18]/75 px-4 backdrop-blur-md">
@@ -3208,31 +2814,9 @@ if (route) {
             </>
           ) : (
             <>
-              {/* <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8ec5eb]">
-                    Selected Pastor
-                  </p>
-                  <h4 className="mt-1 text-base font-semibold text-white">
-                    {selectedQuickPastorName}
-                  </h4>
-                </div>
+        
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedQuickPastorId("");
-                    setSelectedQuickMentorId("");
-                  }}
-                  className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
-                >
-                  Change Pastor
-                </button>
-              </div> */}
-
-              {/* <h4 className="mb-4 text-sm font-semibold text-[#8ec5eb]">
-                Select Mentor
-              </h4> */}
+             
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
   <h4 className="text-sm font-semibold text-[#8ec5eb]">
     Select Mentor
@@ -3252,11 +2836,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
 </div>
          
 
-              {/* {quickAssignMentors.length === 0 ? (
-                <p className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-white/60">
-                  No mentors found.
-                </p>
-              ) : ( */}
+             
            {filteredQuickAssignMentors.length === 0 ? (
   <p className="...">
     No mentors found.
@@ -3337,21 +2917,6 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
     </div>
   </div>
 )}
-      {/* {quickAssignToast && (
-  <div className="fixed left-1/2 top-24 z-[120] -translate-x-1/2 px-4">
-    <div className={`${directorGlassCard} flex items-center gap-3 px-5 py-3 text-sm font-semibold text-white shadow-2xl`}>
-      <i
-        className={`fa-solid ${
-          quickAssignToast.toLowerCase().includes("failed") ||
-          quickAssignToast.toLowerCase().includes("please")
-            ? "fa-circle-exclamation text-amber-300"
-            : "fa-circle-check text-emerald-300"
-        }`}
-      />
-      <span>{quickAssignToast}</span>
-    </div>
-  </div>
-)} */}
 {quickAssignToast && (
   <div
     className={`fixed bottom-6 right-6 z-[120] flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-semibold shadow-2xl ${
@@ -3436,11 +3001,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                       if (!pastorId) return;
 
                       setShowPastorRoadmapModal(false);
-                      // router.push(
-                      //   `/director/pastor-assignments?assignUser=${encodeURIComponent(
-                      //     pastorId
-                      //   )}`
-                      // );
+              
                       router.push(
   `/director/revitalization-roadmap?tab=pastor&pastorId=${encodeURIComponent(
     pastorId
@@ -3449,9 +3010,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                     }}
                    className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 text-left shadow-sm transition hover:border-[#8ec5eb]/45 hover:bg-[#17334d]/80"
                   >
-                    {/* <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
-                      <i className="fa-solid fa-user" />
-                    </span> */}
+                   
                     <QuickLinkAvatar person={pastor} icon="fa-solid fa-user" />
 
                     <span className="min-w-0">
@@ -3475,7 +3034,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
   </div>
 )}
 {showMonthlyAppointmentsModal && (
-  // <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b18]/70 px-4 backdrop-blur-md">
+ 
   <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-[#020b18]/70 px-4 backdrop-blur-md">
   {/* <div className={`${directorGlassCard} w-full max-w-4xl overflow-hidden border border-white/15 bg-[#10243a]/95 shadow-2xl`}> */}
   <div
@@ -3625,9 +3184,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                         onClick={() => {
                           if (!appointmentId) return;
                           setShowMonthlyAppointmentsModal(false);
-                          // router.push(
-                          //   `/director/schedule/${encodeURIComponent(appointmentId)}`
-                          // );
+                     
                           router.push(
   `/director/schedule/${encodeURIComponent(
     appointmentId
@@ -3689,11 +3246,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
 
   <button
     type="button"
-    // onClick={() => {
-    //   setShowMentorMenteeModal(false);
-    //   setSelectedMappingMentorId("");
-    //   setMappingMentees([]);
-    // }}
+
     onClick={() => {
   setShowMentorMenteeModal(false);
   setSelectedMappingMentorId("");
@@ -3787,30 +3340,12 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
             <>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  {/* <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8ec5eb]">
-                    Assigned Mentees
-                  </p>
-                  <h4 className="mt-1 text-base font-semibold text-white">
-                    Selected mentor
-                  </h4> */}
-                  {/* <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8ec5eb]">
-  This mentor&apos;s assigned mentees
-</p> */}
+     
 <h4 className="mt-1 text-base font-semibold text-white">
   {selectedMappingMentorName || "Selected mentor"}
 </h4>
                 </div>
 
-                {/* <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedMappingMentorId("");
-                    setMappingMentees([]);
-                  }}
-                  className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
-                >
-                  Change Mentor
-                </button> */}
               </div>
 
               {mappingMenteesLoading ? (
@@ -3831,10 +3366,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
                       "Unnamed mentee";
 
                     return (
-                      // <div
-                      //   key={menteeId}
-                      //   className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 shadow-sm"
-                      // >
+                 
                       <button
   type="button"
   key={menteeId}
@@ -3845,9 +3377,7 @@ onChange={(e) => setQuickAssignMentorSearch(e.target.value)}
   }}
   className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-[#132a42]/80 px-4 py-4 text-left shadow-sm transition hover:border-[#8ec5eb]/45 hover:bg-[#173653]/90"
 >
-                        {/* <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#8ec5eb]/20 text-[#8ec5eb]">
-                          <i className="fa-solid fa-user" />
-                        </span> */}
+                       
                         <QuickLinkAvatar person={mentee} icon="fa-solid fa-user" />
 
                         <span className="min-w-0 flex-1">

@@ -88,23 +88,7 @@ function convertTo24Hour(time12: string, period: string): string {
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
-// function getPlatformIcon(platform?: string) {
-//   const value = String(platform || "").toLowerCase().trim();
 
-//   if (value.includes("zoom")) return ZoomIcon;
-
-//   if (
-//     value.includes("meet") ||
-//     value.includes("gmeet") ||
-//     value.includes("google")
-//   ) {
-//     return MeetIcon;
-//   }
-
-//   if (value.includes("duo")) return DuoIcon;
-
-//   return ZoomIcon;
-// }
 function getPlatformIcon(platform?: string) {
   const value = String(platform || "").toLowerCase().trim();
 
@@ -583,12 +567,7 @@ useEffect(() => {
       return normalizeAppointmentStatus(a) === "missed";
     })
     .sort((a, b) => new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime());
-  // const appointmentHistory = appointments
-  //   .filter((a) => {
-  //     const ms = new Date(a.meetingDate).getTime();
-  //     return ms < Date.now() || normalizeAppointmentStatus(a) === "missed";
-  //   })
-  //   .sort((a, b) => new Date(b.meetingDate).getTime() - new Date(a.meetingDate).getTime());
+
   const appointmentHistory = appointments
   .filter((a) => {
     const ms = new Date(a.meetingDate).getTime();
@@ -744,12 +723,7 @@ googleCalendarDescription:
 initiatorRole: "mentor",
       });
 
-      // const gHint = googleCalendarSuccessHintFromCreateResponse(res?.data);
-      // const outcome = extractGoogleCalendarCreateOutcome(res?.data);
-      // if (gHint) mentorToastDismissMs = 7000;
-      // if (outcome.warnings.length) {
-      //   mentorToastDismissMs = Math.max(mentorToastDismissMs, 9000);
-      // }
+   
 const outcome = extractGoogleCalendarCreateOutcome(res?.data);
 const hasCalendarWarning = outcome.warnings.length > 0;
       setAvailableSlots((prev) => prev.filter((s) => s !== selectedSlot));
@@ -763,12 +737,7 @@ const hasCalendarWarning = outcome.warnings.length > 0;
       setSelectedSlot("");
       setMeetingTitle("");
 setMeetingDescription("");
-      // const warningSuffix =
-      //   outcome.warnings.length > 0 ? ` Note: ${outcome.warnings.join(" · ")}` : "";
-      // setToastMessage(
-      //   (gHint ? `Appointment created. ${gHint}` : "Appointment created successfully") +
-      //     warningSuffix,
-      // );
+   
       setToastMessage(
   hasCalendarWarning
     ? "Appointment created successfully. For calendar sync details, visit Availability."

@@ -54,7 +54,7 @@ const fileInputRef = useRef<HTMLInputElement>(null);
 
         if (userId) {
           const ownRes = await apiGetDocuments(userId);
-          // setDocuments(Array.isArray(ownRes.data?.data) ? ownRes.data.data : []);
+
           const myDocs = Array.isArray(ownRes.data?.data) ? ownRes.data.data : [];
 
 setDocuments(
@@ -193,7 +193,7 @@ const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const uploaded = res.data?.data;
 
     if (uploaded) {
-      // setDocuments((prev) => [uploaded, ...prev]);
+  
       setDocuments((prev) => [{ ...uploaded, ownerId: userId }, ...prev]);
       setActiveTab("my");
     }
@@ -228,9 +228,7 @@ const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
 
   const handleDeleteDocument = async (doc: any) => {
     try {
-      // if (!doc?.ownerId || !doc?.fileUrl) return;
 
-      // await apiDeleteDocument(doc.ownerId, doc.fileUrl);
 const docId = doc?._id || doc?.id || doc?.docId;
 
 if (!doc?.ownerId || !docId) return;

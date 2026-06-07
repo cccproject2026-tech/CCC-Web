@@ -193,7 +193,7 @@ function TaskPageContent() {
   const fetchComments = useCallback(async () => {
     if (!roadmapId || !userId) return;
     try {
-      // const res = await apiGetComments(roadmapId, userId);
+
       // setComments(unwrapCommentsFromResponse(res));
 const res = await apiGetComments(roadmapId, userId);
 
@@ -230,7 +230,7 @@ setComments(scoped);
     const status = queryTab === "Pending" ? "pending" : "answered";
     try {
       const res = await apiGetQueries(roadmapId, userId, status, taskId || undefined, "pastor");
-      // setQueries(unwrapQueriesFromResponse(res));
+
       const all = unwrapQueriesFromResponse(res);
 
 
@@ -569,7 +569,7 @@ const allRenderableExtrasForHistory = pastorExtrasRows.filter(isRenderablePastor
 const submissionVersions = buildVersionsFromExtras(allRenderableExtrasForHistory);
 const previousSubmissionVersions = submissionVersions.slice(0, -1);
 
-// const renderHistoryAnswerCard = (
+
 //   item: Record<string, unknown>,
 //   idx: number,
 // ): JSX.Element => {
@@ -580,8 +580,8 @@ const renderHistoryAnswerCard = (
 ): JSX.Element => {
   const type = String(item.type ?? "").toUpperCase();
   const label = String(item.name ?? item.key ?? `Item ${idx + 1}`);
-  // const normalizedLabel = label.trim().toLowerCase();
-  // const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
+
+
 const normalizedLabel = label.trim().toLowerCase();
 
 const allUploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
@@ -826,15 +826,15 @@ const renderAnswerCard = (
 ) => {
   const t = String(item.type ?? "").toUpperCase();
   const label = String(item.name ?? item.key ?? fallbackLabel ?? `Item ${idx + 1}`);
-  // const uploadedFiles =
+
   // pastorUploadDocs[label.trim()] ??
   // pastorUploadDocs[label.trim().toLowerCase()] ??
   // [];
-//   const normalizedLabel = label.trim().toLowerCase();
-// const uploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
-// const normalizedLabel = label.trim().toLowerCase();
 
-// const currentUploadBatchId = String(
+
+
+
+
 //   item.uploadBatchId ??
 //     item.uploadBatchID ??
 //     item.batchId ??
@@ -842,9 +842,9 @@ const renderAnswerCard = (
 //     ""
 // ).trim();
 
-// const allUploadedFiles = pastorUploadDocs[normalizedLabel] ?? [];
 
-// const uploadedFiles = currentUploadBatchId
+
+
 //   ? allUploadedFiles.filter((file) => file.uploadBatchId === currentUploadBatchId)
 //   : allUploadedFiles.slice(-1);
 const normalizedLabel = label.trim().toLowerCase();

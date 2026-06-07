@@ -212,11 +212,7 @@ export default function PastorAssessments() {
       }
       if (!opts?.silent) setLoading(true);
       try {
-        // const [assessmentRes, progressRes, appointmentsRes] = await Promise.allSettled([
-        //   apiGetAssignedAssessments(sessionUserId),
-        //   apiGetUserProgress(sessionUserId),
-        //   apiGetAppointments({ userId: sessionUserId, futureOnly: false } as any),
-        // ]);
+    
         const [assessmentRes, allAssessmentsRes, progressRes, appointmentsRes] = await Promise.allSettled([
   apiGetAssignedAssessments(sessionUserId),
   apiGetAssessments(),
@@ -228,39 +224,10 @@ export default function PastorAssessments() {
           throw assessmentRes.reason;
         }
 
-        // const list = parseAssignedAssessmentsListBody(assessmentRes.value.data);
+       
         let list = parseAssignedAssessmentsListBody(assessmentRes.value.data);
 
-// if (list.length === 0 && allAssessmentsRes.status === "fulfilled") {
-//   const allAssessmentsBody: any = allAssessmentsRes.value.data;
 
-//   const allAssessments = Array.isArray(allAssessmentsBody?.data)
-//     ? allAssessmentsBody.data
-//     : Array.isArray(allAssessmentsBody)
-//       ? allAssessmentsBody
-//       : [];
-
-//   list = allAssessments
-//     .map((assessment: any) => {
-//       const assignment = Array.isArray(assessment?.assignments)
-//         ? assessment.assignments.find(
-//             (row: any) => String(row?.userId) === String(sessionUserId)
-//           )
-//         : null;
-
-//       if (!assignment) return null;
-
-//       return {
-//         assessment,
-//         assessmentId: assessment?._id || assessment?.id,
-//         assignmentId: assignment?._id,
-//         dueDate: assignment?.dueDate,
-//         assignedDueDate: assignment?.dueDate,
-//         updatedAt: assignment?.assignedAt || assessment?.updatedAt,
-//       };
-//     })
-//     .filter(Boolean);
-// }
 if (allAssessmentsRes.status === "fulfilled") {
   const allAssessmentsBody: any = allAssessmentsRes.value.data;
 
@@ -329,7 +296,7 @@ if (allAssessmentsRes.status === "fulfilled") {
             const flat = flattenAssignedAssessmentRow(item);
             if (!flat) return null;
            
-            // const { assessment, assessmentId: aid, assignmentId, dueDate, updatedAt } = flat;
+
             const { assessment, assessmentId: aid, assignmentId, updatedAt } = flat;
 
 const rawItem: any = item;
@@ -361,15 +328,7 @@ const dueDate =
             const ps = String(progress?.status || "").toLowerCase().replace(/\s+/g, "_");
 
             const a = assessment as Record<string, unknown>;
-            // const rawBanner =
-            //   (typeof a.bannerImage === "string" && a.bannerImage) ||
-            //   (typeof a.imageUrl === "string" && a.imageUrl) ||
-            //   (typeof a.image === "string" && a.image) ||
-            //   undefined;
-            // const imgUrl = resolveApiMediaUrl(rawBanner);
-
-            // return {
-            //   id: aid,
+       
             const rawBanner =
   (typeof a.bannerImage === "string" && a.bannerImage) ||
   (typeof a.imageUrl === "string" && a.imageUrl) ||
@@ -382,14 +341,6 @@ const appointmentId = String(
   rawFlat.appointmentId ?? rawItem.appointmentId ?? rawFlat.assessment?.appointmentId ?? "",
 ).trim();
 
-// const linkedMeeting =
-//   (appointmentId
-//     ? appointmentsList.find((appointment: any) => String(appointment?._id ?? appointment?.id ?? "") === appointmentId)
-//     : null) ||
-//   appointmentsList.find((appointment: any) => {
-//     const notes = String(appointment?.notes ?? "");
-//     return notes.includes(`assessmentId=${aid}`);
-//   });
 const linkedMeeting =
   (appointmentId
     ? appointmentsList.find(
@@ -414,16 +365,7 @@ const linkedMeetingId = linkedMeeting
   : "";
 const hasScheduledMeeting = Boolean(linkedMeetingId);
 
-// let status: Row["status"] = "Not Started";
-// if (ps === "completed" || ps === "reviewed") {
-//   status = hasScheduledMeeting ? "Completed" : "Submitted";
-// } else if (ps === "submitted") {
-//   status = "Submitted";
-// } else if (ps === "in_progress" || ps === "inprogress" || ps === "due") {
-//   status = "Due";
-// } else if (isDueNowOrPast(dueDate)) {
-//   status = "Due";
-// }
+
 
 const [answersRes, recRes] = await Promise.allSettled([
   apiGetUserAnswers(aid, sessionUserId),
@@ -493,25 +435,7 @@ return {
               desc: (assessment?.description as string) || "",
               status,
               dueDate: dueDate ? new Date(dueDate).toLocaleDateString() : "",
-//               submittedAt: (() => {
-//   const raw =
-//     rawFlat.submittedAt ??
-//     rawItem.submittedAt ??
-//     rawFlat.completedAt ??
-//     rawItem.completedAt ??
-//     rawFlat.updatedAt ??
-//     rawItem.updatedAt ??
-//     updatedAt;
 
-//   return raw ? new Date(raw).toLocaleString("en-US", {
-//     month: "short",
-//     day: "2-digit",
-//     year: "numeric",
-//     hour: "2-digit",
-//     minute: "2-digit",
-//     hour12: true,
-//   }) : undefined;
-// })(),
 submittedAt: (() => {
   const answerData: any =
     answersRes.status === "fulfilled" ? answersRes.value.data?.data : null;
@@ -639,7 +563,7 @@ hasCdp,
     if (activeTab === "All") return matchesSearch;
     return a.status === activeTab && matchesSearch;
   });
-  // const recommendedAssessment = filtered.find((item) => item.status !== "Completed");
+ 
 const recommendedAssessment = filtered.find((item) => item.status === "Not Started");
   const getStatusColor = (status: string) => {
     switch (status) {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
-// import AppFooter from "@/app/Components/AppFooter";
+
 import DirectorHero from "../../DirectorHero";
 import MentorBg from "../../../Assets/mentor-bg.png";
 import Mentor1 from "../../../Assets/mentor1.png";
@@ -247,7 +247,7 @@ const handleAssign = async () => {
 
   try {
     await apiUpdateInterestStatus(interestData.userId, "pending");
-    // setInterestData({ ...interestData, status: "pending" });
+
     setInterestData({ ...interestData, status: "pending" as const });
     setToast("Interest moved to pending successfully");
     setTimeout(() => setToast(null), 3000);
@@ -275,7 +275,7 @@ const handleAssign = async () => {
 
   setInterestData(updatedInterest);
   setToast("Interest accepted successfully. Please continue with assignment.");
-  // setShowAssignModal(true);
+
   setShowAcceptedModal(true);
   setTimeout(() => setToast(null), 3000);
 } catch (error) {

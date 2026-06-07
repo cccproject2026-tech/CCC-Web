@@ -367,17 +367,17 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
                           <div className="flex flex-col w-full">
                             <div className="flex justify-between">
                               <h3 className="font-semibold text-[14px] text-white">
-                                {/* {note.name || "Notification"} */}
+                               
                                 {p.title}
                               </h3>
                               <div className="w-[8px] h-[8px] rounded-full bg-[#FFD700] mt-[2px]"></div>
                             </div>
                             <p className="text-[#cde2f2] text-[13px] leading-snug">
-                              {/* {note.details || note.description || ""} */}
+                             
                               {p.subtitle || ""}
                             </p>
                             <p className="text-white/50 text-[12px] text-right mt-1">
-                              {/* {note?.createdAt ? new Date(note.createdAt).toLocaleString() : ""} */}
+                             
                               {p.time}
                             </p>
                           </div>
@@ -411,22 +411,9 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
                     {user ? `${user.firstName} ${user.lastName}` : "Loading..."}
                   </p>
                 </div>
-                {/* <Image
-                  src={user?.profilePicture || UserProfile}
-                  alt={user ? `${user.firstName} profile` : "User profile"}
-                  width={30}
-                  height={30}
-                  className="rounded-full border border-white/40"
-                /> */}
+               
                 <div className="h-[30px] w-[30px] overflow-hidden rounded-full border border-white/40 bg-white/10">
-  {/* <Image
-    src={user?.profilePicture || UserProfile}
-    alt={user ? `${user.firstName} profile` : "User profile"}
-    width={30}
-    height={30}
-    className="h-full w-full rounded-full object-cover"
-    unoptimized={typeof user?.profilePicture === "string" && user.profilePicture.startsWith("http")}
-  /> */}
+
   <img
   src={
     user?.profilePicture
@@ -485,7 +472,7 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
                         {/* ⚙️ Settings Sub-Menu */}
                         {item.subMenu && showSettingsMenu && (
                           <div className="absolute -left-[240px] top-0 mt-1 w-[230px] rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(245,250,255,0.98)_100%)] text-[#0f4a76] shadow-[0_16px_40px_rgba(3,24,43,0.2)]">
-                            {/* <div className="absolute -right-2 top-3 w-4 h-4 bg-white rotate-45 border-l border-t border-gray-100"></div> */}
+                           
 
                             <div className="flex flex-col py-2">
                               {settingsSubMenu.map((sub, j) => (

@@ -380,9 +380,7 @@ const [assignedMentorLoading, setAssignedMentorLoading] = useState(false);
   const refreshRoadmapsAndProgress = useCallback(async () => {
     if (!pastorUserId) return;
     try {
-      // const res = await apiGetRoadmapsByUser(pastorUserId);
-      // const list = unwrapRoadmapsList(res as unknown as { data: unknown });
-      // setRoadmapsFull(list);
+   
       const [res, progressRes] = await Promise.all([
   apiGetRoadmapsByUser(pastorUserId),
   apiGetUserProgress(pastorUserId),
@@ -396,7 +394,7 @@ const mergedList =
 
 setRoadmapsFull(mergedList);
 
-      // const mapped = list.map((item: any) => {
+    
       const mapped = mergedList.map((item: any) => {
         const rawStatus = String(item?.status ?? "")
           .trim()
@@ -609,80 +607,13 @@ const res = await apiGetAssignedUsers(pastorId);
 };
   return (
     <div className={pastorPageRoot}>
-      {/* <PastorHeader showFullHeader={true} /> */}
-{/* 
-      <section
-        className="relative overflow-hidden bg-cover bg-top px-4 pb-8 pt-6 sm:px-8 lg:px-20"
-        style={{ backgroundImage: `url(${HeroBg.src})` }}
-      >
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,31,53,0.68)_0%,rgba(6,41,70,0.6)_50%,rgba(6,41,70,1)_100%)]" />
-
-        <div className="relative z-10 mx-auto w-full max-w-6xl">
-          <div className="mb-4 flex items-start justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-white/85">{greeting}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-2xl font-bold tracking-wide">{currentTime}</p>
-              <p className="text-xs text-white/80">{currentDate}</p>
-            </div>
-          </div>
-
-          <div
-            className="rounded-2xl border border-white/20 bg-[linear-gradient(180deg,rgba(15,74,118,0.55)_0%,rgba(9,49,80,0.72)_100%)] p-4 shadow-[0_20px_50px_rgba(2,20,38,0.4)] backdrop-blur-md"
-            onClick={() => router.push("/pastor/profile")}
-          >
-            <div className="flex items-center gap-3">
-              <Image
-                src={UserProfile}
-                alt="User"
-                width={44}
-                height={44}
-                className="rounded-full border border-white/40"
-              />
-              <div className="flex-1">
-                <p className="text-lg font-semibold">Welcome aboard!</p>
-                <p className="text-xs text-white/80">Progress</p>
-                <div className="mt-2 flex items-center gap-3">
-                  <div className="h-2 flex-1 rounded-full bg-white/25">
-                    <div
-                      className="h-2 rounded-full bg-[#8ec5eb]"
-                      style={{ width: `${progressPercent}%` }}
-                    />
-                  </div>
-                  <span className="text-sm font-semibold">{progressPercent}%</span>
-                </div>
-                {overallProgressWarning ? (
-                  <p className="mt-2 text-xs text-amber-200/90">{overallProgressWarning}</p>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    router.push("/pastor/Myprogress");
-                  }}
-                  className="mt-2 text-xs font-semibold text-[#8ec5eb] hover:text-white"
-                >
-                  View Progress Tracker
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section> */}
-{/* <PastorHeader showFullHeader={true} />
-
-<div className="px-4 pt-8 sm:px-8 lg:px-20"> */}
+ 
+\
 <PastorHeader showFullHeader={true} />
 
 <main className={`${pastorMainGradient} min-h-screen`}>
   <div className="relative z-10 px-4 pt-8 sm:px-8 lg:px-20">
-  {/* <section
-    className="relative overflow-hidden rounded-3xl border border-white/10 bg-cover bg-center"
-    style={{ backgroundImage: `url(${HeroBg.src})` }}
-  >
-    <div className="absolute inset-0 bg-gradient-to-t from-[#062946] via-[#062946]/75 to-[#0a3558]/50" />
-    <div className="absolute inset-0 bg-gradient-to-r from-[#041f35]/90 via-transparent to-transparent" /> */}
+  
 
 <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-[linear-gradient(180deg,#0a2b45_0%,#08243b_100%)]">
   <div
@@ -694,9 +625,7 @@ const res = await apiGetAssignedUsers(pastorId);
   <div className="absolute inset-y-0 left-0 w-[58%] bg-[linear-gradient(90deg,rgba(4,24,41,0.88)_0%,rgba(4,24,41,0.62)_58%,rgba(4,24,41,0)_100%)]" />
     <div className="relative z-10 flex min-h-[340px] flex-col justify-between p-5 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
       <div className="max-w-full space-y-2 lg:max-w-2xl">
-        {/* <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
-          {greeting}
-        </p> */}
+       
 
         <h1 className="text-xl font-semibold leading-snug sm:text-3xl lg:text-4xl">
          Cultivate Spiritual, Professional, Social, And Community

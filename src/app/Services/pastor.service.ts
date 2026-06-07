@@ -9,9 +9,8 @@ export const getUserAppointments = (userId: string) => {
   return axiosInstance.get(`/appointments/user/${userId}`);
 };
 
-// export const getSingleUser = (userId: string) => {
-//   return api.get(`/users/${userId}`);
-// };
+
+
 export const getSingleUser = (userId: string) => {
   return axiosInstance.get(`/users/${userId}`, {
     params: { t: Date.now() },

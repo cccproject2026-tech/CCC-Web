@@ -399,14 +399,14 @@ export default function DirectorMentoringSessionPage() {
           if (a.sessionNumber !== b.sessionNumber) return a.sessionNumber - b.sessionNumber;
           return new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime();
         });
-    //   const completedCount = pastorSessions.filter((session) => session.status === "completed").length;
-    //   const currentSessionNumber = Math.min(completedCount + 1, 10);
-    //   const currentSession =
+
+
+
     //     pastorSessions.find((session) => session.sessionNumber === currentSessionNumber && session.status !== "completed") ||
     //     pastorSessions.find((session) => session.status !== "completed");
-    //   const latestSession = pastorSessions[pastorSessions.length - 1];
-    //   const displaySession = currentSession || (completedCount >= 10 ? latestSession : undefined);
-    //   const mentor = mentorById.get(pastor.mentorId) || mentorById.get(displaySession?.mentorId || "") || null;
+
+
+
     const normalizeJourneyStatus = (value: unknown) =>
   String(value || "").toLowerCase();
 
@@ -423,10 +423,10 @@ const activeJourneySession =
       normalizeJourneyStatus(session.status) !== "completed"
   ) || sortedSessions[sortedSessions.length - 1];
 
-// const currentSessionNumber =
+
 //   activeJourneySession?.sessionNumber || 1;
 
-// const currentSession = activeJourneySession;
+
 const currentSession =
   sortedSessions.find((session) => {
     const status = normalizeJourneyStatus(session.status);
@@ -452,7 +452,7 @@ const mentor =
   mentorById.get(pastor.mentorId) ||
   mentorById.get(displaySession?.mentorId || "") ||
   null;
-    //   const status: JourneyStatus =
+
     //     completedCount >= 10
     //       ? "completed"
     //       : pastorSessions.some((session) => session.status !== "completed" && session.status === "missed")
@@ -460,13 +460,13 @@ const mentor =
     //         : currentSession?.status === "scheduled"
     //           ? "scheduled"
     //           : "in-progress";
-//     const normalizeStatus = (value: unknown) =>
+
 //   String(value || "").toLowerCase();
 
-// const currentStatus = normalizeStatus(currentSession?.status);
-// const latestStatus = normalizeStatus(latestSession?.status);
 
-// const status: JourneyStatus =
+
+
+
 //   completedCount >= 10
 //     ? "completed"
 //     : currentStatus === "missed" || latestStatus === "missed"

@@ -370,19 +370,7 @@ const performBulkDelete = async () => {
                   </p>
                   {/* Decorative toolbar (visual parity with mobile reference) */}
                   <div className="mb-3 flex flex-wrap gap-2 rounded-xl border border-white/10 bg-white/[0.06] p-2">
-                    {/* {["fa-font", "fa-table-columns", "fa-minus", "fa-list-ul", "fa-list-ol", "fa-align-left", "fa-align-center", "fa-align-right"].map(
-                      (icon) => (
-                        <button
-                          key={icon}
-                          type="button"
-                          className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-[#cde2f2] transition hover:bg-white/10"
-                          disabled
-                          title="Formatting"
-                        >
-                          <i className={`fa-solid ${icon} text-xs`} />
-                        </button>
-                      ),
-                    )} */}
+                   
                     {NOTE_FORMAT_TOOLS.map((tool) => (
   <button
     key={tool.icon}
@@ -464,22 +452,7 @@ const performBulkDelete = async () => {
                   )}
                   {!loading && !listError && notes.length > 0 && (
                     <ul className="mt-4 space-y-3">
-                      {/* {notes.map((n) => (
-                        <li key={n._id}>
-                          <Link
-                            href={`${basePath}/${n._id}`}
-                            className="flex items-center gap-3 rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 transition hover:border-[#8ec5eb]/35 hover:bg-white/10"
-                          >
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate font-semibold text-white">{notePreviewTitle(n)}</p>
-                              <p className="mt-0.5 text-xs text-[#b7d2e6]">
-                                {formatNoteTimestamp(n.createdAt)}
-                              </p>
-                            </div>
-                            <i className="fa-solid fa-chevron-right shrink-0 text-[#8ec5eb]/80" />
-                          </Link>
-                        </li>
-                      ))} */}
+                    
                       {notes.map((n) => {
   if (!n || !n._id || typeof n.content !== "string") return null;
 if (isDeletedNote(String(n._id))) return null;
@@ -532,7 +505,7 @@ if (isDeletedNote(String(n._id))) return null;
           )}
         </MainTag>
 
-        {/* {variant === "pastor" ? <PastorFooter /> : null} */}
+       
       </div>
 
       <NotesDeleteConfirmDialog

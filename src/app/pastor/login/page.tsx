@@ -92,10 +92,7 @@ function LoginInner() {
         return;
       }
 
-      // const { accessToken, refreshToken, user } = json.data || {};
 
-      // if (accessToken) setCookie("accessToken", accessToken);
-      // if (refreshToken) setCookie("refreshToken", refreshToken);
 
       const { accessToken, refreshToken, user } = json.data || {};
 
@@ -108,17 +105,7 @@ if (userRole !== "pastor") {
 
 if (accessToken) setCookie("accessToken", accessToken);
 if (refreshToken) setCookie("refreshToken", refreshToken);
-      // if (user) {
-      //   const normalized = normalizeUserCookieForClient(user as Record<string, unknown>);
-      //   setCookie("user", JSON.stringify(normalized));
-      //   const uid = (normalized.id ?? normalized._id) as string | undefined;
-      //   if (uid) setCookie("userId", String(uid));
-      // }
-
-      // const next = searchParams.get("returnUrl");
-      // const destination = isSafePastorReturnUrl(next)
-      //   ? next
-      //   : "/pastor/profile-incomplete";
+   
 
       let hasProfilePicture = false;
 

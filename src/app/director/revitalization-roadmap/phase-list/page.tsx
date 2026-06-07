@@ -265,11 +265,7 @@ updatedAt: String((x as any).updatedAt || ""),
         setDeleteError("Could not find this task. Try refreshing the page.");
         return;
       }
-      // await apiUpdateRoadmap(roadmapId, {
-      //   name: String(roadmap.name || "").trim() || "Roadmap",
-      //   roadmaps: remaining,
-      //   ...(Array.isArray(roadmap.divisions) ? { divisions: roadmap.divisions } : {}),
-      // } as any);
+  
       await apiUpdateRoadmap(roadmapId, {
   name: String(roadmap.name || "").trim() || "Roadmap",
   roadmaps: remaining,
@@ -292,25 +288,9 @@ updatedAt: String((x as any).updatedAt || ""),
     }
   };
 
-  // const openPhaseTaskPage = (nestedRoadmapId: string, opts?: { viewOnly?: boolean }) => {
-  //   const phase = nestedRoadmapRows(roadmap).find((r) => String(r._id) === nestedRoadmapId);
-  //   if (!phase) return;
-  //   const sub = String(phase.roadMapDetails || phase.description || "");
-  //   const longDesc = String(phase.description || phase.roadMapDetails || "");
-  //   const qp = new URLSearchParams();
-  //   qp.set("roadmapId", roadmapId);
-  //   qp.set("nestedRoadmapId", nestedRoadmapId);
-  //   qp.set("type", "phase");
-  //   qp.set("isEditMode", "true");
-  //   if (opts?.viewOnly) qp.set("viewOnly", "true");
-  //   qp.set("name", String(phase.name || phase.title || ""));
-  //   qp.set("subheading", sub);
-  //   qp.set("longDescription", longDesc);
-  //   qp.set("completionTime", String(phase.duration || ""));
-  //   qp.set("selectedDivision", String(phase.phase || "All"));
-  //   qp.set("bannerImage", String(phase.imageUrl || ""));
-  //   router.push(`/director/revitalization-roadmap/roadmap-form?${qp.toString()}`);
-  // };
+
+
+
   const openPhaseTaskPage = (
   nestedRoadmapId: string,
   opts?: { viewOnly?: boolean }
@@ -469,7 +449,7 @@ updatedAt: String((x as any).updatedAt || ""),
             {items.map((it) => {
               console.log("TASK", it);
               const isCompleted = completedTaskIds.has(String(it.id));
-              // const completedDate = completedTaskUpdateDates[String(it.id)];
+
         const completedOnDate = (it as any).completedOn || "";
 const lastUpdatedDate = completedTaskUpdateDates[String(it.id)] || "";
               const imgSrc = resolveApiMediaUrl(it.imageUrl) || JumpStartBg.src;

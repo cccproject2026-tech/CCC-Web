@@ -930,11 +930,7 @@ export default function IndividualProgressPage() {
               </button> */}
               <button
   type="button"
-  // onClick={() => {
-  //   if (user?.hasCompleted) return;
-  //   setIsFinalCommentsModalOpen(true);
-  // }}
-  // disabled={Boolean(user?.hasCompleted)}
+
   onClick={() => {
   if ((progressData?.overallProgress ?? 0) < 100 || user?.hasCompleted) return;
   setIsFinalCommentsModalOpen(true);

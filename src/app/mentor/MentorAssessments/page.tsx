@@ -76,12 +76,7 @@ type RuleSection = {
   layers?: RuleLayer[];
 };
 
-// function normalizeMentorAssessmentStatus(raw: unknown): MentorAssessmentStatus {
-//   const s = String(raw || "").toLowerCase().replace(/\s+/g, "_");
-//   if (s === "submitted") return "submitted";
-//   if (s === "completed" || s === "reviewed") return "completed";
-//   return "not_started";
-// }
+
 function normalizeMentorAssessmentStatus(raw: unknown): MentorAssessmentStatus {
   const s = String(raw || "").toLowerCase().replace(/\s+/g, "_");
 
@@ -491,10 +486,7 @@ export default function MentorAssessments() {
   const deepLinkAssessmentId = (searchParams.get("assessmentId") || "").trim();
   const deepLinkOpenRecommendation = searchParams.get("openRecommendation") === "1";
 
-  // useEffect(() => {
-  //   if (!deepLinkMenteeId) return;
-  //   setSelectedMenteeId((prev) => (prev === deepLinkMenteeId ? prev : deepLinkMenteeId));
-  // }, [deepLinkMenteeId]);
+
   useEffect(() => {
   if (!deepLinkMenteeId) return;
 
@@ -515,12 +507,7 @@ export default function MentorAssessments() {
       try {
         setLoading(true);
         if (selectedMenteeId) {
-          // const [assignedRes, progressRes, appointmentsRes] = await Promise.all([
-          //   apiGetAssignedAssessments(selectedMenteeId),
-          //   apiGetUserProgress(selectedMenteeId),
-          //   apiGetAppointments({ userId: selectedMenteeId, futureOnly: false } as any),
-          // ]);
-          // const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
+       
           const [assignedRes, allAssessmentsRes, progressRes, appointmentsRes] = await Promise.all([
   apiGetAssignedAssessments(selectedMenteeId),
   apiGetAssessments(),
@@ -584,19 +571,7 @@ assignedRows = [...assignedRows, ...missingFromAssignedApi];
                 ? appointmentsBody.data.data
                 : [];
           const appointmentById = new Map<string, any>();
-          // const appointmentsByAssessmentId = new Map<string, any[]>();
-          // for (const appt of appointmentsList) {
-          //   const id = String(appt?._id ?? appt?.id ?? "").trim();
-          //   if (id) appointmentById.set(id, appt);
-          //   const notes = String(appt?.notes ?? "");
-          //   const m = notes.match(/assessmentId=([^|\s]+)/i);
-          //   const linkedAssessmentId = String(m?.[1] || "").trim();
-          //   if (linkedAssessmentId) {
-          //     const prev = appointmentsByAssessmentId.get(linkedAssessmentId) || [];
-          //     prev.push(appt);
-          //     appointmentsByAssessmentId.set(linkedAssessmentId, prev);
-          //   }
-          // }
+        
           const appointmentsByAssessmentId = new Map<string, any[]>();
 
 for (const appt of appointmentsList) {
@@ -621,11 +596,7 @@ for (const appt of appointmentsList) {
 }
 
           const idStatusRows = assessmentProgress
-            // .map((p: any) => ({
-            //   assessmentId: extractAssessmentIdFromProgressRow(p),
-            //   status: normalizeMentorAssessmentStatus(p?.status),
-            //   assignmentId: p?.assignmentId ? String(p.assignmentId) : undefined,
-            // }))
+          
             .map((p: any) => ({
   assessmentId: extractAssessmentIdFromProgressRow(p),
   status: normalizeMentorAssessmentStatus(p?.status),
@@ -646,8 +617,7 @@ for (const appt of appointmentsList) {
             uniqById.map((row) => [row.assessmentId, row]),
           );
 
-          // const assigned = assignedRows
-          //   .map((item) => {
+        
           const assigned = (await Promise.all(
   assignedRows.map(async (item) => {
               const flat = flattenAssignedAssessmentRow(item);
@@ -675,32 +645,18 @@ for (const appt of appointmentsList) {
               if (appt?._id != null) resolvedAppointmentId = String(appt._id).trim();
               else if (appt?.id != null) resolvedAppointmentId = String(appt.id).trim();
               else resolvedAppointmentId = String(appointmentId || "").trim();
-              // For mentee-filtered cards: status is based on meeting scheduling state.
-              // - no meeting details yet => submitted
-              // - meeting details available => completed
-              // const hasMeetingDetails = !!(resolvedAppointmentId || appt?.meetingDate);
-              // const normalizedStatus: MentorAssessmentStatus = hasMeetingDetails ? "completed" : "submitted";
+
               const storedCdp = getStoredRecommendationsForPastorAssessment(
   selectedMenteeId,
   assessmentId,
 );
 
-// const hasSentCdp = storedCdp.some((rec) => rec.sent === true);
 
-// const progressStatus = progressRow?.status || "not_started";
-
-// const normalizedStatus: MentorAssessmentStatus =
-//   progressStatus === "completed" && !hasSentCdp
-//     ? "submitted"
-//     : progressStatus;
 const hasSentCdp = storedCdp.some((rec) => rec.sent === true);
 
-// const answersRes = await apiGetUserAnswers(
-//   assessmentId,
-//   selectedMenteeId,
-// );
 
-// const hasSubmittedAnswers = Boolean((answersRes?.data as any)?.data?._id);
+
+
 let hasSubmittedAnswers = false;
 
 try {
@@ -718,16 +674,7 @@ const progressStatus = progressRow?.status || "not_started";
 
 let normalizedStatus: MentorAssessmentStatus = "not_started";
 
-// if (hasSentCdp) {
-//   normalizedStatus = "completed";
-// } else if (
-//   hasSubmittedAnswers ||
-//   progressStatus === "submitted" ||
-//   progressStatus === "completed" 
-  
-// ) {
-//   normalizedStatus = "submitted";
-// }
+
 const hasMeetingDetails = Boolean(resolvedAppointmentId || appt?.meetingDate);
 
 if (hasMeetingDetails && hasSentCdp) {
@@ -843,9 +790,7 @@ return {
   }),
 );
           const q = searchTerm.trim().toLowerCase();
-          // const filteredAssigned = !q
-          //   ? assigned
-          //   : assigned.filter((a: any) => {
+         
           const filteredAssigned = !q
   ? assignedWithCdp
   : assignedWithCdp.filter((a: any) => {
@@ -859,10 +804,7 @@ return {
             search: searchTerm || undefined,
           });
           const parsed = parseAssessmentsListPayload(res.data);
-          // const withMenteeCounts = parsed.map((item: any) => ({
-          //   ...item,
-          //   menteeAssigned: countMenteesAssigned(item),
-          // }));
+        
           const withMenteeCounts = parsed.map((item: any) => ({
   ...item,
   createdOn: item.createdOn || item.createdAt || item.updatedAt,
@@ -1078,20 +1020,7 @@ return {
   return false;
 }
 
-    // const submittedDate =
-    //   item.submittedAt ||
-    //   item.completedAt ||
-    //   item.updatedAt ||
-    //   item.createdAt ||
-    //   item.createdOn;
-   
-//  const submittedDate =
-//   item._mentorSubmittedAt ||
-//   item.submittedAt ||
-//   item.completedAt ||
-//   item.updatedAt ||
-//   item.createdAt ||
-//   item.createdOn;
+ 
 const submittedDate = item._mentorSubmittedAt;
 
     return isTodayDate(submittedDate);
@@ -1107,12 +1036,7 @@ const previousSubmissions = useMemo(() => {
   return false;
 }
 
-    // const submittedDate =
-    //   item.submittedAt ||
-    //   item.completedAt ||
-    //   item.updatedAt ||
-    //   item.createdAt ||
-    //   item.createdOn;
+
     const submittedDate = item._mentorSubmittedAt;
 
     return submittedDate && !isTodayDate(submittedDate);

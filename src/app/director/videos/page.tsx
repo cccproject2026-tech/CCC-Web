@@ -110,24 +110,6 @@ export default function VideosPage() {
     }
   };
 
-  // const handleSubmit = () => {
-  //   if (editingVideoId) {
-  //     // Handle video update
-  //     console.log("Updating video:", editingVideoId, videoForm);
-  //     setShowEditVideoModal(false);
-  //     setEditingVideoId(null);
-  //   } else {
-  //     // Handle video upload
-  //     console.log("Uploading video:", videoForm);
-  //     setShowAddVideoModal(false);
-  //   }
-  //   setVideoForm({
-  //     heading: "",
-  //     subHeading: "",
-  //     description: "",
-  //     videoFile: null,
-  //   });
-  // };
 
   const handleSubmit = async () => {
     if (!videoForm.heading.trim()) {

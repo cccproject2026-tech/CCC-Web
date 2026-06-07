@@ -565,20 +565,6 @@ export default function DirectorRoadmapCreationPage() {
     }
   }, [parent, roadmapType, nestedForSingle, nestedDetailDoc, urlSeedKey, isEditMode]);
 
-  // useEffect(() => {
-  //   if (!saveFeedback) return;
-  //   const t = window.setTimeout(() => setSaveFeedback(null), 5000);
-  //   return () => window.clearTimeout(t);
-  // }, [saveFeedback]);
-//   useEffect(() => {
-//   if (!saveFeedback) return;
-
-//   const t = window.setTimeout(() => {
-//     window.location.href = "/director/revitalization-roadmap";
-//   }, 900);
-
-//   return () => window.clearTimeout(t);
-// }, [saveFeedback]);
 
 
   useEffect(() => {
@@ -720,8 +706,8 @@ export default function DirectorRoadmapCreationPage() {
     try {
       // if (isEditMode && roadmapType === "phase") {
       if (isEditMode && (roadmapType === "phase" || roadmapType === "single")) {
-        // const libName = parentLibraryName.trim();
-        // const libDesc = parentLibraryDescription.trim();
+
+
         const libName =
   roadmapType === "single" ? nameToPersist : parentLibraryName.trim();
 
@@ -765,17 +751,14 @@ const libDesc =
       } else {
         await apiUpdateNestedRoadmapItem(roadmapId, effectiveNestedId, patchBody as any);
       }
-//       router.replace("/director/revitalization-roadmap");
-// return;
+
 
       setSaveFeedback(
         roadmapType === "phase"
           ? "The main roadmap (library) title and this phase are saved."
           : "Roadmap library will show this roadmap’s updated info.",
       );
-//       window.setTimeout(() => {
-//   router.replace("/director/revitalization-roadmap");
-// }, 800);
+
       bannerFileRef.current = null;
       setBannerFile(null);
       const res = await apiGetRoadmapById(roadmapId);

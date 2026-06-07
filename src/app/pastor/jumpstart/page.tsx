@@ -248,7 +248,7 @@ function normalizeExtraType(raw: unknown): ExtraComponent["type"] {
  * - `selectedAssessment` from director builder
  */
 function resolveAssessmentIdFromExtraShape(extra: ExtraComponent): string | null {
-  // const raw = extra as Record<string, unknown>;
+
   const raw = extra as unknown as Record<string, unknown>;
   const direct = extra.assessmentId ?? raw.assessmentId;
   if (typeof direct === "string" && direct.trim()) return direct.trim();
@@ -301,15 +301,14 @@ function findExtraByFieldName(items: ExtraComponent[] | undefined, name: string)
   return undefined;
 }
 
-// const UPLOAD_FIELD_ACCEPT =
-//   ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
 const UPLOAD_FIELD_ACCEPT =
   ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.mp4,.mov,.avi,.mkv,.webm,video/*,image/*,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 const UPLOAD_HINT_LINE =
   "Supported file types: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, PNG, JPG, MP4, MOV, WEBM · Max file size: 10 MB";
 
-// const MAX_PASTOR_UPLOAD_BYTES = 25 * 1024 * 1024;
+
 const MAX_PASTOR_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 function unwrapRoadmapSubmission(res: any): RoadmapSubmission | null {
@@ -653,11 +652,7 @@ const hasRequiredSubmissions = useMemo(() => {
 
     for (const extra of items) {
       const fieldKey = extra.name;
-// const metaDateFields = new Set(["Allow pastor to select Date", "Show date on info card"]);
 
-// if (metaDateFields.has(fieldKey)) {
-//   continue;
-// }
 const normalizeMetaName = (value: unknown) =>
   String(value ?? "")
     .trim()
@@ -673,9 +668,7 @@ if (metaDateFields.has(normalizeMetaName(fieldKey))) {
         if (!formData[fieldKey]) return false;
       }
 
-      // if (extra.type === "ASSESSMENT") {
-      //   if (!formData[fieldKey]) return false;
-      // }
+   
       if (extra.type === "ASSESSMENT") {
   const assessmentId = getAssessmentIdFromExtra(extra);
   const state = assessmentId ? assessmentTaskState[assessmentId] : null;
@@ -935,22 +928,7 @@ const refreshSubmissionHistory = useCallback(async (): Promise<RoadmapSubmission
     void refreshSubmissionHistory();
   }, [refreshSubmissionHistory]);
 
-  // const fetchComments = useCallback(async (showLoader = false) => {
-  //   if (!roadmapId || !userId) return;
-  //   if (showLoader) setCommentsLoading(true);
-  //   try {
-  //     const res = await apiGetComments(roadmapId, userId);
-  //     const thread = res.data?.data || res.data;
-  //     const list = Array.isArray(thread?.comments) ? thread.comments : [];
-  //     setComments(list);
-  //     setCommentsCount(list.length);
-  //   } catch {
-  //     setComments([]);
-  //     setCommentsCount(0);
-  //   } finally {
-  //     if (showLoader) setCommentsLoading(false);
-  //   }
-  // }, [roadmapId, userId, scopedNestedId]);
+ 
   const fetchComments = useCallback(async (showLoader = false) => {
   if (!roadmapId || !userId) return;
   if (showLoader) setCommentsLoading(true);
@@ -1262,7 +1240,7 @@ const refreshSubmissionHistory = useCallback(async (): Promise<RoadmapSubmission
     };
   }, [drawerStep, selectedMentor, currentYear, currentMonth, selectedDate, availabilityRefreshKey, appointments, userId]);
 
-  // const scopedNestedId = nestedRoadMapItemIdForExtras;
+ 
 
   // Mobile parity: show server-saved upload documents after refresh.
   useEffect(() => {
@@ -1568,16 +1546,14 @@ useEffect(() => {
           if (Array.isArray(data)) {
             hasCdp =
               hasCdp ||
-              // data.some((row: any) => row?.sent === true || row?.status === "sent");
+             
               data.some((row: any) => hasCdpContent(row));
           } else if (Array.isArray(data?.sections)) {
             hasCdp =
               hasCdp ||
               data.sections.some((section: any) =>
                 Array.isArray(section?.recommendations) &&
-                // section.recommendations.some(
-                //   (rec: any) => rec?.sent === true || rec?.status === "sent",
-                // ),
+              
                 section.recommendations.some((rec: any) => hasCdpContent(rec)),
               );
           }
@@ -1589,19 +1565,11 @@ useEffect(() => {
       }),
     );
 
-    // if (!cancelled) {
-    //   setAssessmentTaskState(next);
-    // }
+   
     if (!cancelled) {
   setAssessmentTaskState(next);
 
-  // const hasCompletedCdp = Object.values(next).some(
-  //   (row) => row.submitted && row.hasCdp,
-  // );
 
-  // if (hasCompletedCdp) {
-  //   setStatusUiOverride("Completed");
-  // }
 }
   };
 
@@ -1618,9 +1586,7 @@ useEffect(() => {
       setTimeout(() => setCompleteFeedback(null), 4000);
       return;
     }
-    // router.push(
-    //   `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(assessmentId)}`,
-    // );
+   
     router.push(
   `/pastor/Assessments/guidelines?assessmentId=${encodeURIComponent(
     assessmentId,
@@ -1699,19 +1665,7 @@ useEffect(() => {
     setIsNewSubmissionMode(false);
   };
 
-  // const openSubmissionDetail = async (submission: RoadmapSubmission) => {
-  //   const submissionId = String(submission._id ?? submission.id ?? "").trim();
-  //   if (!submissionId || submissionId.startsWith("local-")) {
-  //     setSelectedSubmission(submission);
-  //     return;
-  //   }
-  //   try {
-  //     const res = await apiGetRoadmapSubmissionById(submissionId);
-  //     setSelectedSubmission(unwrapRoadmapSubmission(res) ?? submission);
-  //   } catch {
-  //     setSelectedSubmission(submission);
-  //   }
-  // };
+
   const openSubmissionDetail = async (submission: RoadmapSubmission) => {
   setSelectedSubmission(submission);
 };
@@ -1754,39 +1708,7 @@ useEffect(() => {
         extras: extrasArray,
       };
       console.log("[Pastor Jumpstart] Extras payload (create/update)", createPayload);
-      // let usedLegacySubmissionFallback = false;
-      // if (isNewSubmissionMode) {
-      //   try {
-      //     const submissionRes = await apiCreateRoadmapSubmission(roadmapId, createPayload);
-      //     const submission = unwrapRoadmapSubmission(submissionRes);
-      //     const submissionId = String(submission?._id ?? submission?.id ?? "").trim();
-      //     if (!submissionId) throw new Error("Submission ID was not returned.");
-
-      //     for (const [fieldName, files] of Object.entries(pendingUploadFiles)) {
-      //       if (files?.length) {
-      //         await apiUploadRoadmapSubmissionDocuments(submissionId, files, fieldName);
-      //       }
-      //     }
-
-      //     setPendingUploadFiles({});
-      //     setUploadedNowDocs({});
-      //     setIsNewSubmissionMode(false);
-      //     await refreshSubmissionHistory();
-      //     setSaveSuccess(true);
-      //     setSaveFeedback("New submission saved.");
-      //     setTimeout(() => {
-      //       setSaveSuccess(false);
-      //       setSaveFeedback(null);
-      //     }, 1800);
-      //     return;
-      //   } catch (error) {
-      //     console.warn(
-      //       "[Pastor Jumpstart] submission API failed; falling back to legacy extras",
-      //       error,
-      //     );
-      //     usedLegacySubmissionFallback = true;
-      //   }
-      // }
+  
       const shouldPatchExtras = extrasExist || isNewSubmissionMode;
       const updatePayload = {
         extras: extrasArray,
@@ -1855,10 +1777,7 @@ useEffect(() => {
       }
       // Mark save time so the extras loader can retry without wiping UI fields.
       lastExtrasSaveAtRef.current = Date.now();
-      // for (const [key, files] of Object.entries(pendingUploadFiles)) {
-      //   if (files?.length) await apiUploadExtrasDocuments(roadmapId, userId, files, scopedNestedId, key);
-      // }
-      // setPendingUploadFiles({});
+     
       const uploadedNowNames: Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]> = {};
 
 for (const [key, files] of Object.entries(pendingUploadFiles)) {
@@ -1883,30 +1802,7 @@ for (const [key, files] of Object.entries(pendingUploadFiles)) {
 setUploadedNowDocs(uploadedNowNames);
 setPendingUploadFiles({});
       // Refresh server uploads so the UI shows "uploaded" after reload.
-      // try {
-      //   const resDocs = await apiGetExtrasDocuments(roadmapId, userId, scopedNestedId);
-      //   const list = (resDocs?.data?.data || resDocs?.data) as any[];
-      //   const batches = Array.isArray(list) ? list : [];
-      //   const byName: Record<string, { fileName: string; fileUrl: string; uploadBatchId: string }[]> = {};
-      //   batches.forEach((b: any) => {
-      //     const name = String(b?.name ?? "").trim();
-      //     const batchId = String(b?.uploadBatchId ?? "").trim();
-      //     const files = Array.isArray(b?.files) ? b.files : [];
-      //     if (!name || !batchId || files.length === 0) return;
-      //     const mapped = files
-      //       .map((f: any) => ({
-      //         fileName: String(f?.fileName ?? "").trim(),
-      //         fileUrl: String(f?.fileUrl ?? "").trim(),
-      //         uploadBatchId: batchId,
-      //       }))
-      //       .filter((f: any) => f.fileName && f.fileUrl);
-      //     if (!mapped.length) return;
-      //     byName[name] = [...(byName[name] || []), ...mapped];
-      //   });
-      //   setSavedUploadDocs(byName);
-      // } catch {
-      //   // ignore doc refresh failures; upload already succeeded
-      // }
+   
       await refetchRoadmap();
       await refetchProgressData();
       emitProgressUpdated(userId);
@@ -1914,12 +1810,7 @@ setPendingUploadFiles({});
       await fetchQueries(undefined, false);
       setSaveSuccess(true);
       setSaveFeedback(extrasExist ? "Progress updated." : "Progress saved.");
-      // if (isNewSubmissionMode && usedLegacySubmissionFallback) {
-      //   setIsNewSubmissionMode(false);
-      //   setSaveFeedback("New submission saved using legacy storage.");
-      // } else {
-      //   await handleMarkComplete();
-      // }
+    
       if (isNewSubmissionMode) {
   setIsNewSubmissionMode(false);
   await refreshSubmissionHistory();
@@ -2347,9 +2238,7 @@ if (!hasRequiredSubmissions) {
         );
 
       case "DATE_PICKER": {
-        // const allowPastorSelect =
-        //   Array.isArray(extra.checkboxes) &&
-        //   extra.checkboxes.some((cb) => String((cb as ExtraComponent)?.name ?? "") === "Allow pastor to select Date");
+
         const normalizeMetaName = (value: unknown) =>
   String(value ?? "")
     .trim()
@@ -2368,9 +2257,7 @@ const allowPastorSelect =
         const defaultDate =
           typeof extra.date === "string" && extra.date.trim() ? extra.date.trim().slice(0, 10) : "";
         const value = String(formData[fieldKey] ?? defaultDate ?? "");
-        // const metaNames = new Set(["Allow pastor to select Date", "Show date on info card"]);
-        // const displayCheckboxes =
-        //   extra.checkboxes?.filter((cb) => !metaNames.has(String((cb as ExtraComponent)?.name ?? ""))) ?? [];
+       
         const metaNames = new Set(["allow pastor to select date", "show date on info card"]);
 const displayCheckboxes =
   extra.checkboxes?.filter(
@@ -2680,42 +2567,12 @@ const displayCheckboxes =
           </div>
         );
 
-      // case "ASSESSMENT":
-      //   return (
-      //     <div key={`${fieldKey}_${index}`} className="mb-5">
-      //       <h4 className="text-sm font-semibold text-white mb-2">{extra.name}</h4>
-      //       {extra.buttonName && (
-      //         <button
-      //           type="button"
-      //           onClick={() => openAssessment(extra)}
-      //           className="mb-3 bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-5 py-2 rounded-md shadow"
-      //         >
-      //           {extra.buttonName}
-      //         </button>
-      //       )}
-      //       {!extra.buttonName && (
-      //         <button
-      //           type="button"
-      //           onClick={() => openAssessment(extra)}
-      //           className="mb-3 rounded-md border border-white/25 bg-white/10 px-5 py-2 text-sm font-medium text-white transition hover:bg-white/20"
-      //         >
-      //           Open Survey
-      //         </button>
-      //       )}
-      //       {extra.checkboxes && extra.checkboxes.length > 0 && (
-      //         <div className="space-y-2 pl-1">
-      //           {extra.checkboxes.map((cb, i) => renderExtraComponent(cb, i, fieldKey))}
-      //         </div>
-      //       )}
-      //     </div>
-      //   );
+     
       case "ASSESSMENT": {
   const assessmentId = getAssessmentIdFromExtra(extra);
   const state = assessmentId ? assessmentTaskState[assessmentId] : null;
 const isSubmitted = state?.submitted === true;
-// const hasScheduledMeeting = assessmentId
-//   ? hasRoadmapAssessmentMeeting(assessmentId)
-//   : false;
+
 const scheduledMeeting = assessmentId
   ? getRoadmapAssessmentMeeting(assessmentId)
   : null;
@@ -2749,38 +2606,7 @@ const scheduledMeeting = assessmentId
                 View Submitted Answers
               </button>
 
-              {/* {state.hasCdp ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(
-                      `/pastor/Assessments/result/cdp?assessmentId=${assessmentId}&userId=${userId}&roadmapId=${roadmapId || ""}&taskId=${nestedItemId || ""}&parentId=${parentRoadmapId || ""}`,
-                    )
-                  }
-                  className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
-                >
-                  View CDP
-                </button>
-              ) : (
-                // <button
-                //   type="button"
-                //   onClick={() => openAssessmentMeetingDrawer(extra)}
-                //   className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
-                // >
-                //   Schedule Meeting
-                // </button>
-            <button
-  type="button"
-  onClick={() =>
-    scheduledMeeting
-      ? router.push(`/pastor/appointments/${scheduledMeeting._id || scheduledMeeting.id}`)
-      : openAssessmentMeetingDrawer(extra)
-  }
-  className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
->
-  {scheduledMeeting ? "View Meeting Details" : "Schedule Meeting"}
-</button>
-              )} */}
+         
               {state.hasCdp && (
               
   <button
@@ -2831,22 +2657,7 @@ const scheduledMeeting = assessmentId
   );
 }
 
-      // case "SECTION":
-      //   return (
-      //     <div key={`${fieldKey}_${index}`} className="mb-5 border border-[#3B6EA0] rounded-lg p-4">
-      //       <h4 className="text-sm font-semibold text-white mb-3">{extra.name}</h4>
-      //       {extra.checkboxes && extra.checkboxes.length > 0 && (
-      //         <div className="space-y-2 mb-3">
-      //           {extra.checkboxes.map((cb, i) => renderExtraComponent(cb, i, fieldKey))}
-      //         </div>
-      //       )}
-      //       {extra.sections && extra.sections.length > 0 && (
-      //         <div className="space-y-3">
-      //           {extra.sections.map((sec, i) => renderExtraComponent(sec, i, fieldKey))}
-      //         </div>
-      //       )}
-      //     </div>
-      //   );
+     
 case "SECTION":
   return (
     <div
@@ -3180,21 +2991,7 @@ case "SECTION":
                           Cancel
                         </button>
                       )}
-                      {/* {listAlignedStatus !== "Completed" ? (
-                        <button
-                          type="button"
-                          onClick={handleMarkComplete}
-                          disabled={
-                            completeLoading ||
-                            !hasRequiredSignature ||
-                            !hasRequiredUploads ||
-                            !hasRequiredSubmissions
-                          }
-                          className="rounded-md bg-white px-6 py-2 text-sm font-semibold text-[#0f4a76] shadow transition hover:bg-[#e7f1fa] disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {completeLoading ? "Submitting…" : "Submit"}
-                        </button>
-                      ) : null} */}
+                    
                     </div>
                   </div>
                 </div>
@@ -3245,17 +3042,9 @@ case "SECTION":
                             </div>
                           );
                         }
-                        // return (
-                        //   <div key={`${name}-${index}`} className="rounded-lg border border-white/15 bg-white/5 p-3">
-                        //     <p className="mb-1 text-xs font-semibold text-white/70">{name}</p>
-                        //     <p className="text-sm text-white/90">{String(extra.value ?? "")}</p>
-                        //   </div>
-                        // );
+                    
                         const isUpload = type.toUpperCase() === "UPLOAD";
-// const filesForField =
-//   savedUploadDocs[name.toLowerCase()] ||
-//   savedUploadDocs[name] ||
-//   [];
+
 const allFilesForField =
   savedUploadDocs[name.toLowerCase()] ||
   savedUploadDocs[name] ||

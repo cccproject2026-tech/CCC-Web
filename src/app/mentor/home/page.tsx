@@ -89,7 +89,7 @@ export default function MentorHomePage() {
 
   const userId = mentorUser?.id ?? mentorUser?._id ?? userIdStatic;
 
-  // const todayDateOnlyISO = useMemo(() => new Date().toISOString().split("T")[0], []);
+
   const todayDateOnlyISO = useMemo(() => {
   const today = new Date();
 
@@ -201,13 +201,7 @@ export default function MentorHomePage() {
     (async () => {
       try {
         let list: any[] = [];
-        // try {
-        //   const res = await apiGetMentorSchedule(userId);
-        //   list = unwrapAppointmentsAxiosData(res);
-        // } catch {
-        //   const res = await apiGetMentorAppointments(userId, false);
-        //   list = unwrapAppointmentsAxiosData(res);
-        // }
+      
         try {
   const res = await apiGetMentorSchedule(userId);
   list = unwrapAppointmentsAxiosData(res);

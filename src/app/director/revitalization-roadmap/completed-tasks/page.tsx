@@ -263,9 +263,7 @@ const filteredCompletedTasks = useMemo(() => {
                   <button
                     type="button"
                     onClick={() =>
-                      // router.push(
-                      //   `/director/revitalization-roadmap/phase-list?roadmapId=${task.roadmapId}&pastorView=true&userId=${userId}&pastorId=${userId}`,
-                      // )
+                 
                       router.push(
   `/director/revitalization-roadmap/task?roadmapId=${encodeURIComponent(
     task.roadmapId

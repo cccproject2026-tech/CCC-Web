@@ -59,9 +59,7 @@ function matchesQuery(haystack: string, query: string): boolean {
 }
 
 export default function RevitalizationRoadmapPage() {
-  // const router = useRouter();
 
-  // const [activeTab, setActiveTab] = useState("Pastor");
   const router = useRouter();
 const searchParams = useSearchParams();
 
@@ -185,19 +183,7 @@ progress: found?.progress ?? 0,
     );
   };
 
-  // const filteredPastors = useMemo(() => {
-  //   const q = searchQuery.trim();
-  //   if (!q) return mentees;
-  //   return mentees.filter((m) => {
-  //     const fullName = `${m.firstName || ""} ${m.lastName || ""}`.trim();
-  //     return (
-  //       matchesQuery(fullName, q) ||
-  //       matchesQuery(m.email || "", q) ||
-  //       matchesQuery(m.role || "", q) ||
-  //       matchesQuery(m.profileInfo || "", q)
-  //     );
-  //   });
-  // }, [mentees, searchQuery]);
+
   const filteredPastors = useMemo(() => {
   const q = searchQuery.trim();
 

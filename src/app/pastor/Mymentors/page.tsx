@@ -430,12 +430,7 @@ const [mentorToSchedule, setMentorToSchedule] = useState<Mentor | null>(null);
   /** Prefer GET /users/:id (works for newly assigned mentors); fall back to /home/mentor/:email; then list row. */
   const fetchMentorDetail = async (m: Mentor) => {
     try {
-      // const res = await apiGetUserById(m._id);
-      // const raw = res.data?.data as Record<string, unknown> | undefined;
-      // if (raw && typeof raw === "object" && (raw._id || raw.id)) {
-      //   setSelectedMentor(normalizeMentorDetail(raw, m));
-      //   return;
-      // }
+    
       const res = await apiGetUserById(m._id);
 const raw = res.data?.data;
 
@@ -501,10 +496,7 @@ if (raw && typeof raw === "object" && ("_id" in raw || "id" in raw)) {
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_10%,rgba(141,211,243,0.22),transparent_36%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.12),transparent_38%),linear-gradient(180deg,rgba(4,31,53,0.82)_0%,rgba(6,41,70,0.9)_100%)]"></div>
         <div className="relative z-10 flex h-full max-w-3xl flex-col justify-center text-left">
-          {/* <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
-            <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
-            Leadership Support Network
-          </p> */}
+   
           <h1 className="text-3xl font-semibold md:text-5xl">My Mentors</h1>
           <p className="mt-4 max-w-2xl text-sm text-[#d9ebf8] md:text-lg">
             Connect, learn, and schedule personalized sessions with your assigned mentors.
@@ -549,7 +541,7 @@ if (raw && typeof raw === "object" && ("_id" in raw || "id" in raw)) {
           {/* AVATAR ROW */}
           <div className="flex items-center gap-6 overflow-x-auto pb-6">
             {filteredMentors.map((mentor, i) => {
-              // const img = mentorImages[i % mentorImages.length];
+
               const img = getMentorImage(mentor, mentorImages[i % mentorImages.length]);
 
               return (
@@ -593,7 +585,7 @@ if (raw && typeof raw === "object" && ("_id" in raw || "id" in raw)) {
             }`}
           >
             {filteredMentors.map((mentor, i) => {
-              // const img = mentorImages[i % mentorImages.length];
+              
               const img = getMentorImage(mentor, mentorImages[i % mentorImages.length]);
 const phone = mentor.phoneNumber || mentor.phone;
 const whatsappPhone = phone?.replace(/[^\d+]/g, "");

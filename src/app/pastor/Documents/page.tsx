@@ -116,9 +116,7 @@ const toggleSelectedDoc = (key: string) => {
 
 const handleDeleteDocument = async (doc: any) => {
   try {
-    // if (!userId || !doc?.fileUrl) return;
-
-    // await apiDeleteDocument(userId, doc.fileUrl);
+ 
     const docId = doc?._id || doc?.id || doc?.docId || doc?.documentId || doc?.fileId;
 
 if (!userId || !docId) return;

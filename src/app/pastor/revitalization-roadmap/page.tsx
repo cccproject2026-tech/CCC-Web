@@ -21,11 +21,7 @@ import MentorBannerBg from "@/app/Assets/mentor-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { getPastorUserId } from "@/app/utils/pastor-auth";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
-// import {
-//   collapseRoadmapAssignmentsToParents,
-//   fetchRoadmapAssignmentsForUser,
-//   type RoadmapAssignmentUi,
-// } from "@/app/Services/roadmap-assignments";
+
 import {
   collapseRoadmapAssignmentsToParents,
   fetchRoadmapAssignmentsForUser,
@@ -85,7 +81,7 @@ function phaseSequenceIndex(phase: PhaseCard): number {
   return -1;
 }
 
-// const TABS: TabKey[] = ["All", "Due", "In Progress", "Not Started", "Completed"];
+
 const TABS: TabKey[] = [
   "All",
   "Due",
@@ -182,19 +178,7 @@ export default function RevitalizationRoadmap() {
   const [activeTab, setActiveTab] = useState<TabKey>("All");
   const [searchTerm, setSearchTerm] = useState("");
   const [phases, setPhases] = useState<PhaseCard[]>([]);
-//   const [recommendedTask, setRecommendedTask] = useState<{
-//   phase: PhaseCard;
-//   task: any;
-//   taskId: string;
-// } | null>(null);
-// const [recommendedTask, setRecommendedTask] = useState<{
-//   phase: PhaseCard;
-//   task: any;
-//   taskId: string;
-//   totalTasks: number;
-//   completedTasks: number;
-//   progressPercent: number;
-// } | null>(null);
+
 const [recommendedTasks, setRecommendedTasks] = useState<
   {
     phase: PhaseCard;
@@ -452,13 +436,11 @@ const progressData = (progressRes?.data?.data ?? progressRes?.data) as any;
 
 const parentCards = collapseRoadmapAssignmentsToParents(data);
 
-// const mappedPhases: PhaseCard[] = parentCards.map((item) => {
+
 const mappedPhases: PhaseCard[] = await Promise.all(
   
   parentCards.map(async (item) => {
-  // const children = Array.isArray((item as any).children)
-  //   ? (item as any).children
-  //   : [];
+
   let fullRoadmap: any = null;
   let children = Array.isArray((item as any).children)
   ? (item as any).children
@@ -466,9 +448,7 @@ const mappedPhases: PhaseCard[] = await Promise.all(
 
 if (item.hasNestedTasks === true) {
   try {
-    // const rmRes = await apiGetRoadmapById(item.id);
-    // const body = rmRes.data as { data?: unknown };
-    // const rawRoadmap = body?.data ?? rmRes.data;
+ 
     // children = unwrapNestedRoadmapsArray(rawRoadmap);
     const rmRes = await apiGetRoadmapById(item.id);
 const body = rmRes.data as { data?: unknown };
@@ -490,9 +470,7 @@ children = unwrapNestedRoadmapsArray(mergedRoadmaps[0]);
     Boolean(resolveNestedTemplateItemId(task))
   );
 
-  // const allTasksCompleted =
-  //   item.hasNestedTasks === true &&
-  //   validChildren.length > 0 &&
+
   const allTasksCompleted =
   validChildren.length > 0 &&
     validChildren.every((task: any) => {
@@ -529,11 +507,7 @@ const rawAssignment = progressRoadmaps.find((assignment: any) => {
 
   return cardIds.some((id) => id && rawIds.includes(id));
 });
-//   console.log("PHASE META CHECK:", {
-//   phaseId: item.id,
-//   parentRoadmapId: item.parentRoadmapId,
-//   assignmentMeta,
-// });
+
   return {
     id: item.id,
     title: item.title,
@@ -551,15 +525,7 @@ const rawAssignment = progressRoadmaps.find((assignment: any) => {
     months: formatParentCompletionTime(item),
     status: allTasksCompleted ? "Completed" : toUiStatus(item.status),
     sessionDate: item.meetings?.[0] || "",
-//     assignedAt: safeString((item as any).assignedAt),
-// createdBy: safeString((item as any).createdBy || (item as any).createdByName || "—"),
-// assignedAt: safeString(rawAssignment?.assignedAt),
-// createdBy: safeString(
-//   rawAssignment?.createdBy ||
-//   rawAssignment?.createdByName ||
-//   rawAssignment?.assignedByName ||
-//   "—"
-// ),
+
 assignedAt: safeString((rawAssignment as any)?.assignedAt),
 createdBy: safeString(
   (rawAssignment as any)?.createdBy ||
@@ -649,23 +615,7 @@ createdBy: safeString(
     return [...known].sort((a, b) => phaseSequenceIndex(a) - phaseSequenceIndex(b));
   }, [phases]);
 
-  // const openPhaseRoute = useCallback(
-  //   (phase: PhaseCard) => {
-  //     if (phase.hasNestedTasks) {
-  //       router.push(`/pastor/SelfRevitalizationPhasePage?id=${encodeURIComponent(phase.id)}`);
-  //       return;
-  //     }
-  //     const hasParent =
-  //       phase.parentRoadmapId &&
-  //       phase.parentRoadmapId.trim() !== "" &&
-  //       phase.parentRoadmapId !== phase.id;
-  //     const href = hasParent
-  //       ? `/pastor/jumpstart?id=${encodeURIComponent(phase.id)}&parentId=${encodeURIComponent(phase.parentRoadmapId!)}`
-  //       : `/pastor/jumpstart?id=${encodeURIComponent(phase.id)}`;
-  //     router.push(href);
-  //   },
-  //   [router],
-  // );
+
 const openPhaseRoute = useCallback(
   (phase: PhaseCard) => {
     const isJumpStart = phaseSequenceIndex(phase) === 0;

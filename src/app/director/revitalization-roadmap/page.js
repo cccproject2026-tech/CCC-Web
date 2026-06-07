@@ -443,7 +443,7 @@ const [pastorSearch, setPastorSearch] = useState("");
   const [deleteConfirmRoadmap, setDeleteConfirmRoadmap] = useState(null);
   const [selectedPastorModalId, setSelectedPastorModalId] = useState(null);
   const [activeTab, setActiveTab] = useState("library");
-  // const [roadmapSubmissionView, setRoadmapSubmissionView] = useState("today");
+
   useEffect(() => {
   const tab = searchParams.get("tab");
   const pastorId = searchParams.get("pastorId");
@@ -537,13 +537,13 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
           const title = pickRoadmapTitle(item, nested0);
           const desc = pickRoadmapDescription(item, nested0);
           const description = desc || "No description yet";
-          // const completionTime =
+
           //   (nested0 && String(nested0.duration || "").trim()) || String(item.duration || "").trim() || "—";
           const completionTime =
   String(item.duration || "").trim() ||
   (nested0 && String(nested0.duration || "").trim()) ||
   "—";
-          // const img = (nested0 && nested0.imageUrl) || item.imageUrl || Card1;
+
           const img = item.imageUrl || Card1;
           const rid = stringifyRoadmapId(item._id ?? item.id);
           const createdRaw = extractRoadmapCreatedAtRaw(item);
@@ -660,7 +660,7 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
       const ids = pastorRows.map((row) => extractUserIdFromOverallProgressRow(row)).filter(Boolean);
 
       const aggregate = {};
-      // const bump = (rid, userId, pct, status) => {
+
         const bump = (rid, userId, pct, status, taskStats) => {
         if (!rid || !userId) return;
         const uid = String(userId).trim();
@@ -929,7 +929,7 @@ if (activeTab === "pastor") {
       }
     }
 
-    // if (filterPastorId !== "all") {
+  
     if (false) {
       rows = rows.filter((r) => {
         const m = metricsByRoadmapId[r.id];
@@ -975,7 +975,7 @@ if (activeTab === "pastor") {
 
   const totalPages = Math.max(1, Math.ceil(filteredLibrary.length / PAGE_SIZE));
   const clampedPage = Math.min(Math.max(1, libraryPage), totalPages);
-  // const pagedLibrary = filteredLibrary.slice((clampedPage - 1) * PAGE_SIZE, clampedPage * PAGE_SIZE);
+
 const pagedLibrary = filteredLibrary;
   useEffect(() => {
     setLibraryPage(1);
@@ -1128,130 +1128,9 @@ const filteredMentorList = useMemo(() => {
   });
 }, [mentorList, mentorSearch]);
 
-// const isSameDay = (value) => {
-//   const d = parseDate(value);
-//   if (!d) return false;
 
-//   const today = new Date();
-//   return (
-//     d.getDate() === today.getDate() &&
-//     d.getMonth() === today.getMonth() &&
-//     d.getFullYear() === today.getFullYear()
-//   );
-// };
 
-// const isWithinLast7Days = (value) => {
-//   const d = parseDate(value);
-//   if (!d) return false;
 
-//   const now = new Date();
-//   const sevenDaysAgo = new Date();
-//   sevenDaysAgo.setDate(now.getDate() - 7);
-
-//   return d >= sevenDaysAgo && d <= now;
-// };
-
-// const getTaskSubmittedDate = (task) =>
-//   task?.submittedAt ||
-//   task?.submitted_at ||
-//   task?.completedAt ||
-//   task?.completed_at ||
-//   task?.updatedAt ||
-//   task?.updated_at ||
-//   null;
-
-// const roadmapSubmissions = useMemo(() => {
-//   const rows = [];
-
-//   for (const pastor of pastorProgressDetails) {
-//     // const pastorId = extractUserIdFromOverallProgressRow(pastor);
-//     // if (!pastorId) continue;
-
-//     // const pastorName = pastorRowDisplayName(pastor);
-//     const pastorId = pastor.pastorId;
-// const pastorName = pastor.pastorName;
-//     const userMetrics = Object.entries(metricsByRoadmapId);
-
-//     for (const [roadmapId, metric] of userMetrics) {
-//       const taskStats = metric?.taskStatsByUserId?.[String(pastorId)];
-//       if (!taskStats) continue;
-
-//       const roadmap = roadmapById.get(roadmapId);
-//       if (!roadmap) continue;
-
-//       const progressRoadmap =
-//   pastor.roadmaps?.find?.(
-//           (rm) =>
-//             stringifyRoadmapId(rm?.roadMapId ?? rm?.roadmapId ?? rm?._id) ===
-//             String(roadmapId),
-//         ) || null;
-
-//       const tasks = progressNestedRows(progressRoadmap);
-//       console.log("TASK DATE DEBUG:", {
-//   pastorId,
-//   pastorName,
-//   roadmapId,
-//   roadmapName: roadmap?.title,
-//   progressRoadmap,
-//   tasks,
-//   taskDates: tasks.map((task) => ({
-//     name: task?.name || task?.title || task?.taskName,
-//     status: task?.status,
-//     submittedAt: task?.submittedAt,
-//     completedAt: task?.completedAt,
-//     updatedAt: task?.updatedAt,
-//     createdAt: task?.createdAt,
-//   })),
-// });
-
-//       for (const task of tasks) {
-//         if (!isProgressRowCompleted(task)) continue;
-
-//         const submittedAt = getTaskSubmittedDate(task);
-//         if (!submittedAt) continue;
-
-//         if (!isSameDay(submittedAt) && !isWithinLast7Days(submittedAt)) continue;
-
-//         rows.push({
-//           pastorId,
-//           pastorName,
-//           roadmapId,
-//           roadmapName: roadmap.title || "Roadmap",
-//           phaseName:
-//             task?.phaseName ||
-//             task?.phase ||
-//             task?.sectionTitle ||
-//             roadmap?.nested0?.phase ||
-//             "Phase",
-//           taskId: String(task?._id ?? task?.id ?? task?.nestedRoadMapItemId ?? ""),
-//           taskName:
-//             task?.name ||
-//             task?.title ||
-//             task?.taskName ||
-//             task?.roadMapDetails ||
-//             "Submitted task",
-//           submittedAt,
-//           isToday: isSameDay(submittedAt),
-//         });
-//       }
-//     }
-//   }
-
-//   return rows.sort(
-//     (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
-//   );
-// }, [pastorProgressDetails, metricsByRoadmapId, roadmapById]);
-// console.log("ROADMAP SUBMISSIONS:", roadmapSubmissions);
-// console.log("PASTOR PROGRESS RAW:", pastorProgressList);
-// console.log("METRICS RAW:", metricsByRoadmapId);
-
-// const todaysRoadmapSubmissions = roadmapSubmissions.filter((item) => item.isToday);
-// const previousRoadmapSubmissions = roadmapSubmissions.filter((item) => !item.isToday);
-
-// const visibleRoadmapSubmissions =
-//   roadmapSubmissionView === "today"
-//     ? todaysRoadmapSubmissions
-//     : previousRoadmapSubmissions;
   return (
     <div className={directorPageRoot}>
       <DirectorHero
@@ -1548,7 +1427,7 @@ const filteredMentorList = useMemo(() => {
                   type="button"
                   onClick={() => {
                     setSelectedPastorModalId(pid);
-                    // setFilterPastorId(pid);
+                    
                   }}
                   className={`group flex shrink-0 flex-col items-center px-2 py-1 text-center transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3498DB]/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a1128] ${
                     selected ? "opacity-100" : "opacity-[0.82] hover:opacity-100"
@@ -1848,14 +1727,7 @@ const filteredMentorList = useMemo(() => {
 
     <button
       type="button"
-      // onClick={async () => {
-      //   for (const id of selectedRoadmapIds) {
-      //     await handleDeleteRoadmap(id);
-      //   }
-
-      //   setSelectedRoadmapIds([]);
-      //   setSelectMode(false);
-      // }}
+   
       onClick={() => {
   const firstSelected = roadmapLibrary.find(
     (r) => r.id === selectedRoadmapIds[0]
@@ -1925,10 +1797,7 @@ const filteredMentorList = useMemo(() => {
             <div className="mt-auto flex justify-end pt-4">
               <button
                 type="button"
-                // onClick={() => {
-                //   setFilterPastorId(pastorId);
-                //   setSelectedPastorModalId(pastorId);
-                // }}
+             
                 onClick={() => {
   setSelectedPastorModalId(pastorId);
 }}
@@ -2128,16 +1997,16 @@ const filteredMentorList = useMemo(() => {
                     const thumb =
                       typeof imgRaw === "string" ? resolveApiMediaUrl(imgRaw) || imgRaw : imgRaw || Card1;
                     const created = parseDate(roadmap.createdAt);
-                    // const creatorPic = roadmap.createdByAvatar;
-                    // const creatorFallback = Mentor1;
+
+
                     const isPastorSelected = filterPastorId !== "all";
-// const due = parseDate(roadmap.dueDate);
-// const roadmapMetrics = metricsByRoadmapId[roadmap.id];
-// const progressPercent = Math.max(
+
+
+
 //   0,
 //   Math.min(100, Number(roadmapMetrics?.avgProgress || 0)),
 // );
-// const completedText =
+
 //   progressPercent > 0 ? `${progressPercent}% completed` : "0% completed";
 const due = parseDate(roadmap.dueDate);
 const roadmapMetrics = metricsByRoadmapId[roadmap.id];
@@ -2159,22 +2028,7 @@ const completedText =
                     const creatorPic = roadmap.createdByAvatar;
 const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director");
 
-// const selectedPastorRoadmaps =
-//   selectedPastorModalId == null
-//     ? []
-//     : orderedLibrary.filter((r) => {
-//         const m = metricsByRoadmapId[r.id];
-//         const set = m?.assignedUserIds;
-//         return set && typeof set.has === "function"
-//           ? set.has(String(selectedPastorModalId))
-//           : false;
-//       });
 
-// const selectedPastorNameForModal = (() => {
-//   if (selectedPastorModalId == null) return "";
-//   const hit = pastorsForCarousel.find((p, idx) => String(pastorCarouselRowKey(p, idx)) === String(selectedPastorModalId));
-//   return hit ? pastorRowDisplayName(hit) : "Pastor";
-// })();
                     return (
                       <div
                         key={roadmap.id}
@@ -2682,21 +2536,7 @@ const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director
 
     <button
       type="button"
-          // onClick={() => {
-          //   setSelectedPastorModalId(null);
-          //   // setFilterPastorId("all");
-          // }}
-//           onClick={() => {
-//   const returnTo = searchParams.get("returnTo");
 
-//   if (returnTo) {
-//     router.push(returnTo);
-//     return;
-//   }
-
-//   setSelectedPastorModalId(null);
-//   // setFilterPastorId("all");
-// }}
 onClick={() => {
   const returnTo = searchParams.get("returnTo");
 

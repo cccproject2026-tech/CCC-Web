@@ -1154,46 +1154,6 @@ const filteredQueryCommentRows = queryCommentRows.filter((row) => {
   const mentor = getMentorFromCookie();
 const mentorId = String(mentor?.id ?? mentor?._id ?? "");
 
-// const pastorAppointments = appointments.filter((appointment) => {
-//   const appointmentPastorId = String(
-//     appointment.userId ??
-//       appointment.user?._id ??
-//       appointment.user?.id ??
-//       "",
-//   );
-//   const isSameDay = (value?: string) => {
-//   if (!value) return false;
-
-//   const date = new Date(value);
-//   const today = new Date();
-
-//   return (
-//     date.getFullYear() === today.getFullYear() &&
-//     date.getMonth() === today.getMonth() &&
-//     date.getDate() === today.getDate()
-//   );
-// };
-
-// const todayMeetings = pastorAppointments
-//   .filter((appointment) => isSameDay(appointment.meetingDate))
-//   .sort((a, b) => getStartTime(a) - getStartTime(b));
-
-//   const appointmentMentorId = String(
-//     appointment.mentorId ??
-//       appointment.mentor?._id ??
-//       appointment.mentor?.id ??
-//       "",
-//   );
-
-//   return appointmentPastorId === String(pastorId) && appointmentMentorId === mentorId;
-// });
-// const now = Date.now();
-
-// const getStatus = (appointment: any) =>
-//   String(appointment.status ?? "").toLowerCase();
-
-// const getStartTime = (appointment: any) =>
-//   new Date(appointment.meetingDate ?? "").getTime();
 const now = Date.now();
 
 const getStatus = (appointment: any) =>
@@ -1268,8 +1228,7 @@ if (
   );
 }
 
-// const getEndTime = (appointment: any) =>
-//   new Date(appointment.endTime ?? appointment.meetingDate ?? "").getTime();
+
 
 const isPastOrFinished = (appointment: any) => {
   const status = getStatus(appointment);
@@ -1317,51 +1276,7 @@ const futureAppointments = pastorAppointments
 const lastMeeting = endedAppointments[0] ?? null;
 const nextMeeting = ongoingAppointment ?? futureAppointments[0] ?? null;
 const isNextMeetingOngoing = Boolean(ongoingAppointment);
-// const now = Date.now();
 
-// // const completedAppointments = pastorAppointments
-// //   .filter((appointment) => {
-// //     const status = String(appointment.status ?? "").toLowerCase();
-// //     const end = new Date(appointment.endTime ?? appointment.meetingDate ?? "").getTime();
-// //     return status === "completed" || end < now;
-// //   })
-// const completedAppointments = pastorAppointments
-//   .filter((appointment) => {
-//     const end = new Date(appointment.endTime ?? appointment.meetingDate ?? "").getTime();
-//     return Number.isFinite(end) && end < now;
-//   })
-//   .sort(
-//     (a, b) =>
-//       new Date(b.endTime ?? b.meetingDate ?? "").getTime() -
-//       new Date(a.endTime ?? a.meetingDate ?? "").getTime(),
-//   );
-
-// // const upcomingAppointments = pastorAppointments
-// //   .filter((appointment) => {
-// //     const status = String(appointment.status ?? "").toLowerCase();
-// //     const start = new Date(appointment.meetingDate ?? "").getTime();
-// //     return status !== "completed" && start >= now;
-// //   })
-// const upcomingAppointments = pastorAppointments
-//   .filter((appointment) => {
-//     const start = new Date(appointment.meetingDate ?? "").getTime();
-//     return Number.isFinite(start) && start > now;
-//   })
-//   .sort(
-//     (a, b) =>
-//       new Date(a.meetingDate ?? "").getTime() -
-//       new Date(b.meetingDate ?? "").getTime(),
-//   );
-//   const ongoingAppointment =
-//   pastorAppointments.find((appointment) => {
-//     const start = new Date(appointment.meetingDate ?? "").getTime();
-//     const end = new Date(appointment.endTime ?? appointment.meetingDate ?? "").getTime();
-
-//     return Number.isFinite(start) && Number.isFinite(end) && start <= now && end >= now;
-//   }) ?? null;
-
-// const lastMeeting = completedAppointments[0] ?? null;
-// const nextMeeting = upcomingAppointments[0] ?? null;
 
 const formatMeetingDate = (value?: string) => {
   if (!value) return "N/A";
@@ -1410,14 +1325,7 @@ const formatRelativeDays = (value?: string) => {
   return `${days} days ago`;
 };
 
-// const daysUntil = (value?: string) => {
-//   if (!value) return "N/A";
-//   const diff = new Date(value).getTime() - now;
-//   const days = Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-//   if (days === 0) return "Today";
-//   if (days === 1) return "In 1 day";
-//   return `In ${days} days`;
-// };
+
 const daysUntil = (value?: string) => {
   if (!value) return "N/A";
 

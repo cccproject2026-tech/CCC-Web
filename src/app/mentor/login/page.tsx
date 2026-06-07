@@ -93,10 +93,7 @@ function LoginInner() {
         return;
       }
 
-      // const { accessToken, refreshToken, user } = json.data || {};
 
-      // if (accessToken) setCookie("accessToken", accessToken);
-      // if (refreshToken) setCookie("refreshToken", refreshToken);
 
       const { accessToken, refreshToken, user } = json.data || {};
 
@@ -109,17 +106,7 @@ if (userRole !== "mentor") {
 
 if (accessToken) setCookie("accessToken", accessToken);
 if (refreshToken) setCookie("refreshToken", refreshToken);
-      // if (user) {
-      //   const normalized = normalizeUserCookieForClient(user as Record<string, unknown>);
-      //   setCookie("mentor", JSON.stringify(normalized));
-      //   const uid = (normalized.id ?? normalized._id) as string | undefined;
-      //   if (uid) setCookie("userId", String(uid));
-      // }
-
-      // const next = searchParams.get("returnUrl");
-      // const destination = isSafeMentorReturnUrl(next)
-      //   ? next
-      //   : "/mentor/profile-incomplete";
+   
       let hasProfilePicture = false;
 
 if (user) {
@@ -256,20 +243,7 @@ const destination = isSafeMentorReturnUrl(next)
                 Continue Application
               </button>
 
-              {/* <div className="relative flex items-center justify-center py-1">
-                <span className="absolute inset-x-0 top-1/2 h-px bg-white/15" aria-hidden />
-                <span className="relative bg-white/5 px-3 text-[11px] font-medium uppercase tracking-wide text-[#cde2f2]/90">
-                  or
-                </span>
-              </div>
-
-              <button
-                type="button"
-                className="w-full rounded-lg border border-white/25 bg-[#0f4a76] px-4 py-3 text-sm font-medium text-white transition hover:bg-[#0c3f66] focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50"
-                onClick={() => router.push(`/pastor/InterestForm`)}
-              >
-                Submit interest
-              </button> */}
+             
             </form>
           </div>
 

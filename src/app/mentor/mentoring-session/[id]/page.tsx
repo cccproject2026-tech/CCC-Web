@@ -105,7 +105,7 @@ export default function MentorMentoringSessionDetailPage() {
   const search = useSearchParams();
   const pastorIdFromQuery = search.get("pastorId") || "";
 
-  // const sessionId = decodeURIComponent(params.id);
+ 
   const sessionId = decodeURIComponent(String(params.id || ""));
 const isGeneratedSessionId =
   !sessionId || sessionId.startsWith("locked-") || sessionId.startsWith("unscheduled-");
@@ -155,7 +155,7 @@ const isGeneratedSessionId =
     },
   });
   const loading = detailQuery.isLoading;
-  // const session = detailQuery.data?.session ?? null;
+
  const rawSession = detailQuery.data?.session ?? null;
 
 const session =

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Suspense } from "react";
-// import PastorHeader from "@/app/Components/PastorHeader";
+
 import HeroBg from "../../Assets/hero-bg.png";
 import { useSearchParams } from "next/navigation";
 
@@ -39,7 +39,7 @@ function ThankyouContent() {
             </p> */}
           </div>
 
-          {/* <div className="grid gap-8 lg:grid-cols-12 lg:gap-10"> */}
+
           <div className="grid items-center gap-8 lg:grid-cols-12 lg:gap-10">
             <div className="lg:col-span-7 xl:col-span-8">
               <div className="rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.55)_0%,rgba(9,49,80,0.72)_100%)] p-8 shadow-[0_20px_50px_rgba(2,20,38,0.4)] backdrop-blur-md md:p-10 lg:p-12">
@@ -56,13 +56,7 @@ function ThankyouContent() {
                   application and follow up as soon as we can.
                 </p>
 
-                {/* <p className="mt-6 text-sm leading-relaxed text-[#8ec5eb]/95">
-                  <strong className="font-semibold text-white">What’s different from the next page?</strong> This screen
-                  confirms we got your form. The{" "}
-                  <strong className="font-semibold text-white">Processing</strong> page is where you{" "}
-                  <strong className="font-semibold text-white">track approval</strong>, see updates, and continue when
-                  you’re accepted.
-                </p> */}
+              
 
                 <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                   <button
@@ -88,12 +82,7 @@ function ThankyouContent() {
                   >
                     Track application status
                   </button>
-                  {/* <Link
-                    href="/"
-                    className="rounded-xl border border-white/30 bg-white/10 px-8 py-3 text-center text-sm font-semibold text-white transition hover:bg-white/15 md:text-base"
-                  >
-                    Back to home
-                  </Link> */}
+                
                 </div>
               </div>
             </div>

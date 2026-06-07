@@ -87,7 +87,7 @@ function InterestFormContent() {
   const searchParams = useSearchParams();
   const role = searchParams.get("role") || "pastor";
 
-  // const [showInterests, setShowInterests] = useState(false);
+
   const [showPopup, setShowPopup] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -138,9 +138,6 @@ const sanitizeName = (value: string) => value.replace(/[^A-Za-z\s'-]/g, "");
     prev.map((c, i) => {
       if (i !== idx) return c;
 
-      // if (k === "country") {
-      //   return { ...c, country: v, state: "" };
-      // }
 
     if (k === "country") {
   return {
@@ -191,10 +188,7 @@ const getStateOptions = (countryName: string) => {
   return State.getStatesOfCountry(selectedCountry.isoCode);
 };
 
-// const getPhoneCodeByCountryName = (countryName: string) => {
-//   const selectedCountry = countryOptions.find((c) => c.name === countryName);
-//   return selectedCountry?.phonecode ? `+${selectedCountry.phonecode}` : "";
-// };
+
 const getPhoneCodeByCountryName = (countryName: string) => {
   const selectedCountry = countryOptions.find((c) => c.name === countryName);
   return cleanDialCode(selectedCountry?.phonecode);
@@ -210,19 +204,7 @@ const getFlagEmoji = (isoCode: string) =>
       String.fromCodePoint(127397 + char.charCodeAt(0))
     );
 
-// const formatPersonalPhone = (value: string) => {
-//   const digitsOnly = value.replace(/[^\d]/g, "");
-//   const selectedCode = getPhoneCodeByCountryName(personalCountry);
 
-//   if (!selectedCode) return digitsOnly;
-
-//   const codeDigits = selectedCode.replace("+", "");
-//   const numberWithoutCode = digitsOnly.startsWith(codeDigits)
-//     ? digitsOnly.slice(codeDigits.length)
-//     : digitsOnly;
-
-//   return `${selectedCode} ${numberWithoutCode}`.trim();
-// };
 
 const formatChurchPhone = (value: string, countryName: string) => {
   const digitsOnly = value.replace(/[^\d]/g, "");
@@ -253,15 +235,7 @@ const validate = (): boolean => {
   } else if (!nameRegex.test(form.lastName.trim())) {
     errs.lastName = "Last Name should contain only letters.";
   }
-//   if (!personalCountry) {
-//   errs.personalCountry = "Country is required.";
-// }
 
-//   if (!form.phoneNumber.trim()) {
-//     errs.phoneNumber = "Phone Number is required.";
-//   } else if (!/^\+?[\d\s\-()\u00d7]{7,20}$/.test(form.phoneNumber.trim())) {
-//     errs.phoneNumber = "Enter a valid phone number.";
-//   }
 if (!form.phoneNumber.trim()) {
   errs.phoneNumber = "Phone Number is required.";
 } else if (form.phoneNumber.replace(/[^\d]/g, "").length < 7) {
@@ -349,25 +323,7 @@ if (c.churchWebsite.trim()) {
     if (form.yearsInMinistry.trim()) createPayload.yearsInMinistry = form.yearsInMinistry.trim();
     if (form.currentProjects.trim()) createPayload.currentCommunityProjects = form.currentProjects.trim();
 
-//     try {
-//       setIsSubmitting(true);
-//       const response = await apiCreateInterest(createPayload);
-//       const json = response.data;
-//       if (!json.success) {
-//         setErrors({ _form: json.message || "Failed to submit interest form." });
-//         return;
-//       }
-//       // setSuccessMsg(json.message || "Interest form submitted successfully.");
-//       // setToastMessage("Interest submitted successfully.");
-//       // setTimeout(() => setToastMessage(null), 2000);
-//       // setShowInterests(true);
-//       // setCookie("interestEmail", form.email.trim());
-//       setSuccessMsg(json.message || "Interest form submitted successfully.");
-// setToastMessage("Interest submitted successfully.");
-// setTimeout(() => setToastMessage(null), 2000);
-// setCookie("interestEmail", form.email.trim());
-// setShowPopup(true);
-//     } catch (error) {
+
 try {
   setIsSubmitting(true);
 
@@ -393,9 +349,7 @@ try {
     }
   };
 
-  // const handleFirstCheckbox = (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   if (e.target.checked) setShowPopup(true);
-  // };
+
 
   /** Inline red error under a field */
   const Err = ({ k }: { k: string }) =>
@@ -478,23 +432,7 @@ try {
                     />
                     <Err k="lastName" />
                   </div>
-                  {/* <div>
-                    <input
-                      type="tel"
-                      placeholder="Phone Number *"
-                      value={form.phoneNumber}
-                      // onChange={(e) => {
-                      //   const v = e.target.value.replace(/[^\d\s+\-()\u00d7]/g, "");
-                      //   setField("phoneNumber", v);
-                      // }}
-
-                      onChange={(e) => {
-  setField("phoneNumber", formatPersonalPhone(e.target.value));
-}}
-                      className={inputCls("phoneNumber")}
-                    />
-                    <Err k="phoneNumber" />
-                  </div> */}
+                
 <div>
   <div
     className={`${inputCls(

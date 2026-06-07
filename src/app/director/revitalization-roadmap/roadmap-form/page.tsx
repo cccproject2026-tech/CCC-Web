@@ -509,8 +509,7 @@ export default function DirectorRoadmapFormPage() {
             return { type: "TEXT_AREA", name: field.label || field.name || "Text Area", ...(field.placeholder ? { placeHolder: field.placeholder } : {}) };
           case "text":
             return { type: "TEXT_FIELD", name: field.label || field.name || "Text Field", ...(field.placeholder ? { placeHolder: field.placeholder } : {}) };
-          // case "upload":
-          //   return { type: "UPLOAD", name: field.buttonLabel || "Upload" };
+       
           case "upload":
   return {
     type: "UPLOAD",
@@ -746,14 +745,7 @@ field.showOnCard ? { type: "CHECKBOX", name: "Show on Card", checked: true, have
         setParent(doc);
 
         /** New nested template: start with empty verbiage/description so directors fill them here (ignore URL carry-over). */
-        // if (!isEditMode) {
-        //   const fromUrlTitle = safeDecodeURIComponent(roadmapData.name.trim());
-        //   setNestedItemTitle(fromUrlTitle);
-        //   setChurchVerbiage("");
-        //   setDescriptionVerbiage("");
-        //   setTaskDivision("");
-        //   setTaskCompletionTime("");
-        //   setCustomFields([]);
+  
         if (!isEditMode) {
   setNestedItemTitle("");
   setChurchVerbiage("");
@@ -902,14 +894,7 @@ if (
   setError("Please select a division before creating this task.");
   return;
 }
-    // if (!churchVerbiage.trim() || !descriptionVerbiage.trim()) {
-    //   setError("Please fill in Roadmap Verbiage and Description.");
-    //   return;
-    // }
-//     if (!churchVerbiage.trim() || (!isPhaseTaskForm && !descriptionVerbiage.trim())) {
-//   setError(isPhaseTaskForm ? "Please fill in Task Verbiage." : "Please fill in Roadmap Verbiage and Description.");
-//   return;
-// }
+
 if (!churchVerbiage.trim()) {
   setError(isPhaseTaskForm ? "Please fill in Task Verbiage." : "Please fill in Roadmap Verbiage.");
   return;

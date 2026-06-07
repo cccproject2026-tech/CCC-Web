@@ -29,7 +29,7 @@ import type { CreateAssessmentPayload } from "@/app/Services/types/assessment.ty
 import { isRemoteImageSrc } from "@/app/utils/image";
 
 /** Initial count of **choice layers** (survey); add/remove is independent of CDP levels. */
-// const DEFAULT_STARTING_LAYERS = 4;
+
 const MIN_LAYERS = 1;
 /** CDP is always **four levels** (1–4), separate from choice layers. */
 const CDP_LEVEL_COUNT = 4;

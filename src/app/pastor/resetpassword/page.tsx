@@ -45,10 +45,7 @@ export default function ResetPasswordPage() {
     try {
       setIsSubmitting(true);
 
-      // const response = await apiSendOtp({
-      //   email: email.trim(),
-      //   purpose: "password_reset",
-      // });
+    
       const response = await apiForgotPassword({
   email: email.trim(),
 });
@@ -60,9 +57,7 @@ export default function ResetPasswordPage() {
 
       setSuccessMsg(response.data.message || "Verification code sent to your email.");
       setStep("reset");
-    // } catch (err) {
-    //   setErrorMsg(getApiErrorMessage(err, "Failed to send verification code."));
-    // } finally {
+
     } catch (err) {
   console.error("Reset password error:", err);
 
@@ -111,18 +106,7 @@ export default function ResetPasswordPage() {
     try {
       setIsSubmitting(true);
 
-      // const response = await apiResetPassword({
-      //   email: email.trim(),
-      //   otp: otp.trim(),
-      //   password,
-      //   confirmPassword,
-      // });
-      // const response = await apiResetPassword({
-      //   email: email.trim(),
-      //   otp: otp.trim(),
-      //   password,
-      //   confirmPassword,
-      // });
+
       const response = await apiResetPassword({
   email: email.trim(),
   otp: otp.trim(),
@@ -182,17 +166,7 @@ export default function ResetPasswordPage() {
                Enter your registered email to receive a secure code and create a new password.
             </p>
 
-            {/* <div className="mt-6 grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-xl border border-white/15 bg-[#0a3558] p-3">
-                <p className="text-[#8ec5eb] font-semibold">Secure</p>
-                <p className="text-[#d9ebf8]">Email verified</p>
-              </div>
-
-              <div className="rounded-xl border border-white/15 bg-[#0a3558] p-3">
-                <p className="text-[#8ec5eb] font-semibold">Account</p>
-                <p className="text-[#d9ebf8]">Safe reset</p>
-              </div>
-            </div> */}
+        
           </div>
         </div>
 

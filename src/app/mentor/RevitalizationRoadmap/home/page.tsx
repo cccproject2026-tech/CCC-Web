@@ -129,11 +129,7 @@ const isTaskCompleted = (task: any) => {
   const status = String(task?.progress?.status ?? task?.status ?? "").toLowerCase();
   return status.includes("complete");
 };
-  // const roadmapCardStatus = (roadmap: any) => {
-  //   const p = roadmap?.progress;
-  //   const raw = p?.status ?? roadmap?.status ?? "";
-  //   return formatStatus(raw);
-  // };
+
 const roadmapCardStatus = (roadmap: any) => {
   const children = Array.isArray(roadmap?.roadmaps) ? roadmap.roadmaps : [];
 
@@ -153,12 +149,6 @@ const roadmapCardStatus = (roadmap: any) => {
   const raw = p?.status ?? roadmap?.status ?? "";
   return formatStatus(raw);
 };
-  // const roadmapTaskCounts = (roadmap: any) => {
-  //   const p = roadmap?.progress;
-  //   const completed = Number(p?.completedSteps ?? 0);
-  //   const total = Number(p?.totalSteps ?? roadmap?.totalSteps ?? 0);
-  //   return { completed, total: Math.max(total, completed, 1) };
-  // };
   const roadmapTaskCounts = (roadmap: any) => {
   const children = Array.isArray(roadmap?.roadmaps) ? roadmap.roadmaps : [];
 
@@ -182,36 +172,7 @@ const roadmapCardStatus = (roadmap: any) => {
     total: Math.max(total, completed, 1),
   };
 };
-//   const roadmapTaskCounts = (roadmap: any) => {
-//   const p = roadmap?.progress;
 
-//   const childTasks = Array.isArray(roadmap?.roadmaps)
-//     ? roadmap.roadmaps
-//     : [];
-
-//   const actualTotal = childTasks.length;
-
-//   const completedFromChildren = childTasks.filter((task: any) => {
-//     const status = String(
-//       task?.progress?.status ?? task?.status ?? ""
-//     ).toLowerCase();
-
-//     return status.includes("complete");
-//   }).length;
-
-//   const completed = actualTotal > 0
-//     ? completedFromChildren
-//     : Number(p?.completedSteps ?? 0);
-
-//   const total = actualTotal > 0
-//     ? actualTotal
-//     : Number(p?.totalSteps ?? roadmap?.totalSteps ?? 0);
-
-//   return {
-//     completed,
-//     total: Math.max(total, completed, 1),
-//   };
-// };
 
   const filteredRoadmaps = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -306,43 +267,7 @@ const roadmapCardStatus = (roadmap: any) => {
               ) : null}
             </div>
 
-            {/* <div className="relative shrink-0">
-              <button
-                ref={buttonRef}
-                type="button"
-                onClick={() => setShowExpectedOutcomePopup(!showExpectedOutcomePopup)}
-                className="flex items-center justify-center rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-[#cde2f2] transition hover:bg-white/15"
-                aria-expanded={showExpectedOutcomePopup}
-                aria-haspopup="true"
-              >
-                <i className="fa-solid fa-ellipsis-vertical text-lg" />
-              </button>
-
-              {showExpectedOutcomePopup && (
-                <div
-                  ref={popupRef}
-                  className="absolute right-0 top-full z-50 mt-2 min-w-[280px] rounded-xl border border-white/15 bg-[linear-gradient(180deg,rgba(15,74,118,0.98)_0%,rgba(9,49,80,0.99)_100%)] p-2 shadow-xl backdrop-blur-md"
-                >
-                  <div className="space-y-1">
-                    {expectedOutcomes.map((outcome) => (
-                      <button
-                        key={outcome.id}
-                        type="button"
-                        onClick={() => handleOutcomeClick(outcome.id)}
-                        className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium transition ${
-                          selectedOutcome === outcome.id
-                            ? "bg-[#8ec5eb]/20 text-white"
-                            : "text-[#cde2f2] hover:bg-white/10"
-                        }`}
-                      >
-                        <i className="fa-solid fa-download text-[#8ec5eb]" />
-                        <span>{outcome.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div> */}
+            
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">

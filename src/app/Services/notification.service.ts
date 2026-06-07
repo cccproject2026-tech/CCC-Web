@@ -5,13 +5,7 @@ import type {
   DeviceTokenPayload,
 } from "./types/home.types";
 
-// GET /home/notifications?userId=
-// export const getNotification = (userId?: string) =>
-//   axiosInstance.get<{ success: boolean; data: NotificationResponse }>(
-//     "/home/notifications",
-//     { params: userId ? { userId } : undefined },
-//   );
-// GET /home/notifications?userId= or ?role=
+
 export const getNotification = (
   input?: string | { userId?: string; role?: string }
 ) => {

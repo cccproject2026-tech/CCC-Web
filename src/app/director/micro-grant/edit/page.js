@@ -36,7 +36,7 @@ function Page() {
         setLoading(true);
         setError("");
 
-        // const res = await fetchMicroGrantApplicationForm();
+
         const res = await getMicroGrantForm();
         const form = res?.data || res || {};
 
@@ -209,7 +209,7 @@ function Page() {
         })),
       };
 
-      // await saveMicroGrantApplicationForm(payload);
+
       await createOrUpdateMicroGrantForm(payload);
       setSuccess("Form saved successfully");
     } catch (err) {

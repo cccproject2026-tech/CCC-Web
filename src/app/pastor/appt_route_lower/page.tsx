@@ -71,8 +71,7 @@ export default function PastorAppointmentsPage() {
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState(today.getDate());
   const [menuOpenId, setMenuOpenId] = useState(null);
-//   const menuRef = useRef<HTMLDivElement | null>(null);
-// const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+
   const [showReschedule, setShowReschedule] = useState(false);
   const [appointmentToEdit, setAppointmentToEdit] = useState(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -194,13 +193,7 @@ const [scheduleDescription, setScheduleDescription] = useState("");
     const userId = getPastorUserId();
     if (!userId) return [];
     try {
-      // const [scheduleResult, upcomingResult] = await Promise.allSettled([
-      //   apiGetUserSchedule(userId),
-      //   apiGetAppointments({ userId, futureOnly: true }),
-      // ]);
-      // const scheduleData =
-      //   scheduleResult.status === "fulfilled" ? unwrapAppointmentsAxiosData(scheduleResult.value) : [];
-      // setAppointments(scheduleData);
+   
       const [scheduleResult, appointmentsResult] = await Promise.allSettled([
   apiGetUserSchedule(userId),
   apiGetAppointments({ userId, futureOnly: false }),
@@ -236,12 +229,7 @@ console.table(
 setAppointments(mergedAppointments);
 
       const todayYmd = new Date().toLocaleDateString("en-CA");
-      // setAppointmentsToday(
-      //   scheduleData.filter((a: any) => {
-      //     if (!a?.meetingDate) return false;
-      //     return meetingDateLocalYmd(String(a.meetingDate)) === todayYmd;
-      //   }) as any,
-      // );
+    
       setAppointmentsToday(
   // scheduleData.filter((a: any) => {
   mergedAppointments.filter((a: any) => {
@@ -253,24 +241,6 @@ setAppointments(mergedAppointments);
     return meetingDateLocalYmd(String(a.meetingDate)) === todayYmd;
   }) as any,
 );
-
-      // if (upcomingResult.status === "fulfilled") {
-      //   const upcomingData = unwrapAppointmentsAxiosData(upcomingResult.value);
-      //   const nowMs = Date.now();
-      //   const upcomingSorted = upcomingData
-      //     .filter((a: any) => {
-      //       if (!a?.meetingDate) return false;
-      //       const t = new Date(a.meetingDate).getTime();
-      //       return !Number.isNaN(t) && t >= nowMs - 60_000;
-      //     })
-      //     .sort(
-      //       (a: any, b: any) =>
-      //         new Date(a.meetingDate).getTime() - new Date(b.meetingDate).getTime(),
-      //     );
-      //   setUpcomingAppointments((upcomingSorted.length ? upcomingSorted : upcomingData) as any);
-      // } else {
-      //   setUpcomingAppointments([] as any);
-      // }
 
       const nowMs = Date.now();
 
@@ -291,7 +261,7 @@ const upcomingSorted = mergedAppointments
 
 setUpcomingAppointments(upcomingSorted as any);
 
-      // return scheduleData;
+
       return mergedAppointments;
     } catch (err) {
       console.error("Error fetching appointments:", err);
@@ -313,14 +283,7 @@ setUpcomingAppointments(upcomingSorted as any);
 
 
 
-  // const getModeIcon = (mode) => {
-  //   if (!mode) return DuoIcon;
-  //   const m = mode.toLowerCase();
-  //   if (m === "duo") return DuoIcon;
-  //   if (m === "google meet" || m === "meet") return MeetIcon;
-  //   if (m === "zoom") return MeetIcon;
-  //   return DuoIcon;
-  // };
+
   const getModeIcon = (mode?: string) => {
     const m = String(mode || "").toLowerCase().trim();
 
@@ -524,13 +487,7 @@ setUpcomingAppointments(upcomingSorted as any);
         const bookedMs = (appointments as any[])
           .filter((a: any) => {
             const apptMentorId = String(a.mentor?._id ?? a.mentor?.id ?? a.mentorId ?? "");
-            // const status = String(a.status ?? "").toLowerCase();
-            // return (
-            //   apptMentorId === mentorIdStr &&
-            //   !status.includes("cancel") &&
-            //   typeof a.meetingDate === "string" &&
-            //   a.meetingDate.startsWith(selectedYmd)
-            // );
+        
             const status = a.status;
 return (
   apptMentorId === mentorIdStr &&
@@ -570,13 +527,7 @@ console.log("ALL APPOINTMENTS FOR FILTER", appointments);
 
   const handleSchedule = async () => {
     if (isScheduling) return;
-//     const title = scheduleTitle.trim();
-// const description = scheduleDescription.trim();
 
-// if (!title) {
-//   showToast("Please enter a meeting title.");
-//   return;
-// }
 const title = scheduleTitle.trim();
 const description = scheduleDescription.trim();
 
@@ -600,10 +551,6 @@ if (!title) {
       return;
     }
 
-    // if (!selectedTime) {
-    //   showToast("Please select a time");
-    //   return;
-    // }
 
     const userId = getPastorUserId();
     if (!userId) {
@@ -614,10 +561,7 @@ if (!title) {
     const yyyyMmDd = new Date(currentYear, currentMonth, selectedDate).toLocaleDateString("en-CA");
     const meetingDateISO = parseSlotStartToIso(yyyyMmDd, selectedTime);
     const proposedMs = new Date(meetingDateISO).getTime();
-    // const hasOverlap = (appointments as any[]).some((a: any) => {
-    //   const t = new Date(String(a.meetingDate ?? "")).getTime();
-    //   return !Number.isNaN(t) && Math.abs(t - proposedMs) < 60 * 60 * 1000;
-    // });
+ 
     const hasOverlap = (appointments as any[]).some((a: any) => {
   if (!isBlockingAppointmentStatus(a.status)) return false;
 
@@ -631,13 +575,7 @@ if (!title) {
 
     setIsScheduling(true);
 
-    // const payload = {
-    //   userId,
-    //   mentorId: String(mid),
-    //   meetingDate: meetingDateISO,
-    //   platform: uiMeetingModeToPlatform(schedulePlatform),
-    //   notes: "Mentorship session",
-    // };
+ 
 const payload = {
   userId,
   mentorId: String(mid),
@@ -793,10 +731,7 @@ setScheduleDescription("");
 
   const selectedCalendarYmd = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-${String(selectedDate).padStart(2, "0")}`;
   const todayYmd = new Date().toLocaleDateString("en-CA");
-  // const filteredAppointmentsForSelectedDate = (appointments as Record<string, unknown>[]).filter((a) => {
-  //   if (!a?.meetingDate) return false;
-  //   return meetingDateLocalYmd(String(a.meetingDate)) === selectedCalendarYmd;
-  // });
+ 
   const filteredAppointmentsForSelectedDate = (appointments as Record<string, unknown>[]).filter((a) => {
   if (!a?.meetingDate) return false;
 
@@ -813,12 +748,7 @@ setScheduleDescription("");
     weekEnd.setDate(weekEnd.getDate() + 7);
     weekEnd.setHours(23, 59, 59, 999);
     const weekEndMs = weekEnd.getTime();
-    // return (upcomingAppointments as Record<string, unknown>[]).filter((a) => {
-    //   if (!a?.meetingDate) return false;
-    //   const t = new Date(String(a.meetingDate)).getTime();
-    //   if (Number.isNaN(t)) return false;
-    //   return t >= nowMs - 60_000 && t <= weekEndMs;
-    // });
+
     return (upcomingAppointments as Record<string, unknown>[]).filter((a) => {
   if (!a?.meetingDate) return false;
 
@@ -828,7 +758,7 @@ setScheduleDescription("");
   const t = new Date(String(a.meetingDate)).getTime();
   if (Number.isNaN(t)) return false;
 
-  // return t >= nowMs - 60_000 && t <= weekEndMs;
+
   const endMs = getAppointmentEndMs(a);
 
 return endMs >= nowMs - 60_000 && t <= weekEndMs;
@@ -842,7 +772,7 @@ return endMs >= nowMs - 60_000 && t <= weekEndMs;
         const raw = String(a.meetingDate ?? "");
         if (!raw) return false;
         const t = new Date(raw).getTime();
-        // return !Number.isNaN(t) && t < nowMs;
+   
         const endMs = getAppointmentEndMs(a);
 return !Number.isNaN(endMs) && endMs < nowMs;
       })

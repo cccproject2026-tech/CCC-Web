@@ -440,15 +440,7 @@ const [taskUpdatedDates, setTaskUpdatedDates] = useState<Record<string, string>>
 
   const phaseName = String(phase?.name ?? "Phase");
 
-  // const filteredTasks = useMemo(() => {
-  //   const q = searchQuery.trim().toLowerCase();
-  //   if (!q) return tasks;
-  //   return tasks.filter((t) => {
-  //     const blob =
-  //       `${t.name ?? ""} ${t.description ?? ""} ${(t as { roadMapDetails?: unknown }).roadMapDetails ?? ""}`.toLowerCase();
-  //     return blob.includes(q);
-  //   });
-  // }, [tasks, searchQuery]);
+
 
   const filteredTasks = useMemo(() => {
   const q = searchQuery.trim().toLowerCase();

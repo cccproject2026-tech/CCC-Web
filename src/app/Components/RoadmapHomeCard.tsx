@@ -102,7 +102,7 @@ const effectiveStatus =
   const imgUnoptimized =
     typeof img === "string" && (img.startsWith("http://") || img.startsWith("https://"));
 
-  // const showViewButton = Boolean(onViewClick && (isMentor || status !== "Completed"));
+ 
   const showViewButton = Boolean(onViewClick && (isMentor || effectiveStatus !== "Completed"));
 
   const handleCardClick = () => {

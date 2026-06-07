@@ -51,8 +51,7 @@ const fileInputRef = useRef<HTMLInputElement>(null);
 
         setUserId(uid);
 
-        // const res = await apiGetDocuments(uid);
-        // setDocuments(Array.isArray(res.data?.data) ? res.data.data : []);
+      
         const res = await apiGetDocuments(uid);
 const myDocs = Array.isArray(res.data?.data) ? res.data.data : [];
 
@@ -184,23 +183,7 @@ const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
     window.URL.revokeObjectURL(blobUrl);
   };
 
-  // const handleDeleteDocument = async (doc: any) => {
-  //   try {
-  //     if (!userId || !doc?.fileUrl) return;
 
-  //     await apiDeleteDocument(userId, doc.fileUrl);
-
-  //     setDocuments((prev) =>
-  //       prev.filter((item) => item.fileUrl !== doc.fileUrl),
-  //     );
-
-  //     setSelectedUrls((prev) => prev.filter((url) => url !== doc.fileUrl));
-  //     setOpenMenuKey(null);
-  //   } catch (error) {
-  //     console.error("Failed to delete document:", error);
-  //     alert("Failed to delete document.");
-  //   }
-  // };
   const handleDeleteDocument = async (doc: any) => {
   try {
     const ownerId = doc.ownerId || userId;

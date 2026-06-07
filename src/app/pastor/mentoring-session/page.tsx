@@ -172,7 +172,7 @@ export default function PastorMentoringSessionPage() {
       return "";
     }
   };
-// const unwrapUser = (res: any) => res?.data?.user || res?.data || res?.user || res;
+
   const unwrapUser = (res: any) => {
   if (res?.data?.user) return res.data.user;
   if (res?.data?.data) return res.data.data;
@@ -189,9 +189,7 @@ export default function PastorMentoringSessionPage() {
       const pastorRes = await apiGetUserById(pastorId);
       const pastor = unwrapUser(pastorRes);
 
-      // const mentorId = Array.isArray(pastor?.assignedId)
-      //   ? pastor.assignedId[0]
-      //   : pastor?.assignedId || pastor?.mentorId || pastor?.assignedMentorId;
+    
 const mentorIds = [
   ...(Array.isArray(pastor?.assignedId) ? pastor.assignedId : [pastor?.assignedId]),
   pastor?.mentorId,
@@ -265,21 +263,7 @@ useEffect(() => {
   };
 }, []);
 
-    // const filteredSessions = sessions.filter((session) => {
-    // const filteredSessions = allSessions.filter((session) => {
-        // if (filterStatus === "Completed") return session.status === "COMPLETED";
-        // if (filterStatus === "Cancelled") return session.status === "CANCELLED";
-        // if (filterStatus === "Scheduled") return session.status === "SCHEDULED";
-        // return true;
-//         if (filterStatus === "Completed") return session.status === "COMPLETED";
-// if (filterStatus === "Cancelled") return session.status === "CANCELLED";
-// if (filterStatus === "Scheduled") return session.status === "SCHEDULED";
-// return true;
-//     });
 
-    // const visible = filteredSessions.filter((s) =>
-    //     String(s.mentorNote ?? s.title ?? "").toLowerCase().includes(search.toLowerCase())
-    // );
 
     const getPhaseInfo = (sessionNumber: number) => {
         let currentSession = 0;
@@ -292,10 +276,7 @@ useEffect(() => {
         return "Unknown Phase";
     };
 
-    // const sortedSessions = useMemo(() => [...sessions].sort((a, b) => a.sessionNumber - b.sessionNumber), [sessions]);
-    // const nextSessionId = getNextSessionId(
-    //     sortedSessions.map((s) => ({ id: s.id, status: s.status as any, scheduledDate: s.scheduledDate })),
-    // );
+
     const sortedSessions = useMemo(
   () => [...sessions].sort((a, b) => a.sessionNumber - b.sessionNumber),
   [sessions],
@@ -348,9 +329,7 @@ const allSessions = useMemo(() => {
       ? new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000)
       : null;
 
-    // const status =
-    //   apiSession?.status ||
-    //   (sessionNumber === unlockedSessionNumber ? "SCHEDULED" : "LOCKED");
+
     const isCompleted = apiSession?.status === "COMPLETED";
 
 const status = isCompleted
@@ -392,15 +371,11 @@ const filteredSessions = allSessions.filter((session) => {
   return true;
 });
 
-// const visible = filteredSessions.filter((s) =>
-//   String(s.mentorNote ?? s.title ?? "").toLowerCase().includes(search.toLowerCase())
-// );
+
 const visible = filteredSessions.filter((s) =>
   String(s.title ?? "").toLowerCase().includes(search.toLowerCase())
 );
-// const selectedSession =
-//   allSessions.find((s) => s.sessionNumber === selectedSessionNumber) ||
-//   allSessions[0];
+
 const selectedSession =
   selectedSessionNumber == null
     ? null
@@ -423,12 +398,7 @@ const pastorRescheduleEligible =
   !!selectedSession &&
   selectedSession.status !== "LOCKED" &&
   isPastorMentoringRescheduleEligibleStatus(selectedSession.status);
-// const selectedMentor =
-//   selectedRaw?.mentor ||
-//   selectedRaw?.mentorId ||
-//   selectedAppointment?.mentor ||
-//   selectedAppointment?.mentorId ||
-//   {};
+
 const selectedMentor =
   assignedMentor ||
   selectedRaw?.mentor ||

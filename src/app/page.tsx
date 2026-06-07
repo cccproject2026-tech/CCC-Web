@@ -16,7 +16,7 @@ export default function LandingPage() {
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // const isChooseModalOpen = modalMode !== null;
+
   const isChooseModalOpen = modalMode === "login" || modalMode === "interest";
 
   const roles = [
@@ -79,7 +79,7 @@ export default function LandingPage() {
       <PastorHeader />
 
       <main id="home" className="relative z-10">
-        {/* <section className="mx-auto w-full max-w-7xl px-6 pb-20 pt-16 lg:px-8 lg:pt-24"> */}
+      
         <section className="mx-auto w-full max-w-7xl px-6 pb-20 pt-2 lg:px-8 lg:pt-4">
           <div className="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
             <div className="animate-fadeInUp">

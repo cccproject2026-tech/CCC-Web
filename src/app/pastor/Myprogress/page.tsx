@@ -403,8 +403,7 @@ function formatDateShort(raw: string | undefined | null): string | null {
 function PastorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: () => void }) {
   const title = roadmap.title || "Roadmap";
   const desc = roadmap.description || "";
-  // const progressPct = Number(roadmap.percent ?? 0);
-  // const completed = `${roadmap.completedSteps ?? 0}/${roadmap.totalSteps ?? 0}`;
+ 
   const progressPct = Math.min(100, Math.max(0, Number(roadmap.percent ?? 0)));
 
 const totalSteps = Math.max(0, Number(roadmap.totalSteps ?? 0));

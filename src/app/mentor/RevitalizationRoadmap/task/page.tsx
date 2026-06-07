@@ -213,7 +213,7 @@ function TaskPageContent() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // const [activeTab, setActiveTab] = useState<"pastorResponse" | "comments" | "queries">("pastorResponse");
+  
   const [activeTab, setActiveTab] = useState<
   "pastorResponse" | "previousSubmissions" | "comments" | "queries"
 >("pastorResponse");
@@ -1077,17 +1077,7 @@ const renderHistoryAnswerCard = (
                     >
                       Pastor response
                     </button>
-                    {/* <button
-  type="button"
-  onClick={() => setActiveTab("previousSubmissions")}
-  className={`w-full rounded-lg px-4 py-3 text-left text-sm font-semibold transition ${
-    activeTab === "previousSubmissions"
-      ? "border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-white"
-      : "text-[#cde2f2] hover:bg-white/10"
-  }`}
->
-  Previous submissions
-</button> */}
+ 
 <button
   type="button"
   onClick={() => setActiveTab("previousSubmissions")}
@@ -1139,75 +1129,9 @@ const renderHistoryAnswerCard = (
                 {activeTab === "pastorResponse" && (
                   <div className={`${glassPanel} p-6 sm:p-8`}>
                     {(() => {
-                      // const renderableExtras = pastorExtrasRows.filter(isRenderablePastorExtraRow);
-//                       const allRenderableExtras = pastorExtrasRows.filter(isRenderablePastorExtraRow);
 
-// const latestSubmitKey = allRenderableExtras
-//   .map((item) =>
-//     String(
-//       item.submissionId ??
-//         item.responseId ??
-//         item.submitId ??
-//         item.groupId ??
-//         item.createdAt ??
-//         item.updatedAt ??
-//         "",
-//     ),
-//   )
-//   .filter(Boolean)
-//   .at(-1);
-
-// const renderableExtras = latestSubmitKey
-//   ? allRenderableExtras.filter((item) => {
-//       const itemKey = String(
-//         item.submissionId ??
-//           item.responseId ??
-//           item.submitId ??
-//           item.groupId ??
-//           item.createdAt ??
-//           item.updatedAt ??
-//           "",
-//       );
-
-//       return itemKey === latestSubmitKey;
-//     })
-//   : allRenderableExtras;
-
-// const isUpdatedResponse = allRenderableExtras.length > renderableExtras.length;
-// const pastorHasNoResponses = !extrasLoading && renderableExtras.length === 0;
 const allRenderableExtras = pastorExtrasRows.filter(isRenderablePastorExtraRow);
-// const buildVersionsFromExtras = (extras: Record<string, unknown>[]) => {
-//   const versions: Record<string, unknown>[][] = [];
 
-//   extras.forEach((item) => {
-//     const type = String(item.type ?? "").toUpperCase();
-//     const label = String(item.name ?? item.key ?? "").trim().toLowerCase();
-//     if (!label) return;
-
-//     let placed = false;
-
-//     for (const version of versions) {
-//       const alreadyHasField = version.some((row) => {
-//         const rowType = String(row.type ?? "").toUpperCase();
-//         const rowLabel = String(row.name ?? row.key ?? "").trim().toLowerCase();
-//         return `${rowType}__${rowLabel}` === `${type}__${label}`;
-//       });
-
-//       if (!alreadyHasField) {
-//         version.push(item);
-//         placed = true;
-//         break;
-//       }
-//     }
-
-//     if (!placed) versions.push([item]);
-//   });
-
-//   return versions;
-// };
-
-// const submissionVersions = buildVersionsFromExtras(allRenderableExtras);
-// const previousSubmissionVersions = submissionVersions.slice(0, -1);
 const latestExtrasMap = new Map<string, Record<string, unknown>>();
 
 allRenderableExtras.forEach((item) => {
@@ -1223,7 +1147,7 @@ const renderableExtras = Array.from(latestExtrasMap.values());
 
 const isUpdatedResponse = allRenderableExtras.length > renderableExtras.length;
 
-// const pastorHasNoResponses = !extrasLoading && renderableExtras.length === 0;
+
 const pastorHasAssessmentResponse = assessmentTaskState?.submitted === true;
 
 const pastorHasNoResponses =
@@ -1249,10 +1173,7 @@ const renderAnswerCard = (
 ) => {
   const t = String(item.type ?? "").toUpperCase();
   const label = String(item.name ?? item.key ?? fallbackLabel ?? `Item ${idx + 1}`);
-  // const uploadedFiles =
-  // pastorUploadDocs[label.trim()] ??
-  // pastorUploadDocs[label.trim().toLowerCase()] ??
-  // [];
+
   const normalizedLabel = label.trim().toLowerCase();
 const uploadedFiles = getUploadedFilesForSubmission(normalizedLabel, item, 0, true);
   const sig = item.signatureData !== undefined ? item.signatureData : undefined;
@@ -1368,16 +1289,7 @@ const uploadedFiles = getUploadedFilesForSubmission(normalizedLabel, item, 0, tr
     );
   }
 
-  // if (typeof val === "boolean") {
-  //   return (
-  //     <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">
-  //       <p className="text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
-  //         {label}
-  //       </p>
-  //       <p className="mt-1 text-sm text-white">{val ? "Yes" : "No"}</p>
-  //     </div>
-  //   );
-  // }
+
   if (typeof val === "boolean") {
   return (
     <div key={`${label}-${idx}`} className="rounded-xl border border-white/10 bg-white/[0.04] p-4">

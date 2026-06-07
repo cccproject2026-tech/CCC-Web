@@ -24,7 +24,7 @@ import { apiGetAllUsers, apiGetAssignedUsers } from "@/app/Services/users.servic
 import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
 import type { UserOverallProgress } from "@/app/Services/types";
 
-// const PLACEHOLDER_IMAGES = [Mentor1, Mentor2, Mentor3] as const;
+
 
 type MenteeItem = {
   userId: string;
@@ -84,15 +84,7 @@ function getInitialsAvatar(name: string, fallback = "User") {
     name || fallback
   )}&background=173653&color=ffffff`;
 }
-// function imageForItem(
-//   profilePicture: string | undefined,
-//   index: number,
-// ): string | (typeof PLACEHOLDER_IMAGES)[number] {
-//   if (typeof profilePicture === "string" && profilePicture.trim()) {
-//     return resolveApiMediaUrl(profilePicture) ?? profilePicture;
-//   }
-//   return PLACEHOLDER_IMAGES[index % PLACEHOLDER_IMAGES.length];
-// }
+
 function imageForItem(profilePicture: string | undefined, name: string): string {
   if (typeof profilePicture === "string" && profilePicture.trim()) {
     return resolveApiMediaUrl(profilePicture) ?? profilePicture;
@@ -110,16 +102,7 @@ function normalizeRow(
     `${item.firstName ?? ""} ${item.lastName ?? ""}`.trim() ||
     item.email ||
     "Unknown";
-  // return {
-  //   userId,
-  //   fullName,
-  //   role: item.role ?? "—",
-  //   progress: Math.round(
-  //     Math.min(100, Math.max(0, item.overallProgress ?? 0)),
-  //   ),
-  //   // profileImage: imageForItem(item.profilePicture, index),
-  //   profileImage: imageForItem(item.profilePicture, fullName),
-  // };
+
   return {
   userId,
   fullName,
@@ -218,10 +201,7 @@ export default function TrackProgressPage() {
           const mentorId = String(mentor._id ?? mentor.id ?? "");
           if (!mentorId) return null;
           const rawPic = mentor?.profilePicture;
-          // const mentorImage: string | (typeof PLACEHOLDER_IMAGES)[number] =
-          //   typeof rawPic === "string" && rawPic.trim()
-          //     ? (resolveApiMediaUrl(rawPic) ?? rawPic)
-          //     : PLACEHOLDER_IMAGES[idx % PLACEHOLDER_IMAGES.length];
+
           const mentorName = `${mentor.firstName ?? ""} ${mentor.lastName ?? ""}`.trim() || "Mentor";
 const mentorImage =
   typeof rawPic === "string" && rawPic.trim()
@@ -366,10 +346,7 @@ const mentorImage =
             if (!uid) return null;
             const name = `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Pastor";
             const rawPastor = u?.profilePicture;
-            // const profileImage: string | (typeof PLACEHOLDER_IMAGES)[number] =
-            //   typeof rawPastor === "string" && rawPastor.trim()
-            //     ? (resolveApiMediaUrl(rawPastor) ?? rawPastor)
-            //     : PLACEHOLDER_IMAGES[ui % PLACEHOLDER_IMAGES.length];
+
             const profileImage =
   typeof rawPastor === "string" && rawPastor.trim()
     ? (resolveApiMediaUrl(rawPastor) ?? rawPastor)

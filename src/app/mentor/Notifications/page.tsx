@@ -58,9 +58,7 @@ export default function NotificationsPage() {
     setLoading(true);
     setError(null);
     try {
-      // const res = await getNotification(mentorId);
-      // const list = unwrapNotificationsList(res);
-      // setItems(list);
+ 
       const res = await getNotification(mentorId);
 const list = unwrapNotificationsList(res);
 const newestFirst = [...list].reverse();

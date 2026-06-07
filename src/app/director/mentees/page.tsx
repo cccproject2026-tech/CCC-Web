@@ -108,7 +108,7 @@ function labelForSortKey(k: MenteeSortKey): string {
   }
 }
 
-// const IMAGE_POOL = [Mentor1, Mentor2, Mentor3];
+
 const getInitialsAvatar = (name: string) =>
   `https://ui-avatars.com/api/?name=${encodeURIComponent(
     name || "User"

@@ -166,27 +166,7 @@ const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
     }
   };
 
-  // -------------------------
-  // FETCH USER
-  // -------------------------
-  // useEffect(() => {
-  //   const storedUser = JSON.parse(getCookie("user") || "{}");
-  //   const userId = storedUser?.id;
-  //   if (!userId) return;
 
-  //   async function fetchUser() {
-  //     try {
-  //       const res = await getSingleUser(userId);
-  //       const data = res.data?.data;
-  //       setProfile(data);
-  //       initForm(data);
-  //     } catch (err) {
-  //       console.error("Error fetching profile:", err);
-  //     }
-  //   }
-
-  //   fetchUser();
-  // }, []);
 
   useEffect(() => {
   const storedUser = JSON.parse(getCookie("user") || "{}");
@@ -281,17 +261,7 @@ const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
 
     const res = await apiUploadProfilePicture(userId, formData);
     const uploadedUrl = res.data?.data?.profilePicture;
-    // if (uploadedUrl) {
-//   const storedUser = JSON.parse(getCookie("user") || "{}");
 
-//   setCookie(
-//     "user",
-//     JSON.stringify({
-//       ...storedUser,
-//       profilePicture: uploadedUrl,
-//     }),
-//   );
-// }
 if (uploadedUrl) {
   const storedUser = JSON.parse(getCookie("user") || "{}");
 
@@ -395,15 +365,7 @@ console.log("PASTOR USER ID:", userId);
 console.log("PASTOR USER PAYLOAD:", userPayload);
 console.log("PASTOR INTEREST PAYLOAD:", interestPayload);
 
-// const [userRes, interestRes] = await Promise.all([
-//   apiUpdateUserById(userId, userPayload),
-//   updateInterestByEmail(email, interestPayload),
-// ]);
 
-// console.log("USER UPDATED LAST NAME:", userRes.data?.data?.lastName);
-// const freshRes = await getSingleUser(userId);
-// console.log("FRESH USER AFTER SAVE:", freshRes.data?.data?.lastName);
-// console.log("INTEREST UPDATE RESPONSE:", interestRes.data);
 const interestRes = await updateInterestByEmail(email, {
   ...interestPayload,
   firstName: form.firstName,

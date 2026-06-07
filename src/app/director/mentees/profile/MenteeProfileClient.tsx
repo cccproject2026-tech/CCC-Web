@@ -638,33 +638,11 @@ useEffect(() => {
                       </span>
                     </button>
                   </div>
-                {/* ) : null} */}
+               
 
-                {/* <button
-                  type="button"
-                  onClick={inviteButton.onClick}
-                  disabled={inviteButton.disabled}
-                  title={
-                    inviteState === "none" && !canInviteFieldMentor
-                      ? "Available when the program is complete and the mentee is marked complete (mentor or director)."
-                      : undefined
-                  }
-                  className={`${directorBtnPrimary} w-full justify-center disabled:cursor-not-allowed disabled:opacity-50`}
-                >
-                  <i className={inviteButton.icon} />
-                  <span>{inviteButton.label}</span>
-                </button> */}
+           
                 <div className="space-y-3">
-  {/* {hasRealCertificate(certificate) ? (
-    <button
-      type="button"
-      disabled
-      className={`${directorBtnPrimary} w-full justify-center disabled:cursor-not-allowed disabled:opacity-50`}
-    >
-      <i className="fa-solid fa-certificate" />
-      <span>Certificate issued</span>
-    </button>
-  ) : userMarkedComplete ? ( */}
+ 
   {hasRealCertificate(certificate) ? (
   <button
     type="button"
@@ -841,54 +819,7 @@ useEffect(() => {
     </div>
   </div>
 )}
-      {/* {showDocs && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setShowDocs(false)}
-        >
-          <div
-            className="max-h-[80vh] w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-              <h3 className="text-lg font-bold text-gray-900">Documents</h3>
-              <button
-                type="button"
-                onClick={() => setShowDocs(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
-                aria-label="Close"
-              >
-                <i className="fa-solid fa-xmark" />
-              </button>
-            </div>
-            <ul className="max-h-[60vh] overflow-y-auto p-4">
-              {documents.map((d) => (
-                <li
-                  key={d.id}
-                  className="flex items-center justify-between gap-2 border-b border-gray-100 py-3 last:border-0"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-gray-900">{d.name}</p>
-                    <p className="text-xs text-gray-500">{d.size}</p>
-                  </div>
-                  {d.url ? (
-                    <a
-                      href={d.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="shrink-0 text-sm font-semibold text-[#2E3B8E] hover:underline"
-                    >
-                      Open
-                    </a>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )} */}
+
 
       {toast && (
         <div className="fixed left-1/2 top-20 z-[110] max-w-[min(90vw,28rem)] -translate-x-1/2 animate-fade-in">
@@ -1035,13 +966,7 @@ useEffect(() => {
           Download PDF
         </button>
 
-        {/* <button
-          type="button"
-          onClick={() => setToast({ message: "Email certificate integration pending.", variant: "success" })}
-          className="w-full rounded-lg border border-gray-300 px-4 py-3 font-semibold"
-        >
-          Email Certificate
-        </button> */}
+     
 
         <button
           type="button"

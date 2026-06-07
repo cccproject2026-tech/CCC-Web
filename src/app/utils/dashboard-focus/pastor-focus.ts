@@ -271,31 +271,14 @@ export async function loadPastorFocusSections(input: PastorFocusInput): Promise<
     typeof a === "object" && a ? (a as Record<string, unknown>) : {},
   );
 
-  // const flattenedTasks: TaskWithRoadmap[] = roadmaps.flatMap((roadmap) =>
-  //   (roadmap.roadmaps || []).map((task) => ({
-  //     ...task,
-  //     roadmapId: String(roadmap._id ?? roadmap.id ?? ""),
-  //     roadmapName: String(roadmap.name ?? "Roadmap"),
-  //   })),
-  // );
+
   console.log(
   roadmaps.map((r) => ({
     name: r.name,
     status: r.status,
   }))
 );
-  // const flattenedTasks: TaskWithRoadmap[] = roadmaps
-  // .filter(
-  //   (roadmap) =>
-  //     normalizeNestedTaskStatus(roadmap.status) !== "completed"
-  // )
-  // .flatMap((roadmap) =>
-  //   (roadmap.roadmaps || []).map((task) => ({
-  //     ...task,
-  //     roadmapId: String(roadmap._id ?? roadmap.id ?? ""),
-  //     roadmapName: String(roadmap.name ?? "Roadmap"),
-  //   })),
-  // );
+
 const flattenedTasks: TaskWithRoadmap[] = roadmaps
   .filter((roadmap) => !isRoadmapPhaseCompleted(roadmap))
   .flatMap((roadmap) =>

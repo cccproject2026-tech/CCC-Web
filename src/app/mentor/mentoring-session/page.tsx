@@ -369,9 +369,7 @@ export default function MentorMentoringSessionPage() {
       };
     }, [fetchGroupedSessions]);
 
-    // const handleViewDetails = (session: MentorSession) => {
-    //     router.push(`/mentor/mentoring-session/${encodeURIComponent(session.id)}?pastorId=${encodeURIComponent(session.pastorId)}`);
-    // };
+
  const handleViewDetails = (session: MentorSession) => {
   const sessionId = String(session.id || "");
   if (!sessionId || sessionId.startsWith("locked-") || sessionId.startsWith("unscheduled-")) {
@@ -458,11 +456,7 @@ const buildAllSessions = (sessions: MentorSession[], pastorId: string) => {
 
     const isCompleted = apiSession?.status === "COMPLETED";
 
-    // const status = isCompleted
-    //   ? "COMPLETED"
-    //   : sessionNumber === unlockedSessionNumber
-    //   ? "SCHEDULED"
-    //   : "LOCKED";
+
     const isUnlocked = sessionNumber === unlockedSessionNumber;
 const scheduledDate = apiSession?.scheduledDate || fallbackDate?.toISOString() || "";
 const isPastDue =
@@ -487,18 +481,10 @@ const status = isCompleted
         apiSession?.appointmentId,
       pastorId,
       sessionNumber,
-    //   title:
-    //     apiSession?.title ||
-    //     `Session ${sessionNumber}—${title}`,
+   
     title: apiSession?.title || `Session ${sessionNumber}—${title}`,
       status,
-    //   scheduledDate: isCompleted
-    //     ? apiSession?.scheduledDate || ""
-    //     : sessionNumber === unlockedSessionNumber
-    //     ? fallbackDate?.toISOString() ||
-    //       apiSession?.scheduledDate ||
-    //       ""
-    //     : "",
+  
     scheduledDate: isCompleted
   ? apiSession?.scheduledDate || ""
   : isUnlocked
@@ -508,8 +494,7 @@ const status = isCompleted
   });
 };
     const selectedGroup = selectedPastorId ? groupedSessions.find(g => g.pastorId === selectedPastorId) : undefined;
-    // const sessionsForPastor = selectedGroup?.sessions ?? [];
-    // const sortedSessions = useMemo(() => [...sessionsForPastor].sort((a, b) => a.sessionNumber - b.sessionNumber), [sessionsForPastor]);
+
     const sessionsForPastor = selectedGroup?.sessions ?? [];
 
 const allSessionsForPastor = useMemo(
@@ -518,9 +503,7 @@ const allSessionsForPastor = useMemo(
 );
 
 const sortedSessions = allSessionsForPastor;
-    // const nextSessionId = getNextSessionId(
-    //     sortedSessions.map((s) => ({ id: s.id, status: s.status, scheduledDate: s.scheduledDate })),
-    // );
+ 
     const nextSessionId = getNextSessionId(
   sortedSessions.map((s) => ({
     id: s.id,
@@ -722,29 +705,7 @@ const getRescheduleRequestForSession = (session: any) =>
                                 </h2>
                                 <div className="custom-scrollbar max-h-[600px] space-y-3 overflow-y-auto pr-2">
                                     {groupedSessions.length > 0 ? (
-                                        // groupedSessions.map((group) => (
-                                        //     <button
-                                        //         key={group.pastorId}
-                                        //         onClick={() => {
-                                        //             setSelectedPastorId(group.pastorId);
-                                        //         }}
-                                        //         className={`w-full text-left px-4 py-3 rounded-lg transition border ${selectedPastorId === group.pastorId
-                                        //             ? "bg-[#8ec5eb]/25 border-[#8ec5eb]/35 text-white"
-                                        //             : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white"
-                                        //             }`}
-                                        //     >
-                                        //         <div className="flex items-center justify-between">
-                                        //             <div className="flex-1">
-                                        //                 <p className="font-medium text-sm">{group.pastorName}</p>
-                                        //                 <p className="text-xs text-white/50 mt-1 truncate">
-                                        //                     {group.pastorEmail}
-                                        //                 </p>
-                                        //             </div>
-                                        //             <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-full bg-[#8ec5eb]/30 text-xs font-semibold">
-                                        //                 {group.sessions.length}
-                                        //             </span>
-                                        //         </div>
-                                        //     </button>
+                                      
                                         groupedSessions.map((group) => {
   const allSessions = buildAllSessions(group.sessions, group.pastorId);
 
@@ -756,9 +717,7 @@ const getRescheduleRequestForSession = (session: any) =>
     (s) => String(s.status) === "SCHEDULED"
   );
 
-//   const missedSession = allSessions.find(
-//     (s) => String(s.status) === "MISSED"
-//   );
+
 const missedSession =
   group.sessions.find((s) => String(s.status) === "MISSED") ||
   allSessions.find((s) => String(s.status) === "MISSED");
@@ -855,7 +814,7 @@ const missedSession =
                                     const selectedGroup = groupedSessions.find(g => g.pastorId === selectedPastorId);
                                     if (!selectedGroup) return null;
 
-                                    // const filteredSessions = selectedGroup.sessions.filter((session) => {
+
                                     const allSessions = buildAllSessions(selectedGroup.sessions, selectedGroup.pastorId);
 
 const filteredSessions = allSessions.filter((session) => {

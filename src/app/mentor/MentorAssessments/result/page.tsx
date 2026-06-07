@@ -657,8 +657,7 @@ const contentTopRef = useRef<HTMLDivElement | null>(null);
           }),
         ),
       );
-      // const failed = sendResults.filter((r) => r.status === "rejected").length;
-      // const succeeded = sendResults.length - failed;
+   
       const isAlreadySentError = (r: any) =>
   r.status === "rejected" &&
   String(r.reason?.response?.data?.message || "")
