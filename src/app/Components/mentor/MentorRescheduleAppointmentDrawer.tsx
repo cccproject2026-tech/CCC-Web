@@ -299,7 +299,7 @@ export default function MentorRescheduleAppointmentDrawer({
                     }
 
                     return timeSlots.map((slot: any, idx: number) => {
-                      const timeLabel = `${slot.startTime} ${slot.startPeriod}`;
+                      const timeLabel = `${slot.startTime} ${slot.startPeriod} - ${slot.endTime} ${slot.endPeriod}`;
                       const isoString = new Date(`${selectedDateSlots.date}T${convertTo24Hour(slot.startTime, slot.startPeriod)}`).toISOString();
 
                       return (
@@ -413,7 +413,7 @@ export default function MentorRescheduleAppointmentDrawer({
                     }
 
                     return timeSlots.map((slot: any, idx: number) => {
-                      const timeLabel = `${slot.startTime} ${slot.startPeriod}`;
+                      const timeLabel = `${slot.startTime} ${slot.startPeriod} - ${slot.endTime} ${slot.endPeriod}`;
                       const isoString = new Date(`${selectedDateSlots.date}T${convertTo24Hour(slot.startTime, slot.startPeriod)}`).toISOString();
 
                       return (

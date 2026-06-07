@@ -172,6 +172,7 @@ const shouldOpenReschedule = searchParams.get("reschedule") === "1";
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [drawerStep, setDrawerStep] = useState<1 | 2>(1);
   const [showMenu, setShowMenu] = useState<string | null>(null);
+  const [appointmentPendingCancellation, setAppointmentPendingCancellation] = useState<Appointment | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const router = useRouter();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -414,26 +415,26 @@ useEffect(() => {
           }
           return;
         }
-        const normalize = (t: string) => t.replace(/\s+/g, "").toLowerCase();
-
-        const bookedSlots = busyAppointments
+        const busyAppointmentTimes = busyAppointments
           .filter(
             (a) =>
-              a.meetingDate.startsWith(meetingDate) &&
+              typeof a.meetingDate === "string" &&
               !["cancelled", "canceled", "missed"].includes((a.status || "").toLowerCase()),
           )
           .map((a) => {
-            const d = new Date(a.meetingDate);
-            return normalize(d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
-          });
+            const ms = new Date(a.meetingDate).getTime();
+            return Number.isNaN(ms) ? null : ms;
+          })
+          .filter((ms): ms is number => ms != null);
 
         const formatted = dayData.slots
           .map((s: any) => {
             return `${s.startTime} ${s.startPeriod.toLowerCase()} - ${s.endTime} ${s.endPeriod.toLowerCase()}`;
           })
           .filter((slot: string) => {
-            const startTime = normalize(slot.split(" - ")[0]);
-            return !bookedSlots.includes(startTime);
+            const slotMs = new Date(parseSlotStartToIso(meetingDate, slot)).getTime();
+            if (Number.isNaN(slotMs)) return true;
+            return !busyAppointmentTimes.some((busyMs) => Math.abs(busyMs - slotMs) < 60 * 60 * 1000);
           });
 
         const participantUserIds = Array.from(
@@ -755,7 +756,10 @@ setMeetingDescription("");
 
   const handleCancelMentorAppointment = async (appt: Appointment) => {
     const id = appointmentEntityId(appt);
-    if (!id || !mentorId) return;
+    if (!id || !mentorId) {
+      setAppointmentPendingCancellation(null);
+      return;
+    }
 
     try {
       await apiCancelAppointment(id);
@@ -776,6 +780,8 @@ setMeetingDescription("");
       setToastMessage(stillActive ? "Failed to cancel appointment" : "Appointment cancelled");
     } catch (_) {
       setToastMessage("Failed to cancel appointment");
+    } finally {
+      setAppointmentPendingCancellation(null);
     }
     setTimeout(() => setToastMessage(null), 3000);
   };
@@ -1143,7 +1149,10 @@ const isCancelled = status === "cancelled" || status === "canceled";
                                   <button
                                     type="button"
                                     className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
-                                    onClick={() => handleCancelMentorAppointment(appt)}
+                                    onClick={() => {
+                                      setAppointmentPendingCancellation(appt);
+                                      setShowMenu(null);
+                                    }}
                                   >
                                     <i className="fa-regular fa-circle-xmark mr-2 text-red-300" />
                                     Cancel meeting
@@ -1679,6 +1688,32 @@ const isCancelled = status === "cancelled" || status === "canceled";
           setTimeout(() => setToastMessage(null), 3000);
         }}
       />
+      {appointmentPendingCancellation ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-[420px] rounded-2xl border border-white/15 bg-[#041f35] p-6 text-white shadow-2xl">
+            <h3 className="text-lg font-semibold">Cancel appointment?</h3>
+            <p className="mt-2 text-sm leading-6 text-[#cde2f2]">
+              This will cancel the meeting for all participants.
+            </p>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className={mentorSecondaryCta}
+                onClick={() => setAppointmentPendingCancellation(null)}
+              >
+                Keep meeting
+              </button>
+              <button
+                type="button"
+                className={mentorPrimaryCta}
+                onClick={() => void handleCancelMentorAppointment(appointmentPendingCancellation)}
+              >
+                Cancel appointment
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {toastMessage ? (
         <div
           className="fixed bottom-6 right-4 z-[60] max-w-md rounded-2xl border border-white/20 bg-[#0a3558]/95 px-5 py-4 shadow-2xl backdrop-blur-md sm:right-8"

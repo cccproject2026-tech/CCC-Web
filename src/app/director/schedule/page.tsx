@@ -300,6 +300,7 @@ const [historySearch, setHistorySearch] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState<string | null>(null);
   const [showHistoryMenu, setShowHistoryMenu] = useState<string | null>(null);
+  const [appointmentPendingCancellation, setAppointmentPendingCancellation] = useState<AppointmentResponse | null>(null);
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
   const [rescheduleTarget, setRescheduleTarget] = useState<AppointmentResponse | null>(null);
   const [rescheduleDateTime, setRescheduleDateTime] = useState("");
@@ -872,7 +873,6 @@ useEffect(() => {
     const normalizedDirectorEmail = normalizeIdentityText(directorIdentity.email);
     return appointments
       .filter((a) => {
-        if (!appointmentNotCancelled(a)) return false;
         if (new Date(a.meetingDate).toISOString().slice(0, 10) !== selectedAppointmentDate) return false;
         const userPerson = asPerson(a.user) ?? asPerson(a.userId as string | PersonInfo);
         const mentorPerson = asPerson(a.mentor) ?? asPerson(a.mentorId as string | PersonInfo);
@@ -906,7 +906,6 @@ useEffect(() => {
     );
     return appointments
       .filter((a) => {
-        if (!appointmentNotCancelled(a)) return false;
         if (new Date(a.meetingDate).toISOString().slice(0, 10) !== selectedAppointmentDate) return false;
         const apptId = appointmentEntityId(a) || `${a.meetingDate}-${appointmentUserIdString(a)}-${appointmentMentorIdString(a)}`;
         return !myIds.has(apptId);
@@ -1197,7 +1196,10 @@ setMeetingDescription("");
   // ── Cancel appointment ────────────────────────────────────────────────────────
   const handleCancelAppointment = async (appt: AppointmentResponse) => {
     const id = appointmentEntityId(appt);
-    if (!id) return;
+    if (!id) {
+      setAppointmentPendingCancellation(null);
+      return;
+    }
 
     try {
       await apiCancelAppointment(id);
@@ -1218,6 +1220,8 @@ setMeetingDescription("");
       showToast(stillActive ? "Failed to cancel appointment" : "Appointment cancelled");
     } catch (_) {
       showToast("Failed to cancel appointment");
+    } finally {
+      setAppointmentPendingCancellation(null);
     }
   };
 
@@ -1497,6 +1501,8 @@ await apiRescheduleAppointment(id, {
     const md = new Date(appt.meetingDate);
     const missed = isAppointmentMissed(appt);
     const sched = isAppointmentScheduled(appt);
+    const status = String(appt.status || "").toLowerCase();
+    const cancelled = status === "cancelled" || status === "canceled";
     const mentor = appt.mentor ?? (typeof appt.mentorId === "object" ? appt.mentorId : undefined);
     const mentee = appt.user ?? (typeof appt.userId === "object" ? appt.userId : undefined);
     const mentorName = labelPerson(mentor, "Unknown");
@@ -1567,7 +1573,14 @@ await apiRescheduleAppointment(id, {
   </button>
 ) : null}
                   {sched ? (
-                  <button type="button" className="w-full px-4 py-2.5 text-left transition hover:bg-white/10" onClick={() => handleCancelAppointment(appt)}>
+                  <button
+                    type="button"
+                    className="w-full px-4 py-2.5 text-left transition hover:bg-white/10"
+                    onClick={() => {
+                      setAppointmentPendingCancellation(appt);
+                      setShowMenu(null);
+                    }}
+                  >
                     <i className="fa-regular fa-circle-xmark mr-2 text-red-300" />
                     Cancel meeting
                   </button>
@@ -1631,7 +1644,11 @@ await apiRescheduleAppointment(id, {
               <i className="fa-regular fa-clock text-[#8ec5eb]" />
               {md.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: true })}
             </span>
-            {missed ? (
+            {cancelled ? (
+              <span className="flex items-center gap-1 rounded-full border border-red-400/40 bg-red-600/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-red-100">
+                Cancelled
+              </span>
+            ) : missed ? (
               <span className="flex items-center gap-1 rounded-full border border-amber-400/40 bg-amber-600/20 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-100">
                 Missed
               </span>
@@ -2398,6 +2415,33 @@ await apiRescheduleAppointment(id, {
       {toastMessage && (
         <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-xl border border-white/20 bg-[#062946]/90 px-5 py-3 text-sm text-white shadow-xl backdrop-blur-md">
           {toastMessage}
+        </div>
+      )}
+
+      {appointmentPendingCancellation && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-[420px] rounded-2xl border border-white/15 bg-[#041f35] p-6 text-white shadow-2xl">
+            <h3 className="text-lg font-semibold">Cancel appointment?</h3>
+            <p className="mt-2 text-sm leading-6 text-[#cde2f2]">
+              This will cancel the meeting for all participants.
+            </p>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                className={directorBtnSecondary}
+                onClick={() => setAppointmentPendingCancellation(null)}
+              >
+                Keep meeting
+              </button>
+              <button
+                type="button"
+                className={directorBtnPrimary}
+                onClick={() => void handleCancelAppointment(appointmentPendingCancellation)}
+              >
+                Cancel appointment
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
