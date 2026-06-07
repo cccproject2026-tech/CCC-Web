@@ -29,15 +29,7 @@ function parseYmdParts(ymd: string): { y: number; m: number } | null {
 }
 
 /** Compare API slot.date to selectedDate (both calendar YYYY-MM-DD). */
-// function slotDateToYmd(raw: unknown): string | null {
-//   if (raw == null) return null;
-//   const s = String(raw).trim();
-//   const head = s.match(/^(\d{4}-\d{2}-\d{2})/);
-//   if (head) return head[1];
-//   const d = new Date(s);
-//   if (Number.isNaN(d.getTime())) return null;
-//   return d.toLocaleDateString("en-CA");
-// }
+
 function slotDateToYmd(raw: unknown): string | null {
   if (raw == null) return null;
 

@@ -29,7 +29,7 @@ export default function AssignMentorModal({
   loading = false,
 }: AssignMentorModalProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  // const [selectedMentors, setSelectedMentors] = useState<string[]>([]);
+ 
   const [selectedMentor, setSelectedMentor] = useState<string>("");
 
   if (!isOpen) return null;
@@ -38,20 +38,12 @@ export default function AssignMentorModal({
     m.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  // const toggleMentor = (id: string) => {
-  //   setSelectedMentors((prev) =>
-  //     prev.includes(id) ? prev.filter((mid) => mid !== id) : [...prev, id],
-  //   );
-  // };
+
   const toggleMentor = (id: string) => {
   setSelectedMentor((prev) => (prev === id ? "" : id));
 };
 
-  // const handleConfirm = () => {
-  //   onConfirm(selectedMentors);
-  //   setSelectedMentors([]);
-  //   onClose();
-  // };
+
   const handleConfirm = () => {
   if (!selectedMentor) return;
   onConfirm([selectedMentor]);
@@ -101,7 +93,7 @@ export default function AssignMentorModal({
           <>
           <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredMentors.map((mentor) => {
-              // const selected = selectedMentors.includes(mentor.id);
+
               const selected = selectedMentor === mentor.id;
               return (
                 <button

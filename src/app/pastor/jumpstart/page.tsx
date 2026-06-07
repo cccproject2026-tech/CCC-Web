@@ -870,33 +870,7 @@ if (extra.type === "DATE_PICKER") {
   const queryNestedRoadMapItemId =
     parentRoadmapId && nestedItemId?.trim() ? nestedItemId.trim() : undefined;
 
-  // const refreshSubmissionHistory = useCallback(async (): Promise<RoadmapSubmission[]> => {
-  //   if (!roadmapId || !userId) return [];
-  //   setSubmissionHistoryLoading(true);
-  //   try {
-  //     const [historyResult, latestResult] = await Promise.allSettled([
-  //       apiGetRoadmapSubmissions(roadmapId, userId, scopedNestedId),
-  //       apiGetLatestRoadmapSubmission(roadmapId, userId, scopedNestedId),
-  //     ]);
-  //     const history =
-  //       historyResult.status === "fulfilled"
-  //         ? unwrapRoadmapSubmissionList(historyResult.value)
-  //         : [];
-  //     const latest =
-  //       latestResult.status === "fulfilled"
-  //         ? unwrapRoadmapSubmission(latestResult.value)
-  //         : null;
-  //     setSubmissionHistory(history);
-  //     setLatestSubmission(latest);
-  //     return history;
-  //   } catch {
-  //     setSubmissionHistory([]);
-  //     setLatestSubmission(null);
-  //     return [];
-  //   } finally {
-  //     setSubmissionHistoryLoading(false);
-  //   }
-  // }, [roadmapId, userId, scopedNestedId]);
+
   const buildSubmissionHistoryFromExtras = (extras: any[] = []): RoadmapSubmission[] => {
   const versions: RoadmapSubmission[] = [];
 
@@ -1419,46 +1393,13 @@ const refreshSubmissionHistory = useCallback(async (): Promise<RoadmapSubmission
     });
   };
 
-  // const getAssessmentIdFromExtra = (extra: ExtraComponent): string | null => {
-  //   const fromShape = resolveAssessmentIdFromExtraShape(extra);
-  //   if (fromShape) return fromShape;
-  //   const fromNav = String(extra.navigateTo || "");
-  //   if (!fromNav) return null;
-  //   const q = /[?&]assessmentId=([^&]+)/i.exec(fromNav);
-  //   if (q?.[1]) return decodeURIComponent(q[1]).trim();
-  //   return null;
-  // };
+
 
   const getAssessmentCheckboxKey = (extra: ExtraComponent): string | undefined => {
     const checkbox = extra.checkboxes?.find((cb) => cb.type === "CHECKBOX" && String(cb.name || "").trim());
     return checkbox?.name;
   };
-//   const hasRoadmapAssessmentMeeting = (assessmentId: string) => {
-//   return appointments.some((appt: any) => {
-//     const notes = String(appt?.notes || "");
-//     const status = String(appt?.status || "").toLowerCase();
 
-//     return (
-//       !status.includes("cancel") &&
-//       notes.includes(`assessmentId:${assessmentId}`) &&
-//       notes.includes(`taskId:${nestedItemId || ""}`) &&
-//       notes.includes(`roadmapId:${roadmapId || ""}`)
-//     );
-//   });
-// };
-// const getRoadmapAssessmentMeeting = (assessmentId: string) => {
-//   return appointments.find((appt: any) => {
-//     const notes = String(appt?.notes || "");
-//     const status = String(appt?.status || "").toLowerCase();
-
-//     return (
-//       !status.includes("cancel") &&
-//       notes.includes(`assessmentId:${assessmentId}`) &&
-//       notes.includes(`taskId:${nestedItemId || ""}`) &&
-//       notes.includes(`roadmapId:${roadmapId || ""}`)
-//     );
-//   });
-// };
 const getRoadmapAssessmentMeeting = (assessmentId: string) => {
   return appointments.find((appt: any) => {
     const notes = String(appt?.notes || "");
@@ -1724,63 +1665,7 @@ useEffect(() => {
     });
   };
 
-  // const handleBeginNewSubmission = async () => {
-  //   if (!roadmapId || !userId || startingNewSubmission) return;
-  //   setStartingNewSubmission(true);
-  //   setSaveFeedback(null);
-  //   try {
-  //     if (submissionHistory.length === 0) {
-  //       const extras = buildExtrasArray(formData, pendingUploadFiles);
-  //       try {
-  //         // await apiCreateRoadmapSubmission(roadmapId, {
-  //         //   userId,
-  //         //   roadMapId: roadmapId,
-  //         //   ...(scopedNestedId?.trim()
-  //         //     ? { nestedRoadMapItemId: scopedNestedId.trim() }
-  //         //     : {}),
-  //         //   extras,
-  //         // });
-  //       } catch (error) {
-  //         console.warn(
-  //           "[Pastor Jumpstart] could not preserve previous submission in backend; using local snapshot",
-  //           error,
-  //         );
-  //         try {
-  //           setLocalPreviousSubmissions((prev) => [
-  //             ...prev,
-  //             {
-  //               id: `local-${Date.now()}`,
-  //               submissionNumber:
-  //                 submissionHistory.length + localPreviousSubmissions.length + 1,
-  //               createdAt: new Date().toISOString(),
-  //               extras,
-  //               isLocalFallback: true,
-  //             },
-  //           ]);
-  //         } catch (localSnapshotError) {
-  //           console.warn(
-  //             "[Pastor Jumpstart] could not preserve previous submission locally",
-  //             localSnapshotError,
-  //           );
-  //           setSaveFeedback("Could not preserve previous submission.");
-  //           return;
-  //         }
-  //       }
-  //     }
-  //     await refreshSubmissionHistory();
-  //     previousFormDataRef.current = formData;
-  //     previousSavedUploadDocsRef.current = savedUploadDocs;
-  //     setFormData(buildDefaultFormDataFromTemplate());
-  //     setPendingUploadFiles({});
-  //     setUploadedNowDocs({});
-  //     setIsNewSubmissionMode(true);
-  //   } catch (error) {
-  //     console.warn("[Pastor Jumpstart] could not start new submission", error);
-  //     setSaveFeedback("Could not preserve previous submission.");
-  //   } finally {
-  //     setStartingNewSubmission(false);
-  //   }
-  // };
+
   const handleBeginNewSubmission = async () => {
   if (!roadmapId || !userId || startingNewSubmission) return;
 

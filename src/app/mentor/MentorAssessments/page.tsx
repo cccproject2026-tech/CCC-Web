@@ -174,28 +174,7 @@ function formatCreatedDate(value?: string): string | null {
     year: "numeric",
   });
 }
-// function isTodayDate(value?: string): boolean {
-//   if (!value) return false;
 
-//   const date = new Date(value);
-//   if (Number.isNaN(date.getTime())) return false;
-
-//   const today = new Date();
-
-//   return (
-//     date.getDate() === today.getDate() &&
-//     date.getMonth() === today.getMonth() &&
-//     date.getFullYear() === today.getFullYear()
-//   );
-// }
-// function isTodayDate(value?: string): boolean {
-//   if (!value) return false;
-
-//   const submittedDay = value.slice(0, 10);
-//   const todayDay = new Date().toISOString().slice(0, 10);
-
-//   return submittedDay === todayDay;
-// }
 function isTodayDate(value?: string): boolean {
   if (!value) return false;
 
@@ -829,26 +808,7 @@ const assignedWithCdp = await Promise.all(
       const body: any = recRes.data;
       const data = body?.data ?? body;
 
-      // const hasBackendCdp =
-      //   Array.isArray(data)
-      //     ? data.length > 0
-      //     : Array.isArray(data?.sections)
-      //       ? data.sections.some((section: any) =>
-      //           Array.isArray(section?.recommendations) &&
-      //           section.recommendations.length > 0,
-      //         )
-      //       : false;
-  //     const hasBackendCdp =
-  // Array.isArray(data)
-  //   ? data.some((rec: any) => rec?.sent === true || rec?.status === "sent")
-  //   : Array.isArray(data?.sections)
-  //     ? data.sections.some((section: any) =>
-  //         Array.isArray(section?.recommendations) &&
-  //         section.recommendations.some(
-  //           (rec: any) => rec?.sent === true || rec?.status === "sent",
-  //         ),
-  //       )
-  //     : false;
+    
   const hasBackendCdp =
   Array.isArray(data)
     ? data.some((rec: any) => rec?.sent === true || rec?.status === "sent")
@@ -862,33 +822,7 @@ const assignedWithCdp = await Promise.all(
           ),
         )
       : false;
-// const hasBackendCdp =
-//   Array.isArray(data)
-//     ? data.some((rec: any) => {
-//         const recs = Array.isArray(rec?.recommendations)
-//           ? rec.recommendations.filter((x: any) => String(x || "").trim())
-//           : [];
 
-//         return (
-//           rec?.sent === true ||
-//           rec?.status === "sent" ||
-//           recs.length > 0 ||
-//           String(rec?.message || rec?.text || "").trim() !== ""
-//         );
-//       })
-//     : Array.isArray(data?.sections)
-//       ? data.sections.some((section: any) =>
-//           Array.isArray(section?.recommendations) &&
-//           section.recommendations.some((rec: any) => {
-//             if (typeof rec === "string") return rec.trim() !== "";
-//             return (
-//               rec?.sent === true ||
-//               rec?.status === "sent" ||
-//               String(rec?.message || rec?.text || "").trim() !== ""
-//             );
-//           }),
-//         )
-//       : false;
 const finalHasCdp = assessment._mentorHasSentCdp || hasBackendCdp;
 const hasMeetingDetails = Boolean(
   assessment._mentorAppointmentId || assessment._mentorMeetingDate
@@ -902,27 +836,7 @@ return {
       ? "completed"
       : assessment._mentorAssignmentStatus,
 };
-      // return {
-      //   ...assessment,
-      //   _mentorHasSentCdp: assessment._mentorHasSentCdp || hasBackendCdp,
-//         _mentorCreatedAt:
-//   assessment?.createdAt ||
-//   assessment?.updatedAt ||
-//   assessment?._mentorSubmittedAt,
-
-// _mentorCreatedBy:
-//   assessment?.createdByName ||
-//   fullAssessment?.createdByName ||
-//   (typeof assessment?.createdBy === "string" ? assessment.createdBy : "") ||
-//   (typeof fullAssessment?.createdBy === "string" ? fullAssessment.createdBy : "") ||
-//   assessment?.createdBy?.name ||
-//   fullAssessment?.createdBy?.name ||
-//   assessment?.createdBy?.email ||
-//   fullAssessment?.createdBy?.email ||
-//   assessment?.assignedByName ||
-//   fullAssessment?.assignedByName ||
-//   "N/A",
-      // };
+ 
     } catch {
       return assessment;
     }

@@ -55,19 +55,7 @@ function assessmentTabFromSearchParam(
   return match ?? null;
 }
 
-// type Row = {
-//   id: string;
-//   title: string;
-//   desc: string;
-//   status: "Due" | "Not Started" | "Completed" | "Submitted";
-//   dueDate: string;
-//   submittedAt?: string;
-//   completedAt?: string;
-//   imgUrl: string | null;
-//   button: string;
-//   createdOn?: string;
-//   createdBy?: string;
-// };
+
 type Row = {
   id: string;
   title: string;

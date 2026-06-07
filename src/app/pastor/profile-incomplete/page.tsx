@@ -78,59 +78,7 @@ const [hasProfileChanged, setHasProfileChanged] = useState(false);
     fileInputRef.current?.click();
   };
 
-  // 🔹 Handle profile picture upload
-  // const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   const file = e.target.files?.[0];
-  //   if (!file) return;
 
-  //   const uid = getPastorUserId() || user?.id || user?._id;
-  //   if (!uid) {
-  //     setProfileErrorMsg("Missing user id. Please login again.");
-  //     return;
-  //   }
-
-  //   const formData = new FormData();
-  //   formData.append("file", file);
-
-  //   try {
-  //     setIsProfileUploading(true);
-  //     setProfileErrorMsg(null);
-
-  //     const response = await apiUploadProfilePicture(String(uid), formData);
-  //     const json = response.data;
-
-  //     if (!json.success) {
-  //       setProfileErrorMsg(
-  //         json.message || "Failed to upload profile picture."
-  //       );
-  //       return;
-  //     }
-
-  //     const newUrl: string | undefined = json.data?.profilePicture;
-  //     if (newUrl) {
-  //       setProfileImage(newUrl);
-
-  //       // update local user + localStorage
-  //       const updatedUser: User = {
-  //         ...user,
-  //         profilePicture: newUrl,
-  //       };
-  //       const merged = normalizeUserCookieForClient(
-  //         updatedUser as Record<string, unknown>,
-  //       ) as User;
-  //       setUser(merged);
-  //       if (typeof window !== "undefined") {
-  //         setCookie("user", JSON.stringify(merged));
-  //       }
-  //     }
-  //   } catch (err) {
-  //     console.error("Upload error:", err);
-  //     setProfileErrorMsg("Something went wrong. Please try again.");
-  //   } finally {
-  //     setIsProfileUploading(false);
-  //     e.target.value = "";
-  //   }
-  // };
 
 const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
@@ -149,68 +97,7 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   setProfileErrorMsg(null);
 };
 
-// const handleSaveProfile = async () => {
-//   const uid = getPastorUserId() || user?.id || user?._id;
 
-//   if (!uid) {
-//     setProfileErrorMsg("Missing user id. Please login again.");
-//     return;
-//   }
-
-//   if (!selectedProfileFile) {
-//     setProfileErrorMsg("Please choose a profile picture first.");
-//     return;
-//   }
-
-//   const formData = new FormData();
-//   formData.append("file", selectedProfileFile);
-
-//   try {
-//     setIsProfileUploading(true);
-//     setProfileErrorMsg(null);
-
-//     const response = await apiUploadProfilePicture(String(uid), formData);
-//     const json = response.data;
-
-//     if (!json.success) {
-//       setProfileErrorMsg(json.message || "Failed to upload profile picture.");
-//       return;
-//     }
-
-//     // const newUrl: string | undefined = json.data?.profilePicture;
-//     const uploadedUrl: string | undefined = json.data?.profilePicture;
-// const newUrl = uploadedUrl ? `${uploadedUrl}?t=${Date.now()}` : undefined;
-
-//     if (newUrl) {
-//       setProfileImage(newUrl);
-
-//       const updatedUser: User = {
-//         ...user,
-//         id: user?.id || String(uid),
-//         _id: user?._id,
-//         profilePicture: newUrl,
-//       };
-
-//       const merged = normalizeUserCookieForClient(
-//         updatedUser as Record<string, unknown>
-//       ) as User;
-
-//       setUser(merged);
-
-//       if (typeof window !== "undefined") {
-//         setCookie("user", JSON.stringify(merged));
-//       }
-//     }
-
-//     // router.push("/pastor/home");
-//     window.location.href = "/pastor/home";
-//   } catch (err) {
-//     console.error("Upload error:", err);
-//     setProfileErrorMsg("Something went wrong. Please try again.");
-//   } finally {
-//     setIsProfileUploading(false);
-//   }
-// };
 const handleSaveProfile = async () => {
   const uid = getPastorUserId() || user?.id || user?._id;
 

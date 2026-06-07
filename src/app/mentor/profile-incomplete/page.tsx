@@ -47,37 +47,7 @@ const [hasProfileChanged, setHasProfileChanged] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null); // profile picture
   const docFileInputRef = useRef<HTMLInputElement | null>(null); // documents
 
-  // 🔹 Load user from localStorage on mount
-//   useEffect(() => {
-//     if (typeof window !== "undefined") {
-//       const stored = getCookie("mentor");
-//       if (stored) {
-//         try {
-//           const parsedAny = JSON.parse(stored) as any;
-//           // Normalize `_id` -> `id` since some backend responses store only `_id`.
-//           const normalized: User = {
-//             ...(parsedAny as User),
-//             id: parsedAny?.id || parsedAny?._id,
-//           };
 
-//           setUser(normalized);
-//           // if (normalized.profilePicture) {
-//           //   setProfileImage(normalized.profilePicture);
-//           // }
-//           setUser(normalized);
-
-// if (normalized.profilePicture) {
-//   router.replace("/mentor/home");
-//   return;
-// }
-
-// setProfileImage(ProfileLogo);
-//         } catch (e) {
-//           console.error("Failed to parse user from localStorage", e);
-//         }
-//       }
-//     }
-//   }, []);
 useEffect(() => {
   const stored = getCookie("mentor");
 
@@ -112,52 +82,7 @@ useEffect(() => {
     fileInputRef.current?.click();
   };
 
-  // 🔹 Handle profile picture upload
-  // const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   const file = e.target.files?.[0];
-  //   if (!file) return;
-
-  //   if (!user?.id) {
-  //     setProfileErrorMsg("Missing user id. Please login again.");
-  //     return;
-  //   }
-
-  //   const formData = new FormData();
-  //   formData.append("file", file);
-
-  //   try {
-  //     setIsProfileUploading(true);
-  //     setProfileErrorMsg(null);
-
-  //     const response = await apiUploadProfilePicture(user.id, formData);
-  //     const json = response.data;
-
-  //     if (!json.success) {
-  //       setProfileErrorMsg(
-  //         json.message || "Failed to upload profile picture."
-  //       );
-  //       return;
-  //     }
-
-  //     const newUrl: string | undefined = json.data?.profilePicture;
-  //     if (newUrl) {
-  //       setProfileImage(newUrl);
-
-  //       // update local user + localStorage
-  //       const updatedUser: User = { ...user, profilePicture: newUrl };
-  //       setUser(updatedUser);
-  //       if (typeof window !== "undefined") {
-  //         setCookie("mentor", JSON.stringify(updatedUser));
-  //       }
-  //     }
-  //   } catch (err) {
-  //     console.error("Upload error:", err);
-  //     setProfileErrorMsg("Something went wrong. Please try again.");
-  //   } finally {
-  //     setIsProfileUploading(false);
-  //     e.target.value = "";
-  //   }
-  // };
+  
 const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
   if (!file) return;
@@ -175,57 +100,6 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   setProfileErrorMsg(null);
 };
 
-// const handleSaveProfile = async () => {
-//   if (!user?.id) {
-//     setProfileErrorMsg("Missing user id. Please login again.");
-//     return;
-//   }
-
-//   if (!selectedProfileFile) {
-//     setProfileErrorMsg("Please choose a profile picture first.");
-//     return;
-//   }
-
-//   const formData = new FormData();
-//   formData.append("file", selectedProfileFile);
-
-//   try {
-//     setIsProfileUploading(true);
-//     setProfileErrorMsg(null);
-
-//     const response = await apiUploadProfilePicture(user.id, formData);
-//     const json = response.data;
-
-//     if (!json.success) {
-//       setProfileErrorMsg(json.message || "Failed to upload profile picture.");
-//       return;
-//     }
-
-//     const newUrl: string | undefined = json.data?.profilePicture;
-
-//     if (newUrl) {
-//       setProfileImage(newUrl);
-
-//       const updatedUser: User = {
-//         ...user,
-//         profilePicture: newUrl,
-//       };
-
-//       setUser(updatedUser);
-
-//       if (typeof window !== "undefined") {
-//         setCookie("mentor", JSON.stringify(updatedUser));
-//       }
-//     }
-
-//     router.push("/mentor/home");
-//   } catch (err) {
-//     console.error("Upload error:", err);
-//     setProfileErrorMsg("Something went wrong. Please try again.");
-//   } finally {
-//     setIsProfileUploading(false);
-//   }
-// };
 const handleSaveProfile = async () => {
   if (!user?.id) {
     setProfileErrorMsg("Missing user id. Please login again.");

@@ -673,37 +673,13 @@ const alreadySent = sendResults.filter(isAlreadySentError).length;
 
 const succeeded =
   sendResults.filter((r: any) => r.status === "fulfilled").length + alreadySent;
-// console.log(
-//   "CDP SEND FAILED DETAILS:",
-//   sendResults.map((r: any) =>
-//     r.status === "rejected"
-//       ? {
-//           message: r.reason?.message,
-//           status: r.reason?.response?.status,
-//           data: r.reason?.response?.data,
-//           url: r.reason?.config?.url,
-//           method: r.reason?.config?.method,
-//           payload: r.reason?.config?.data,
-//         }
-//       : r,
-//   ),
-// );
-      // if (failed === sendResults.length) throw new Error("All recommendation requests failed");
-//       if (failed === sendResults.length) {
-//   // console.error("ALL CDP REQUESTS FAILED:", sendResults);
-//   setToast("Failed to send CDP");
-//   return;
-// }
+
 if (failed > 0 && succeeded === 0) {
   console.error("ALL CDP REQUESTS FAILED:", sendResults);
   setToast("Failed to send CDP");
   return;
 }
-      // setToast(
-      //   failed > 0
-      //     ? `Sent ${succeeded} recommendation section(s); ${failed} failed`
-      //     : "Recommendations sent successfully",
-      // );
+    
       if (alreadySent > 0 && failed === 0) {
   setToast("CDP already sent");
 } else if (failed > 0) {

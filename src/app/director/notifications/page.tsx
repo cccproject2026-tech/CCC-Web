@@ -82,10 +82,7 @@ if (!cancelled) setItems(newestFirst);
               {items.map((n) => {
                 const p = mapNotificationItemToPopup(n);
                 return (
-                  // <div
-                  //   key={n._id}
-                  //   className={`relative px-6 py-5 transition hover:border-white/25 ${directorGlassCard}`}
-                  // >
+                
                   <div
   key={n._id}
   role={p.link ? "button" : undefined}

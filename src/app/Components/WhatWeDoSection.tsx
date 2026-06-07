@@ -54,10 +54,7 @@ export default function WhatWeDoSection() {
               prevEl: ".prev-btn",
             }}
             loop={true}
-            // onBeforeInit={(swiper) => {
-            //   swiper.params.navigation.prevEl = ".prev-btn";
-            //   swiper.params.navigation.nextEl = ".next-btn";
-            // }}
+            
             breakpoints={{
               0: { slidesPerView: 1 },
               640: { slidesPerView: 2 },

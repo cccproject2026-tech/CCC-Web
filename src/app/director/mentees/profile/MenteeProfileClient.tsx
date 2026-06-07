@@ -249,17 +249,6 @@ console.log("Mentee profile certificate debug:", {
       setInterests(interest?.interests?.join("\n") ?? "");
       setComments(interest?.comments ?? "");
 
-      // setDocuments(
-      //   user.uploadedDocuments?.map((doc: any, i: number) => ({
-      //     id: doc._id ?? String(i),
-      //     name: doc.fileName ?? "Document",
-      //     size:
-      //       typeof doc.fileSize === "number"
-      //         ? `${(doc.fileSize / 1024).toFixed(1)} KB`
-      //         : "",
-      //     url: doc.fileUrl,
-      //   })) ?? [],
-      // );
       try {
   const docsRes = await apiGetDocuments(menteeId);
   const docs = Array.isArray(docsRes.data?.data) ? docsRes.data.data : [];

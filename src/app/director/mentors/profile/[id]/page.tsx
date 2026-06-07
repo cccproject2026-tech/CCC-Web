@@ -154,33 +154,7 @@ export default function MentorProfilePage() {
   console.error("Failed to load mentor documents", docErr);
   setMentorDocuments([]);
 }
-// setMentorDocuments(
-//   docs
-//     .map((doc: any) => {
-//       const url =
-//         doc.url ??
-//         doc.fileUrl ??
-//         doc.documentUrl ??
-//         doc.path ??
-//         "";
 
-//       return {
-//         name:
-//           doc.name ??
-//           doc.fileName ??
-//           doc.originalName ??
-//           doc.title ??
-//           "Document",
-//         url: String(url),
-//         uploadedAt:
-//           doc.uploadedAt ??
-//           doc.createdAt ??
-//           doc.updatedAt ??
-//           undefined,
-//       };
-//     })
-//     .filter((doc: MentorDocumentRow) => doc.url)
-// );
       const interest = user?.interest;
       const ids = normalizeAssignedIds(user);
       setAssignedIds(ids);

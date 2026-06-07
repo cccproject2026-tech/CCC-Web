@@ -155,13 +155,7 @@ fieldMentorInvitation: u.fieldMentorInvitation,
     fetchUsers();
   }, [query]);
 
-  // const data = useMemo(() => {
-  //   return users.filter(
-  //     (u) =>
-  //       u.status === activeTab &&
-  //       u.name.toLowerCase().includes(query.toLowerCase())
-  //   );
-  // }, [users, activeTab, query]);
+
   const data = useMemo(() => {
   return users.filter((u: any) => {
     const matchesSearch = u.name.toLowerCase().includes(query.toLowerCase());
@@ -268,20 +262,7 @@ fieldMentorInvitation: u.fieldMentorInvitation,
     }
   };
 
-  // const data = useMemo(() => {
-  //   const filtered = PEOPLE.filter((p) => {
-  //     if (activeTab === "completed") return p.status === "completed";
-  //     if (activeTab === "certificate_issued")
-  //       return p.status === "certificate_issued";
-  //     return p.status === "invited";
-  //   }).filter((p) => p.name.toLowerCase().includes(query.toLowerCase()));
 
-  //   // Basic client-side sort mock
-  //   return filtered;
-  // }, [activeTab, query]);
-
-  // Get counts for each tab
-  // const completedCount = PEOPLE.filter((p) => p.status === "completed").length;
 
   const handleIssueCertificate = (id: number) => {
     setToast("Certificate Issued Successfully");

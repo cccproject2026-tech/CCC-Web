@@ -158,46 +158,7 @@ export default function PastorMyProgressPage() {
     });
   }, [userId]);
 
-//   useEffect(() => {
-//     if (!progress?.roadmaps?.length) return;
 
-//     const hydrateRoadmaps = async () => {
-//       try {
-//         const results = await Promise.allSettled(
-//           progress.roadmaps.map(async (r: any) => {
-//             const rid = r.roadMapId ?? r.roadmapId ?? r._id;
-//             const res = await apiGetRoadmapById(rid);
-//             const roadmap = res.data?.data;
-//             const percent = r.progressPercentage ?? 0;
-//            const normalizedPercent = Math.min(100, Math.max(0, Number(percent || 0)));
-// const normalizedStatus = String(r.status || "").toLowerCase();
-//             const isPhase =
-//               String(roadmap?.type || "").toLowerCase() === "phase" ||
-//               roadmap?.haveNextedRoadMaps === true ||
-//               (Array.isArray(roadmap?.roadmaps) && roadmap.roadmaps.length > 0);
-//             return {
-//               ...r,
-//               roadMapId: rid,
-//               title: roadmap?.name,
-//               description: roadmap?.description,
-//               timeline: roadmap?.timeline,
-//               imageUrl: roadmap?.imageUrl,
-//               // percent,
-//               percent: normalizedPercent,
-// status: normalizedStatus,
-//               isPhase,
-//             };
-//           }),
-//         );
-//         const valid = results.filter((r) => r.status === "fulfilled").map((r: any) => r.value);
-//         setRoadmaps(valid);
-//       } catch (err) {
-//         console.error("Failed to load roadmap details", err);
-//       }
-//     };
-
-//     hydrateRoadmaps();
-//   }, [progress]);
 useEffect(() => {
   if (!userId) return;
 

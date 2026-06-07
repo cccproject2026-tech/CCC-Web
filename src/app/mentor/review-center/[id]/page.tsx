@@ -1043,61 +1043,7 @@ const loadQueriesAndComments = async () => {
     setQueryCommentLoading(false);
   }
 };
-//     const loadAppointments = async () => {
-//       const loadAssessmentStats = async () => {
-//   try {
-//     const res = await apiGetAssignedAssessments(String(pastorId));
-//     const rows = parseAssignedAssessmentsListBody(res.data);
 
-//     let completed = 0;
-//     let pendingReview = 0;
-
-//     rows.forEach((item: any) => {
-//       const flat: any = flattenAssignedAssessmentRow(item);
-//       if (!flat) return;
-
-//       const status = String(
-//         flat.status ??
-//           flat.progressStatus ??
-//           item?.status ??
-//           item?.progressStatus ??
-//           "",
-//       )
-//         .toLowerCase()
-//         .trim();
-
-//       if (status === "completed" || status === "reviewed") {
-//         completed += 1;
-//       }
-
-//       if (status === "submitted") {
-//         pendingReview += 1;
-//       }
-//     });
-
-//     setAssessmentStats({
-//       completed,
-//       total: rows.length,
-//       pendingReview,
-//     });
-//   } catch (error) {
-//     console.error("Failed to load assessment stats", error);
-//     setAssessmentStats({
-//       completed: 0,
-//       total: 0,
-//       pendingReview: 0,
-//     });
-//   }
-// };
-//   try {
-//     const res = await apiGetMentorAppointments(String(mentorId), false);
-//     const list = unwrapAppointmentsAxiosData(res);
-//     setAppointments(Array.isArray(list) ? list : []);
-//   } catch (error) {
-//     console.error("Failed to load mentor appointments", error);
-//     setAppointments([]);
-//   }
-// };
     setMentorName(getDisplayName(mentor));
 //     if (mentorId) {
 //   void loadAppointments();
@@ -1614,84 +1560,7 @@ const roadmapModalTitle =
     ? "Pastor Resubmitted Tasks"
     : "New Roadmap Submissions";
 
-// const renderMeetingModal = ({
-//   title,
-//   description,
-//   meetings,
-//   emptyText,
-//   onClose,
-// }: {
-//   title: string;
-//   description: string;
-//   meetings: any[];
-//   emptyText: string;
-//   onClose: () => void;
-// }) => (
-  
-//   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-//     <div className={`w-full max-w-xl p-5 ${mentorGlassCardFrost}`}>
-//       <div className="mb-4 flex items-center justify-between gap-3">
-//         <div>
-//           <h3 className="text-lg font-extrabold text-white">{title}</h3>
-//           <p className="text-xs text-[#cde2f2]/65">{description}</p>
-//         </div>
-//         <button
-//           type="button"
-//           onClick={onClose}
-//           className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white hover:bg-white/15"
-//         >
-//           <i className="fa-solid fa-xmark" />
-//         </button>
-//       </div>
 
-//       <div className="max-h-[224px] space-y-3 overflow-y-auto pr-1">
-//         {meetings.length > 0 ? (
-//           meetings.map((meeting) => (
-//             <Link
-//               key={meeting._id ?? meeting.id}
-//               href={`/mentor/MentorSchedule/${meeting._id ?? meeting.id}`}
-//               className="block rounded-2xl border border-white/10 bg-white/[0.05] p-4 transition hover:bg-white/[0.08]"
-//             >
-//               <div className="flex items-start justify-between gap-3">
-//                 <div>
-//                   <p className="text-sm font-extrabold text-white">{pastorName}</p>
-//                   <p className="text-xs text-[#cde2f2]/65">Pastor</p>
-//                 </div>
-//                 <span className="rounded-lg border border-amber-300/35 bg-amber-400/15 px-2 py-1 text-[10px] font-bold uppercase text-amber-100">
-//                   {String(meeting.status ?? "Scheduled")}
-//                 </span>
-//               </div>
-
-//               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-//                 <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
-//                   <p className="text-[10px] text-[#cde2f2]/55">Date</p>
-//                   <p className="text-xs font-bold text-white">
-//                     {formatMeetingDate(meeting.meetingDate)}
-//                   </p>
-//                 </div>
-//                 <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
-//                   <p className="text-[10px] text-[#cde2f2]/55">Time</p>
-//                   <p className="text-xs font-bold text-white">
-//                     {formatMeetingTime(meeting.meetingDate)} -{" "}
-//                     {formatMeetingTime(meeting.endTime)}
-//                   </p>
-//                 </div>
-//               </div>
-
-//               <p className="mt-3 text-xs font-semibold text-[#8ec5eb]">
-//                 Mode: {meeting.mode ?? meeting.platform ?? "N/A"}
-//               </p>
-//             </Link>
-//           ))
-//         ) : (
-//           <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-6 text-center">
-//             <p className="text-sm font-semibold text-white">{emptyText}</p>
-//           </div>
-//         )}
-//       </div>
-//     </div>
-//   </div>
-// );
 
 
   return (
@@ -2271,10 +2140,7 @@ const roadmapModalTitle =
               <div className="max-h-[224px] space-y-3 overflow-y-auto pr-1">
                 {roadmapModalItems.length > 0 ? (
                   roadmapModalItems.map((activity, index) => (
-                    // <div
-                    //   key={`${activity.submissionId ?? activity.roadMapId}-${index}`}
-                    //   className="rounded-2xl border border-white/10 bg-white/[0.05] p-4"
-                    // >
+                  
                     <Link
   key={`${activity.submissionId ?? activity.roadMapId}-${index}`}
   href={`/mentor/RevitalizationRoadmap/task?userId=${encodeURIComponent(

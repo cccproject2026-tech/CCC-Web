@@ -120,12 +120,6 @@ function InterestFormContent() {
     }
   }, [searchParams, role]);
 
-  // const interests = [
-  //   "I would like to find out more about the Center for Community Change",
-  //   "I am interested in receiving mentoring in community engagement",
-  //   "I would like to talk to one of the mentors",
-  //   "I am a conference administrator and would like to find out more about partnering with the center",
-  // ];
 
   const setField = (k: keyof typeof form, v: string) => {
     setForm((prev) => ({ ...prev, [k]: v }));
@@ -136,11 +130,7 @@ const sanitizeName = (value: string) => value.replace(/[^A-Za-z\s'-]/g, "");
 
 
 
-  // const setChurchField = (idx: number, k: keyof ChurchRow, v: string) => {
-  //   setChurches((prev) => prev.map((c, i) => (i === idx ? { ...c, [k]: v } : c)));
-  //   const errKey = idx === 0 ? k : `${k}_${idx}`;
-  //   setErrors((prev) => { const e = { ...prev }; delete e[errKey]; return e; });
-  // };
+
 
 // Reset state whenever country changes so state/province always matches the selected country.
   const setChurchField = (idx: number, k: keyof ChurchRow, v: string) => {
@@ -180,45 +170,7 @@ const sanitizeName = (value: string) => value.replace(/[^A-Za-z\s'-]/g, "");
   const addChurch = () => setChurches((prev) => [...prev, emptyChurch()]);
   const removeChurch = (idx: number) => setChurches((prev) => prev.filter((_, i) => i !== idx));
 
-  // const validate = (): boolean => {
-  //   const errs: Record<string, string> = {};
 
-  //   if (!form.firstName.trim()) errs.firstName = "First Name is required.";
-  //   if (!form.lastName.trim()) errs.lastName = "Last Name is required.";
-  //   if (!form.phoneNumber.trim()) {
-  //     errs.phoneNumber = "Phone Number is required.";
-  //   } else if (!/^\+?[\d\s\-()\u00d7]{7,20}$/.test(form.phoneNumber.trim())) {
-  //     errs.phoneNumber = "Enter a valid phone number.";
-  //   }
-  //   if (!form.email.trim()) {
-  //     errs.email = "Email is required.";
-  //   } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-  //     errs.email = "Enter a valid email address.";
-  //   }
-
-  //   churches.forEach((c, i) => {
-  //     const p = i === 0 ? "" : `_${i}`;
-  //     if (!c.churchName.trim()) errs[`churchName${p}`] = "Church Name is required.";
-  //     if (!c.churchPhone.trim()) errs[`churchPhone${p}`] = "Church Phone is required.";
-  //     // churchWebsite is optional
-  //     if (!c.churchAddress.trim()) errs[`churchAddress${p}`] = "Church Address is required.";
-  //     if (!c.city.trim()) errs[`city${p}`] = "City is required.";
-  //     if (!c.state) errs[`state${p}`] = "State is required.";
-  //     if (!c.zipCode.trim()) errs[`zipCode${p}`] = "Zip Code is required.";
-  //     if (!c.country) errs[`country${p}`] = "Country is required.";
-  //   });
-
-  //   if (!form.yearsInMinistry.trim()) errs.yearsInMinistry = "Years in Ministry is required.";
-  //   if (!form.conference.trim()) errs.conference = "Conference is required.";
-  //   if (!form.currentProjects.trim()) errs.currentProjects = "Current Community Service Projects is required.";
-  //   if (!form.interestSelect) errs.interestSelect = "Please select an interest.";
-  //   // comments is optional
-
-  //   setErrors(errs);
-  //   return Object.keys(errs).length === 0;
-  // };
-/// Country/state data is powered by country-state-city so the dropdown supports more than US/Canada.
-  // const countryOptions = Country.getAllCountries();
   const countryOptions = (() => {
   const allCountries = Country.getAllCountries();
 

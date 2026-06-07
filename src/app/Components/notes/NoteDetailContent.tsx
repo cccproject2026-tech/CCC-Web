@@ -126,90 +126,7 @@ export default function NoteDetailContent({
     loadOne();
   }, [loadOne]);
 
-  // useEffect(() => {
-  //   if (note && editing) setDraft(noteBody(note));
-  // }, [note, editing]);
-  // this is overwriting the my upated text
 
-  // const handleSaveEdit = async () => {
-  //   if (!userId || !noteId) return;
-  //   const text = draft.trim();
-  //   if (!text) {
-  //     setActionError("Note cannot be empty.");
-  //     return;
-  //   }
-  //   setSaving(true);
-  //   setActionError(null);
-  //   setActionOk(null);
-  //   try {
-  //     const updated = await updateNoteBestEffort(userId, noteId, text);
-  //     if (updated) setNote(updated);
-  //     else await loadOne();
-  //     setEditing(false);
-  //     setActionOk("Note updated.");
-  //     setTimeout(() => setActionOk(null), 2000);
-  //   } catch (e) {
-  //     console.error(e);
-  //     setActionError(extractApiErrorMessage(e));
-  //   } finally {
-  //     setSaving(false);
-  //   }
-  // };
-
-
-  // -> use to change old logic
-//   const handleSaveEdit = async () => {
-//   if (!userId || !noteId) return;
-
-//   const text = draft.trim();
-//   if (!text) {
-//     setActionError("Note cannot be empty.");
-//     return;
-//   }
-
-//   setSaving(true);
-//   setActionError(null);
-//   setActionOk(null);
-
-//   try {
-//     const updated = await updateNoteBestEffort(userId, noteId, text);
-
-//     if (updated) {
-//       setNote(updated);
-
-//       // 🔥 IMPORTANT FIX (this was missing)
-//       setDraft(typeof updated.content === "string" ? updated.content : "");
-//     } else {
-//       await loadOne();
-//     }
-
-//     setEditing(false);
-//     setActionOk("Note updated.");
-//     setTimeout(() => setActionOk(null), 2000);
-
-//   } catch (e) {
-//     console.error(e);
-//     setActionError(extractApiErrorMessage(e));
-//   } finally {
-//     setSaving(false);
-//   }
-// };
-
-  // const handleDelete = async () => {
-  //   if (!userId || !noteId) return;
-  //   if (!window.confirm("Delete this note permanently?")) return;
-  //   setDeleting(true);
-  //   setActionError(null);
-  //   try {
-  //     await deleteNoteSafe(userId, noteId);
-  //     router.push(basePath);
-  //   } catch (e) {
-  //     console.error(e);
-  //     setActionError(extractApiErrorMessage(e));
-  //   } finally {
-  //     setDeleting(false);
-  //   }
-  // };
 
 //-> test
 const handleSaveEdit = async () => {
@@ -258,7 +175,7 @@ const handleSaveEdit = async () => {
     setActionOk("Note updated.");
     setTimeout(() => setActionOk(null), 2000);
 
-    // router.replace(basePath);
+
     window.location.href = basePath;
 
   } catch (e) {

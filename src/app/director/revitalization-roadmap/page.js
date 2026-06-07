@@ -509,10 +509,7 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
     };
   }, [showSortMenu, updateSortMenuPosition]);
 
-  // useEffect(() => {
-  //   const id = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 350);
-  //   return () => clearTimeout(id);
-  // }, [searchQuery]);
+
   useEffect(() => {
   const activeSearch =
     activeTab === "mentor"
@@ -698,12 +695,7 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
           for (const rm of pr.roadmaps) {
             const rid = stringifyRoadmapId(rm.roadMapId ?? rm.roadmapId ?? rm._id);
             if (!rid) continue;
-            // bump(
-            //   rid,
-            //   userId,
-            //   typeof rm.progressPercentage === "number" ? rm.progressPercentage : Number(rm.progressPercentage),
-            //   rm.status,
-            // );
+        
             bump(
   rid,
   userId,
@@ -725,12 +717,7 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
       for (const [rid, cur] of Object.entries(aggregate)) {
         const nAssign = cur.assignedUserIds.size;
         const avg = cur.progressN > 0 ? Math.round(cur.progressSum / cur.progressN) : 0;
-        // out[rid] = {
-        //   assignedCount: nAssign,
-        //   avgProgress: avg,
-        //   sampleAvatarUrls: cur.sampleAvatarUrls,
-        //   assignedUserIds: cur.assignedUserIds,
-        // };
+     
         out[rid] = {
   assignedCount: nAssign,
   avgProgress: avg,
@@ -747,59 +734,7 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
       cancelled = true;
     };
   }, [pastorProgressList, roadmapIdsKey, loadingPastors, roadmapLibrary.length]);
-//   useEffect(() => {
-//   if (!pastorProgressList.length) {
-//     setPastorProgressDetails([]);
-//     return;
-//   }
 
-//   let cancelled = false;
-
-//   (async () => {
-//     try {
-//       const ids = pastorProgressList
-//         .map((row) => extractUserIdFromOverallProgressRow(row))
-//         .filter(Boolean);
-
-//       const results = await mapLimit(ids, 5, async (userId) => {
-//         try {
-//           const res = await apiGetUserProgress(userId);
-//           const progress = unwrapUserProgressDetail(res);
-
-//           const pastorRow = pastorProgressList.find(
-//             (row) =>
-//               String(extractUserIdFromOverallProgressRow(row)) === String(userId),
-//           );
-
-//           return {
-//             pastorId: String(userId),
-//             pastorName: pastorRowDisplayName(pastorRow),
-//             roadmaps: Array.isArray(progress?.roadmaps)
-//               ? progress.roadmaps
-//               : [],
-//           };
-//         } catch (e) {
-//           console.warn("Detailed roadmap progress failed", userId, e);
-//           return null;
-//         }
-//       });
-
-//       if (!cancelled) {
-//         setPastorProgressDetails(results.filter(Boolean));
-//       }
-//     } catch (e) {
-//       console.error(e);
-
-//       if (!cancelled) {
-//         setPastorProgressDetails([]);
-//       }
-//     }
-//   })();
-
-//   return () => {
-//     cancelled = true;
-//   };
-// }, [pastorProgressList]);
 
   useEffect(() => {
     if (!showSortMenu) return;
@@ -845,11 +780,7 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
 
   const openRoadmapView = (row) => {
     const rm = row?.raw || {};
-    // const t = String(rm.type || "").toLowerCase();
-    // const isPhaseLibrary = t === "phase" || t.includes("phase");
-  //   const isPhaseLibrary =
-  // Array.isArray(rm?.roadmaps) &&
-  // rm.roadmaps.length > 0;
+
   const roadmapType = String(rm?.type || row?.raw?.type || "").toLowerCase();
 
 const isPhaseLibrary =
@@ -859,20 +790,7 @@ const isPhaseLibrary =
     const roadmapId = row?.id;
     if (!roadmapId) return;
 
-    // if (isPhaseLibrary) {
-    //   router.push(`/director/revitalization-roadmap/phase-list?roadmapId=${encodeURIComponent(roadmapId)}`);
-    //   return;
-    // }
-//     if (isPhaseLibrary) {
-//   const isPastorSelected = filterPastorId !== "all";
 
-//   router.push(
-//     `/director/revitalization-roadmap/phase-list?roadmapId=${encodeURIComponent(roadmapId)}${
-//       isPastorSelected ? "&pastorView=true" : ""
-//     }`
-//   );
-//   return;
-// }
 if (isPhaseLibrary) {
   const pastorId =
     selectedPastorModalId != null
@@ -1027,13 +945,7 @@ if (activeTab === "pastor") {
       rows = rows.filter((r) => roadmapRowMatchesTextQuery(r, qNorm));
     }
 
-    // if (!rearrangeMode) {
-    //   rows.sort((a, b) => {
-    //     const da = parseDate(a.createdAt)?.getTime() || 0;
-    //     const db = parseDate(b.createdAt)?.getTime() || 0;
-    //     return sortCreated === "newest" ? db - da : da - db;
-    //   });
-    // }
+
     if (!rearrangeMode && activeTab !== "library") {
   rows.sort((a, b) => {
     const da = parseDate(a.createdAt)?.getTime() || 0;
@@ -2811,44 +2723,7 @@ onClick={() => {
             No assigned roadmaps found for this pastor.
           </div>
         ) : (
-          // selectedPastorRoadmaps.map((roadmap) => (
-          //   <div
-          //     key={`modal-${roadmap.id}`}
-          //     className="flex min-h-[130px] overflow-hidden rounded-2xl border border-white/12 bg-white/[0.04]"
-          //   >
-          //     <div className="relative w-[110px] shrink-0 self-stretch">
-          //       <Image
-          //         src={typeof roadmap.img === "string" ? resolveApiMediaUrl(roadmap.img) || roadmap.img : roadmap.img || Card1}
-          //         alt=""
-          //         fill
-          //         className="object-cover"
-          //         sizes="110px"
-          //         unoptimized={typeof roadmap.img === "string" && isRemoteImageSrc(roadmap.img)}
-          //       />
-          //     </div>
 
-          //     <div className="flex min-w-0 flex-1 flex-col justify-between p-4">
-          //       <div>
-          //         <h3 className="truncate text-base font-semibold text-white">{roadmap.title}</h3>
-          //         <p className="mt-1 line-clamp-2 text-sm text-white/60">{roadmap.description}</p>
-          //       </div>
-
-          //       <div className="mt-3 flex items-center justify-between gap-3">
-          //         <span className="text-xs text-white/55">
-          //           Completion time: <span className="text-white/85">{roadmap.completionTime}</span>
-          //         </span>
-
-          //         <button
-          //           type="button"
-          //           onClick={() => openRoadmapView(roadmap)}
-          //           className="rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/18 px-4 py-2 text-xs font-semibold text-white transition hover:bg-[#3498DB]/28"
-          //         >
-          //           View
-          //         </button>
-          //       </div>
-          //     </div>
-          //   </div>
-          // ))
           selectedPastorRoadmaps.map((roadmap) => {
   const due = parseDate(roadmap.dueDate);
   const roadmapMetrics = metricsByRoadmapId[roadmap.id];

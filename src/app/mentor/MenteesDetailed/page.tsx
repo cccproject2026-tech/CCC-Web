@@ -506,13 +506,7 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
               >
                 {!loading &&
                   processedMentees.map((mentee) => (
-                    // <button
-                    //   key={mentee.id}
-                    //   type="button"
-                    //   // onClick={() => router.push(`/mentor/MenteesDetailed/profile?id=${mentee.id}`)}
-                    //   onClick={() => openMenteeDrawer(mentee)}
-                    //   className={`${mentorGlassCardRoadmap} relative w-full cursor-pointer flex-col items-stretch gap-4 p-5 text-left sm:flex-row sm:items-center sm:gap-6`}
-                    // >
+                  
                     <div
   key={mentee.id}
   role="button"

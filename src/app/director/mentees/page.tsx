@@ -160,13 +160,7 @@ function getUserListPhone(user: any): string | undefined {
   return undefined;
 }
 
-// function profileImageForUser(user: any, index: number) {
-//   const raw = user.profilePicture;
-//   if (typeof raw === "string" && raw.trim()) {
-//     return resolveApiMediaUrl(raw) ?? raw;
-//   }
-//   return IMAGE_POOL[index % IMAGE_POOL.length];
-// }
+
 function profileImageForUser(user: any) {
   const raw = user.profilePicture;
   if (typeof raw === "string" && raw.trim()) {
@@ -259,9 +253,7 @@ export default function MenteesPage() {
   const loadAssignedUsers = async (menteeId: string) => {
     const res = await apiGetAssignedUsers(menteeId);
 
-    // const assignedIds = res.data.data.map(
-    //   (u: any) => u.id ?? u._id
-    // );
+   
     const assignedUsers = res.data.data ?? [];
 
 const assignedIds = assignedUsers.map((u: any) => u.id ?? u._id);
@@ -527,29 +519,7 @@ setAssignedMentorList(
 
   /* ---------------- REMOVE ---------------- */
 
-  // const handleRemoveMentors = async (mentorIdsToRemove: string[]) => {
-  //   if (!selectedMentee) return;
-
-  //   const mentee = mentees.find((m) => m.id === selectedMentee);
-  //   if (!mentee?.assignedLoaded) return;
-
-  //   const updated = mentee.assignedId.filter(
-  //     (id) => !mentorIdsToRemove.includes(id)
-  //   );
-
-  //   await apiAssignUsers(selectedMentee, updated);
-
-  //   setMentees((prev) =>
-  //     prev.map((m) =>
-  //       m.id === selectedMentee
-  //         ? { ...m, assignedId: updated }
-  //         : m
-  //     )
-  //   );
-
-  //   setShowRemoveModal(false);
-  //   setToast("Mentors removed successfully");
-  // };
+ 
   const handleRemoveMentors = async (mentorIdsToRemove: string[]) => {
   if (!selectedMentee || mentorIdsToRemove.length === 0) return;
 
@@ -641,9 +611,7 @@ setAssignedMentorList(
       label: "Revitalization Roadmap",
       color: "text-[#8ec5eb]",
       onClick: () =>
-        // router.push(
-        //   `/director/pastor-assignments?assignUser=${encodeURIComponent(menteeId)}`
-        // ),
+       
   router.push(
   `/director/revitalization-roadmap?tab=pastor&pastorId=${encodeURIComponent(
     menteeId
@@ -660,12 +628,7 @@ setAssignedMentorList(
           `/director/assessments?tab=pastors&pastorId=${encodeURIComponent(menteeId)}`
         ),
     },
-    // {
-    //   icon: "fa-solid fa-chart-line",
-    //   label: "Track Progress",
-    //   color: "text-red-500",
-    //   onClick: handleTrackProgress,
-    // },
+
 
     {
   icon: "fa-solid fa-user-group",

@@ -1330,12 +1330,7 @@ setRescheduleDescription(String((appt as any).description || ""));
       const _h12 = _h24 % 12 === 0 ? 12 : _h24 % 12;
       const startTime = `${_h12}:${String(_min).padStart(2, "0")}`;
 
-      // await apiRescheduleAppointment(id, {
-      //   newDate,
-      //   startTime,
-      //   startPeriod,
-      //   platform: reschedulePlatform as any,
-      // });
+   
       const title = rescheduleTitle.trim();
 const description = rescheduleDescription.trim();
 

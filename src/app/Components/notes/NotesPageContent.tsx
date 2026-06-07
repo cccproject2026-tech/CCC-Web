@@ -8,7 +8,7 @@ import MentorHeader from "@/app/Components/MentorHeader";
 import PastorHeader from "@/app/Components/PastorHeader";
 import PastorFooter from "@/app/Components/PastorFooter";
 import { apiGetNotes } from "@/app/Services/api";
-// import { createNoteBestEffort, normalizeNotesList } from "@/app/Services/notes.service";
+
 import {
   createNoteBestEffort,
   deleteNoteSafe,
@@ -86,22 +86,7 @@ const isDeletedNote = (id: string) => {
     return false;
   }
 };
-  //new 
-// const deletedNotesKey = `deletedNotes:${variant}:${userId ?? "guest"}`;
 
-// const filterDeletedNotes = (items: Note[]): Note[] => {
-//   try {
-//     const raw = sessionStorage.getItem(deletedNotesKey);
-//     if (!raw) return items;
-
-//     const deletedIds: string[] = JSON.parse(raw);
-//     if (!Array.isArray(deletedIds) || deletedIds.length === 0) return items;
-
-//     return items.filter((n) => !deletedIds.includes(String(n._id)));
-//   } catch {
-//     return items;
-//   }
-// };
 
 
 
@@ -120,59 +105,20 @@ const isDeletedNote = (id: string) => {
         setNotes([]);
         return;
       }
-      // const raw = envelope.data !== undefined ? envelope.data : (res.data as unknown);
-      // setNotes(normalizeNotesList(raw));
+  
       const raw = envelope.data !== undefined ? envelope.data : (res.data as unknown);
 
-// setNotes((prev) => {
-//   const incoming = normalizeNotesList(raw);
-//   const merged = [...incoming];
 
-//   for (const p of prev) {
-//     if (!merged.find((n) => n._id === p._id)) {
-//       merged.unshift(p);
-//     }
-//   }
-
-//   return merged;
-// });
-// setNotes((prev) => {
-//   const incoming = normalizeNotesList(raw);
-
-//   // merge backend + UI notes safely
-//   const merged = [...prev];
-
-//   for (const inc of incoming) {
-//     if (!merged.find((n) => n._id === inc._id)) {
-//       merged.push(inc);
-//     }
-//   }
-
-//   return merged;
-// });
 
 setNotes((prev) => {
   const incoming = normalizeNotesList(raw);
-  // const incoming = filterDeletedNotes(normalizeNotesList(raw));
+ 
 
   const byId = new Map<string, Note>();
 
-  // 🔥 FIRST: add backend notes (source of truth)
-//   for (const note of incoming) {
-//     if (note?._id) {
-//       byId.set(String(note._id), note);
-//     }
-//   }
+ 
 
-// for (const note of prev) {
-//   if (!note?._id) continue;
 
-//   const id = String(note._id);
-
-//   if (!byId.has(id)) {
-//     byId.set(id, note);
-//   }
-// }
 for (const note of incoming) {
   if (note?._id) {
     byId.set(String(note._id), note);
@@ -200,7 +146,7 @@ for (const note of prev) {
   }
 }
 
-  // 🔥 return merged list (newest first)
+  
   return Array.from(byId.values()).sort((a, b) => {
     const aTime = new Date(a.createdAt ?? 0).getTime();
     const bTime = new Date(b.createdAt ?? 0).getTime();
@@ -229,25 +175,16 @@ for (const note of prev) {
     const parsed = JSON.parse(cached) as Note[];
     if (Array.isArray(parsed) && parsed.length > 0) {
       setNotes(parsed);
-      // setNotes(filterDeletedNotes(parsed));
+      
     }
   } catch (e) {
     console.error("Failed to restore cached notes:", e);
   }
 }, [userId, notesStorageKey]);
 
-// useEffect(() => {
-//   if (!userId) return;
 
-//   try {
-//     sessionStorage.setItem(notesStorageKey, JSON.stringify(notes));
 
-//   } catch (e) {
-//     console.error("Failed to cache notes:", e);
-//   }
-// }, [notes, userId, notesStorageKey]);
 
-//--> test
 useEffect(() => {
   if (!userId) return;
   if (loading) return;
@@ -271,167 +208,7 @@ useEffect(() => {
         ? directorGlassCard
         : glassPanelPastor;
 
-//   const handleSave = async () => {
-//     if (!userId) {
-//       setSaveError("Session expired. Please sign in again.");
-//       return;
-//     }
-//     const text = draft.trim();
-//     if (!text) {
-//       setSaveError("Write something before saving.");
-//       return;
-//     }
-//     setSaving(true);
-//     setSaveError(null);
-//     setSaveOk(null);
-//     try {
-//       // await createNoteBestEffort(userId, text, userId);
 
-//       // setDraft("");
-//       // setSaveOk("Note saved.");
-//       // setTimeout(() => setSaveOk(null), 2000);
-//       // await loadNotes();
-//       // setTab("previous");
-//       const savedNote = await createNoteBestEffort(userId, text, userId);
-
-// if (!savedNote || !savedNote._id) {
-//   throw new Error("Invalid note returned from server");
-// }
-
-// setNotes((prev) => [savedNote, ...prev]);
-
-// setDraft("");
-// setSaveOk("Note saved.");
-// setTimeout(() => setSaveOk(null), 2000);
-
-// setTab("previous");
-//     } catch (e) {
-//       console.error(e);
-//       setSaveError(extractApiErrorMessage(e));
-//     } finally {
-//       setSaving(false);
-//     }
-//   };
-// const handleSave = async () => {
-//   if (!userId) {
-//     setSaveError("Session expired. Please sign in again.");
-//     return;
-//   }
-
-//   const text = draft.trim();
-//   if (!text) {
-//     setSaveError("Write something before saving.");
-//     return;
-//   }
-
-//   setSaving(true);
-//   setSaveError(null);
-//   setSaveOk(null);
-
-//   try {
-//     await createNoteBestEffort(userId, text, userId);
-
-//     setDraft("");
-//     setSaveOk("Note saved.");
-//     setTimeout(() => setSaveOk(null), 2000);
-
-//     // ✅ ALWAYS reload from backend
-//     await loadNotes();
-
-//     setTab("previous");
-//   } catch (e) {
-//     console.error(e);
-//     setSaveError(extractApiErrorMessage(e));
-//   } finally {
-//     setSaving(false);
-//   }
-// };
-
-// type NoteFormat =
-//   | "heading"
-//   | "quote"
-//   | "divider"
-//   | "bullet"
-//   | "number"
-//   | "left"
-//   | "center"
-//   | "right";
-
-// const applyNoteFormat = (format: NoteFormat) => {
-//   const textarea = textareaRef.current;
-//   if (!textarea) return;
-
-//   const start = textarea.selectionStart;
-//   const end = textarea.selectionEnd;
-//   const selectedText = draft.slice(start, end);
-//   const fallbackText = selectedText || "Your text";
-//   let formattedText = fallbackText;
-
-//   switch (format) {
-//     case "heading":
-//       formattedText = `# ${fallbackText}`;
-//       break;
-
-//     case "quote":
-//       formattedText = fallbackText
-//         .split("\n")
-//         .map((line) => `> ${line}`)
-//         .join("\n");
-//       break;
-
-//     case "divider":
-//       formattedText = `${fallbackText}\n\n---\n`;
-//       break;
-
-//     case "bullet":
-//       formattedText = fallbackText
-//         .split("\n")
-//         .map((line) => `• ${line}`)
-//         .join("\n");
-//       break;
-
-//     case "number":
-//       formattedText = fallbackText
-//         .split("\n")
-//         .map((line, index) => `${index + 1}. ${line}`)
-//         .join("\n");
-//       break;
-
-//     case "left":
-//       formattedText = fallbackText
-//         .split("\n")
-//         .map((line) => `<p style="text-align:left">${line}</p>`)
-//         .join("\n");
-//       break;
-
-//     case "center":
-//       formattedText = fallbackText
-//         .split("\n")
-//         .map((line) => `<p style="text-align:center">${line}</p>`)
-//         .join("\n");
-//       break;
-
-//     case "right":
-//       formattedText = fallbackText
-//         .split("\n")
-//         .map((line) => `<p style="text-align:right">${line}</p>`)
-//         .join("\n");
-//       break;
-
-//     default:
-//       break;
-//   }
-
-//   const nextDraft =
-//     draft.slice(0, start) + formattedText + draft.slice(end);
-
-//   setDraft(nextDraft);
-
-//   window.setTimeout(() => {
-//     textarea.focus();
-//     textarea.setSelectionRange(start, start + formattedText.length);
-//   }, 0);
-// };
 
 const handleSave = async () => {
   if (!userId) {
@@ -449,33 +226,7 @@ const handleSave = async () => {
   setSaveError(null);
   setSaveOk(null);
 
-  // try {
-  //   const savedNote = await createNoteBestEffort(userId, text, userId);
-
-  //   // 🔴 CRITICAL CHECK
-  //   if (!savedNote || !savedNote._id) {
-  //     throw new Error("Backend did not save note");
-  //   }
-
-  //   console.log("SAVE SUCCESS:", savedNote);
-
-  //   // ✅ show only confirmed note
-  //   setNotes((prev) => [savedNote, ...prev]);
-
-  //   setDraft("");
-  //   setSaveOk("Note saved.");
-  //   setTimeout(() => setSaveOk(null), 2000);
-
-  //   setTab("previous");
-
-  // } catch (e) {
-  //   console.error("SAVE FAILED:", e);
-
-  //   // ❌ IMPORTANT: show error clearly
-  //   setSaveError("❌ Save failed. Backend rejected request.");
-  // } finally {
-  //   setSaving(false);
-  // }
+ 
 
   try {
   const savedNote = await createNoteBestEffort(userId, text, userId);

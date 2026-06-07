@@ -18,26 +18,7 @@ import {
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 
-// function isTodayDate(value?: string): boolean {
-//   if (!value) return false;
-//   const date = new Date(value);
-//   if (Number.isNaN(date.getTime())) return false;
-//   const today = new Date();
 
-//   return (
-//     date.getDate() === today.getDate() &&
-//     date.getMonth() === today.getMonth() &&
-//     date.getFullYear() === today.getFullYear()
-//   );
-// }
-// function isTodayDate(value?: string): boolean {
-//   if (!value) return false;
-
-//   const submittedDay = value.slice(0, 10);
-//   const todayDay = new Date().toISOString().slice(0, 10);
-
-//   return submittedDay === todayDay;
-// }
 function isTodayDate(value?: string): boolean {
   if (!value) return false;
 

@@ -43,11 +43,7 @@ export default function CCCDropdown({ isOpen, onClose }: CCCDropdownProps) {
       label: "Assessments",
       path: "/director/assessments",
     },
-    // {
-    //   icon: "fa-solid fa-tasks",
-    //   label: "Assignments",
-    //   path: "/director/assignments",
-    // },
+    
   ];
 
   const handleNavigation = (path: string) => {

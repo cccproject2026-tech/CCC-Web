@@ -13,7 +13,7 @@ import {
 } from "../directorUi";
 import { DirectorFilterSection } from "../ui";
 import SearchBar from "@/app/Components/SearchBar";
-// import { apiGetAllInterests } from "@/app/Services/interests.service";
+
 import {
   apiDeleteInterestById,
   apiGetAllInterests,
@@ -57,24 +57,7 @@ function loadInterestsErrorMessage(err: unknown): string {
   return "Could not load interests. Check your connection and try again.";
 }
 
-// export interface Interest {
-//   _id: string;
-//   firstName: string;
-//   lastName: string;
-//   email: string;
-//   phoneNumber?: string;
-//   title?: string;
-//   status: InterestStatus;
-//   churchDetails: any[];
-//   createdAt: string;
-//   updatedAt: string;
-//   user?: {
-//     _id: string;
-//     role: string;
-//     isEmailVerified: boolean;
-//     roleId: string;
-//   };
-// }
+
 
 export default function InterestReceivedPage() {
   const router = useRouter();
@@ -139,73 +122,7 @@ const [isDeletingInterest, setIsDeletingInterest] = useState(false);
   const rejectedCount = groupedInterests.rejected.length;
 
 
-  // // Dummy data for interests
-  // const interests = [
-  //   {
-  //     id: 1,
-  //     name: "Robert Fox",
-  //     role: "Pastor",
-  //     status: "new",
-  //     timestamp: "09:43 AM",
-  //     date: "15 Nov 2024",
-  //   },
-  //   {
-  //     id: 2,
-  //     name: "Robert Fox",
-  //     role: "Pastor",
-  //     status: "new",
-  //     timestamp: "09:43 AM",
-  //     date: "15 Nov 2024",
-  //   },
-  //   {
-  //     id: 3,
-  //     name: "Robert Fox",
-  //     role: "Pastor",
-  //     status: "pending",
-  //     timestamp: null,
-  //     date: "15 Nov 2024",
-  //   },
-  //   {
-  //     id: 4,
-  //     name: "Robert Fox",
-  //     role: "Pastor",
-  //     status: "new",
-  //     timestamp: null,
-  //     date: "15 Nov 2024",
-  //   },
-  //   {
-  //     id: 5,
-  //     name: "Robert Fox",
-  //     role: "Pastor",
-  //     status: "new",
-  //     timestamp: null,
-  //     date: "15 Nov 2024",
-  //   },
-  //   {
-  //     id: 6,
-  //     name: "Robert Fox",
-  //     role: "Pastor",
-  //     status: "accepted",
-  //     timestamp: null,
-  //     date: "15 Nov 2024",
-  //   },
-  //   {
-  //     id: 7,
-  //     name: "Robert Fox",
-  //     role: "Pastor",
-  //     status: "new",
-  //     timestamp: null,
-  //     date: "15 Nov 2024",
-  //   },
-  //   {
-  //     id: 8,
-  //     name: "Robert Fox",
-  //     role: "Pastor",
-  //     status: "pending",
-  //     timestamp: null,
-  //     date: "15 Nov 2024",
-  //   },
-  // ];
+
 
   const handleToggleSelect = (id: string) => {
     setSelectedPastors(prev =>
@@ -239,20 +156,7 @@ const [isDeletingInterest, setIsDeletingInterest] = useState(false);
       setLoading(false);
     }
   }, []);
-//   const handleDeleteRejectedInterest = async (id: string) => {
-//   const ok = window.confirm("Remove this rejected interest from the list?");
-//   if (!ok) return;
 
-//   try {
-//     await apiDeleteInterestById(id);
-
-//     setAllInterests((prev) => prev.filter((item) => item._id !== id));
-//     setSelectedPastors((prev) => prev.filter((selectedId) => selectedId !== id));
-//   } catch (error) {
-//     console.error("Failed to delete interest", error);
-//     setFetchError(loadInterestsErrorMessage(error));
-//   }
-// };
 const handleDeleteRejectedInterest = async () => {
   if (!deleteInterestId) return;
 

@@ -16,12 +16,7 @@ function loginNotStarted(m: Mentor): boolean {
   return !m.loginDate || m.loginDate === "Not Started yet";
 }
 
-// export default function RemoveMentorModal({
-//   isOpen,
-//   onClose,
-//   onConfirm,
-//   mentors,
-// }: RemoveMentorModalProps) {
+
 export default function RemoveMentorModal({
   isOpen,
   onClose,

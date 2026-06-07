@@ -88,75 +88,7 @@ const [hasAssignedMentor, setHasAssignedMentor] = useState(false);
     fetchInterest();
   }, [slug]);
 
-//   useEffect(() => {
-//   if (!interestData?.userId) return;
 
-//   const checkAssignedMentor = async () => {
-//     try {
-//       const res = await apiGetAssignedUsers(interestData.userId);
-//       const assignedUsers = Array.isArray(res?.data?.data) ? res.data.data : [];
-
-//       const hasMentor = assignedUsers.some((user: any) => {
-//         const role = String(
-//           user?.role ??
-//             user?.assignedUser?.role ??
-//             user?.user?.role ??
-//             ""
-//         )
-//           .toLowerCase()
-//           .trim();
-
-//         return role === "mentor";
-//       });
-
-//       setHasAssignedMentor(hasMentor);
-//     } catch (error) {
-//       console.error("Failed to check assigned mentor", error);
-//       setHasAssignedMentor(false);
-//     }
-//   };
-
-//   checkAssignedMentor();
-// }, [interestData?.userId]);
-// useEffect(() => {
-//   if (!interestData?.userId) return;
-
-//   const userId = String(interestData.userId);
-
-//   const checkAssignedMentor = async () => {
-//     try {
-//       const res = await apiGetAssignedUsers(userId);
-//       const assignedUsers = Array.isArray(res?.data?.data) ? res.data.data : [];
-
-//       const hasMentor = assignedUsers.some((user: any) => {
-//         const role = String(
-//           user?.role ??
-//             user?.assignedUser?.role ??
-//             user?.user?.role ??
-//             ""
-//         )
-//           .toLowerCase()
-//           .trim();
-
-//         return role === "mentor";
-//       });
-
-//       setHasAssignedMentor(hasMentor);
-// //     } catch (error) {
-// //       console.error("Failed to check assigned mentor", error);
-// //       setHasAssignedMentor(false);
-// //     }
-// //   };
-
-// //   checkAssignedMentor();
-// // }, [interestData?.userId]);
-// } catch (error: any) {
-//   if (error?.response?.status !== 404) {
-//     console.error("Failed to check assigned mentor", error);
-//   }
-
-//   setHasAssignedMentor(false);
-// }, [interestData?.userId]);
 useEffect(() => {
   if (!interestData?.userId) return;
 
@@ -241,20 +173,7 @@ useEffect(() => {
     loadAssignUsers();
   }, [showAssignModal, isMentorInterest]);
 
-  // const handleAssign = () => {
-  //   setShowAssignModal(false);
-  //   // setToast("Interest assigned to mentor successfully");
-  //   setToast(assignSuccessMessage);
-  //   setTimeout(() => setToast(null), 3000);
-  // };
-//   const handleAssign = () => {
-//   setShowAssignModal(false);
-//   setToast(assignSuccessMessage);
 
-//   setTimeout(() => {
-//     router.push("/director/interest-list");
-//   }, 1200);
-// };
 const handleAssign = async () => {
   if (!interestData?.userId) {
     setToast("Missing user id — cannot assign.");
@@ -289,26 +208,6 @@ const handleAssign = async () => {
 };
 
 
-  // const handleReject = async () => {
-  //   if (!interestData?.userId) {
-  //     setToast("Missing user id — cannot reject.");
-  //     setTimeout(() => setToast(null), 3000);
-  //     return;
-  //   }
-
-  //   try {
-  //     await apiUpdateInterestStatus(interestData.userId, "rejected");
-  //     setInterestData({ ...interestData, status: "rejected" });
-  //     setToast("Interest rejected successfully");
-  //     setShowRejectModal(false);
-  //     setTimeout(() => router.back(), 1200);
-  //   } catch (error) {
-  //     console.error("Failed to reject interest", error);
-  //     setToast("Failed to reject interest");
-  //   } finally {
-  //     setTimeout(() => setToast(null), 3000);
-  //   }
-  // };
 
   const handleReject = async () => {
   if (!interestData?.userId) {
@@ -365,17 +264,6 @@ const handleAssign = async () => {
       setTimeout(() => setToast(null), 3000);
       return;
     }
-
-    // try {
-    //   await apiUpdateInterestStatus(interestData.userId, "accepted");
-    //   setInterestData({ ...interestData, status: "accepted" });
-    //   setToast("Interest accepted successfully");
-    //   setTimeout(() => router.back(), 1200);
-    // } catch (error) {
-    //   console.error("Failed to accept interest", error);
-    //   setToast("Failed to accept interest");
-    //   setTimeout(() => setToast(null), 3000);
-    // }
 
     try {
   await apiUpdateInterestStatus(interestData.userId, "accepted");
@@ -438,9 +326,7 @@ const handleAssign = async () => {
   
   const interestsList = interestData.interests ?? [];
   const fullName = `${interestData.firstName} ${interestData.lastName}`.trim();
-  // const isMentorInterest = String(interestData.title ?? "")
-  // .toLowerCase()
-  // .includes("mentor");
+
 
 const assignButtonLabel = isMentorInterest ? "Assign to Mentee" : "Assign to Mentor";
 const canShowAssignButton =

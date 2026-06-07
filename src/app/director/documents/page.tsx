@@ -65,23 +65,14 @@ setDocuments(
 );
         }
 
-        // const [pastorsRes, mentorsRes] = await Promise.all([
-        //   apiGetAllUsers({ role: "pastor", roleMatch: "mixed", limit: 9999 }),
-        //   apiGetAllUsers({ role: "mentor", roleMatch: "mixed", limit: 9999 }),
-        // ]);
+       
         const [pastorsRes, mentorsRes, fieldMentorsRes] = await Promise.all([
   apiGetAllUsers({ role: "pastor", roleMatch: "mixed", page: 1, limit: 9999 }),
   apiGetAllUsers({ role: "mentor", roleMatch: "mixed", page: 1, limit: 9999 }),
   apiGetAllUsers({ role: "field-mentor", roleMatch: "mixed", page: 1, limit: 9999 }),
 ]);
 
-        // const pastors = Array.isArray(pastorsRes.data?.data?.users)
-        //   ? pastorsRes.data.data.users
-        //   : [];
 
-        // const mentors = Array.isArray(mentorsRes.data?.data?.users)
-        //   ? mentorsRes.data.data.users
-        //   : [];
      const pastors = unwrapUsers(pastorsRes);
 const mentors = [...unwrapUsers(mentorsRes), ...unwrapUsers(fieldMentorsRes)];
 

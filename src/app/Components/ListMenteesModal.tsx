@@ -160,10 +160,7 @@ useEffect(() => {
           {!loading && !error && filteredMentees.length > 0 && (
             <div className="space-y-3">
               {filteredMentees.map((mentee, index) => (
-                // <div
-                //   key={mentee._id}
-                //   className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.06] px-4 py-3 transition hover:bg-white/[0.1]"
-                // >
+              
                 <button
   key={mentee._id}
   type="button"

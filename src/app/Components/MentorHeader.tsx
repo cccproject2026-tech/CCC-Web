@@ -48,7 +48,7 @@ export default function MentorHeader({ showFullHeader = false }) {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
-  // const [notificationList, setNotificationList] = useState<any[]>([]);
+  
   const [notificationList, setNotificationList] = useState<NotificationItem[]>([]);
   const [searchResults, setSearchResults] = useState<{
     roadmaps: any[];
@@ -116,12 +116,7 @@ export default function MentorHeader({ showFullHeader = false }) {
       }
 
       try {
-        // const res = await getNotification(mentorId);
-        // const list = res.data?.data?.notifications || [];
-        // setNotificationList(list);
-//         const res = await getNotification(mentorId);
-// const list = unwrapNotificationsList(res);
-// setNotificationList(list);
+     
 const res = await getNotification(mentorId);
 const list = unwrapNotificationsList(res);
 const newestFirst = [...list].reverse();
@@ -176,8 +171,7 @@ setNotificationList(newestFirst);
     { icon: <User size={18} />, label: "Profile", path: "/mentor/profile" },
     { icon: <Award size={18} />, label: "Certificates", path: "/mentor/certificates" },
       { icon: <ClipboardCheck size={18} />, label: "Review Center", path: "/mentor/review-center" },
-    // { icon: <Clipboard size={18} />, label: "Mentorship Sessions", path: "/mentor/mentoring-session" },
-    // { icon: <File size={18} />, label: "Assignments", path: "/mentor/assignments" },
+   
     { icon: <Trophy size={18} />, label: "Micro Grant", path: "/mentor/micro-grant" },
     { icon: <FolderOpen size={18} />, label: "Documents", path: "/mentor/documents" },
     { icon: <Mic size={18} />, label: "Voice Notes", path: "/mentor/voice-notes" },

@@ -114,12 +114,7 @@ const getInitialsAvatar = (name: string) =>
   )}&background=173653&color=ffffff`;
 // Helper function to convert User to Mentor (index = stable fallback avatar)
 const convertUserToMentor = (user: any, index: number): Mentor => {
-  const defaultImages = [Mentor1, Mentor2, Mentor3];
-  // const rawPic = user?.profilePicture;
-  // const img =
-  //   typeof rawPic === "string" && rawPic.trim()
-  //     ? (resolveApiMediaUrl(rawPic) ?? rawPic)
-  //     : defaultImages[index % defaultImages.length];
+
   const name = `${user?.firstName || ""} ${user?.lastName || ""}`.trim();
 const rawPic = user?.profilePicture;
 const img =
@@ -536,13 +531,7 @@ export default function MyMentorsPage() {
     setIsRemoveMenteesOpen(true);
   }, []);
 
-  // const handleListMentees = useCallback((mentor: Mentor) => {
-  //   setSelectedMentor(mentor);
-  //   setShowListMenteesModal(true);
-  // }, []);
-//   const handleListMentees = useCallback((mentor: Mentor) => {
-//   router.push(`/director/mentees?mentorId=${encodeURIComponent(mentor.id)}`);
-// }, [router]);
+ 
 const handleListMentees = useCallback((mentor: Mentor) => {
   setSelectedMentor(mentor);
   setShowListMenteesModal(true);
@@ -648,13 +637,7 @@ const handleListMentees = useCallback((mentor: Mentor) => {
       color: "text-[#8ec5eb]",
       onClick: () => handleScheduleMeeting(mentor),
     },
-    // {
-    //   icon: "fa-regular fa-pen-to-square",
-    //   label: "Edit Profile",
-    //   color: "text-[#8ec5eb]",
-    //   onClick: () =>
-    //     router.push(`/director/mentors/profile/edit?id=${encodeURIComponent(mentor.id)}`),
-    // },
+   
   ];
 
   return (

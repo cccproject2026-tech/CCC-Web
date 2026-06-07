@@ -147,30 +147,7 @@ export default function NotificationPopup({
         )}
         {!loading &&
           displayNotifications.map((notification) => (
-          // <div
-          //   key={notification.id}
-          //   className="border-b border-gray-100 px-6 py-4 hover:bg-gray-50 transition relative"
-          // >
-//           <div
-//   key={notification.id}
-//   role={notification.link ? "button" : undefined}
-//   tabIndex={notification.link ? 0 : undefined}
-//   onClick={() => {
-//     if (notification.link) {
-//       window.location.href = notification.link;
-//     }
-//   }}
-//   onKeyDown={(e) => {
-//     if (!notification.link) return;
-//     if (e.key === "Enter" || e.key === " ") {
-//       e.preventDefault();
-//       window.location.href = notification.link;
-//     }
-//   }}
-//   className={`border-b border-gray-100 px-6 py-4 hover:bg-gray-50 transition relative ${
-//     notification.link ? "cursor-pointer" : ""
-//   }`}
-// >
+       
 
 <div
   key={notification.id}
@@ -234,15 +211,7 @@ export default function NotificationPopup({
                 )}
 
                 {notification.link && (
-                  // <a
-                  //   href="#"
-                  //   className="text-[12px] text-[#2E3B8E] hover:underline"
-                  // >
-//                   <a
-//   href={notification.link}
-//   onClick={(e) => e.stopPropagation()}
-//   className="text-[12px] text-[#2E3B8E] hover:underline"
-// >
+      
 <a
   href={notification.link}
   onClick={(e) => {

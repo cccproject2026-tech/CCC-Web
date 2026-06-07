@@ -67,21 +67,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
     setIsClient(true);
   }, []);
 
-  // useEffect(() => {
-  //   const userId = getPastorUserId();
-  //   if (!userId) return;
 
-  //   async function fetchProfile() {
-  //     try {
-  //       const res = await getSingleUser(userId);
-  //       setProfile(res.data?.data);
-  //     } catch (error) {
-  //       console.error("Error fetching user:", error);
-  //     }
-  //   }
-
-  //   fetchProfile();
-  // }, []);
 
   useEffect(() => {
   const userId = getPastorUserId();
@@ -166,8 +152,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
   const profileMenu = [
     { icon: <User size={18} />, label: "Profile", path: "/pastor/profile" },
     { icon: <Award size={18} />, label: "Certificates", path: "/pastor/Certificates" },
-    // { icon: <Clipboard size={18} />, label: "Mentorship Sessions", path: "/pastor/mentoring-session" },
-    // { icon: <File size={18} />, label: "Assignments", path: "/pastor/Assignments" },
+ 
     { icon: <Trophy size={18} />, label: "Micro Grant", path: "/pastor/MicroGrantApplication" },
     { icon: <FolderOpen size={18} />, label: "Documents", path: "/pastor/Documents" },
     { icon: <Mic size={18} />, label: "Voice Notes", path: "/pastor/voice-notes" },
@@ -193,26 +178,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
     },
   ];
 
-  // useEffect(() => {
-  //   const userId = getPastorUserId();
-  //   if (!userId) return;
-
-  //   async function fetchNotifications() {
-  //     try {
-  //       const res = await getNotifications(userId);
-  //       const list = unwrapNotificationsList(res);
-  //       setNotificationList(list);
-  //       const unread = list.filter((n) => !n.isRead).length;
-  //       setNotificationCount(unread > 0 ? Math.min(unread, 99) : 0);
-  //     } catch (err) {
-  //       console.error("Error fetching notifications:", err);
-  //       setNotificationList([]);
-  //       setNotificationCount(0);
-  //     }
-  //   }
-
-  //   fetchNotifications();
-  // }, []);
+ 
   useEffect(() => {
   const pastorUserId = getPastorUserId();
 
@@ -278,22 +244,9 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
 const isLoginPage = pathname === "/pastor/login";
 const logoHref = isLoginPage ? "/" : "/pastor/home";
   return (
-    // <header className="relative z-40 flex items-center justify-between border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md md:px-6 lg:px-10 font-[Albert_Sans]">
+   
     <header className="relative z-40 flex items-center gap-6 border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md md:px-6 lg:px-10 font-[Albert_Sans]">
-      {/* ✅ Left Logo */}
-      {/* <div className="flex items-center gap-3">
-        <Image src={Framelogo1} alt="Logo" width={26} height={26} />
-      </div> */}
-
-      {/* <Link
-  href="/pastor/home"
-  // className="flex items-center gap-3"
-  // className="flex w-[64px] shrink-0 items-center gap-3"
-  className="flex w-[44px] shrink-0 items-center justify-center"
-  aria-label="Pastor Home"
->
-  <Image src={Framelogo1} alt="Logo" width={26} height={26} />
-</Link> */}
+    
 
 <Link
   href={logoHref}
@@ -305,8 +258,7 @@ const logoHref = isLoginPage ? "/" : "/pastor/home";
 
       {/* ✅ Middle Nav Links */}
       {showFullHeader && (
-        // <nav className="hidden lg:flex items-center gap-6">
-      //  <nav className="hidden min-w-0 flex-1 items-center justify-center gap-5 lg:flex">
+       
       <nav className="hidden min-w-0 flex-1 items-center justify-start gap-6 lg:flex">
           {navLinks.map((link, index) => {
             const isActive =
@@ -471,74 +423,7 @@ const logoHref = isLoginPage ? "/" : "/pastor/home";
                     </a>
                   </div>
 
-                  {/* Notifications List */}
-                  {/* <div className="space-y-2 p-2">
-                    {notificationList.length === 0 ? (
-                      <p className="rounded-xl bg-[#F5F7FA] px-3 py-4 text-center text-[13px] text-[#7A7A7A]">
-                        No notifications yet.
-                      </p>
-                    ) : (
-                      // notificationList.slice(0, 4).map((note) => {
-                      //   const p = mapNotificationItemToPopup(note);
-                      //   return (
-                      //     <div
-                      //       key={note._id}
-                      //       className="flex items-start justify-between rounded-xl bg-[#F5F7FA] p-3"
-                      //     >
-                      notificationList.map((note) => {
-  const p = mapNotificationItemToPopup(note);
-  return (
-    <div
-      key={note._id}
-      role={p.link ? "button" : undefined}
-      tabIndex={p.link ? 0 : undefined}
-      onClick={() => {
-        if (p.link) {
-          setShowNotifications(false);
-          router.push(p.link);
-        }
-      }}
-      onKeyDown={(e) => {
-        if (!p.link) return;
-
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          setShowNotifications(false);
-          router.push(p.link);
-        }
-      }}
-      className={`flex items-start justify-between rounded-xl bg-[#F5F7FA] p-3 transition hover:bg-[#eef2f6] ${
-        p.link ? "cursor-pointer" : ""
-      }`}
-    >
-                            <div className="flex w-full items-start gap-3">
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/80 bg-white">
-                                <i className={`${p.icon} text-base ${p.iconColor}`} aria-hidden />
-                              </div>
-
-                              <div className="flex min-w-0 flex-1 flex-col">
-                                <div className="flex justify-between gap-2">
-                                  <h3 className="text-[14px] font-semibold text-[#000000]">{p.title}</h3>
-                                  {!note.isRead && (
-                                    <span
-                                      className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#FFD700]"
-                                      title="Unread"
-                                    />
-                                  )}
-                                </div>
-
-                                {p.subtitle ? (
-                                  <p className="mt-0.5 text-[13px] leading-snug text-[#7A7A7A]">{p.subtitle}</p>
-                                ) : null}
-
-                                <p className="mt-1 text-right text-[12px] text-[#9A9A9A]">{p.time}</p>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div> */}
+                  
 
                   {/* Notifications List */}
 <div className="relative z-10 max-h-[520px] space-y-3 overflow-y-auto p-3 pr-2">

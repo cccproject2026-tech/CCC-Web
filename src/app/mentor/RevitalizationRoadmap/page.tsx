@@ -39,17 +39,7 @@ function isHttpUrl(u?: string): boolean {
   return !!u && (u.startsWith("http://") || u.startsWith("https://"));
 }
 
-// type Mentee = {
-//   _id: string;
-//   firstName: string;
-//   lastName: string;
-//   email: string;
-//   role: string;
-//   profileInfo?: string;
-//   profilePicture?: string;
-//   country?: string;
-//   progress: number;
-// };
+
 type Mentee = {
   _id: string;
   firstName: string;

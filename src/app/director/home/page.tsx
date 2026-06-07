@@ -314,36 +314,7 @@ function getInitialsAvatar(firstName?: string, lastName?: string, fallback = "Us
   )}&background=173653&color=ffffff`;
 }
 
-// function QuickLinkAvatar({
-//   person,
-//   icon = "fa-solid fa-user",
-// }: {
-//   person: any;
-//   icon?: string;
-// }) {
-//   const [failed, setFailed] = useState(false);
-//   const src = getPersonProfilePicture(person);
 
-//   if (src && !failed) {
-//     return (
-//       <Image
-//         src={src}
-//         alt="Profile"
-//         width={64}
-//         height={64}
-//         unoptimized={isRemoteImageSrc(src)}
-//         onError={() => setFailed(true)}
-//         className="h-11 w-11rounded-full border border-white/15 object-cover"
-//       />
-//     );
-//   }
-
-//   return (
-//     <div className="flex h-11 w-11shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#8ec5eb]/15">
-//       <i className={`${icon} text-xl text-[#8ec5eb]`} />
-//     </div>
-//   );
-// }
 function QuickLinkAvatar({
   person,
   icon = "fa-solid fa-user",
@@ -609,18 +580,10 @@ useEffect(() => {
   limit: 40,
   t: ts,
 }),
-//         apiGetAllUsers({
-//   role: "field-mentor",
-//   roleMatch: "mixed",
-//   page: 1,
-//   limit: 40,
-//   t: ts,
-// }),
+
       ]);
       if (req !== networkMapRequestId.current) return;
-      // const { users: mu } = parseMentorUsersListResponse(mRes);
-      // const { users: pu } = parseMentorUsersListResponse(pRes);
-      // const { users: fmu } = parseMentorUsersListResponse(fmRes);
+
       const { users: mu } =
   mRes.status === "fulfilled" ? parseMentorUsersListResponse(mRes.value) : { users: [] };
 
@@ -633,11 +596,7 @@ const { users: fmu } =
       const pastors = pu.map((u, i) => mapUserToPin(u, "pastor", i));
       const fieldMentors = fmu.map((u, i) => mapUserToPin(u, "field-mentor", i));
       const interleaved: typeof mentors = [];
-      // const maxL = Math.max(mentors.length, pastors.length);
-      // for (let i = 0; i < maxL; i++) {
-      //   if (i < mentors.length) interleaved.push(mentors[i]);
-      //   if (i < pastors.length) interleaved.push(pastors[i]);
-      // }
+
       const maxL = Math.max(mentors.length, pastors.length, fieldMentors.length);
       // const maxL = Math.max(mentors.length, pastors.length);
 
@@ -790,14 +749,7 @@ apiGetAllUsers({ role: "pastor", roleMatch: "mixed", page: 1, limit: 20, t: Date
       
       ]);
 
-      // Handle appointments (envelope shapes vary — same as schedule / mentor pages)
-      // if (results[0].status === "fulfilled") {
-      //   setAppointments((unwrapAppointmentsAxiosData(results[0].value) || []) as Appointment[]);
-      // } else {
-      //   console.error("Error fetching appointments:", results[0].reason);
-      //   setAppointments([]);
-      // }
-      // setAppointmentsLoading(false);
+
       if (results[0].status === "fulfilled") {
   const list = (unwrapAppointmentsAxiosData(results[0].value) || []) as Appointment[];
 
@@ -829,24 +781,7 @@ apiGetAllUsers({ role: "pastor", roleMatch: "mixed", page: 1, limit: 20, t: Date
 }
 setAppointmentsLoading(false);
 
-      // Handle interests
-      // if (results[1].status === "fulfilled") {
-      //   const intRes = results[1].value;
-      //   const raw = intRes?.data as Record<string, unknown> | undefined;
-      //   const list = Array.isArray(raw?.data)
-      //     ? raw.data
-      //     : Array.isArray(raw)
-      //       ? raw
-      //       : [];
-      //   setInterests((list || []) as Interest[]);
-      // } else {
-      //   console.error("Error fetching interests:", results[1].reason);
-      //   setInterests([]);
-      // }
-      // setInterestsLoading(false);
 
-      // Handle interests
-// if (results[1].status === "fulfilled") {
 if (results[1].status === "fulfilled" && results[1].value) {
   // const intRes = results[1].value;
   // const body: any = intRes?.data;
@@ -988,14 +923,7 @@ const body = completedRes?.data?.data;
     }));
   }, [directorOverview?.monthlyData, chartRangeId, currentTime]);
 
-  // const filteredNetworkMapPeople = useMemo(() => {
-  //   if (!debouncedMapSearch) return networkMapPeople;
-  //   return networkMapPeople.filter(
-  //     (p) =>
-  //       p.name.toLowerCase().includes(debouncedMapSearch) ||
-  //       p.id.toLowerCase().includes(debouncedMapSearch),
-  //   );
-  // }, [networkMapPeople, debouncedMapSearch]);
+
   const filteredNetworkMapPeople = useMemo(() => {
   return networkMapPeople.filter((p) => {
     const matchesSearch =

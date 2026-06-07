@@ -198,71 +198,7 @@ function countPastorsAssigned(item: any): number {
 
   return 0;
 }
-// function hasCdpPayload(body: any): boolean {
-//   const data = body?.data ?? body;
 
-//   if (Array.isArray(data)) {
-//     return data.some((row) => {
-//       const recs = row?.recommendations;
-//       return Array.isArray(recs) && recs.length > 0;
-//     });
-//   }
-
-//   const sections = Array.isArray(data?.sections) ? data.sections : [];
-//   return sections.some((section: any) => {
-//     const recs = section?.recommendations;
-//     if (Array.isArray(recs) && recs.length > 0) return true;
-
-//     const layers = Array.isArray(section?.layers) ? section.layers : [];
-//     return layers.some((layer: any) =>
-//       String(
-//         layer?.mentorCdp ??
-//           layer?.cdp ??
-//           layer?.customizedDevelopmentPlan ??
-//           layer?.recommendation ??
-//           "",
-//       ).trim(),
-//     );
-//   });
-// }
-// function hasCdpPayload(body: any): boolean {
-//   const data = body?.data ?? body;
-
-//   if (Array.isArray(data)) {
-//     return data.some((row) => {
-//       const recs = row?.recommendations;
-//       return Array.isArray(recs) && recs.length > 0;
-//     });
-//   }
-
-//   const sections = Array.isArray(data?.sections) ? data.sections : [];
-
-//   return sections.some((section: any) => {
-//     const recs = section?.recommendations;
-//     return Array.isArray(recs) && recs.length > 0;
-//   });
-// }
-// function hasCdpPayload(body: any): boolean {
-//   const data = body?.data ?? body;
-
-//   if (Array.isArray(data)) {
-//     return data.some(
-//       (row) => row?.sent === true || row?.status === "sent",
-//     );
-//   }
-
-//   const sections = Array.isArray(data?.sections) ? data.sections : [];
-
-//   return sections.some((section: any) => {
-//     const recs = Array.isArray(section?.recommendations)
-//       ? section.recommendations
-//       : [];
-
-//     return recs.some(
-//       (rec: any) => rec?.sent === true || rec?.status === "sent",
-//     );
-//   });
-// }
 function hasCdpPayload(body: any): boolean {
   const data = body?.data ?? body;
 
@@ -330,12 +266,7 @@ function getInitialsAvatar(name: string, fallback = "User") {
     name || fallback
   )}&background=173653&color=ffffff`;
 }
-// const mapUserToAssignUser = (user: any): AssignUserRow => ({
-//   id: String(user.id ?? user._id ?? ""),
-//   name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "User",
-//   role: user.role,
-//   avatar: user.profilePicture || Mentor1,
-// });
+
 const mapUserToAssignUser = (user: any): AssignUserRow => {
   const name = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "User";
 
@@ -381,9 +312,7 @@ const pastorIdFromQuery = searchParams.get("pastorId");
   const [assignDueDate, setAssignDueDate] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name_asc" | "name_desc">("newest");
   const [statusFilter, setStatusFilter] = useState<"all" | "not_started" | "submitted" | "completed">("all");
-//   const [activeTab, setActiveTab] = useState<
-//   "assessments" | "mentors" | "pastors"
-// >("assessments");
+
 const [activeTab, setActiveTab] = useState<
   "assessments" | "mentors" | "pastors"
 >(tabFromQuery === "pastors" ? "pastors" : "assessments");
@@ -464,12 +393,7 @@ const [mentorPastorRows, setMentorPastorRows] = useState<any[]>([]);
 
         if (selectedMenteeId) {
           try {
-            // const [assignedRes, progRes, appointmentsRes] = await Promise.all([
-            //   apiGetAssignedAssessments(selectedMenteeId),
-            //   apiGetUserProgress(selectedMenteeId),
-            //   apiGetAppointments({ userId: selectedMenteeId, futureOnly: false } as any),
-            // ]);
-            // const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
+           
             const [assignedRes, allAssessmentsRes, progRes, appointmentsRes] = await Promise.all([
   apiGetAssignedAssessments(selectedMenteeId),
   apiGetAssessments(),
@@ -530,19 +454,7 @@ assignedRows = [...assignedRows, ...missingFromAssignedApi];
                   ? appointmentsBody.data.data
                   : [];
             const appointmentById = new Map<string, any>();
-            // const appointmentsByAssessmentId = new Map<string, any[]>();
-            // for (const appt of appointmentsList) {
-            //   const id = String(appt?._id ?? appt?.id ?? "").trim();
-            //   if (id) appointmentById.set(id, appt);
-            //   const notes = String(appt?.notes ?? "");
-            //   const m = notes.match(/assessmentId=([^|\s]+)/i);
-            //   const linkedAssessmentId = String(m?.[1] || "").trim();
-            //   if (linkedAssessmentId) {
-            //     const prev = appointmentsByAssessmentId.get(linkedAssessmentId) || [];
-            //     prev.push(appt);
-            //     appointmentsByAssessmentId.set(linkedAssessmentId, prev);
-            //   }
-            // }
+           
             const appointmentsByAssessmentId = new Map<string, any[]>();
 
 for (const appt of appointmentsList) {
@@ -610,12 +522,7 @@ for (const appt of appointmentsList) {
                     (assignmentId && rowAssignmentId && rowAssignmentId === assignmentId)
                   );
                 });
-                // const hasMeetingDetails = !!(resolvedAppointmentId || appt?.meetingDate);
-                // const progressStatus = hasMeetingDetails ? "completed" : "submitted";
-                // const progressStatus = normalizeAssessmentStatus(progressRow?.status);
-                // const resolvedDueDate = pickAssignedDueDate(item, flat);
-
-                // return {
+    
             const rawProgressStatus = normalizeAssessmentStatus(progressRow?.status);
 const resolvedDueDate = pickAssignedDueDate(item, flat);
 
@@ -935,11 +842,7 @@ useEffect(() => {
     }
   };
 
-  // const filteredAssessments = useMemo(() => {
-  //   const q = searchQuery.toLowerCase();
-  //   const filtered = assessments.filter((assessment) =>
-  //     String(assessment.title ?? "").toLowerCase().includes(q),
-  //   );
+ 
   const filteredAssessments = useMemo(() => {
   const q = searchQuery.toLowerCase();
 
@@ -969,7 +872,7 @@ useEffect(() => {
       (a, b) =>
         new Date(String(b.createdOn ?? 0)).getTime() - new Date(String(a.createdOn ?? 0)).getTime(),
     );
-  // }, [assessments, searchQuery, sortBy]);
+ 
   }, [assessments, searchQuery, sortBy, selectedMenteeId, statusFilter]);
 
   const filteredFeaturedItems = useMemo(() => {
@@ -1113,11 +1016,7 @@ const filteredMentorRows = useMemo(() => {
             ? "bg-[#3498DB] text-white"
             : "text-white/75 hover:bg-white/10"
         }`}
-  //     >
-  //       Pastor Assessments
-  //     </button>
-  //   </div>
-  // </div>
+  
         >
         Pastor Assessments
       </button>
@@ -1314,22 +1213,7 @@ const filteredMentorRows = useMemo(() => {
           <button
             key={row.id}
             type="button"
-            // onClick={() => {
-            //   const mentorId = row.id;
-            //   setSelectedMentorId(mentorId);
-            //   setSelectedMentorName(row.name);
-            //   setSelectedMenteeId(null);
-
-            //   const assignedPastors = allPastorRows.filter((pastor: any) => {
-            //     const assignedIds = Array.isArray(pastor.assignedId)
-            //       ? pastor.assignedId.map(String)
-            //       : [];
-
-            //     return assignedIds.includes(mentorId);
-            //   });
-
-            //   setMentorPastorRows(assignedPastors);
-            // }}
+   
             onClick={() => {
   router.push(`/director/assessments/mentor?mentorId=${row.id}`);
 }}

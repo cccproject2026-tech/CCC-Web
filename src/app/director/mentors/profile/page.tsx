@@ -18,54 +18,7 @@ function MentorProfileContent() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  // const [mentor, setMentor] = useState<any>(null);
 
-  // const mentorData = {
-  //   firstName: "Robert",
-  //   lastName: "Fox",
-  //   role: "Senior Field Mentor",
-  //   phoneNumber: "09878564398",
-  //   email: "johnross@gmail.com",
-  //   progress: 100,
-  //   specialization: "Church Revitalization",
-  //   experience: 15,
-  //   totalMentees: 5,
-  //   activeMentees: 3,
-  //   completedMentees: 2,
-  //   church1: {
-  //     name: "Loma Linda University Church, CA",
-  //     phone: "09878564398",
-  //     website: "johnross@gmail.com",
-  //     address: "Loma Linda University Church,CA",
-  //     city: "Oakland",
-  //     state: "North American",
-  //     zipCode: "000000",
-  //     country: "USA",
-  //   },
-  //   church2: {
-  //     name: "Loma Linda University Church, CA",
-  //     phone: "09878564398",
-  //     website: "johnross@gmail.com",
-  //     address: "Loma Linda University Church,CA",
-  //     city: "Oakland",
-  //     state: "North American",
-  //     zipCode: "000000",
-  //     country: "USA",
-  //   },
-  //   otherInfo: {
-  //     title: "Field Mentor",
-  //     yearsInMinistry: "11",
-  //     conference: "Oakland",
-  //     communityServiceProjects: "11",
-  //     bio: "Dedicated mentor with 15 years of experience in pastoral ministry and church leadership. Passionate about helping pastors grow and develop their ministries through strategic guidance and support.",
-  //   },
-  // };
-
-  // const assignedMentees = [
-  //   { id: 1, name: "John Ross", church: "Loma Linda Church", progress: 65 },
-  //   { id: 2, name: "Robert Smith", church: "Grace Community", progress: 80 },
-  //   { id: 3, name: "Michael Brown", church: "Hope Church", progress: 45 },
-  // ];
 
   const [personal, setPersonal] = useState<PersonalInfo>({
     firstName: "",

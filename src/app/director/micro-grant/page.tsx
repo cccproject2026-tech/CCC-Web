@@ -192,7 +192,7 @@ const Page: React.FC = () => {
     <MicroGrantCard
       key={app._id}
       variant="directorGlass"
-      // image={UserProfile}
+      
       image={applicantProfileImage(app)}
       name={user?.email || "Unknown"}
       role={churchLabel(app) ? `Church: ${churchLabel(app)}` : "Church: Not provided"}

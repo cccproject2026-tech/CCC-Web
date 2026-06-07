@@ -118,16 +118,7 @@ function extractMentorCdpText(layer: Record<string, unknown> | null | undefined)
 
 function parseRecommendationsCdpPayload(data: unknown): CdpMap {
   const out: CdpMap = {};
-  // if (Array.isArray(data)) {
-  //   data.forEach((r: Record<string, unknown>) => {
-  //     const msg = r?.message ?? r?.text ?? r?.cdp ?? r?.mentorCdp;
-  //     const lid = r?.layerId ?? r?.layer_id ?? r?._id;
-  //     if (lid != null && msg != null && String(msg).trim()) {
-  //       out[String(lid)] = String(msg).trim();
-  //     }
-  //   });
-  //   return out;
-  // }
+
   if (Array.isArray(data)) {
   data.forEach((r: Record<string, unknown>, idx: number) => {
     const recs = Array.isArray(r?.recommendations)

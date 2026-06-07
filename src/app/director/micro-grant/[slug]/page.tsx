@@ -36,8 +36,7 @@ const router = useRouter();
 
     const fetchData = async () => {
       try {
-        // const payload = await loadMicroGrantDetailBySlug(userId);
-        // setData(payload);
+
         const res = await getMicroGrantByUserId(userId);
 const payload = unwrapMicroGrantWithUser(res);
 console.log("DIRECTOR MICRO RAW:", res.data);
@@ -54,20 +53,7 @@ setData(payload);
     fetchData();
   }, [userId]);
 
-  // const handleStatusChange = async (
-  //   applicationId: string,
-  //   status: 'new' | 'pending' | 'accepted' | 'rejected'
-  // ) => {
-  //   try {
-  //     await updateMicroGrantStatus(applicationId, status);
 
-  //     // update UI optimistically or refetch
-  //     console.log('Status updated successfully');
-  //   } catch (error) {
-  //     console.log('Failed to update status');
-  //     console.error(error);
-  //   }
-  // };
 
  const handleStatusChange = async (
   applicationId: string,
@@ -172,22 +158,9 @@ console.log("MICRO GRANT FORM:", data.application.formId);
   );
 
   return (
-    // <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#1d538d] to-[#1d538d]">
+
      <div className="min-h-screen bg-[#061a2f] text-white">
-      {/* <MicroGrantDetailHero
-        title={
-          typeof data.application.formId === "object" && data.application.formId?.title
-            ? data.application.formId.title
-            : "Micro Grant Application"
-        }
-        subtitle="Please keep in mind that the church applying for a grant must become a partner with the CCC by signing a MOU."
-        backgroundImageUrl={RoadmapJumpStartBg.src}
-        breadcrumbItems={[
-          { label: "Micro Grant", href: "/director/micro-grant" },
-          { label: data.user.email },
-        ]}
-        rightCard={rightCard}
-      /> */}
+    
       <section className="border-b border-white/10 bg-[linear-gradient(135deg,#08233d_0%,#0b3153_55%,#123d66_100%)] px-6 py-8 md:px-12 lg:px-20">
   <div className="mx-auto flex max-w-7xl flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
     <div>
@@ -195,12 +168,6 @@ console.log("MICRO GRANT FORM:", data.application.formId);
         Micro Grant / {data.user.email}
       </p>
 
-      {/* <h1 className="text-3xl font-bold">
-        {typeof data.application.formId === "object" &&
-        data.application.formId?.title
-          ? data.application.formId.title
-          : "Micro Grant Application"}
-      </h1> */}
       <h1 className="text-3xl font-bold">
   Micro Grant Application
 </h1>
@@ -309,7 +276,7 @@ console.log("MICRO GRANT FORM:", data.application.formId);
 
               {Object.entries(answers).map(
                 ([label, value]) => (
-                  // <div key={label}>
+
                   <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
                     <label className="block text-sm font-semibold mb-2">
                       {label} <span className="text-red-500">*</span>

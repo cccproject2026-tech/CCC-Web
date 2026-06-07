@@ -22,12 +22,7 @@ import {
   apiGetAllInterests,
 } from "@/app/Services/api";
 import { parseAssessmentsListPayload } from "@/app/Services/assessment.service";
-// import {
-//   mapNotificationItemToPopup,
-//   resolveSessionUserId,
-//   unwrapNotificationsList,
-//   type NotificationPopupItem,
-// } from "@/app/Services/notificationUi";
+
 import {
   mapNotificationItemToPopup,
   resolveSessionUserId,
@@ -74,13 +69,7 @@ export default function AppHeader({ showFullHeader = false }) {
     const load = async () => {
       setNotificationsLoading(true);
       try {
-        // const res = await getNotification(uid);
-        // const list: NotificationItem[] = unwrapNotificationsList(res);
-        // if (cancelled) return;
-        // const unread = list.filter((n) => n.isRead === false).length;
-        // const badge = unread > 0 ? unread : list.length;
-        // setNotificationBadge(Math.min(badge, 99));
-        // setNotificationItems(list.slice(0, 6).map(mapNotificationItemToPopup));
+
         const res = await getNotification({ role: "director" });
 const list: NotificationItem[] = unwrapNotificationsList(res);
 const newestFirst = [...list].reverse();
@@ -157,7 +146,7 @@ setNotificationItems(newestFirst.slice(0, 6).map(mapNotificationItemToPopup));
 
   const loadNewInterestCount = async () => {
     try {
-      // const res = await apiGetAllInterests();
+     
      const res = await apiGetAllInterests({});
 const raw: any = res.data?.data;
 
@@ -575,7 +564,7 @@ const list: any[] = Array.isArray(raw)
       <ProfileDropdown
         isOpen={showProfileDropdown}
         onClose={() => setShowProfileDropdown(false)}
-        // onDocumentsClick={() => setShowDocuments(true)}
+       
         onDocumentsClick={() => router.push("/director/documents")}
         onSettingsClick={() => setShowSettingsModal(true)}
       />
