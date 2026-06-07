@@ -13,12 +13,13 @@ import {
 } from "@/app/Services/appointment-utils";
 import {
   apiGetAppointmentById,
-  // apiGetMentorSchedule,
-    apiGetAppointments,
+  apiGetAppointments,
+  apiGetMentorSchedule,
   apiGenerateTranscriptSummary,
   apiPostAppointmentJoin,
   apiUpdateAppointment,
 } from "@/app/Services/appointments.service";
+import { apiGetUserById } from "@/app/Services/users.service";
 import type {
   AppointmentResponse,
   PersonInfo,
@@ -65,9 +66,143 @@ function getPlatformIcon(platform: string) {
 }
 
 function unwrapPerson(populated?: PersonInfo, rawId?: string | PersonInfo): PersonInfo | undefined {
-  if (populated && typeof populated === "object" && populated._id) return populated;
-  if (rawId && typeof rawId === "object" && (rawId as PersonInfo)._id) return rawId as PersonInfo;
-  return undefined;
+  return normalizePerson(populated) ?? normalizePerson(rawId);
+}
+
+function normalizePerson(raw?: string | PersonInfo | Record<string, unknown> | null, fallbackId?: string): PersonInfo | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const id = String((raw as any)._id ?? (raw as any).id ?? fallbackId ?? "").trim();
+  if (!id) return undefined;
+  return { ...(raw as PersonInfo), _id: id };
+}
+
+function personId(raw?: string | PersonInfo | Record<string, unknown> | null): string {
+  if (!raw) return "";
+  if (typeof raw === "string") return raw.trim();
+  return String((raw as any)._id ?? (raw as any).id ?? "").trim();
+}
+
+function samePersonId(a?: string, b?: string): boolean {
+  return !!a && !!b && String(a) === String(b);
+}
+
+function mergePerson(primary?: PersonInfo, fallback?: PersonInfo): PersonInfo | undefined {
+  if (!primary) return fallback;
+  if (!fallback) return primary;
+  return {
+    ...fallback,
+    ...primary,
+    _id: primary._id || fallback._id,
+    firstName: primary.firstName ?? fallback.firstName,
+    lastName: primary.lastName ?? fallback.lastName,
+    email: primary.email ?? fallback.email,
+    phoneNumber: primary.phoneNumber ?? fallback.phoneNumber,
+    profilePicture: primary.profilePicture ?? fallback.profilePicture,
+    role: primary.role ?? fallback.role,
+    roleId: primary.roleId ?? fallback.roleId,
+    status: primary.status ?? fallback.status,
+  };
+}
+
+function hasNameAndRole(person?: PersonInfo): boolean {
+  if (!person) return false;
+  const name = `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim() || String(person.email ?? "").trim();
+  return !!name && !!String(person.role ?? "").trim();
+}
+
+function appointmentPersonScore(person?: PersonInfo): number {
+  if (!person) return 0;
+  let score = 1;
+  if (`${person.firstName ?? ""} ${person.lastName ?? ""}`.trim()) score += 3;
+  if (person.email) score += 1;
+  if (person.role) score += 2;
+  if (person.profilePicture) score += 1;
+  return score;
+}
+
+function appointmentRichnessScore(appt: AppointmentResponse, currentMentorId: string): number {
+  const user = unwrapPerson(appt.user, appt.userId);
+  const mentor = unwrapPerson(appt.mentor, appt.mentorId);
+  const userId = personId(appt.user) || personId(appt.userId);
+  const mentorId = personId(appt.mentor) || personId(appt.mentorId);
+  const userIsCurrent = samePersonId(userId, currentMentorId);
+  const other = userIsCurrent ? mentor : user || (!samePersonId(mentorId, currentMentorId) ? mentor : undefined);
+  return appointmentPersonScore(user) + appointmentPersonScore(mentor) + appointmentPersonScore(other);
+}
+
+function pickRichestAppointment(candidates: AppointmentResponse[], currentMentorId: string): AppointmentResponse | null {
+  let best: AppointmentResponse | null = null;
+  let bestScore = -1;
+  for (const item of candidates) {
+    const score = appointmentRichnessScore(item, currentMentorId);
+    if (score > bestScore) {
+      best = item;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+function getMentorCookieId(): string {
+  try {
+    const mentorCookie = Cookies.get("mentor");
+    if (!mentorCookie) return "";
+    const mentorData = JSON.parse(decodeURIComponent(mentorCookie));
+    return String(mentorData?.id ?? mentorData?._id ?? "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function appointmentParticipantIds(appt: AppointmentResponse, currentMentorId: string) {
+  const userId = personId(appt.user) || personId(appt.userId);
+  const mentorId = personId(appt.mentor) || personId(appt.mentorId);
+  const userIsCurrent = samePersonId(userId, currentMentorId);
+  const otherId = userIsCurrent ? mentorId : userId || (!samePersonId(mentorId, currentMentorId) ? mentorId : "");
+  return { userId, mentorId, otherId };
+}
+
+function appointmentParticipants(
+  appt: AppointmentResponse,
+  currentMentorId: string,
+  lookup: Record<string, PersonInfo>,
+) {
+  const { userId, mentorId } = appointmentParticipantIds(appt, currentMentorId);
+  const userPerson = mergePerson(unwrapPerson(appt.user, appt.userId), lookup[userId]);
+  const appointmentMentorPerson = mergePerson(unwrapPerson(appt.mentor, appt.mentorId), lookup[mentorId]);
+  const userIsCurrent =
+    samePersonId(userPerson?._id, currentMentorId) ||
+    samePersonId(userId, currentMentorId);
+  const mentorPerson = userIsCurrent ? userPerson : appointmentMentorPerson;
+  const otherPerson = userIsCurrent ? appointmentMentorPerson : userPerson;
+  return { mentorPerson, otherPerson };
+}
+
+function appointmentNeedsUserLookup(appt: AppointmentResponse, currentMentorId: string, lookup: Record<string, PersonInfo>) {
+  const { userId, mentorId, otherId } = appointmentParticipantIds(appt, currentMentorId);
+  const { mentorPerson, otherPerson } = appointmentParticipants(appt, currentMentorId, lookup);
+  const ids: string[] = [];
+  if (mentorId && !lookup[mentorId] && !hasNameAndRole(mentorPerson)) ids.push(mentorId);
+  if (otherId && otherId !== mentorId && !lookup[otherId] && !hasNameAndRole(otherPerson)) ids.push(otherId);
+  if (!otherId && userId && !samePersonId(userId, currentMentorId) && !lookup[userId] && !hasNameAndRole(otherPerson)) {
+    ids.push(userId);
+  }
+  return Array.from(new Set(ids));
+}
+
+function appointmentFromResponse(res: { data?: unknown } | null | undefined): AppointmentResponse | null {
+  const body = (res?.data as any)?.data ?? res?.data;
+  return body && typeof body === "object" && (body as AppointmentResponse).meetingDate
+    ? (body as AppointmentResponse)
+    : null;
+}
+
+function findAppointmentInList(list: AppointmentResponse[], apptId: string): AppointmentResponse | null {
+  return (
+    list.find((a) => appointmentEntityId(a) === apptId) ??
+    list.find((a) => String((a as any)._id ?? (a as any).id) === apptId) ??
+    null
+  );
 }
 
 function computeEndMs(appt: AppointmentResponse): number {
@@ -153,6 +288,7 @@ export default function MentorAppointmentDetailPage() {
 
   const [loading, setLoading] = useState(true);
   const [appt, setAppt] = useState<AppointmentResponse | null>(null);
+  const [personLookup, setPersonLookup] = useState<Record<string, PersonInfo>>({});
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   const [tsLoading, setTsLoading] = useState(false);
@@ -161,123 +297,54 @@ export default function MentorAppointmentDetailPage() {
   const [idCopied, setIdCopied] = useState(false);
   const [passCopied, setPassCopied] = useState(false);
   const [joinSubmitting, setJoinSubmitting] = useState(false);
+  const currentMentorId = useMemo(() => getMentorCookieId(), []);
 
   // ── Fetch appointment (prefer by id; fallback mentor schedule from cookie) ──
   useEffect(() => {
     const run = async () => {
       try {
         setLoading(true);
-        // let found: AppointmentResponse | null = null;
+        const candidates: AppointmentResponse[] = [];
 
-        // try {
-        //   const res = await apiGetAppointmentById(apptId);
-        //   const body = (res.data as { data?: AppointmentResponse })?.data ?? (res.data as unknown as AppointmentResponse);
-        //   if (body && (body as AppointmentResponse).meetingDate) found = body as AppointmentResponse;
-        // } catch {
-        //   found = null;
-        // }
+        try {
+          const cached = sessionStorage.getItem("mentorSelectedAppointment");
+          if (cached) {
+            const parsed = JSON.parse(cached) as AppointmentResponse;
+            if (appointmentEntityId(parsed) === apptId) candidates.push(parsed);
+          }
+        } catch {
+          /* ignore malformed cache */
+        }
 
-        // if (!found) {
-//         let found: AppointmentResponse | null = null;
+        const byIdRes = await Promise.allSettled([apiGetAppointmentById(apptId)]);
+        const byIdAppointment =
+          byIdRes[0].status === "fulfilled" ? appointmentFromResponse(byIdRes[0].value) : null;
+        if (byIdAppointment) candidates.push(byIdAppointment);
 
+        if (currentMentorId) {
+          const [appointmentsRes, mentorScheduleRes] = await Promise.allSettled([
+            apiGetAppointments({ userId: currentMentorId, mentorId: currentMentorId, futureOnly: false }),
+            apiGetMentorSchedule(currentMentorId),
+          ]);
 
+          if (appointmentsRes.status === "fulfilled") {
+            const list = unwrapAppointmentsAxiosData(appointmentsRes.value) as AppointmentResponse[];
+            const item = findAppointmentInList(list, apptId);
+            if (item) candidates.push(item);
+          }
 
-// try {
-//   const cached = sessionStorage.getItem("mentorSelectedAppointment");
-//   if (cached) {
-//     const parsed = JSON.parse(cached) as AppointmentResponse;
-//     if (appointmentEntityId(parsed) === apptId) {
-//       found = parsed;
-//     }
-//   }
-// } catch {
-//   found = null;
-// }
+          if (mentorScheduleRes.status === "fulfilled") {
+            const list = unwrapAppointmentsAxiosData(mentorScheduleRes.value) as AppointmentResponse[];
+            const item = findAppointmentInList(list, apptId);
+            if (item) candidates.push(item);
+          }
+        }
 
-// if (!found) {
-//   // keep your API fetch fallback here
-// }
-        
-// const mentorCookie = Cookies.get("mentor");
-// if (!mentorCookie) throw new Error("Mentor information not found");
+        if (!currentMentorId && candidates.length === 0) {
+          throw new Error("Mentor ID not found");
+        }
 
-// const mentorData = JSON.parse(decodeURIComponent(mentorCookie));
-// const mentorId = String(mentorData?.id ?? mentorData?._id ?? "").trim();
-// if (!mentorId) throw new Error("Mentor ID not found");
-
-// try {
-//   const res = await apiGetAppointments({
-//     userId: mentorId,
-//     mentorId,
-//     futureOnly: false,
-//   });
-
-//   const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
-
-//   found =
-//     list.find((a) => appointmentEntityId(a) === apptId) ??
-//     list.find((a) => String((a as any)._id ?? (a as any).id) === apptId) ??
-//     null;
-// } catch {
-//   found = null;
-// }
-
-// if (!found) {
-//           const mentorCookie = Cookies.get("mentor");
-//           if (!mentorCookie) throw new Error("Mentor information not found");
-//           const mentorData = JSON.parse(decodeURIComponent(mentorCookie));
-//           const mentorId = String(mentorData?.id ?? mentorData?._id ?? "").trim();
-//           if (!mentorId) throw new Error("Mentor ID not found");
-
-//           // const res = await apiGetMentorSchedule(mentorId);
-//           // const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
-//           const res = await apiGetAppointments({
-//   userId: mentorId,
-//   mentorId,
-//   futureOnly: false,
-// });
-
-// const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
-//           found =
-//             list.find((a) => appointmentEntityId(a) === apptId) ??
-//             list.find((a) => String((a as { _id?: string; id?: string })._id ?? (a as { id?: string }).id) === apptId) ??
-//             null;
-//         }
-let found: AppointmentResponse | null = null;
-
-try {
-  const cached = sessionStorage.getItem("mentorSelectedAppointment");
-  if (cached) {
-    const parsed = JSON.parse(cached) as AppointmentResponse;
-    if (appointmentEntityId(parsed) === apptId) {
-      found = parsed;
-    }
-  }
-} catch {
-  found = null;
-}
-
-if (!found) {
-  const mentorCookie = Cookies.get("mentor");
-  if (!mentorCookie) throw new Error("Mentor information not found");
-
-  const mentorData = JSON.parse(decodeURIComponent(mentorCookie));
-  const mentorId = String(mentorData?.id ?? mentorData?._id ?? "").trim();
-  if (!mentorId) throw new Error("Mentor ID not found");
-
-  const res = await apiGetAppointments({
-    userId: mentorId,
-    mentorId,
-    futureOnly: false,
-  });
-
-  const list = unwrapAppointmentsAxiosData(res) as AppointmentResponse[];
-
-  found =
-    list.find((a) => appointmentEntityId(a) === apptId) ??
-    list.find((a) => String((a as any)._id ?? (a as any).id) === apptId) ??
-    null;
-}
+        const found = pickRichestAppointment(candidates, currentMentorId);
 
         setAppt(found);
       } catch (e) {
@@ -293,7 +360,39 @@ if (!found) {
     };
     void run();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apptId]);
+  }, [apptId, currentMentorId]);
+
+  useEffect(() => {
+    if (!appt || !currentMentorId) return;
+    const missingIds = appointmentNeedsUserLookup(appt, currentMentorId, personLookup);
+    if (missingIds.length === 0) return;
+
+    let cancelled = false;
+    const run = async () => {
+      const results = await Promise.allSettled(
+        missingIds.map(async (id) => {
+          const res = await apiGetUserById(id);
+          return [id, normalizePerson((res.data as any)?.data ?? res.data, id)] as const;
+        }),
+      );
+
+      if (cancelled) return;
+      setPersonLookup((prev) => {
+        const next = { ...prev };
+        for (const result of results) {
+          if (result.status !== "fulfilled") continue;
+          const [id, person] = result.value;
+          if (person) next[id] = person;
+        }
+        return next;
+      });
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [appt, currentMentorId, personLookup]);
 
   // Re-evaluate join window periodically
   useEffect(() => {
@@ -458,31 +557,7 @@ if (!found) {
     );
   }
 
-  // const mentorPerson = unwrapPerson(appt.mentor, appt.mentorId);
-  // const menteePerson = unwrapPerson(appt.user, appt.userId);
-const mentorCookie = Cookies.get("mentor");
-const currentMentorData = mentorCookie
-  ? JSON.parse(decodeURIComponent(mentorCookie))
-  : null;
-
-const currentMentorId = String(
-  currentMentorData?.id ?? currentMentorData?._id ?? ""
-).trim();
-
-const userPerson = unwrapPerson(appt.user, appt.userId);
-const appointmentMentorPerson = unwrapPerson(appt.mentor, appt.mentorId);
-
-const mentorPerson =
-  userPerson &&
-  (String(userPerson._id) === currentMentorId || String((userPerson as any).id) === currentMentorId)
-    ? userPerson
-    : appointmentMentorPerson;
-
-const otherPerson =
-  userPerson &&
-  (String(userPerson._id) === currentMentorId || String((userPerson as any).id) === currentMentorId)
-    ? appointmentMentorPerson
-    : userPerson;
+  const { mentorPerson, otherPerson } = appointmentParticipants(appt, currentMentorId, personLookup);
   const mentorName =
     `${mentorPerson?.firstName ?? ""} ${mentorPerson?.lastName ?? ""}`.trim() ||
     mentorPerson?.email ||

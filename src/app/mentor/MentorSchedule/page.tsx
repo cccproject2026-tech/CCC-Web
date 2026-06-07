@@ -1301,7 +1301,10 @@ const isCancelled = status === "cancelled" || status === "canceled";
                           <p className="mb-2 text-[12px] text-[#cde2f2]">Mode: <span className="font-semibold text-[#8ec5eb]">{appt.platform}</span></p>
                           <button
                             type="button"
-                            onClick={() => router.push(`/mentor/MentorSchedule/${encodeURIComponent(appointmentEntityId(appt))}`)}
+                            onClick={() => {
+                              sessionStorage.setItem("mentorSelectedAppointment", JSON.stringify(appt));
+                              router.push(`/mentor/MentorSchedule/${encodeURIComponent(appointmentEntityId(appt))}`);
+                            }}
                             className={`${mentorPrimaryCta} mt-1 px-4 py-1.5 text-xs`}
                           >
                             Details
