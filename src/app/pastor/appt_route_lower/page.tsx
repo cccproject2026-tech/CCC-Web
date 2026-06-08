@@ -89,6 +89,8 @@ const [scheduleDescription, setScheduleDescription] = useState("");
   const [availabilityRefreshKey, setAvailabilityRefreshKey] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [appointmentsTab, setAppointmentsTab] = useState<"next" | "history">("next");
+  const [appointmentSearch, setAppointmentSearch] = useState("");
+  const [appointmentDateFilter, setAppointmentDateFilter] = useState("");
   const [monthlyAvailabilitySlots, setMonthlyAvailabilitySlots] = useState<any[]>([]);
   const router = useRouter();
 
@@ -783,6 +785,65 @@ return !Number.isNaN(endMs) && endMs < nowMs;
       );
   }, [appointments]);
 
+  const appointmentMatchesSearch = (appt: Record<string, unknown>, query: string): boolean => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+
+    const people = [
+      appt.mentor,
+      appt.user,
+      appt.director,
+      typeof appt.mentorId === "object" ? appt.mentorId : null,
+      typeof appt.userId === "object" ? appt.userId : null,
+      typeof appt.directorId === "object" ? appt.directorId : null,
+    ].filter(Boolean) as Record<string, unknown>[];
+
+    const personText = people
+      .map((person) =>
+        [
+          person.firstName,
+          person.lastName,
+          person.name,
+          person.role,
+          person.email,
+        ]
+          .filter((value) => value != null)
+          .join(" "),
+      )
+      .join(" ");
+
+    const haystack = [
+      personText,
+      getMeetingTitle(appt),
+      appt.title,
+      appt.meetingTitle,
+      appt.appointmentTitle,
+      appt.platform,
+    ]
+      .filter((value) => value != null)
+      .join(" ")
+      .toLowerCase();
+
+    return haystack.includes(q);
+  };
+
+  const appointmentMatchesDate = (appt: Record<string, unknown>, dateFilter: string): boolean => {
+    if (!dateFilter) return true;
+    const raw = String(appt.meetingDate ?? "");
+    if (!raw) return false;
+    return meetingDateLocalYmd(raw) === dateFilter;
+  };
+
+  const applyAppointmentFilters = (list: Record<string, unknown>[]) =>
+    list.filter(
+      (appt) =>
+        appointmentMatchesSearch(appt, appointmentSearch) &&
+        appointmentMatchesDate(appt, appointmentDateFilter),
+    );
+
+  const visibleUpcomingAppointments = applyAppointmentFilters(filteredUpcoming);
+  const visibleHistoryAppointments = applyAppointmentFilters(filteredHistory);
+
   const handleCancelAppointment = async () => {
     if (!appointmentToCancel) return;
     const id = appointmentEntityId(appointmentToCancel);
@@ -1184,17 +1245,57 @@ const selectedDateHasRawAvailability = useMemo(() => {
               </button>
             </div>
 
+            <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px_auto] md:items-end">
+              <div>
+                <label className={pastorFieldLabel} htmlFor="appointment-search-filter">
+                  Search appointments
+                </label>
+                <input
+                  id="appointment-search-filter"
+                  type="text"
+                  value={appointmentSearch}
+                  onChange={(e) => setAppointmentSearch(e.target.value)}
+                  placeholder="Search name, role, email, or title"
+                  className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white outline-none placeholder:text-[#cde2f2]/65 focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/20"
+                />
+              </div>
+              <div>
+                <label className={pastorFieldLabel} htmlFor="appointment-date-filter">
+                  Date
+                </label>
+                <input
+                  id="appointment-date-filter"
+                  type="date"
+                  value={appointmentDateFilter}
+                  onChange={(e) => setAppointmentDateFilter(e.target.value)}
+                  className={`${pastorDarkSelect} [color-scheme:dark]`}
+                />
+              </div>
+              {(appointmentSearch || appointmentDateFilter) && (
+                <button
+                  type="button"
+                  className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-sm font-medium text-[#d9ebf8] transition hover:bg-white/10"
+                  onClick={() => {
+                    setAppointmentSearch("");
+                    setAppointmentDateFilter("");
+                  }}
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+
             {appointmentsTab === "next" ? (
               <div>
                 <p className="mb-4 text-xs text-[#cde2f2]/75">
                   Showing scheduled meetings in the next 7 days. Further-out meetings stay on your calendar above.
                 </p>
                 <div className="grid grid-cols-1 gap-6 md:gap-10 lg:grid-cols-2">
-                {filteredUpcoming.length === 0 && (
+                {visibleUpcomingAppointments.length === 0 && (
                   <p className="text-sm text-[#cde2f2]/90">No appointments scheduled in the next 7 days.</p>
                 )}
 
-                {filteredUpcoming.map((appt) => {
+                {visibleUpcomingAppointments.map((appt) => {
                   const mode = String(appt.platform ?? "Duo");
                   const icon = getModeIcon(mode);
                   const mentor = appt.mentor as { profilePicture?: string; firstName?: string; lastName?: string } | undefined;
@@ -1376,11 +1477,11 @@ const selectedDateHasRawAvailability = useMemo(() => {
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-6 md:gap-10 lg:grid-cols-2">
-                {filteredHistory.length === 0 && (
+                {visibleHistoryAppointments.length === 0 && (
                   <p className="text-sm text-[#cde2f2]/90">No appointment history yet.</p>
                 )}
 
-                {filteredHistory.map((appt) => {
+                {visibleHistoryAppointments.map((appt) => {
                   const mode = String(appt.platform ?? "Duo");
                   const icon = getModeIcon(mode);
                   const mentor = appt.mentor as { profilePicture?: string; firstName?: string; lastName?: string } | undefined;

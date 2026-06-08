@@ -280,11 +280,12 @@ export default function MentorAvailabilityRecurringWorkspace({
         maxBookingsPerDay,
         preferredPlatform,
       });
-      const msg =
-        typeof (res.data as { message?: string } | undefined)?.message === "string"
-          ? (res.data as { message: string }).message
-          : "Recurring availability saved.";
-      onToast(msg, "ok");
+      // const msg =
+      //   typeof (res.data as { message?: string } | undefined)?.message === "string"
+      //     ? (res.data as { message: string }).message
+      //     : "Recurring availability saved.";
+      // onToast(msg, "ok");
+      onToast("Recurring availability saved.", "ok");
       setConfirmClearOpen(false);
       setClearPersonalizations(false);
       await loadMonth();
@@ -411,14 +412,18 @@ const hydrateWeekdaySlotsFromMonth = (dayIndex: number) => {
       if (w.slots.length > 0) return { ...w, enabled: true };
 
 
-  const matchingMonthRow = monthRows.find((raw) => {
-  const row = raw as Record<string, unknown>;
-  const ymd = String(row.date ?? row.day ?? row.calendarDate ?? "").slice(0, 10);
+  const matchingMonthRows = monthRows.filter((raw) => {
+    const row = raw as Record<string, unknown>;
+    const ymd = String(row.date ?? row.day ?? row.calendarDate ?? "").slice(0, 10);
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return false;
 
-  return new Date(`${ymd}T12:00:00`).getDay() === dayIndex;
-});
+    return new Date(`${ymd}T12:00:00`).getDay() === dayIndex;
+  });
+
+  const matchingMonthRow =
+    matchingMonthRows.find((raw) => classifyDayOccurrence(raw as Record<string, unknown>).slots.length > 0) ??
+    matchingMonthRows[0];
 
 const c: { unavailable: boolean; slots: AppointmentAvailabilityTimeSlot[] } =
   matchingMonthRow
@@ -571,6 +576,9 @@ const c: { unavailable: boolean; slots: AppointmentAvailabilityTimeSlot[] } =
   <p className="mt-1 text-[13px] text-[#cde2f2]/85">
     Your time slots will repeat weekly for the next 60 days.
   </p>
+  <p className="mt-1 text-[12px] text-amber-100/80">
+  New availability applies from future dates and does not create slots for today.
+</p>
 </div>
         </div>
 
@@ -644,7 +652,7 @@ const c: { unavailable: boolean; slots: AppointmentAvailabilityTimeSlot[] } =
         <p className="text-sm font-semibold">{row.label}</p>
 
         <p className={`mt-1 text-xs ${row.enabled ? "text-[#8ec5eb]" : "text-[#cde2f2]/75"}`}>
-          {row.enabled ? "Set" : "Not set"}
+          {row.enabled && row.slots.length > 0 ? "Set" : row.enabled ? "No slots" : "Not set"}
         </p>
 
         {/* {row.enabled && (

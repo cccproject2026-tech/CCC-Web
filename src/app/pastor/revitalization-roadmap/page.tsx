@@ -1111,7 +1111,7 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
                 {phase.title}
               </h3>
 
-              <p className="line-clamp-4 text-sm leading-relaxed text-white/65 sm:line-clamp-3">
+              <p className="line-clamp-1 text-sm leading-relaxed text-white/65">
                 {phase.description}
               </p>
 
