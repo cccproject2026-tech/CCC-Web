@@ -298,7 +298,8 @@ const currentDate = new Date().toLocaleDateString("en-US", {
       <MentorHeader showFullHeader={true} />
 
       {/* <main className="relative z-10 w-full flex-1 pb-28 pt-0 sm:pb-10"> */}
-      <main className="relative z-10 flex w-full flex-1 flex-col gap-4 pb-28 pt-0 sm:gap-5 sm:pb-10">
+      <main className="relative z-10 w-full flex-1 pb-28 pt-0 sm:pb-10">
+        <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 sm:gap-5 sm:px-6 lg:px-8">
         {/* Hero — CCC-Mobile: greeting on hero, compact welcome card, showClockDate false */}
         {/* <section
           className={`relative overflow-hidden rounded-3xl border border-white/10 ${mentorGlassCardFrost}`}
@@ -622,6 +623,7 @@ const pin = pins[index];
     </div>
   </div>
 </section>
+        </div>
       </main>
 
       <nav

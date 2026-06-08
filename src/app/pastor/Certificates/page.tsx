@@ -76,7 +76,6 @@ export default function PastorCertificatesPage() {
     downloadCertificatePreviewPdf(
       certificatePreviewRef.current,
       certificate?.certificateId,
-      certificate?.pdfUrl || certificate?.certificateUrl,
     );
 
   const requestCertificatePreviewDownload = () => {
@@ -160,13 +159,6 @@ export default function PastorCertificatesPage() {
                   <button
                     type="button"
                     onClick={() => setShowCertificatePreview(true)}
-                    className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/15 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
-                  >
-                    Preview Certificate
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowCertificatePreview(true)}
                     className="rounded-lg bg-[#8ec5eb] px-4 py-2.5 text-sm font-semibold text-[#062946] transition hover:bg-[#a9d5f2] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     View Certificate
@@ -174,7 +166,6 @@ export default function PastorCertificatesPage() {
                   <button
                     type="button"
                     onClick={requestCertificatePreviewDownload}
-                    disabled={!certificate.pdfUrl && !certificate.certificateUrl}
                     className="rounded-lg border border-white/25 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Download PDF
@@ -203,7 +194,6 @@ export default function PastorCertificatesPage() {
                 <button
                   type="button"
                   onClick={() => void handleDownloadCertificatePreview()}
-                  disabled={!certificate?.pdfUrl && !certificate?.certificateUrl}
                   className="rounded-lg border border-[#062946] px-3 py-2 text-sm font-semibold text-[#062946] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Download PDF

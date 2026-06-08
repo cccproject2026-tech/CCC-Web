@@ -1157,13 +1157,22 @@ const mentorId = String(mentor?.id ?? mentor?._id ?? "");
 const now = Date.now();
 
 const getStatus = (appointment: any) =>
-  String(appointment.status ?? "").toLowerCase();
+  String(appointment.status ?? "").toLowerCase().trim();
 
 const getStartTime = (appointment: any) =>
   new Date(appointment.meetingDate ?? "").getTime();
 
 const getEndTime = (appointment: any) =>
   new Date(appointment.endTime ?? appointment.meetingDate ?? "").getTime();
+
+const excludedNextMeetingStatuses = new Set([
+  "completed",
+  "missed",
+  "cancelled",
+  "canceled",
+]);
+
+const futureNextMeetingStatuses = new Set(["scheduled", "rescheduled"]);
 
 const pastorAppointments = appointments.filter((appointment) => {
   const appointmentPastorId = String(
@@ -1247,6 +1256,7 @@ const isPastOrFinished = (appointment: any) => {
     status === "completed" ||
     status === "missed" ||
     status === "cancelled" ||
+    status === "canceled" ||
     status === "scheduled" ||
     status === "rescheduled"
   )
@@ -1258,27 +1268,32 @@ const endedAppointments = pastorAppointments
   .sort((a, b) => getEndTime(b) - getEndTime(a));
 
 const ongoingAppointment =
-  pastorAppointments.find((appointment) => {
-    const status = getStatus(appointment);
-    const start = getStartTime(appointment);
-    const end = getEndTime(appointment);
+  pastorAppointments
+    .filter((appointment) => {
+      const status = getStatus(appointment);
+      const start = getStartTime(appointment);
+      const end = getEndTime(appointment);
 
-    if (["completed", "missed", "cancelled"].includes(status)) return false;
+      if (excludedNextMeetingStatuses.has(status)) return false;
 
-    return (
-      Number.isFinite(start) &&
-      Number.isFinite(end) &&
-      start <= now &&
-      now < end
-    );
-  }) ?? null;
+      return (
+        Number.isFinite(start) &&
+        Number.isFinite(end) &&
+        start <= now &&
+        now < end
+      );
+    })
+    .sort((a, b) => getStartTime(a) - getStartTime(b))[0] ?? null;
 
 const futureAppointments = pastorAppointments
   .filter((appointment) => {
     const status = getStatus(appointment);
     const start = getStartTime(appointment);
+    const end = getEndTime(appointment);
 
-    if (["completed", "missed", "cancelled"].includes(status)) return false;
+    if (excludedNextMeetingStatuses.has(status)) return false;
+    if (!futureNextMeetingStatuses.has(status)) return false;
+    if (Number.isFinite(end) && end < now) return false;
 
     return Number.isFinite(start) && start > now;
   })
@@ -1287,6 +1302,9 @@ const futureAppointments = pastorAppointments
 const lastMeeting = endedAppointments[0] ?? null;
 const nextMeeting = ongoingAppointment ?? futureAppointments[0] ?? null;
 const isNextMeetingOngoing = Boolean(ongoingAppointment);
+const isLastMeetingCancelled = lastMeeting
+  ? ["cancelled", "canceled"].includes(getStatus(lastMeeting))
+  : false;
 
 
 const formatMeetingDate = (value?: string) => {
@@ -1611,7 +1629,9 @@ const roadmapModalTitle =
   </p>
   <p className="text-xs font-bold text-red-200">
     {lastMeeting
-  ? `${formatMeetingTime(lastMeeting.meetingDate)} · Finished`
+  ? `${formatMeetingTime(lastMeeting.meetingDate)} · ${
+      isLastMeetingCancelled ? "Cancelled" : "Finished"
+    }`
   : "No finished meeting"}
   </p>
 </Link>
@@ -1649,7 +1669,7 @@ const roadmapModalTitle =
   ? isNextMeetingOngoing
     ? `${formatMeetingTime(nextMeeting.meetingDate)} – ${formatMeetingTime(nextMeeting.endTime)}`
     : `${daysUntil(nextMeeting.meetingDate)} · ${formatMeetingTime(nextMeeting.meetingDate)}`
-  : "No upcoming meeting"}
+  : "No current meeting"}
   </p>
 </Link>
              <div className="flex flex-col items-center justify-center p-3 text-center">

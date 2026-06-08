@@ -207,24 +207,18 @@ console.log("MICRO GRANT FORM:", data.application.formId);
 
       <div className="mx-auto flex max-w-7xl flex-col gap-10 px-6 py-10 md:flex-row md:px-12 lg:px-20">
         {/* ---------- LEFT STEPS (unchanged) ---------- */}
-        <div className="flex shrink-0 items-start space-x-4 md:w-1/3 lg:w-1/4">
-          <div className="flex flex-col items-center mt-2">
-            {[1, 2].map((step, i) => (
-              <React.Fragment key={step}>
-                <div
-                  className={`w-10 h-10 flex items-center justify-center rounded-full border-4 ${activeStep === step
-                    ? "border-green-500 bg-green-100 text-green-700"
-                    : "border-gray-400 bg-gray-200 text-gray-600"
-                    } font-semibold`}
-                >
-                  {step}
-                </div>
-                {i === 0 && <div className="w-1 h-12 bg-blue-600" />}
-              </React.Fragment>
-            ))}
-          </div>
-
-          <div className="space-y-4">
+        <div className="relative flex shrink-0 flex-col gap-4 md:w-1/3 lg:w-1/4">
+          <div className="absolute left-5 top-14 h-12 w-1 -translate-x-1/2 rounded-full bg-blue-600" />
+          <div className="flex items-start gap-4">
+            <div
+              className={`relative z-10 mt-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-4 font-semibold ${
+                activeStep === 1
+                  ? "border-green-500 bg-green-100 text-green-700"
+                  : "border-gray-400 bg-gray-200 text-gray-600"
+              }`}
+            >
+              1
+            </div>
             {/* <div
               onClick={() => setActiveStep(1)}
               className={`cursor-pointer rounded-xl px-6 py-5 shadow-lg border ${activeStep === 1
@@ -234,16 +228,25 @@ console.log("MICRO GRANT FORM:", data.application.formId);
             > */}
             <div
   onClick={() => setActiveStep(1)}
-  className={`cursor-pointer rounded-2xl border px-6 py-5 shadow-lg transition ${
+  className={`min-h-[72px] flex-1 cursor-pointer rounded-2xl border px-6 py-5 shadow-lg transition ${
     activeStep === 1
       ? "border-[#8ec5eb]/40 bg-white/[0.08] text-white"
       : "border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.07]"
   }`}
 >
               <h3 className="text-xl font-semibold">Cover Sheet</h3>
-              <p className="text-sm mt-1 opacity-80">
-                Please answer the questions succinctly following prompts
-              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-4">
+            <div
+              className={`relative z-10 mt-4 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-4 font-semibold ${
+                activeStep === 2
+                  ? "border-green-500 bg-green-100 text-green-700"
+                  : "border-gray-400 bg-gray-200 text-gray-600"
+              }`}
+            >
+              2
             </div>
 {/* 
             <div
@@ -255,8 +258,8 @@ console.log("MICRO GRANT FORM:", data.application.formId);
             > */}
             <div
   onClick={() => setActiveStep(2)}
-  className={`cursor-pointer rounded-2xl border px-6 py-5 shadow-lg transition ${
-    activeStep === 1
+  className={`min-h-[72px] flex-1 cursor-pointer rounded-2xl border px-6 py-5 shadow-lg transition ${
+    activeStep === 2
       ? "border-[#8ec5eb]/40 bg-white/[0.08] text-white"
       : "border-white/10 bg-white/[0.04] text-white/70 hover:bg-white/[0.07]"
   }`}
@@ -399,14 +402,15 @@ console.log("MICRO GRANT FORM:", data.application.formId);
   >
     Back
   </button>
-<button
-  type="button"
-  onClick={() => handleStatusChange(data.application._id, "pending")}
-  className="rounded-xl border border-amber-300/30 bg-amber-500/15 px-6 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-500/25"
->
-  Move to Pending
-</button>
-  <div className="flex gap-3">
+  <div className="flex flex-wrap gap-3 sm:justify-end">
+    <button
+      type="button"
+      onClick={() => handleStatusChange(data.application._id, "pending")}
+      className="rounded-xl border border-amber-300/30 bg-amber-500/15 px-6 py-2 text-sm font-semibold text-amber-100 hover:bg-amber-500/25"
+    >
+      Move to Pending
+    </button>
+
     <button
       type="button"
       onClick={() => handleStatusChange(data.application._id, "rejected")}

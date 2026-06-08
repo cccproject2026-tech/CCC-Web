@@ -398,7 +398,6 @@ const handleDownloadCertificatePreview = () =>
   downloadCertificatePreviewPdf(
     certificatePreviewRef.current,
     certificate?.certificateId,
-    certificate?.pdfUrl || certificate?.certificateUrl,
   );
 
 const requestCertificatePreviewDownload = () => {
@@ -944,14 +943,6 @@ useEffect(() => {
         <button
           type="button"
           onClick={() => setIsCertificatePreviewModalOpen(true)}
-          className="w-full rounded-lg border border-[#08056b] px-4 py-3 font-semibold text-[#08056b]"
-        >
-          Preview Certificate
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setIsCertificatePreviewModalOpen(true)}
           className="w-full rounded-lg bg-[#08056b] px-4 py-3 font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           View Certificate
@@ -960,7 +951,6 @@ useEffect(() => {
         <button
           type="button"
           onClick={requestCertificatePreviewDownload}
-          disabled={!certificate?.pdfUrl && !certificate?.certificateUrl}
           className="w-full rounded-lg border border-gray-300 px-4 py-3 font-semibold disabled:cursor-not-allowed disabled:opacity-50"
         >
           Download PDF
@@ -996,7 +986,6 @@ useEffect(() => {
           <button
             type="button"
             onClick={() => void handleDownloadCertificatePreview()}
-            disabled={!certificate?.pdfUrl && !certificate?.certificateUrl}
             className="rounded-lg border border-[#08056b] px-3 py-2 text-sm font-semibold text-[#08056b] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Download PDF

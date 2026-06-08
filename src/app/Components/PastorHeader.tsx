@@ -8,7 +8,6 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import Framelogo1 from "../Assets/Frame-logo-1.png";
 import Connecticon from "../Assets/Connect-icon.png";
-import NotificationIcon from "../Assets/notification.png";
 import SearchIcon from "../Assets/search.png";
 import UserProfile from "../Assets/user-profile.png";
 import NotificationPopup from "./NotificationPopup";
@@ -24,6 +23,7 @@ import {
   Settings,
   LogOut,
   Lock,
+  Bell,
   BellOff,
   UserX,
   Menu,
@@ -137,16 +137,24 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const navLinks = [
+  const navLinks: Array<{ name: string; path: string; desktopLabel?: string }> = [
     { name: "Home", path: "/pastor/home" },
-    { name: "My Mentors", path: "/pastor/Mymentors" },
-    { name: "Revitalization\nRoadmap", path: "/pastor/revitalization-roadmap" },
+    { name: "My Mentors", path: "/pastor/Mymentors", desktopLabel: "My\nMentors" },
+    {
+      name: "Revitalization Roadmap",
+      path: "/pastor/revitalization-roadmap",
+      desktopLabel: "Revitalization\nRoadmap",
+    },
     { name: "Assessments", path: "/pastor/Assessments" },
     { name: "Progress", path: "/pastor/Myprogress" },
     { name: "Appointments", path: "/pastor/appointments" },
-    { name: "Mentorship Sessions", path: "/pastor/mentoring-session" },
+    {
+      name: "Mentorship Sessions",
+      path: "/pastor/mentoring-session",
+      desktopLabel: "Mentorship\nSessions",
+    },
     { name: "Notes", path: "/pastor/notes" },
-    { name: "Voice\nNotes", path: "/pastor/voice-notes" },
+    { name: "Voice Notes", path: "/pastor/voice-notes", desktopLabel: "Voice\nNotes" },
   ];
 
 
@@ -246,12 +254,12 @@ const isLoginPage = pathname === "/pastor/login";
 const logoHref = isLoginPage ? "/" : "/pastor/home";
   return (
    
-    <header className="relative z-40 flex items-center gap-6 border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md md:px-6 lg:px-10 font-[Albert_Sans]">
+    <header className="relative z-40 flex min-h-[64px] w-full items-center justify-between border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md md:px-6 lg:px-10 font-[Albert_Sans]">
     
 
 <Link
   href={logoHref}
-  className="flex w-[44px] shrink-0 items-center justify-center cursor-pointer"
+  className="flex h-10 w-10 shrink-0 items-center justify-start cursor-pointer"
   aria-label={isLoginPage ? "Landing Page" : "Pastor Home"}
 >
   <Image src={Framelogo1} alt="Logo" width={26} height={26} />
@@ -260,7 +268,7 @@ const logoHref = isLoginPage ? "/" : "/pastor/home";
       {/* ✅ Middle Nav Links */}
       {showFullHeader && (
        
-      <nav className="hidden min-w-0 flex-1 items-center justify-start gap-6 lg:flex">
+      <nav className="hidden min-w-0 flex-1 items-center justify-center gap-3 px-4 lg:flex xl:gap-4 2xl:gap-6">
           {navLinks.map((link, index) => {
             const isActive =
               pathname === link.path ||
@@ -269,12 +277,12 @@ const logoHref = isLoginPage ? "/" : "/pastor/home";
               <a
                 key={index}
                 href={link.path}
-                className={`max-w-[140px] text-center text-[13px] leading-tight xl:text-sm cursor-pointer transition-all duration-200 ${isActive
+                className={`flex min-h-10 max-w-[118px] items-center justify-center px-1.5 text-center text-[12px] leading-tight whitespace-pre-line cursor-pointer transition-colors duration-200 xl:max-w-[132px] xl:px-2 xl:text-[13px] ${isActive
                   ? "font-semibold text-white"
                   : "text-white/80 hover:text-white"
                   }`}
               >
-                {link.name}
+                {link.desktopLabel ?? link.name}
               </a>
             );
           })}
@@ -283,7 +291,7 @@ const logoHref = isLoginPage ? "/" : "/pastor/home";
 
       {/* ✅ Right Icons */}
       {/* <div className="relative flex items-center gap-3 md:gap-5" ref={dropdownRef}> */}
-      <div className="relative flex w-[360px] shrink-0 items-center justify-end gap-3" ref={dropdownRef}>
+      <div className="relative flex shrink-0 items-center justify-end gap-2 sm:gap-3 xl:gap-4" ref={dropdownRef}>
         {/* Mobile Menu Button */}
         {showFullHeader && isClient && (
           <button
@@ -310,7 +318,7 @@ const logoHref = isLoginPage ? "/" : "/pastor/home";
             </button>
 
             {showSearch && (
-              <div className="absolute right-[160px] top-12 z-[60] w-[420px] rounded-2xl border border-white/20 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] p-3 shadow-2xl">
+              <div className="absolute right-0 top-12 z-[60] w-[min(420px,calc(100vw-2rem))] rounded-2xl border border-white/20 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] p-3 shadow-2xl xl:right-[120px]">
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -394,7 +402,7 @@ const logoHref = isLoginPage ? "/" : "/pastor/home";
                 }}
                 className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15 cursor-pointer"
               >
-                <Image src={NotificationIcon} alt="Notification" width={20} height={20} />
+                <Bell size={20} aria-hidden="true" />
 
                 {/* 🔥 Dynamic Count */}
                 {notificationCount > 0 && (
@@ -513,12 +521,12 @@ const logoHref = isLoginPage ? "/" : "/pastor/home";
                   setShowNotifications(false);
                   setShowSettingsMenu(false);
                 }}
-                className="flex items-center gap-2 rounded-full border border-[#8ec5eb]/40 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-2 py-1 transition hover:bg-[linear-gradient(180deg,#145787_0%,#0f4a76_100%)] cursor-pointer md:px-3"
+                className="flex items-center gap-2 rounded-full border border-[#8ec5eb]/40 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-2 py-1 transition hover:bg-[linear-gradient(180deg,#145787_0%,#0f4a76_100%)] cursor-pointer"
                 suppressHydrationWarning
               >
-                <div className="hidden md:block text-right text-[11px] leading-tight">
+                <div className="hidden max-w-[120px] text-right text-[11px] leading-tight xl:block">
                   <p className="text-white/80">Good Morning</p>
-                  <p className="text-white font-medium">
+                  <p className="truncate text-white font-medium">
                     {profile ? `${profile.firstName} ${profile.lastName}` : "..."}
                   </p>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   apiGetAssignedUsers,
   apiGetMentorByEmail,
@@ -354,12 +354,24 @@ function Scheduler({
     </div>
   );
 }
-function NoImageBox({ className = "" }: { className?: string }) {
+function NoImageBox({
+  className = "",
+  firstName = "",
+  lastName = "",
+}: {
+  className?: string;
+  firstName?: string;
+  lastName?: string;
+}) {
+  const firstInitial = firstName.trim().charAt(0);
+  const lastInitial = lastName.trim().charAt(0);
+  const initials = `${firstInitial}${lastInitial}`.toUpperCase() || "M";
+
   return (
     <div
-      className={`flex items-center justify-center bg-[linear-gradient(145deg,#17496d,#0b2f4d)] text-[10px] font-bold uppercase tracking-[0.18em] text-white/55 ${className}`}
+      className={`flex items-center justify-center bg-[linear-gradient(145deg,#17496d,#0b2f4d)] text-lg font-bold uppercase text-white ${className}`}
     >
-      NO IMAGE
+      {initials}
     </div>
   );
 }
@@ -376,7 +388,7 @@ export default function Mymentors() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [pastorUserId, setPastorUserId] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-
+const menuRef = useRef<HTMLDivElement | null>(null);
   const [scheduleDrawerOpen, setScheduleDrawerOpen] = useState(false);
 const [mentorToSchedule, setMentorToSchedule] = useState<Mentor | null>(null);
 
@@ -484,7 +496,19 @@ if (raw && typeof raw === "object" && ("_id" in raw || "id" in raw)) {
       }),
     );
   }, [searchText, mentors]);
+useEffect(() => {
+  const handleClickOutside = (event: MouseEvent) => {
+    if (
+      menuRef.current &&
+      !menuRef.current.contains(event.target as Node)
+    ) {
+      setOpenMenuId(null);
+    }
+  };
 
+  document.addEventListener("mousedown", handleClickOutside);
+  return () => document.removeEventListener("mousedown", handleClickOutside);
+}, []);
   return (
     <div className="min-h-screen flex flex-col relative bg-[#062946] text-white font-[Albert_Sans]">
       <PastorHeader showFullHeader={true} />
@@ -545,10 +569,16 @@ if (raw && typeof raw === "object" && ("_id" in raw || "id" in raw)) {
               const img = getMentorImage(mentor, mentorImages[i % mentorImages.length]);
 
               return (
-                <div
-                  key={mentor._id}
-                  className="flex flex-col items-center shrink-0"
-                >
+                // <div
+                //   key={mentor._id}
+                //   className="flex flex-col items-center shrink-0"
+                // >
+                <button
+  key={mentor._id}
+  type="button"
+  onClick={() => void fetchMentorDetail(mentor)}
+  className="flex shrink-0 flex-col items-center"
+>
              <div className="w-[72px] h-[72px] p-[2px] rounded-full bg-[linear-gradient(145deg,#8ec5eb,#9c7cff)]">
   {mentor.profilePicture?.trim() ? (
     <Image
@@ -560,14 +590,18 @@ if (raw && typeof raw === "object" && ("_id" in raw || "id" in raw)) {
       className="h-full w-full rounded-full border border-[#062946] object-cover"
     />
   ) : (
-    <NoImageBox className="h-full w-full rounded-full border border-[#062946]" />
+    <NoImageBox
+      firstName={mentor.firstName}
+      lastName={mentor.lastName}
+      className="h-full w-full rounded-full border border-[#062946]"
+    />
   )}
 </div>
 
 <p className="text-xs text-white mt-2 whitespace-nowrap">
   {mentor.firstName}
 </p>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -598,14 +632,30 @@ const whatsappPhone = phone?.replace(/[^\d+]/g, "");
                   onClick={() => void fetchMentorDetail(mentor)}
                   className="cursor-pointer bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] border border-white/15 rounded-xl p-4 shadow flex items-center gap-4 hover:shadow-lg hover:border-[#8ec5eb66] transition"
                 >
-                 <Image
+                 {/* <Image
   src={img}
   alt=""
   unoptimized={typeof img === "string"}
   width={65}
   height={65}
   className="w-[65px] h-[65px] rounded-lg object-cover"
-/>
+/> */}
+{mentor.profilePicture?.trim() ? (
+  <Image
+    src={mentor.profilePicture}
+    alt={`${mentor.firstName} ${mentor.lastName}`}
+    unoptimized
+    width={65}
+    height={65}
+    className="w-[65px] h-[65px] rounded-lg object-cover"
+  />
+) : (
+  <NoImageBox
+    firstName={mentor.firstName}
+    lastName={mentor.lastName}
+    className="w-[65px] h-[65px] rounded-lg"
+  />
+)}
                   <div className="flex-1">
                     <h4 className="font-semibold text-white">
                       {mentor.firstName} {mentor.lastName}
@@ -617,10 +667,46 @@ const whatsappPhone = phone?.replace(/[^\d+]/g, "");
                   </div>
 
                   <div className="flex gap-4 text-[#8ec5eb] text-sm">
-                    <i className="fa-regular fa-envelope"></i>
+                    {/* <i className="fa-regular fa-envelope"></i>
                     <i className="fa-regular fa-comment"></i>
                     <i className="fa-solid fa-phone"></i>
-                    <i className="fa-brands fa-whatsapp"></i>
+                    <i className="fa-brands fa-whatsapp"></i> */}
+                    {mentor.email ? (
+  <a href={`mailto:${mentor.email}`} onClick={(e) => e.stopPropagation()}>
+    <i className="fa-regular fa-envelope" />
+  </a>
+) : (
+  <i className="fa-regular fa-envelope opacity-40 cursor-not-allowed" />
+)}
+
+{phone ? (
+  <a href={`sms:${phone}`} onClick={(e) => e.stopPropagation()}>
+    <i className="fa-regular fa-comment" />
+  </a>
+) : (
+  <i className="fa-regular fa-comment opacity-40 cursor-not-allowed" />
+)}
+
+{phone ? (
+  <a href={`tel:${phone}`} onClick={(e) => e.stopPropagation()}>
+    <i className="fa-solid fa-phone" />
+  </a>
+) : (
+  <i className="fa-solid fa-phone opacity-40 cursor-not-allowed" />
+)}
+
+{whatsappPhone ? (
+  <a
+    href={`https://wa.me/${whatsappPhone.replace("+", "")}`}
+    target="_blank"
+    rel="noopener noreferrer"
+    onClick={(e) => e.stopPropagation()}
+  >
+    <i className="fa-brands fa-whatsapp" />
+  </a>
+) : (
+  <i className="fa-brands fa-whatsapp opacity-40 cursor-not-allowed" />
+)}
 
                     {/* <button className="w-7 h-7 border border-white/35 rounded flex items-center justify-center hover:bg-white/15 hover:text-white">
                       <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
@@ -649,7 +735,7 @@ const whatsappPhone = phone?.replace(/[^\d+]/g, "");
 }}
                   className="relative cursor-pointer bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] border border-white/15 rounded-xl shadow hover:shadow-lg hover:-translate-y-0.5 hover:border-[#8ec5eb66] transition-all duration-300 flex flex-col"
                 >
-                  <div className="absolute right-3 top-3 z-20">
+                 <div ref={menuRef} className="absolute right-3 top-3 z-20">
   <button
     type="button"
     onClick={(e) => {
@@ -689,7 +775,11 @@ setScheduleDrawerOpen(true);
       className="object-cover"
     />
   ) : (
-    <NoImageBox className="h-full w-full" />
+    <NoImageBox
+      firstName={mentor.firstName}
+      lastName={mentor.lastName}
+      className="h-full w-full"
+    />
   )}
 </div>
 
@@ -816,7 +906,11 @@ setScheduleDrawerOpen(true);
     className="h-[120px] w-[120px] rounded-lg object-cover"
   />
 ) : (
-  <NoImageBox className="h-[120px] w-[120px] rounded-lg" />
+  <NoImageBox
+    firstName={selectedMentor.firstName}
+    lastName={selectedMentor.lastName}
+    className="h-[120px] w-[120px] rounded-lg"
+  />
 )}
 
               <div className="text-center">
