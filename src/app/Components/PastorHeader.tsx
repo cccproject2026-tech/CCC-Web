@@ -120,6 +120,7 @@ function PastorHeaderComponent({ showFullHeader = false }: { showFullHeader?: bo
         setShowNotifications(false);
         setShowProfileMenu(false);
         setShowSettingsMenu(false);
+        setShowSearch(false);
       }
 
       // Check if click is outside mobile menu area

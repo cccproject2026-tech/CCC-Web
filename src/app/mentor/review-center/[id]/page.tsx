@@ -1234,12 +1234,23 @@ const isPastOrFinished = (appointment: any) => {
   const status = getStatus(appointment);
   const end = getEndTime(appointment);
 
+  // return (
+  //   status === "completed" ||
+  //   status === "missed" ||
+  //   status === "cancelled" ||
+  //   (Number.isFinite(end) && end < now)
+  // );
   return (
+  Number.isFinite(end) &&
+  end < now &&
+  (
     status === "completed" ||
     status === "missed" ||
     status === "cancelled" ||
-    (Number.isFinite(end) && end < now)
-  );
+    status === "scheduled" ||
+    status === "rescheduled"
+  )
+);
 };
 
 const endedAppointments = pastorAppointments

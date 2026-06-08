@@ -608,7 +608,7 @@ const res = await apiGetAssignedUsers(pastorId);
   return (
     <div className={pastorPageRoot}>
  
-\
+
 <PastorHeader showFullHeader={true} />
 
 <main className={`${pastorMainGradient} min-h-screen`}>
@@ -818,7 +818,7 @@ Development
             </div>
           </section>
 
-          <section className="mt-6">
+          {/* <section className="mt-6">
             <div
               className={`flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6 ${pastorFocusGlass}`}
             >
@@ -828,19 +828,7 @@ Development
                 </div>
                 <div>
                   <h3 className="text-base font-semibold sm:text-lg">Need a Help?</h3>
-                  {/* <p className="mt-1 text-sm text-[#cde2f2]">
-                    {(() => {
-                      if (!nextAppointment) {
-                        return "We've got simple steps to help you move forward.";
-                      }
-                      const raw = appointmentMeetingDate(nextAppointment);
-                      const d = raw ? new Date(raw) : null;
-                      if (!d || Number.isNaN(d.getTime())) {
-                        return "We've got simple steps to help you move forward.";
-                      }
-                      return `Next: ${d.toLocaleString()}`;
-                    })()}
-                  </p> */}
+               
                   <p className="mt-1 text-sm text-[#cde2f2]">
   We&apos;ve got simple steps to help you move forward.
 </p>
@@ -865,7 +853,7 @@ Development
 </button>
               </div>
             </div>
-          </section>
+          </section> */}
 
           <section className="mt-6">
             <div className={`p-5 sm:p-6 ${pastorFocusGlass}`}>
@@ -894,6 +882,44 @@ Development
               </div>
             </div>
           </section>
+
+            <section className="mt-6">
+            <div
+              className={`flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6 ${pastorFocusGlass}`}
+            >
+              <div className="flex flex-1 items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10">
+                  <i className="fa-solid fa-book-open text-[#8ec5eb]" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold sm:text-lg">Need a Help?</h3>
+               
+                  <p className="mt-1 text-sm text-[#cde2f2]">
+  We&apos;ve got simple steps to help you move forward.
+</p>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2 sm:gap-3">
+                <Link
+                  href="/pastor/help"
+                  prefetch
+                  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium backdrop-blur-sm transition hover:bg-white/15"
+                >
+                  <i className="fa-regular fa-circle-question text-[#8ec5eb]" />
+                  Help
+                </Link>
+               <button
+  type="button"
+  onClick={openAssignedMentorModal}
+  className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium backdrop-blur-sm transition hover:bg-white/15"
+>
+  <i className="fa-solid fa-phone text-[#8ec5eb]" />
+  Call Mentor
+</button>
+              </div>
+            </div>
+          </section>
+
 
           {(loadingMentors || mentorsError || roadmaps.length === 0) && (
             <div className="mt-5 text-xs text-[#cde2f2]">
