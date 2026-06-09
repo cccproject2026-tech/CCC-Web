@@ -1000,7 +1000,17 @@ useEffect(() => {
           </button>
         </div>
       </div>
-      <div ref={certificatePreviewRef}>
+      {/* <div ref={certificatePreviewRef}> */}
+      <div
+  ref={certificatePreviewRef}
+  className="mx-auto"
+  style={{
+    width: "1123px",
+    height: "794px",
+    background: "#ffffff",
+    overflow: "hidden",
+  }}
+>
         <CertificatePreview
           pastorName={certificate.pastorName || fullName}
           completionDate={certificate.completionDate || completionDate}

@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import MentorHeader from "@/app/Components/MentorHeader";
+
+
 import Image from "next/image";
 import Link from "next/link";
 import Cookies from "js-cookie";
 import UserProfile from "@/app/Assets/user-profile.png";
-import { apiGetAssignedUsers } from "@/app/Services/api";
+import { apiGetAssignedUsers, apiGetRoadmapSubmissionActivity } from "@/app/Services/api";
 import {
   apiGetAssessments,
   apiGetAssignedAssessments,
@@ -38,14 +40,18 @@ import {
 type ReviewCenterCounts = {
   resubmittedTaskCount: number;
   todaysMeetingCount: number;
+  totalRoadmapCount: number;
   assessmentWaitingCount: number;
+  notStartedRoadmapCount: number;
   badgeCount: number;
 };
 
 const emptyCounts: ReviewCenterCounts = {
   resubmittedTaskCount: 0,
   todaysMeetingCount: 0,
+  totalRoadmapCount: 0,
   assessmentWaitingCount: 0,
+  notStartedRoadmapCount: 0,
   badgeCount: 0,
 };
 
@@ -333,12 +339,51 @@ async function loadAssessmentCounts(pastorId: string) {
   };
 }
 
+// async function loadRoadmapCounts(pastorId: string) {
+//   const roadmaps = await fetchMergedRoadmapsForAssignedUser(pastorId);
+//   const rows = roadmapTaskRows(roadmaps);
+//   return {
+//     resubmittedTaskCount: countUnique(rows, isRoadmapResubmitted),
+//   };
+// }
+const formatLocalDate = (date: Date) =>
+  [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+  async function loadResubmittedActivityCount(pastorId: string) {
+  const today = formatLocalDate(new Date());
+
+  const res = await apiGetRoadmapSubmissionActivity(
+    pastorId,
+    today,
+    today,
+  );
+
+  const rows = Array.isArray(res.data?.data) ? res.data.data : [];
+
+  return rows.filter((activity: any) => activity?.isResubmission === true).length;
+}
 async function loadRoadmapCounts(pastorId: string) {
   const roadmaps = await fetchMergedRoadmapsForAssignedUser(pastorId);
   const rows = roadmapTaskRows(roadmaps);
+
+  // return {
+  //   resubmittedTaskCount: countUnique(rows, isRoadmapResubmitted),
+  //   notStartedRoadmapCount: countUnique(rows, (row) => {
+  //     const status = normalizeStatus(row?.status ?? row?.submissionStatus ?? row?.reviewStatus);
+  //     return status === "not_started" || status === "notstarted" || status === "";
+  //   }),
+  // };
   return {
-    resubmittedTaskCount: countUnique(rows, isRoadmapResubmitted),
-  };
+  resubmittedTaskCount: await loadResubmittedActivityCount(pastorId),
+  totalRoadmapCount: rows.length,
+  notStartedRoadmapCount: countUnique(rows, (row) => {
+    const status = normalizeStatus(row?.status ?? row?.submissionStatus ?? row?.reviewStatus);
+    return status === "not_started" || status === "notstarted" || status === "";
+  }),
+};
 }
 
 async function loadTodaysMeetingCount(pastorId: string) {
@@ -386,16 +431,27 @@ async function loadPastorReviewCounts(pastorId: string): Promise<ReviewCenterCou
       loadRoadmapCounts(pastorId),
       loadTodaysMeetingCount(pastorId),
     ]);
+    // const badgeCount =
+    //   roadmapCounts.resubmittedTaskCount +
+    //   todaysMeetingCount +
+    //   assessmentCounts.assessmentWaitingCount;
     const badgeCount =
-      roadmapCounts.resubmittedTaskCount +
-      todaysMeetingCount +
-      assessmentCounts.assessmentWaitingCount;
+  roadmapCounts.resubmittedTaskCount +
+  roadmapCounts.notStartedRoadmapCount;
+    // return {
+    //   resubmittedTaskCount: roadmapCounts.resubmittedTaskCount,
+    //   todaysMeetingCount,
+    //   assessmentWaitingCount: assessmentCounts.assessmentWaitingCount,
+    //   badgeCount,
+    // };
     return {
-      resubmittedTaskCount: roadmapCounts.resubmittedTaskCount,
-      todaysMeetingCount,
-      assessmentWaitingCount: assessmentCounts.assessmentWaitingCount,
-      badgeCount,
-    };
+  resubmittedTaskCount: roadmapCounts.resubmittedTaskCount,
+  notStartedRoadmapCount: roadmapCounts.notStartedRoadmapCount,
+  todaysMeetingCount,
+  assessmentWaitingCount: assessmentCounts.assessmentWaitingCount,
+  totalRoadmapCount: roadmapCounts.totalRoadmapCount,
+  badgeCount,
+};
   } catch (error) {
     console.warn("Failed to load review center counts", { pastorId, error });
     return emptyCounts;
@@ -562,7 +618,7 @@ const filteredMentees = useMemo(() => {
                     </div>
 
                     <p className="mt-0.5 truncate text-xs text-[#cde2f2]/65">
-                      {counts.resubmittedTaskCount} resubmitted tasks · {counts.todaysMeetingCount} today meetings · {counts.assessmentWaitingCount} assessment waiting
+{counts.resubmittedTaskCount} resubmitted roadmap · {counts.totalRoadmapCount} roadmaps assigned · {counts.notStartedRoadmapCount} not started
                     </p>
                   </div>
 

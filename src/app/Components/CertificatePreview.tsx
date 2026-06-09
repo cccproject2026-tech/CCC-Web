@@ -36,21 +36,32 @@ export async function downloadCertificatePreviewPdf(
       import("html2canvas"),
       import("jspdf"),
     ]);
-    const canvas = await html2canvas(previewElement, {
-      backgroundColor: "#ffffff",
-      scale: 2,
-      useCORS: true,
-    });
-    const imageData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF({
-      orientation: "landscape",
-      unit: "px",
-      format: [canvas.width, canvas.height],
-    });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
+    // const canvas = await html2canvas(previewElement, {
+    //   backgroundColor: "#ffffff",
+    //   scale: 2,
+    //   useCORS: true,
+    // });
+    // const imageData = canvas.toDataURL("image/png");
+    // const pdf = new jsPDF({
+    //   orientation: "landscape",
+    //   unit: "px",
+    //   format: [canvas.width, canvas.height],
+    // });
+    // const pageWidth = pdf.internal.pageSize.getWidth();
+    // const pageHeight = pdf.internal.pageSize.getHeight();
 
-    pdf.addImage(imageData, "PNG", 0, 0, pageWidth, pageHeight);
+    // pdf.addImage(imageData, "PNG", 0, 0, pageWidth, pageHeight);
+const canvas = await html2canvas(previewElement, {
+  backgroundColor: "#ffffff",
+  scale: 3,
+  useCORS: true,
+});
+
+const imageData = canvas.toDataURL("image/png");
+
+const pdf = new jsPDF("l", "mm", [140.2, 112.2]);
+
+pdf.addImage(imageData, "PNG", 0, 0, 140.2, 112.2);
     pdf.save(`${text(certificateId, "certificate")}.pdf`);
   } catch (error) {
     console.error("Failed to generate certificate preview PDF", error);
@@ -69,7 +80,11 @@ export default function CertificatePreview({
   className = "",
 }: CertificatePreviewProps) {
   return (
-    <div id="certificate-preview" className={`relative mx-auto aspect-[1402/1122] max-h-[78vh] w-full max-w-[97.5vh] overflow-hidden bg-white ${className}`}>
+    // <div id="certificate-preview" className={`relative mx-auto aspect-[1402/1122] max-h-[78vh] w-full max-w-[97.5vh] overflow-hidden bg-white ${className}`}>
+    <div
+  id="certificate-preview"
+  className={`relative mx-auto aspect-[1402/1122] w-full max-w-[1100px] overflow-hidden bg-white ${className}`}
+>
       <Image
         src={CertificateTemplate}
         alt="Completion certificate preview"

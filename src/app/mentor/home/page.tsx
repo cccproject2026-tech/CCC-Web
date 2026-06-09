@@ -5,7 +5,8 @@ import HeroBg from "../../Assets/hero-bg.png";
 import UserProfile from "../../Assets/user-profile.png";
 import MapImg from "../../Assets/map-placeholder.png";
 import { useRouter } from "next/navigation";
-import { apiGetAssignedUsers, apiGetMentorAppointments, apiGetMentorSchedule } from "@/app/Services/api";
+import { apiGetAssignedUsers, apiGetMentorAppointments, apiGetMentorSchedule, apiGetRoadmapSubmissionActivity } from "@/app/Services/api";
+import { fetchMergedRoadmapsForAssignedUser, unwrapNestedRoadmapsArray } from "@/app/Services/roadmap-assignments";
 import { unwrapAppointmentsAxiosData } from "@/app/Services/appointment-utils";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { getGreeting } from "@/app/Services/utils/helpers";
@@ -71,10 +72,40 @@ const quickLinks = [
     route: "/mentor/TrackProgress",
   },
 ];
+const formatLocalDate = (date: Date) =>
+  [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
 
+const normalizeStatus = (value: unknown) =>
+  String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+
+async function pastorNeedsReviewAttention(pastorId: string) {
+  const today = formatLocalDate(new Date());
+
+  const activityRes = await apiGetRoadmapSubmissionActivity(pastorId, today, today);
+  const activityRows = Array.isArray(activityRes.data?.data) ? activityRes.data.data : [];
+
+  const hasResubmitted = activityRows.some(
+    (row: any) => row?.isResubmission === true,
+  );
+
+  const roadmaps = await fetchMergedRoadmapsForAssignedUser(pastorId);
+  const hasNotStarted = roadmaps.some((roadmap: any) =>
+    unwrapNestedRoadmapsArray(roadmap).some((task: any) => {
+      const status = normalizeStatus(task?.status ?? task?.submissionStatus ?? task?.reviewStatus);
+      return status === "" || status === "not_started" || status === "notstarted";
+    }),
+  );
+
+  return hasResubmitted || hasNotStarted;
+}
 export default function MentorHomePage() {
   const router = useRouter();
   const [mentees, setMentees] = useState<any[]>([]);
+  const [reviewCenterAttentionCount, setReviewCenterAttentionCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [scheduleList, setScheduleList] = useState<any[]>([]);
   const [mentorUser, setMentorUser] = useState<ReturnType<typeof getMentorFromCookie>>(null);
@@ -179,8 +210,21 @@ export default function MentorHomePage() {
           return;
         }
         const res = await apiGetAssignedUsers(String(uid));
+        // const raw = res.data?.data;
+        // setMentees(Array.isArray(raw) ? raw : []);
         const raw = res.data?.data;
-        setMentees(Array.isArray(raw) ? raw : []);
+const assigned = Array.isArray(raw) ? raw : [];
+
+setMentees(assigned);
+const attentionFlags = await Promise.all(
+  assigned.map(async (pastor: any) => {
+    const pastorId = String(pastor?._id ?? pastor?.id ?? "").trim();
+    if (!pastorId) return false;
+    return pastorNeedsReviewAttention(pastorId);
+  }),
+);
+
+setReviewCenterAttentionCount(attentionFlags.filter(Boolean).length);
       } catch (error) {
         console.error("Error fetching mentor home data:", error);
         setMentees([]);
@@ -512,9 +556,20 @@ const currentDate = new Date().toLocaleDateString("en-US", {
               </span>
               <i className="fa-solid fa-chevron-right text-[10px] text-emerald-100/80" />
             </span> */}
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center self-start rounded-lg border border-emerald-300/30 bg-emerald-400/15 text-emerald-100 sm:self-center">
+            {/* <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center self-start rounded-lg border border-emerald-300/30 bg-emerald-400/15 text-emerald-100 sm:self-center">
   <i className="fa-solid fa-chevron-right text-sm text-emerald-100/90" />
-</span>
+</span> */}
+<div className="relative self-start sm:self-center">
+  {reviewCenterAttentionCount > 0 && (
+    <span className="absolute -right-2 -top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-black text-white">
+      {reviewCenterAttentionCount}
+    </span>
+  )}
+
+  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-emerald-300/30 bg-emerald-400/15 text-emerald-100">
+    <i className="fa-solid fa-chevron-right text-sm text-emerald-100/90" />
+  </span>
+</div>
           </Link>
         </section>
         {/* Quick Links — same card pattern as mobile (title row + four tiles); no extra subtitle */}

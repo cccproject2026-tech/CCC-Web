@@ -173,6 +173,13 @@ const attentionItems = [
     description: "Sessions scheduled for today",
     tone: "border-emerald-300/30 bg-emerald-400/15 text-emerald-100",
   },
+  {
+  icon: "fa-regular fa-circle-play",
+  title: "Not Started Tasks",
+  count: 0,
+  description: "Roadmap tasks not yet started",
+  tone: "border-red-300/30 bg-red-400/15 text-red-200",
+},
 ];
 
 const getMentorFromCookie = () => {
@@ -615,6 +622,8 @@ export default function MentorReviewCenterDetailPage() {
   const [showMissedMeetings, setShowMissedMeetings] = useState(false);
   const [showRescheduledMeetings, setShowRescheduledMeetings] = useState(false);
   const [showWeeklyAssessments, setShowWeeklyAssessments] = useState(false);
+  const [showNotStartedTasks, setShowNotStartedTasks] = useState(false);
+const [notStartedRoadmaps, setNotStartedRoadmaps] = useState<any[]>([]);
 const [showWeeklyRoadmaps, setShowWeeklyRoadmaps] = useState<
   "new" | "resubmitted" | null
 >(null);
@@ -946,7 +955,54 @@ const loadRoadmapProgressRows = async () => {
     setRoadmapProgressRows([]);
   }
 };
+const loadNotStartedTasks = async () => {
+  try {
+    const roadmaps = await fetchMergedRoadmapsForAssignedUser(
+      String(pastorId)
+    );
 
+    const grouped = roadmaps
+      .map((roadmap: any) => {
+        const roadmapName = String(
+          roadmap?.name ??
+          roadmap?.title ??
+          roadmap?.parentRoadmapName ??
+          "Roadmap"
+        );
+
+        const tasks = unwrapNestedRoadmapsArray(roadmap);
+
+        const notStartedTasks = tasks.filter((task: any) => {
+          const status = String(
+            task?.status ??
+            task?.submissionStatus ??
+            task?.reviewStatus ??
+            ""
+          )
+            .toLowerCase()
+            .trim();
+
+          return (
+            status === "" ||
+            status === "not_started" ||
+            status === "not started" ||
+            status === "notstarted"
+          );
+        });
+
+        return {
+          roadmapName,
+          tasks: notStartedTasks,
+        };
+      })
+      .filter((group) => group.tasks.length > 0);
+
+    setNotStartedRoadmaps(grouped);
+  } catch (error) {
+    console.error("Failed to load not started tasks", error);
+    setNotStartedRoadmaps([]);
+  }
+};
 const loadMentorshipSessionCard = async () => {
   try {
     const res = await apiGetPastorMentoringSessions(String(pastorId));
@@ -1056,8 +1112,10 @@ if (pastorId) {
   void loadProgressStats();
   void loadRoadmapActivity();
   void loadRoadmapProgressRows();
+  
   void loadMentorshipSessionCard();
   void loadQueriesAndComments();
+  void loadNotStartedTasks();
 }
     if (!mentorId || !pastorId) {
       setLoading(false);
@@ -1521,8 +1579,8 @@ const roadmapModalTitle =
         </header>
 
         <section className={`mb-5 overflow-hidden ${mentorGlassCardFrost}`}>
-          <div className="flex flex-col lg:flex-row lg:items-stretch">
-            <div className="flex min-w-0 items-center gap-3 p-4 lg:w-[235px] lg:shrink-0">
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(260px,1.4fr)_minmax(180px,1fr)_minmax(180px,1fr)]">
+            <div className="flex min-w-0 items-center gap-3 p-4">
               <Image
                 src={pastor.profilePicture || UserProfile}
                 alt={pastorName}
@@ -1556,131 +1614,47 @@ const roadmapModalTitle =
               </div>
             </div>
 
-            <div className="grid flex-1 grid-cols-2 border-t border-white/10 sm:grid-cols-5 lg:border-l lg:border-t-0">
-              <div className="flex items-center gap-2 border-b border-r border-white/10 p-3 sm:border-b-0">
-                <div
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
-                  style={{
-                    background: `conic-gradient(#3498DB ${roadmapPercent}%, rgba(255,255,255,0.12) 0)`,
-                  }}
-                >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0a2945] text-[11px] font-black text-white">
-                    {Math.round(roadmapPercent)}%
-                  </div>
-                </div>
-                <div>
-                  <p className="text-[11px] text-[#cde2f2]/65">
-                    Roadmap Progress
-                  </p>
-                  <p className="mt-1 text-xs font-bold text-emerald-200">
-                    On Track
-                  </p>
+            <div className="flex items-center justify-center gap-3 border-t border-white/10 p-4 text-center lg:border-l lg:border-t-0">
+              <div
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
+                style={{
+                  background: `conic-gradient(#3498DB ${roadmapPercent}%, rgba(255,255,255,0.12) 0)`,
+                }}
+              >
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0a2945] text-[11px] font-black text-white">
+                  {Math.round(roadmapPercent)}%
                 </div>
               </div>
-              {/* <div className="border-b border-r border-white/10 p-3 sm:border-b-0">
+              <div>
                 <p className="text-[11px] text-[#cde2f2]/65">
-                  Assessments Completed
+                  Roadmap Progress
                 </p>
-                <p className="mt-2 text-lg font-black text-white">4/6</p>
-                <p className="text-xs font-bold text-amber-100">
-                  2 Pending Review
+                <p className="mt-1 text-xs font-bold text-emerald-200">
+                  On Track
                 </p>
-              </div> */}
-              <Link
-  href={`/mentor/MentorAssessments?menteeId=${encodeURIComponent(String(pastorId))}`}
-  className="flex flex-col items-center justify-center border-b border-r border-white/10 p-3 text-center transition hover:bg-white/[0.05] sm:border-b-0"
->
-  <p className="text-[11px] text-[#cde2f2]/65">
-    Assessments Completed
-  </p>
-
-  <span
-    className="mt-2 flex h-12 w-12 items-center justify-center rounded-full"
-    style={assessmentCircleStyle}
-  >
-    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0a2945] text-[11px] font-black text-white">
-      {assessmentCompleted}/{assessmentTotal || 0}
-    </span>
-  </span>
-
-  <p className="mt-2 text-xs font-bold text-amber-100">
-    {assessmentPendingReview} Pending Review
-  </p>
-</Link>
-              {/* <div className="border-b border-r border-white/10 p-3 sm:border-b-0">
-                <p className="text-[11px] text-[#cde2f2]/65">Last Meeting</p>
-                <p className="mt-2 text-sm font-black text-white">12 days ago</p>
-                <p className="text-xs font-bold text-red-200">Overdue</p>
-              </div> */}
-              <Link
-  href={
-  lastMeeting
-    ? `/mentor/MentorSchedule/${lastMeeting._id ?? lastMeeting.id}`
-    : "#"
-}
-  className="flex flex-col items-center justify-center border-b border-r border-white/10 p-3 text-center transition hover:bg-white/[0.05] sm:border-b-0"
->
-  <p className="text-[11px] text-[#cde2f2]/65">Last Meeting</p>
-  <span className="mt-2 flex h-10 w-10 items-center justify-center rounded-full bg-sky-400/15 text-[#8ec5eb]">
-    <i className="fa-regular fa-calendar-check text-sm" />
-  </span>
-  <p className="mt-2 text-sm font-black text-white">
-    {lastMeeting ? formatNextMeetingMain(lastMeeting.meetingDate) : "N/A"}
-  </p>
-  <p className="text-xs font-bold text-red-200">
-    {lastMeeting
-  ? `${formatMeetingTime(lastMeeting.meetingDate)} · ${
-      isLastMeetingCancelled ? "Cancelled" : "Finished"
-    }`
-  : "No finished meeting"}
-  </p>
-</Link>
-              {/* <div className="border-r border-white/10 p-3">
-                <p className="text-[11px] text-[#cde2f2]/65">Next Meeting</p>
-                <p className="mt-2 text-sm font-black text-white">
-                  May 31, 2026
-                </p>
-                <p className="text-xs font-bold text-sky-100">In 3 days</p>
-              </div> */}
-              <Link
-  href={
-  nextMeeting
-    ? `/mentor/MentorSchedule/${nextMeeting._id ?? nextMeeting.id}`
-    : "#"
-}
-  className="flex flex-col items-center justify-center border-r border-white/10 p-3 text-center transition hover:bg-white/[0.05]"
->
-  <p className="text-[11px] text-[#cde2f2]/65">Next Meeting</p>
-  <span className="mt-2 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-200">
-    <i className="fa-regular fa-calendar-plus text-sm" />
-  </span>
-  <p className="mt-2 text-sm font-black text-white">
-    {nextMeeting
-  ? isNextMeetingOngoing
-    ? "Ongoing now"
-    : formatNextMeetingMain(nextMeeting.meetingDate)
-  : "N/A"}
-  </p>
-  <p className="text-xs font-bold text-sky-100">
-   {/* {nextMeeting
-  ? `${daysUntil(nextMeeting.meetingDate)} · ${formatMeetingTime(nextMeeting.meetingDate)}`
-  : "No upcoming meeting"} */}
-  {nextMeeting
-  ? isNextMeetingOngoing
-    ? `${formatMeetingTime(nextMeeting.meetingDate)} – ${formatMeetingTime(nextMeeting.endTime)}`
-    : `${daysUntil(nextMeeting.meetingDate)} · ${formatMeetingTime(nextMeeting.meetingDate)}`
-  : "No current meeting"}
-  </p>
-</Link>
-             <div className="flex flex-col items-center justify-center p-3 text-center">
-  <p className="text-[11px] text-[#cde2f2]/65">Last Login</p>
-  <span className="mt-2 flex h-10 w-10 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-200">
-    <i className="fa-regular fa-user text-sm" />
-  </span>
-  <p className="mt-2 text-sm font-black text-white">N/A</p>
-  <p className="text-xs font-bold text-[#cde2f2]/70">No login data</p>
-</div>
+              </div>
             </div>
+            <Link
+              href={`/mentor/MentorAssessments?menteeId=${encodeURIComponent(String(pastorId))}`}
+              className="flex flex-col items-center justify-center border-t border-white/10 p-4 text-center transition hover:bg-white/[0.05] lg:border-l lg:border-t-0"
+            >
+              <p className="text-[11px] text-[#cde2f2]/65">
+                Assessments Completed
+              </p>
+
+              <span
+                className="mt-2 flex h-12 w-12 items-center justify-center rounded-full"
+                style={assessmentCircleStyle}
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#0a2945] text-[11px] font-black text-white">
+                  {assessmentCompleted}/{assessmentTotal || 0}
+                </span>
+              </span>
+
+              <p className="mt-2 text-xs font-bold text-amber-100">
+                {assessmentPendingReview} Pending Review
+              </p>
+            </Link>
           </div>
         </section>
 
@@ -1688,8 +1662,18 @@ const roadmapModalTitle =
           <h2 className="mb-3 text-sm font-extrabold uppercase tracking-[0.16em] text-[#cde2f2]/75">
             Attention Required
           </h2>
-          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {attentionItems.map((item) => (
+          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+            {attentionItems
+              .filter((item) =>
+                [
+                  "Pastor Resubmitted Tasks",
+                  "New Roadmap Submissions",
+                  "New Assessment Submissions",
+                      "Not Started Tasks",
+
+                ].includes(item.title),
+              )
+              .map((item) => (
               // <button
               //   key={item.title}
               //   type="button"
@@ -1700,6 +1684,9 @@ const roadmapModalTitle =
   type="button"
   onClick={() => {
     if (item.title === "Missed Meetings") setShowMissedMeetings(true);
+    if (item.title === "Not Started Tasks") {
+  setShowNotStartedTasks(true);
+}
     if (item.title === "Rescheduled Meetings") {
       setShowRescheduledMeetings(true);
     }
@@ -1736,7 +1723,12 @@ const roadmapModalTitle =
                               ? todayMeetings.length
                               : item.title === "New Assessment Submissions"
                                 ? weeklyAssessmentSubmissions.length
-                                : item.count}
+                               : item.title === "Not Started Tasks"
+  ? notStartedRoadmaps.reduce(
+      (total, roadmap) => total + roadmap.tasks.length,
+      0
+    )
+  : item.count}
                   </span>
                   <span className="mt-1.5 block text-[11px] font-bold leading-tight text-white">
                     {item.title}
@@ -1751,30 +1743,7 @@ const roadmapModalTitle =
           </div>
         </section>
 
-        <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Panel title="Mentorship Sessions" icon="fa-regular fa-calendar">
-  <div className="flex-1">
-  <DetailRow label="Last Session" value={mentorshipSessionCard.lastSession} />
-  <DetailRow label="Next Session" value={mentorshipSessionCard.nextSession} />
-  <DetailRow label="Sessions Completed" value={mentorshipSessionCard.sessionsCompleted} />
-  <DetailRow
-    label="Status"
-    value={mentorshipSessionCard.status}
-    valueClassName={mentorshipSessionStatusClass(mentorshipSessionCard.status)}
-  />
-  </div>
-
-  <button
-    type="button"
-    onClick={() =>
-      router.push(`/mentor/mentoring-session?pastorId=${encodeURIComponent(String(pastorId))}`)
-    }
-    className="mt-auto inline-flex items-center gap-2 pt-4 text-xs font-bold text-[#8ec5eb] transition hover:text-white"
-  >
-    View sessions
-    <i className="fa-solid fa-arrow-right text-[10px]" />
-  </button>
-</Panel>
+        <div className="mb-5 grid gap-3 md:grid-cols-2">
           <Panel title="Roadmap Progress" icon="fa-solid fa-road">
             <div className="flex-1">
             {roadmapProgressRows.length > 0 ? (
@@ -1839,28 +1808,6 @@ const roadmapModalTitle =
     <i className="fa-solid fa-arrow-right text-[10px]" />
   </button>
 </Panel>
-          <Panel
-            title="Queries and Comments"
-            icon="fa-regular fa-comments"
-          >
-            <div className="flex-1">
-            <DetailRow
-              label="Unanswered Queries"
-              value={String(unansweredQueryCount)}
-            />
-            <DetailRow label="Total Queries" value={String(queryRows.length)} />
-            <DetailRow label="Total Comments" value={String(commentRows.length)} />
-            <DetailRow label="Total Messages" value={String(queryCommentRows.length)} />
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowQueriesCommentsModal(true)}
-              className="mt-auto inline-flex items-center gap-2 pt-4 text-xs font-bold text-[#8ec5eb] transition hover:text-white"
-            >
-              View all messages
-              <i className="fa-solid fa-arrow-right text-[10px]" />
-            </button>
-          </Panel>
         </div>
 
 {showQueriesCommentsModal && (
@@ -1958,6 +1905,50 @@ const roadmapModalTitle =
             </p>
           </div>
         )}
+      </div>
+    </div>
+  </div>
+)}
+{showNotStartedTasks && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+    <div className={`w-full max-w-3xl p-5 ${mentorGlassCardFrost}`}>
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-lg font-extrabold text-white">
+          Not Started Tasks
+        </h3>
+
+        <button
+          onClick={() => setShowNotStartedTasks(false)}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10"
+        >
+          <i className="fa-solid fa-xmark text-white" />
+        </button>
+      </div>
+
+      <div className="max-h-[500px] overflow-y-auto space-y-4">
+        {notStartedRoadmaps.map((group) => (
+          <div
+            key={group.roadmapName}
+            className="rounded-2xl border border-white/10 bg-white/[0.05] p-4"
+          >
+            <h4 className="mb-3 text-sm font-bold text-[#8ec5eb]">
+              {group.roadmapName}
+            </h4>
+
+            <div className="space-y-2">
+              {group.tasks.map((task: any) => (
+                <div
+                  key={task._id || task.id}
+                  className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2"
+                >
+                  <p className="text-sm font-semibold text-white">
+                    {task.name || task.title}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   </div>
