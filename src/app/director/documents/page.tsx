@@ -327,7 +327,8 @@ await apiDeleteDocument(doc.ownerId, docId);
   </button>
 </div>
 
-          <div className="mt-8 grid grid-cols-3 overflow-hidden rounded-xl border border-white/15 bg-white/5">
+          {/* <div className="mt-8 grid grid-cols-3 overflow-hidden rounded-xl border border-white/15 bg-white/5"> */}
+          <div className="mt-8 grid grid-cols-1 overflow-hidden rounded-xl border border-white/15 bg-white/5 sm:grid-cols-3">
             {[
               { id: "my", label: "My Documents" },
               { id: "mentees", label: "Mentee Documents" },
@@ -429,7 +430,7 @@ await apiDeleteDocument(doc.ownerId, docId);
 
             {!loading && !error && filteredDocuments.length > 0 && (
               <div>
-                <div
+                {/* <div
                   className={`grid ${
                     showUploadedBy
                       // ? "grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
@@ -437,7 +438,14 @@ await apiDeleteDocument(doc.ownerId, docId);
                       ? "grid-cols-[minmax(0,2fr)_0.6fr_0.9fr_1fr_0.5fr]"
 : "grid-cols-[minmax(0,2fr)_0.7fr_1fr_0.5fr]"
                   } items-center gap-4 border-b border-white/15 px-5 py-4 text-xs font-bold uppercase tracking-wide text-[#cde2f2]`}
-                >
+                > */}
+                <div
+  className={`hidden sm:grid ${
+    showUploadedBy
+      ? "sm:grid-cols-[minmax(0,2fr)_0.6fr_0.9fr_1fr_0.5fr]"
+      : "sm:grid-cols-[minmax(0,2fr)_0.7fr_1fr_0.5fr]"
+  } items-center gap-4 border-b border-white/15 px-5 py-4 text-xs font-bold uppercase tracking-wide text-[#cde2f2]`}
+>
                   <p>Document Name</p>
                   <p>Type</p>
                   <p>Date Uploaded</p>
@@ -454,16 +462,24 @@ await apiDeleteDocument(doc.ownerId, docId);
                       ?.toUpperCase() || "FILE";
 
                   return (
-                    <div
-                      key={key}
-                      className={`grid ${
-                        showUploadedBy
-                          // ? "grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
-                          // : "grid-cols-[2fr_0.7fr_1fr_0.5fr]"
-                          ? "grid-cols-[minmax(0,2fr)_0.6fr_0.9fr_1fr_0.5fr]"
-: "grid-cols-[minmax(0,2fr)_0.7fr_1fr_0.5fr]"
-                      } items-center gap-4 border-b border-white/10 px-5 py-5 last:border-b-0`}
-                    >
+//                     <div
+//                       key={key}
+//                       className={`grid ${
+//                         showUploadedBy
+//                           // ? "grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
+//                           // : "grid-cols-[2fr_0.7fr_1fr_0.5fr]"
+//                           ? "grid-cols-[minmax(0,2fr)_0.6fr_0.9fr_1fr_0.5fr]"
+// : "grid-cols-[minmax(0,2fr)_0.7fr_1fr_0.5fr]"
+//                       } items-center gap-4 border-b border-white/10 px-5 py-5 last:border-b-0`}
+//                     >
+<div
+  key={key}
+  className={`flex flex-col gap-4 border-b border-white/10 px-4 py-5 last:border-b-0 sm:grid ${
+    showUploadedBy
+      ? "sm:grid-cols-[minmax(0,2fr)_0.6fr_0.9fr_1fr_0.5fr]"
+      : "sm:grid-cols-[minmax(0,2fr)_0.7fr_1fr_0.5fr]"
+  } sm:items-center sm:gap-4 sm:px-5`}
+>
                       <div className="flex min-w-0 items-center gap-4">
                         {selectMode && (
                           <input
@@ -487,7 +503,7 @@ await apiDeleteDocument(doc.ownerId, docId);
                         </button>
                       </div>
 
-                      <p className="text-sm text-[#cde2f2]">{type}</p>
+                      {/* <p className="text-sm text-[#cde2f2]">{type}</p>
 
                       <p className="text-sm text-[#cde2f2]">
                         {doc.uploadedAt
@@ -503,7 +519,29 @@ await apiDeleteDocument(doc.ownerId, docId);
                         <p className="text-sm font-semibold text-[#cde2f2]">
                           {doc.uploadedBy || "User"}
                         </p>
-                      )}
+                      )} */}
+                      <p className="text-sm text-[#cde2f2]">
+  <span className="font-semibold text-white/60 sm:hidden">Type: </span>
+  {type}
+</p>
+
+<p className="text-sm text-[#cde2f2]">
+  <span className="font-semibold text-white/60 sm:hidden">Date Uploaded: </span>
+  {doc.uploadedAt
+    ? new Date(doc.uploadedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "Uploaded"}
+</p>
+
+{showUploadedBy && (
+  <p className="text-sm font-semibold text-[#cde2f2]">
+    <span className="font-semibold text-white/60 sm:hidden">Uploaded By: </span>
+    {doc.uploadedBy || "User"}
+  </p>
+)}
 
                       <div className="relative flex items-center justify-end gap-4 text-[#8ec5eb]">
                         <button

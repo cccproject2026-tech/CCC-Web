@@ -129,7 +129,11 @@ function MentorAssessmentPastorsContent() {
                 const row = mapUserToCardUser(pastor);
 
                 return (
-                  <div key={row.id} className={`${directorGlassCard} relative flex gap-5 p-5`}>
+                  // <div key={row.id} className={`${directorGlassCard} relative flex gap-5 p-5`}>
+                  <div
+  key={row.id}
+  className={`${directorGlassCard} relative flex flex-col gap-4 p-4 sm:flex-row sm:gap-5 sm:p-5`}
+>
      <div className="absolute right-4 top-4">
   <button
     type="button"
@@ -162,14 +166,15 @@ function MentorAssessmentPastorsContent() {
                       alt={row.name}
                       width={150}
                       height={150}
-                      className="h-32 w-32 rounded-xl object-cover"
+                      // className="h-32 w-32 rounded-xl object-cover"
+                      className="h-28 w-full rounded-xl object-cover sm:h-32 sm:w-32"
                       unoptimized={
                         typeof row.avatar === "string" && isRemoteImageSrc(row.avatar)
                       }
                     />
 
                     <div className="flex min-w-0 flex-1 flex-col">
-                      <h3 className="text-lg font-bold text-white">{row.name}</h3>
+                      <h3 className="truncate pr-10 text-lg font-bold text-white">{row.name}</h3>
                       <p className="mt-1 truncate text-sm text-white/60">{row.email}</p>
                       <p className="mt-1 text-sm text-[#cde2f2]">{row.role}</p>
                       <div className="mt-4 flex items-center gap-2">
@@ -206,15 +211,15 @@ function MentorAssessmentPastorsContent() {
   </button>
 </div>
 
-                      <button
-                        type="button"
-                        onClick={() =>
-                          router.push(`/director/assessments?assignUser=${row.id}`)
-                        }
-                        className={`${directorBtnPrimary} mt-auto self-end`}
-                      >
-                        View Assessments
-                      </button>
+                     <button
+  type="button"
+  onClick={() =>
+    router.push(`/director/assessments?assignUser=${row.id}`)
+  }
+  className={`${directorBtnPrimary} mt-4 w-full justify-center sm:mt-auto sm:w-auto sm:self-end`}
+>
+  View Assessments
+</button>
                     </div>
                   </div>
                 );

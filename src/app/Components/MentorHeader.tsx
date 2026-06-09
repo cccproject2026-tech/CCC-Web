@@ -40,7 +40,7 @@ export default function MentorHeader({ showFullHeader = false }) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
-
+const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
@@ -199,6 +199,7 @@ setNotificationList(newestFirst);
 const isLoginPage = pathname === "/mentor/login";
 const logoHref = isLoginPage ? "/" : "/mentor/home";
   return (
+    <>
     <header className="relative z-50 flex min-h-[64px] w-full items-center justify-between border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md md:px-6 lg:px-10 font-[Albert_Sans]">
       {/* ✅ Left Logo */}
       {/* <div className="flex items-center gap-3">
@@ -520,9 +521,55 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
                 </div>
               )}
             </div>
+                        {/* Mobile Menu Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowMobileMenu((prev) => !prev);
+                setShowSearch(false);
+                setShowNotifications(false);
+                setShowProfileMenu(false);
+                setShowSettingsMenu(false);
+              }}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15 lg:hidden"
+              aria-label="Toggle mentor menu"
+            >
+              <i className={`fa-solid ${showMobileMenu ? "fa-xmark" : "fa-bars"} text-lg`} />
+            </button>
           </>
         )}
       </div>
-    </header>
-  );
+     </header>
+
+    {showFullHeader && showMobileMenu && (
+      <div className="fixed left-0 right-0 top-[64px] z-40 max-h-[calc(100vh-64px)] overflow-y-auto border-t border-white/10 bg-[#062946]/98 shadow-lg backdrop-blur-md lg:hidden">
+        <nav className="space-y-2 px-4 py-4">
+          {navLinks.map((link) => {
+            const isActive =
+              pathname === link.path ||
+              (link.path.length > 1 && pathname.startsWith(`${link.path}/`));
+
+            return (
+              <button
+                key={link.path}
+                type="button"
+                onClick={() => {
+                  router.push(link.path);
+                  setShowMobileMenu(false);
+                }}
+                className={`w-full rounded-md px-4 py-3 text-left text-sm font-semibold transition ${
+                  isActive
+                    ? "bg-[#8ec5eb]/20 text-white"
+                    : "text-white/90 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {link.name}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+    )}
+  </>
+);
 }

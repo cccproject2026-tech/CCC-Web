@@ -1711,7 +1711,8 @@ const selectedAssignMentorName =
     <div className={directorPageRoot}>
       {/* Hero — mentor / pastor glass + image */}
       <section className={`relative overflow-hidden rounded-3xl border border-white/10 ${directorGlassCard}`}>
-        <div className="relative h-[240px] sm:h-[300px] lg:h-[340px]">
+        {/* <div className="relative h-[240px] sm:h-[300px] lg:h-[340px]"> */}
+        <div className="relative min-h-[360px] sm:min-h-[300px] lg:min-h-[340px]">
           <Image
             src={HeroBg}
             alt=""
@@ -1722,12 +1723,14 @@ const selectedAssignMentorName =
           <div className="absolute inset-0 bg-gradient-to-t from-[#062946] via-[#062946]/75 to-[#0a3558]/50" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#041f35]/90 via-transparent to-transparent" />
 
-          <div className="relative z-10 flex h-full flex-col justify-between p-5 sm:p-8 lg:flex-row lg:items-end lg:justify-between">
+          {/* <div className="relative z-10 flex h-full flex-col justify-between p-5 sm:p-8 lg:flex-row lg:items-end lg:justify-between"> */}
+          <div className="relative z-10 flex min-h-[360px] flex-col justify-between gap-5 p-5 sm:min-h-[300px] sm:p-8 lg:min-h-[340px] lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-full space-y-2 lg:max-w-2xl">
               <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/70">
                 {getGreeting()}
               </p>
-              <h1 className="text-xl font-semibold leading-snug sm:text-3xl lg:text-4xl">
+              {/* <h1 className="text-xl font-semibold leading-snug sm:text-3xl lg:text-4xl"> */}
+              <h1 className="text-lg font-semibold leading-snug sm:text-3xl lg:text-4xl">
                 Cultivate Spiritual, Professional, Social, And Community
                 <br className="hidden sm:block" />
                 Engagement Developments
@@ -1816,8 +1819,10 @@ const {
               key={appointment.id}
               className="rounded-2xl border border-white/10 bg-white/[0.04] p-4"
             >
-              <div className="flex items-start gap-4">
-                <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10">
+              {/* <div className="flex items-start gap-4"> */}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                {/* <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10"> */}
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 sm:h-[72px] sm:w-[72px]">
                   <Image
                     src={platformIcon}
                     alt={appointment.platform}
@@ -1963,7 +1968,8 @@ const {
         {interests.slice(0, 4).map((interest) => (
           <div
             key={interest._id}
-            className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3"
+            // className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3"
+            className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 sm:flex-row sm:items-center sm:gap-4"
           >
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/15 bg-[#8ec5eb]/20">
               <i className="fa-solid fa-user text-sm text-[#8ec5eb]" />

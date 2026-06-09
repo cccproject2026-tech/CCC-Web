@@ -595,7 +595,8 @@ const filteredMentees = useMemo(() => {
                 <Link
                   key={id || name}
                   href={`/mentor/review-center/${encodeURIComponent(id)}`}
-                  className={`flex items-center gap-3 rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 transition hover:bg-white/[0.1] ${mentorGlassCardFrost}`}
+                  // className={`flex min-h[76px] items-center gap-3 rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 transition hover:bg-white/[0.1] ${mentorGlassCardFrost}`}
+                  className={`flex min-h-[76px] items-center gap-3 rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 transition hover:bg-white/[0.1] ${mentorGlassCardFrost}`}
                 >
                   <Image
                     src={mentee.profilePicture || UserProfile}
@@ -617,9 +618,12 @@ const filteredMentees = useMemo(() => {
                       </span>
                     </div>
 
-                    <p className="mt-0.5 truncate text-xs text-[#cde2f2]/65">
+                    {/* <p className="mt-0.5 truncate text-xs text-[#cde2f2]/65">
 {counts.resubmittedTaskCount} resubmitted roadmap · {counts.totalRoadmapCount} roadmaps assigned · {counts.notStartedRoadmapCount} not started
-                    </p>
+                    </p> */}
+                    <p className="mt-0.5 line-clamp-2 pr-4 text-[11px] leading-snug text-[#cde2f2]/65 sm:text-xs">
+  {counts.resubmittedTaskCount} resubmitted roadmap · {counts.totalRoadmapCount} roadmaps assigned · {counts.notStartedRoadmapCount} not started
+</p>
                   </div>
 
                   <i className="fa-solid fa-chevron-right text-xs text-[#cde2f2]/55" />

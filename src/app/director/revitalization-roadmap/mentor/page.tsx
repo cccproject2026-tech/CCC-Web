@@ -195,7 +195,8 @@ const mentorId = searchParams.get("mentorId") || "";
                   <div
                     key={pastorId}
                     // className={`${directorGlassCard} flex min-h-[170px] gap-4 overflow-hidden p-4`}
-                    className={`${directorGlassCard} relative flex min-h-[170px] gap-4 overflow-visible p-4 pr-14`}
+                    // className={`${directorGlassCard} relative flex min-h-[170px] gap-4 overflow-visible p-4 pr-14`}
+                    className={`${directorGlassCard} relative flex min-h-[170px] flex-col gap-4 overflow-hidden p-4 sm:flex-row sm:overflow-visible sm:pr-14`}
                   >
                     <div className="relative h-[120px] w-[120px] shrink-0 overflow-hidden rounded-xl bg-white/5">
                       <Image
@@ -210,13 +211,8 @@ const mentorId = searchParams.get("mentorId") || "";
 
                     <div className="flex min-w-0 flex-1 flex-col">
                       <h3 className="truncate text-base font-bold text-white">{name}</h3>
-                      {/* <p className="mt-1 truncate text-sm text-white/60">
-                        {pastor?.email || "No email available"}
-                      </p>
-                      <p className="mt-1 truncate text-sm text-white/55">
-                        {pastor?.phoneNumber || pastor?.phone || "No phone available"}
-                      </p> */}
-                      <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-white/60">
+                   
+                      {/* <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-white/60">
 {(() => {
   const profileInfo =
     [
@@ -238,6 +234,20 @@ const mentorId = searchParams.get("mentorId") || "";
     </p>
   );
 })()}
+</p> */}
+<p className="mt-1 line-clamp-2 text-sm leading-relaxed text-white/60">
+  {[
+    pastor?.profileInformation,
+    pastor?.profileInfo,
+    pastor?.about,
+    pastor?.bio,
+    pastor?.description,
+    pastor?.ministryExperience,
+    pastor?.churchName,
+  ]
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean)
+    .join(" · ") || "No profile information available"}
 </p>
                       <div className="absolute right-4 top-4">
   <button
@@ -301,7 +311,8 @@ const mentorId = searchParams.get("mentorId") || "";
                           View Roadmaps
                         </button>
                       </div> */}
-                      <div className="mt-auto flex items-center justify-between gap-4 pt-4">
+                      {/* <div className="mt-auto flex items-center justify-between gap-4 pt-4"> */}
+                      <div className="mt-auto flex flex-col gap-3 pt-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
   <div className="flex items-center gap-4 text-[17px] text-[#8ec5eb]">
     <a
       href={`mailto:${pastor?.email || ""}`}
@@ -337,7 +348,8 @@ const mentorId = searchParams.get("mentorId") || "";
   )}`
 )
     }
-    className="inline-flex h-9 items-center justify-center rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/18 px-4 text-xs font-semibold text-white transition hover:bg-[#3498DB]/28"
+    // className="inline-flex h-9 items-center justify-center rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/18 px-4 text-xs font-semibold text-white transition hover:bg-[#3498DB]/28"
+    className="inline-flex h-9 w-full items-center justify-center rounded-lg border border-[#3498DB]/45 bg-[#3498DB]/18 px-4 text-xs font-semibold text-white transition hover:bg-[#3498DB]/28 sm:w-auto"
   >
     View Roadmaps
   </button>

@@ -1696,11 +1696,17 @@ await apiRescheduleAppointment(id, {
         <div className={directorPageContainer}>
 
           {/* ── Tab bar ── */}
-          <DirectorFilterSection className="!p-4 sm:!p-5">
+          {/* <DirectorFilterSection className="!p-4 sm:!p-5">
             <div
               className="inline-flex h-10 shrink-0 items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-1"
               role="tablist"
-            >
+            > */}
+            <DirectorFilterSection className="!p-4 sm:!p-5">
+  <div className="w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div
+      className="inline-flex h-10 min-w-max items-center gap-1 rounded-lg border border-white/15 bg-white/5 px-1"
+      role="tablist"
+    >
               {(["Appointments", "Availability", "Schedule", "Appointment History"] as const).map((tab) => (
                 <button
                   key={tab}
@@ -1718,7 +1724,7 @@ await apiRescheduleAppointment(id, {
                     if (tab === "Schedule") { setIsDrawerOpen(true); setDrawerStep(1); }
                     else setIsDrawerOpen(false);
                   }}
-                  className={`relative h-8 rounded-md px-5 text-sm font-semibold transition-all ${activeTab === tab
+                  className={`relative h-8 rounded-md px-3 text-xs font-semibold transition-all sm:px-5 sm:text-sm ${activeTab === tab
                     ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/35"
                     : "bg-transparent text-white/70 hover:text-white"
                     }`}
@@ -1726,6 +1732,7 @@ await apiRescheduleAppointment(id, {
                   {tab}
                 </button>
               ))}
+            </div>
             </div>
           </DirectorFilterSection>
 

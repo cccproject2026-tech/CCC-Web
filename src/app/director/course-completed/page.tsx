@@ -409,7 +409,7 @@ fieldMentorInvitation: u.fieldMentorInvitation,
           {finalData.map((p) => (
             <div
               key={p.id}
-              className={`flex items-start gap-5 rounded-xl p-5 ${directorGlassCard} transition-all hover:border-white/25`}
+              className={`flex flex-col gap-4 rounded-xl p-4 ${directorGlassCard} transition-all hover:border-white/25 sm:flex-row sm:items-start sm:gap-5 sm:p-5`}
             >
               {/* Image with relative positioning for "New" badge - Clickable */}
               <Link

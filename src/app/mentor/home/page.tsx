@@ -342,7 +342,7 @@ const currentDate = new Date().toLocaleDateString("en-US", {
       <MentorHeader showFullHeader={true} />
 
       {/* <main className="relative z-10 w-full flex-1 pb-28 pt-0 sm:pb-10"> */}
-      <main className="relative z-10 w-full flex-1 pb-28 pt-0 sm:pb-10">
+      <main className="relative z-10 w-full flex-1 pb-10 pt-0">
         <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-4 px-4 sm:gap-5 sm:px-6 lg:px-8">
         {/* Hero — CCC-Mobile: greeting on hero, compact welcome card, showClockDate false */}
         {/* <section
@@ -400,7 +400,8 @@ const currentDate = new Date().toLocaleDateString("en-US", {
 <section
   className={`relative m-0 overflow-hidden rounded-none border-0 sm:rounded-3xl sm:border sm:border-white/10 ${mentorGlassCardFrost}`}
 >
-  <div className="relative h-[240px] sm:h-[300px] lg:h-[340px]">
+  {/* <div className="relative h-[240px] sm:h-[300px] lg:h-[340px]"> */}
+  <div className="relative min-h-[360px] sm:min-h-[300px] lg:min-h-[340px]">
     <Image
       src={HeroBg}
       alt=""
@@ -559,7 +560,7 @@ const currentDate = new Date().toLocaleDateString("en-US", {
             {/* <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center self-start rounded-lg border border-emerald-300/30 bg-emerald-400/15 text-emerald-100 sm:self-center">
   <i className="fa-solid fa-chevron-right text-sm text-emerald-100/90" />
 </span> */}
-<div className="relative self-start sm:self-center">
+<div className="relative self-end sm:self-center">
   {reviewCenterAttentionCount > 0 && (
     <span className="absolute -right-2 -top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-black text-white">
       {reviewCenterAttentionCount}
@@ -681,7 +682,7 @@ const pin = pins[index];
         </div>
       </main>
 
-      <nav
+      {/* <nav
         className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-white/10 bg-[#0a1220]/95 py-3 backdrop-blur-lg md:hidden"
         aria-label="Primary"
       >
@@ -697,7 +698,7 @@ const pin = pins[index];
           <i className="fa-regular fa-user text-lg" />
           <span className="text-[10px] font-medium">Profile</span>
         </Link>
-      </nav>
+      </nav> */}
 
       <DashboardFocusModal
         open={focusModalOpen}

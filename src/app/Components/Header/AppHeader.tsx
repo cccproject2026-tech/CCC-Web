@@ -185,23 +185,40 @@ const list: any[] = Array.isArray(raw)
     { name: "Home", path: "/director/home" },
     { name: "Mentors", path: "/director/mentors" },
     { name: "Mentees", path: "/director/mentees" },
-    {
-      name: "Courses",
-      path: "/director/courses",
-      hasDropdown: true,
-      onClick: () => setShowCCCDropdown(!showCCCDropdown),
-    },
-   {
+//     {
+//       name: "Courses",
+//       path: "/director/courses",
+//       hasDropdown: true,
+//       onClick: () => setShowCCCDropdown(!showCCCDropdown),
+//     },
+//    {
+//   name: "New Interests",
+//   path: "/director/interest-list",
+//   hasBadge: newInterestCount > 0 ? String(newInterestCount) : undefined,
+// },
+//     {
+//       name: "CCC",
+//       path: "/director/ccc",
+//       hasDropdown: true,
+//       onClick: () => setShowCoursesDropdown(!showCoursesDropdown),
+//     },
+{
+  name: "Courses",
+  path: "/director/courses",
+  hasDropdown: true,
+  onClick: () => setShowCoursesDropdown(!showCoursesDropdown),
+},
+{
   name: "New Interests",
   path: "/director/interest-list",
   hasBadge: newInterestCount > 0 ? String(newInterestCount) : undefined,
 },
-    {
-      name: "CCC",
-      path: "/director/ccc",
-      hasDropdown: true,
-      onClick: () => setShowCoursesDropdown(!showCoursesDropdown),
-    },
+{
+  name: "CCC",
+  path: "/director/ccc",
+  hasDropdown: true,
+  onClick: () => setShowCCCDropdown(!showCCCDropdown),
+},
     { name: "Track Progress", path: "/director/track-progress" },
     { name: "Schedule", path: "/director/schedule" },
     { name: "Notes", path: "/director/notes" },
@@ -259,19 +276,33 @@ const list: any[] = Array.isArray(raw)
                   )}
                 </button>
                 {/* Dropdown for Courses */}
-                {link.name === "Courses" && (
+                {/* {link.name === "Courses" && (
                   <CCCDropdown
                     isOpen={showCCCDropdown && !showMobileMenu}
                     onClose={() => setShowCCCDropdown(false)}
                   />
-                )}
+                )} */}
                 {/* Dropdown for CCC */}
-                {link.name === "CCC" && (
+                {/* {link.name === "CCC" && (
                   <CoursesDropdown
                     isOpen={showCoursesDropdown && !showMobileMenu}
                     onClose={() => setShowCoursesDropdown(false)}
                   />
                 )}
+     */}
+     {link.name === "Courses" && (
+  <CCCDropdown
+    isOpen={showCoursesDropdown && !showMobileMenu}
+    onClose={() => setShowCoursesDropdown(false)}
+  />
+)}
+
+{link.name === "CCC" && (
+  <CoursesDropdown
+    isOpen={showCCCDropdown && !showMobileMenu}
+    onClose={() => setShowCCCDropdown(false)}
+  />
+)}
               </div>
             ))}
           </nav>
@@ -295,7 +326,7 @@ const list: any[] = Array.isArray(raw)
                 <Image src={SearchIcon} alt="" width={18} height={18} />
               </button>
 
-              {showSearch && (
+              {/* {showSearch && (
                 <div className="absolute right-0 top-12 z-[60] w-[min(420px,calc(100vw-2rem))] rounded-2xl border border-white/20 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] p-3 shadow-2xl sm:right-[120px]">
                   <input
                     value={searchQuery}
@@ -303,7 +334,31 @@ const list: any[] = Array.isArray(raw)
                     placeholder="Search roadmaps, assessments, people…"
                     className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/70 outline-none focus:border-[#8ec5eb]/50"
                     autoFocus
-                  />
+                  /> */}
+                  {showSearch && (
+  <div className="absolute right-0 top-12 z-[60] w-[min(420px,calc(100vw-2rem))] rounded-2xl border border-white/20 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] p-3 shadow-2xl sm:right-[120px]">
+    <div className="flex items-center gap-2">
+      <input
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        placeholder="Search roadmaps, assessments, people…"
+        className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/70 outline-none focus:border-[#8ec5eb]/50"
+        autoFocus
+      />
+
+      <button
+        type="button"
+        onClick={() => {
+          setShowSearch(false);
+          setSearchQuery("");
+          setSearchResults({ roadmaps: [], assessments: [], people: [] });
+        }}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white/80 transition hover:bg-white/15 hover:text-white"
+        aria-label="Close search"
+      >
+        <i className="fa-solid fa-xmark" />
+      </button>
+    </div>
                   <div className="mt-3 max-h-[360px] space-y-3 overflow-auto pr-1 text-left">
                     {searchLoading && <p className="text-xs text-white/80">Searching…</p>}
                     {!searchLoading && searchQuery.trim() && (
@@ -413,13 +468,22 @@ const list: any[] = Array.isArray(raw)
 
               {/* Mobile Menu Button */}
               <button
+                // onClick={() => {
+                //   setShowMobileMenu(!showMobileMenu);
+                //   if (!showMobileMenu) {
+                //     setShowCoursesDropdown(false);
+                //     setShowCCCDropdown(false);
+                //   }
+                // }}
                 onClick={() => {
-                  setShowMobileMenu(!showMobileMenu);
-                  if (!showMobileMenu) {
-                    setShowCoursesDropdown(false);
-                    setShowCCCDropdown(false);
-                  }
-                }}
+  setShowMobileMenu(!showMobileMenu);
+  setShowSearch(false);
+
+  if (!showMobileMenu) {
+    setShowCoursesDropdown(false);
+    setShowCCCDropdown(false);
+  }
+}}
                 className="lg:hidden p-2 hover:opacity-80 transition"
               >
                 <i
@@ -441,7 +505,7 @@ const list: any[] = Array.isArray(raw)
 
       {/* Mobile Navigation Menu */}
       {showFullHeader && showMobileMenu && (
-        <div className="fixed left-0 right-0 top-[60px] z-40 border-t border-white/10 bg-[#062946]/98 shadow-lg backdrop-blur-md lg:hidden">
+        <div className="fixed left-0 right-0 top-[60px] z-40 max-h-[calc(100vh-60px)] overflow-y-auto border-t border-white/10 bg-[#062946]/98 shadow-lg backdrop-blur-md lg:hidden">
           <nav className="px-4 py-4 space-y-2">
             {navLinks.map((link, index) => (
               <div key={index}>
@@ -480,7 +544,7 @@ const list: any[] = Array.isArray(raw)
                     className="ml-4 mt-2 space-y-1"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    {[
+                    {/* {[
                       {
                         icon: "fa-solid fa-trophy",
                         label: "Micro Grant",
@@ -501,7 +565,19 @@ const list: any[] = Array.isArray(raw)
                         label: "Contact Details",
                         path: "/director/contact-details",
                       },
-                    ].map((item, idx) => (
+                    ].map((item, idx) => ( */}
+                    {[
+  {
+    icon: "fa-solid fa-route",
+    label: "Roadmap",
+    path: "/director/revitalization-roadmap",
+  },
+  {
+    icon: "fa-regular fa-clipboard",
+    label: "Assessments",
+    path: "/director/assessments",
+  },
+].map((item, idx) => (
                       <button
                         key={idx}
                         onClick={(e) => {
@@ -518,7 +594,7 @@ const list: any[] = Array.isArray(raw)
                     ))}
                   </div>
                 )}
-
+{/* 
                 {link.name === "CCC" && showCCCDropdown && (
                   <div
                     className="ml-4 mt-2 space-y-1"
@@ -537,15 +613,71 @@ const list: any[] = Array.isArray(raw)
                       <span className="text-sm">CCC Options</span>
                     </button>
                   </div>
-                )}
+                )} */}
+                {link.name === "CCC" && showCCCDropdown && (
+  <div
+    className="ml-4 mt-2 space-y-1"
+    onClick={(e) => e.stopPropagation()}
+  >
+    {[
+      {
+        icon: "fa-solid fa-trophy",
+        label: "Micro Grant",
+        path: "/director/micro-grant",
+      },
+      {
+        icon: "fa-solid fa-chalkboard-user",
+        label: "Invite to be a Field Mentor",
+        path: "/director/invite-field-mentor",
+      },
+      {
+        icon: "fa-solid fa-play",
+        label: "Videos",
+        path: "/director/videos",
+      },
+      {
+        icon: "fa-solid fa-phone",
+        label: "Contact Details",
+        path: "/director/contact-details",
+      },
+    ].map((item, idx) => (
+      <button
+        key={idx}
+        onClick={(e) => {
+          e.stopPropagation();
+          router.push(item.path);
+          setShowMobileMenu(false);
+          setShowCCCDropdown(false);
+        }}
+        className="w-full text-left px-4 py-2 rounded-md text-white/80 transition hover:bg-white/10 hover:text-white flex items-center gap-3"
+      >
+        <i className={`${item.icon} text-sm`} />
+        <span className="text-sm">{item.label}</span>
+      </button>
+    ))}
+  </div>
+)}
               </div>
             ))}
 
             {/* Mobile Search */}
-            <button className="w-full text-left px-4 py-3 rounded-md text-white/90 transition hover:bg-white/10 hover:text-white flex items-center gap-3">
+            {/* <button className="w-full text-left px-4 py-3 rounded-md text-white/90 transition hover:bg-white/10 hover:text-white flex items-center gap-3">
               <Image src={SearchIcon} alt="Search" width={18} height={18} />
               Search
-            </button>
+            </button> */}
+            <button
+  type="button"
+  onClick={() => {
+    setShowSearch(true);
+    setShowMobileMenu(false);
+    setShowNotifications(false);
+    setShowProfileDropdown(false);
+  }}
+  className="w-full text-left px-4 py-3 rounded-md text-white/90 transition hover:bg-white/10 hover:text-white flex items-center gap-3"
+>
+  <Image src={SearchIcon} alt="Search" width={18} height={18} />
+  Search
+</button>
           </nav>
         </div>
       )}

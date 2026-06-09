@@ -121,7 +121,8 @@ export default function NotificationPopup({
   return (
     <div
       ref={popupRef}
-      className="absolute right-6 top-[68px] z-50 w-[430px] overflow-hidden rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.98)_0%,rgba(6,36,62,0.98)_100%)] text-white shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl animate-slide-down"
+      className="fixed right-3 top-[68px] z-50 w-[calc(100vw-1.5rem)] max-w-[430px] overflow-hidden rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.98)_0%,rgba(6,36,62,0.98)_100%)] text-white shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl animate-slide-down sm:absolute sm:right-6 sm:rounded-3xl"
+      // className="absolute right-6 top-[68px] z-50 w-[430px] overflow-hidden rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.98)_0%,rgba(6,36,62,0.98)_100%)] text-white shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl animate-slide-down"
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">

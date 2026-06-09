@@ -32,10 +32,15 @@ export default function MicroGrantCard({
   const isNavy = appearance === "navy" || variant === "directorGlass";
 
   const shell = isNavy
-    ? "rounded-2xl border border-[#8ec5eb]/25 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-5 shadow-[0_8px_32px_rgba(2,20,40,0.45)] transition hover:border-[#8ec5eb]/35"
-    : "rounded-2xl bg-white p-5 shadow-lg";
+    // ? "rounded-2xl border border-[#8ec5eb]/25 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-5 shadow-[0_8px_32px_rgba(2,20,40,0.45)] transition hover:border-[#8ec5eb]/35"
+    ? "rounded-2xl border border-[#8ec5eb]/25 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-4 shadow-[0_8px_32px_rgba(2,20,40,0.45)] transition hover:border-[#8ec5eb]/35 sm:p-5"
+    // : "rounded-2xl bg-white p-5 shadow-lg";
+    : "rounded-2xl bg-white p-4 shadow-lg sm:p-5";
 
-  const titleCls = isNavy ? "text-lg font-semibold text-white mb-1" : "text-lg font-semibold text-gray-900 mb-1";
+  // const titleCls = isNavy ? "text-lg font-semibold text-white mb-1" : "text-lg font-semibold text-gray-900 mb-1";
+  const titleCls = isNavy
+  ? "mb-1 max-w-full truncate text-sm font-semibold text-white sm:text-lg"
+  : "mb-1 max-w-full truncate text-sm font-semibold text-gray-900 sm:text-lg";
   const roleCls = isNavy ? "text-sm text-[#cde2f2]" : "text-sm text-gray-500";
   const dateCls = isNavy ? "text-xs text-[#cde2f2]/80" : "text-xs text-gray-400";
   const iconCls = isNavy ? "text-[#8ec5eb] hover:text-white transition" : "text-black hover:opacity-70 transition";
@@ -56,7 +61,8 @@ export default function MicroGrantCard({
     <div className={`flex h-auto min-h-[140px] w-full flex-col items-stretch justify-between gap-4 sm:h-[160px] sm:flex-row sm:items-center ${shell}`}>
       <div className="flex min-w-0 flex-1 items-center gap-4">
         <div
-          className={`relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl ${
+          // className={`relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-xl ${
+          className={`relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl sm:h-20 sm:w-20 ${
             isNavy ? "border border-white/15 bg-white/5" : "bg-[#EFEBE0]"
           }`}
         >
@@ -69,7 +75,10 @@ export default function MicroGrantCard({
 
         <div className="flex min-w-0 flex-1 flex-col justify-between py-1">
           <div>
-            <h3 className={titleCls}>{name}</h3>
+            {/* <h3 className={titleCls}>{name}</h3> */}
+            <h3 className={titleCls} title={name}>
+  {name}
+</h3>
             <p className={`truncate ${roleCls}`}>{role}</p>
           </div>
 

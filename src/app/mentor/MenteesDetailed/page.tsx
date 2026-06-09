@@ -287,14 +287,19 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
   return (
     <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
-
+{/* 
       <section
         className="relative overflow-hidden bg-cover bg-top px-0 pb-10 pt-4"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
-      >
+      > */}
+      <section
+  className="relative overflow-hidden bg-cover bg-top px-4 pb-10 pt-4 sm:px-6 lg:px-8"
+  style={{ backgroundImage: `url(${HeroBg.src})` }}
+>
         <div className={mentorHeroOverlay} />
 
-        <div className="relative z-10 mx-auto w-full max-w-6xl">
+        {/* <div className="relative z-10 mx-auto w-full max-w-6xl"> */}
+        <div className="relative z-10 mx-auto w-full max-w-[1180px]">
           <h1 className="text-2xl font-semibold sm:text-3xl">My Mentees</h1>
           <p className={`mt-2 ${mentorBodyText}`}>
             View and manage pastors assigned to your mentoring care.
@@ -302,8 +307,10 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
         </div>
       </section>
 
-      <main className={`${mentorMainGradient} flex-1 px-0 py-10`}>
-        <div className="w-full">
+      {/* <main className={`${mentorMainGradient} flex-1 px-0 py-10`}> */}
+      <main className={`${mentorMainGradient} flex-1 px-4 py-10 sm:px-6 lg:px-8`}>
+        {/* <div className="w-full"> */}
+        <div className="mx-auto w-full max-w-[1180px]">
           {loadError ? (
             <div className={`mb-6 ${mentorWarningPanel}`}>{loadError}</div>
           ) : null}
