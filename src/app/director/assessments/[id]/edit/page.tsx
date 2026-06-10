@@ -193,6 +193,20 @@ const [isEditMode, setIsEditMode] = useState(false);
     setWizardSections((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== sectionIdx)));
   };
 
+  const handleDeleteSelectedSection = () => {
+    setWizardSections((prev) => {
+      if (prev.length <= 1) return prev;
+
+      const next = prev.filter((_, index) => index !== selectedSectionIndex);
+
+      setSelectedSectionIndex((current) =>
+        Math.min(current, Math.max(0, next.length - 1)),
+      );
+
+      return next;
+    });
+  };
+
   const handleUpdateSection = (sectionIdx: number, field: string, value: unknown) => {
     setWizardSections((prev) => {
       const n = [...prev];
@@ -1263,6 +1277,61 @@ const selectedSection = wizardSections[selectedSectionIndex] ?? wizardSections[0
     </div>
   </div>
 </div>
+
+          <div className="mb-6 rounded-xl border border-white/20 bg-white/5 p-5">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-white">Section details</h3>
+                <p className="mt-1 text-sm text-white/60">
+                  Update the selected section name and participant guidelines.
+                </p>
+              </div>
+
+              {wizardSections.length > 1 ? (
+                <button
+                  type="button"
+                  onClick={handleDeleteSelectedSection}
+                  className="rounded-lg border border-red-300/40 bg-red-500/15 px-3 py-2 text-xs font-semibold text-red-200 transition hover:bg-red-500/25"
+                >
+                  <i className="fa-solid fa-trash mr-1" />
+                  Delete section
+                </button>
+              ) : null}
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+                  Section name
+                </label>
+                <input
+                  id={`director-section-name-${selectedSectionIndex}`}
+                  type="text"
+                  value={selectedSection.name}
+                  onChange={(e) =>
+                    handleUpdateSection(selectedSectionIndex, "name", e.target.value)
+                  }
+                  placeholder="e.g. Personal Well-Being"
+                  className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+                  Guidelines / description
+                </label>
+                <textarea
+                  value={selectedSection.guidelines}
+                  onChange={(e) =>
+                    handleUpdateSection(selectedSectionIndex, "guidelines", e.target.value)
+                  }
+                  rows={3}
+                  placeholder="Explain what this section is about for the participant."
+                  className="min-h-[90px] w-full resize-y rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                />
+              </div>
+            </div>
+          </div>
 
           {/* Instructions */}
           {/* <div className="mb-6 rounded-xl border border-white/20 bg-white/5 p-5">

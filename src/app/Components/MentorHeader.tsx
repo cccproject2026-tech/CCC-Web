@@ -257,19 +257,29 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
                 setShowProfileMenu(false);
                 setShowSettingsMenu(false);
               }}
-              className="hidden h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15 md:flex"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15"
             >
               <Image src={SearchIcon} alt="Search" width={18} height={18} />
             </button>
 
             {showSearch && (
-              <div className="absolute right-0 top-12 z-[60] w-[min(420px,calc(100vw-2rem))] rounded-2xl border border-white/20 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] p-3 shadow-2xl xl:right-[120px]">
-                <input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search roadmaps, assessments, pastors..."
-                  className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/70 outline-none"
-                />
+              <div className="fixed left-4 right-4 top-[76px] z-[80] max-h-[calc(100vh-96px)] overflow-hidden rounded-2xl border border-white/20 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] p-3 shadow-2xl md:absolute md:left-auto md:right-0 md:top-12 md:z-[60] md:w-[min(420px,calc(100vw-2rem))] xl:right-[120px]">
+                <div className="flex items-center gap-2">
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search roadmaps, assessments, pastors..."
+                    className="min-w-0 flex-1 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/70 outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSearch(false)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15 md:hidden"
+                    aria-label="Close search"
+                  >
+                    <i className="fa-solid fa-xmark text-sm" />
+                  </button>
+                </div>
                 <div className="mt-3 max-h-[360px] space-y-3 overflow-auto pr-1">
                   {searchLoading && <p className="text-xs text-white/80">Searching...</p>}
                   {!searchLoading && searchQuery.trim() && (
