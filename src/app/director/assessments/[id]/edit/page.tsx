@@ -41,6 +41,7 @@ type PreSurveyRow = {
 
 const MAX_BANNER_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_BANNER_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp"]);
+const MIN_LAYERS = 1;
 
 const defaultPreSurveyRow = (): PreSurveyRow => ({
   id: Date.now(),
@@ -249,6 +250,20 @@ const [isEditMode, setIsEditMode] = useState(false);
       next[sectionIdx] = copy;
       return next;
     });
+  };
+
+  const handleRemoveLayer = (sectionIdx: number, layerIdx: number) => {
+    setWizardSections((prev) =>
+      prev.map((section, currentSectionIdx) => {
+        if (currentSectionIdx !== sectionIdx) return section;
+        if (section.layers.length <= MIN_LAYERS) return section;
+
+        return {
+          ...section,
+          layers: section.layers.filter((_, currentLayerIdx) => currentLayerIdx !== layerIdx),
+        };
+      }),
+    );
   };
 
   const handleUpdateLayerNotes = (sectionIdx: number, layerIdx: number, value: string) => {
@@ -840,13 +855,25 @@ const selectedSection = wizardSections[selectedSectionIndex] ?? wizardSections[0
                     <div key={layer.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <span className="text-sm font-semibold text-white/90">Step {layerIdx + 1} — choices</span>
-                        <button
-                          type="button"
-                          onClick={() => handleAddLayerChoice(sectionIdx, layerIdx)}
-                          className="text-xs font-semibold text-[#8ec5eb] hover:underline"
-                        >
-                          + Choice
-                        </button>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleAddLayerChoice(sectionIdx, layerIdx)}
+                            className="text-xs font-semibold text-[#8ec5eb] hover:underline"
+                          >
+                            + Choice
+                          </button>
+                          {section.layers.length > MIN_LAYERS ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveLayer(sectionIdx, layerIdx)}
+                              className="rounded-lg border border-red-400/30 bg-red-500/15 px-2.5 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/25"
+                            >
+                              <i className="fa-solid fa-trash mr-1" />
+                              Delete Layer
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                       {layer.choices.map((choice, choiceIdx) => (
                         <div key={choiceIdx} className="mb-2 flex items-center gap-2">
@@ -1524,9 +1551,21 @@ const selectedSection = wizardSections[selectedSectionIndex] ?? wizardSections[0
                key={`${layerIdx}-${layer.id ?? "layer"}`}
                 className="rounded-xl border-2 border-white/20 bg-white/5 p-5"
               >
-                <div className="mb-4 flex items-center justify-between">
+                <div className="mb-4 flex items-center justify-between gap-3">
                   <h3 className="font-semibold text-white">Layer {layerIdx + 1}</h3>
-                  <span className="text-xs text-white/60">Choices</span>
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <span className="text-xs text-white/60">Choices</span>
+                    {selectedSection.layers.length > MIN_LAYERS ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveLayer(selectedSectionIndex, layerIdx)}
+                        className="rounded-lg border border-red-300/40 bg-red-500/15 px-2.5 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/25"
+                      >
+                        <i className="fa-solid fa-trash mr-1" />
+                        Delete Layer
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="mb-4 space-y-2">

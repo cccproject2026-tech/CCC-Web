@@ -265,7 +265,7 @@ export default function TrackProgressPage() {
       <MentorHeader showFullHeader />
 
       <section
-        className="relative overflow-hidden bg-cover bg-top px-0 pb-10 pt-4"
+        className="relative overflow-hidden bg-cover bg-top px-4 pb-10 pt-4 sm:px-6 lg:px-8"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className={mentorHeroOverlay} />
@@ -278,8 +278,8 @@ export default function TrackProgressPage() {
         </div>
       </section>
 
-      <main className={`${mentorMainGradient} flex-1 px-0 py-10`}>
-        <div className="w-full">
+      <main className={`${mentorMainGradient} flex-1 px-4 py-10 sm:px-6 lg:px-8`}>
+        <div className="mx-auto w-full max-w-[1180px]">
           {loadError ? <div className={`mb-6 ${mentorWarningPanel}`}>{loadError}</div> : null}
 
           <div className={`${mentorFilterPanel} mb-10`}>

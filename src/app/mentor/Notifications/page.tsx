@@ -96,11 +96,11 @@ setItems(newestFirst);
       <MentorHeader showFullHeader={true} />
 
       <section
-        className="relative flex min-h-[180px] flex-col justify-center bg-cover bg-center px-0 py-10 text-white sm:min-h-[220px]"
+        className="relative flex min-h-[180px] flex-col justify-center bg-cover bg-center px-4 py-10 text-white sm:min-h-[220px] sm:px-6 lg:px-8"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className={mentorHeroOverlay} />
-        <div className="relative z-10 max-w-3xl">
+        <div className="relative z-10 mx-auto w-full max-w-[1180px]">
           <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
             <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
             Leadership Support Network
@@ -113,8 +113,8 @@ setItems(newestFirst);
         </div>
       </section>
 
-      <main className={`${mentorMainGradient} flex-1 px-0 pb-16 pt-8`}>
-        <div className="mx-auto max-w-5xl">
+      <main className={`${mentorMainGradient} flex-1 px-4 pb-16 pt-8 sm:px-6 lg:px-8`}>
+        <div className="mx-auto w-full max-w-5xl">
           <div className={`${mentorGlassCardFrost} mb-6 p-5 sm:p-6`}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>

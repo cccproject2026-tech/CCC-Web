@@ -1377,20 +1377,25 @@ try {
     <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
-      <section
+      {/* <section
         className="relative overflow-hidden bg-cover bg-center px-0 pb-10 pt-4"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
-      >
+      > */}
+      <section
+  className="relative overflow-hidden bg-cover bg-center px-4 pb-10 pt-4 sm:px-6 lg:px-8"
+  style={{ backgroundImage: `url(${HeroBg.src})` }}
+>
         <div className={mentorHeroOverlay} />
 
-        <div className="relative z-10 w-full">
+        <div className="relative z-10 mx-auto w-full max-w-[1180px]">
           <h1 className="text-2xl font-semibold sm:text-3xl">Assessments</h1>
           <p className={`mt-2 ${mentorBodyText}`}>Create, assign, and review mentoring assessments.</p>
         </div>
       </section>
 
-      <main className={`${mentorMainGradient} flex-1 px-0 pb-12`}>
-        <div className="w-full space-y-6">
+      {/* <main className={`${mentorMainGradient} flex-1 px-0 pb-12`}> */}
+      <main className={`${mentorMainGradient} flex-1 px-4 pb-12 sm:px-6 lg:px-8`}>
+        <div className="mx-auto w-full max-w-[1180px] space-y-6">
           {!showForm ? (
             <>
               <div className={`mb-6 ${mentorFilterPanel}`}>

@@ -72,7 +72,13 @@ export default function VoiceNotesListContent({ variant }: { variant: VoiceNotes
     <div className={variant === "mentor" ? mentorPageRoot : "min-h-screen font-[Albert_Sans] text-white"}>
       <Header showFullHeader />
 
-      <main className={variant === "mentor" ? mentorContainer : "mx-auto w-full max-w-6xl px-4 py-8 sm:px-8"}>
+      <main
+        className={
+          variant === "mentor"
+            ? "mx-auto w-full max-w-[1180px] px-4 py-8 sm:px-6 md:py-10 lg:px-8"
+            : "mx-auto w-full max-w-6xl px-4 py-8 sm:px-8"
+        }
+      >
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1 className="text-2xl font-bold text-white sm:text-3xl">Voice Notes</h1>

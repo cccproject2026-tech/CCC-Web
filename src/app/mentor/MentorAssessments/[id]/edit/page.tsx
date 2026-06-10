@@ -488,10 +488,10 @@ export default function MentorEditAssessmentPage() {
   return (
     <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
       <MentorHeader showFullHeader={true} />
-      <section className="relative flex-1 px-0 py-6">
-        <div className="max-w-[1600px] mx-auto flex gap-6 h-full">
+      <section className="relative flex-1 px-4 py-6 sm:px-6 md:px-0">
+        <div className="mx-auto flex h-full max-w-[1600px] flex-col gap-6 md:flex-row">
           {/* Left Sidebar - Sections */}
-          <div className="w-80 flex-shrink-0 space-y-3">
+          <div className="w-full flex-shrink-0 space-y-3 md:w-80">
             <div className="flex items-center gap-3 mb-4">
               <button
                 onClick={() => setShowAddSectionModal(true)}
@@ -543,7 +543,7 @@ export default function MentorEditAssessmentPage() {
           </div>
 
           {/* Main Content Area */}
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             {selectedSectionData ? (
               <>
                 {/* Help Text */}
@@ -705,7 +705,7 @@ export default function MentorEditAssessmentPage() {
                           value={instruction.text}
                           onChange={(e) => handleUpdateInstructionText(instruction.id, e.target.value)}
                           placeholder={`Instruction ${idx + 1}`}
-                          className="flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                          className="min-w-0 flex-1 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
                         />
                         {instructions.length > 1 ? (
                           <button
@@ -764,7 +764,7 @@ export default function MentorEditAssessmentPage() {
                             className="space-y-3 rounded-xl border border-white/10 bg-white/[0.03] p-4"
                           >
                             <div className="flex flex-wrap items-end gap-3">
-                              <div className="min-w-[220px] flex-1">
+                              <div className="min-w-0 flex-1 sm:min-w-[220px]">
                                 <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">Question {qIdx + 1}</label>
                                 <input
                                   id={`mentor-presurvey-question-${qIdx}`}
@@ -803,7 +803,7 @@ export default function MentorEditAssessmentPage() {
                 {/* Divider and Action Buttons */}
                 <div className="border-t border-white/20 mb-6"></div>
 
-                <div className="flex justify-end gap-2 mb-6">
+                <div className="mb-6 flex flex-wrap justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => setIsEditMode((prev) => !prev)}
@@ -853,7 +853,7 @@ export default function MentorEditAssessmentPage() {
                                   e.target.value,
                                 )
                               }
-                              className="flex-1 rounded border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/40"
+                              className="min-w-0 flex-1 rounded border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/40"
                               placeholder={`Choice ${choiceIdx + 1}`}
                               readOnly={!isEditMode}
                             />
@@ -971,10 +971,10 @@ export default function MentorEditAssessmentPage() {
         </div>
 
         {/* Bottom Action Buttons */}
-        <div className="flex justify-end gap-4 mt-6">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end sm:gap-4">
           <button
             onClick={() => router.push("/mentor/MentorAssessments")}
-            className="px-10 py-3 bg-white text-gray-700 rounded-lg font-semibold hover:bg-gray-100 shadow-md"
+            className="rounded-lg bg-white px-10 py-3 font-semibold text-gray-700 shadow-md hover:bg-gray-100"
           >
             Cancel
           </button>

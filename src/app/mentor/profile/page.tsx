@@ -38,6 +38,10 @@ export default function MentorProfile() {
   const [loading, setLoading] = useState(true);
   const [greeting, setGreeting] = useState("");
   const [form, setForm] = useState<Record<string, unknown> | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
   const profileImageInputRef = useRef<HTMLInputElement | null>(null);
 const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
 
@@ -73,6 +77,13 @@ const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
     void fetchProfile();
   }, [fetchProfile]);
 
+  useEffect(() => {
+    if (!toast) return;
+
+    const timeout = window.setTimeout(() => setToast(null), 3000);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
+
 
   const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
   const file = e.target.files?.[0];
@@ -82,7 +93,10 @@ const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
 
 if (!allowedTypes.includes(file.type)) {
-  alert("Only JPEG, PNG, and WebP images are allowed.");
+  setToast({
+    message: "Only JPEG, PNG, and WebP images are allowed.",
+    type: "error",
+  });
   return;
 }
 
@@ -215,8 +229,16 @@ setProfile((prev) => {
 });
 
 setIsEditing(false);
+setToast({
+  message: "Profile updated successfully.",
+  type: "success",
+});
     } catch (err) {
       console.error("Update failed", err);
+      setToast({
+        message: "Failed to update profile. Please try again.",
+        type: "error",
+      });
     }
   };
 
@@ -286,11 +308,11 @@ setIsEditing(false);
       <MentorHeader showFullHeader />
 
       <section
-        className="relative flex min-h-[180px] flex-col justify-center bg-cover bg-center px-0 py-10 text-white"
+        className="relative flex min-h-[180px] flex-col justify-center bg-cover bg-center px-4 py-10 text-white sm:px-6 lg:px-8"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className={mentorHeroOverlay} />
-        <div className="relative z-10 max-w-3xl">
+        <div className="relative z-10 mx-auto w-full max-w-[1180px]">
           <h1 className="text-2xl font-semibold sm:text-3xl md:text-4xl">Your profile</h1>
           <p className={`mt-2 max-w-2xl ${mentorBodyText}`}>
             Update your contact details, ministry context, and church information — styled to match the rest of the
@@ -299,8 +321,8 @@ setIsEditing(false);
         </div>
       </section>
 
-      <main className={`${mentorMainGradient} flex-1 px-0 pb-16 pt-8`}>
-        <div className="flex w-full flex-col gap-8 md:flex-row">
+      <main className={`${mentorMainGradient} flex-1 px-4 pb-16 pt-8 sm:px-6 lg:px-8`}>
+        <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-8 md:flex-row">
           <div
             className={`${mentorGlassCardFrost} flex h-auto w-full flex-shrink-0 flex-col p-6 text-center md:sticky md:top-24 md:w-[300px] md:self-start`}
           >
@@ -545,6 +567,23 @@ setIsEditing(false);
 
       {profileId ? (
         <DocumentsModal isOpen={showDocuments} onClose={() => setShowDocuments(false)} userId={profileId} />
+      ) : null}
+
+      {toast ? (
+        <div className="fixed inset-x-4 bottom-5 z-[80] flex justify-center sm:inset-x-auto sm:right-5 sm:justify-end">
+          <div className="flex max-w-sm items-start gap-3 rounded-xl border border-white/15 bg-[#062946]/95 px-4 py-3 text-sm text-white shadow-2xl shadow-black/40 backdrop-blur-md">
+            <span
+              className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
+                toast.type === "success"
+                  ? "bg-emerald-500/20 text-emerald-300"
+                  : "bg-red-500/20 text-red-300"
+              }`}
+            >
+              <i className={`fa-solid ${toast.type === "success" ? "fa-check" : "fa-xmark"} text-xs`} />
+            </span>
+            <p className="leading-5">{toast.message}</p>
+          </div>
+        </div>
       ) : null}
     </div>
   );

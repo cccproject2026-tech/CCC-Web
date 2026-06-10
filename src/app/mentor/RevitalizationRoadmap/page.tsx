@@ -228,15 +228,27 @@ progress: found?.progress ?? 0,
     <div className={mentorPageRoot}>
       <MentorHeader showFullHeader={true} />
 
-      <DirectorHero
+      {/* <DirectorHero
         title="Revitalization Roadmap"
         subtitle="Open a pastor&apos;s assigned roadmaps or browse templates from the library."
         image={RoadmapHero}
         className="mb-6"
-      />
+      /> */}
+      <div className="px-4 sm:px-6 lg:px-8">
+  <div className="mx-auto w-full max-w-[1180px]">
+    <DirectorHero
+      title="Revitalization Roadmap"
+      subtitle="Open a pastor&apos;s assigned roadmaps or browse templates from the library."
+      image={RoadmapHero}
+      className="mb-6"
+    />
+  </div>
+</div>
 
-      <main className={mentorRoadmapHubMain}>
-        <div className="py-6 md:py-8">
+      {/* <main className={mentorRoadmapHubMain}>
+        <div className="py-6 md:py-8"> */}
+        <main className={mentorRoadmapHubMain}>
+  <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6 md:py-8 lg:px-8">
           <div className={`${mentorFilterPanel} mb-8`}>
             <div className="flex flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-center">
             <MentorSearchBar

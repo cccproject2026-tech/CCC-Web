@@ -830,11 +830,11 @@ setMeetingDescription("");
       <MentorHeader showFullHeader={true} />
 
       <section
-        className="relative flex min-h-[200px] flex-col justify-center bg-cover bg-center px-0 py-10 text-white sm:min-h-[240px]"
+        className="relative flex min-h-[200px] flex-col justify-center bg-cover bg-center px-4 py-10 text-white sm:min-h-[240px] sm:px-6 lg:px-8"
         style={{ backgroundImage: `url(${HeroBg.src})` }}
       >
         <div className={mentorHeroOverlay} />
-        <div className="relative z-10 max-w-4xl">
+        <div className="relative z-10 mx-auto w-full max-w-[1180px]">
           <h1 className="text-2xl font-semibold sm:text-3xl md:text-4xl">Mentor schedule</h1>
           <p className={`mt-2 max-w-2xl ${mentorBodyText}`}>
             View appointments, manage recurring availability, or schedule a new meeting with an assigned pastor — same look
@@ -843,8 +843,8 @@ setMeetingDescription("");
         </div>
       </section>
 
-      <main className={`${mentorMainGradient} flex-1 px-0 pb-20 pt-8`}>
-        <div className="w-full">
+      <main className={`${mentorMainGradient} flex-1 px-4 pb-20 pt-8 sm:px-6 lg:px-8`}>
+        <div className="mx-auto w-full max-w-[1180px]">
           <div className={`${mentorFilterPanel} mb-8`}>
             <div className="flex flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-center">
               <MentorFilterTabGroup

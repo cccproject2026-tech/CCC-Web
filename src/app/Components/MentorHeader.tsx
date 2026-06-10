@@ -324,8 +324,10 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
               </button>
 
               {/* Notification Dropdown */}
-              {showNotifications && (
-                <div className="absolute -right-8 mt-4 w-[450px] overflow-hidden rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.98)_0%,rgba(6,36,62,0.98)_100%)] text-white shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+             {/* {showNotifications && ( 
+                <div className="absolute -right-8 mt-4 w-[450px] overflow-hidden rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.98)_0%,rgba(6,36,62,0.98)_100%)] text-white shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl"> */}
+                {showNotifications && (
+  <div className="fixed left-4 right-4 top-[76px] z-[80] max-h-[calc(100vh-96px)] overflow-hidden rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.98)_0%,rgba(6,36,62,0.98)_100%)] text-white shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl md:absolute md:left-auto md:right-0 md:top-auto md:mt-4 md:w-[450px]">
                   {/* Pointer */}
                  <div className="absolute -top-2 right-8 h-4 w-4 rotate-45 border-l border-t border-white/15 bg-[#0c3a5f]" />
 
@@ -342,7 +344,8 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
                   </div>
 
                   {/* Notifications List */}
-                  <div className="relative z-10 max-h-[520px] space-y-3 overflow-y-auto p-3 pr-2">
+                  {/* <div className="relative z-10 max-h-[520px] space-y-3 overflow-y-auto p-3 pr-2"> */}
+                  <div className="relative z-10 max-h-[calc(100vh-170px)] space-y-3 overflow-y-auto p-3 pr-2 md:max-h-[520px]">
                     {/* {notificationList.slice(0, 4).map((note, i) => (
                       <div
                         key={i}
@@ -475,7 +478,7 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
 
                         {/* ⚙️ Settings Sub-Menu */}
                         {item.subMenu && showSettingsMenu && (
-                          <div className="absolute -left-[240px] top-0 mt-1 w-[230px] rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(245,250,255,0.98)_100%)] text-[#0f4a76] shadow-[0_16px_40px_rgba(3,24,43,0.2)]">
+                          <div className="static mt-1 w-full rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(245,250,255,0.98)_100%)] text-[#0f4a76] shadow-[0_16px_40px_rgba(3,24,43,0.2)] md:absolute md:-left-[240px] md:top-0 md:mt-1 md:w-[230px]">
                            
 
                             <div className="flex flex-col py-2">

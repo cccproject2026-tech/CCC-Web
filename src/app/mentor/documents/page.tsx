@@ -348,7 +348,7 @@ await apiDeleteDocument(ownerId, docId);
               />
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex w-full flex-wrap items-center gap-3 lg:w-auto">
               {selectMode && selectedUrls.length > 0 && (
                 <>
                   <button
@@ -383,7 +383,7 @@ await apiDeleteDocument(ownerId, docId);
               <select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value as "newest" | "oldest")}
-                className="rounded-xl border border-white/15 bg-[#103c60] px-4 py-3 text-sm font-semibold text-white outline-none"
+                className="min-w-[150px] rounded-xl border border-white/15 bg-[#103c60] px-4 py-3 text-sm font-semibold text-white outline-none"
               >
                 <option value="newest">Sort: Newest</option>
                 <option value="oldest">Sort: Oldest</option>
@@ -410,10 +410,15 @@ await apiDeleteDocument(ownerId, docId);
             {!loading && !error && filteredDocuments.length > 0 && (
               <div>
                 {/* <div className="grid grid-cols-[1.5fr_0.6fr_0.8fr_0.4fr] border-b border-white/15 px-5 py-4 text-xs font-bold uppercase tracking-wide text-[#cde2f2]"> */}
-          <div className={`grid ${
+          {/* <div className={`grid ${
   activeTab === "mentee"
     ? "grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
     : "grid-cols-[2fr_0.7fr_1fr_0.5fr]"
+} items-center gap-4 border-b border-white/15 px-5 py-4 text-xs font-bold uppercase tracking-wide text-[#cde2f2]`}> */}
+<div className={`hidden md:grid ${
+  activeTab === "mentee"
+    ? "md:grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
+    : "md:grid-cols-[2fr_0.7fr_1fr_0.5fr]"
 } items-center gap-4 border-b border-white/15 px-5 py-4 text-xs font-bold uppercase tracking-wide text-[#cde2f2]`}>
                   <p>Document Name</p>
                   <p>Type</p>
@@ -431,14 +436,22 @@ await apiDeleteDocument(ownerId, docId);
                       ?.toUpperCase() || "FILE";
 
                   return (
-                    <div
-                      key={key}
-                      className={`grid ${
-  activeTab === "mentee"
-    ? "grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
-    : "grid-cols-[2fr_0.7fr_1fr_0.5fr]"
-} items-center gap-4 border-b border-white/10 px-5 py-5 last:border-b-0`}
-                    >
+//                     <div
+//                       key={key}
+//                       className={`grid ${
+//   activeTab === "mentee"
+//     ? "grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
+//     : "grid-cols-[2fr_0.7fr_1fr_0.5fr]"
+// } items-center gap-4 border-b border-white/10 px-5 py-5 last:border-b-0`}
+//                     >
+<div
+  key={key}
+  className={`flex flex-col gap-4 border-b border-white/10 px-4 py-5 last:border-b-0 md:grid ${
+    activeTab === "mentee"
+      ? "md:grid-cols-[2fr_0.6fr_0.9fr_1fr_0.5fr]"
+      : "md:grid-cols-[2fr_0.7fr_1fr_0.5fr]"
+  } md:items-center md:gap-4 md:px-5`}
+>
                       <div className="flex items-center gap-4">
                         {selectMode && (
                           <input
@@ -462,19 +475,29 @@ await apiDeleteDocument(ownerId, docId);
                         </button>
                       </div>
 
-                      <p className="text-sm text-[#cde2f2]">{type}</p>
+                     <p className="text-sm text-[#cde2f2]">
+  <span className="font-semibold text-white/60 md:hidden">Type: </span>
+  {type}
+</p>
 
                       <p className="text-sm text-[#cde2f2]">
-                        {doc.uploadedAt
-                          ? new Date(doc.uploadedAt).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })
-                          : "Uploaded"}
-                      </p>
+  <span className="font-semibold text-white/60 md:hidden">Date Uploaded: </span>
+  {doc.uploadedAt
+    ? new Date(doc.uploadedAt).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "Uploaded"}
+</p>
+{/* {activeTab === "mentee" && (
+  <p className="text-sm font-semibold text-[#cde2f2]">
+    {doc.uploadedBy || "Mentee"}
+  </p>
+)} */}
 {activeTab === "mentee" && (
   <p className="text-sm font-semibold text-[#cde2f2]">
+    <span className="font-semibold text-white/60 md:hidden">Uploaded By: </span>
     {doc.uploadedBy || "Mentee"}
   </p>
 )}
