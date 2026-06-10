@@ -537,16 +537,26 @@ const selectedTranscriptText = getTranscriptText(
                     </div>
                 ) : visible.length > 0 ? (
                     // <div className="space-y-4">
-                   <div
+//                    <div
+//   className={`grid gap-6 ${
+//     selectedSession ? "lg:grid-cols-[1.5fr_0.9fr]" : "lg:grid-cols-1"
+//   }`}
+// >
+//   <div
+//   className={`space-y-4 pr-2 ${
+//     selectedSession ? "max-h-[720px] overflow-y-auto" : ""
+//   }`}
+// >
+<div
   className={`grid gap-6 ${
     selectedSession ? "lg:grid-cols-[1.5fr_0.9fr]" : "lg:grid-cols-1"
   }`}
 >
   <div
-  className={`space-y-4 pr-2 ${
-    selectedSession ? "max-h-[720px] overflow-y-auto" : ""
-  }`}
->
+    className={`space-y-4 pr-0 lg:pr-2 ${
+      selectedSession ? "lg:max-h-[720px] lg:overflow-y-auto" : ""
+    }`}
+  >
     <SessionProgressHeader sessions={allSessions as any} />
 
     {visible.map((session, index) => {
@@ -567,20 +577,20 @@ const selectedTranscriptText = getTranscriptText(
           onClick={() => setSelectedSessionNumber(session.sessionNumber)}
           className={`w-full px-6 py-4 text-left ${isLockedSession ? "cursor-not-allowed opacity-75" : ""}`}
         >
-          <div className="flex items-center justify-between">
-            <div className="flex flex-1 items-center gap-4">
-              <div className="flex-1">
-                <div className="mb-1 flex items-center gap-2">
-                  <h3 className="font-semibold text-base">
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 flex min-w-0 flex-wrap items-center gap-2">
+                  <h3 className="min-w-0 break-words text-base font-semibold leading-snug">
                     {session.mentorNote}
                   </h3>
 
-                  <span className="text-xs text-white/40">
+                  <span className="shrink-0 text-xs text-white/40">
                     Session {session.sessionNumber}
                   </span>
 
                   {isCurrentSession ? (
-                    <span className="rounded-md border border-yellow-400/30 bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-200">
+                    <span className="shrink-0 rounded-md border border-yellow-400/30 bg-yellow-500/20 px-2 py-0.5 text-[10px] font-bold text-yellow-200">
                       Current
                     </span>
                   ) : null}
@@ -603,18 +613,20 @@ const selectedTranscriptText = getTranscriptText(
               </div>
 
               {sessionStatus === "LOCKED" ? (
-                <span className="rounded-md bg-white/10 px-3 py-1 text-xs font-bold text-white/55">
+                <span className="shrink-0 rounded-md bg-white/10 px-3 py-1 text-xs font-bold text-white/55">
                   LOCKED
                 </span>
               ) : (
+                <span className="shrink-0">
                 <SessionStatusBadge
   status={(isSessionMissed(session) ? "MISSED" : session.status) as any}
   compact
 />
+                </span>
               )}
             </div>
 
-            <i className="fas fa-chevron-right ml-4 text-white/40" />
+            <i className="fas fa-chevron-right shrink-0 text-white/40" />
           </div>
         </button>
       </div>
@@ -623,7 +635,12 @@ const selectedTranscriptText = getTranscriptText(
   </div>
 
   {selectedSession ? (
-    <aside className="rounded-2xl border border-white/15 bg-white/5 p-6">
+    <>
+    <div
+      className="fixed inset-0 z-40 bg-black/45 backdrop-blur-sm lg:hidden"
+      onClick={() => setSelectedSessionNumber(null)}
+    />
+    <aside className="fixed inset-x-3 bottom-3 top-20 z-50 overflow-y-auto rounded-2xl border border-white/15 bg-[#0b3555] p-4 shadow-2xl lg:static lg:inset-auto lg:z-auto lg:overflow-visible lg:bg-white/5 lg:p-6 lg:shadow-none">
       {/* <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-white">
           Session {selectedSession.sessionNumber} Details
@@ -811,6 +828,7 @@ const selectedTranscriptText = getTranscriptText(
         </div>
       </div>
     </aside>
+    </>
   ) : null}
 </div>
                 ) : (

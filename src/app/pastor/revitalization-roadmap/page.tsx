@@ -792,8 +792,7 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
               </DirectorFilterSection>
 
 {activeRecommendedTask ? (
- 
-  <section className={`${directorGlassCard} relative mb-6 overflow-hidden px-5 py-4 sm:px-6 sm:py-5`}>
+ <section className={`${directorGlassCard} relative mb-6 overflow-hidden p-4 sm:p-6`}>
   {recommendedTasks.length > 1 ? (
     <>
       <button
@@ -803,7 +802,7 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
             current === 0 ? recommendedTasks.length - 1 : current - 1
           )
         }
-        className={`${directorIconButton} absolute left-4 top-1/2 z-10 !h-9 !w-9 -translate-y-1/2`}
+        className={`${directorIconButton} absolute left-3 top-1/2 z-10 hidden !h-9 !w-9 -translate-y-1/2 sm:flex`}
         aria-label="Previous recommendation"
       >
         <i className="fa-solid fa-chevron-left text-xs" />
@@ -816,7 +815,7 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
             current === recommendedTasks.length - 1 ? 0 : current + 1
           )
         }
-        className={`${directorIconButton} absolute right-4 top-1/2 z-10 !h-9 !w-9 -translate-y-1/2`}
+        className={`${directorIconButton} absolute right-3 top-1/2 z-10 hidden !h-9 !w-9 -translate-y-1/2 sm:flex`}
         aria-label="Next recommendation"
       >
         <i className="fa-solid fa-chevron-right text-xs" />
@@ -824,18 +823,19 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
     </>
   ) : null}
 
-  <div className="flex flex-col gap-4 px-0 sm:px-12 lg:flex-row lg:items-center lg:justify-between">
+  <div className="flex min-w-0 flex-col gap-5 sm:px-10 lg:flex-row lg:items-end lg:justify-between">
     <div className="min-w-0 flex-1">
-      <p className="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-[#f4d27a]">
+      <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.24em] text-[#f4d27a]">
         Recommended for today
       </p>
 
-      <h2 className="text-xl font-bold text-white sm:text-2xl">
+      <h2 className="break-words text-lg font-bold leading-snug text-white sm:text-2xl">
         {activeRecommendedTask.phase.title}
       </h2>
 
-      <p className="mt-1 text-sm text-[#cde2f2]">
-        Next step:{" "}
+      <p className="mt-2 break-words text-sm leading-relaxed text-[#cde2f2]">
+        <span className="text-white/65">Next step</span>
+        <span className="mx-1 text-white/40">•</span>
         <span className="font-semibold text-white">
           {activeRecommendedTask.task?.name ||
             activeRecommendedTask.task?.title ||
@@ -843,15 +843,28 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
         </span>
       </p>
 
-      <div className="mt-3 max-w-xl">
-        <div className="mb-1 flex items-center justify-between text-xs font-semibold text-white/75">
-          <span>
-            {activeRecommendedTask.completedTasks}/{activeRecommendedTask.totalTasks} tasks completed
-          </span>
-          <span>{activeRecommendedTask.progressPercent}%</span>
+      <div className="mt-5 rounded-2xl border border-white/10 bg-[#041f35]/25 p-3">
+        <div className="mb-3 grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-wide text-white/45">
+              Completed
+            </p>
+            <p className="mt-1 text-sm font-bold text-white">
+              {activeRecommendedTask.completedTasks}/{activeRecommendedTask.totalTasks}
+            </p>
+          </div>
+
+          <div className="text-right">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-white/45">
+              Progress
+            </p>
+            <p className="mt-1 text-sm font-bold text-white">
+              {activeRecommendedTask.progressPercent}%
+            </p>
+          </div>
         </div>
 
-        <div className="h-2 overflow-hidden rounded-full bg-white/10">
+        <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
           <div
             className="h-full rounded-full bg-[#3498DB]"
             style={{ width: `${activeRecommendedTask.progressPercent}%` }}
@@ -860,7 +873,7 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
       </div>
 
       {recommendedTasks.length > 1 ? (
-        <div className="mt-3 flex items-center gap-2">
+        <div className="mt-4 flex items-center justify-center gap-2 sm:justify-start">
           {recommendedTasks.map((item, index) => (
             <button
               key={`${item.phase.id}-${item.taskId}`}
@@ -887,12 +900,121 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
           )}&parentId=${encodeURIComponent(activeRecommendedTask.phase.id)}`
         );
       }}
-      className={`${directorBtnPrimary} min-h-[42px] !px-5 !py-2.5 !text-sm`}
+      className={`${directorBtnPrimary} min-h-[46px] w-full !px-5 !py-3 !text-sm lg:w-auto lg:min-w-[190px]`}
     >
       Continue Journey
     </button>
   </div>
 </section>
+//   <section className={`${directorGlassCard} relative mb-6 overflow-hidden px-4 py-5 sm:px-6 sm:py-5`}>
+//   {recommendedTasks.length > 1 ? (
+//     <>
+//       <button
+//         type="button"
+//         onClick={() =>
+//           setRecommendedIndex((current) =>
+//             current === 0 ? recommendedTasks.length - 1 : current - 1
+//           )
+//         }
+//         className={`${directorIconButton} absolute left-4 top-1/2 z-10 !h-9 !w-9 -translate-y-1/2`}
+//         aria-label="Previous recommendation"
+//       >
+//         <i className="fa-solid fa-chevron-left text-xs" />
+//       </button>
+
+//       <button
+//         type="button"
+//         onClick={() =>
+//           setRecommendedIndex((current) =>
+//             current === recommendedTasks.length - 1 ? 0 : current + 1
+//           )
+//         }
+//         className={`${directorIconButton} absolute right-4 top-1/2 z-10 !h-9 !w-9 -translate-y-1/2`}
+//         aria-label="Next recommendation"
+//       >
+//         <i className="fa-solid fa-chevron-right text-xs" />
+//       </button>
+//     </>
+//   ) : null}
+
+//   <div className="flex flex-col gap-4 px-0 sm:px-12 lg:flex-row lg:items-center lg:justify-between">
+//     <div className="min-w-0 flex-1">
+//       <p className="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-[#f4d27a]">
+//         Recommended for today
+//       </p>
+
+//       <h2 className="text-lg font-bold leading-snug text-white sm:text-2xl">
+//         {activeRecommendedTask.phase.title}
+//       </h2>
+
+//       <p className="mt-1 text-sm text-[#cde2f2]">
+//         Next step:{" "}
+//         <span className="font-semibold text-white">
+//           {activeRecommendedTask.task?.name ||
+//             activeRecommendedTask.task?.title ||
+//             "Continue your next task"}
+//         </span>
+//       </p>
+
+//       {/* <div className="mt-3 max-w-xl">
+//         <div className="mb-1 flex items-center justify-between text-xs font-semibold text-white/75">
+//           <span>
+//             {activeRecommendedTask.completedTasks}/{activeRecommendedTask.totalTasks} tasks completed
+//           </span>
+//           <span>{activeRecommendedTask.progressPercent}%</span>
+//         </div>
+
+//         <div className="h-2 overflow-hidden rounded-full bg-white/10"> */}
+//         <div className="mt-4 max-w-xl">
+//   <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-white/75">
+//     <span>
+//       {activeRecommendedTask.completedTasks}/{activeRecommendedTask.totalTasks} tasks completed
+//     </span>
+//     <span>{activeRecommendedTask.progressPercent}% completed</span>
+//   </div>
+
+//   <div className="h-2.5 overflow-hidden rounded-full bg-white/10">
+//           <div
+//             className="h-full rounded-full bg-[#3498DB]"
+//             style={{ width: `${activeRecommendedTask.progressPercent}%` }}
+//           />
+//         </div>
+//       </div>
+
+//       {recommendedTasks.length > 1 ? (
+//         <div className="mt-3 flex items-center gap-2">
+//           {recommendedTasks.map((item, index) => (
+//             <button
+//               key={`${item.phase.id}-${item.taskId}`}
+//               type="button"
+//               onClick={() => setRecommendedIndex(index)}
+//               className={`h-2 rounded-full transition-all ${
+//                 index === recommendedIndex
+//                   ? "w-7 bg-[#3498DB]"
+//                   : "w-2 bg-white/25 hover:bg-white/45"
+//               }`}
+//               aria-label={`Show recommendation ${index + 1}`}
+//             />
+//           ))}
+//         </div>
+//       ) : null}
+//     </div>
+
+//     <button
+//       type="button"
+//       onClick={() => {
+//         router.push(
+//           `/pastor/jumpstart?id=${encodeURIComponent(
+//             activeRecommendedTask.taskId
+//           )}&parentId=${encodeURIComponent(activeRecommendedTask.phase.id)}`
+//         );
+//       }}
+//       className={`${directorBtnPrimary} min-h-[44px] w-full !px-5 !py-3 !text-sm lg:w-auto`}
+//     >
+//       Continue Journey
+//     </button>
+//   </div>
+// </section>
 ) : null}
 <div className="mb-5 mt-2 flex items-center gap-4">
   <h2 className="shrink-0 text-2xl font-bold text-white">
@@ -1075,7 +1197,7 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
         <div
           key={`${phase.parentRoadmapId || "parent"}-${phase.id}`}
           // className={`${directorGlassCard} flex flex-col overflow-hidden sm:flex-row`}
-          className="group flex min-h-[230px] overflow-hidden rounded-3xl border border-white/15 bg-[linear-gradient(135deg,rgba(255,255,255,0.12),rgba(255,255,255,0.06))] shadow-[0_18px_50px_rgba(0,0,0,0.25)] transition hover:border-[#8ec5eb]/35 hover:bg-white/[0.09] sm:flex-row"
+          className="group flex flex-col overflow-hidden rounded-3xl border border-white/15 bg-[linear-gradient(135deg,rgba(255,255,255,0.12),rgba(255,255,255,0.06))] shadow-[0_18px_50px_rgba(0,0,0,0.25)] transition hover:border-[#8ec5eb]/35 hover:bg-white/[0.09] sm:min-h-[230px] sm:flex-row"
         >
           <div className="relative aspect-[16/10] max-h-52 w-full shrink-0 sm:aspect-auto sm:h-auto sm:max-h-none sm:min-h-[200px] sm:w-[42%] sm:max-w-[220px]">
             {img ? (
@@ -1129,7 +1251,7 @@ const activeRecommendedTask = recommendedTasks[recommendedIndex] ?? null;
                 <span className="font-semibold text-white">{phase.months}</span>
               </p> */}
               <div className="mt-5 border-t border-white/10 pt-4">
-  <div className="grid gap-4 sm:grid-cols-3">
+  <div className="grid gap-3 sm:grid-cols-3 sm:gap-4">
     <div>
       <p className="mb-1 flex items-center gap-2 text-xs font-bold text-white/60">
         <i className="fa-regular fa-calendar text-[#8ec5eb]" />

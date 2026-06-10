@@ -244,13 +244,14 @@ const handleDownloadDocument = async (doc: any) => {
                 Sort: Oldest
               </option>
             </select> */}
-            <div className="flex items-center gap-3">
+            {/* <div className="flex items-center gap-3"> */}
+            <div className="flex w-full flex-wrap items-center gap-3 md:w-auto md:flex-nowrap">
   {selectMode && selectedDocs.length > 0 ? (
     <>
       <button
         type="button"
         onClick={handleBulkShare}
-        className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+        className="min-w-[86px] rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
       >
         Share
       </button>
@@ -279,7 +280,7 @@ const handleDownloadDocument = async (doc: any) => {
   <select
     value={sortOrder}
     onChange={(e) => setSortOrder(e.target.value as "newest" | "oldest")}
-    className="rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white outline-none"
+    className="min-w-[140px] rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white outline-none"
   >
     <option className="bg-[#062946]" value="newest">
       Sort: Newest
@@ -292,7 +293,7 @@ const handleDownloadDocument = async (doc: any) => {
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-white/15 bg-white/[0.03]">
-            <div className="grid grid-cols-[1.8fr_0.7fr_0.9fr_0.5fr] border-b border-white/10 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-[#cde2f2]">
+            <div className="hidden border-b border-white/10 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-[#cde2f2] md:grid md:grid-cols-[1.8fr_0.7fr_0.9fr_0.5fr]">
               <span>Document Name</span>
               <span>Type</span>
               <span>Date Uploaded</span>
@@ -365,10 +366,11 @@ const handleDownloadDocument = async (doc: any) => {
     const isSelected = selectedDocs.includes(docKey);
 
     return (
+    
       <div
-        key={docKey}
-        className="grid grid-cols-[1.8fr_0.7fr_0.9fr_0.5fr] items-center border-b border-white/10 px-6 py-5 last:border-b-0"
-      >
+  key={docKey}
+  className="border-b border-white/10 px-4 py-5 last:border-b-0 md:grid md:grid-cols-[1.8fr_0.7fr_0.9fr_0.5fr] md:items-center md:px-6"
+>
         <div className="flex min-w-0 items-center gap-4">
           {selectMode && (
             <input

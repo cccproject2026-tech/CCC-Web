@@ -1045,7 +1045,7 @@ const selectedDateHasRawAvailability = useMemo(() => {
                   return (
                     <div
                       key={appointmentEntityId(appt)}
-                      className={`relative flex flex-col items-start gap-5 p-4 md:flex-row md:items-center md:p-5 ${pastorGlassCard} ${menuOpenId === appointmentEntityId(appt) ? "z-[60]" : ""}`}
+                      className={`relative flex flex-col items-start gap-4 p-4 md:flex-row md:items-center md:gap-5 md:p-6 ${pastorGlassCard} ${menuOpenId === appointmentEntityId(appt) ? "z-[60]" : ""}`}
                       style={menuOpenId === appointmentEntityId(appt) ? { overflow: "visible" } : undefined}
                     >
                       {/* Icon */}
@@ -1381,12 +1381,12 @@ const selectedDateHasRawAvailability = useMemo(() => {
                         )}
                       </div>
 
-                      <div className="flex h-[100px] w-[100px] shrink-0 items-center justify-center rounded-xl bg-white/95 md:h-[140px] md:w-[140px]">
-                        <Image src={icon} alt={String(mode)} className="h-[50px] w-[50px] md:h-[60px] md:w-[60px]" />
+                      <div className="flex h-[76px] w-[76px] shrink-0 items-center justify-center rounded-xl bg-white/95 md:h-[140px] md:w-[140px]">
+                        <Image src={icon} alt={String(mode)} className="h-[42px] w-[42px] md:h-[60px] md:w-[60px]" />
                       </div>
 
                       <div className="flex w-full flex-col text-white">
-                        <div className="mb-3 flex items-center gap-3">
+                        <div className="mb-3 flex min-w-0 items-center gap-3">
                           {/* <Image
                             src={mentor?.profilePicture || UserProfile}
                             alt="Mentor"
@@ -1407,15 +1407,19 @@ const selectedDateHasRawAvailability = useMemo(() => {
     {getInitials(mentor?.firstName, mentor?.lastName)}
   </div>
 )}
-                          <div>
+                          {/* <div>
                             <h4 className="text-sm font-semibold">
                               {mentor?.firstName} {mentor?.lastName}
-                            </h4>
+                            </h4> */}
+                            <div className="min-w-0">
+  <h4 className="truncate text-sm font-semibold">
+    {mentor?.firstName} {mentor?.lastName}
+  </h4>
                             <p className="text-xs capitalize text-[#8ec5eb]">{String((mentor as any)?.role ?? "Mentor")}</p>
                           </div>
                         </div>
 
-                        <div className="mb-3 flex flex-col flex-wrap gap-2 md:flex-row">
+                        <div className="mb-3 flex flex-row flex-wrap gap-2">
                           <div className="flex items-center gap-2 rounded-md border border-white/20 bg-white/10 px-2 py-[3px] text-xs text-[#d9ebf8] md:px-3">
                             <i className="fa-regular fa-calendar text-[#E3D247]" />
                             <span>Date: {formatDate(String(appt.meetingDate ?? ""))}</span>

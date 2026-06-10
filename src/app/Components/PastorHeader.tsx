@@ -317,14 +317,37 @@ const logoHref = isLoginPage ? "/" : "/pastor/home";
               <Image src={SearchIcon} alt="Search" width={18} height={18} />
             </button>
 
-            {showSearch && (
+            {/* {showSearch && (
               <div className="absolute right-0 top-12 z-[60] w-[min(420px,calc(100vw-2rem))] rounded-2xl border border-white/20 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] p-3 shadow-2xl xl:right-[120px]">
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search roadmaps, assessments, mentors..."
                   className="w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/70 outline-none"
-                />
+                /> */}
+                {showSearch && (
+  <div className="absolute right-0 top-12 z-[60] w-[calc(100vw-2rem)] max-w-[420px] rounded-2xl border border-white/20 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] p-3 shadow-2xl xl:right-[120px]">
+    <div className="flex items-center gap-2">
+      <input
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        placeholder="Search roadmaps, assessments, mentors..."
+        className="min-w-0 flex-1 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-white/70 outline-none"
+      />
+
+      <button
+        type="button"
+        onClick={() => {
+          setShowSearch(false);
+          setSearchQuery("");
+          setSearchResults({ roadmaps: [], assessments: [], mentors: [] });
+        }}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+        aria-label="Close search"
+      >
+        <X size={18} />
+      </button>
+    </div>
                 <div className="mt-3 max-h-[360px] space-y-3 overflow-auto pr-1">
                   {searchLoading && (
                     <p className="text-xs text-white/80">Searching...</p>
@@ -633,13 +656,30 @@ const logoHref = isLoginPage ? "/" : "/pastor/home";
             })}
 
             <div className="flex items-center gap-4 px-4 py-3 border-t border-white/10">
-              <button
+              {/* <button
                 className="flex items-center gap-2 text-white/80 hover:text-white text-sm cursor-pointer"
                 suppressHydrationWarning
               >
                 <Image src={SearchIcon} alt="Search" width={16} height={16} />
                 Search
-              </button>
+              </button> */}
+              <button
+  type="button"
+  onClick={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowSearch(true);
+    setShowMobileMenu(false);
+    setShowNotifications(false);
+    setShowProfileMenu(false);
+    setShowSettingsMenu(false);
+  }}
+  className="flex items-center gap-2 text-white/80 hover:text-white text-sm cursor-pointer"
+  suppressHydrationWarning
+>
+  <Image src={SearchIcon} alt="Search" width={16} height={16} />
+  Search
+</button>
               <button
                 className="flex items-center gap-2 text-white/80 hover:text-white text-sm cursor-pointer"
                 suppressHydrationWarning

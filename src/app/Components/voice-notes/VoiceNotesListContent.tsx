@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import MentorHeader from "@/app/Components/MentorHeader";
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
+
 import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
 import type { VoiceNoteStatus } from "@/app/Services/types/voice-notes.types";
 import { useToast } from "@/app/Components/ui/Toast";
@@ -186,16 +186,26 @@ export default function VoiceNotesListContent({ variant }: { variant: VoiceNotes
               </button>
             </div>
           ) : (
-            <ul className="grid gap-4 sm:grid-cols-2">
-              {filteredNotes.map((note) => (
-                <li key={note.id}>
-                  <button
-                    type="button"
-                    onClick={() => router.push(`${basePath}/${encodeURIComponent(note.id)}`)}
-                    className={`${mentorGlassCardFrost} w-full p-5 text-left transition hover:border-[#3498DB]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3498DB]`}
-                    aria-label={`Open voice note ${note.title}`}
-                  >
-                    <div className="flex items-start gap-3">
+            // <ul className="grid gap-4 sm:grid-cols-2">
+            //   {filteredNotes.map((note) => (
+            //     <li key={note.id}>
+            //       <button
+            //         type="button"
+            //         onClick={() => router.push(`${basePath}/${encodeURIComponent(note.id)}`)}
+            //         className={`${mentorGlassCardFrost} w-full p-5 text-left transition hover:border-[#3498DB]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3498DB]`}
+            //         aria-label={`Open voice note ${note.title}`}
+            //       >
+            //         <div className="flex items-start gap-3">
+            <ul className="grid min-w-0 gap-4 sm:grid-cols-2">
+  {filteredNotes.map((note) => (
+    <li key={note.id} className="min-w-0">
+      <button
+        type="button"
+        onClick={() => router.push(`${basePath}/${encodeURIComponent(note.id)}`)}
+        className={`${mentorGlassCardFrost} w-full min-w-0 overflow-hidden p-5 text-left transition hover:border-[#3498DB]/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#3498DB]`}
+        aria-label={`Open voice note ${note.title}`}
+      >
+        <div className="flex min-w-0 items-start gap-3">
                       <span
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#3498DB]/25 bg-[#3498DB]/15 text-lg"
                         aria-hidden
@@ -203,7 +213,9 @@ export default function VoiceNotesListContent({ variant }: { variant: VoiceNotes
                         🎤
                       </span>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-base font-bold text-white">{note.title}</div>
+                        <div className="max-w-full truncate text-base font-bold text-white">
+  {note.title}
+</div>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <VoiceNoteStatusBadge status={note.status} compact />
                           <span className="text-xs text-white/55">
@@ -232,7 +244,7 @@ export default function VoiceNotesListContent({ variant }: { variant: VoiceNotes
           ) : null}
       </main>
 
-      {variant === "pastor" ? <PastorFooter /> : null}
+      
 
       <VoiceNoteRecordModal
         isOpen={recordOpen}

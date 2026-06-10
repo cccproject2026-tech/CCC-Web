@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import MentorHeader from "@/app/Components/MentorHeader";
 import PastorHeader from "@/app/Components/PastorHeader";
-import PastorFooter from "@/app/Components/PastorFooter";
+
 import TranscriptSummarySection from "@/app/Components/transcript-summary/TranscriptSummarySection";
 import { extractApiErrorMessage } from "@/app/Services/appointment-utils";
 import { useToast } from "@/app/Components/ui/Toast";
@@ -128,7 +128,10 @@ export default function VoiceNoteDetailContent({ variant }: { variant: VoiceNote
           <div className={`${mentorGlassCardFrost} mb-6 p-5 sm:p-6`}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
-                <h1 className="text-xl font-bold text-white sm:text-2xl">{note.title}</h1>
+                {/* <h1 className="text-xl font-bold text-white sm:text-2xl">{note.title}</h1> */}
+                <h1 className="break-words text-xl font-bold text-white sm:text-2xl">
+  {note.title}
+</h1>
                 <p className="mt-1 text-sm text-white/60">{formatVoiceNoteDate(note.createdAt)}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -212,7 +215,7 @@ export default function VoiceNoteDetailContent({ variant }: { variant: VoiceNote
           ) : null}
       </main>
 
-      {variant === "pastor" ? <PastorFooter /> : null}
+      {/* {variant === "pastor" ? <PastorFooter /> : null} */}
 
       <VoiceNoteUploadModal
         isOpen={retryUploadOpen}
