@@ -92,11 +92,6 @@ export default function MentorAssessmentCdpPage() {
         try {
           const recommendationsRes = await apiGetSectionRecommendations(requestedAssessmentId, userId);
           const sentIds = collectSentSectionIds(recommendationsRes.data);
-          mapped = parseRecommendationSectionsForPastorView(
-            recommendationsRes.data,
-            Array.isArray(detail?.sections) ? detail.sections : [],
-          );
-
           let answersBySection: Record<string, number> = {};
           try {
             const answersRes = await apiGetUserAnswers(requestedAssessmentId, userId);
@@ -116,6 +111,11 @@ export default function MentorAssessmentCdpPage() {
           } catch {
             // Keep the page useful even if answer scores are unavailable.
           }
+          mapped = parseRecommendationSectionsForPastorView(
+            recommendationsRes.data,
+            Array.isArray(detail?.sections) ? detail.sections : [],
+            answersBySection,
+          );
 
           const responseData = recommendationsRes.data as Record<string, unknown>;
           const sections = Array.isArray(responseData?.sections) ? responseData.sections : [];

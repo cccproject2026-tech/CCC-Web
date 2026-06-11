@@ -1,3 +1,9 @@
+import {
+  extractCdpLevelBlock,
+  hasMultipleCdpLevelBlocks,
+  normalizeSendableCdpMessage,
+} from "@/app/utils/assessment-recommendations";
+
 type RecommendationSectionView = {
   sectionId: string;
   sectionTitle: string;
@@ -21,14 +27,41 @@ function linesToText(lines: string[]): string {
   return lines.map((line) => normalizeText(line)).filter(Boolean).join("\n").trim();
 }
 
-function recommendationValueToLines(value: unknown): string[] {
+function toFiniteNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function getSelectedLevel(row: Record<string, unknown>): number | undefined {
+  return toFiniteNumber(row.level ?? row.score ?? row.sectionScore ?? row.selectedLevel);
+}
+
+function recommendationValueToLines(value: unknown, selectedLevel?: number): string[] {
   if (typeof value === "string") {
     const text = normalizeText(value);
-    return text ? [text] : [];
+    const normalized = normalizeSendableCdpMessage(text, selectedLevel);
+    return normalized ? [normalized] : [];
   }
 
   if (Array.isArray(value)) {
-    return value.flatMap((item) => recommendationValueToLines(item));
+    const primitiveOnly = value.every(
+      (item) => typeof item === "string" || typeof item === "number",
+    );
+    if (primitiveOnly) {
+      const lines = value.map(normalizeText).filter(Boolean);
+      const joined = lines.join("\n");
+      if (hasMultipleCdpLevelBlocks(joined)) {
+        const levelText = extractCdpLevelBlock(joined, selectedLevel);
+        return levelText ? [levelText] : [];
+      }
+      return lines;
+    }
+
+    return value.flatMap((item) => recommendationValueToLines(item, selectedLevel));
   }
 
   if (!value || typeof value !== "object") {
@@ -36,20 +69,32 @@ function recommendationValueToLines(value: unknown): string[] {
   }
 
   const row = value as Record<string, unknown>;
+  const rowLevel = getSelectedLevel(row);
+  const effectiveLevel = selectedLevel ?? rowLevel;
   const direct = row.message ?? row.text ?? row.description ?? row.label ?? row.cdp ?? row.mentorCdp;
   if (direct != null && normalizeText(direct)) {
-    return [normalizeText(direct)];
+    const directText = normalizeText(direct);
+    if (hasMultipleCdpLevelBlocks(directText)) {
+      const levelText = extractCdpLevelBlock(directText, effectiveLevel);
+      return levelText ? [levelText] : [];
+    }
+    return [directText];
   }
 
-  const items = row.items ?? row.recommendations;
-  if (items != null) {
-    return recommendationValueToLines(items);
+  if (row.items != null) {
+    if (selectedLevel == null) return [];
+    if (rowLevel != null && rowLevel !== selectedLevel) return [];
+    return recommendationValueToLines(row.items, effectiveLevel);
+  }
+
+  if (row.recommendations != null) {
+    return recommendationValueToLines(row.recommendations, effectiveLevel);
   }
 
   return [];
 }
 
-function extractLayerRecommendationText(layer: unknown): string {
+function extractLayerRecommendationText(layer: unknown, selectedLevel?: number): string {
   if (!layer || typeof layer !== "object") return "";
   const row = layer as Record<string, unknown>;
   const keys = [
@@ -76,7 +121,7 @@ function extractLayerRecommendationText(layer: unknown): string {
 
   for (const key of keys) {
     const value = row[key];
-    const text = linesToText(recommendationValueToLines(value));
+    const text = linesToText(recommendationValueToLines(value, selectedLevel ?? getSelectedLevel(row)));
     if (text) return text;
   }
 
@@ -129,6 +174,7 @@ function parseSectionRow(
   rows: Map<string, RecommendationSectionView>,
   titleById: Map<string, string>,
   sectionIndex: number,
+  scoreBySectionId: Record<string, number> = {},
 ) {
   const sectionId = normalizeText(row.sectionId ?? row._id ?? row.id ?? `section_${sectionIndex}`);
   const sectionTitle =
@@ -136,9 +182,13 @@ function parseSectionRow(
     titleById.get(sectionId) ||
     `Section ${sectionIndex + 1}`;
   const sentAt = normalizeText(row.sentAt ?? row.updatedAt ?? row.createdAt) || undefined;
+  const selectedLevel = getSelectedLevel(row) ?? scoreBySectionId[sectionId];
 
   const directMessage = linesToText(
-    recommendationValueToLines(row.recommendations ?? row.message ?? row.text ?? row.cdp ?? row.mentorCdp),
+    recommendationValueToLines(
+      row.recommendations ?? row.message ?? row.text ?? row.cdp ?? row.mentorCdp,
+      selectedLevel,
+    ),
   );
   if (directMessage) {
     addRow(rows, sectionId, sectionTitle, directMessage, sentAt);
@@ -146,7 +196,7 @@ function parseSectionRow(
 
   const layers = Array.isArray(row.layers) ? row.layers : [];
   const layerMessages = layers
-    .map((layer) => extractLayerRecommendationText(layer))
+    .map((layer) => extractLayerRecommendationText(layer, selectedLevel))
     .filter((message) => message !== "");
   if (layerMessages.length > 0) {
     addRow(rows, sectionId, sectionTitle, layerMessages.join("\n\n"), sentAt);
@@ -157,11 +207,12 @@ function walkRecommendationPayload(
   payload: unknown,
   rows: Map<string, RecommendationSectionView>,
   titleById: Map<string, string>,
+  scoreBySectionId: Record<string, number> = {},
 ) {
   if (Array.isArray(payload)) {
     payload.forEach((entry, index) => {
       if (entry && typeof entry === "object") {
-        parseSectionRow(entry as Record<string, unknown>, rows, titleById, index);
+        parseSectionRow(entry as Record<string, unknown>, rows, titleById, index, scoreBySectionId);
       }
     });
     return;
@@ -171,23 +222,24 @@ function walkRecommendationPayload(
 
   const body = payload as Record<string, unknown>;
   if (Array.isArray(body.sections)) {
-    walkRecommendationPayload(body.sections, rows, titleById);
+    walkRecommendationPayload(body.sections, rows, titleById, scoreBySectionId);
   }
   if (Array.isArray(body.recommendations)) {
-    walkRecommendationPayload(body.recommendations, rows, titleById);
+    walkRecommendationPayload(body.recommendations, rows, titleById, scoreBySectionId);
   }
   if (body.data != null) {
-    walkRecommendationPayload(body.data, rows, titleById);
+    walkRecommendationPayload(body.data, rows, titleById, scoreBySectionId);
   }
 }
 
 export function parseRecommendationSectionsForPastorView(
   payload: unknown,
   sections: SectionMeta[] = [],
+  scoreBySectionId: Record<string, number> = {},
 ): RecommendationSectionView[] {
   const titleById = buildSectionTitleMap(sections);
   const rows = new Map<string, RecommendationSectionView>();
-  walkRecommendationPayload(payload, rows, titleById);
+  walkRecommendationPayload(payload, rows, titleById, scoreBySectionId);
 
   if (rows.size === 0) return [];
 

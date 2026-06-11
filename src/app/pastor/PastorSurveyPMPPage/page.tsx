@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 
 export default function PastorSurveyPMPPage() {
   const [activeSection, setActiveSection] = useState(1);
+  const sectionTopRef = useRef<HTMLDivElement | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [showMeeting, setShowMeeting] = useState(false);
   const [showMentorSidebar, setShowMentorSidebar] = useState(false);
@@ -25,9 +26,25 @@ export default function PastorSurveyPMPPage() {
       .forEach((cb) => (cb.checked = false));
   };
 
+  const scrollToSectionTop = () => {
+    requestAnimationFrame(() => {
+      if (sectionTopRef.current) {
+        sectionTopRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+        return;
+      }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  };
+
   const handleNext = () => {
-    if (activeSection < sections.length) setActiveSection(activeSection + 1);
-    else {
+    if (activeSection < sections.length) {
+      setActiveSection(activeSection + 1);
+      scrollToSectionTop();
+    } else {
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
@@ -102,6 +119,7 @@ export default function PastorSurveyPMPPage() {
           key={activeSection}
           className="flex-1 bg-transparent rounded-lg p-1 sm:p-2 overflow-y-auto transition-all duration-500"
         >
+          <div ref={sectionTopRef} />
           <p className="text-xs sm:text-sm text-white/90 mb-4 sm:mb-6 leading-relaxed">
             Choose the option in each box that best matches how you feel and who
             you are, as this self-assessment helps you understand yourself

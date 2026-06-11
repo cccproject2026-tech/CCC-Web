@@ -5,11 +5,10 @@ import { useRouter, useParams } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import {
-  apiPatchAssessment,
+  apiPatchAssessmentMain,
   apiGetAssessmentById,
   apiUploadAssessmentBanner,
   apiUpdateInstructions,
-  apiUpdateSections,
   formatAssessmentApiErrorMessage,
   parseAssessmentDetailPayload,
 } from "@/app/Services/assessment.service";
@@ -37,6 +36,7 @@ type PreSurveyRow = {
 
 const MAX_BANNER_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_BANNER_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp"]);
+const MIN_LAYERS = 1;
 
 const defaultPreSurveyRow = (): PreSurveyRow => ({
   id: Date.now(),
@@ -76,14 +76,7 @@ export default function MentorEditAssessmentPage() {
   const [hasPreSurvey, setHasPreSurvey] = useState(false);
 
   // Modals
-  const [showAddSectionModal, setShowAddSectionModal] = useState(false);
-  const [showAddLayerModal, setShowAddLayerModal] = useState(false);
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
-
-  // Form state for Add Section
-  const [newSectionName, setNewSectionName] = useState("");
-  const [newSectionGuidelines, setNewSectionGuidelines] = useState("");
-  const [newSectionLayers, setNewSectionLayers] = useState(2);
 
   // Instructions state
   const [instructions, setInstructions] = useState<InstructionItem[]>([]);
@@ -93,6 +86,36 @@ export default function MentorEditAssessmentPage() {
   const bannerInputRef = useRef<HTMLInputElement | null>(null);
 
   const [sections, setSections] = useState<Section[]>([]);
+
+  const createId = (prefix: string) =>
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+  const createBlankLayer = (sectionId: string, layerIndex: number) => {
+    const layerId = createId(`${sectionId}-layer-${layerIndex + 1}`);
+    return {
+      id: layerId,
+      name: `Layer ${layerIndex + 1}`,
+      choices: [{ id: createId(`${layerId}-choice-1`), text: "" }],
+      recommendations: [],
+    };
+  };
+
+  const createBlankSection = (sectionIndex: number): Section => {
+    const sectionId = createId(`section-${sectionIndex + 1}`);
+    return {
+      id: sectionId,
+      name: "",
+      description: "",
+      layers: [createBlankLayer(sectionId, 0)],
+      levelPlans: ([1, 2, 3, 4] as const).map((level) => ({
+        id: `${sectionId}-level-${level}`,
+        level,
+        items: [{ id: createId(`${sectionId}-level-${level}-item-1`), text: "" }],
+      })),
+    };
+  };
 
   useEffect(() => {
     if (!params?.id) return;
@@ -215,19 +238,62 @@ export default function MentorEditAssessmentPage() {
     el.focus();
   };
 
-  const handleAddSection = () => {
-    if (!newSectionName) return;
+  const handleUpdateSectionField = (
+    sectionId: string,
+    field: "name" | "description",
+    value: string,
+  ) => {
+    setSections((prev) =>
+      prev.map((section) => (section.id === sectionId ? { ...section, [field]: value } : section)),
+    );
+  };
 
+  const handleAddSection = () => {
+    const nextSection = createBlankSection(sections.length);
+    setSections((prev) => [...prev, nextSection]);
+    setSelectedSection(nextSection.id);
+    setIsEditMode(true);
     showToast("Section Added Successfully");
-    setShowAddSectionModal(false);
-    setNewSectionName("");
-    setNewSectionGuidelines("");
-    setNewSectionLayers(2);
+  };
+
+  const handleDeleteSelectedSection = () => {
+    if (!selectedSectionData || sections.length <= 1) return;
+
+    setSections((prev) => {
+      const currentIndex = prev.findIndex((section) => section.id === selectedSectionData.id);
+      const next = prev.filter((section) => section.id !== selectedSectionData.id);
+      const fallback = next[Math.min(Math.max(currentIndex, 0), Math.max(next.length - 1, 0))];
+      setSelectedSection(fallback?.id ?? "");
+      return next;
+    });
   };
 
   const handleAddLayer = () => {
-    showToast("Layer Added Successfully");
-    setShowAddLayerModal(false);
+    if (!selectedSectionData) return;
+
+    setSections((prev) =>
+      prev.map((section) => {
+        if (section.id !== selectedSectionData.id) return section;
+        return {
+          ...section,
+          layers: [...section.layers, createBlankLayer(section.id, section.layers.length)],
+        };
+      }),
+    );
+    setIsEditMode(true);
+    showToast("Layer added successfully");
+  };
+
+  const handleRemoveLayer = (sectionId: string, layerId: string) => {
+    setSections((prev) =>
+      prev.map((section) => {
+        if (section.id !== sectionId || section.layers.length <= MIN_LAYERS) return section;
+        return {
+          ...section,
+          layers: section.layers.filter((layer) => layer.id !== layerId),
+        };
+      }),
+    );
   };
 
   const handleDeleteInstructions = () => {
@@ -435,13 +501,15 @@ export default function MentorEditAssessmentPage() {
         return;
       }
 
+      const existingType = String(assessment.type || "").toUpperCase();
+      const isCmaAssessment = existingType === "CMA";
       const preSurveyPayload = buildPreSurveyPayloadForDirectorCreate(preSurveyRows);
-      if (hasPreSurvey && preSurveyPayload.length === 0) {
+      if (isCmaAssessment && hasPreSurvey && preSurveyPayload.length === 0) {
         showToast("Include pre-survey is on — add at least one pre-survey question with text.");
         focusField("mentor-presurvey-question-0");
         return;
       }
-      const firstEmptyPreSurveyIdx = hasPreSurvey
+      const firstEmptyPreSurveyIdx = isCmaAssessment && hasPreSurvey
         ? preSurveyRows.findIndex((row) => row.text.trim().length === 0)
         : -1;
       if (firstEmptyPreSurveyIdx !== -1) {
@@ -450,17 +518,20 @@ export default function MentorEditAssessmentPage() {
         return;
       }
 
-      await apiPatchAssessment(assessment.id, {
+      const typeForApi: "CMA" | "PMP" = isCmaAssessment ? "CMA" : "PMP";
+      const patchBody = {
         name: assessmentName.trim(),
         description: description.trim(),
-        type: hasPreSurvey ? "CMA" : "PMP",
-        preSurvey: hasPreSurvey ? preSurveyPayload : [],
-      });
+        type: typeForApi,
+        sections: buildSectionsPayload(sections),
+        instructions: instructionLines,
+        ...(isCmaAssessment
+          ? { preSurvey: hasPreSurvey ? preSurveyPayload : [] }
+          : {}),
+      };
 
-      await apiUpdateSections(
-        assessment.id,
-        buildSectionsPayload(sections)
-      );
+      console.log("MENTOR PATCH BODY", patchBody);
+      await apiPatchAssessmentMain(assessment.id, patchBody);
 
       if (bannerFile) {
         await apiUploadAssessmentBanner(assessment.id, bannerFile);
@@ -494,7 +565,7 @@ export default function MentorEditAssessmentPage() {
           <div className="w-full flex-shrink-0 space-y-3 md:w-80">
             <div className="flex items-center gap-3 mb-4">
               <button
-                onClick={() => setShowAddSectionModal(true)}
+                onClick={handleAddSection}
                 className="flex items-center gap-2 rounded-lg bg-[#8ec5eb]/90 px-4 py-2 text-sm font-semibold text-[#062946] shadow-md hover:bg-[#8ec5eb]"
               >
                 <i className="fa-solid fa-plus"></i>
@@ -685,6 +756,57 @@ export default function MentorEditAssessmentPage() {
                   </div>
                 </div>
 
+                <div className="mb-6 rounded-xl border border-white/20 bg-white/5 p-5">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-white font-semibold">Section Details</h3>
+                      <p className="mt-1 text-sm text-white/60">Edit the selected section name and guidelines.</p>
+                    </div>
+                    {sections.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={handleDeleteSelectedSection}
+                        className="rounded-lg border border-red-300/40 bg-red-500/15 px-3 py-2 text-sm font-semibold text-red-200 hover:bg-red-500/25"
+                      >
+                        <i className="fa-solid fa-trash mr-2"></i>
+                        Delete section
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+                        Name of Section
+                      </label>
+                      <input
+                        type="text"
+                        value={selectedSectionData.name}
+                        onChange={(e) =>
+                          handleUpdateSectionField(selectedSectionData.id, "name", e.target.value)
+                        }
+                        placeholder="Enter Name of Section"
+                        className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-sm font-semibold text-[#cde2f2]">
+                        Guidelines
+                      </label>
+                      <input
+                        type="text"
+                        value={selectedSectionData.description}
+                        onChange={(e) =>
+                          handleUpdateSectionField(selectedSectionData.id, "description", e.target.value)
+                        }
+                        placeholder="Enter Guidelines"
+                        className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="rounded-xl border border-white/20 bg-white/5 p-5 mb-6">
                   <div className="mb-3 flex items-center justify-between">
                     <h3 className="text-white font-semibold">Edit Instructions</h3>
@@ -813,7 +935,7 @@ export default function MentorEditAssessmentPage() {
                     {isEditMode ? "Done" : "Edit"}
                   </button>
                   <button
-                    onClick={() => setShowAddLayerModal(true)}
+                    onClick={handleAddLayer}
                     className="px-5 py-2 bg-white text-[#2E3B8E] rounded-lg font-semibold hover:bg-gray-100 text-sm flex items-center gap-2 shadow-md"
                   >
                     <i className="fa-solid fa-layer-group"></i>
@@ -828,15 +950,27 @@ export default function MentorEditAssessmentPage() {
                       key={layer.id}
                       className="rounded-xl border-2 border-white/20 bg-white/5 p-5"
                     >
-                      <div className="mb-4 flex items-center justify-between">
+                      <div className="mb-4 flex items-center justify-between gap-3">
                         <h3 className="text-white font-semibold">Layer {layerIdx + 1}</h3>
-                        <span className="text-xs text-white/60">Choices</span>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <span className="text-xs text-white/60">Choices</span>
+                          {selectedSectionData.layers.length > MIN_LAYERS ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveLayer(selectedSectionData.id, layer.id)}
+                              className="rounded-lg border border-red-300/40 bg-red-500/15 px-2.5 py-1.5 text-xs font-semibold text-red-200 hover:bg-red-500/25"
+                            >
+                              <i className="fa-solid fa-trash mr-1"></i>
+                              Delete Layer
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
 
                       <div className="space-y-2 mb-4">
                         {layer.choices.map((choice, choiceIdx) => (
                           <div
-                            key={choiceIdx}
+                            key={choice.id}
                             className="bg-white/10 border border-white/25 rounded-lg p-3 text-white flex items-center gap-3 transition-all"
                           >
                             <span className="text-sm font-semibold">
@@ -986,208 +1120,6 @@ export default function MentorEditAssessmentPage() {
           </button>
         </div>
       </section>
-
-      {/* Add Section Modal (Offcanvas from right) */}
-      {showAddSectionModal && (
-        <div className="fixed inset-0 bg-black/60 flex justify-end z-50">
-          <div className="bg-[#0a3558] w-full max-w-lg h-full overflow-y-auto border border-white/15 shadow-2xl animate-slide-left">
-            <div className="sticky top-0 bg-[#0a3558] border-b border-white/10 p-6 flex justify-between items-center z-10">
-              <h3 className="text-2xl font-bold text-white">Add Section</h3>
-              <button
-                onClick={() => setShowAddSectionModal(false)}
-                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg"
-              >
-                <i className="fa-solid fa-xmark text-gray-600"></i>
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              <h4 className="text-xl font-bold text-white">
-                Section {sections.length + 1}
-              </h4>
-
-              <div>
-                <label className="block text-sm font-medium text-[#cde2f2] mb-2">
-                  Name of Section
-                </label>
-                <input
-                  type="text"
-                  value={newSectionName}
-                  onChange={(e) => setNewSectionName(e.target.value)}
-                  placeholder="Enter Name of Section"
-                  className="w-full px-4 py-3 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50 text-white placeholder-white/40 bg-white/5"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#cde2f2] mb-2">
-                  Guidelines
-                </label>
-                <input
-                  type="text"
-                  value={newSectionGuidelines}
-                  onChange={(e) => setNewSectionGuidelines(e.target.value)}
-                  placeholder="Enter Guidelines"
-                  className="w-full px-4 py-3 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50 text-white placeholder-white/40 bg-white/5"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[#cde2f2] mb-2">
-                  Number of Layers
-                </label>
-                <select
-                  value={newSectionLayers}
-                  onChange={(e) => setNewSectionLayers(Number(e.target.value))}
-                  className="w-full px-4 py-3 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50 text-white bg-white/5"
-                >
-                  {[2, 3, 4, 5].map((num) => (
-                    <option key={num} value={num}>
-                      {num}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {Array.from({ length: newSectionLayers }).map((_, i) => (
-                <div key={i} className="border-t pt-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="text-base font-bold text-gray-900">
-                      Layer {i + 1}
-                    </label>
-                    <button className="px-3 py-1 bg-white border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg text-sm font-semibold hover:bg-blue-50 flex items-center gap-1">
-                      <i className="fa-solid fa-plus"></i>
-                      Choice
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Choice 1"
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900 placeholder-gray-400"
-                  />
-                </div>
-              ))}
-
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-base font-bold text-gray-900">
-                    Layer 1 - Customized Development Plans
-                  </label>
-                  <button className="px-3 py-1 bg-white border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg text-sm font-semibold hover:bg-blue-50 flex items-center gap-1">
-                    <i className="fa-solid fa-plus"></i>
-                    Plan
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Choice 1"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900 placeholder-gray-400"
-                />
-              </div>
-
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-base font-bold text-gray-900">
-                    Layer 2 - Customized Development Plans
-                  </label>
-                  <button className="px-3 py-1 bg-white border-2 border-[#2E3B8E] text-[#2E3B8E] rounded-lg text-sm font-semibold hover:bg-blue-50 flex items-center gap-1">
-                    <i className="fa-solid fa-plus"></i>
-                    Plan
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Choice 1"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900 placeholder-gray-400"
-                />
-              </div>
-            </div>
-
-            <div className="sticky bottom-0 bg-[#0a3558] border-t border-white/10 p-6 flex justify-between gap-4">
-              <button
-                onClick={() => setShowAddSectionModal(false)}
-                className="flex-1 px-6 py-3 border-2 border-white/20 bg-white/5 text-[#cde2f2] rounded-lg font-semibold hover:bg-white/10"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddSection}
-                disabled={!newSectionName}
-                className={`flex-1 px-6 py-3 rounded-lg font-semibold ${newSectionName
-                  ? "bg-[#8ec5eb]/90 text-[#062946] hover:bg-[#8ec5eb]"
-                  : "bg-white/20 text-white/50 cursor-not-allowed"
-                  }`}
-              >
-                Create Section
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Layer Modal */}
-      {showAddLayerModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#0a3558] rounded-2xl border border-white/15 p-8 max-w-lg w-full shadow-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-bold text-white">Add Layer</h3>
-              <button
-                onClick={() => setShowAddLayerModal(false)}
-                className="w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded-lg"
-              >
-                <i className="fa-solid fa-xmark text-gray-600"></i>
-              </button>
-            </div>
-
-            <div className="space-y-6">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-base font-bold text-white">
-                    Layer {selectedSectionData?.layers.length! + 1}
-                  </label>
-                  <button className="px-3 py-1 bg-white/10 border border-[#8ec5eb]/60 text-[#8ec5eb] rounded-lg text-sm font-semibold hover:bg-white/5 flex items-center gap-1">
-                    <i className="fa-solid fa-plus"></i>
-                    Choice
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Choice 1"
-                  className="w-full px-4 py-3 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#8ec5eb]/50 text-white placeholder-white/40 bg-white/5"
-                />
-              </div>
-
-              <div className="border-t pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <label className="text-base font-bold text-white">
-                    Layer {selectedSectionData?.layers.length! + 1}
-                  </label>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Choice 2"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2E3B8E] text-gray-900 placeholder-gray-400"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-4 mt-8">
-              <button
-                onClick={() => setShowAddLayerModal(false)}
-                className="flex-1 px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg font-semibold hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddLayer}
-                className="flex-1 px-6 py-3 bg-[#2E3B8E] text-white rounded-lg font-semibold hover:bg-[#1F2A6E]"
-              >
-                Create Layer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Instructions Modal */}
       {showInstructionsModal && (

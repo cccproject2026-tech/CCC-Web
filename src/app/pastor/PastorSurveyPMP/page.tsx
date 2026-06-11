@@ -1,21 +1,40 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import headerBg from "../../Assets/PMP-hero-bg.png";
 
 export default function PastorSurveyPMP() {
   const [activeSection, setActiveSection] = useState(0);
+  const sectionTopRef = useRef<HTMLDivElement | null>(null);
   const [answers, setAnswers] = useState<Record<string, boolean>>({});
+  const scrollToSectionTop = () => {
+    requestAnimationFrame(() => {
+      if (sectionTopRef.current) {
+        sectionTopRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+        return;
+      }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  };
 
   const handleCheck = (key: string) =>
     setAnswers((prev) => ({ ...prev, [key]: !prev[key] }));
 
   const handleNext = () => {
-    if (activeSection < sections.length - 1)
+    if (activeSection < sections.length - 1) {
       setActiveSection((prev) => prev + 1);
+      scrollToSectionTop();
+    }
   };
   const handlePrev = () => {
-    if (activeSection > 0) setActiveSection((prev) => prev - 1);
+    if (activeSection > 0) {
+      setActiveSection((prev) => prev - 1);
+      scrollToSectionTop();
+    }
   };
 
   // ✅ Sections 1 – 5
@@ -367,6 +386,7 @@ export default function PastorSurveyPMP() {
 
         {/* RIGHT PANEL */}
         <section className="flex-1">
+          <div ref={sectionTopRef} />
           <p className="text-xs sm:text-sm leading-relaxed mb-4 sm:mb-6 max-w-full sm:max-w-2xl">
             Choose the option in each box that best matches how you feel and who
             you are. Your accuracy allows us to provide the best support and

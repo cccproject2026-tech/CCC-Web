@@ -65,7 +65,7 @@ type AssessmentCardRow = {
   id: string;
   title: string;
   description: string;
-  image: string | typeof Thumb1;
+ image: string | typeof Thumb1 | null;
   type?: unknown;
   progressStatus?: "not_started" | "submitted" | "completed";
   dueDate?: string;
@@ -307,7 +307,7 @@ const pastorIdFromQuery = searchParams.get("pastorId");
   const [featuredLoading, setFeaturedLoading] = useState(false);
 
   const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(
-  pastorIdFromQuery || assignUserFromQuery
+  pastorIdFromQuery
 );
   const [assignDueDate, setAssignDueDate] = useState("");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name_asc" | "name_desc">("newest");
@@ -373,8 +373,12 @@ const [mentorPastorRows, setMentorPastorRows] = useState<any[]>([]);
           if (!id) continue;
 
           const raw = rawItem.bannerImage;
+          // const resolved =
+          //   (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
           const resolved =
-            (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
+  typeof raw === "string" && raw.trim()
+    ? resolveApiMediaUrl(raw) ?? raw
+    : null;
           const titleRaw =
             (typeof rawItem.name === "string" && rawItem.name.trim() ? rawItem.name : null) ??
             (typeof rawItem.title === "string" && rawItem.title.trim() ? rawItem.title : null);
@@ -497,8 +501,12 @@ for (const appt of appointmentsList) {
                 };
 
                 const raw = detailObj.bannerImage;
+                // const image =
+                //   (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
                 const image =
-                  (typeof raw === "string" ? resolveApiMediaUrl(raw) ?? raw : null) || Thumb1;
+  typeof raw === "string" && raw.trim()
+    ? resolveApiMediaUrl(raw) ?? raw
+    : null;
                 const assessmentId = String(detailObj._id ?? detailObj.id ?? flat.assessmentId);
                 const assignmentId = String(flat.assignmentId ?? "").trim();
                 const appointmentId = String((item as any)?.appointmentId ?? detailObj?.appointmentId ?? "").trim();
@@ -702,6 +710,16 @@ useEffect(() => {
 
   useEffect(() => {
 
+    if (!pastorIdFromQuery) return;
+    setSelectedMenteeId(pastorIdFromQuery);
+    setSelectedUsers([]);
+    setSelectedAssessments([]);
+    setIsSelectionMode(false);
+    setToast(null);
+  }, [pastorIdFromQuery]);
+
+  useEffect(() => {
+
      if (!assignUserFromQuery || pastorIdFromQuery) return;
     if (lastAssignBootstrap.current === assignUserFromQuery) return;
     lastAssignBootstrap.current = assignUserFromQuery;
@@ -712,7 +730,7 @@ useEffect(() => {
     setToast("Select assessments, then tap Assign.");
     const t = setTimeout(() => setToast(null), 4500);
     return () => clearTimeout(t);
-  }, [assignUserFromQuery]);
+  }, [assignUserFromQuery, pastorIdFromQuery]);
 
   useEffect(() => {
     if (!showAssignModal) return;
@@ -1301,14 +1319,23 @@ const filteredMentorRows = useMemo(() => {
                   </p>
                 </div>
               </div>
-
+{/* 
               <button
                 type="button"
                 onClick={() => setSelectedMenteeId(row.id)}
                 className={`${directorBtnPrimary} mt-4 w-full justify-center`}
               >
                 View Assessments
-              </button>
+              </button> */}
+              <button
+  type="button"
+  onClick={() => {
+    router.push(`/director/assessments?pastorId=${row.id}&tab=pastors`);
+  }}
+  className={`${directorBtnPrimary} mt-4 w-full justify-center`}
+>
+  View Assessments
+</button>
             </div>
           );
         })}
@@ -1684,7 +1711,7 @@ const filteredMentorRows = useMemo(() => {
                   <div className="flex flex-col gap-0 p-0">
                     {/* Row 1: Image + Title + Description */}
                     <div className="flex gap-4 p-6 pb-4">
-                      <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
+                      {/* <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
                         <Image
                           src={assessment.image || Thumb1}
                           alt={assessment.title}
@@ -1694,7 +1721,26 @@ const filteredMentorRows = useMemo(() => {
                             typeof assessment.image === "string" &&
                             (assessment.image.startsWith("blob:") || isRemoteImageSrc(assessment.image))
                           }
-                        />
+                        /> */}
+                        <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
+  {assessment.image ? (
+    <Image
+      src={assessment.image}
+      alt={assessment.title}
+      fill
+      className="object-cover"
+      unoptimized={
+        typeof assessment.image === "string" &&
+        (assessment.image.startsWith("blob:") || isRemoteImageSrc(assessment.image))
+      }
+    />
+  ) : (
+    <div className="flex h-full w-full items-center justify-center bg-white/5 text-center">
+      <span className="px-2 text-sm font-semibold text-white/60">
+        {assessment.title || "No Image"}
+      </span>
+    </div>
+  )}
                         {selectedMenteeId && (
                           <div className="absolute bottom-1.5 left-1.5 inline-flex max-w-[120px] items-center gap-1 truncate rounded-md bg-[#fff6d8] px-1.5 py-[2px] text-[10px] font-semibold text-[#d38a00]">
                             <i className="fa-regular fa-calendar text-[10px]" />

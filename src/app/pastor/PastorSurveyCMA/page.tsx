@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import headerBg from "../../Assets/CMA-hero-bg.png";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -16,9 +16,14 @@ import { apiGetRoadmapsByUser, apiTriggerJumpstartComplete } from "@/app/Service
 import { apiUpdateAssessmentProgress } from "@/app/Services/progress.service";
 import { getCookie } from "@/app/utils/cookies";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
-import { apiCreateAppointment } from "@/app/Services/appointments.service";
+import { apiCreateAppointment, apiGetAppointments } from "@/app/Services/appointments.service";
 import axiosInstance from "@/app/Services/config/axios-instance";
-import { formatAvailabilitySlotLabel, parseSlotStartToIso, unwrapMonthlyAvailabilityPayload } from "@/app/Services/appointment-utils";
+import {
+  formatAvailabilitySlotLabel,
+  parseSlotStartToIso,
+  unwrapAppointmentsList,
+  unwrapMonthlyAvailabilityPayload,
+} from "@/app/Services/appointment-utils";
 import { isAxiosError } from "axios";
 
 /** HTML `input[type=date]` value is YYYY-MM-DD — parse without UTC day-shift. */
@@ -299,6 +304,64 @@ function getTimesForDate(dateStr: string, availability: any[]): string[] {
   return [];
 }
 
+function getAppointmentMentorId(appt: any): string {
+  return String(appt?.mentor?._id ?? appt?.mentor?.id ?? appt?.mentorId ?? "").trim();
+}
+
+function isBlockingBookedAppointment(appt: any, mentorId: string): boolean {
+  const apptMentorId = getAppointmentMentorId(appt);
+  const status = String(appt?.status ?? "").toLowerCase();
+  return (
+    apptMentorId === mentorId &&
+    !status.includes("cancel") &&
+    status !== "missed" &&
+    typeof appt?.meetingDate === "string" &&
+    !Number.isNaN(new Date(appt.meetingDate).getTime())
+  );
+}
+
+function buildBookedSlotStartMsByDate(appointments: any[], mentorId: string): Map<string, number[]> {
+  const bookedByDate = new Map<string, number[]>();
+
+  appointments.forEach((appt) => {
+    if (!isBlockingBookedAppointment(appt, mentorId)) return;
+    const meetingDate = String(appt.meetingDate);
+    const ymd = slotDateToYmd(meetingDate);
+    const ms = new Date(meetingDate).getTime();
+    if (!ymd || Number.isNaN(ms)) return;
+    const existing = bookedByDate.get(ymd) ?? [];
+    existing.push(ms);
+    bookedByDate.set(ymd, existing);
+  });
+
+  return bookedByDate;
+}
+
+function filterBookedAvailabilitySlots(availabilitySlots: any[], appointments: any[], mentorId: string): any[] {
+  const bookedByDate = buildBookedSlotStartMsByDate(appointments, mentorId);
+
+  return availabilitySlots.map((slot: any) => {
+    const ymd = slotDateToYmd(
+      slot?.date ?? slot?.day ?? slot?.calendarDate ?? slot?.meetingDate ?? slot?.dateString,
+    );
+    const rawSlots = Array.isArray(slot?.slots) ? slot.slots : [];
+    if (!ymd || rawSlots.length === 0) return slot;
+
+    const bookedMs = bookedByDate.get(ymd) ?? [];
+    if (bookedMs.length === 0) return slot;
+
+    const openSlots = rawSlots.filter((raw: any) => {
+      const label = formatAvailabilitySlotLabel(raw);
+      if (!label.trim()) return false;
+      const slotMs = new Date(parseSlotStartToIso(ymd, label)).getTime();
+      if (Number.isNaN(slotMs)) return false;
+      return !bookedMs.some((booked) => Math.abs(booked - slotMs) < 30 * 60 * 1000);
+    });
+
+    return { ...slot, slots: openSlots };
+  });
+}
+
 /** Backend expects selectedChoice like "1", "2", ... based on option order. */
 function toSelectedChoiceNumber(layer: any, selectedValue: string): string {
   const raw = String(selectedValue ?? "").trim();
@@ -386,7 +449,21 @@ async function ensureJumpstartTriggeredForAssessment(userId: string): Promise<vo
 function PastorSurveyCMAContent() {
   const router = useRouter();
   const [activeSection, setActiveSection] = useState(0);
+  const sectionTopRef = useRef<HTMLDivElement | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const scrollToSectionTop = () => {
+    requestAnimationFrame(() => {
+      if (sectionTopRef.current) {
+        sectionTopRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+        return;
+      }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  };
   const searchParams = useSearchParams();
   const assessmentId = searchParams.get("assessmentId");
   const routeRoadmapId = searchParams.get("roadmapId")?.trim() || "";
@@ -607,7 +684,18 @@ const meetingPlatform = searchParams.get("platform")?.trim() || "";
             slots = Array.isArray(raw) ? raw : [];
           }
         }
-        setAvailability(slots);
+        let bookedAppointments: any[] = [];
+        try {
+          const appointmentsRes = await apiGetAppointments({
+            mentorId: selectedMentor,
+            futureOnly: false,
+          } as any);
+          bookedAppointments = unwrapAppointmentsList(appointmentsRes.data);
+        } catch (appointmentsErr) {
+          console.error("Failed to fetch booked mentor appointments", appointmentsErr);
+        }
+
+        setAvailability(filterBookedAvailabilitySlots(slots, bookedAppointments, selectedMentor));
       } catch (err) {
         console.error("Failed to fetch availability", err);
         setAvailability([]);
@@ -662,11 +750,15 @@ const meetingPlatform = searchParams.get("platform")?.trim() || "";
 
     if (activeSection < sections.length - 1) {
       setActiveSection((prev) => prev + 1);
+      scrollToSectionTop();
     }
   };
 
   const handlePrev = () => {
-    if (activeSection > 0) setActiveSection((prev) => prev - 1);
+    if (activeSection > 0) {
+      setActiveSection((prev) => prev - 1);
+      scrollToSectionTop();
+    }
   };
  const handleClearResponses = () => {
   if (uiReadOnly) return;
@@ -1033,7 +1125,7 @@ const confirmClearResponses = () => {
             </aside>
 
             <section className="min-w-0 flex-1">
-              <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+              <div ref={sectionTopRef} className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
                 <p className="max-w-2xl text-sm leading-relaxed text-[#cde2f2]">
                   Choose the option in each box that best matches how you feel and who you are. Your accuracy allows us
                   to provide the best support and guidance.

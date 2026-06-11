@@ -602,10 +602,10 @@ const recommendedAssessment = filtered.find((item) => item.status === "Not Start
       >
         <div className={pastorHeroOverlay} />
         <div className="relative z-10">
-          <p className={pastorEyebrowPill}>
+          {/* <p className={pastorEyebrowPill}>
             <span className={pastorEyebrowDot} />
             Leadership Support Network
-          </p>
+          </p> */}
           <h1 className="mt-3 text-2xl font-semibold text-white md:text-4xl">Assessments</h1>
           <p className="mt-2 max-w-xl text-sm text-[#d9ebf8] md:text-base">
             Complete assigned assessments and monitor your submission status.

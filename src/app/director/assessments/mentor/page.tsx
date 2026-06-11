@@ -214,7 +214,7 @@ function MentorAssessmentPastorsContent() {
                      <button
   type="button"
   onClick={() =>
-    router.push(`/director/assessments?assignUser=${row.id}`)
+    router.push(`/director/assessments?pastorId=${row.id}&tab=pastors`)
   }
   className={`${directorBtnPrimary} mt-4 w-full justify-center sm:mt-auto sm:w-auto sm:self-end`}
 >

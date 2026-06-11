@@ -5,7 +5,7 @@ import HeroBg from "@/app/Assets/assignments-bg.png";
 import UserProfile from "@/app/Assets/user-profile.png";
 import Thumb1 from "@/app/Assets/thumb1.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import { isRemoteImageSrc } from "@/app/utils/image";
+import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { ApiAvatarPlaceholder, ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import {
@@ -46,7 +46,11 @@ import {
 } from "@/app/Components/mentor/mentor-theme";
 import FeaturedAvatars, { FeaturedAvatarItem } from "@/app/Components/FeaturedAvatars";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
-import { getStoredRecommendationsForPastorAssessment, upsertStoredRecommendation } from "@/app/utils/assessment-recommendations";
+import {
+  getStoredRecommendationsForPastorAssessment,
+  normalizeSendableCdpMessage,
+  upsertStoredRecommendation,
+} from "@/app/utils/assessment-recommendations";
 
 type MentorAssessmentStatus = "not_started" | "submitted" | "completed";
 
@@ -353,19 +357,6 @@ function buildLayerTextForScore(section: RuleSection | undefined, score: number 
       return lines.join("\n");
     }
   }
-
-  // Fallback: if score-specific layer is empty, aggregate non-empty layer recommendations.
-  const aggregated: string[] = [];
-  layers.forEach((layer) => {
-    const items = Array.isArray(layer.recommendations)
-      ? layer.recommendations.filter((x) => String(x || "").trim() !== "")
-      : [];
-    if (items.length > 0) {
-      if (layer.title) aggregated.push(`${layer.title}:`);
-      items.forEach((item) => aggregated.push(`- ${item}`));
-    }
-  });
-  if (aggregated.length > 0) return aggregated.join("\n");
 
   return "";
 }
@@ -1148,13 +1139,25 @@ try {
     cancelled = true;
   };
 }, [activeTab, featuredItems, assessments]);
-  const getCardImageSrc = (assessment: any): string | typeof Thumb1 => {
-    const assessmentId = getAssessmentId(assessment);
-    if (assessmentId && failedBannerImageIds[assessmentId]) return Thumb1;
-    const src = assessment?.image;
-    if (typeof src === "string" && src.trim()) return src;
-    return Thumb1;
-  };
+  // const getCardImageSrc = (assessment: any): string | typeof Thumb1 => {
+  //   const assessmentId = getAssessmentId(assessment);
+  //   if (assessmentId && failedBannerImageIds[assessmentId]) return Thumb1;
+  //   const src = assessment?.image;
+  //   if (typeof src === "string" && src.trim()) return src;
+  //   return Thumb1;
+  // };
+  const getCardImageSrc = (assessment: any): string | null => {
+  const assessmentId = getAssessmentId(assessment);
+  if (assessmentId && failedBannerImageIds[assessmentId]) return null;
+
+  const raw = assessment?.bannerImage || assessment?.image;
+
+  if (typeof raw === "string" && raw.trim()) {
+    return resolveApiMediaUrl(raw) ?? raw;
+  }
+
+  return null;
+};
 
   const selectedMenteeName = useMemo(() => {
     const row = featuredItems.find((item) => String(item.id) === String(selectedMenteeId || ""));
@@ -1192,8 +1195,6 @@ try {
         const sectionTitle = String(section?.name || section?.title || `Section ${idx + 1}`);
         const existing = stored.find((s) => s.sectionId === sectionId);
         const matchedRulesSection = findRuleSection(ruleSections, sectionId, sectionTitle, idx);
-        const rulesText = buildSectionRuleText(matchedRulesSection);
-        const existingFromAssessment = buildSectionExistingText(section);
 
         const answerSection = answerSections.find((s) => s.sectionId === sectionId);
         const answerText = (answerSection?.recommendations || []).join("\n");
@@ -1201,12 +1202,18 @@ try {
         const previewText = (previewSection?.recommendations || []).join("\n");
         const currentScore = answerSection?.sectionScore ?? previewSection?.score;
         const layerText = buildLayerTextForScore(matchedRulesSection, currentScore);
+        const existingText = existing?.sent
+          ? normalizeSendableCdpMessage(existing.message, currentScore)
+          : "";
+        const answerCdpText = normalizeSendableCdpMessage(answerText, currentScore);
+        const previewCdpText = normalizeSendableCdpMessage(previewText, currentScore);
+        const generatedCdpText = normalizeSendableCdpMessage(layerText, currentScore);
 
         return {
           sectionId,
           sectionTitle,
           score: currentScore,
-          message: existing?.message || answerText || previewText || layerText || existingFromAssessment || rulesText,
+          message: existingText || answerCdpText || previewCdpText || generatedCdpText,
         };
       });
 
@@ -1250,7 +1257,9 @@ try {
     const payloadRows = recommendationRows
       .map((row) => ({
         ...row,
-        parsedItems: parseRecommendationItemsFromText(row.message),
+        parsedItems: parseRecommendationItemsFromText(
+          normalizeSendableCdpMessage(row.message, row.score),
+        ),
       }))
       .filter((row) => row.parsedItems.length > 0);
 
@@ -2090,9 +2099,9 @@ assessment._mentorHasSentCdp
 
                       <div className="flex flex-col gap-0 p-0">
                         {/* Row 1: Image + Title + Description */}
-                        <div className="flex gap-5 p-6">
-                          <div className="relative h-32 w-32 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
-                            {(() => {
+                        <div className="flex gap-4 p-4 pr-14">
+                          <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-lg ring-1 ring-white/10">
+                            {/* {(() => {
                               const cardImageSrc = getCardImageSrc(assessment);
                               const assessmentId = getAssessmentId(assessment);
                               return (
@@ -2113,33 +2122,61 @@ assessment._mentorHasSentCdp
                               }
                             />
                               );
-                            })()}
-                            {selectedMenteeId && (
-                              <div className="absolute bottom-1.5 left-1.5 inline-flex max-w-[120px] items-center gap-1 truncate rounded-md bg-[#fff6d8] px-1.5 py-[2px] text-[10px] font-semibold text-[#d38a00]">
-                                <i className="fa-regular fa-calendar text-[10px]" />
-                                Due: {formatDueDate(assessment._mentorDueDate) || "N/A"}
-                              </div>
-                            )}
+                            })()} */}
+                            {(() => {
+  const cardImageSrc = getCardImageSrc(assessment);
+  const assessmentId = getAssessmentId(assessment);
+
+  return cardImageSrc ? (
+    <Image
+      src={cardImageSrc}
+      alt={assessment.name || "Assessment"}
+      fill
+      className="object-cover"
+      onError={() => {
+        if (!assessmentId) return;
+        setFailedBannerImageIds((prev) =>
+          prev[assessmentId] ? prev : { ...prev, [assessmentId]: true },
+        );
+      }}
+      unoptimized={
+        cardImageSrc.startsWith("blob:") || isRemoteImageSrc(cardImageSrc)
+      }
+    />
+  ) : (
+    <div className="flex h-full w-full items-center justify-center bg-white/5 text-center">
+      <span className="px-2 text-sm font-semibold text-white/60">
+        {assessment.name || "No Image"}
+      </span>
+    </div>
+  );
+})()}
                           </div>
 
-                          <div className="flex flex-1 flex-col justify-between">
+                          <div className="flex min-w-0 flex-1 flex-col justify-between">
                             <div>
                               {/* <h3 className="mb-2 text-lg font-bold text-white">{assessment.name}</h3>
                               <p className="text-sm text-white/65">{assessment.description}</p> */}
-                              <h3 className="mb-2 text-lg font-bold text-white">{assessment.name}</h3>
+                              <h3 className="mb-1 truncate text-base font-bold text-white">{assessment.name}</h3>
 
-<p className="line-clamp-2 min-h-[44px] text-sm leading-[22px] text-white/65">
+<p className="line-clamp-2 min-h-[38px] text-sm leading-[19px] text-white/65">
   {assessment.description || "No description available."}
 </p>
 
 {selectedMenteeId && (
-  <span
-    className={`mt-3 inline-flex w-fit rounded-lg border px-3 py-1 text-sm font-bold ${assessmentStatusChipClass(
-      assessment._mentorAssignmentStatus,
-    )}`}
-  >
-    {assessmentStatusLabel(assessment._mentorAssignmentStatus)}
-  </span>
+  <div className="mt-2 flex flex-wrap items-center gap-2">
+    <span
+      className={`inline-flex w-fit rounded-md border px-2.5 py-1 text-xs font-bold ${assessmentStatusChipClass(
+        assessment._mentorAssignmentStatus,
+      )}`}
+    >
+      {assessmentStatusLabel(assessment._mentorAssignmentStatus)}
+    </span>
+    <span className="inline-flex w-fit items-center gap-1 rounded-md bg-[#fff6d8] px-2.5 py-1 text-xs font-bold text-[#d38a00]">
+      <i className="fa-regular fa-calendar text-[10px]" />
+      Due: {formatDueDate(assessment._mentorDueDate) || "N/A"}
+    </span>
+  </div>
   
 )}
                             </div>
@@ -2147,88 +2184,31 @@ assessment._mentorHasSentCdp
                         </div>
 
 {activeTab === "pastors" && selectedMenteeId ? (
-  <div className="grid grid-cols-1 gap-3 border-t border-white/10 px-6 py-4 text-xs text-[#d9ebf8] sm:grid-cols-[220px_1fr]">
-    <div className="flex flex-col gap-2">
-      <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-        <p className="text-[10px] text-[#d9ebf8]/65">Created By</p>
-        <p className="truncate font-semibold text-white">
-          {assessment._mentorCreatedBy || "N/A"}
-        </p>
-      </div>
-
-      <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-        <p className="text-[10px] text-[#d9ebf8]/65">Created At</p>
-        <p className="font-semibold text-white">
-          {formatCreatedDate(assessment._mentorCreatedAt) || "N/A"}
-        </p>
-      </div>
-    </div>
-
-    {assessment._mentorMeetingActive && (
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => router.push(`/mentor/MentorSchedule/${assessment._mentorAppointmentId}`)}
-        onKeyDown={(e) => {
-          if (e.key !== "Enter" && e.key !== " ") return;
-          e.preventDefault();
-          router.push(`/mentor/MentorSchedule/${assessment._mentorAppointmentId}`);
-        }}
-        // className="relative flex min-h-[92px] w-full flex-col justify-center rounded-lg border border-[#8ec5eb]/35 bg-[#173a55]/65 px-4 py-3 text-left transition hover:bg-[#1c4564]/75"
-        className="relative flex min-h-[116px] w-full flex-col justify-center rounded-lg border border-[#8ec5eb]/35 bg-[#173a55]/65 px-5 py-4 text-left transition hover:bg-[#1c4564]/75"
-      >
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8ec5eb]">Meeting</p>
-        <p className="mt-1 pr-9 text-sm font-bold text-white">
-          {assessment._mentorMeetingDateLabel || "Meeting scheduled"}
-        </p>
-        <p className="mt-1 text-xs font-semibold text-[#8ec5eb]">Zoom</p>
-
-        <div className="options-menu-container absolute right-3 top-3">
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowDropdown(
-                showDropdown === `meeting-${assessment._id}` ? null : `meeting-${assessment._id}`,
-              );
-            }}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter" && e.key !== " ") return;
-              e.preventDefault();
-              e.stopPropagation();
-              setShowDropdown(
-                showDropdown === `meeting-${assessment._id}` ? null : `meeting-${assessment._id}`,
-              );
-            }}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-white/70 hover:bg-white/10"
-            aria-label="Meeting options"
-          >
-            <i className="fa-solid fa-ellipsis-vertical" />
-          </span>
-
-          {showDropdown === `meeting-${assessment._id}` && (
-            <div
-              className="absolute right-0 z-50 mt-2 w-40 rounded-xl border border-white/15 bg-[#041f35] py-2 shadow-xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                type="button"
-                onClick={() => {
-                  setShowDropdown(null);
-                  router.push(
-  `/mentor/MentorSchedule?appointmentId=${assessment._mentorAppointmentId}&reschedule=1`,
-);
-                }}
-                className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm font-semibold text-white/90 hover:bg-white/10"
-              >
-                Reschedule
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    )}
+  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-white/10 px-4 py-3 text-xs text-[#d9ebf8]">
+    <span className="min-w-0">
+      <span className="text-[#d9ebf8]/65">Created By: </span>
+      <span className="font-semibold text-white">{assessment._mentorCreatedBy || "N/A"}</span>
+    </span>
+    <span>
+      <span className="text-[#d9ebf8]/65">Created At: </span>
+      <span className="font-semibold text-white">{formatCreatedDate(assessment._mentorCreatedAt) || "N/A"}</span>
+    </span>
+    <span className="min-w-0">
+      <span className="text-[#d9ebf8]/65">Meeting: </span>
+      {assessment._mentorAppointmentId ? (
+        <button
+          type="button"
+          onClick={() => router.push(`/mentor/MentorSchedule/${encodeURIComponent(assessment._mentorAppointmentId)}`)}
+          className="font-bold text-amber-200 underline-offset-2 hover:text-amber-100 hover:underline"
+        >
+          {assessment._mentorMeetingDateLabel ? `${assessment._mentorMeetingDateLabel} · Zoom` : "Meeting scheduled · Zoom"}
+        </button>
+      ) : (
+        <span className="font-bold text-amber-200">
+          {assessment._mentorMeetingDateLabel ? `${assessment._mentorMeetingDateLabel} · Zoom` : "N/A"}
+        </span>
+      )}
+    </span>
   </div>
 ) : null}
                         

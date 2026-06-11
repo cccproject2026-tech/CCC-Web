@@ -14,7 +14,11 @@ import {
   parseAssessmentDetailPayload,
   extractSurveySectionsForCma,
 } from "@/app/Services/assessment.service";
-import { getStoredRecommendationsForPastorAssessment, upsertStoredRecommendation } from "@/app/utils/assessment-recommendations";
+import {
+  getStoredRecommendationsForPastorAssessment,
+  normalizeSendableCdpMessage,
+  upsertStoredRecommendation,
+} from "@/app/utils/assessment-recommendations";
 
 type CdpMap = Record<string, string>;
 type AnswersMap = Record<string, string>;
@@ -569,27 +573,28 @@ const contentTopRef = useRef<HTMLDivElement | null>(null);
         const sectionTitle = String(section?.name || section?.title || `Section ${idx + 1}`);
         const existing = stored.find((s) => s.sectionId === sectionId);
         const matchedRulesSection = findRuleSection(ruleSections, sectionId, sectionTitle, idx);
-        const rulesText = buildSectionRuleText(matchedRulesSection);
-        const existingFromAssessment = buildSectionExistingText(section);
         const answerSection = answerSections.find((s) => s.sectionId === sectionId);
         const answerText = (answerSection?.recommendations || []).join("\n");
         const previewSection = previewSections.find((s) => s.sectionId === sectionId);
         const previewText = (previewSection?.recommendations || []).join("\n");
         const currentScore = answerSection?.sectionScore ?? previewSection?.score;
         const layerText = buildLayerTextForScore(matchedRulesSection, currentScore);
+        const existingText = existing?.sent
+          ? normalizeSendableCdpMessage(existing.message, currentScore)
+          : "";
+        const answerCdpText = normalizeSendableCdpMessage(answerText, currentScore);
+        const previewCdpText = normalizeSendableCdpMessage(previewText, currentScore);
+        const generatedCdpText = normalizeSendableCdpMessage(layerText, currentScore);
         return {
           sectionId,
           sectionTitle,
           score: currentScore,
-          // message: existing?.message || answerText || previewText || layerText || existingFromAssessment || rulesText,
           message: viewRecommendation
-  ? existing?.message || previewText || answerText || ""
-  : existing?.message ||
-    answerText ||
-    previewText ||
-    layerText ||
-    existingFromAssessment ||
-    rulesText,
+  ? existingText || previewCdpText || answerCdpText || ""
+  : existingText ||
+    answerCdpText ||
+    previewCdpText ||
+    generatedCdpText,
         };
       });
 
@@ -626,7 +631,12 @@ const contentTopRef = useRef<HTMLDivElement | null>(null);
     if (!assessmentId || !userId) return;
     const now = new Date().toISOString();
     const payloadRows = recommendationRows
-      .map((row) => ({ ...row, parsedItems: parseRecommendationItemsFromText(row.message) }))
+      .map((row) => ({
+        ...row,
+        parsedItems: parseRecommendationItemsFromText(
+          normalizeSendableCdpMessage(row.message, row.score),
+        ),
+      }))
       .filter((row) => row.parsedItems.length > 0);
     if (payloadRows.length === 0) {
       setToast("Add at least one recommendation to send");

@@ -68,3 +68,53 @@ export function upsertStoredRecommendation(entry: StoredAssessmentRecommendation
   }
   writeAll(list);
 }
+
+function normalizeCdpText(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
+function getLevelHeading(line: string): number | undefined {
+  const match = line.trim().match(/^level\s*([1-4])\b/i);
+  if (!match) return undefined;
+
+  const level = Number(match[1]);
+  return Number.isFinite(level) ? level : undefined;
+}
+
+function getLevelHeadings(message: string): Array<{ level: number; index: number }> {
+  return message
+    .split(/\r?\n/)
+    .map((line, index) => ({ level: getLevelHeading(line), index }))
+    .filter((item): item is { level: number; index: number } => item.level != null);
+}
+
+export function hasMultipleCdpLevelBlocks(message: string): boolean {
+  return new Set(getLevelHeadings(message).map((item) => item.level)).size > 1;
+}
+
+export function extractCdpLevelBlock(message: string, selectedLevel?: number): string {
+  const text = normalizeCdpText(message);
+  if (!text) return "";
+
+  const headings = getLevelHeadings(text);
+  if (headings.length === 0) return text;
+  if (!hasMultipleCdpLevelBlocks(text)) return text;
+  if (selectedLevel == null || !Number.isFinite(selectedLevel)) return "";
+
+  const selectedIndex = headings.findIndex((heading) => heading.level === selectedLevel);
+  if (selectedIndex < 0) return "";
+
+  const lines = text.split(/\r?\n/);
+  const start = headings[selectedIndex].index + 1;
+  const end = headings[selectedIndex + 1]?.index ?? lines.length;
+
+  return lines.slice(start, end).map(normalizeCdpText).filter(Boolean).join("\n").trim();
+}
+
+export function normalizeSendableCdpMessage(message: unknown, selectedLevel?: number): string {
+  const text = normalizeCdpText(message);
+  if (!text) return "";
+  if (!hasMultipleCdpLevelBlocks(text)) return text;
+
+  return extractCdpLevelBlock(text, selectedLevel);
+}
