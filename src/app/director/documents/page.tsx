@@ -36,7 +36,8 @@ export default function DirectorDocumentsPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedUrls, setSelectedUrls] = useState<string[]>([]);
   const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
-
+const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+const [deleting, setDeleting] = useState(false);
   const [uploading, setUploading] = useState(false);
 const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -211,7 +212,7 @@ const handleUploadDocument = async (e: React.ChangeEvent<HTMLInputElement>) => {
 
   const handleDownloadDocument = async (doc: any) => {
     if (!doc?.fileUrl) return;
-
+console.log("DOWNLOAD DOC:", doc.fileUrl);
     const response = await fetch(doc.fileUrl);
     const blob = await response.blob();
     const blobUrl = window.URL.createObjectURL(blob);
@@ -249,6 +250,17 @@ await apiDeleteDocument(doc.ownerId, docId);
       alert("Failed to delete document.");
     }
   };
+  const handleConfirmDeleteDocument = async () => {
+  if (!deleteTarget || deleting) return;
+
+  try {
+    setDeleting(true);
+    await handleDeleteDocument(deleteTarget);
+    setDeleteTarget(null);
+  } finally {
+    setDeleting(false);
+  }
+};
 
   const handleShareDocument = async (doc: any) => {
     if (!doc?.fileUrl) return;
@@ -568,14 +580,25 @@ await apiDeleteDocument(doc.ownerId, docId);
                               Share
                             </button>
 
-                            <button
+                            {/* <button
                               type="button"
                               onClick={() => handleDeleteDocument(doc)}
                               className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-100 hover:bg-red-500/20"
                             >
                               <i className="fa-solid fa-trash text-red-200" />
                               Delete
-                            </button>
+                            </button> */}
+                            <button
+  type="button"
+  onClick={() => {
+    setDeleteTarget(doc);
+    setOpenMenuKey(null);
+  }}
+  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-100 hover:bg-red-500/20"
+>
+  <i className="fa-solid fa-trash text-red-200" />
+  Delete
+</button>
                           </div>
                         )}
 
@@ -595,7 +618,52 @@ await apiDeleteDocument(doc.ownerId, docId);
             )}
           </div>
         </div>
-      </main>
+        </main>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-white/15 bg-[#082f4d] p-6 shadow-2xl">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-red-500/15 text-red-200">
+                <i className="fa-solid fa-trash" />
+              </div>
+
+              <div>
+                <h2 className="text-lg font-semibold text-white">
+                  Delete document?
+                </h2>
+                <p className="mt-1 text-sm text-[#cde2f2]">
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <p className="mb-6 break-words rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white">
+              {deleteTarget.fileName || "Document"}
+            </p>
+
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmDeleteDocument}
+                disabled={deleting}
+                className="rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {deleting ? "Deleting..." : "Yes, delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -115,7 +115,7 @@ const getInitialsAvatar = (name: string) =>
   )}&background=173653&color=ffffff`;
 
 const PAGE_SIZE = 10;
-const FEATURED_THUMB_LIMIT = 6;
+const FEATURED_THUMB_LIMIT = 500;
 
 function getUserListEmail(person: {
   email?: string;
@@ -228,6 +228,10 @@ export default function MenteesPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [tabCounts, setTabCounts] = useState({
+  active: 0,
+  completed: 0,
+});
   const [activeTab, setActiveTab] = useState<"all" | "active" | "completed">(
     "all"
   );
@@ -314,6 +318,43 @@ setAssignedMentorList(
 
     fetchMentees();
   }, [debouncedQuery, currentPage, activeTab]);
+
+  useEffect(() => {
+  let cancelled = false;
+
+  const fetchTabCounts = async () => {
+    try {
+      const search = debouncedQuery.length > 0 ? debouncedQuery : undefined;
+
+      const [activeRes, completedRes] = await Promise.all([
+        apiGetAllUsers(
+          buildMenteeListParams("active", search, 1, 1) as any,
+        ),
+        apiGetAllUsers(
+          buildMenteeListParams("completed", search, 1, 1) as any,
+        ),
+      ]);
+
+      if (cancelled) return;
+
+      setTabCounts({
+        active: Number(activeRes.data?.data?.total ?? 0),
+        completed: Number(completedRes.data?.data?.total ?? 0),
+      });
+    } catch (error) {
+      console.error("Failed to load mentee tab counts", error);
+      if (!cancelled) {
+        setTabCounts({ active: 0, completed: 0 });
+      }
+    }
+  };
+
+  void fetchTabCounts();
+
+  return () => {
+    cancelled = true;
+  };
+}, [debouncedQuery]);
 
   // First 6 profile thumbnails: page 1 for current search + tab (not paged / client sort)
   useEffect(() => {
@@ -605,18 +646,77 @@ setAssignedMentorList(
     [featuredMentees],
   );
 
-  const getMenteeOptions = (menteeId: string) => [
+//   const getMenteeOptions = (menteeId: string) => [
+//     {
+//       icon: "fa-solid fa-route",
+//       label: "Revitalization Roadmap",
+//       color: "text-[#8ec5eb]",
+//       onClick: () =>
+       
+//   router.push(
+//   `/director/revitalization-roadmap?tab=pastor&pastorId=${encodeURIComponent(
+//     menteeId
+//   )}&returnTo=${encodeURIComponent("/director/mentees")}`
+// )
+//     },
+//     {
+//       icon: "fa-solid fa-clipboard-check",
+//       label: "Assessments",
+//       color: "text-[#8ec5eb]",
+//       onClick: () =>
+//         router.push(
+//           // `/director/assessments?assignUser=${encodeURIComponent(menteeId)}`
+//           `/director/assessments?tab=pastors&pastorId=${encodeURIComponent(menteeId)}`
+//         ),
+//     },
+
+
+//     {
+//   icon: "fa-solid fa-user-group",
+//   label: "Assigned Mentors",
+//   color: "text-[#8ec5eb]",
+//   onClick: async () => {
+//     setSelectedMentee(menteeId);
+//     await loadAssignedUsers(menteeId);
+//     setShowAssignedMentorsModal(true);
+//   },
+// },
+//     {
+//       icon: "fa-solid fa-user-plus",
+//       label: "Assign New Mentor",
+//       color: "text-[#8ec5eb]",
+//       onClick: () => {
+//         setSelectedMentee(menteeId);
+//         setShowAssignModal(true);
+//       },
+//     },
+//     {
+//       icon: "fa-solid fa-user-minus",
+//       label: "Remove a Mentor",
+//       color: "text-red-400",
+//       onClick: async () => {
+//         setSelectedMentee(menteeId);
+//         await loadAssignedUsers(menteeId);
+//         setShowRemoveModal(true);
+//       },
+//     },
+//   ];
+
+const getMenteeOptions = (mentee: Mentee) => {
+  const menteeId = mentee.id;
+  const isCompleted = mentee.status === "completed" || Number(mentee.progress ?? 0) >= 100;
+
+  return [
     {
       icon: "fa-solid fa-route",
       label: "Revitalization Roadmap",
       color: "text-[#8ec5eb]",
       onClick: () =>
-       
-  router.push(
-  `/director/revitalization-roadmap?tab=pastor&pastorId=${encodeURIComponent(
-    menteeId
-  )}&returnTo=${encodeURIComponent("/director/mentees")}`
-)
+        router.push(
+          `/director/revitalization-roadmap?tab=pastor&pastorId=${encodeURIComponent(
+            menteeId,
+          )}&returnTo=${encodeURIComponent("/director/mentees")}`,
+        ),
     },
     {
       icon: "fa-solid fa-clipboard-check",
@@ -624,44 +724,46 @@ setAssignedMentorList(
       color: "text-[#8ec5eb]",
       onClick: () =>
         router.push(
-          // `/director/assessments?assignUser=${encodeURIComponent(menteeId)}`
-          `/director/assessments?tab=pastors&pastorId=${encodeURIComponent(menteeId)}`
+          `/director/assessments?tab=pastors&pastorId=${encodeURIComponent(menteeId)}`,
         ),
     },
-
-
     {
-  icon: "fa-solid fa-user-group",
-  label: "Assigned Mentors",
-  color: "text-[#8ec5eb]",
-  onClick: async () => {
-    setSelectedMentee(menteeId);
-    await loadAssignedUsers(menteeId);
-    setShowAssignedMentorsModal(true);
-  },
-},
-    {
-      icon: "fa-solid fa-user-plus",
-      label: "Assign New Mentor",
+      icon: "fa-solid fa-user-group",
+      label: "Assigned Mentors",
       color: "text-[#8ec5eb]",
-      onClick: () => {
-        setSelectedMentee(menteeId);
-        setShowAssignModal(true);
-      },
-    },
-    {
-      icon: "fa-solid fa-user-minus",
-      label: "Remove a Mentor",
-      color: "text-red-400",
       onClick: async () => {
         setSelectedMentee(menteeId);
         await loadAssignedUsers(menteeId);
-        setShowRemoveModal(true);
+        setShowAssignedMentorsModal(true);
       },
     },
+    ...(!isCompleted
+      ? [
+          {
+            icon: "fa-solid fa-user-plus",
+            label: "Assign New Mentor",
+            color: "text-[#8ec5eb]",
+            onClick: () => {
+              setSelectedMentee(menteeId);
+              setShowAssignModal(true);
+            },
+          },
+          {
+            icon: "fa-solid fa-user-minus",
+            label: "Remove a Mentor",
+            color: "text-red-400",
+            onClick: async () => {
+              setSelectedMentee(menteeId);
+              await loadAssignedUsers(menteeId);
+              setShowRemoveModal(true);
+            },
+          },
+        ]
+      : []),
   ];
+};
 
-  const activeCount = mentees.filter((m) => m.status === "active").length;
+  // const activeCount = mentees.filter((m) => m.status === "active").length;
   const sortControlClass = (active: boolean) =>
     `flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[13px] transition sm:text-[14px] ${
       active
@@ -765,13 +867,18 @@ setAssignedMentorList(
                 }`}
             >
               <span>In-Progress</span>
-              {activeTab === "active" && activeCount > 0 && (
+              {/* {activeTab === "active" && activeCount > 0 && (
                 <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#FFD700] px-1.5 text-[11px] font-bold text-[#0f4a76]">
                   {activeCount}
                 </span>
-              )}
+              )} */}
+              {tabCounts.active > 0 && (
+  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#FFD700] px-1.5 text-[11px] font-bold text-[#0f4a76]">
+    {tabCounts.active}
+  </span>
+)}
             </button>
-            <button
+            {/* <button
               type="button"
               onClick={() => setActiveTab("completed")}
               className={`whitespace-nowrap rounded-lg px-5 py-2.5 text-[13px] font-semibold transition-all duration-200 sm:px-7 sm:text-[14px] ${activeTab === "completed"
@@ -780,7 +887,22 @@ setAssignedMentorList(
                 }`}
             >
               Completed
-            </button>
+            </button> */}
+            <button
+  type="button"
+  onClick={() => setActiveTab("completed")}
+  className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-5 py-2.5 text-[13px] font-semibold transition-all duration-200 sm:px-7 sm:text-[14px] ${activeTab === "completed"
+    ? "bg-[#8ec5eb]/25 text-white ring-1 ring-[#8ec5eb]/35"
+    : "text-white/65 hover:text-white"
+    }`}
+>
+  <span>Completed</span>
+  {tabCounts.completed > 0 && (
+    <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#FFD700] px-1.5 text-[11px] font-bold text-[#0f4a76]">
+      {tabCounts.completed}
+    </span>
+  )}
+</button>
           </div>
 
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3 lg:shrink-0">
@@ -1075,7 +1197,7 @@ setAssignedMentorList(
                   ? { phase: m.phase, value: m.progress }
                   : undefined
               }
-              optionsMenu={getMenteeOptions(m.id)}
+              optionsMenu={getMenteeOptions(m)}
               actionButton={
                 activeTab === "active" && m.progress === 100
                   ? { text: "Mark as Complete", onClick: handleMarkComplete }

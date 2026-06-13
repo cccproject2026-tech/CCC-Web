@@ -1,5 +1,5 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import { isRemoteImageSrc } from "@/app/utils/image";
@@ -90,14 +90,23 @@ function IconLink({
 }) {
   if (href) {
     return (
+      // <a
+      //   href={href}
+      //   target={href.startsWith("http") ? "_blank" : undefined}
+      //   rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+      //   className={className}
+      //   aria-label={ariaLabel}
+      //   title={title ?? ariaLabel}
+      // >
       <a
-        href={href}
-        target={href.startsWith("http") ? "_blank" : undefined}
-        rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
-        className={className}
-        aria-label={ariaLabel}
-        title={title ?? ariaLabel}
-      >
+  href={href}
+  target={href.startsWith("http") ? "_blank" : undefined}
+  rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
+  className={className}
+  aria-label={ariaLabel}
+  title={title ?? ariaLabel}
+  onClick={(e) => e.stopPropagation()}
+>
         {children}
       </a>
     );
@@ -145,6 +154,25 @@ export default function PersonListCard({
 }: PersonListCardProps) {
   const [showOptions, setShowOptions] = useState(false);
   const isGlass = variant === "glass";
+  const optionsRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!showOptions) return;
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+
+      if (optionsRef.current && target && !optionsRef.current.contains(target)) {
+        setShowOptions(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown, true);
+
+    return () => {
+      document.removeEventListener("pointerdown", handleOutsidePointerDown, true);
+    };
+  }, [showOptions]);
 
   const emailTrim = email?.trim().replace(/[\u200B-\u200D\uFEFF]/g, "") ?? "";
   const hasEmail = emailTrim.length > 0 && emailTrim.includes("@");
@@ -214,11 +242,28 @@ export default function PersonListCard({
         )}
       </Link>
 
-      {optionsMenu && optionsMenu.length > 0 && (
+      {/* {optionsMenu && optionsMenu.length > 0 && (
         <div className="absolute right-3 top-3 sm:right-4 sm:top-4">
           <button
             type="button"
-            onClick={() => setShowOptions(!showOptions)}
+            onClick={() => setShowOptions(!showOptions)} */}
+            {optionsMenu && optionsMenu.length > 0 && (
+  <div
+    ref={optionsRef}
+    className="absolute right-3 top-3 z-30 sm:right-4 sm:top-4"
+    onPointerDown={(e) => e.stopPropagation()}
+    onMouseDown={(e) => e.stopPropagation()}
+    onClick={(e) => e.stopPropagation()}
+  >
+    <button
+      type="button"
+      onPointerDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowOptions((prev) => !prev);
+      }}
             className={
               isGlass
                 ? "flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 text-white/80 transition hover:bg-white/10"
@@ -227,7 +272,7 @@ export default function PersonListCard({
           >
             <i className="fa-solid fa-ellipsis-vertical" />
           </button>
-          {showOptions && (
+          {/* {showOptions && (
             <>
               <div
                 className="fixed inset-0 z-40"
@@ -239,15 +284,32 @@ export default function PersonListCard({
                     ? "border border-white/15 bg-[#041f35]/98 backdrop-blur-md"
                     : "bg-white"
                 }`}
-              >
+              > */}
+              {showOptions && (
+    <div
+      onPointerDown={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      className={`absolute right-0 top-full z-50 mt-2 min-w-[220px] rounded-xl py-2 pl-1 pr-1 shadow-2xl ${
+        isGlass
+          ? "border border-white/15 bg-[#041f35]/98 backdrop-blur-md"
+          : "bg-white"
+      }`}
+    >
                 {optionsMenu.map((item, index) => (
                   <button
                     key={index}
                     type="button"
-                    onClick={() => {
-                      item.onClick();
-                      setShowOptions(false);
-                    }}
+                    // onClick={() => {
+                    //   item.onClick();
+                    //   setShowOptions(false);
+                    // }}
+                    onClick={(e) => {
+  e.preventDefault();
+  e.stopPropagation();
+  item.onClick();
+  setShowOptions(false);
+}}
                     className={`flex w-full items-center gap-3 rounded-lg px-4 py-2.5 text-left text-[13px] transition-all ${
                       isGlass
                         ? "text-white/90 hover:bg-white/10"
@@ -265,7 +327,6 @@ export default function PersonListCard({
                   </button>
                 ))}
               </div>
-            </>
           )}
         </div>
       )}
@@ -440,7 +501,7 @@ export default function PersonListCard({
             <i className={`fa-solid fa-phone ${iconPhone}`} />
           </IconLink>
         </div> */}
-        <div className={iconRowClass}>
+        {/* <div className={iconRowClass}>
   {mailto ? (
     <a
       href={mailto}
@@ -467,6 +528,60 @@ export default function PersonListCard({
   <span className={`${iconWrapperBase} cursor-not-allowed opacity-40`}>
     <i className={`fa-solid fa-phone ${iconPhone}`} />
   </span>
+</div> */}
+<div className={iconRowClass}>
+  {mailto ? (
+    <a
+      href={mailto}
+      className={iconWrapperBase}
+      aria-label={`Send email to ${name}`}
+      title={`Email ${emailTrim}`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <i className={`fa-regular fa-envelope ${iconLg}`} />
+    </a>
+  ) : (
+    <span
+      className={`${iconWrapperBase} cursor-not-allowed opacity-40`}
+      aria-label="Email not available"
+      title="No email on file"
+    >
+      <i className={`fa-regular fa-envelope ${iconLg}`} />
+    </span>
+  )}
+
+  <IconLink
+    href={hasPhone ? smsHref(phoneTrim) : hasEmail ? mailto : undefined}
+    ariaLabel={
+      hasPhone
+        ? `Text ${name}`
+        : hasEmail
+          ? `Message ${name} via email`
+          : "SMS not available"
+    }
+    className={iconWrapperBase}
+    title={hasPhone ? `Text ${name}` : hasEmail ? `Email ${name}` : "No phone number on file"}
+  >
+    <i className={`fa-regular fa-comment-dots ${iconLg}`} />
+  </IconLink>
+
+  <IconLink
+    href={wa ?? undefined}
+    ariaLabel={wa ? `WhatsApp ${name}` : "WhatsApp not available"}
+    className={iconWrapperBase}
+    title={wa ? `WhatsApp ${name}` : "No WhatsApp number on file"}
+  >
+    <i className={`fa-brands fa-whatsapp ${iconLg}`} />
+  </IconLink>
+
+  <IconLink
+    href={hasPhone ? telHref(phoneTrim) : undefined}
+    ariaLabel={hasPhone ? `Call ${name}` : "Phone number not available"}
+    className={iconWrapperBase}
+    title={hasPhone ? `Call ${name}` : "No phone number on file"}
+  >
+    <i className={`fa-solid fa-phone ${iconPhone}`} />
+  </IconLink>
 </div>
       </div>
 

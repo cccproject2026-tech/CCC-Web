@@ -92,6 +92,7 @@ const [scheduleDescription, setScheduleDescription] = useState("");
   const [appointmentSearch, setAppointmentSearch] = useState("");
   const [appointmentDateFilter, setAppointmentDateFilter] = useState("");
   const [monthlyAvailabilitySlots, setMonthlyAvailabilitySlots] = useState<any[]>([]);
+  const [mentorBookedAppointments, setMentorBookedAppointments] = useState<any[]>([]);
   const router = useRouter();
 
   const showToast = (msg: string, duration = 3000) => {
@@ -389,6 +390,7 @@ setUpcomingAppointments(upcomingSorted as any);
         }));
         setMentors(list);
         setFilteredMentors(list);
+  
       } catch (error) {
         console.error("Error fetching mentors", error);
         setMentors([]);
@@ -415,12 +417,19 @@ setUpcomingAppointments(upcomingSorted as any);
   }, [search, mentors]);
 
   useEffect(() => {
+    // if (drawerStep !== "schedule" || !selectedMentor) {
+    //   setAvailableTimesForBooking([]);
+    //   setMonthlyAvailabilitySlots([]);
+    //   setAvailabilityLoading(false);
+    //   return;
+    // }
     if (drawerStep !== "schedule" || !selectedMentor) {
-      setAvailableTimesForBooking([]);
-      setMonthlyAvailabilitySlots([]);
-      setAvailabilityLoading(false);
-      return;
-    }
+  setAvailableTimesForBooking([]);
+  setMonthlyAvailabilitySlots([]);
+  setMentorBookedAppointments([]);
+  setAvailabilityLoading(false);
+  return;
+}
     const mentorId = String(selectedMentor.id ?? selectedMentor._id ?? "").trim();
     if (!mentorId) return;
 
@@ -451,6 +460,24 @@ setUpcomingAppointments(upcomingSorted as any);
             slots = [];
           }
         }
+
+let mentorAppointments: any[] = [];
+
+try {
+  const mentorAppointmentsRes = await apiGetAppointments({
+    mentorId: String(mentorId),
+    futureOnly: false,
+  } as any);
+
+  mentorAppointments = unwrapAppointmentsAxiosData(mentorAppointmentsRes);
+} catch (error) {
+  console.error("Failed to fetch mentor booked appointments:", error);
+  mentorAppointments = [];
+}
+
+if (!cancelled) {
+  setMentorBookedAppointments(mentorAppointments);
+}
 
         // Store the monthly slots for the calendar
         if (!cancelled) {
@@ -485,28 +512,66 @@ setUpcomingAppointments(upcomingSorted as any);
         }
 
         // Remove slots that are already booked (by any non-cancelled appointment on this day with this mentor)
-        const mentorIdStr = String(selectedMentor.id ?? selectedMentor._id ?? "");
-        const bookedMs = (appointments as any[])
-          .filter((a: any) => {
-            const apptMentorId = String(a.mentor?._id ?? a.mentor?.id ?? a.mentorId ?? "");
+//         const mentorIdStr = String(selectedMentor.id ?? selectedMentor._id ?? "");
+//         const bookedMs = (appointments as any[])
+//           .filter((a: any) => {
+//             const apptMentorId = String(a.mentor?._id ?? a.mentor?.id ?? a.mentorId ?? "");
         
-            const status = a.status;
-return (
-  apptMentorId === mentorIdStr &&
-  isBlockingAppointmentStatus(status) &&
-  typeof a.meetingDate === "string" &&
-  a.meetingDate.startsWith(selectedYmd)
-);
-          })
-          .map((a: any) => new Date(a.meetingDate).getTime())
-          .filter((ms: number) => !Number.isNaN(ms));
+//             const status = a.status;
+// return (
+//   apptMentorId === mentorIdStr &&
+//   isBlockingAppointmentStatus(status) &&
+//   typeof a.meetingDate === "string" &&
+//   a.meetingDate.startsWith(selectedYmd)
+// );
+//           })
+//           .map((a: any) => new Date(a.meetingDate).getTime())
+//           .filter((ms: number) => !Number.isNaN(ms));
+// console.log("RAW AVAILABILITY TIMES BEFORE FILTER", times);
+// console.log("BOOKED APPOINTMENT MS", bookedMs);
+// console.log("ALL APPOINTMENTS FOR FILTER", appointments);
+//         times = times.filter((label: string) => {
+//           const slotMs = new Date(parseSlotStartToIso(selectedYmd, label)).getTime();
+//           return !bookedMs.some((bMs: number) => Math.abs(bMs - slotMs) < 30 * 60 * 1000);
+//         });
+
+// Remove slots already booked by this mentor, even if booked by another pastor.
+const mentorIdStr = String(selectedMentor.id ?? selectedMentor._id ?? "");
+
+const bookedSource = [...mentorAppointments, ...(appointments as any[])];
+
+const bookedMs = bookedSource
+  .filter((a: any) => {
+    const apptMentorId = String(
+      a.mentor?._id ??
+        a.mentor?.id ??
+        a.mentorId?._id ??
+        a.mentorId?.id ??
+        a.mentorId ??
+        "",
+    );
+
+    return (
+      apptMentorId === mentorIdStr &&
+      isBlockingAppointmentStatus(a.status) &&
+      typeof a.meetingDate === "string" &&
+      meetingDateLocalYmd(String(a.meetingDate)) === selectedYmd
+    );
+  })
+  .map((a: any) => new Date(String(a.meetingDate)).getTime())
+  .filter((ms: number) => !Number.isNaN(ms));
+
 console.log("RAW AVAILABILITY TIMES BEFORE FILTER", times);
+console.log("MENTOR BOOKED APPOINTMENTS", mentorAppointments);
 console.log("BOOKED APPOINTMENT MS", bookedMs);
-console.log("ALL APPOINTMENTS FOR FILTER", appointments);
-        times = times.filter((label: string) => {
-          const slotMs = new Date(parseSlotStartToIso(selectedYmd, label)).getTime();
-          return !bookedMs.some((bMs: number) => Math.abs(bMs - slotMs) < 30 * 60 * 1000);
-        });
+
+times = times.filter((label: string) => {
+  const slotMs = new Date(parseSlotStartToIso(selectedYmd, label)).getTime();
+
+  return !bookedMs.some(
+    (bMs: number) => Math.abs(bMs - slotMs) < 60 * 60 * 1000,
+  );
+});
 
         if (!cancelled) {
           setAvailableTimesForBooking(times);
@@ -601,9 +666,13 @@ const payload = {
 setScheduleDescription("");
       await refreshAppointmentLists();
       setAvailabilityRefreshKey((prev) => prev + 1);
-    } catch (error) {
-      console.error("Error scheduling appointment:", error);
-      showToast("Failed to schedule appointment.");
+    } catch (error : any) {
+        console.error("Error scheduling appointment:", error?.response?.data || error);
+  showToast(
+    error?.response?.data?.message ||
+      error?.response?.data?.error ||
+      "Failed to schedule appointment.",
+  );
     } finally {
       setIsScheduling(false);
     }

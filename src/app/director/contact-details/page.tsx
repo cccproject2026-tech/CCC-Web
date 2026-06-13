@@ -1,8 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DirectorHero from "../DirectorHero";
 import { directorGlassCard, directorInputClass, directorPageRoot } from "../directorUi";
 import ContactDetailHeader from "../../Assets/contactdetailheader.jpg";
+
+const CONTACT_DETAILS_STORAGE_KEY = "director_contact_details";
 
 export default function ContactDetailsPage() {
   const [formData, setFormData] = useState({
@@ -28,6 +30,26 @@ export default function ContactDetailsPage() {
       },
     },
   });
+  const [toast, setToast] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(CONTACT_DETAILS_STORAGE_KEY);
+      if (!saved) return;
+
+      const parsed = JSON.parse(saved);
+      setFormData((prev) => ({
+        ...prev,
+        ...parsed,
+        socialMedia: {
+          ...prev.socialMedia,
+          ...(parsed.socialMedia ?? {}),
+        },
+      }));
+    } catch (error) {
+      console.error("Failed to load saved contact details", error);
+    }
+  }, []);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -69,8 +91,56 @@ export default function ContactDetailsPage() {
   };
 
   const handleSave = () => {
-    console.log("Saving contact details:", formData);
-    // Add save functionality here
+    try {
+      window.localStorage.setItem(
+        CONTACT_DETAILS_STORAGE_KEY,
+        JSON.stringify(formData),
+      );
+
+      setToast("Contact details saved.");
+      window.setTimeout(() => setToast(null), 2500);
+    } catch (error) {
+      console.error("Failed to save contact details", error);
+      setToast("Could not save contact details.");
+      window.setTimeout(() => setToast(null), 2500);
+    }
+  };
+
+  const copyText = async (value: string, label: string) => {
+    if (!value.trim()) return;
+
+    try {
+      await navigator.clipboard.writeText(value);
+      setToast(`${label} copied.`);
+    } catch (error) {
+      console.error("Copy failed", error);
+      setToast("Copy failed.");
+    }
+
+    window.setTimeout(() => setToast(null), 2500);
+  };
+
+  const shareText = async (value: string, label: string) => {
+    if (!value.trim()) return;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: label,
+          text: value,
+          url: value.startsWith("http") ? value : undefined,
+        });
+        return;
+      }
+
+      await navigator.clipboard.writeText(value);
+      setToast(`${label} copied for sharing.`);
+    } catch (error) {
+      console.error("Share failed", error);
+      setToast("Share failed.");
+    }
+
+    window.setTimeout(() => setToast(null), 2500);
   };
 
   return (
@@ -140,7 +210,7 @@ export default function ContactDetailsPage() {
 
               {/* Social Media Links */}
               <div className="mb-6">
-                <label className="block text-gray-900 font-semibold mb-4">
+                <label className="mb-4 block font-semibold text-white/85">
                   Social Media Links
                 </label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -154,17 +224,35 @@ export default function ContactDetailsPage() {
                         onChange={() => handleSocialMediaToggle("facebook")}
                         className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       />
-                      <label htmlFor="facebook" className="text-gray-900 font-semibold">
+                      <label htmlFor="facebook" className="font-semibold text-white/85">
                         Facebook
                       </label>
                     </div>
-                    <input
-                      type="url"
-                      value={formData.socialMedia.facebook.url}
-                      onChange={(e) => handleSocialMediaUrlChange("facebook", e)}
-                      disabled={!formData.socialMedia.facebook.enabled}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white focus:outline-none focus:border-[#2E3B8E] disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={formData.socialMedia.facebook.url}
+                        onChange={(e) => handleSocialMediaUrlChange("facebook", e)}
+                        disabled={!formData.socialMedia.facebook.enabled}
+                        className={`${directorInputClass} text-white disabled:cursor-not-allowed disabled:opacity-50`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => copyText(formData.socialMedia.facebook.url, "Facebook link")}
+                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
+                        title="Copy"
+                      >
+                        <i className="fa-regular fa-copy" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => shareText(formData.socialMedia.facebook.url, "Facebook link")}
+                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
+                        title="Share"
+                      >
+                        <i className="fa-solid fa-share-nodes" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Twitter */}
@@ -177,17 +265,35 @@ export default function ContactDetailsPage() {
                         onChange={() => handleSocialMediaToggle("twitter")}
                         className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       />
-                      <label htmlFor="twitter" className="text-gray-900 font-semibold">
+                      <label htmlFor="twitter" className="font-semibold text-white/85">
                         Twitter
                       </label>
                     </div>
-                    <input
-                      type="url"
-                      value={formData.socialMedia.twitter.url}
-                      onChange={(e) => handleSocialMediaUrlChange("twitter", e)}
-                      disabled={!formData.socialMedia.twitter.enabled}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white focus:outline-none focus:border-[#2E3B8E] disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={formData.socialMedia.twitter.url}
+                        onChange={(e) => handleSocialMediaUrlChange("twitter", e)}
+                        disabled={!formData.socialMedia.twitter.enabled}
+                        className={`${directorInputClass} text-white disabled:cursor-not-allowed disabled:opacity-50`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => copyText(formData.socialMedia.twitter.url, "Twitter link")}
+                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
+                        title="Copy"
+                      >
+                        <i className="fa-regular fa-copy" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => shareText(formData.socialMedia.twitter.url, "Twitter link")}
+                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
+                        title="Share"
+                      >
+                        <i className="fa-solid fa-share-nodes" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* LinkedIn */}
@@ -200,17 +306,35 @@ export default function ContactDetailsPage() {
                         onChange={() => handleSocialMediaToggle("linkedin")}
                         className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       />
-                      <label htmlFor="linkedin" className="text-gray-900 font-semibold">
+                      <label htmlFor="linkedin" className="font-semibold text-white/85">
                         Linkedin
                       </label>
                     </div>
-                    <input
-                      type="url"
-                      value={formData.socialMedia.linkedin.url}
-                      onChange={(e) => handleSocialMediaUrlChange("linkedin", e)}
-                      disabled={!formData.socialMedia.linkedin.enabled}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white focus:outline-none focus:border-[#2E3B8E] disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={formData.socialMedia.linkedin.url}
+                        onChange={(e) => handleSocialMediaUrlChange("linkedin", e)}
+                        disabled={!formData.socialMedia.linkedin.enabled}
+                        className={`${directorInputClass} text-white disabled:cursor-not-allowed disabled:opacity-50`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => copyText(formData.socialMedia.linkedin.url, "LinkedIn link")}
+                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
+                        title="Copy"
+                      >
+                        <i className="fa-regular fa-copy" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => shareText(formData.socialMedia.linkedin.url, "LinkedIn link")}
+                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
+                        title="Share"
+                      >
+                        <i className="fa-solid fa-share-nodes" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* WhatsApp */}
@@ -223,17 +347,35 @@ export default function ContactDetailsPage() {
                         onChange={() => handleSocialMediaToggle("whatsapp")}
                         className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       />
-                      <label htmlFor="whatsapp" className="text-gray-900 font-semibold">
+                      <label htmlFor="whatsapp" className="font-semibold text-white/85">
                         Whatsapp
                       </label>
                     </div>
-                    <input
-                      type="url"
-                      value={formData.socialMedia.whatsapp.url}
-                      onChange={(e) => handleSocialMediaUrlChange("whatsapp", e)}
-                      disabled={!formData.socialMedia.whatsapp.enabled}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-900 bg-white focus:outline-none focus:border-[#2E3B8E] disabled:bg-gray-100 disabled:cursor-not-allowed"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={formData.socialMedia.whatsapp.url}
+                        onChange={(e) => handleSocialMediaUrlChange("whatsapp", e)}
+                        disabled={!formData.socialMedia.whatsapp.enabled}
+                        className={`${directorInputClass} text-white disabled:cursor-not-allowed disabled:opacity-50`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => copyText(formData.socialMedia.whatsapp.url, "WhatsApp link")}
+                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
+                        title="Copy"
+                      >
+                        <i className="fa-regular fa-copy" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => shareText(formData.socialMedia.whatsapp.url, "WhatsApp link")}
+                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
+                        title="Share"
+                      >
+                        <i className="fa-solid fa-share-nodes" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -251,6 +393,11 @@ export default function ContactDetailsPage() {
           </div>
         </div>
       </section>
+      {toast && (
+        <div className="fixed right-6 top-20 z-[100] rounded-xl border border-white/15 bg-[#041f35]/95 px-5 py-3 text-sm font-semibold text-white shadow-2xl">
+          {toast}
+        </div>
+      )}
     </div>
   );
 }

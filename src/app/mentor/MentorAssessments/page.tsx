@@ -747,19 +747,43 @@ const assignedWithCdp = await Promise.all(
       const data = body?.data ?? body;
 
     
-  const hasBackendCdp =
-  Array.isArray(data)
-    ? data.some((rec: any) => rec?.sent === true || rec?.status === "sent")
-    : Array.isArray(data?.sections)
-      ? data.sections.some((section: any) =>
-          Array.isArray(section?.recommendations) &&
-          section.recommendations.some(
-            (rec: any) =>
-              typeof rec === "object" &&
-              (rec?.sent === true || rec?.status === "sent"),
-          ),
-        )
-      : false;
+  const hasRecommendationContent = (node: any): boolean => {
+    if (!node) return false;
+
+    if (typeof node === "string") return node.trim() !== "";
+
+    if (Array.isArray(node)) {
+      return node.some((item) => hasRecommendationContent(item));
+    }
+
+    if (typeof node !== "object") return false;
+
+    if (node.sent === true || node.status === "sent") return true;
+
+    const contentKeys = ["message", "text", "cdp", "mentorCdp", "recommendation"];
+    if (contentKeys.some((key) => hasRecommendationContent(node[key]))) return true;
+
+    if (
+      Array.isArray(node.recommendations) &&
+      node.recommendations.some((rec: any) =>
+        typeof rec === "string" ? rec.trim() !== "" : rec != null || hasRecommendationContent(rec),
+      )
+    ) {
+      return true;
+    }
+
+    if (Array.isArray(node.sections) && node.sections.some((section: any) => hasRecommendationContent(section))) {
+      return true;
+    }
+
+    if (Array.isArray(node.layers) && node.layers.some((layer: any) => hasRecommendationContent(layer))) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const hasBackendCdp = hasRecommendationContent(data);
 
 const finalHasCdp = assessment._mentorHasSentCdp || hasBackendCdp;
 const hasMeetingDetails = Boolean(

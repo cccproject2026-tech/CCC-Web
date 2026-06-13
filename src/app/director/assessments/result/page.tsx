@@ -272,12 +272,34 @@ function buildAnswerMapFromSections(templateSections: any[], answerSections: any
         userAnswers[uiLayerId] = String(
           matchingChoice?._id ?? matchingChoice?.id ?? matchingChoice?.value ?? matchingChoice?.label,
         );
-      } else if (hasNumericIndex && selectedAsIndex >= 0 && selectedAsIndex < choices.length) {
-        const byIndex = choices[selectedAsIndex];
-        userAnswers[uiLayerId] = String(byIndex?._id ?? byIndex?.id ?? byIndex?.value ?? byIndex?.label ?? selected);
-      } else {
-        userAnswers[uiLayerId] = selected;
-      }
+      // } else if (hasNumericIndex && selectedAsIndex >= 0 && selectedAsIndex < choices.length) {
+      //   const byIndex = choices[selectedAsIndex];
+      //   userAnswers[uiLayerId] = String(byIndex?._id ?? byIndex?.id ?? byIndex?.value ?? byIndex?.label ?? selected);
+      // } else {
+      //   userAnswers[uiLayerId] = selected;
+      // }
+      } else if (hasNumericIndex) {
+  // Backend can send selectedChoice as 1-based ("1","2",...) or 0-based.
+  const oneBasedIndex = selectedAsIndex - 1;
+  const zeroBasedIndex = selectedAsIndex;
+
+  const byIndex =
+    oneBasedIndex >= 0 && oneBasedIndex < choices.length
+      ? choices[oneBasedIndex]
+      : zeroBasedIndex >= 0 && zeroBasedIndex < choices.length
+        ? choices[zeroBasedIndex]
+        : null;
+
+  if (byIndex) {
+    userAnswers[uiLayerId] = String(
+      byIndex?._id ?? byIndex?.id ?? byIndex?.value ?? byIndex?.label ?? selected,
+    );
+  } else {
+    userAnswers[uiLayerId] = selected;
+  }
+} else {
+  userAnswers[uiLayerId] = selected;
+}
     });
   });
 

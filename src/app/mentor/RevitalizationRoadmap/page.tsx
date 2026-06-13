@@ -235,7 +235,7 @@ progress: found?.progress ?? 0,
         className="mb-6"
       /> */}
       <div className="px-4 sm:px-6 lg:px-8">
-  <div className="mx-auto w-full max-w-[1180px]">
+  <div className="mx-auto w-full max-w-[1440px]">
     <DirectorHero
       title="Revitalization Roadmap"
       subtitle="Open a pastor&apos;s assigned roadmaps or browse templates from the library."
@@ -248,7 +248,7 @@ progress: found?.progress ?? 0,
       {/* <main className={mentorRoadmapHubMain}>
         <div className="py-6 md:py-8"> */}
         <main className={mentorRoadmapHubMain}>
-  <div className="mx-auto w-full max-w-[1180px] px-4 py-6 sm:px-6 md:py-8 lg:px-8">
+ <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 md:py-8 lg:px-8">
           <div className={`${mentorFilterPanel} mb-8`}>
             <div className="flex flex-col items-stretch justify-between gap-4 lg:flex-row lg:items-center">
             <MentorSearchBar
@@ -366,7 +366,7 @@ progress: found?.progress ?? 0,
   ) : null}
 </div>
               
-              <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 sm:gap-8 xl:grid-cols-2">
                 {!loading &&
                   filteredPastors.map((mentee) => (
                     // <button
@@ -414,7 +414,7 @@ progress: found?.progress ?? 0,
     </div>
   ) : null}
 </div>
-                      <div className="relative m-4 h-[180px] w-full shrink-0 sm:h-[200px] sm:w-[200px]">
+                      <div className="relative mx-4 mt-4 h-[170px] shrink-0 overflow-hidden rounded-lg sm:m-4 sm:h-[180px] sm:w-[180px]">
                         {isHttpUrl(mentee.profilePicture) ? (
                           <Image
                             src={mentee.profilePicture!}
@@ -428,7 +428,7 @@ progress: found?.progress ?? 0,
                           <ApiImagePlaceholder className="h-full w-full rounded-lg" />
                         )}
                       </div>
-                      <div className="flex flex-1 flex-col justify-between p-4 md:p-5">
+                      <div className="flex min-w-0 flex-1 flex-col justify-between p-4 md:p-5">
                         <div>
                           <h3 className="mb-1 text-base font-semibold text-white md:text-[17px]">
                             {mentee.firstName} {mentee.lastName}
@@ -450,15 +450,15 @@ progress: found?.progress ?? 0,
                               {Math.min(100, Math.round(mentee.progress))}%
                             </span>
                           </div>
-                          <div className="h-1.5 w-full max-w-xs rounded-full bg-white/15">
+                          <div className="mb-5 h-1.5 w-full max-w-xs rounded-full bg-white/15">
                             <div
                               className="h-1.5 rounded-full bg-[#3498DB]"
                               style={{ width: `${Math.min(100, mentee.progress)}%` }}
                             />
                           </div>
                         </div>
-                        <div className="mt-4 flex items-center justify-between gap-4 sm:mt-0">
-  <div className="flex items-center gap-4 text-[18px] text-[#8ec5eb]">
+                        <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-4 sm:mt-0">
+  <div className="flex min-w-0 flex-wrap items-center gap-4 text-[18px] text-[#8ec5eb]">
     <a
       href={`mailto:${mentee.email}`}
       onClick={(e) => e.stopPropagation()}
@@ -502,7 +502,9 @@ progress: found?.progress ?? 0,
 </a>
   </div>
 
-  <span className={mentorPrimaryCtaDashboard}>View roadmaps</span>
+  <span className={`${mentorPrimaryCtaDashboard} shrink-0 whitespace-nowrap`}>
+  View roadmaps
+</span>
 </div>
                       </div>
                     </div>

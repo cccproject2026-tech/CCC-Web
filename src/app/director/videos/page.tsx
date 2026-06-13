@@ -31,6 +31,7 @@ export default function VideosPage() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDeleteToast, setShowDeleteToast] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [deleteCount, setDeleteCount] = useState(0);
   const [videoForm, setVideoForm] = useState<VideoFormState>({
     heading: "",
@@ -110,12 +111,17 @@ export default function VideosPage() {
     }
   };
 
+  const showFormError = (message: string) => {
+  setFormError(message);
+  window.setTimeout(() => setFormError(null), 3000);
+};
+
 
   const handleSubmit = async () => {
     if (!videoForm.heading.trim()) {
-      alert("Heading is required");
-      return;
-    }
+  showFormError("Heading is required.");
+  return;
+}
 
     try {
       // ---------- EDIT MODE ----------
@@ -138,10 +144,10 @@ export default function VideosPage() {
 
       // ---------- ADD MODE ----------
       else {
-        if (!videoForm.videoFile) {
-          alert("Please upload a video file");
-          return;
-        }
+       if (!videoForm.videoFile) {
+  showFormError("Please upload a video file.");
+  return;
+}
 
         await createMedia({
           heading: videoForm.heading,
@@ -170,7 +176,7 @@ export default function VideosPage() {
       setVideos(res.data?.data || []);
     } catch (error) {
       console.error("Save failed", error);
-      alert("Something went wrong");
+      showFormError("Something went wrong. Please try again.");
     }
   };
 
@@ -644,6 +650,31 @@ export default function VideosPage() {
           </div>
         </div>
       )}
+      {formError && (
+  <div className="fixed left-1/2 top-24 z-[999] w-[min(92vw,420px)] -translate-x-1/2 rounded-2xl border border-red-400/30 bg-[#062946]/95 p-4 shadow-2xl backdrop-blur-md">
+    <div className="flex items-start gap-3">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/15 text-red-200">
+        <i className="fa-solid fa-circle-exclamation" />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <h3 className="text-sm font-semibold text-white">
+          Cannot upload video
+        </h3>
+        <p className="mt-1 text-sm text-white/70">{formError}</p>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setFormError(null)}
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white/60 transition hover:bg-white/10 hover:text-white"
+        aria-label="Close error"
+      >
+        <i className="fa-solid fa-xmark" />
+      </button>
+    </div>
+  </div>
+)}
     </div>
   );
 }

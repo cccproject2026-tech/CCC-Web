@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { getCookie } from "@/app/utils/cookies";
 import { apiInviteFieldMentor } from "@/app/Services/users.service";
 import MentorBg from "../../Assets/mentor-bg.png";
@@ -8,6 +9,7 @@ import DirectorHero from "../DirectorHero";
 import { directorGlassCard, directorInputClass, directorPageRoot } from "../directorUi";
 
 export default function InviteFieldMentorPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -52,8 +54,17 @@ export default function InviteFieldMentorPage() {
         ]}
       />
 
-      <section className="mx-auto max-w-lg pb-16">
-        <form
+     <section className="mx-auto max-w-lg pb-16">
+  <button
+    type="button"
+    onClick={() => router.back()}
+    className="mb-4 inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+  >
+    <i className="fa-solid fa-arrow-left" />
+    Back
+  </button>
+
+  <form
           onSubmit={handleSubmit}
           className={`space-y-4 rounded-2xl border border-white/15 p-6 sm:p-8 ${directorGlassCard}`}
         >

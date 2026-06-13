@@ -225,38 +225,91 @@ setComments(scoped);
   // }, [roadmapId, userId]);
   }, [roadmapId, userId, taskId]);
 
-  const fetchQueries = useCallback(async () => {
-    if (!roadmapId || !userId) return;
-    const status = queryTab === "Pending" ? "pending" : "answered";
-    try {
-      const res = await apiGetQueries(roadmapId, userId, status, taskId || undefined, "pastor");
+//   const fetchQueries = useCallback(async () => {
+//     if (!roadmapId || !userId) return;
+//     const status = queryTab === "Pending" ? "pending" : "answered";
+//     try {
+//       const res = await apiGetQueries(roadmapId, userId, status, taskId || undefined, "pastor");
 
-      const all = unwrapQueriesFromResponse(res);
+//       const all = unwrapQueriesFromResponse(res);
 
 
-const hasScopedIds = all.some((q: any) =>
-  Boolean(q.nestedRoadMapItemId ?? q.nestedItemId ?? q.taskId ?? q.roadmapItemId)
-);
+// const hasScopedIds = all.some((q: any) =>
+//   Boolean(q.nestedRoadMapItemId ?? q.nestedItemId ?? q.taskId ?? q.roadmapItemId)
+// );
 
-const scoped = hasScopedIds
-  ? all.filter((q: any) => {
-      const qTaskId = String(
-        q.nestedRoadMapItemId ??
-          q.nestedItemId ??
-          q.taskId ??
-          q.roadmapItemId ??
-          ""
+// const scoped = hasScopedIds
+//   ? all.filter((q: any) => {
+//       const qTaskId = String(
+//         q.nestedRoadMapItemId ??
+//           q.nestedItemId ??
+//           q.taskId ??
+//           q.roadmapItemId ??
+//           ""
+//       );
+
+//       return qTaskId === String(taskId);
+//     })
+//   : all;
+
+// setQueries(scoped);
+//     } catch {
+//       setQueries([]);
+//     }
+//   }, [roadmapId, userId, queryTab, taskId]);
+const fetchQueries = useCallback(async () => {
+  if (!roadmapId || !userId) return;
+
+  const status = queryTab === "Pending" ? "pending" : "answered";
+
+  try {
+    const taskScopedRes = await apiGetQueries(
+      roadmapId,
+      userId,
+      status,
+      taskId || undefined,
+      "pastor",
+    );
+
+    let all = unwrapQueriesFromResponse(taskScopedRes);
+
+    // Single roadmap / Jumpstart queries may not be saved with nested task ids.
+    // If task-scoped fetch returns nothing, fall back to roadmap-level queries.
+    if (all.length === 0 && taskId) {
+      const roadmapScopedRes = await apiGetQueries(
+        roadmapId,
+        userId,
+        status,
+        undefined,
+        "pastor",
       );
 
-      return qTaskId === String(taskId);
-    })
-  : all;
-
-setQueries(scoped);
-    } catch {
-      setQueries([]);
+      all = unwrapQueriesFromResponse(roadmapScopedRes);
     }
-  }, [roadmapId, userId, queryTab, taskId]);
+
+    const hasScopedIds = all.some((q: any) =>
+      Boolean(q.nestedRoadMapItemId ?? q.nestedItemId ?? q.taskId ?? q.roadmapItemId),
+    );
+
+    const scoped = hasScopedIds
+      ? all.filter((q: any) => {
+          const qTaskId = String(
+            q.nestedRoadMapItemId ??
+              q.nestedItemId ??
+              q.taskId ??
+              q.roadmapItemId ??
+              "",
+          );
+
+          return qTaskId === String(taskId);
+        })
+      : all;
+
+    setQueries(scoped);
+  } catch {
+    setQueries([]);
+  }
+}, [roadmapId, userId, queryTab, taskId]);
 
   useEffect(() => {
     if (!roadmapId || !taskId) {

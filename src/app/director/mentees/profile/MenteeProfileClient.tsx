@@ -25,9 +25,11 @@ import Mentor1 from "@/app/Assets/mentor1.png";
 
 import {
   apiDeleteUser,
+  apiGetAllUsers,
   apiGetUserById,
   apiInviteFieldMentor,
   apiUpdateUserById,
+  apiUploadProfilePicture,
 } from "@/app/Services/users.service";
 import {
   apiGetUserCertificate,
@@ -48,11 +50,29 @@ type InviteState = "none" | "invited" | "accepted";
 
 type ToastState = { message: string; variant: "success" | "error" } | null;
 
+// const deriveInviteState = (user: any): InviteState => {
+//   const invite = user.fieldMentorInvitation;
+//   if (!invite) return "none";
+//   if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) return "none";
+//   return "invited";
+// };
+
 const deriveInviteState = (user: any): InviteState => {
-  const invite = user.fieldMentorInvitation;
-  if (!invite) return "none";
-  if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) return "none";
-  return "invited";
+  const invite = user?.fieldMentorInvitation;
+
+  if (user?.isFieldMentor === true || invite?.status === "accepted") {
+    return "accepted";
+  }
+
+  if (invite) {
+    if (invite.expiresAt && new Date(invite.expiresAt) < new Date()) {
+      return "none";
+    }
+
+    return "invited";
+  }
+
+  return "none";
 };
 
 function churchInfoToDetails(c: ChurchInfo): ChurchDetails {
@@ -141,6 +161,8 @@ const [certificateNote, setCertificateNote] = useState(
 const [certificate, setCertificate] = useState<CertificateRecord | null>(null);
 const [completionDate, setCompletionDate] = useState<string | undefined>();
 const certificatePreviewRef = useRef<HTMLDivElement | null>(null);
+const profileImageInputRef = useRef<HTMLInputElement | null>(null);
+const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
 
   const [progressOverallDone, setProgressOverallDone] = useState(false);
   const [userMarkedComplete, setUserMarkedComplete] = useState(false);
@@ -169,7 +191,24 @@ const certificatePreviewRef = useRef<HTMLDivElement | null>(null);
 
   const [interests, setInterests] = useState("");
   const [comments, setComments] = useState("");
+const fetchInvitationStateFromList = useCallback(async (): Promise<InviteState | null> => {
+  try {
+    const res = await apiGetAllUsers({
+      role: "pastor",
+      limit: 1000,
+    });
 
+    const users = res.data?.data?.users ?? [];
+    const match = users.find((u: any) => String(u.id ?? u._id) === String(menteeId));
+
+    if (!match) return null;
+
+    return deriveInviteState(match);
+  } catch (error) {
+    console.error("Failed to fetch invitation state from users list", error);
+    return null;
+  }
+}, [menteeId]);
   const loadProfile = useCallback(async () => {
     setLoadError(null);
     try {
@@ -227,7 +266,15 @@ console.log("Mentee profile certificate debug:", {
           ? resolveApiMediaUrl(rawPic) ?? rawPic
           : null;
       setProfileImage(resolved || Mentor1);
-      setInviteState(deriveInviteState(user));
+      // setInviteState(deriveInviteState(user));
+      const detailInviteState = deriveInviteState(user);
+
+if (detailInviteState !== "none") {
+  setInviteState(detailInviteState);
+} else {
+  const listInviteState = await fetchInvitationStateFromList();
+  setInviteState(listInviteState ?? "none");
+}
 
       setPersonal({
         firstName: user.firstName ?? "",
@@ -278,7 +325,7 @@ console.log("Mentee profile certificate debug:", {
     } finally {
       setLoading(false);
     }
-  }, [menteeId]);
+ }, [menteeId, fetchInvitationStateFromList]);
 
   useEffect(() => {
     void loadProfile();
@@ -413,6 +460,57 @@ useEffect(() => {
   }, 0);
   return () => window.clearTimeout(timer);
 }, [downloadCertificateWhenPreviewOpens, isCertificatePreviewModalOpen]);
+
+const handleProfileImageChange = async (
+  e: React.ChangeEvent<HTMLInputElement>,
+) => {
+  const file = e.target.files?.[0];
+  e.target.value = "";
+
+  if (!file) return;
+
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+  if (!allowedTypes.includes(file.type)) {
+    setToast({
+      message: "Only JPEG, PNG, and WebP images are allowed.",
+      variant: "error",
+    });
+    return;
+  }
+
+  try {
+    setUploadingProfileImage(true);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await apiUploadProfilePicture(menteeId, formData);
+    const uploadedUrl = String(res.data?.data?.profilePicture ?? "").trim();
+
+    if (!uploadedUrl) {
+      throw new Error("No profile picture returned from upload API.");
+    }
+
+    const resolved = resolveApiMediaUrl(uploadedUrl) ?? uploadedUrl;
+
+    setProfileImage(resolved);
+    setToast({
+      message: "Profile picture updated successfully.",
+      variant: "success",
+    });
+
+    await loadProfile();
+  } catch (error) {
+    console.error("Profile image upload failed", error);
+    setToast({
+      message: "Profile image upload failed.",
+      variant: "error",
+    });
+  } finally {
+    setUploadingProfileImage(false);
+  }
+};
 
   const persistProfile = async () => {
     const churches: ChurchDetails[] = [];
@@ -555,7 +653,7 @@ useEffect(() => {
             <aside className="w-full shrink-0 lg:max-w-[320px]">
               <div className={`p-6 sm:p-8 ${directorGlassCard}`}>
                 <div className="mb-6 flex flex-col items-center">
-                  <div className="mb-4 h-[140px] w-[140px] overflow-hidden rounded-full border border-white/20 bg-white/10">
+                  <div className="relative mb-4 h-[140px] w-[140px] overflow-hidden rounded-full border border-white/20 bg-white/10">
                     <Image
                       src={profileImage}
                       alt={fullName}
@@ -564,6 +662,27 @@ useEffect(() => {
                       unoptimized={typeof profileImage === "string" && isRemoteImageSrc(profileImage)}
                       className="h-full w-full object-cover"
                     />
+
+                    {isEditing && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => profileImageInputRef.current?.click()}
+                          disabled={uploadingProfileImage}
+                          className="absolute inset-x-0 bottom-0 bg-black/60 px-2 py-2 text-[11px] font-semibold text-white transition hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {uploadingProfileImage ? "Uploading..." : "Change"}
+                        </button>
+
+                        <input
+                          ref={profileImageInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="hidden"
+                          onChange={handleProfileImageChange}
+                        />
+                      </>
+                    )}
                   </div>
                   <h3 className="text-center text-lg font-semibold text-white sm:text-xl">{fullName}</h3>
                   <p className="mt-1 text-[13px] capitalize text-white/65">{role}</p>

@@ -47,7 +47,46 @@ function normalizeAssignedIds(user: any): string[] {
   if (!Array.isArray(raw)) return [];
   return raw.map((x: unknown) => String(x));
 }
+function getProfilePhone(user: any): string {
+//   const candidates = [
+//     user?.phoneNumber,
+//     user?.phone,
+//     user?.mobileNumber,
+//     user?.mobile,
+//     user?.whatsappNumber,
+//     user?.contact?.phoneNumber,
+//     user?.contact?.phone,
+//     user?.contact?.mobileNumber,
+//     user?.user?.phoneNumber,
+//     user?.user?.phone,
+//   ];
+  const candidates = [
+    user?.phoneNumber,
+    user?.phone,
+    user?.mobileNumber,
+    user?.mobile,
+    user?.whatsappNumber,
 
+    user?.interest?.phoneNumber,
+    user?.interest?.phone,
+    user?.interest?.mobileNumber,
+    user?.interest?.mobile,
+    user?.interest?.whatsappNumber,
+
+    user?.contact?.phoneNumber,
+    user?.contact?.phone,
+    user?.contact?.mobileNumber,
+
+    user?.user?.phoneNumber,
+    user?.user?.phone,
+  ];
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number") return String(value);
+  }
+
+  return "";
+}
 async function rowsWithProgress(rows: AssignedMenteeRow[]): Promise<AssignedMenteeRow[]> {
   const results = await Promise.all(
     rows.map(async (row) => {
@@ -137,6 +176,7 @@ export default function MentorProfilePage() {
       if (!silent) setLoading(true);
       const res = await apiGetUserById(id);
       const user = res.data.data;
+ 
      try {
   const docsRes = await apiGetDocuments(String(user?._id ?? user?.id ?? id));
   const docs = Array.isArray(docsRes.data?.data) ? docsRes.data.data : [];
@@ -162,7 +202,7 @@ export default function MentorProfilePage() {
         firstName: user.firstName ?? "",
         lastName: user.lastName ?? "",
         role: user.role ?? "",
-        phoneNumber: user.phoneNumber ?? "",
+        phoneNumber: getProfilePhone(user),
         email: user.email ?? "",
         profilePicture: user.profilePicture ?? null,
         totalMentees: ids.length,
@@ -232,12 +272,40 @@ export default function MentorProfilePage() {
     ? `mailto:${encodeURIComponent(mentorData.email.trim())}`
     : undefined;
   const telHref = phoneDigits ? `tel:${phoneDigits}` : undefined;
-  const whatsappHref =
-    phoneDigits.length >= 10
-      ? `https://wa.me/${phoneDigits.replace(/^0+/, "")}`
-      : undefined;
+  const whatsappDigits =
+  phoneDigits.length === 10 ? `91${phoneDigits}` : phoneDigits.replace(/^0+/, "");
+
+const whatsappHref =
+  whatsappDigits.length >= 10
+    ? `https://wa.me/${whatsappDigits}`
+    : undefined;
   const smsHref = phoneDigits ? `sms:${phoneDigits}` : undefined;
 
+const handleDownloadDocument = async (doc: MentorDocumentRow) => {
+  try {
+    const response = await fetch(doc.url);
+    if (!response.ok) throw new Error("Download failed");
+
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = doc.name || "document";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    window.URL.revokeObjectURL(blobUrl);
+  } catch (error) {
+    console.error("Failed to download document", error);
+    setToast({
+      message: "Could not download document. Try opening it and saving manually.",
+      variant: "error",
+    });
+  }
+};
+  
   if (loading) {
     return (
       <div className={directorPageRoot}>
@@ -342,8 +410,70 @@ export default function MentorProfilePage() {
                     <span className="capitalize">{mentorTitle || mentorData.role}</span>
                   </div> */}
                 </div>
+<div className="mb-6 flex items-center justify-center gap-4 border-b border-white/10 pb-6 text-lg text-[#8ec5eb]">
+  <a
+    href={mailtoHref || "#"}
+    className="transition hover:opacity-80"
+    aria-label="Email"
+    title="Email"
+    onClick={(e) => {
+      if (!mailtoHref) {
+        e.preventDefault();
+        setToast({ message: "No email available.", variant: "error" });
+      }
+    }}
+  >
+    <i className="fa-regular fa-envelope" />
+  </a>
 
-                <div className="mb-6 flex items-center justify-center gap-4 border-b border-white/10 pb-6 text-lg text-[#8ec5eb]">
+  <a
+    href={smsHref || "#"}
+    className="transition hover:opacity-80"
+    aria-label="Text message"
+    title="Message"
+    onClick={(e) => {
+      if (!smsHref) {
+        e.preventDefault();
+        setToast({ message: "No phone number available.", variant: "error" });
+      }
+    }}
+  >
+    <i className="fa-regular fa-comment" />
+  </a>
+
+  <a
+    href={whatsappHref || "#"}
+    target={whatsappHref ? "_blank" : undefined}
+    rel={whatsappHref ? "noopener noreferrer" : undefined}
+    className="transition hover:opacity-80"
+    aria-label="WhatsApp"
+    title="WhatsApp"
+    onClick={(e) => {
+      if (!whatsappHref) {
+        e.preventDefault();
+        setToast({ message: "No WhatsApp number available.", variant: "error" });
+      }
+    }}
+  >
+    <i className="fa-brands fa-whatsapp" />
+  </a>
+
+  <a
+    href={telHref || "#"}
+    className="transition hover:opacity-80"
+    aria-label="Call"
+    title="Call"
+    onClick={(e) => {
+      if (!telHref) {
+        e.preventDefault();
+        setToast({ message: "No phone number available.", variant: "error" });
+      }
+    }}
+  >
+    <i className="fa-solid fa-phone" />
+  </a>
+</div>
+                {/* <div className="mb-6 flex items-center justify-center gap-4 border-b border-white/10 pb-6 text-lg text-[#8ec5eb]">
                   {mailtoHref ? (
                     <a
                       href={mailtoHref}
@@ -392,7 +522,7 @@ export default function MentorProfilePage() {
                       <i className="fa-solid fa-phone" />
                     </span>
                   )}
-                </div>
+                </div> */}
 
                 <div className="mb-6 space-y-4 border-b border-white/10 pb-6">
                   <div className="flex items-center justify-between gap-2">
@@ -473,13 +603,13 @@ export default function MentorProfilePage() {
               View
             </a>
 
-            <a
-              href={doc.url}
-              download
-              className="flex-1 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-center text-xs font-semibold text-white transition hover:bg-white/15"
-            >
-              Download
-            </a>
+           <button
+  type="button"
+  onClick={() => void handleDownloadDocument(doc)}
+  className="flex-1 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-center text-xs font-semibold text-white transition hover:bg-white/15"
+>
+  Download
+</button>
           </div>
         </div>
       ))}
