@@ -142,7 +142,7 @@ const img =
 };
 
 const PAGE_SIZE = 20;
-const FEATURED_THUMB_LIMIT = 6;
+const FEATURED_THUMB_LIMIT = 500;
 /** Max rows pulled from `role=mentor&roleMatch=mixed` when we filter by role on the client. */
 const MENTOR_LIST_CLIENT_FILTER_LIMIT = 2000;
 
@@ -271,6 +271,7 @@ export default function MyMentorsPage() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [sortBy, setSortBy] = useState("Least Mentees");
   const [showSortMenu, setShowSortMenu] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showListMenteesModal, setShowListMenteesModal] = useState(false);
@@ -665,6 +666,42 @@ const handleListMentees = useCallback((mentor: Mentor) => {
                 variant="dark"
               />
             </div>
+            <div className="flex shrink-0 justify-end gap-2 sm:pl-2">
+              <button
+                type="button"
+                onClick={() => router.push("/director/mentors/location")}
+                className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-[#8ec5eb] transition hover:bg-white/15"
+                aria-label="Map view"
+              >
+                <i className="fa-solid fa-location-dot" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("grid")}
+                aria-pressed={viewMode === "grid"}
+                className={`flex h-11 w-11 items-center justify-center rounded-lg border text-[#8ec5eb] transition hover:bg-white/15 ${
+                  viewMode === "grid"
+                    ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20"
+                    : "border-white/15 bg-white/10"
+                }`}
+                aria-label="Grid view"
+              >
+                <i className="fa-solid fa-table-cells" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("list")}
+                aria-pressed={viewMode === "list"}
+                className={`flex h-11 w-11 items-center justify-center rounded-lg border text-[#8ec5eb] transition hover:bg-white/15 ${
+                  viewMode === "list"
+                    ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20"
+                    : "border-white/15 bg-white/10"
+                }`}
+                aria-label="List view"
+              >
+                <i className="fa-solid fa-list" />
+              </button>
+            </div>
           </div>
 
           {!loading && featuredItems.length > 0 && (
@@ -763,7 +800,13 @@ const handleListMentees = useCallback((mentor: Mentor) => {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 md:gap-5">
+            <div
+              className={
+                viewMode === "list"
+                  ? "flex flex-col gap-3"
+                  : "grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 md:gap-5"
+              }
+            >
               {filteredMentors.map((mentor) => (
                 <PersonListCard
                   key={mentor.id}
@@ -773,6 +816,7 @@ const handleListMentees = useCallback((mentor: Mentor) => {
                   description={mentor.description}
                   image={mentor.img}
                   variant="glass"
+                  listLayout={viewMode === "list"}
                   profileLink={`/director/mentors/profile/${mentor.id}`}
                   menteeCount={mentor.menteeCount}
                   optionsMenu={getMentorOptions(mentor)}

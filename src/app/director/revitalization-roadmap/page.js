@@ -211,6 +211,28 @@ function getInitialsAvatar(firstName, lastName, fallback = "User") {
   )}&background=173653&color=ffffff`;
 }
 
+function getCreatorInitials(name) {
+  const value = String(name ?? "").trim();
+  if (!value) return "DI";
+
+  const initials = value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || "DI";
+}
+
+function resolveCreatorAvatar(raw) {
+  if (typeof raw !== "string") return "";
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  return resolveApiMediaUrl(trimmed) ?? trimmed;
+}
+
 /** Pull ISO-ish created timestamp from roadmap list/detail payloads. */
 function extractRoadmapCreatedAtRaw(item) {
   if (!item || typeof item !== "object") return null;
@@ -415,6 +437,33 @@ function SortRadio({ checked, onSelect, label, className = "" }) {
       </span>
       {label}
     </button>
+  );
+}
+
+function CreatorAvatar({ name, avatar }) {
+  const [failed, setFailed] = useState(false);
+  const imageSrc = resolveCreatorAvatar(avatar);
+
+  if (!imageSrc || failed) {
+    return (
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#8ec5eb]/35 bg-[#173653] text-xs font-semibold text-white">
+        {getCreatorInitials(name)}
+      </span>
+    );
+  }
+
+  return (
+    <span className="relative h-9 w-9 shrink-0 overflow-hidden rounded-full border border-[#8ec5eb]/35 bg-[#173653]">
+      <Image
+        src={imageSrc}
+        alt={name || "Created by"}
+        fill
+        sizes="36px"
+        unoptimized={isRemoteImageSrc(imageSrc)}
+        className="object-cover"
+        onError={() => setFailed(true)}
+      />
+    </span>
   );
 }
 
@@ -767,6 +816,28 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
     if (showOptionsMenu != null) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showOptionsMenu]);
+
+  useEffect(() => {
+    if (!openMentorMenuId) return;
+
+    const handleClickOutsideMentorMenu = (event) => {
+      const target = event.target;
+
+      if (
+        target instanceof Element &&
+        target.closest(".mentor-roadmap-options-menu")
+      ) {
+        return;
+      }
+
+      setOpenMentorMenuId(null);
+    };
+
+    document.addEventListener("mousedown", handleClickOutsideMentorMenu);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutsideMentorMenu);
+    };
+  }, [openMentorMenuId]);
 
   const handleDeleteRoadmap = async (id) => {
     try {
@@ -1822,7 +1893,7 @@ const filteredMentorList = useMemo(() => {
         No mentors found.
       </div>
     ) : (
-      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-5 overflow-visible md:grid-cols-2 xl:grid-cols-3">
         {filteredMentorList.map((mentor) => {
           const mentorId = String(mentor?._id ?? mentor?.id ?? "");
           const name =
@@ -1846,7 +1917,7 @@ const filteredMentorList = useMemo(() => {
   onClick={() =>
     router.push(`/director/revitalization-roadmap/mentor?mentorId=${encodeURIComponent(mentorId)}`)
   }
-  className={`${directorGlassCard} relative flex cursor-pointer items-center gap-4 p-4 text-left transition hover:border-[#3498DB]/40`}
+  className={`${directorGlassCard} relative flex cursor-pointer items-center gap-4 overflow-visible p-4 text-left transition hover:border-[#3498DB]/40`}
 >
               <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-full border border-white/15">
                 <Image
@@ -1875,10 +1946,14 @@ const filteredMentorList = useMemo(() => {
 >
   <i className="fa-solid fa-ellipsis-vertical text-sm" />
 </button> */}
-<div className="absolute right-4 top-4">
+<div
+  className="mentor-roadmap-options-menu absolute right-4 top-4 z-[80]"
+  onClick={(e) => e.stopPropagation()}
+>
   <button
     type="button"
     onClick={(e) => {
+      e.preventDefault();
       e.stopPropagation();
       setOpenMentorMenuId((prev) => (prev === mentorId ? null : mentorId));
     }}
@@ -1891,11 +1966,12 @@ const filteredMentorList = useMemo(() => {
   {openMentorMenuId === mentorId ? (
     <div
       onClick={(e) => e.stopPropagation()}
-      className="absolute right-0 top-11 z-30 w-48 rounded-xl border border-white/15 bg-[#0d1f33] p-2 shadow-xl"
+      className="absolute right-0 top-11 z-[100] w-56 rounded-xl border border-white/15 bg-[#0d1f33] p-2 shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
     >
       <button
         type="button"
-        onClick={() => {
+        onClick={(e) => {
+          e.stopPropagation();
           setOpenMentorMenuId(null);
           router.push(
             `/director/schedule?tab=Schedule&recipientType=mentor&mentorId=${encodeURIComponent(mentorId)}`
@@ -2025,10 +2101,6 @@ const completedText =
   totalTasks > 0
     ? `${completedTasks}/${totalTasks} tasks completed`
     : "0 tasks completed";
-                    const creatorPic = roadmap.createdByAvatar;
-const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director");
-
-
                     return (
                       <div
                         key={roadmap.id}
@@ -2269,20 +2341,7 @@ const creatorInitials = getInitialsAvatar("", "", roadmap.createdBy || "Director
           Created by
         </span>
         <span className="flex items-center gap-2 pl-5 text-[13px] text-white/90">
-          <span className="relative inline-block h-7 w-7 shrink-0 overflow-hidden rounded-full ring-1 ring-white/20">
-            <Image
-              src={creatorPic || creatorInitials}
-              alt=""
-              fill
-              className="object-cover"
-              sizes="28px"
-              unoptimized={
-                typeof creatorPic === "string" && creatorPic
-                  ? isRemoteImageSrc(creatorPic)
-                  : false
-              }
-            />
-          </span>
+          <CreatorAvatar name={roadmap.createdBy} avatar={roadmap.createdByAvatar} />
           <span className="min-w-0 truncate">{roadmap.createdBy || "—"}</span>
         </span>
       </div>

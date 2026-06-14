@@ -743,7 +743,14 @@ apiGetAllUsers({ role: "pastor", roleMatch: "mixed", page: 1, limit: 20, t: Date
           includeUsers: true,
         }),
         uid ? apiGetUserById(uid) : Promise.resolve(null),
-        apiGetAllUsers({ role: "pastor", hasCompleted: true, limit: 1 }),
+        // apiGetAllUsers({ role: "pastor", hasCompleted: true, limit: 1 }),
+        apiGetAllUsers({
+  role: "pastor",
+  roleMatch: "mixed",
+  page: 1,
+  limit: 1000,
+  t: Date.now(),
+}),
         apiGetOverallProgress(["mentor", "pastor"]),
       
       ]);
@@ -881,21 +888,39 @@ progressRows = unwrapOverallProgressList(progressRes);
       }
 
     
-      if (results[6].status === "fulfilled" && results[6].value) {
+//       if (results[6].status === "fulfilled" && results[6].value) {
 
-        const completedRes: any = results[6].value;
-const body = completedRes?.data?.data;
-        const total =
-          typeof body?.total === 'number'
-            ? body.total
-            : Array.isArray(body?.users)
-              ? body.users.length
-              : 0;
-        setCompletedPastorsCount(total);
-      } else {
-        logApiFailure("Error fetching completed pastors count:", (results[6] as any).reason);
-        setCompletedPastorsCount(null);
-      }
+//         const completedRes: any = results[6].value;
+// const body = completedRes?.data?.data;
+//         const total =
+//           typeof body?.total === 'number'
+//             ? body.total
+//             : Array.isArray(body?.users)
+//               ? body.users.length
+//               : 0;
+//         setCompletedPastorsCount(total);
+//       } else {
+//         logApiFailure("Error fetching completed pastors count:", (results[6] as any).reason);
+//         setCompletedPastorsCount(null);
+//       }
+if (results[6].status === "fulfilled" && results[6].value) {
+  const completedRes: any = results[6].value;
+  const body = completedRes?.data?.data;
+
+  const users: any[] = Array.isArray(body)
+    ? body
+    : Array.isArray(body?.users)
+      ? body.users
+      : [];
+
+  const count = users.filter((u: any) => Boolean(u?.hasCompleted)).length;
+
+  setCompletedPastorsCount(count);
+} else {
+  logApiFailure("Error fetching completed pastors count:", (results[6] as any).reason);
+  setCompletedPastorsCount(null);
+}
+
     };
 
     fetchAllData();
@@ -1986,7 +2011,7 @@ const {
             </div>
 
 
-         <div className="flex items-center gap-4 text-[#8ec5eb]">
+         {/* <div className="flex items-center gap-4 text-[#8ec5eb]">
   <button
     type="button"
     className="hover:opacity-80"
@@ -2017,6 +2042,99 @@ const {
     className="cursor-not-allowed opacity-40"
     aria-label="Call disabled"
     title="Call disabled"
+  >
+    <i className="fa-solid fa-phone text-sm" />
+  </button>
+</div> */}
+
+<div className="flex items-center gap-4 text-[#8ec5eb]">
+  <button
+    type="button"
+    className="hover:opacity-80"
+    aria-label={`Email ${interest.email || "interest"}`}
+    onClick={() => {
+      if (!interest.email) return;
+
+      const subject = encodeURIComponent("Community Change Interest Form");
+      window.location.href = `mailto:${interest.email}?subject=${subject}`;
+    }}
+  >
+    <i className="fa-solid fa-envelope text-sm" />
+  </button>
+
+  <button
+    type="button"
+    className="hover:opacity-80"
+    aria-label="Message interest"
+    onClick={() => {
+      const interestAny = interest as any;
+
+      const phone = String(
+        interestAny.phoneNumber ??
+          interestAny.phone ??
+          interestAny.mobileNumber ??
+          interestAny.mobile ??
+          "",
+      ).replace(/\s/g, "");
+
+      if (!phone) return;
+
+      window.location.href = `sms:${phone}`;
+    }}
+  >
+    <i className="fa-regular fa-comment text-sm" />
+  </button>
+
+  <button
+    type="button"
+    className="hover:opacity-80"
+    aria-label="WhatsApp interest"
+    onClick={() => {
+      const interestAny = interest as any;
+
+      const rawPhone = String(
+        interestAny.phoneNumber ??
+          interestAny.phone ??
+          interestAny.mobileNumber ??
+          interestAny.mobile ??
+          "",
+      );
+
+      const digits = rawPhone.replace(/\D/g, "");
+      if (!digits) return;
+
+      const whatsappDigits =
+        digits.length === 10 ? `91${digits}` : digits.replace(/^0+/, "");
+
+      window.open(
+        `https://wa.me/${whatsappDigits}`,
+        "_blank",
+        "noopener,noreferrer",
+      );
+    }}
+  >
+    <i className="fa-brands fa-whatsapp text-sm" />
+  </button>
+
+  <button
+    type="button"
+    className="hover:opacity-80"
+    aria-label="Call interest"
+    onClick={() => {
+      const interestAny = interest as any;
+
+      const phone = String(
+        interestAny.phoneNumber ??
+          interestAny.phone ??
+          interestAny.mobileNumber ??
+          interestAny.mobile ??
+          "",
+      ).replace(/\s/g, "");
+
+      if (!phone) return;
+
+      window.location.href = `tel:${phone}`;
+    }}
   >
     <i className="fa-solid fa-phone text-sm" />
   </button>
@@ -2249,35 +2367,215 @@ if (route) {
             <div className="py-8 text-center text-white/55">No data available</div>
           ) : (
             // <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6">
-<div className="flex w-full max-w-full gap-6 overflow-x-auto overflow-y-hidden pb-5 pr-4 [scrollbar-width:thin] [scrollbar-color:#8ec5eb55_transparent] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-white/5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#8ec5eb]/40">
+
+<div className="flex w-full max-w-full gap-4 overflow-x-auto overflow-y-hidden pb-5 pr-4 [scrollbar-width:thin] [scrollbar-color:#8ec5eb55_transparent] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-white/5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#8ec5eb]/40">
               {currentData.map((person) => {
                 const personId = (person as any).id || person._id;
                 const menteeCount = person.assignedId?.length || person.menteeCount || 0;
                 const isMentor = activeTab === "mentors";
              
-                return (
- <div key={personId} className="w-[300px]  shrink-0">
-  <MentorCard
-                    variant="glass"
-                    // image={person?.profilePicture ? person.profilePicture : Mentor1}
-                    image={
+//                 return (
+//  <div key={personId} className="w-[240px] shrink-0">
+//   <MentorCard
+//                     variant="glass"
+//                     // image={person?.profilePicture ? person.profilePicture : Mentor1}
+//                     image={
+//   getPersonProfilePicture(person) ||
+//   getInitialsAvatar(person?.firstName, person?.lastName, activeTab === "mentors" ? "Mentor" : "Pastor")
+// }
+//                     name={`${person.firstName} ${person.lastName}`}
+//                     role={person.role}
+//                     menteeCount={menteeCount}
+//                     email={getUserListEmail(person as Record<string, unknown>) ?? person.email}
+//                     // phoneNumber={person.phoneNumber}
+//                     phoneNumber=""
+//                     onViewDetails={() =>
+//                       isMentor
+//                         ? router.push(`/director/mentors/profile/${personId}`)
+//                         : router.push(`/director/mentees/profile/${personId}`)
+//                     }
+//                  />
+//   </div>
+//                 );
+const profileImage =
   getPersonProfilePicture(person) ||
-  getInitialsAvatar(person?.firstName, person?.lastName, activeTab === "mentors" ? "Mentor" : "Pastor")
-}
-                    name={`${person.firstName} ${person.lastName}`}
-                    role={person.role}
-                    menteeCount={menteeCount}
-                    email={getUserListEmail(person as Record<string, unknown>) ?? person.email}
-                    // phoneNumber={person.phoneNumber}
-                    phoneNumber=""
-                    onViewDetails={() =>
-                      isMentor
-                        ? router.push(`/director/mentors/profile/${personId}`)
-                        : router.push(`/director/mentees/profile/${personId}`)
-                    }
-                 />
+  getInitialsAvatar(
+    person?.firstName,
+    person?.lastName,
+    activeTab === "mentors" ? "Mentor" : "Pastor",
+  );
+
+const fullName = `${person.firstName ?? ""} ${person.lastName ?? ""}`.trim() || "User";
+const email = getUserListEmail(person as Record<string, unknown>) ?? person.email ?? "";
+const personAny = person as any;
+
+const phone = String(
+  personAny.phoneNumber ??
+    personAny.phone ??
+    personAny.mobileNumber ??
+    personAny.mobile ??
+    personAny.whatsappNumber ??
+    personAny.interest?.phoneNumber ??
+    personAny.interest?.phone ??
+    personAny.contact?.phoneNumber ??
+    personAny.contact?.phone ??
+    "",
+).trim();
+
+const phoneForHref = phone.replace(/\s/g, "");
+const phoneDigits = phone.replace(/\D/g, "");
+
+const telHref = phoneForHref ? `tel:${phoneForHref}` : "";
+const smsHref = phoneForHref ? `sms:${phoneForHref}` : "";
+
+const whatsappDigits =
+  phoneDigits.length === 10 ? `91${phoneDigits}` : phoneDigits.replace(/^0+/, "");
+
+const whatsappHref =
+  whatsappDigits.length >= 10 ? `https://wa.me/${whatsappDigits}` : "";
+return (
+  <div key={personId} className="w-[300px] shrink-0">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 shadow-sm transition hover:border-[#8ec5eb]/30 hover:bg-white/[0.08]">
+      <div className="flex items-center gap-4">
+        <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-white/15 bg-[#123a59]">
+          <Image
+            src={profileImage}
+            alt={fullName}
+            fill
+            unoptimized={isRemoteImageSrc(profileImage)}
+            className="object-cover"
+          />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-base font-semibold text-white">
+            {fullName}
+          </h3>
+
+          <p className="mt-0.5 truncate text-xs capitalize text-white/60">
+            {person.role || (isMentor ? "Mentor" : "Pastor")}
+          </p>
+
+          {/* <span className="mt-2 inline-flex rounded-full border border-[#8ec5eb]/30 bg-[#8ec5eb]/15 px-2.5 py-1 text-[11px] font-semibold text-[#cde2f2]">
+            {menteeCount} {menteeCount === 1 ? "Mentee" : "Mentees"}
+          </span> */}
+          {activeTab === "mentors" && (
+  <span className="mt-2 inline-flex rounded-full border border-[#8ec5eb]/30 bg-[#8ec5eb]/15 px-2.5 py-1 text-[11px] font-semibold text-[#cde2f2]">
+    {menteeCount} {menteeCount === 1 ? "Mentee" : "Mentees"}
+  </span>
+)}
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
+        {/* <div className="flex items-center gap-4 text-[#8ec5eb]">
+          <button
+            type="button"
+            disabled={!email}
+            onClick={() => {
+              if (!email) return;
+              window.location.href = `mailto:${email}`;
+            }}
+            className="transition hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+            aria-label={`Email ${fullName}`}
+          >
+            <i className="fa-regular fa-envelope" />
+          </button>
+
+          <button
+            type="button"
+            disabled
+            className="cursor-not-allowed opacity-35"
+            aria-label="Chat disabled"
+          >
+            <i className="fa-regular fa-comment-dots" />
+          </button>
+
+          <button
+            type="button"
+            disabled
+            className="cursor-not-allowed opacity-35"
+            aria-label="WhatsApp disabled"
+          >
+            <i className="fa-brands fa-whatsapp" />
+          </button>
+
+          <button
+            type="button"
+            disabled
+            className="cursor-not-allowed opacity-35"
+            aria-label="Call disabled"
+          >
+            <i className="fa-solid fa-phone" />
+          </button>
+        </div> */}
+
+        <div className="flex items-center gap-4 text-[#8ec5eb]">
+  <button
+    type="button"
+    className="transition hover:text-white"
+    aria-label={`Email ${fullName}`}
+    onClick={() => {
+      if (!email) return;
+      window.location.href = `mailto:${email}`;
+    }}
+  >
+    <i className="fa-regular fa-envelope" />
+  </button>
+
+  <button
+    type="button"
+    className="transition hover:text-white"
+    aria-label={`Message ${fullName}`}
+    onClick={() => {
+      if (!smsHref) return;
+      window.location.href = smsHref;
+    }}
+  >
+    <i className="fa-regular fa-comment-dots" />
+  </button>
+
+  <button
+    type="button"
+    className="transition hover:text-white"
+    aria-label={`WhatsApp ${fullName}`}
+    onClick={() => {
+      if (!whatsappHref) return;
+      window.open(whatsappHref, "_blank", "noopener,noreferrer");
+    }}
+  >
+    <i className="fa-brands fa-whatsapp" />
+  </button>
+
+  <button
+    type="button"
+    className="transition hover:text-white"
+    aria-label={`Call ${fullName}`}
+    onClick={() => {
+      if (!telHref) return;
+      window.location.href = telHref;
+    }}
+  >
+    <i className="fa-solid fa-phone" />
+  </button>
+</div>
+
+        <button
+          type="button"
+          onClick={() =>
+            isMentor
+              ? router.push(`/director/mentors/profile/${personId}`)
+              : router.push(`/director/mentees/profile/${personId}`)
+          }
+          className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 text-[#8ec5eb] transition hover:bg-[#8ec5eb]/20 hover:text-white"
+          aria-label={`View ${fullName}`}
+        >
+          <i className="fa-solid fa-up-right-from-square text-sm" />
+        </button>
+      </div>
+    </div>
   </div>
-                );
+);
               })}
             </div>
           )}

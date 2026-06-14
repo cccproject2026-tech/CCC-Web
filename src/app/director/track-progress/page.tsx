@@ -65,11 +65,20 @@ type MentorListItem = {
 //   // profileImage: string | (typeof PLACEHOLDER_IMAGES)[number];
 //   profileImage: string;
 // };
+// type ProgressListItem = {
+//   userId: string;
+//   fullName: string;
+//   role: string;
+//   progress: number;
+//   profileImage: string;
+//   email?: string;
+// };
 type ProgressListItem = {
   userId: string;
   fullName: string;
   role: string;
   progress: number;
+  isCompleted: boolean;
   profileImage: string;
   email?: string;
 };
@@ -103,13 +112,34 @@ function normalizeRow(
     item.email ||
     "Unknown";
 
-  return {
+//   return {
+//   userId,
+//   fullName,
+//   role: item.role ?? "—",
+//   progress: Math.round(
+//     Math.min(100, Math.max(0, item.overallProgress ?? 0)),
+//   ),
+//   profileImage: imageForItem(item.profilePicture, fullName),
+//   email: item.email || "",
+// };
+const progress = Math.round(
+  Math.min(100, Math.max(0, item.overallProgress ?? 0)),
+);
+
+const rawStatus = String((item as any).status ?? "").trim().toLowerCase();
+
+const isCompleted =
+  progress >= 100 ||
+  Boolean((item as any).hasCompleted) ||
+  Boolean((item as any).overallCompleted) ||
+  rawStatus === "completed";
+
+return {
   userId,
   fullName,
   role: item.role ?? "—",
-  progress: Math.round(
-    Math.min(100, Math.max(0, item.overallProgress ?? 0)),
-  ),
+  progress: isCompleted ? 100 : progress,
+  isCompleted,
   profileImage: imageForItem(item.profilePicture, fullName),
   email: item.email || "",
 };
@@ -234,10 +264,20 @@ const mentorImage =
     }
   }, [mentorList.length, byMentorLoading, loadByMentor]);
 
+  // const inProgressCount = useMemo(
+  //   () => progressData.filter((p) => p.progress < 100).length,
+  //   [progressData],
+  // );
+
   const inProgressCount = useMemo(
-    () => progressData.filter((p) => p.progress < 100).length,
-    [progressData],
-  );
+  () => progressData.filter((p) => !p.isCompleted).length,
+  [progressData],
+);
+
+const completedCount = useMemo(
+  () => progressData.filter((p) => p.isCompleted).length,
+  [progressData],
+);
 
   const filteredData = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -247,10 +287,14 @@ const mentorImage =
         item.fullName.toLowerCase().includes(q) ||
         item.role.toLowerCase().includes(q) ||
         item.userId.toLowerCase().includes(q);
+      // const matchesFilter =
+      //   activeTab === "all" ||
+      //   (activeTab === "in-progress" && item.progress < 100) ||
+      //   (activeTab === "completed" && item.progress === 100);
       const matchesFilter =
-        activeTab === "all" ||
-        (activeTab === "in-progress" && item.progress < 100) ||
-        (activeTab === "completed" && item.progress === 100);
+  activeTab === "all" ||
+  (activeTab === "in-progress" && !item.isCompleted) ||
+  (activeTab === "completed" && item.isCompleted);
       return matchesSearch && matchesFilter;
     });
   }, [progressData, activeTab, searchQuery]);

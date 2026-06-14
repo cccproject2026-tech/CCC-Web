@@ -1,13 +1,11 @@
 "use client";
 import { useState, useEffect } from "react";
 import Image from "next/image";
-import Mentor1 from "../Assets/mentor1.png";
-import Mentor2 from "../Assets/mentor2.png";
-import Mentor3 from "../Assets/mentor3.png";
 import { apiGetAllUsers } from "@/app/Services/users.service";
 import { apiAssignRoadmap } from "@/app/Services/api";
 import { parseMentorUsersListResponse } from "@/app/director/mentors/parseMentorUsersResponse";
 import { emitPastorAssignmentsChanged } from "@/app/utils/progress-sync";
+import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 
 /** Match filter tabs to API roles ("lay leader" vs "lay-leader", case, etc.). */
 function normalizeRoleKey(role: string): string {
@@ -48,6 +46,47 @@ function formatAssignRoadmapError(err: unknown): string {
   return text;
 }
 
+function getUserInitials(user: any): string {
+  const firstName = String(user?.firstName ?? user?.first_name ?? "").trim();
+  const lastName = String(user?.lastName ?? user?.last_name ?? "").trim();
+  const fullName = String(user?.name ?? user?.fullName ?? "").trim();
+
+  const value = `${firstName} ${lastName}`.trim() || fullName || "User";
+
+  const initials = value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  return initials || "U";
+}
+
+function getUserAvatarUrl(user: any): string {
+  const raw =
+    user?.profilePicture ??
+    user?.profile_picture ??
+    user?.profileImage ??
+    user?.profile_image ??
+    user?.avatar ??
+    user?.imageUrl ??
+    user?.image ??
+    user?.img ??
+    user?.user?.profilePicture ??
+    user?.user?.profile_picture ??
+    user?.user?.avatar ??
+    "";
+
+  if (typeof raw !== "string") return "";
+
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+
+  return resolveApiMediaUrl(trimmed) ?? trimmed;
+}
+
 const ROLE_FILTERS = [
   { label: "All", value: "all" },
   { label: "Pastors", value: "pastor" },
@@ -55,14 +94,13 @@ const ROLE_FILTERS = [
   { label: "Seminarians", value: "seminarian" },
 ];
 
-const DEFAULT_IMAGES = [Mentor1, Mentor2, Mentor3];
-
 interface Person {
   id: string;
   name: string;
   email: string;
   role: string;
-  img: any;
+  img?: string;
+  [key: string]: any;
 }
 
 interface AssignRoadmapModalProps {
@@ -73,6 +111,34 @@ interface AssignRoadmapModalProps {
   onSuccess?: () => void;
   /** When set (e.g. deep link from mentees list), this user is pre-selected in the list. */
   initialUserId?: string | null;
+}
+
+function AssignUserAvatar({ user }: { user: any }) {
+  const [failed, setFailed] = useState(false);
+  const imageSrc = getUserAvatarUrl(user);
+  const initials = getUserInitials(user);
+
+  if (!imageSrc || failed) {
+    return (
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-[#173653] text-xs font-bold uppercase text-[#8ec5eb]">
+        {initials}
+      </span>
+    );
+  }
+
+  return (
+    <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full border border-white/10 bg-[#173653]">
+      <Image
+        src={imageSrc}
+        alt={initials}
+        fill
+        sizes="40px"
+        unoptimized={isRemoteImageSrc(imageSrc)}
+        className="object-cover"
+        onError={() => setFailed(true)}
+      />
+    </span>
+  );
 }
 
 export default function AssignRoadmapModal({
@@ -157,12 +223,13 @@ export default function AssignRoadmapModal({
       });
 
       setPeople(
-        allUsers.map((u: any, i: number) => ({
+        allUsers.map((u: any) => ({
+          ...u,
           id: extractUserId(u),
           name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || u.email || "User",
           email: u.email ?? "",
           role: u.role,
-          img: u.profilePicture || DEFAULT_IMAGES[i % DEFAULT_IMAGES.length],
+          img: getUserAvatarUrl(u),
         })).filter((p: Person) => p.id.length > 0)
       );
     } catch {
@@ -318,15 +385,7 @@ export default function AssignRoadmapModal({
                     >
                       {checked && <i className="fa-solid fa-check text-white text-[9px]"></i>}
                     </div>
-                    <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-100 flex-shrink-0">
-                      <Image
-                        src={person.img}
-                        alt={person.name}
-                        width={36}
-                        height={36}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
+                    <AssignUserAvatar user={person} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         <p className="text-sm font-semibold text-gray-900 truncate">{person.name}</p>

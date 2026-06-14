@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
+import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
 
 import DirectorHero from "../../DirectorHero";
 import MentorBg from "../../../Assets/mentor-bg.png";
@@ -901,25 +902,39 @@ const assignModalDescription = isMentorInterest
   height={38}
   className="h-9 w-9 shrink-0 rounded-full border border-white/15 object-cover"
 /> */}
-{user.profilePicture || user.profileImage || user.avatar ? (
-  <Image
-    src={user.profilePicture || user.profileImage || user.avatar}
-    alt={fullName}
-    width={38}
-    height={38}
-    className="h-9 w-9 shrink-0 rounded-full border border-white/15 object-cover"
-  />
-) : (
-  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-[#173653] text-xs font-bold uppercase text-[#8ec5eb]">
-    {`${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}` ||
-      fullName
-        .split(" ")
-        .map((part: string) => part[0])
-        .join("")
-        .slice(0, 2) ||
-      "U"}
-  </div>
-)}
+{(() => {
+  const rawImage =
+    user.profilePicture ||
+    user.profileImage ||
+    user.avatar ||
+    user.user?.profilePicture;
+
+  const imageSrc =
+    typeof rawImage === "string" && rawImage.trim()
+      ? resolveApiMediaUrl(rawImage.trim()) ?? rawImage.trim()
+      : "";
+
+  return imageSrc ? (
+    <Image
+      src={imageSrc}
+      alt={fullName}
+      width={38}
+      height={38}
+      unoptimized={isRemoteImageSrc(imageSrc)}
+      className="h-9 w-9 shrink-0 rounded-full border border-white/15 object-cover"
+    />
+  ) : (
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-[#173653] text-xs font-bold uppercase text-[#8ec5eb]">
+      {`${user.firstName?.[0] ?? ""}${user.lastName?.[0] ?? ""}` ||
+        fullName
+          .split(" ")
+          .map((part: string) => part[0])
+          .join("")
+          .slice(0, 2) ||
+        "U"}
+    </div>
+  );
+})()}
 
 <div className="min-w-0">
             <p className="truncate font-medium text-white">{fullName}</p>

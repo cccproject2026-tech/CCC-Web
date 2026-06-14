@@ -40,6 +40,7 @@ export default function AppHeader({ showFullHeader = false }) {
   const [showCCCDropdown, setShowCCCDropdown] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [newInterestCount, setNewInterestCount] = useState(0);
+  const [courseCompletedCount, setCourseCompletedCount] = useState(0);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -180,7 +181,42 @@ const list: any[] = Array.isArray(raw)
     cancelled = true;
   };
 }, []);
+useEffect(() => {
+  let cancelled = false;
 
+  const loadCourseCompletedCount = async () => {
+    try {
+      const res = await apiGetAllUsers({
+        role: "pastor",
+        roleMatch: "mixed",
+        limit: 1000,
+      });
+
+      const users = Array.isArray(res.data?.data?.users)
+        ? res.data.data.users
+        : Array.isArray(res.data?.data)
+          ? res.data.data
+          : [];
+
+      const count = users.filter((u: any) => Boolean(u?.hasCompleted)).length;
+
+      if (!cancelled) {
+        setCourseCompletedCount(count);
+      }
+    } catch (error) {
+      console.error("Failed to load course completed count:", error);
+      if (!cancelled) {
+        setCourseCompletedCount(0);
+      }
+    }
+  };
+
+  void loadCourseCompletedCount();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
   const navLinks = [
     { name: "Home", path: "/director/home" },
     { name: "Mentors", path: "/director/mentors" },
@@ -222,11 +258,14 @@ const list: any[] = Array.isArray(raw)
     { name: "Track Progress", path: "/director/track-progress" },
     { name: "Schedule", path: "/director/schedule" },
     { name: "Notes", path: "/director/notes" },
-    {
-      name: "Course Completed",
-      path: "/director/course-completed",
-      hasBadge: "3",
-    },
+  {
+  name: "Course Completed",
+  path: "/director/course-completed",
+  hasBadge:
+    courseCompletedCount > 0
+      ? String(Math.min(courseCompletedCount, 99))
+      : undefined,
+},
   ];
 
   const handleNavClick = (link: any, e: React.MouseEvent) => {

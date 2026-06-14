@@ -55,21 +55,7 @@ export interface Mentee {
 
 type MenteeSortKey =
   | { kind: "latest" }
-  | { kind: "phase_self" | "phase_church" | "phase_community" }
-  | { kind: "country"; country: string }
-  | { kind: "name_az" | "name_za" | "progress" };
-
-function phaseFilterMatches(
-  phase: string | undefined,
-  sub: "self" | "church" | "community",
-): boolean {
-  const p = (phase || "").toLowerCase();
-  if (sub === "self")
-    return p.includes("self") && p.includes("revitalization");
-  if (sub === "church")
-    return p.includes("church") && p.includes("empowerment");
-  return p.includes("community") || p.includes("multiplication");
-}
+  | { kind: "name_az" | "name_za" | "progress_low" | "progress_high" };
 
 function sortByCreatedDesc(a?: string, b?: string) {
   const ta = a ? new Date(a).getTime() : 0;
@@ -77,32 +63,18 @@ function sortByCreatedDesc(a?: string, b?: string) {
   return tb - ta;
 }
 
-function isPhaseSortKey(k: MenteeSortKey): boolean {
-  return (
-    k.kind === "phase_self" ||
-    k.kind === "phase_church" ||
-    k.kind === "phase_community"
-  );
-}
-
 function labelForSortKey(k: MenteeSortKey): string {
   switch (k.kind) {
     case "latest":
       return "Latest Join";
-    case "phase_self":
-      return "Self Revitalization";
-    case "phase_church":
-      return "Church Empowerment";
-    case "phase_community":
-      return "Community Revitalization and Multiplication";
-    case "country":
-      return `Country · ${k.country}`;
     case "name_az":
       return "Name A–Z";
     case "name_za":
       return "Name Z–A";
-    case "progress":
-      return "Progress";
+    case "progress_low":
+      return "Progress Low–High";
+    case "progress_high":
+      return "Progress High–Low";
     default:
       return "Latest Join";
   }
@@ -237,8 +209,6 @@ export default function MenteesPage() {
   );
   const [sortKey, setSortKey] = useState<MenteeSortKey>({ kind: "latest" });
   const [showSortMenu, setShowSortMenu] = useState(false);
-  const [phaseSectionOpen, setPhaseSectionOpen] = useState(true);
-  const [countrySectionOpen, setCountrySectionOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -506,12 +476,12 @@ setAssignedMentorList(
       }
 
       setMentors(
-        enriched.map((u: any, i: number): Mentor => ({
+        enriched.map((u: any): Mentor => ({
           id: u.id ?? u._id,
           name: `${u.firstName} ${u.lastName}`,
           role: u.role,
           menteeCount: u.assignedId?.length ?? 0,
-          img: profileImageForUser(u, i),
+          img: profileImageForUser(u),
           loginDate: formatUserLastLoginDisplay(u),
         })),
       );
@@ -552,6 +522,7 @@ setAssignedMentorList(
 
     setShowAssignModal(false);
     setToast("Mentors assigned successfully");
+    setTimeout(() => setToast(null), 3000);
   };
 
   /* ---------------- MARK COMPLETE ---------------- */
@@ -597,41 +568,21 @@ setAssignedMentorList(
     );
   }, [selectedMentee, mentees, mentors]);
 
-  const uniqueCountries = useMemo(() => {
-    const s = new Set<string>();
-    for (const m of mentees) {
-      const c = m.country?.trim();
-      if (c) s.add(c);
-    }
-    return [...s].sort((a, b) => a.localeCompare(b));
-  }, [mentees]);
-
   const sortedMentees = useMemo(() => {
-    let list = [...mentees];
+    const arr = [...mentees];
 
-    if (sortKey.kind === "phase_self") {
-      list = list.filter((m) => phaseFilterMatches(m.phase, "self"));
-    } else if (sortKey.kind === "phase_church") {
-      list = list.filter((m) => phaseFilterMatches(m.phase, "church"));
-    } else if (sortKey.kind === "phase_community") {
-      list = list.filter((m) => phaseFilterMatches(m.phase, "community"));
-    } else if (sortKey.kind === "country") {
-      const want = sortKey.country.trim().toLowerCase();
-      list = list.filter(
-        (m) => (m.country || "").trim().toLowerCase() === want,
-      );
-    }
-
-    const arr = [...list];
     if (sortKey.kind === "name_az") {
       arr.sort((a, b) => a.name.localeCompare(b.name));
     } else if (sortKey.kind === "name_za") {
       arr.sort((a, b) => b.name.localeCompare(a.name));
-    } else if (sortKey.kind === "progress") {
+    } else if (sortKey.kind === "progress_low") {
       arr.sort((a, b) => (a.progress ?? 0) - (b.progress ?? 0));
+    } else if (sortKey.kind === "progress_high") {
+      arr.sort((a, b) => (b.progress ?? 0) - (a.progress ?? 0));
     } else {
       arr.sort((a, b) => sortByCreatedDesc(a.createdAt, b.createdAt));
     }
+
     return arr;
   }, [mentees, sortKey]);
 
@@ -921,183 +872,18 @@ const getMenteeOptions = (mentee: Mentee) => {
 
               {showSortMenu && (
                 <div className="absolute right-0 top-full z-50 mt-2 w-[min(100vw-2rem,320px)] rounded-xl border border-gray-200 bg-white py-2 shadow-xl">
-                  {/* Phase */}
-                  <div
-                    className={`mx-2 rounded-lg ${
-                      isPhaseSortKey(sortKey)
-                        ? "bg-[#e8f0f8]"
-                        : "bg-transparent"
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setPhaseSectionOpen(!phaseSectionOpen)}
-                      className="flex w-full items-center justify-between gap-2 px-2 py-2 text-left"
-                    >
-                      <span className="flex items-center gap-2">
-                        <span
-                          className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
-                            isPhaseSortKey(sortKey)
-                              ? "border-emerald-500 bg-emerald-500"
-                              : "border-gray-300"
-                          }`}
-                        >
-                          {isPhaseSortKey(sortKey) ? (
-                            <i className="fa-solid fa-check text-[9px] text-white" />
-                          ) : null}
-                        </span>
-                        <span className="text-[14px] font-semibold text-gray-900">
-                          Phase
-                        </span>
-                      </span>
-                      <span
-                        className={`flex h-8 w-8 items-center justify-center rounded border ${
-                          isPhaseSortKey(sortKey)
-                            ? "border-[#2E3B8E] bg-[#2E3B8E] text-white"
-                            : "border-[#2E3B8E] bg-white text-[#2E3B8E]"
-                        }`}
-                      >
-                        <i
-                          className={`fa-solid ${
-                            phaseSectionOpen ? "fa-chevron-up" : "fa-chevron-down"
-                          } text-xs`}
-                        />
-                      </span>
-                    </button>
-                    {phaseSectionOpen ? (
-                      <div className="border-t border-gray-200/80 pb-2 pl-4 pr-2 pt-1">
-                        {(
-                          [
-                            {
-                              key: "phase_self" as const,
-                              label: "Self Revitalization",
-                            },
-                            {
-                              key: "phase_church" as const,
-                              label: "Church Empowerment",
-                            },
-                            {
-                              key: "phase_community" as const,
-                              label:
-                                "Community Revitalization and Multiplication",
-                            },
-                          ] as const
-                        ).map(({ key, label }) => {
-                          const active = sortKey.kind === key;
-                          return (
-                            <button
-                              key={key}
-                              type="button"
-                              onClick={() => {
-                                setSortKey({ kind: key });
-                                setShowSortMenu(false);
-                              }}
-                              className={sortControlClass(active)}
-                            >
-                              <span
-                                className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
-                                  active
-                                    ? "border-emerald-500 bg-emerald-500"
-                                    : "border-gray-300"
-                                }`}
-                              >
-                                {active ? (
-                                  <i className="fa-solid fa-check text-[9px] text-white" />
-                                ) : null}
-                              </span>
-                              <span>{label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {/* Country */}
-                  <div className="mx-2 mt-1 rounded-lg border-t border-gray-100 pt-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setCountrySectionOpen(!countrySectionOpen)
-                      }
-                      className="flex w-full items-center justify-between gap-2 px-2 py-2 text-left"
-                    >
-                      <span className="flex items-center gap-2">
-                        <span
-                          className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
-                            sortKey.kind === "country"
-                              ? "border-emerald-500 bg-emerald-500"
-                              : "border-gray-300"
-                          }`}
-                        >
-                          {sortKey.kind === "country" ? (
-                            <i className="fa-solid fa-check text-[9px] text-white" />
-                          ) : null}
-                        </span>
-                        <span className="text-[14px] font-semibold text-gray-900">
-                          Country
-                        </span>
-                      </span>
-                      <span className="flex h-8 w-8 items-center justify-center rounded border border-[#2E3B8E] bg-white text-[#2E3B8E]">
-                        <i
-                          className={`fa-solid ${
-                            countrySectionOpen
-                              ? "fa-chevron-up"
-                              : "fa-chevron-down"
-                          } text-xs`}
-                        />
-                      </span>
-                    </button>
-                    {countrySectionOpen ? (
-                      <div className="max-h-48 overflow-y-auto border-t border-gray-200/80 py-1 pl-4 pr-2">
-                        {uniqueCountries.length === 0 ? (
-                          <p className="px-2 py-2 text-[13px] text-gray-500">
-                            No countries on this page.
-                          </p>
-                        ) : (
-                          uniqueCountries.map((c) => {
-                            const active =
-                              sortKey.kind === "country" &&
-                              sortKey.country === c;
-                            return (
-                              <button
-                                key={c}
-                                type="button"
-                                onClick={() => {
-                                  setSortKey({ kind: "country", country: c });
-                                  setShowSortMenu(false);
-                                }}
-                                className={sortControlClass(active)}
-                              >
-                                <span
-                                  className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
-                                    active
-                                      ? "border-emerald-500 bg-emerald-500"
-                                      : "border-gray-300"
-                                  }`}
-                                >
-                                  {active ? (
-                                    <i className="fa-solid fa-check text-[9px] text-white" />
-                                  ) : null}
-                                </span>
-                                <span>{c}</span>
-                              </button>
-                            );
-                          })
-                        )}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="mx-2 mt-1 border-t border-gray-100 pt-2">
+                  <div className="mx-2 space-y-1">
                     {(
                       [
+                        { kind: "latest" as const, label: "Latest Join" },
                         { kind: "name_az" as const, label: "Name A–Z" },
                         { kind: "name_za" as const, label: "Name Z–A" },
-                        { kind: "progress" as const, label: "Progress" },
+                        { kind: "progress_low" as const, label: "Progress Low–High" },
+                        { kind: "progress_high" as const, label: "Progress High–Low" },
                       ] as const
                     ).map(({ kind, label }) => {
                       const active = sortKey.kind === kind;
+
                       return (
                         <button
                           key={kind}
@@ -1123,30 +909,6 @@ const getMenteeOptions = (mentee: Mentee) => {
                         </button>
                       );
                     })}
-                  </div>
-
-                  <div className="mx-2 mt-1 border-t border-gray-100 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSortKey({ kind: "latest" });
-                        setShowSortMenu(false);
-                      }}
-                      className={sortControlClass(sortKey.kind === "latest")}
-                    >
-                      <span
-                        className={`flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2 ${
-                          sortKey.kind === "latest"
-                            ? "border-emerald-500 bg-emerald-500"
-                            : "border-gray-300"
-                        }`}
-                      >
-                        {sortKey.kind === "latest" ? (
-                          <i className="fa-solid fa-check text-[9px] text-white" />
-                        ) : null}
-                      </span>
-                      <span>Clear Slot</span>
-                    </button>
                   </div>
                 </div>
               )}
