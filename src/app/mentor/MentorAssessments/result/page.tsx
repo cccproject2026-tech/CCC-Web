@@ -852,20 +852,24 @@ const scrollToSectionTop = () => {
                             (choice?.label != null && answers[layerId] === String(choice.label));
 
                           return (
-                            <label
-                              key={`${layerId}-${choiceKey}-${ci}`}
-                              className={`flex items-start gap-3 rounded-lg border px-2 py-1 ${
+                          <label
+  key={`${layerId}-${choiceKey}-${ci}`}
+  role="radio"
+  aria-checked={selected}
+  className={`flex items-start gap-3 rounded-lg border px-2 py-1 ${
                                 selected ? "border-[#8ec5eb]/40 bg-[#8ec5eb]/10" : "border-transparent"
                               }`}
                             >
-                              <input
-                                type="radio"
-                                name={layerId}
-                                checked={selected}
-                                readOnly
-                                disabled
-                                className="mt-1 h-4 w-4 accent-[#8ec5eb]"
-                              />
+                            <span
+  aria-hidden="true"
+  className={`mt-1 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+    selected
+      ? "border-[#8ec5eb] bg-[#8ec5eb]"
+      : "border-[#9fb8c9] bg-transparent"
+  }`}
+>
+  {selected && <span className="h-2 w-2 rounded-full bg-[#062946]" />}
+</span>
                               <span className="text-sm leading-relaxed text-[#e8f4fc]">{choiceLabel}</span>
                             </label>
                           );

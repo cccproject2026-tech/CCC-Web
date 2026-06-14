@@ -165,6 +165,20 @@ progress: found?.progress ?? 0,
     fetchRoadmaps();
   }, [activeTab]);
 
+useEffect(() => {
+  if (!openPastorMenuId) return;
+
+  const handleClickOutside = () => {
+    setOpenPastorMenuId(null);
+  };
+
+  document.addEventListener("click", handleClickOutside);
+
+  return () => {
+    document.removeEventListener("click", handleClickOutside);
+  };
+}, [openPastorMenuId]);
+
   const handleUserClick = async (clickedUserId: string) => {
     try {
       const list = await fetchMergedRoadmapsForAssignedUser(clickedUserId);

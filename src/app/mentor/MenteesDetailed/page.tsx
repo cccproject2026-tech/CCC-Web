@@ -161,7 +161,19 @@ const mapped = menteeUsers.map((u: any, i: number) => {
 
     hydrateProgress();
   }, [mentees.length]);
+useEffect(() => {
+  if (!openCardMenuId) return;
 
+  const handleClickOutside = () => {
+    setOpenCardMenuId(null);
+  };
+
+  document.addEventListener("click", handleClickOutside);
+
+  return () => {
+    document.removeEventListener("click", handleClickOutside);
+  };
+}, [openCardMenuId]);
   const processedMentees = useMemo(() => {
     let list = [...mentees];
 
@@ -446,14 +458,21 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
                     aria-label="Mentee progress filter"
                     className="w-full lg:w-auto"
                   />
-                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
-                    <span className="text-xs font-medium text-[#d9ebf8]">Sort by</span>
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className={`${mentorSelectDark} min-w-[140px]`}
-                      aria-label="Sort mentees"
-                    >
+                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+  <label
+    htmlFor="mentees-sort"
+    className="whitespace-nowrap text-xs font-semibold text-[#d9ebf8]"
+  >
+    Sort by
+  </label>
+
+  <select
+    id="mentees-sort"
+    value={sortBy}
+    onChange={(e) => setSortBy(e.target.value)}
+    className={`${mentorSelectDark} min-w-[160px]`}
+    aria-label="Sort mentees"
+  >
                       {/* <option className="bg-[#0f4a76] text-white" value="Phase">
                         Phase
                       </option> */}

@@ -80,6 +80,12 @@ type RuleSection = {
   layers?: RuleLayer[];
 };
 
+type MentorFeaturedAvatarItem = FeaturedAvatarItem & {
+  email?: string;
+  phoneNumber?: string;
+  phone?: string;
+};
+
 
 function normalizeMentorAssessmentStatus(raw: unknown): MentorAssessmentStatus {
   const s = String(raw || "").toLowerCase().replace(/\s+/g, "_");
@@ -440,7 +446,8 @@ export default function MentorAssessments() {
   const searchParams = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [mode, setMode] = useState<"normal" | "select">("normal");
-  const [sortBy, setSortBy] = useState<"latest" | "oldest" | "name_asc" | "name_desc">("latest");
+  const [librarySortBy, setLibrarySortBy] = useState<"latest" | "oldest" | "name_asc" | "name_desc">("latest");
+  const [pastorSortBy, setPastorSortBy] = useState<"name_asc" | "name_desc">("name_asc");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
@@ -457,7 +464,7 @@ export default function MentorAssessments() {
   const [showForm, setShowForm] = useState(false);
   const [assessments, setAssessments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [featuredItems, setFeaturedItems] = useState<FeaturedAvatarItem[]>([]);
+  const [featuredItems, setFeaturedItems] = useState<MentorFeaturedAvatarItem[]>([]);
   const [featuredLoading, setFeaturedLoading] = useState(false);
   const [selectedMenteeId, setSelectedMenteeId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"all" | "pastors">("all");
@@ -854,10 +861,13 @@ return {
         const res = await apiGetAssignedUsers(mentorId);
         const raw = res.data?.data;
         const list = Array.isArray(raw) ? raw : [];
-        const mapped: FeaturedAvatarItem[] = list.map((u: any, idx: number) => ({
+        const mapped: MentorFeaturedAvatarItem[] = list.map((u: any, idx: number) => ({
           id: String(u._id ?? u.id ?? idx),
           name: `${u.firstName || ""} ${u.lastName || ""}`.trim() || "Pastor",
           img: isHttpUrl(u.profilePicture) ? u.profilePicture : UserProfile,
+          email: u.email,
+          phoneNumber: u.phoneNumber,
+          phone: u.phone,
         }));
         if (!cancelled) setFeaturedItems(mapped);
       } catch (err) {
@@ -1000,19 +1010,21 @@ return {
     }
   };
 
+  const activeSortBy = activeTab === "pastors" ? pastorSortBy : librarySortBy;
+
   const filtered = useMemo(() => {
     const list = [...assessments];
     const statusFiltered =
   selectedMenteeId && statusFilter !== "all"
     ? list.filter((item) => item._mentorAssignmentStatus === statusFilter)
     : list;
-    if (sortBy === "name_asc") {
+    if (activeSortBy === "name_asc") {
       return statusFiltered.sort((a, b) => String(a?.name || "").localeCompare(String(b?.name || "")));
     }
-    if (sortBy === "name_desc") {
+    if (activeSortBy === "name_desc") {
       return statusFiltered.sort((a, b) => String(b?.name || "").localeCompare(String(a?.name || "")));
     }
-    if (sortBy === "oldest") {
+    if (activeSortBy === "oldest") {
       return statusFiltered.sort(
         (a, b) =>
           new Date(String(a?.createdOn ?? a?.createdAt ?? 0)).getTime() -
@@ -1024,7 +1036,7 @@ return {
         new Date(String(b?.createdOn ?? b?.createdAt ?? 0)).getTime() -
         new Date(String(a?.createdOn ?? a?.createdAt ?? 0)).getTime(),
     );
-  }, [assessments, sortBy, selectedMenteeId, statusFilter]);
+  }, [assessments, activeSortBy, selectedMenteeId, statusFilter]);
 
   const todaySubmissions = useMemo(() => {
   return filtered.filter((item: any) => {
@@ -1060,9 +1072,19 @@ const previousSubmissions = useMemo(() => {
 
   const filteredFeaturedItems = useMemo(() => {
     const q = searchTerm.trim().toLowerCase();
-    if (!q) return featuredItems;
-    const matched = featuredItems.filter((item) =>
-      String(item?.name || "").toLowerCase().includes(q),
+    const sortPastors = (items: MentorFeaturedAvatarItem[]) =>
+      [...items].sort((a, b) => {
+        const left = String(a?.name || "");
+        const right = String(b?.name || "");
+        return pastorSortBy === "name_desc"
+          ? right.localeCompare(left)
+          : left.localeCompare(right);
+      });
+    if (!q) return sortPastors(featuredItems);
+    const matched = sortPastors(
+      featuredItems.filter((item) =>
+        String(item?.name || "").toLowerCase().includes(q),
+      ),
     );
     if (!selectedMenteeId) return matched;
     const selected = featuredItems.find((item) => String(item.id) === String(selectedMenteeId));
@@ -1070,7 +1092,7 @@ const previousSubmissions = useMemo(() => {
     return matched.some((item) => String(item.id) === String(selected.id))
       ? matched
       : [selected, ...matched];
-  }, [featuredItems, searchTerm, selectedMenteeId]);
+  }, [featuredItems, pastorSortBy, searchTerm, selectedMenteeId]);
   const allTodaySubmissions = useMemo(() => {
   return allPastorSubmissions.filter((item) => isTodayDate(item.submittedAt));
 }, [allPastorSubmissions]);
@@ -1447,6 +1469,7 @@ try {
     type="button"
     onClick={() => {
       setActiveTab("all");
+      setLibrarySortBy("latest");
       setSelectedMenteeId(null);
     }}
     className={`rounded-lg px-5 py-2 text-sm font-semibold transition ${
@@ -1460,7 +1483,10 @@ try {
 
   <button
     type="button"
-    onClick={() => setActiveTab("pastors")}
+    onClick={() => {
+      setActiveTab("pastors");
+      setPastorSortBy("name_asc");
+    }}
     className={`rounded-lg px-5 py-2 text-sm font-semibold transition ${
       activeTab === "pastors"
         ? "bg-[#3498DB] text-white"
@@ -1475,34 +1501,46 @@ try {
                     {mode !== "select" && (
                       <>
                         <select
-                          value={sortBy}
-                          onChange={(e) =>
-                            setSortBy(e.target.value as "latest" | "oldest" | "name_asc" | "name_desc")
-                          }
+                          value={activeSortBy}
+                          onChange={(e) => {
+                            if (activeTab === "pastors") {
+                              setPastorSortBy(e.target.value as "name_asc" | "name_desc");
+                            } else {
+                              setLibrarySortBy(e.target.value as "latest" | "oldest" | "name_asc" | "name_desc");
+                            }
+                          }}
                           className="h-[42px] min-w-[170px] rounded-lg border border-white/20 bg-white/10 px-3 text-sm font-medium text-white outline-none transition focus:border-[#8ec5eb]/55 focus:ring-2 focus:ring-[#8ec5eb]/30 [&>option]:bg-[#062946] [&>option]:text-white"
                           aria-label="Sort assessments"
                         >
-                          <option value="latest">Newest</option>
-                          <option value="oldest">Oldest</option>
+                          {activeTab === "all" && (
+                            <>
+                              <option value="latest">Newest</option>
+                              <option value="oldest">Oldest</option>
+                            </>
+                          )}
                           <option value="name_asc">Name A-Z</option>
                           <option value="name_desc">Name Z-A</option>
                         </select>
-                        <button
-                          type="button"
-                          onClick={toggleSelectMode}
-                          className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 font-semibold text-white transition hover:bg-white/15"
-                        >
-                          <i className="fa-solid fa-check-square" />
-                          Select
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => router.push("/mentor/MentorAssessments/create")}
-                          className="inline-flex items-center gap-2 rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/20 px-4 py-2 font-semibold text-white transition hover:bg-[#8ec5eb]/30"
-                        >
-                          <i className="fa-solid fa-plus" />
-                          Add
-                        </button>
+                        {activeTab === "all" && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={toggleSelectMode}
+                              className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-4 py-2 font-semibold text-white transition hover:bg-white/15"
+                            >
+                              <i className="fa-solid fa-check-square" />
+                              Select
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => router.push("/mentor/MentorAssessments/create")}
+                              className="inline-flex items-center gap-2 rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/20 px-4 py-2 font-semibold text-white transition hover:bg-[#8ec5eb]/30"
+                            >
+                              <i className="fa-solid fa-plus" />
+                              Add
+                            </button>
+                          </>
+                        )}
                       </>
                     )}
                   </div>
@@ -1597,7 +1635,14 @@ try {
     </h2>
 
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-      {filteredFeaturedItems.map((pastor) => (
+      {filteredFeaturedItems.map((pastor) => {
+        const email = String(pastor.email || "");
+        const phoneRaw = String(pastor.phoneNumber || pastor.phone || "");
+        const phoneHref = phoneRaw.replace(/[^\d+]/g, "");
+        const whatsappHref = phoneRaw.replace(/[^\d]/g, "");
+        const hasPhoneNumber = /\d/.test(phoneRaw);
+
+        return (
         // <div key={pastor.id} className={`${mentorFilterPanel} flex items-center gap-5 p-5`}>
         //   <Image
         //     src={pastor.img || UserProfile}
@@ -1665,24 +1710,58 @@ try {
 
     <div className="mt-4 flex items-center gap-2">
       <a
-        href={`mailto:?subject=Community Change Assessment`}
+        href={`mailto:${email}?subject=Community Change Assessment`}
+        onClick={(e) => e.stopPropagation()}
         className="flex h-9 w-9 items-center justify-center rounded-full border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb]"
         aria-label="Email pastor"
       >
         <i className="fa-regular fa-envelope" />
       </a>
 
-      <button type="button" disabled className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
-        <i className="fa-solid fa-phone" />
-      </button>
+      {hasPhoneNumber ? (
+        <a
+          href={`tel:${phoneHref}`}
+          onClick={(e) => e.stopPropagation()}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb]"
+          aria-label="Call pastor"
+        >
+          <i className="fa-solid fa-phone" />
+        </a>
+      ) : (
+        <span className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
+          <i className="fa-solid fa-phone" />
+        </span>
+      )}
 
-      <button type="button" disabled className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
-        <i className="fa-brands fa-whatsapp" />
-      </button>
+      {whatsappHref ? (
+        <a
+          href={`https://wa.me/${whatsappHref}`}
+          onClick={(e) => e.stopPropagation()}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb]"
+          aria-label="WhatsApp pastor"
+        >
+          <i className="fa-brands fa-whatsapp" />
+        </a>
+      ) : (
+        <span className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
+          <i className="fa-brands fa-whatsapp" />
+        </span>
+      )}
 
-      <button type="button" disabled className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
-        <i className="fa-regular fa-comment-dots" />
-      </button>
+      {hasPhoneNumber ? (
+        <a
+          href={`sms:${phoneHref}`}
+          onClick={(e) => e.stopPropagation()}
+          className="flex h-9 w-9 items-center justify-center rounded-full border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb]"
+          aria-label="Message pastor"
+        >
+          <i className="fa-regular fa-comment-dots" />
+        </a>
+      ) : (
+        <span className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
+          <i className="fa-regular fa-comment-dots" />
+        </span>
+      )}
     </div>
   </div>
 
@@ -1694,7 +1773,8 @@ try {
     View
   </button>
 </div>
-      ))}
+        );
+      })}
     </div>
   </div>
 )}
