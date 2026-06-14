@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { GripVertical } from "lucide-react";
 import DirectorHero from "../../DirectorHero";
 import {
   directorBtnPrimary,
@@ -670,6 +671,7 @@ export default function CreateAssessmentPage() {
             <div className="mt-8">
               <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                 <span className={`${directorLabelClass} mb-0 flex items-center gap-2`}>
+                  <GripVertical className="h-4 w-4 text-white/40" aria-hidden="true" />
                   <i className="fa-solid fa-image text-[#8ec5eb]" />
                   Banner image (optional)
                 </span>

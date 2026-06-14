@@ -284,6 +284,7 @@ export default function DirectorRoadmapCreationPage() {
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const bannerBlobUrlRef = useRef<string | null>(null);
   const bannerFileRef = useRef<File | null>(null);
+  const saveRedirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Nested phase card title (e.g. 12-Month…); kept when Name input shows parent roadmap title. */
   const nestedPhaseNameForApiRef = useRef<string>("");
   /** Nested phase from GET /roadmaps/:id/nested/:nestedId (source of truth with parent fetch). */
@@ -569,6 +570,10 @@ export default function DirectorRoadmapCreationPage() {
 
   useEffect(() => {
     return () => {
+      if (saveRedirectTimeoutRef.current) {
+        clearTimeout(saveRedirectTimeoutRef.current);
+        saveRedirectTimeoutRef.current = null;
+      }
       if (bannerBlobUrlRef.current) {
         URL.revokeObjectURL(bannerBlobUrlRef.current);
         bannerBlobUrlRef.current = null;
@@ -666,6 +671,10 @@ export default function DirectorRoadmapCreationPage() {
   ]);
 
   const handleSave = async () => {
+    if (saveRedirectTimeoutRef.current) {
+      clearTimeout(saveRedirectTimeoutRef.current);
+      saveRedirectTimeoutRef.current = null;
+    }
     setSaveFeedback(null);
     setError(null);
     const nameToPersist = name.trim();
@@ -758,6 +767,13 @@ const libDesc =
           ? "The main roadmap (library) title and this phase are saved."
           : "Roadmap library will show this roadmap’s updated info.",
       );
+
+      if (isEditMode) {
+        saveRedirectTimeoutRef.current = setTimeout(() => {
+          saveRedirectTimeoutRef.current = null;
+          router.push("/director/revitalization-roadmap");
+        }, 2000);
+      }
 
       bannerFileRef.current = null;
       setBannerFile(null);

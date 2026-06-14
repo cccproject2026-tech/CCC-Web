@@ -54,6 +54,16 @@ function getApiErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
+function getAssessmentAssignErrorMessage(err: unknown): string {
+  const message = getApiErrorMessage(err, "Failed to assign assessment");
+  if (/\balready\b.*\bassign(?:ed)?\b|\bassign(?:ed)?\b.*\balready\b|duplicate|already exists/i.test(message)) {
+    return "This assessment is already assigned to this user.";
+  }
+  return message;
+}
+
+type ToastKind = "success" | "error" | "info";
+
 type AssignUserRow = {
   id: string;
   name: string;
@@ -296,6 +306,7 @@ const pastorIdFromQuery = searchParams.get("pastorId");
   const [showOptionsMenu, setShowOptionsMenu] = useState<string | null>(null);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [toastKind, setToastKind] = useState<ToastKind>("success");
   const [assessments, setAssessments] = useState<AssessmentCardRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<AssignUserRow[]>([]);
@@ -727,6 +738,7 @@ useEffect(() => {
     setSelectedUsers([assignUserFromQuery]);
     setIsSelectionMode(true);
   
+    setToastKind("info");
     setToast("Select assessments, then tap Assign.");
     const t = setTimeout(() => setToast(null), 4500);
     return () => clearTimeout(t);
@@ -796,6 +808,7 @@ useEffect(() => {
     const userIds = selectedUsers.map(String).filter(Boolean);
     const assessmentIds = selectedAssessments.map(String).filter(Boolean);
     if (!userIds.length || !assessmentIds.length) {
+      setToastKind("error");
       setToast("Select at least one user and one assessment");
       return;
     }
@@ -818,10 +831,12 @@ useEffect(() => {
       setSelectedUsers([]);
       setSelectedAssessments([]);
 
+      setToastKind("success");
       setToast("Assessment assigned successfully");
     } catch (error) {
       console.error("Assignment failed", error);
-      setToast(getApiErrorMessage(error, "Failed to assign assessment"));
+      setToastKind("error");
+      setToast(getAssessmentAssignErrorMessage(error));
     } finally {
       setLoading(false);
       setTimeout(() => setToast(null), 5000);
@@ -838,12 +853,14 @@ useEffect(() => {
 
       setAssessments((prev) => prev.filter((a) => !selectedAssessments.includes(a.id)));
 
+      setToastKind("success");
       setToast(`${selectedAssessments.length} assessment(s) deleted`);
       setShowDeleteModal(false);
       setIsSelectionMode(false);
       setSelectedAssessments([]);
     } catch (err) {
       console.error(err);
+      setToastKind("error");
       setToast(getApiErrorMessage(err, "Failed to delete assessments"));
     } finally {
       setLoading(false);
@@ -1143,6 +1160,7 @@ const filteredMentorRows = useMemo(() => {
                   type="button"
                   onClick={() => {
                     if (selectedAssessments.length === 0) {
+                      setToastKind("error");
                       setToast("Select at least one assessment first.");
                       setTimeout(() => setToast(null), 3500);
                       return;
@@ -2012,9 +2030,17 @@ const filteredMentorRows = useMemo(() => {
       />
 
       {toast && (
-        <div className="fixed right-6 top-6 z-[110] animate-fade-in">
+        <div className="fixed right-6 top-6 z-[1000] animate-fade-in">
           <div className={directorToastClass}>
-            <i className="fa-solid fa-circle-check text-xl text-green-500" />
+            <i
+              className={`fa-solid text-xl ${
+                toastKind === "success"
+                  ? "fa-circle-check text-green-500"
+                  : toastKind === "error"
+                    ? "fa-circle-exclamation text-red-500"
+                    : "fa-circle-info text-[#2E3B8E]"
+              }`}
+            />
             <span className="font-semibold text-gray-800">{toast}</span>
           </div>
         </div>
