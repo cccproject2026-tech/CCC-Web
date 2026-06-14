@@ -21,6 +21,8 @@ const [userId, setUserId] = useState<string>("");
 const [selectMode, setSelectMode] = useState(false);
 const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
 const [openMenuKey, setOpenMenuKey] = useState<string | null>(null);
+const [deleteDoc, setDeleteDoc] = useState<any | null>(null);
+const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -131,6 +133,18 @@ await apiDeleteDocument(userId, docId);
   } catch (error) {
     console.error("Failed to delete document:", error);
     alert("Failed to delete document.");
+  }
+};
+
+const handleConfirmDelete = async () => {
+  if (!deleteDoc) return;
+
+  try {
+    setDeleting(true);
+    await handleDeleteDocument(deleteDoc);
+    setDeleteDoc(null);
+  } finally {
+    setDeleting(false);
   }
 };
 
@@ -429,13 +443,17 @@ const handleDownloadDocument = async (doc: any) => {
               >
                 Share
               </button>
-              <button
-                type="button"
-                onClick={() => handleDeleteDocument(doc)}
-                className="block w-full px-4 py-2 text-left text-sm text-red-200 hover:bg-red-500/20"
-              >
-                Delete
-              </button>
+            <button
+  type="button"
+  onClick={(e) => {
+    e.stopPropagation();
+    setOpenMenuKey(null);
+    setDeleteDoc(doc);
+  }}
+  className="block w-full px-4 py-2 text-left text-sm text-red-200 hover:bg-red-500/20"
+>
+  Delete
+</button>
             </div>
           )}
 <button
@@ -453,6 +471,54 @@ const handleDownloadDocument = async (doc: any) => {
           </div>
         </div>
       </main>
+      {deleteDoc && (
+  <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/60 px-4">
+    <button
+      type="button"
+      aria-label="Close delete confirmation"
+      className="absolute inset-0"
+      onClick={() => {
+        if (!deleting) setDeleteDoc(null);
+      }}
+    />
+
+    <div className="relative z-10 w-full max-w-md rounded-2xl border border-white/15 bg-[#062946] p-6 text-white shadow-2xl">
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-red-300/30 bg-red-500/15 text-red-200">
+        <i className="fa-solid fa-trash" />
+      </div>
+
+      <h2 className="text-xl font-semibold">Delete document?</h2>
+
+      <p className="mt-2 text-sm text-[#cde2f2]">
+        Are you sure you want to delete{" "}
+        <span className="font-semibold text-white">
+          {deleteDoc.fileName || "this document"}
+        </span>
+        ? This action cannot be undone.
+      </p>
+
+      <div className="mt-6 flex justify-end gap-3">
+        <button
+          type="button"
+          disabled={deleting}
+          onClick={() => setDeleteDoc(null)}
+          className="rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          disabled={deleting}
+          onClick={handleConfirmDelete}
+          className="rounded-xl border border-red-300/30 bg-red-500/20 px-4 py-2 text-sm font-semibold text-red-100 transition hover:bg-red-500/30 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {deleting ? "Deleting..." : "Delete"}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 }

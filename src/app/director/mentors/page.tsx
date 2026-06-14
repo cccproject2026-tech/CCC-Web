@@ -288,6 +288,11 @@ export default function MyMentorsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [tabCounts, setTabCounts] = useState({
+  all: 0,
+  mentors: 0,
+  fieldMentors: 0,
+});
   /** When mentor ids are unchanged but assignments change (e.g. assign modal), re-run assigned GETs. */
   const [mentorMenteeHydrateNonce, setMentorMenteeHydrateNonce] = useState(0);
 
@@ -303,6 +308,57 @@ export default function MyMentorsPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [activeFilter, debouncedQuery]);
+
+useEffect(() => {
+  let cancelled = false;
+
+  const fetchTabCounts = async () => {
+    try {
+      const search = debouncedQuery.length > 0 ? debouncedQuery : undefined;
+
+      const [allRes, mentorsRes, fieldRes] = await Promise.all([
+        buildMentorListRequest("All", {
+          search,
+          page: 1,
+          limit: 1,
+        }),
+        fetchMentorOnlyPage({
+          search,
+          page: 1,
+          limit: 1,
+        }),
+        fetchFieldMentorPage({
+          search,
+          page: 1,
+          limit: 1,
+        }),
+      ]);
+
+      if (cancelled) return;
+
+      setTabCounts({
+        all: Number(allRes.data?.data?.total ?? 0),
+        mentors: Number(mentorsRes.total ?? 0),
+        fieldMentors: Number(fieldRes.total ?? 0),
+      });
+    } catch (error) {
+      console.error("Error fetching mentor tab counts:", error);
+      if (!cancelled) {
+        setTabCounts({
+          all: 0,
+          mentors: 0,
+          fieldMentors: 0,
+        });
+      }
+    }
+  };
+
+  void fetchTabCounts();
+
+  return () => {
+    cancelled = true;
+  };
+}, [debouncedQuery]);
 
   useEffect(() => {
     const fetchMentors = async () => {
@@ -510,11 +566,11 @@ export default function MyMentorsPage() {
     "Last Contacted",
   ];
 
-  const filterOptions = [
-    { label: "All", value: "All" },
-    { label: "Mentors", value: "Mentors" },
-    { label: "Field Mentor", value: "Field Mentor" },
-  ];
+const filterOptions = [
+  { label: "All", value: "All", count: tabCounts.all },
+  { label: "Mentors", value: "Mentors", count: tabCounts.mentors },
+  { label: "Field Mentor", value: "Field Mentor", count: tabCounts.fieldMentors },
+];
 
   const handleScheduleMeeting = useCallback((mentor: Mentor) => {
     setSelectedMentor(mentor);
@@ -731,7 +787,10 @@ const handleListMentees = useCallback((mentor: Mentor) => {
                   : "text-white/65 hover:text-white"
                   }`}
               >
-                {option.label}
+                <span>{option.label}</span>
+<span className="ml-2 rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[11px] font-bold text-white/85">
+  {option.count}
+</span>
               </button>
             ))}
           </div>

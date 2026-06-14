@@ -4,11 +4,14 @@ import { FormEvent, useState } from "react";
 import PastorHeader from "@/app/Components/PastorHeader";
 import { getCookie } from "@/app/utils/cookies";
 import { apiSendOtp, apiResetPassword } from "@/app/Services/api";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function PastorSettingsPage() {
   const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -96,20 +99,40 @@ export default function PastorSettingsPage() {
                 Send OTP
               </button>
             </div>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="New Password"
-              className="w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-[#cde2f2] outline-none"
-            />
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm New Password"
-              className="w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-[#cde2f2] outline-none"
-            />
+           <div className="relative">
+  <input
+    type={showPassword ? "text" : "password"}
+    value={password}
+    onChange={(e) => setPassword(e.target.value)}
+    placeholder="New Password"
+    className="w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2 pr-11 text-sm text-white placeholder:text-[#cde2f2] outline-none"
+  />
+  <button
+    type="button"
+    onClick={() => setShowPassword((prev) => !prev)}
+    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#cde2f2] transition hover:text-white"
+    aria-label={showPassword ? "Hide password" : "Show password"}
+  >
+    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+  </button>
+</div>
+          <div className="relative">
+  <input
+    type={showConfirmPassword ? "text" : "password"}
+    value={confirmPassword}
+    onChange={(e) => setConfirmPassword(e.target.value)}
+    placeholder="Confirm New Password"
+    className="w-full rounded-xl border border-white/20 bg-white/5 px-3 py-2 pr-11 text-sm text-white placeholder:text-[#cde2f2] outline-none"
+  />
+  <button
+    type="button"
+    onClick={() => setShowConfirmPassword((prev) => !prev)}
+    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#cde2f2] transition hover:text-white"
+    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+  >
+    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+  </button>
+</div>
             {message && <p className="text-sm text-[#9ef0be]">{message}</p>}
             {error && <p className="text-sm text-[#ffb2b2]">{error}</p>}
             <button

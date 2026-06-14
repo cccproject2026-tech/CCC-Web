@@ -160,10 +160,9 @@ fieldMentorInvitation: u.fieldMentorInvitation,
   return users.filter((u: any) => {
     const matchesSearch = u.name.toLowerCase().includes(query.toLowerCase());
 
-    if (activeTab === "completed") {
-      return matchesSearch && u.hasCompleted && !u.hasRealCertificate;
-    }
-
+  if (activeTab === "completed") {
+  return matchesSearch && u.hasCompleted;
+}
     if (activeTab === "certificate_issued") {
       return matchesSearch && u.hasRealCertificate;
     }
@@ -176,9 +175,9 @@ fieldMentorInvitation: u.fieldMentorInvitation,
   });
 }, [users, activeTab, query]);
 
-  const completedCount = users.filter(
-    (u) => u.status === "completed"
-  ).length;
+ const completedCount = users.filter(
+  (u) => u.hasCompleted
+).length;
 
   const issuedCount = users.filter(
     (u) => u.status === "certificate_issued"

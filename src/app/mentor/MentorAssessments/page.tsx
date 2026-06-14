@@ -1014,10 +1014,28 @@ return {
 
   const filtered = useMemo(() => {
     const list = [...assessments];
+    const q = searchTerm.trim().toLowerCase();
+    const searchedList =
+  activeTab === "all" && q
+    ? list.filter((item) => {
+        const haystack = [
+          item?.name,
+          item?.description,
+          item?.roadMapDetails,
+          item?.type,
+          item?.createdBy,
+          item?.createdByName,
+        ]
+          .map((x) => String(x || "").toLowerCase())
+          .join(" ");
+
+        return haystack.includes(q);
+      })
+    : list;
     const statusFiltered =
   selectedMenteeId && statusFilter !== "all"
-    ? list.filter((item) => item._mentorAssignmentStatus === statusFilter)
-    : list;
+    ? searchedList.filter((item) => item._mentorAssignmentStatus === statusFilter)
+    : searchedList;
     if (activeSortBy === "name_asc") {
       return statusFiltered.sort((a, b) => String(a?.name || "").localeCompare(String(b?.name || "")));
     }
@@ -1036,7 +1054,7 @@ return {
         new Date(String(b?.createdOn ?? b?.createdAt ?? 0)).getTime() -
         new Date(String(a?.createdOn ?? a?.createdAt ?? 0)).getTime(),
     );
-  }, [assessments, activeSortBy, selectedMenteeId, statusFilter]);
+  }, [activeTab, assessments, activeSortBy, searchTerm, selectedMenteeId, statusFilter]);
 
   const todaySubmissions = useMemo(() => {
   return filtered.filter((item: any) => {
@@ -1470,6 +1488,7 @@ try {
     onClick={() => {
       setActiveTab("all");
       setLibrarySortBy("latest");
+      setSearchTerm("");
       setSelectedMenteeId(null);
     }}
     className={`rounded-lg px-5 py-2 text-sm font-semibold transition ${
@@ -1486,6 +1505,8 @@ try {
     onClick={() => {
       setActiveTab("pastors");
       setPastorSortBy("name_asc");
+      setSearchTerm("");
+      setSelectedMenteeId(null);
     }}
     className={`rounded-lg px-5 py-2 text-sm font-semibold transition ${
       activeTab === "pastors"
@@ -1634,6 +1655,9 @@ try {
       Pastor Profiles
     </h2>
 
+    {filteredFeaturedItems.length === 0 && !featuredLoading ? (
+      <div className={mentorEmptyPanel}>No pastor found.</div>
+    ) : (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       {filteredFeaturedItems.map((pastor) => {
         const email = String(pastor.email || "");
@@ -1776,6 +1800,7 @@ try {
         );
       })}
     </div>
+    )}
   </div>
 )}
                   {/* {selectedMenteeId && (
@@ -2428,6 +2453,9 @@ assessment._mentorHasSentCdp
                   ))}
                 </div>
                   ) : (
+                    activeTab === "all" && !loading ? (
+                      <div className={mentorEmptyPanel}>No assessment found.</div>
+                    ) : (
                 <div className={`mx-auto max-w-md px-8 py-14 text-center ${mentorGlassCardRoadmap} rounded-xl border border-white/10`}>
                   <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-white/10">
                     <i className="fa-regular fa-folder-open text-2xl text-[#8ec5eb]" />
@@ -2443,6 +2471,7 @@ assessment._mentorHasSentCdp
                       : "Try another search or create an assessment with Add."}
                   </p>
                                </div>
+                    )
                   )}
   </>
 )}

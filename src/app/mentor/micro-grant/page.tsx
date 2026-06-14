@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import MentorHeader from "@/app/Components/MentorHeader";
+import { apiGetAssignedUsers } from "@/app/Services/users.service";
+import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 import MicroGrantBg from "../../Assets/micro-grant.jpg";
 import UserProfile from "../../Assets/user-profile.png";
 import {
@@ -63,34 +65,103 @@ type MentorMgTab = (typeof TAB_LABELS)[number];
 
 export default function MentorMicroGrantPage() {
   const [activeTab, setActiveTab] = useState<MentorMgTab>("All");
+  const [assignedPastorIds, setAssignedPastorIds] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
   const [applications, setApplications] = useState<MicroGrantApplicationResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  // useEffect(() => {
+  //   let cancelled = false;
+  //   (async () => {
+  //     setLoading(true);
+  //     setFetchError(null);
+  //     try {
+  //       const res = await getAllMicroGrand();
+  //       const list = unwrapMicroGrantApplicationsList(res);
+  //       if (!cancelled) setApplications(list);
+  //     } catch (e) {
+  //       console.error(e);
+  //       if (!cancelled) {
+  //         setApplications([]);
+  //         setFetchError("Could not load applications. Try again later.");
+  //       }
+  //     } finally {
+  //       if (!cancelled) setLoading(false);
+  //     }
+  //   })();
+  //   return () => {
+  //     cancelled = true;
+  //   };
+  // }, []);
+
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      setFetchError(null);
-      try {
-        const res = await getAllMicroGrand();
-        const list = unwrapMicroGrantApplicationsList(res);
-        if (!cancelled) setApplications(list);
-      } catch (e) {
-        console.error(e);
+  let cancelled = false;
+
+  (async () => {
+    setLoading(true);
+    setFetchError(null);
+
+    try {
+      const mentor = getMentorFromCookie();
+      const mentorId = mentor?.id ?? mentor?._id;
+
+      if (!mentorId) {
         if (!cancelled) {
+          setAssignedPastorIds(new Set());
           setApplications([]);
-          setFetchError("Could not load applications. Try again later.");
+          setFetchError("Sign in as a mentor to view assigned pastors' applications.");
         }
-      } finally {
-        if (!cancelled) setLoading(false);
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+
+      const [assignedRes, microGrantRes] = await Promise.all([
+        apiGetAssignedUsers(String(mentorId)),
+        getAllMicroGrand(),
+      ]);
+
+      const assignedUsers = Array.isArray(assignedRes.data?.data)
+        ? assignedRes.data.data
+        : [];
+
+      const assignedIds = new Set(
+        assignedUsers
+          .map((u: any) => String(u?._id ?? u?.id ?? "").trim())
+          .filter(Boolean),
+      );
+
+      const list = unwrapMicroGrantApplicationsList(microGrantRes);
+
+      const assignedApplications = list.filter((app) => {
+        const userId = app.userId;
+        const applicantId =
+          userId && typeof userId === "object"
+            ? String(userId._id ?? userId.id ?? "").trim()
+            : String(userId ?? "").trim();
+
+        return applicantId && assignedIds.has(applicantId);
+      });
+
+      if (!cancelled) {
+        setAssignedPastorIds(assignedIds);
+        setApplications(assignedApplications);
+      }
+    } catch (e) {
+      console.error(e);
+      if (!cancelled) {
+        setAssignedPastorIds(new Set());
+        setApplications([]);
+        setFetchError("Could not load applications. Try again later.");
+      }
+    } finally {
+      if (!cancelled) setLoading(false);
+    }
+  })();
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -166,7 +237,7 @@ export default function MentorMicroGrantPage() {
               </div>
               <p className={mentorBodyText}>
                 {applications.length === 0
-                  ? "No micro grant applications yet."
+                   ? "No micro grant applications from your assigned pastors yet."
                   : "No applications match your search or filter."}
               </p>
             </div>

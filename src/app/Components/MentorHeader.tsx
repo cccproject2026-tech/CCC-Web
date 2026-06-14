@@ -36,6 +36,8 @@ import type { NotificationItem } from "../Services/types/home.types";
 import { mapNotificationItemToPopup, unwrapNotificationsList } from "../Services/notificationUi";
 import { parseAssessmentsListPayload } from "../Services/assessment.service";
 
+const MENTOR_NOTIFICATIONS_STORAGE_KEY = "mentorNotificationsEnabled";
+
 export default function MentorHeader({ showFullHeader = false }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -115,9 +117,19 @@ const [showMobileMenu, setShowMobileMenu] = useState(false);
     if (!mentorId) return;
 
     const fetchNotifications = async () => {
+      const storedPreference =
+        typeof window !== "undefined"
+          ? window.localStorage.getItem(MENTOR_NOTIFICATIONS_STORAGE_KEY)
+          : null;
       const enabledCookie = getCookie("mentor_notifications_enabled");
-      const enabled = enabledCookie === null ? true : enabledCookie !== "false";
+      const enabled =
+        storedPreference === null
+          ? enabledCookie === null
+            ? true
+            : enabledCookie !== "false"
+          : storedPreference !== "false";
       setNotificationsEnabled(enabled);
+      setCookie("mentor_notifications_enabled", enabled ? "true" : "false", 30);
       if (!enabled) {
         setNotificationList([]);
         return;
@@ -193,7 +205,15 @@ setNotificationList(newestFirst);
 
   const settingsSubMenu = [
     { icon: <Lock size={18} className="text-[#0f4a76]" />, label: "Change Password", active: true },
-    { icon: <BellOff size={18} className="text-[#0f4a76]" />, label: "Turn Off Notifications", active: true },
+    {
+      icon: notificationsEnabled ? (
+        <BellOff size={18} className="text-[#0f4a76]" />
+      ) : (
+        <Bell size={18} className="text-[#0f4a76]" />
+      ),
+      label: notificationsEnabled ? "Turn Off Notifications" : "Turn On Notifications",
+      active: true,
+    },
     { icon: <UserX size={18} className="text-gray-400" />, label: "Change Mentor", active: false },
   ];
 const isLoginPage = pathname === "/mentor/login";
@@ -506,10 +526,22 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
                                       return;
                                     }
 
-                                    if (sub.label === "Turn Off Notifications") {
-                                      setCookie("mentor_notifications_enabled", "false", 30);
-                                      setNotificationsEnabled(false);
-                                      setNotificationList([]);
+                                    if (
+                                      sub.label === "Turn Off Notifications" ||
+                                      sub.label === "Turn On Notifications"
+                                    ) {
+                                      const nextEnabled = !notificationsEnabled;
+                                      if (typeof window !== "undefined") {
+                                        window.localStorage.setItem(
+                                          MENTOR_NOTIFICATIONS_STORAGE_KEY,
+                                          String(nextEnabled),
+                                        );
+                                      }
+                                      setCookie("mentor_notifications_enabled", nextEnabled ? "true" : "false", 30);
+                                      setNotificationsEnabled(nextEnabled);
+                                      if (!nextEnabled) {
+                                        setNotificationList([]);
+                                      }
                                       setShowNotifications(false);
                                       setShowSettingsMenu(false);
                                       setShowProfileMenu(false);

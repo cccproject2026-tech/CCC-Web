@@ -31,7 +31,6 @@ import {
 } from "@/app/Services/mentoring-sessions.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import {
-  collapseRoadmapAssignmentsToParents,
   fetchMergedRoadmapsForAssignedUser,
   fetchRoadmapAssignmentsForUser,
   resolveNestedTemplateItemId,
@@ -241,31 +240,28 @@ function unwrapAssessmentsFromResponse(res: { data?: unknown }): any[] {
 }
 
 function hasSentRecommendations(data: any): boolean {
+  if (!data) return false;
+  if (typeof data === "string") return data.trim() !== "";
   if (Array.isArray(data)) {
-    return data.some((rec: any) => rec?.sent === true || rec?.status === "sent");
+    return data.some((rec: any) => hasSentRecommendations(rec));
+  }
+  if (typeof data !== "object") return false;
+  if (data?.sent === true || data?.status === "sent") return true;
+
+  const contentKeys = ["message", "text", "cdp", "mentorCdp", "recommendation"];
+  if (contentKeys.some((key) => hasSentRecommendations(data?.[key]))) return true;
+
+  if (Array.isArray(data?.recommendations) && data.recommendations.some((rec: any) => hasSentRecommendations(rec))) {
+    return true;
   }
   if (Array.isArray(data?.sections)) {
-    return data.sections.some((section: any) =>
-      Array.isArray(section?.recommendations) &&
-      section.recommendations.some(
-        (rec: any) =>
-          typeof rec === "object" &&
-          (rec?.sent === true || rec?.status === "sent"),
-      ),
-    );
+    return data.sections.some((section: any) => hasSentRecommendations(section));
   }
-  return false;
-}
+  if (Array.isArray(data?.layers)) {
+    return data.layers.some((layer: any) => hasSentRecommendations(layer));
+  }
 
-function normalizeRoadmapStatusLabel(status: unknown): string {
-  const raw = String(status ?? "").trim();
-  if (!raw) return "Not Started";
-  const normalized = raw.replace(/[_-]+/g, " ").toLowerCase();
-  if (normalized.includes("complete")) return "Completed";
-  if (normalized.includes("progress")) return "In Progress";
-  if (normalized.includes("due")) return "Due";
-  if (normalized.includes("not started")) return "Not Started";
-  return raw;
+  return false;
 }
 
 function roadmapValueClass(value: string, status: unknown): string {
@@ -282,33 +278,66 @@ function roadmapValueClass(value: string, status: unknown): string {
   return "text-[#cde2f2]/70";
 }
 
-function roadmapProgressValue(roadmap: any, progressRow: any): string {
-  const rawPercent =
-    progressRow?.progressPercentage ??
-    roadmap?.progressPercentage ??
-    roadmap?.progressPercent ??
-    roadmap?.percent ??
-    roadmap?.progress?.progressPercentage;
-  if (rawPercent !== undefined && rawPercent !== null && rawPercent !== "") {
-    const pct = Math.min(100, Math.max(0, Math.round(Number(rawPercent) || 0)));
-    return `${pct}%`;
-  }
+function roadmapAssignmentId(value: unknown): string {
+  return String(value ?? "").trim();
+}
 
-  const rawCompleted =
-    progressRow?.completedSteps ??
-    roadmap?.completedSteps ??
-    roadmap?.progress?.completedSteps;
-  const rawTotal =
-    progressRow?.totalSteps ??
-    roadmap?.totalSteps ??
-    roadmap?.progress?.totalSteps;
-  const total = Number(rawTotal);
-  if (Number.isFinite(total) && total > 0) {
-    const completed = Math.min(total, Math.max(0, Number(rawCompleted) || 0));
-    return `${completed}/${total}`;
-  }
+function isRoadmapAssignmentCompleted(row: any): boolean {
+  const status = String(row?.status ?? "").toLowerCase().replace(/[_-]+/g, " ").trim();
+  return status.includes("complete");
+}
 
-  return normalizeRoadmapStatusLabel(roadmap?.status);
+function buildRoadmapProgressSummary(assignments: any[]): {
+  percent: number;
+  rows: RoadmapProgressCardRow[];
+} {
+  const byParent = new Map<string, any[]>();
+
+  assignments.forEach((item) => {
+    const parentId =
+      roadmapAssignmentId(item?.parentRoadmapId) ||
+      roadmapAssignmentId(item?.id) ||
+      roadmapAssignmentId(item?.parentRoadmapName) ||
+      roadmapAssignmentId(item?.title);
+    if (!parentId) return;
+    const group = byParent.get(parentId) || [];
+    group.push(item);
+    byParent.set(parentId, group);
+  });
+
+  let totalTasks = 0;
+  let completedTasks = 0;
+
+  const rows = Array.from(byParent.entries()).map(([parentId, group], index) => {
+    const title =
+      String(group[0]?.parentRoadmapName || "").trim() ||
+      String(group[0]?.title || "").trim() ||
+      "Roadmap";
+    const taskRows =
+      group.length === 1 && roadmapAssignmentId(group[0]?.id) === roadmapAssignmentId(group[0]?.parentRoadmapId)
+        ? group
+        : group.filter((item) => roadmapAssignmentId(item?.id) !== roadmapAssignmentId(item?.parentRoadmapId));
+    const rowsToCount = taskRows.length > 0 ? taskRows : group;
+    const total = Math.max(rowsToCount.length, 1);
+    const completed = rowsToCount.filter(isRoadmapAssignmentCompleted).length;
+    const percent = Math.round((completed / total) * 100);
+    const value = completed >= total ? "Completed" : `${completed}/${total}`;
+
+    totalTasks += total;
+    completedTasks += Math.min(completed, total);
+
+    return {
+      id: parentId || `roadmap-${index}`,
+      title,
+      value,
+      valueClassName: roadmapValueClass(`${percent}%`, completed >= total ? "Completed" : "In-progress"),
+    };
+  });
+
+  return {
+    percent: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+    rows,
+  };
 }
 
 function getSessionStringValue(...values: unknown[]): string {
@@ -801,11 +830,11 @@ const loadProgressStats = async () => {
 
         const progressStatus = progressRow?.status || "not_started";
         const status =
-          hasMeetingDetails && (hasStoredCdp || hasBackendCdp)
+          progressStatus === "completed" ||
+          (hasMeetingDetails && (hasStoredCdp || hasBackendCdp))
             ? "completed"
             : hasSubmittedAnswers ||
-                progressStatus === "submitted" ||
-                progressStatus === "completed"
+                progressStatus === "submitted"
               ? "submitted"
               : "not_started";
 
@@ -892,9 +921,6 @@ const loadProgressStats = async () => {
         ),
     );
 
-    setRoadmapPercent(
-      Math.min(100, Math.max(0, Number(progress?.overallRoadmapProgress ?? 0))),
-    );
   } catch (error) {
     console.error("Failed to load pastor progress stats", error);
     setAssessmentStatusRows([]);
@@ -904,7 +930,6 @@ const loadProgressStats = async () => {
       pendingReview: 0,
     });
     setWeeklyAssessmentSubmissions([]);
-    setRoadmapPercent(0);
   }
 };
 
@@ -927,31 +952,14 @@ const loadRoadmapActivity = async () => {
 
 const loadRoadmapProgressRows = async () => {
   try {
-    const [assignments, progressRes] = await Promise.all([
-      fetchRoadmapAssignmentsForUser(String(pastorId)),
-      apiGetUserProgress(String(pastorId)),
-    ]);
-    const parentRoadmaps = collapseRoadmapAssignmentsToParents(assignments);
-    const progress = unwrapProgressData(progressRes);
-    const progressRows = Array.isArray(progress?.roadmaps) ? progress.roadmaps : [];
+    const assignments = await fetchRoadmapAssignmentsForUser(String(pastorId));
+    const summary = buildRoadmapProgressSummary(assignments);
 
-    setRoadmapProgressRows(
-      parentRoadmaps.slice(0, 4).map((roadmap: any, index: number) => {
-        const roadmapId = String(roadmap?.parentRoadmapId ?? roadmap?.id ?? "").trim();
-        const progressRow = progressRows.find(
-          (row: any) => String(row?.roadMapId ?? row?.roadmapId ?? row?._id ?? row?.id ?? "").trim() === roadmapId,
-        );
-        const value = roadmapProgressValue(roadmap, progressRow);
-        return {
-          id: roadmapId || String(roadmap?.id ?? roadmap?.title ?? `roadmap-${index}`),
-          title: String(roadmap?.title ?? roadmap?.parentRoadmapName ?? "Roadmap"),
-          value,
-          valueClassName: roadmapValueClass(value, roadmap?.status),
-        };
-      }),
-    );
+    setRoadmapPercent(summary.percent);
+    setRoadmapProgressRows(summary.rows.slice(0, 4));
   } catch (error) {
     console.warn("Failed to load roadmap progress rows", error);
+    setRoadmapPercent(0);
     setRoadmapProgressRows([]);
   }
 };

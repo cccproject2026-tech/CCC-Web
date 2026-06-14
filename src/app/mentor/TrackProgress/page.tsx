@@ -210,20 +210,35 @@ export default function TrackProgressPage() {
             const id = String(uid);
             const row = byUserId.get(id);
             const counts = await getPastorProgressCounts(id, allAssessments);
-            return {
-              id,
-              name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Pastor",
-              desc: u.profileInfo || "Assigned pastor",
-              // img: u.profilePicture || PastorImg,
-              img:
-  u.profilePicture ||
-  getInitialsAvatar(`${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()),
-              progress: Math.min(100, Math.max(0, numFromApi(row?.overallProgress ?? row?.overall_progress))),
-              roadmapDone: counts.roadmapDone,
-              roadmapTotal: counts.roadmapTotal,
-              assessmentDone: counts.assessmentDone,
-              assessmentTotal: counts.assessmentTotal,
-            };
+  //           return {
+  //             id,
+  //             name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Pastor",
+  //             desc: u.profileInfo || "Assigned pastor",
+  //             // img: u.profilePicture || PastorImg,
+  //             img:
+  // u.profilePicture ||
+  // getInitialsAvatar(`${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()),
+  //             progress: Math.min(100, Math.max(0, numFromApi(row?.overallProgress ?? row?.overall_progress))),
+  //             roadmapDone: counts.roadmapDone,
+  //             roadmapTotal: counts.roadmapTotal,
+  //             assessmentDone: counts.assessmentDone,
+  //             assessmentTotal: counts.assessmentTotal,
+  //           };
+  return {
+  id,
+  name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Pastor",
+  desc: u.profileInfo || "Assigned pastor",
+  img:
+    u.profilePicture ||
+    getInitialsAvatar(`${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()),
+  email: u.email || "",
+  phoneNumber: u.phoneNumber || u.phone || u.mobileNumber || "",
+  progress: Math.min(100, Math.max(0, numFromApi(row?.overallProgress ?? row?.overall_progress))),
+  roadmapDone: counts.roadmapDone,
+  roadmapTotal: counts.roadmapTotal,
+  assessmentDone: counts.assessmentDone,
+  assessmentTotal: counts.assessmentTotal,
+};
           })
           )
         ).filter((p): p is NonNullable<typeof p> => p != null && Boolean(p.id));
@@ -435,12 +450,86 @@ onClick={(e) => {
                       </div>
                     </div>
 
-                    <div className="mt-3 flex gap-4 text-[15px] text-[#8ec5eb]">
-                      <i className="fa-regular fa-envelope pointer-events-none" aria-hidden />
-                      <i className="fa-regular fa-comment pointer-events-none" aria-hidden />
-                      <i className="fa-solid fa-phone pointer-events-none" aria-hidden />
-                      <i className="fa-brands fa-whatsapp pointer-events-none" aria-hidden />
-                    </div>
+                    {(() => {
+  const email = String(pastor.email || "").trim();
+  const phoneRaw = String(pastor.phoneNumber || "").trim();
+  const phoneHref = phoneRaw.replace(/[^\d+]/g, "");
+  const whatsappHref = phoneRaw.replace(/[^\d]/g, "");
+  const hasPhone = /\d/.test(phoneRaw);
+
+  const activeIconClass = "transition hover:text-white";
+  const disabledIconClass = "cursor-not-allowed text-white/30";
+
+  return (
+    <div className="mt-3 flex gap-4 text-[15px] text-[#8ec5eb]">
+      {email ? (
+        <a
+          href={`mailto:${email}`}
+          onClick={(e) => e.stopPropagation()}
+          className={activeIconClass}
+          title="Email"
+          aria-label={`Email ${pastor.name}`}
+        >
+          <i className="fa-regular fa-envelope" aria-hidden />
+        </a>
+      ) : (
+        <span className={disabledIconClass} title="No email available">
+          <i className="fa-regular fa-envelope" aria-hidden />
+        </span>
+      )}
+
+      {hasPhone ? (
+        <a
+          href={`sms:${phoneHref}`}
+          onClick={(e) => e.stopPropagation()}
+          className={activeIconClass}
+          title="Message"
+          aria-label={`Message ${pastor.name}`}
+        >
+          <i className="fa-regular fa-comment" aria-hidden />
+        </a>
+      ) : (
+        <span className={disabledIconClass} title="No phone number available">
+          <i className="fa-regular fa-comment" aria-hidden />
+        </span>
+      )}
+
+      {hasPhone ? (
+        <a
+          href={`tel:${phoneHref}`}
+          onClick={(e) => e.stopPropagation()}
+          className={activeIconClass}
+          title="Call"
+          aria-label={`Call ${pastor.name}`}
+        >
+          <i className="fa-solid fa-phone" aria-hidden />
+        </a>
+      ) : (
+        <span className={disabledIconClass} title="No phone number available">
+          <i className="fa-solid fa-phone" aria-hidden />
+        </span>
+      )}
+
+      {hasPhone ? (
+        <a
+          href={`https://wa.me/${whatsappHref}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className={activeIconClass}
+          title="WhatsApp"
+          aria-label={`WhatsApp ${pastor.name}`}
+        >
+          <i className="fa-brands fa-whatsapp" aria-hidden />
+        </a>
+      ) : (
+        <span className={disabledIconClass} title="No phone number available">
+          <i className="fa-brands fa-whatsapp" aria-hidden />
+        </span>
+      )}
+    </div>
+  );
+})()}
                   </div>
                 </div>
               ))}
