@@ -96,6 +96,38 @@ function normalizeMentorAssessmentStatus(raw: unknown): MentorAssessmentStatus {
   return "not_started";
 }
 
+function hasSubmittedMainAssessmentAnswers(body: unknown): boolean {
+  const root =
+    body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+
+  const data =
+    root.data && typeof root.data === "object"
+      ? (root.data as Record<string, unknown>)
+      : root;
+
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+
+  return sections.some((section: any) => {
+    const layers = Array.isArray(section?.layers) ? section.layers : [];
+
+    return layers.some((layer: any) => {
+      const selectedChoice = layer?.selectedChoice;
+      const selectedValues = layer?.selectedValues;
+
+      const hasSelectedChoice =
+        selectedChoice !== undefined &&
+        selectedChoice !== null &&
+        String(selectedChoice).trim() !== "";
+
+      const hasSelectedValues =
+        Array.isArray(selectedValues) &&
+        selectedValues.some((value) => String(value ?? "").trim() !== "");
+
+      return hasSelectedChoice || hasSelectedValues;
+    });
+  });
+}
+
 function statusChipClass(status: MentorAssessmentStatus): string {
   if (status === "completed") return "border-emerald-300/40 bg-emerald-400/20 text-emerald-100";
   if (status === "submitted") return "border-amber-300/40 bg-amber-400/20 text-amber-100";
@@ -663,7 +695,7 @@ try {
     selectedMenteeId,
   );
 
-  hasSubmittedAnswers = Boolean((answersRes?.data as any)?.data?._id);
+  hasSubmittedAnswers = hasSubmittedMainAssessmentAnswers(answersRes?.data);
 } catch {
   hasSubmittedAnswers = false;
 }
@@ -677,11 +709,7 @@ const hasMeetingDetails = Boolean(resolvedAppointmentId || appt?.meetingDate);
 
 if (hasMeetingDetails && hasSentCdp) {
   normalizedStatus = "completed";
-} else if (
-  hasSubmittedAnswers ||
-  progressStatus === "submitted" ||
-  progressStatus === "completed"
-) {
+} else if (hasSubmittedAnswers) {
   normalizedStatus = "submitted";
 }
               const resolvedDueDate = pickAssignedDueDate(item, flat);

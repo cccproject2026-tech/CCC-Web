@@ -7,6 +7,7 @@ import { isAxiosError } from "axios";
 import PastorHeader from "@/app/Components/PastorHeader";
 import {
   apiGetAssessmentById,
+  apiGetUserAnswers,
   apiSubmitPreSurvey,
   parseAssessmentDetailPayload,
 } from "@/app/Services/assessment.service";
@@ -31,6 +32,26 @@ function normalizePreSurveyQuestions(raw: unknown): NormalizedQ[] {
   }));
 }
 
+function readSessionUserId(): string | null {
+  try {
+    const userCookie = getCookie("user");
+    if (!userCookie) return null;
+    const user = JSON.parse(userCookie) as { id?: string; _id?: string };
+    const uid = String(user.id || user._id || "");
+    return uid || null;
+  } catch {
+    return null;
+  }
+}
+
+function extractPreSurveyAnswers(body: unknown): unknown[] {
+  if (!body || typeof body !== "object") return [];
+  const root = body as Record<string, unknown>;
+  const data = root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : root;
+  const rows = data.preSurveyAnswers ?? root.preSurveyAnswers;
+  return Array.isArray(rows) ? rows : [];
+}
+
 function PreSurveyInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -47,6 +68,7 @@ function PreSurveyInner() {
   const [submitting, setSubmitting] = useState(false);
   const [assessment, setAssessment] = useState<Record<string, unknown> | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [hasSubmittedPreSurvey, setHasSubmittedPreSurvey] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -80,15 +102,64 @@ function PreSurveyInner() {
 
   const title = String(assessment?.name ?? "Assessment");
 
-  const handleSubmit = async () => {
-    const userCookie = getCookie("user");
-    if (!userCookie || !assessmentId) {
-      setError("Please sign in again.");
+  useEffect(() => {
+    if (!assessmentId || questions.length === 0) {
+      setHasSubmittedPreSurvey(false);
       return;
     }
-    const user = JSON.parse(userCookie) as { id?: string; _id?: string };
-    const uid = String(user.id || user._id || "");
+
+    const uid = readSessionUserId();
     if (!uid) {
+      setHasSubmittedPreSurvey(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await apiGetUserAnswers(assessmentId, uid);
+        const savedRows = extractPreSurveyAnswers(res.data);
+        if (savedRows.length === 0) {
+          if (!cancelled) setHasSubmittedPreSurvey(false);
+          return;
+        }
+
+        const mapped: Record<string, string> = {};
+        for (const row of savedRows) {
+          if (!row || typeof row !== "object") continue;
+          const item = row as Record<string, unknown>;
+          const questionId = String(item.questionId ?? item.id ?? "").trim();
+          const questionText = String(item.questionText ?? item.question ?? item.text ?? "").trim();
+          const matched = questions.find(
+            (q) => (questionId && q.id === questionId) || (questionText && q.text === questionText),
+          );
+          if (!matched) continue;
+          mapped[matched.id] = String(item.answer ?? item.value ?? "");
+        }
+
+        if (!cancelled) {
+          setAnswers((prev) => ({ ...prev, ...mapped }));
+          setHasSubmittedPreSurvey(Object.keys(mapped).length > 0);
+        }
+      } catch {
+        if (!cancelled) setHasSubmittedPreSurvey(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assessmentId, questions]);
+
+  const handleSubmit = async () => {
+    if (hasSubmittedPreSurvey && !retake) {
+      router.push(toCmaSurveyHref());
+      return;
+    }
+
+    const uid = readSessionUserId();
+    if (!uid || !assessmentId) {
       setError("Please sign in again.");
       return;
     }
@@ -202,6 +273,7 @@ function PreSurveyInner() {
                 type={q.type === "number" ? "number" : "text"}
                 placeholder={q.placeholder || ""}
                 value={answers[q.id] ?? ""}
+                readOnly={hasSubmittedPreSurvey && !retake}
                 onChange={(e) =>
                   setAnswers((prev) => ({ ...prev, [q.id]: e.target.value }))
                 }
@@ -227,7 +299,11 @@ function PreSurveyInner() {
             onClick={handleSubmit}
             className="rounded-lg bg-white px-6 py-2 text-sm font-semibold text-[#0f4a76] hover:bg-[#e7f1fa] disabled:opacity-60"
           >
-            {submitting ? "Submitting…" : "Submit & continue"}
+            {hasSubmittedPreSurvey && !retake
+              ? "Continue to survey"
+              : submitting
+                ? "Submitting..."
+                : "Submit & continue"}
           </button>
         </div>
       </main>

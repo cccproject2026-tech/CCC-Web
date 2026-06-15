@@ -10,7 +10,13 @@ import card from "@/app/Assets/card1.png";
 import { apiAddFinalComment, apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetUserById } from "@/app/Services/users.service";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
-import { apiGetAssessmentById, parseAssessmentDetailPayload } from "@/app/Services/assessment.service";
+import {
+  apiGetAssignedAssessments,
+  apiGetAssessmentById,
+  flattenAssignedAssessmentRow,
+  parseAssessmentDetailPayload,
+  parseAssignedAssessmentsListBody,
+} from "@/app/Services/assessment.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import {
@@ -32,6 +38,11 @@ import {
   mentorWarningPanel,
 } from "@/app/Components/mentor/mentor-theme";
 
+function isCompletedAssessmentStatus(status: unknown): boolean {
+  const s = String(status || "").toLowerCase().replace(/[_\s-]+/g, " ");
+  return s === "completed" || s === "complete" || s === "reviewed";
+}
+
 function PastorProgressPageContent() {
   const router = useRouter();
   const [roadmapFilter, setRoadmapFilter] = useState<RoadmapFilterTab>("All");
@@ -46,6 +57,10 @@ function PastorProgressPageContent() {
   const userId = searchParams.get("userId");
   const [roadmaps, setRoadmaps] = useState<any[]>([]);
   const [assessments, setAssessments] = useState<any[]>([]);
+  const [assignedAssessmentStats, setAssignedAssessmentStats] = useState<{
+    total: number;
+    completed: number;
+  } | null>(null);
   const [pastorUser, setPastorUser] = useState<{
     firstName?: string;
     lastName?: string;
@@ -178,6 +193,49 @@ function PastorProgressPageContent() {
     hydrateAssessments();
   }, [progress]);
 
+  useEffect(() => {
+    if (!userId) {
+      setAssignedAssessmentStats(null);
+      return;
+    }
+
+    const loadAssignedAssessmentStats = async () => {
+      try {
+        const assignedRes = await apiGetAssignedAssessments(userId);
+        const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
+        const progressAssessments = Array.isArray(progress?.assessments) ? progress.assessments : [];
+        const seen = new Set<string>();
+        let completed = 0;
+
+        for (const row of assignedRows) {
+          const flat = flattenAssignedAssessmentRow(row);
+          const assessmentId = String(flat?.assessmentId || "").trim();
+          const assignmentId = String(flat?.assignmentId || "").trim();
+          const key = assignmentId || assessmentId;
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+
+          const progressRow = progressAssessments.find(
+            (item: any) =>
+              String(item?.assessmentId ?? "") === assessmentId ||
+              Boolean(assignmentId && item?.assignmentId && String(item.assignmentId) === assignmentId),
+          );
+
+          if (isCompletedAssessmentStatus(progressRow?.status ?? (flat as any)?.status ?? (row as any)?.status)) {
+            completed += 1;
+          }
+        }
+
+        setAssignedAssessmentStats({ total: seen.size, completed });
+      } catch (err) {
+        console.error("Failed to load assigned assessment stats", err);
+        setAssignedAssessmentStats(null);
+      }
+    };
+
+    void loadAssignedAssessmentStats();
+  }, [progress, userId]);
+
   const handleMarkComplete = async () => {
     try {
       const mentor = getMentorFromCookie();
@@ -227,6 +285,14 @@ useEffect(() => {
       </div>
     );
   }
+
+  const progressForChart = assignedAssessmentStats
+    ? {
+        ...(progress || {}),
+        totalAssessments: assignedAssessmentStats.total,
+        completedAssessments: assignedAssessmentStats.completed,
+      }
+    : progress;
 
   return (
     <div className={mentorPageRoot}>
@@ -320,7 +386,7 @@ useEffect(() => {
                     )}
                   </div>
                 </div>
-                <IndividualBreakdownBarChart progress={progress} />
+                <IndividualBreakdownBarChart progress={progressForChart} />
               </section>
             </>
           )}

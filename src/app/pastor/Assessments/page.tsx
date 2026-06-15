@@ -137,6 +137,38 @@ function hasCdpInAnswerPayload(body: unknown): boolean {
   });
 }
 
+function hasSubmittedMainAssessmentAnswers(body: unknown): boolean {
+  const root =
+    body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+
+  const data =
+    root.data && typeof root.data === "object"
+      ? (root.data as Record<string, unknown>)
+      : root;
+
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+
+  return sections.some((section: any) => {
+    const layers = Array.isArray(section?.layers) ? section.layers : [];
+
+    return layers.some((layer: any) => {
+      const selectedChoice = layer?.selectedChoice;
+      const selectedValues = layer?.selectedValues;
+
+      const hasSelectedChoice =
+        selectedChoice !== undefined &&
+        selectedChoice !== null &&
+        String(selectedChoice).trim() !== "";
+
+      const hasSelectedValues =
+        Array.isArray(selectedValues) &&
+        selectedValues.some((value) => String(value ?? "").trim() !== "");
+
+      return hasSelectedChoice || hasSelectedValues;
+    });
+  });
+}
+
 function isDueNowOrPast(dueDateRaw?: string): boolean {
   if (!dueDateRaw) return false;
   const due = new Date(dueDateRaw);
@@ -379,17 +411,14 @@ const hasCdpFromRecommendations =
 const hasCdp = hasCdpFromAnswers || hasCdpFromRecommendations;
 const hasSubmittedAnswers =
   answersRes.status === "fulfilled" &&
-  Boolean((answersRes.value.data as any)?.data?._id);
+  hasSubmittedMainAssessmentAnswers(answersRes.value.data);
 
 let status: Row["status"] = "Not Started";
 
 if (hasCdp) {
   status = "Completed";
 } else if (
-  hasSubmittedAnswers ||
-  ps === "submitted" ||
-  ps === "completed" ||
-  ps === "reviewed"
+  hasSubmittedAnswers
 ) {
   status = "Submitted";
 } else if (

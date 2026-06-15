@@ -271,6 +271,11 @@ function formatDateShort(raw: unknown): string | undefined {
   return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 }
 
+function isCompletedAssessmentStatus(status: unknown): boolean {
+  const s = String(status || "").toLowerCase().replace(/[_\s-]+/g, " ");
+  return s === "completed" || s === "complete" || s === "reviewed";
+}
+
 function hasCdpInRecommendationsPayload(body: unknown): boolean {
   const walk = (node: unknown, parentSent = false): boolean => {
     if (!node) return false;
@@ -552,6 +557,7 @@ export default function IndividualProgressPage() {
                   flat.assessment.bannerImage || flat.assessment.imageUrl || flat.assessment.image,
                 ),
                 status: hasCdp ? "Completed" : submitted ? "Submitted" : "Remaining",
+                progressStatusRaw: progressRow?.status,
                 hasResult,
                 hasCdp,
                 submittedDate: formatDateShort(
@@ -705,6 +711,12 @@ export default function IndividualProgressPage() {
     completed: progressData?.overallProgress ?? 0,
     remaining: 100 - (progressData?.overallProgress ?? 0),
   };
+  const totalAssessmentsForChart = assessments.length;
+  const completedAssessmentsForChart = assessments.filter(
+    (assessment) =>
+      isCompletedAssessmentStatus(assessment.status) ||
+      isCompletedAssessmentStatus(assessment.progressStatusRaw),
+  ).length;
 
   // Donut Chart Data
   const donutChartData = {
@@ -738,13 +750,13 @@ export default function IndividualProgressPage() {
     datasets: [
       {
         label: "Total",
-        data: [progressData?.totalRoadmaps ?? 0, progressData?.totalAssessments ?? 0],
+        data: [progressData?.totalRoadmaps ?? 0, totalAssessmentsForChart],
         backgroundColor: "rgba(142, 197, 235, 0.35)",
         borderRadius: 4,
       },
       {
         label: "Completed",
-        data: [progressData?.completedRoadmaps ?? 0, progressData?.completedAssessments ?? 0],
+        data: [progressData?.completedRoadmaps ?? 0, completedAssessmentsForChart],
         backgroundColor: "#8ec5eb",
         borderRadius: 4,
       },
@@ -754,9 +766,9 @@ export default function IndividualProgressPage() {
   const maxBar = Math.max(
     3,
     progressData?.totalRoadmaps ?? 0,
-    progressData?.totalAssessments ?? 0,
+    totalAssessmentsForChart,
     progressData?.completedRoadmaps ?? 0,
-    progressData?.completedAssessments ?? 0,
+    completedAssessmentsForChart,
   );
 
   const barChartOptions = {

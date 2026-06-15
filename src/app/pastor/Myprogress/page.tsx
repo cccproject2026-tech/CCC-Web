@@ -65,6 +65,11 @@ function pickAssignedDueDate(raw: any): string | null {
   return null;
 }
 
+function isCompletedAssessmentStatus(status: unknown): boolean {
+  const s = String(status || "").toLowerCase().replace(/[_\s-]+/g, " ");
+  return s === "completed" || s === "complete" || s === "reviewed";
+}
+
 async function mapWithConcurrencyLimit<T, R>(
   items: T[],
   limit: number,
@@ -268,15 +273,13 @@ totalSteps:
       </div>
     );
   }
-const progressForChart = progress
-  ? {
-      ...progress,
-      assessments: assessments.map((assessment) => ({
-        assessmentId: assessment.assessmentId,
-        status: assessment.status || "not_started",
-      })),
-    }
-  : null;
+const progressForChart = {
+  ...(progress || {}),
+  totalAssessments: assessments.length,
+  completedAssessments: assessments.filter((assessment) =>
+    isCompletedAssessmentStatus(assessment.status),
+  ).length,
+};
   return (
     <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
       <PastorHeader showFullHeader={true} />
@@ -330,7 +333,7 @@ const progressForChart = progress
                   Individual — Roadmap, Assessments
                 </h2>
                 {/* <IndividualBreakdownBarChart progress={progress} /> */}
-                <IndividualBreakdownBarChart progress={progressForChart ?? progress} />
+                <IndividualBreakdownBarChart progress={progressForChart} />
               </section>
             </>
           )}
