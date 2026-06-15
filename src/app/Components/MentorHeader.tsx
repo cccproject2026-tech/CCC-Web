@@ -92,25 +92,44 @@ const [showMobileMenu, setShowMobileMenu] = useState(false);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const navLinks: Array<{ name: string; path: string; desktopLabel?: string }> = [
-    { name: "Home", path: "/mentor/home" },
-    { name: "My Mentees", path: "/mentor/MenteesDetailed", desktopLabel: "My\nMentees" },
-    {
-      name: "Revitalization Roadmap",
-      path: "/mentor/RevitalizationRoadmap",
-      desktopLabel: "Revitalization\nRoadmap",
-    },
-    { name: "Assessments", path: "/mentor/MentorAssessments" },
-    { name: "Track Progress", path: "/mentor/TrackProgress", desktopLabel: "Track\nProgress" },
-    { name: "Appointments", path: "/mentor/MentorSchedule" },
-    { name: "Notes", path: "/mentor/notes" },
-    { name: "Voice Notes", path: "/mentor/voice-notes", desktopLabel: "Voice\nNotes" },
-    {
-      name: "Mentorship Sessions",
-      path: "/mentor/mentoring-session",
-      desktopLabel: "Mentorship\nSessions",
-    },
-  ];
+  // const navLinks: Array<{ name: string; path: string; desktopLabel?: string }> = [
+  //   { name: "Home", path: "/mentor/home" },
+  //   { name: "My Mentees", path: "/mentor/MenteesDetailed", desktopLabel: "My\nMentees" },
+  //   {
+  //     name: "Revitalization Roadmap",
+  //     path: "/mentor/RevitalizationRoadmap",
+  //     desktopLabel: "Revitalization\nRoadmap",
+  //   },
+  //   { name: "Assessments", path: "/mentor/MentorAssessments" },
+  //   { name: "Track Progress", path: "/mentor/TrackProgress", desktopLabel: "Track\nProgress" },
+  //   { name: "Appointments", path: "/mentor/MentorSchedule" },
+  //   { name: "Notes", path: "/mentor/notes" },
+  //   { name: "Voice Notes", path: "/mentor/voice-notes", desktopLabel: "Voice\nNotes" },
+  //   {
+  //     name: "Mentorship Sessions",
+  //     path: "/mentor/mentoring-session",
+  //     desktopLabel: "Mentorship\nSessions",
+  //   },
+  // ];
+const navLinks: Array<{ name: string; path: string; desktopLabel?: string }> = [
+  { name: "Home", path: "/mentor/home" },
+  { name: "My Mentees", path: "/mentor/MenteesDetailed", desktopLabel: "My Mentees" },
+  {
+    name: "Revitalization Roadmap",
+    path: "/mentor/RevitalizationRoadmap",
+    desktopLabel: "Revitalization Roadmap",
+  },
+  { name: "Assessments", path: "/mentor/MentorAssessments" },
+  { name: "Track Progress", path: "/mentor/TrackProgress", desktopLabel: "Track Progress" },
+  { name: "Appointments", path: "/mentor/MentorSchedule" },
+  { name: "Notes", path: "/mentor/notes" },
+  { name: "Voice Notes", path: "/mentor/voice-notes", desktopLabel: "Voice Notes" },
+  {
+    name: "Mentorship Sessions",
+    path: "/mentor/mentoring-session",
+    desktopLabel: "Mentorship\nSessions",
+  },
+];
 
   useEffect(() => {
     const mentorId = getMentorUserId();
@@ -243,7 +262,7 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
       {/* ✅ Middle Nav Links */}
       {showFullHeader && (
         // <nav className="hidden lg:flex items-center gap-6">
-        <nav className="hidden min-w-0 flex-1 items-center justify-center gap-3 px-4 lg:flex xl:gap-4 2xl:gap-6">
+        <nav className="hidden min-w-0 flex-1 items-center justify-center gap-2 px-3 lg:flex xl:gap-3 2xl:gap-4">
           {navLinks.map((link, index) => {
             const isActive =
               pathname === link.path ||
@@ -252,7 +271,7 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
               <a
                 key={index}
                 href={link.path}
-                className={`flex min-h-10 max-w-[118px] items-center justify-center px-1.5 text-center text-[12px] leading-tight whitespace-pre-line cursor-pointer transition-colors duration-200 xl:max-w-[132px] xl:px-2 xl:text-[13px] ${isActive
+                className={`flex min-h-10 max-w-none items-center justify-center px-1 text-center text-[12px] leading-tight whitespace-pre-line cursor-pointer transition-colors duration-200 xl:px-1.5 xl:text-[13px] ${isActive
                   ? "font-semibold text-white"
                   : "text-white/80 hover:text-white"
                   }`}
@@ -266,7 +285,7 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
 
 
       {/* ✅ Right Icons */}
-      <div className="relative flex shrink-0 items-center justify-end gap-2 sm:gap-3 xl:gap-4" ref={dropdownRef}>
+     <div className="relative flex shrink-0 items-center justify-end gap-1.5 sm:gap-2 xl:gap-2" ref={dropdownRef}>
         {showFullHeader && (
           <>
             {/* 🔍 Search */}
@@ -277,7 +296,7 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
                 setShowProfileMenu(false);
                 setShowSettingsMenu(false);
               }}
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15"
+             className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15"
             >
               <Image src={SearchIcon} alt="Search" width={18} height={18} />
             </button>
@@ -343,7 +362,7 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
                   setShowProfileMenu(false);
                   setShowSettingsMenu(false);
                 }}
-                className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15 cursor-pointer"
+               className="relative flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15 cursor-pointer"
               >
                 <Bell size={20} aria-hidden="true" />
                 {notificationList.length > 0 && (
@@ -428,7 +447,7 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
             </div>
 
             {/* 🔗 Connect */}
-            <button className="hidden h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15 md:flex">
+            <button className="hidden h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15 md:flex">
               <Image src={Connecticon} alt="Connect" width={22} height={22} />
             </button>
 
@@ -440,9 +459,9 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
                   setShowNotifications(false);
                   setShowSettingsMenu(false);
                 }}
-                className="flex items-center gap-2 rounded-full border border-[#8ec5eb]/40 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-2 py-1 transition hover:bg-[linear-gradient(180deg,#145787_0%,#0f4a76_100%)] cursor-pointer"
+                className="flex items-center gap-1.5 rounded-full border border-[#8ec5eb]/40 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] px-1.5 py-1 transition hover:bg-[linear-gradient(180deg,#145787_0%,#0f4a76_100%)] cursor-pointer"
               >
-                <div className="hidden max-w-[120px] text-right text-[11px] leading-tight xl:block">
+                <div className="hidden max-w-[100px] text-right text-[11px] leading-tight xl:block">
                   <p className="text-white/80">{getGreeting()}</p>
                   <p className="truncate text-white font-medium">
                     {user ? `${user.firstName} ${user.lastName}` : "Loading..."}

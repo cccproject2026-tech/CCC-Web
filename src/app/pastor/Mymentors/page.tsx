@@ -825,7 +825,7 @@ setScheduleDrawerOpen(true);
     <i className="fa-regular fa-envelope opacity-40 cursor-not-allowed" />
   )}
 
-  {mentor.email ? (
+  {/* {mentor.email ? (
     <a
       href={`mailto:${mentor.email}?subject=Message to ${mentor.firstName}`}
       onClick={(e) => e.stopPropagation()}
@@ -836,7 +836,19 @@ setScheduleDrawerOpen(true);
     </a>
   ) : (
     <i className="fa-regular fa-comment opacity-40 cursor-not-allowed" />
-  )}
+  )} */}
+  {phone ? (
+  <a
+    href={`sms:${phone}`}
+    onClick={(e) => e.stopPropagation()}
+    className="hover:text-white"
+    title="Message"
+  >
+    <i className="fa-regular fa-comment" />
+  </a>
+) : (
+  <i className="fa-regular fa-comment opacity-40 cursor-not-allowed" />
+)}
 
   {phone ? (
     <a

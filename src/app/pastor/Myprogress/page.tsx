@@ -268,7 +268,15 @@ totalSteps:
       </div>
     );
   }
-
+const progressForChart = progress
+  ? {
+      ...progress,
+      assessments: assessments.map((assessment) => ({
+        assessmentId: assessment.assessmentId,
+        status: assessment.status || "not_started",
+      })),
+    }
+  : null;
   return (
     <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
       <PastorHeader showFullHeader={true} />
@@ -321,7 +329,8 @@ totalSteps:
                 <h2 className="mb-6 text-base font-bold text-white sm:text-lg">
                   Individual — Roadmap, Assessments
                 </h2>
-                <IndividualBreakdownBarChart progress={progress} />
+                {/* <IndividualBreakdownBarChart progress={progress} /> */}
+                <IndividualBreakdownBarChart progress={progressForChart ?? progress} />
               </section>
             </>
           )}

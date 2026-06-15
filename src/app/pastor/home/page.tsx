@@ -90,7 +90,7 @@ const pastorQuickLinks = [
     icon: "fa-solid fa-layer-group",
     line1: "Roadmap",
     line2: "Phases",
-    href: "/pastor/revitalization-roadmap?tab=In%20Progress",
+    href: "/pastor/revitalization-roadmap?tab=All",
   },
 ] as const;
 

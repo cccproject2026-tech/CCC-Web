@@ -142,14 +142,22 @@ function PreSurveyInner() {
     );
   }
 
+  // if (loading) {
+  //   return (
+  //     <div className="flex min-h-screen items-center justify-center bg-[#062946] text-white">
+  //       <PastorHeader showFullHeader={true} />
+  //       <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+  //     </div>
+  //   );
+  // }
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#062946] text-white">
-        <PastorHeader showFullHeader={true} />
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
-      </div>
-    );
-  }
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#062946] text-white">
+      <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#8ec5eb] border-t-transparent" />
+      <p className="text-sm text-[#cde2f2]">Loading pre-survey…</p>
+    </div>
+  );
+}
 
   if (!assessment || questions.length === 0) {
     return (

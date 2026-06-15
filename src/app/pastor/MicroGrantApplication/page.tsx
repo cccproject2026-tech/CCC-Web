@@ -29,7 +29,16 @@ const QUESTION_LABELS = [
   "What are the measurable markers of your success?",
 ] as const;
 
+
+
 type QuestionKey = (typeof QUESTION_LABELS)[number];
+const TEXTAREA_QUESTION_LABELS = new Set<QuestionKey>([
+  "Who does the project/program serve and why is it important?",
+  "What action steps will you take to achieve your goals?",
+  "What resources do you already have?",
+
+  "What are the measurable markers of your success?",
+]);
 type AnswersState = Record<QuestionKey, string>;
 
 const initialAnswers: AnswersState = {
@@ -372,13 +381,30 @@ export default function MicroGrantApplicationPage() {
                         <label className="text-sm font-medium text-white/90">
                           {label} *
                         </label>
-                        <input
+                        {/* <input
                           type="text"
                           value={answers[label]}
                           onChange={(e) => handleAnswerChange(label, e.target.value)}
                           placeholder="Your Answer"
                           className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:ring-2 focus:ring-[#8ec5eb]"
-                        />
+                        /> */}
+                        {TEXTAREA_QUESTION_LABELS.has(label) ? (
+  <textarea
+    value={answers[label]}
+    onChange={(e) => handleAnswerChange(label, e.target.value)}
+    placeholder="Your Answer"
+    rows={4}
+    className="min-h-[120px] rounded-xl border border-white/20 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-[#cde2f2] outline-none resize-y focus:ring-2 focus:ring-[#8ec5eb]"
+  />
+) : (
+  <input
+    type="text"
+    value={answers[label]}
+    onChange={(e) => handleAnswerChange(label, e.target.value)}
+    placeholder="Your Answer"
+    className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:ring-2 focus:ring-[#8ec5eb]"
+  />
+)}
                       </div>
                     ))}
 
@@ -606,9 +632,18 @@ export default function MicroGrantApplicationPage() {
           className="rounded-xl border border-white/10 bg-[#0b3557]/40 p-4"
         >
           <p className="text-sm font-semibold text-white">{label}</p>
-          <p className="mt-2 text-sm text-[#d9ebf8]">
+          {/* <p className="mt-2 text-sm text-[#d9ebf8]">
             {String(value || "—")}
-          </p>
+          </p> */}
+          {TEXTAREA_QUESTION_LABELS.has(label as QuestionKey) ? (
+  <p className="mt-2 whitespace-pre-line rounded-lg border border-white/10 bg-white/5 p-3 text-sm leading-relaxed text-[#d9ebf8]">
+    {String(value || "—")}
+  </p>
+) : (
+  <p className="mt-2 text-sm text-[#d9ebf8]">
+    {String(value || "—")}
+  </p>
+)}
         </div>
       ))}
     </div>

@@ -17,6 +17,13 @@ unwrapMicroGrantWithUser,
 } from "@/app/Services/microGrand.service";
 import { MicroGrantResponse } from "@/app/Services/types";
 
+const TEXTAREA_ANSWER_LABELS = new Set([
+  "Who does the project/program serve and why is it important?",
+  "What action steps will you take to achieve your goals?",
+  "What resources do you already have?",
+  "What are the measurable markers of your success?",
+]);
+
 const Page: React.FC = () => {
   const [activeStep, setActiveStep] = useState<number>(1);
   const [data, setData] = useState<MicroGrantResponse | null>(null);
@@ -284,12 +291,27 @@ console.log("MICRO GRANT FORM:", data.application.formId);
                     <label className="block text-sm font-semibold mb-2">
                       {label} <span className="text-red-500">*</span>
                     </label>
-                    <input
+                    {/* <input
                       type="text"
                       value={value}
                       readOnly
                       className="mt-3 w-full rounded-xl border border-white/10 bg-[#102b43] p-4 text-white outline-none"
-                    />
+                    /> */}
+{TEXTAREA_ANSWER_LABELS.has(label) ? (
+  <textarea
+    value={String(value ?? "")}
+    readOnly
+    rows={String(value ?? "").length > 120 ? 4 : 3}
+    className="mt-3 w-full resize-none rounded-xl border border-white/10 bg-[#102b43] p-4 text-white outline-none"
+  />
+) : (
+  <input
+    type="text"
+    value={String(value ?? "")}
+    readOnly
+    className="mt-3 w-full rounded-xl border border-white/10 bg-[#102b43] p-4 text-white outline-none"
+  />
+)}
                   </div>
                 )
               )}

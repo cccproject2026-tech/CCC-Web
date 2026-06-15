@@ -288,11 +288,15 @@ const flattenedTasks: TaskWithRoadmap[] = roadmaps
       roadmapName: String(roadmap.name ?? "Roadmap"),
     })),
   );
+  // const roadmapItems: DashboardFocusItem[] = flattenedTasks
+  //   .filter((task) => isRoadmapTaskInFocus(task))
+  //   .sort(compareRoadmapTasksForFocus)
+  //   .slice(0, MAX_ITEMS_PER_SECTION)
+  //   .map((task) => {
   const roadmapItems: DashboardFocusItem[] = flattenedTasks
-    .filter((task) => isRoadmapTaskInFocus(task))
-    .sort(compareRoadmapTasksForFocus)
-    .slice(0, MAX_ITEMS_PER_SECTION)
-    .map((task) => {
+  .filter((task) => isRoadmapTaskInFocus(task))
+  .sort(compareRoadmapTasksForFocus)
+  .map((task) => {
       const st = normalizeNestedTaskStatus(task.status);
       const meta =
         st === "in-progress"
@@ -422,7 +426,7 @@ const flattenedTasks: TaskWithRoadmap[] = roadmaps
   return [
     {
       id: "roadmaps",
-      title: "Incomplete roadmap tasks",
+      title: "Pending roadmap tasks",
       emptyMessage: "No roadmap tasks in progress right now.",
       items: roadmapItems,
     },

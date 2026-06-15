@@ -1,6 +1,6 @@
 "use client";
 import PastorHeader from "@/app/Components/PastorHeader";
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import { getNotifications } from "@/app/Services/pastor.service";
@@ -12,6 +12,8 @@ export default function NotificationsPage() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+const notificationsPerPage = 8;
 
   useEffect(() => {
     async function loadNotifications() {
@@ -21,10 +23,26 @@ export default function NotificationsPage() {
 
         const res = await getNotifications(userId);
       
-        const list = unwrapNotificationsList(res);
-const newestFirst = [...list].reverse();
+//         const list = unwrapNotificationsList(res);
+// const newestFirst = [...list].reverse();
+
+// setNotifications(newestFirst);
+const list = unwrapNotificationsList(res);
+
+const newestFirst = [...list].sort((a: any, b: any) => {
+  const aTime = new Date(
+    a.createdAt || a.updatedAt || a.date || a.time || a.timestamp || 0,
+  ).getTime();
+
+  const bTime = new Date(
+    b.createdAt || b.updatedAt || b.date || b.time || b.timestamp || 0,
+  ).getTime();
+
+  return bTime - aTime;
+});
 
 setNotifications(newestFirst);
+setCurrentPage(1);
       } catch (err) {
         console.error("Error loading notifications:", err);
       } finally {
@@ -34,6 +52,19 @@ setNotifications(newestFirst);
 
     loadNotifications();
   }, []);
+
+  const totalPages = Math.ceil(notifications.length / notificationsPerPage);
+
+const paginatedNotifications = useMemo(() => {
+  const startIndex = (currentPage - 1) * notificationsPerPage;
+  return notifications.slice(startIndex, startIndex + notificationsPerPage);
+}, [notifications, currentPage]);
+
+const goToPage = (page: number) => {
+  if (page < 1 || page > totalPages) return;
+  setCurrentPage(page);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+};
 
   return (
     <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_20%_10%,rgba(141,211,243,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)]">
@@ -65,7 +96,7 @@ setNotifications(newestFirst);
 
           {/* Notification List */}
           <div className="flex flex-col gap-4">
-            {notifications.map((note) => {
+           {paginatedNotifications.map((note) => {
               const p = mapNotificationItemToPopup(note);
               return (
                 // <div
@@ -114,6 +145,54 @@ setNotifications(newestFirst);
               );
             })}
           </div>
+          {!loading && totalPages > 1 && (
+  <div className="mt-6 flex flex-col items-center justify-between gap-3 rounded-xl border border-white/15 bg-white/5 px-4 py-3 sm:flex-row">
+    <p className="text-xs text-[#cde2f2]">
+      Showing {(currentPage - 1) * notificationsPerPage + 1}-
+      {Math.min(currentPage * notificationsPerPage, notifications.length)} of{" "}
+      {notifications.length} notifications
+    </p>
+
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => goToPage(currentPage - 1)}
+        disabled={currentPage === 1}
+        className="rounded-lg border border-white/15 px-3 py-2 text-xs text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Previous
+      </button>
+
+      {Array.from({ length: totalPages }, (_, index) => {
+        const page = index + 1;
+
+        return (
+          <button
+            key={page}
+            type="button"
+            onClick={() => goToPage(page)}
+            className={`h-8 w-8 rounded-lg border text-xs font-semibold transition ${
+              currentPage === page
+                ? "border-[#8ec5eb] bg-[#8ec5eb] text-[#062946]"
+                : "border-white/15 text-white hover:bg-white/10"
+            }`}
+          >
+            {page}
+          </button>
+        );
+      })}
+
+      <button
+        type="button"
+        onClick={() => goToPage(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className="rounded-lg border border-white/15 px-3 py-2 text-xs text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Next
+      </button>
+    </div>
+  </div>
+)}
         </div>
       </main>
     </div>

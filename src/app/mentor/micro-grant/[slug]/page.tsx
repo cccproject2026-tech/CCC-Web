@@ -19,7 +19,13 @@ import {
   mentorSecondaryCta,
   mentorSpinner,
 } from "@/app/Components/mentor/mentor-theme";
+const TEXTAREA_ANSWER_LABELS = new Set([
+  "Who does the project/program serve and why is it important?",
+  "What action steps will you take to achieve your goals?",
+  "What resources do you already have?",
 
+  "What are the measurable markers of your success?",
+]);
 function supportingDocEntry(
   doc: unknown,
   idx: number,
@@ -233,12 +239,27 @@ export default function MentorMicroGrantDetailPage() {
                     <label className="mb-2 block text-sm font-semibold text-white">
                       {label} <span className="text-red-400">*</span>
                     </label>
-                    <input
+                    {/* <input
                       type="text"
                       value={String(value ?? "")}
                       readOnly
                       className="w-full rounded-lg border border-white/20 bg-white/10 p-3 text-sm text-white outline-none"
-                    />
+                    /> */}
+   {TEXTAREA_ANSWER_LABELS.has(label) ? (
+  <textarea
+    value={String(value ?? "")}
+    readOnly
+    rows={String(value ?? "").length > 120 ? 4 : 3}
+    className="w-full resize-none rounded-lg border border-white/20 bg-white/10 p-3 text-sm text-white outline-none"
+  />
+) : (
+  <input
+    type="text"
+    value={String(value ?? "")}
+    readOnly
+    className="w-full rounded-lg border border-white/20 bg-white/10 p-3 text-sm text-white outline-none"
+  />
+)}
                   </div>
                 ))}
 
