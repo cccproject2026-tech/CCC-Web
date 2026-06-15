@@ -124,6 +124,8 @@ export {
   apiReorderRoadmaps,
   apiUpdateRoadmap,
   apiDeleteRoadmap,
+  apiGetRoadmapAssignments,
+  apiRemoveRoadmapAssignments,
   apiGetNestedRoadmapItem,
   apiAddNestedRoadmapItem,
   apiUpdateNestedRoadmapItem,

@@ -490,12 +490,22 @@ fieldMentorInvitation: u.fieldMentorInvitation,
               {/* Action Button */}
               <div className="self-end flex-shrink-0">
                 {activeTab === "completed" && (
-                <Link
-  href={`/director/mentees/profile/${p.id}?issueCertificate=1`}
-  className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:bg-[#8ec5eb]/30"
->
-  Issue Certificate
-</Link>
+                  p.hasRealCertificate ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2.5 text-[13px] font-semibold text-white opacity-50 cursor-not-allowed"
+                    >
+                      Issued
+                    </button>
+                  ) : (
+                    <Link
+                      href={`/director/mentees/profile/${p.id}?issueCertificate=1`}
+                      className="whitespace-nowrap rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/20 px-4 py-2.5 text-[13px] font-semibold text-white transition-all hover:bg-[#8ec5eb]/30"
+                    >
+                      Issue Certificate
+                    </Link>
+                  )
                 )}
               {activeTab === "certificate_issued" && (
   p.fieldMentorInvitation ? (

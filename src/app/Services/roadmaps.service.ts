@@ -319,6 +319,14 @@ export const apiUpdateRoadmap = (id: string, payload: UpdateRoadMapPayload, imag
 // DELETE /roadmaps/:id
 export const apiDeleteRoadmap = (id: string) =>
   axiosInstance.delete(`/roadmaps/${id}`);
+
+export const apiGetRoadmapAssignments = (roadMapId: string) =>
+  axiosInstance.get(`/roadmaps/${roadMapId}/assignments`);
+
+export const apiRemoveRoadmapAssignments = (
+  roadMapId: string,
+  payload: { userIds: string[] },
+) => axiosInstance.delete(`/roadmaps/${roadMapId}/assignments`, { data: payload });
 // PATCH /roadmaps/reorder
 export const apiReorderRoadmaps = (orderedRoadmapIds: string[]) =>
   axiosInstance.patch("/roadmaps/reorder", {

@@ -11,6 +11,8 @@ import Card1 from "../../Assets/card1.png";
 import {
   apiGetRoadmaps,
   apiDeleteRoadmap,
+  apiGetRoadmapAssignments,
+  apiRemoveRoadmapAssignments,
   apiGetAllUsers,
   apiReorderRoadmaps,
 } from "@/app/Services/api";
@@ -209,6 +211,82 @@ function getInitialsAvatar(firstName, lastName, fallback = "User") {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(
     `${firstName || ""} ${lastName || ""}`.trim() || fallback
   )}&background=173653&color=ffffff`;
+}
+
+function unwrapRoadmapAssignmentsResponse(res) {
+  const body = res?.data ?? res;
+  if (Array.isArray(body)) return body;
+  if (!body || typeof body !== "object") return [];
+  if (Array.isArray(body.data)) return body.data;
+  if (body.data && typeof body.data === "object") {
+    const d = body.data;
+    if (Array.isArray(d.data)) return d.data;
+    if (Array.isArray(d.assignments)) return d.assignments;
+    if (Array.isArray(d.items)) return d.items;
+  }
+  if (Array.isArray(body.assignments)) return body.assignments;
+  if (Array.isArray(body.items)) return body.items;
+  return [];
+}
+
+function roadmapAssignmentUserId(row) {
+  const raw =
+    row?.userId ??
+    row?.user_id ??
+    row?.assignedUserId ??
+    row?.assigned_user_id ??
+    row?.pastorId ??
+    row?.pastor_id ??
+    row?.user?._id ??
+    row?.user?.id ??
+    row?.pastor?._id ??
+    row?.pastor?.id;
+  return stringifyRoadmapId(raw);
+}
+
+function roadmapAssignmentsContainUserIds(rows, userIds) {
+  const ids = new Set(userIds.map((id) => String(id).trim()).filter(Boolean));
+  if (!ids.size) return false;
+  return rows.some((row) => ids.has(roadmapAssignmentUserId(row)));
+}
+
+function progressContainsRoadmapId(progress, roadMapId) {
+  const target = stringifyRoadmapId(roadMapId);
+  if (!target) return false;
+  const roadmaps = Array.isArray(progress?.roadmaps)
+    ? progress.roadmaps
+    : Array.isArray(progress)
+      ? progress
+      : [];
+  return roadmaps.some((row) => {
+    const ids = [
+      row?.roadMapId,
+      row?.roadmapId,
+      row?.parentRoadmapId,
+      row?._id,
+      row?.id,
+    ].map(stringifyRoadmapId);
+    return ids.includes(target);
+  });
+}
+
+function roadmapAssignmentName(row) {
+  return (
+    String(row?.pastorName || "").trim() ||
+    `${row?.firstName ?? row?.user?.firstName ?? ""} ${row?.lastName ?? row?.user?.lastName ?? ""}`.trim() ||
+    String(row?.name || row?.user?.name || row?.email || row?.user?.email || "Pastor").trim()
+  );
+}
+
+function roadmapAssignmentAvatar(row) {
+  const raw =
+    row?.profilePicture ??
+    row?.user?.profilePicture ??
+    row?.profile_image ??
+    row?.user?.profile_image ??
+    "";
+  if (typeof raw !== "string" || !raw.trim()) return "";
+  return resolveApiMediaUrl(raw.trim()) ?? raw.trim();
 }
 
 function getCreatorInitials(name) {
@@ -490,6 +568,13 @@ const [pastorSearch, setPastorSearch] = useState("");
   const [loadingMetrics, setLoadingMetrics] = useState(false);
   const [filterPastorId, setFilterPastorId] = useState("all");
   const [deleteConfirmRoadmap, setDeleteConfirmRoadmap] = useState(null);
+  const [removeAssignedRoadmap, setRemoveAssignedRoadmap] = useState(null);
+  const [removeAssignedUsers, setRemoveAssignedUsers] = useState([]);
+  const [selectedRemoveUserIds, setSelectedRemoveUserIds] = useState([]);
+  const [removeAssignedLoading, setRemoveAssignedLoading] = useState(false);
+  const [removeAssignedSubmitting, setRemoveAssignedSubmitting] = useState(false);
+  const [removeAssignedError, setRemoveAssignedError] = useState("");
+  const [removeAssignedSuccess, setRemoveAssignedSuccess] = useState("");
   const [selectedPastorModalId, setSelectedPastorModalId] = useState(null);
   const [activeTab, setActiveTab] = useState("library");
 
@@ -846,6 +931,164 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
       router.push("/director/revitalization-roadmap");
     } catch (err) {
       console.error("Error deleting roadmap:", err);
+    }
+  };
+
+  const loadRoadmapAssignmentsForRemoval = useCallback(async (roadmapId) => {
+    if (!roadmapId) return;
+    try {
+      setRemoveAssignedLoading(true);
+      setRemoveAssignedError("");
+      const res = await apiGetRoadmapAssignments(roadmapId);
+      const rows = unwrapRoadmapAssignmentsResponse(res)
+        .map((row) => ({
+          ...row,
+          userId: roadmapAssignmentUserId(row),
+          pastorName: roadmapAssignmentName(row),
+          profilePicture: roadmapAssignmentAvatar(row),
+        }))
+        .filter((row) => row.userId);
+      setRemoveAssignedUsers(rows);
+      setSelectedRemoveUserIds((prev) =>
+        prev.filter((id) => rows.some((row) => String(row.userId) === String(id))),
+      );
+    } catch (err) {
+      console.error("Error fetching roadmap assignments:", err);
+      setRemoveAssignedUsers([]);
+      setRemoveAssignedError(fetchErrorMessage(err));
+    } finally {
+      setRemoveAssignedLoading(false);
+    }
+  }, []);
+
+  const openRemoveAssignedRoadmapModal = (roadmap) => {
+    const roadmapId = String(roadmap?.id || "").trim();
+    setShowOptionsMenu(null);
+    setRemoveAssignedRoadmap(roadmap);
+    setRemoveAssignedUsers([]);
+    setSelectedRemoveUserIds([]);
+    setRemoveAssignedError("");
+    setRemoveAssignedSuccess("");
+    if (!roadmapId) {
+      setRemoveAssignedError("Missing roadmap id.");
+      return;
+    }
+    loadRoadmapAssignmentsForRemoval(roadmapId);
+  };
+
+  const closeRemoveAssignedRoadmapModal = () => {
+    if (removeAssignedSubmitting) return;
+    setRemoveAssignedRoadmap(null);
+    setRemoveAssignedUsers([]);
+    setSelectedRemoveUserIds([]);
+    setRemoveAssignedError("");
+    setRemoveAssignedSuccess("");
+  };
+
+  const toggleRemoveAssignedUser = (userId) => {
+    setSelectedRemoveUserIds((prev) =>
+      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId],
+    );
+  };
+
+  const handleRemoveRoadmapAssignments = async () => {
+    const roadmapId = String(removeAssignedRoadmap?.id || "").trim();
+    const userIds = selectedRemoveUserIds.map(String).filter(Boolean);
+    if (!roadmapId || userIds.length === 0) return;
+    const payload = { userIds };
+    try {
+      setRemoveAssignedSubmitting(true);
+      setRemoveAssignedError("");
+      setRemoveAssignedSuccess("");
+      console.log("Roadmap assignment remove request", {
+        url: `/roadmaps/${roadmapId}/assignments`,
+        roadMapId: roadmapId,
+        userIds,
+        payload,
+      });
+      const deleteRes = await apiRemoveRoadmapAssignments(roadmapId, payload);
+      console.log("Roadmap assignment remove response", deleteRes?.data ?? deleteRes);
+
+      const verifyRes = await apiGetRoadmapAssignments(roadmapId);
+      const verifyRows = unwrapRoadmapAssignmentsResponse(verifyRes);
+      console.log("Roadmap assignment verify response", verifyRes?.data ?? verifyRes);
+
+      if (roadmapAssignmentsContainUserIds(verifyRows, userIds)) {
+        const warning =
+          "Remove request completed, but this pastor is still assigned. Please check backend assignment removal.";
+        console.warn(
+          "Backend delete endpoint returned success but assignment list still contains the removed user.",
+          {
+            url: `/roadmaps/${roadmapId}/assignments`,
+            payload,
+            deleteResponse: deleteRes?.data ?? deleteRes,
+            verifyResponse: verifyRes?.data ?? verifyRes,
+          },
+        );
+        setRemoveAssignedError(warning);
+        setRemoveAssignedUsers(
+          verifyRows
+            .map((row) => ({
+              ...row,
+              userId: roadmapAssignmentUserId(row),
+              pastorName: roadmapAssignmentName(row),
+              profilePicture: roadmapAssignmentAvatar(row),
+            }))
+            .filter((row) => row.userId),
+        );
+        return;
+      }
+
+      const pastorProgressResults = await Promise.all(
+        userIds.map(async (userId) => {
+          try {
+            const progressRes = await apiGetUserProgress(userId);
+            const progress = unwrapUserProgressDetail(progressRes);
+            return {
+              userId,
+              url: `/progress/${userId}`,
+              response: progressRes?.data ?? progressRes,
+              stillContainsRoadmap: progressContainsRoadmapId(progress, roadmapId),
+            };
+          } catch (err) {
+            return {
+              userId,
+              url: `/progress/${userId}`,
+              error: fetchErrorMessage(err),
+              stillContainsRoadmap: null,
+            };
+          }
+        }),
+      );
+      console.log("Pastor roadmap source check after remove", {
+        pastorPageApis: [
+          `fetchRoadmapAssignmentsForUser(userId)`,
+          `apiGetUserProgress(userId)`,
+          `GET /progress/:userId`,
+        ],
+        roadMapId: roadmapId,
+        results: pastorProgressResults,
+      });
+
+      const progressStillContainsRoadmap = pastorProgressResults.some(
+        (row) => row.stillContainsRoadmap === true,
+      );
+      if (progressStillContainsRoadmap) {
+        setRemoveAssignedError(
+          "Remove request completed, but this pastor still has the roadmap in progress. Please check backend progress removal.",
+        );
+        return;
+      }
+
+      setSelectedRemoveUserIds([]);
+      setRemoveAssignedSuccess("Assigned roadmap removed successfully.");
+      await loadRoadmapAssignmentsForRemoval(roadmapId);
+      await Promise.all([fetchRoadmaps(), reloadPastors()]);
+    } catch (err) {
+      console.error("Error removing roadmap assignments:", err);
+      setRemoveAssignedError(fetchErrorMessage(err));
+    } finally {
+      setRemoveAssignedSubmitting(false);
     }
   };
 
@@ -2209,6 +2452,14 @@ const completedText =
     Assign to
   </button>
 )}
+                                    <button
+                                      type="button"
+                                      onClick={() => openRemoveAssignedRoadmapModal(roadmap)}
+                                      className="flex w-full items-center gap-3 px-4 py-2 text-left text-sm text-white/90 hover:bg-white/10"
+                                    >
+                                      <i className="fa-solid fa-user-minus text-[#3498DB]" aria-hidden />
+                                      Remove assigned roadmap
+                                    </button>
                                     {/* <button
                                       type="button"
                                       onClick={() => {
@@ -2873,6 +3124,140 @@ document.body
           })}
         </div>
       )}
+    </div>
+  </div>
+) : null}
+{removeAssignedRoadmap ? (
+  <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/60 px-4">
+    <div className="flex max-h-[85vh] w-full max-w-xl flex-col rounded-2xl border border-white/15 bg-[#061f35] shadow-xl">
+      <div className="border-b border-white/10 p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-white">Remove assigned roadmap</h2>
+            <p className="mt-2 text-sm text-white/70">
+              Select pastors to remove{" "}
+              <span className="font-semibold text-white">
+                {removeAssignedRoadmap.title || "this roadmap"}
+              </span>{" "}
+              from. The roadmap template will not be deleted.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={closeRemoveAssignedRoadmapModal}
+            disabled={removeAssignedSubmitting}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10 text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label="Close remove assigned roadmap modal"
+          >
+            <i className="fa-solid fa-xmark" aria-hidden />
+          </button>
+        </div>
+      </div>
+
+      <div className="min-h-[220px] flex-1 overflow-y-auto p-6">
+        {removeAssignedError ? (
+          <div className="mb-4 rounded-xl border border-red-400/35 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+            {removeAssignedError}
+          </div>
+        ) : null}
+
+        {removeAssignedSuccess ? (
+          <div className="mb-4 rounded-xl border border-emerald-300/35 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
+            {removeAssignedSuccess}
+          </div>
+        ) : null}
+
+        {removeAssignedLoading ? (
+          <div className="flex justify-center py-16">
+            <div className={directorSpinner} />
+          </div>
+        ) : removeAssignedUsers.length === 0 ? (
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-8 text-center">
+            <h3 className="text-base font-bold text-white">No assigned pastors found</h3>
+            <p className="mt-2 text-sm text-white/60">
+              This roadmap is not currently assigned to any pastors.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {removeAssignedUsers.map((pastor) => {
+              const userId = String(pastor.userId);
+              const checked = selectedRemoveUserIds.includes(userId);
+              const avatar =
+                String(pastor.profilePicture || "").trim() ||
+                getInitialsAvatar(pastor.pastorName, "", "Pastor");
+              return (
+                <button
+                  key={`${userId}-${pastor.assignmentId || ""}`}
+                  type="button"
+                  onClick={() => toggleRemoveAssignedUser(userId)}
+                  className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-3 text-left transition hover:bg-white/[0.08]"
+                >
+                  <span
+                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${
+                      checked ? "border-[#3498DB] bg-[#3498DB]" : "border-white/30 bg-transparent"
+                    }`}
+                  >
+                    {checked ? <i className="fa-solid fa-check text-[9px] text-white" aria-hidden /> : null}
+                  </span>
+                  <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-full border border-white/15 bg-[#173653]">
+                    <Image
+                      src={avatar}
+                      alt=""
+                      fill
+                      className="object-cover"
+                      unoptimized={typeof avatar === "string" && isRemoteImageSrc(avatar)}
+                    />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-white">
+                      {pastor.pastorName || "Pastor"}
+                    </span>
+                    <span className="block truncate text-xs text-white/60">
+                      {pastor.email || pastor.status || "Assigned pastor"}
+                    </span>
+                  </span>
+                  {pastor.assignedAt ? (
+                    <span className="hidden shrink-0 text-xs text-white/45 sm:inline">
+                      {formatShortDate(parseDate(pastor.assignedAt))}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-4 border-t border-white/10 px-6 py-4">
+        <p className="text-sm text-white/60">
+          {selectedRemoveUserIds.length > 0
+            ? `${selectedRemoveUserIds.length} selected`
+            : "No pastors selected"}
+        </p>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={closeRemoveAssignedRoadmapModal}
+            disabled={removeAssignedSubmitting}
+            className={directorBtnSecondary}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleRemoveRoadmapAssignments}
+            disabled={
+              removeAssignedSubmitting ||
+              removeAssignedLoading ||
+              selectedRemoveUserIds.length === 0
+            }
+            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {removeAssignedSubmitting ? "Removing..." : "Remove"}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 ) : null}
