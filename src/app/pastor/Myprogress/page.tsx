@@ -28,6 +28,8 @@ import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
 import {
   apiGetAssignedAssessments,
+  apiGetSectionRecommendations,
+  apiGetUserAnswers,
   flattenAssignedAssessmentRow,
   parseAssignedAssessmentsListBody,
 } from "@/app/Services/assessment.service";
@@ -68,6 +70,83 @@ function pickAssignedDueDate(raw: any): string | null {
 function isCompletedAssessmentStatus(status: unknown): boolean {
   const s = String(status || "").toLowerCase().replace(/[_\s-]+/g, " ");
   return s === "completed" || s === "complete" || s === "reviewed";
+}
+
+function hasCdpInRecommendationsPayload(body: unknown): boolean {
+  const walk = (node: unknown, parentSent = false): boolean => {
+    if (!node) return false;
+    if (Array.isArray(node)) return node.some((item) => walk(item, parentSent));
+    if (typeof node !== "object") return false;
+    const row = node as Record<string, unknown>;
+    const sentRaw = row.sent ?? row.isSent ?? row.status;
+    const isSent =
+      parentSent ||
+      sentRaw === true ||
+      String(sentRaw ?? "").trim().toLowerCase() === "sent";
+    const message = String(row.message ?? row.text ?? row.cdp ?? row.mentorCdp ?? "").trim();
+    const recommendations = Array.isArray(row.recommendations)
+      ? row.recommendations.some((value) => String(value ?? "").trim())
+      : false;
+    if (isSent && (message || recommendations)) return true;
+    return (
+      walk(row.data, isSent) ||
+      walk(row.sections, isSent) ||
+      walk(row.recommendations, isSent) ||
+      walk(row.layers, isSent)
+    );
+  };
+  return walk(body);
+}
+
+function hasCdpInAnswerPayload(body: unknown): boolean {
+  const root = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+  return sections.some((section: any) => {
+    const sectionRecommendations = Array.isArray(section?.recommendations)
+      ? section.recommendations.some((value: unknown) => String(value ?? "").trim())
+      : false;
+    const layerRecommendations = Array.isArray(section?.layers)
+      ? section.layers.some(
+          (layer: any) =>
+            Array.isArray(layer?.recommendations) &&
+            layer.recommendations.some((value: unknown) => String(value ?? "").trim()),
+        )
+      : false;
+    return sectionRecommendations || layerRecommendations;
+  });
+}
+
+function hasSubmittedMainAssessmentAnswers(body: unknown): boolean {
+  const root =
+    body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+
+  const data =
+    root.data && typeof root.data === "object"
+      ? (root.data as Record<string, unknown>)
+      : root;
+
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+
+  return sections.some((section: any) => {
+    const layers = Array.isArray(section?.layers) ? section.layers : [];
+
+    return layers.some((layer: any) => {
+      const selectedChoice = layer?.selectedChoice;
+      const selectedValues = layer?.selectedValues;
+
+      const hasSelectedChoice =
+        selectedChoice !== undefined &&
+        selectedChoice !== null &&
+        String(selectedChoice).trim() !== "";
+
+      const hasSelectedValues =
+        Array.isArray(selectedValues) &&
+        selectedValues.some((value) => String(value ?? "").trim() !== "");
+
+      return hasSelectedChoice || hasSelectedValues;
+    });
+  });
 }
 
 async function mapWithConcurrencyLimit<T, R>(
@@ -215,8 +294,8 @@ totalSteps:
         const assignedList = parseAssignedAssessmentsListBody(assignedRes.data);
         const progressAssessments = Array.isArray(progress?.assessments) ? progress.assessments : [];
 
-        const hydrated = assignedList
-          .map((item: any) => {
+        const hydrated = (
+          await mapWithConcurrencyLimit(assignedList, 4, async (item: any) => {
             const flat = flattenAssignedAssessmentRow(item);
             if (!flat) return null;
             const assessmentId = String(flat.assessmentId || "").trim();
@@ -228,8 +307,33 @@ totalSteps:
                 (flat.assignmentId && p?.assignmentId && String(p.assignmentId) === String(flat.assignmentId)),
             );
             const detail = flat.assessment as Record<string, unknown>;
-            const status = (progressRow?.status ?? "not_started") as string;
-            const submittedOnRaw = pickSubmittedAtFromProgressAssessment(progressRow);
+            const [answersRes, recommendationsRes] = await Promise.allSettled([
+              apiGetUserAnswers(assessmentId, userId),
+              apiGetSectionRecommendations(assessmentId, userId),
+            ]);
+            const answerData =
+              answersRes.status === "fulfilled"
+                ? (answersRes.value.data as { data?: Record<string, unknown> })?.data
+                : undefined;
+            const hasMainSurveyAnswers =
+              answersRes.status === "fulfilled" &&
+              hasSubmittedMainAssessmentAnswers(answersRes.value.data);
+            const hasCdp =
+              (answersRes.status === "fulfilled" &&
+                hasCdpInAnswerPayload(answersRes.value.data)) ||
+              (recommendationsRes.status === "fulfilled" &&
+                hasCdpInRecommendationsPayload(recommendationsRes.value.data));
+            const status = hasCdp ? "completed" : hasMainSurveyAnswers ? "submitted" : "not_started";
+            const submittedOnRaw =
+              hasMainSurveyAnswers || hasCdp
+                ? String(
+                    answerData?.submittedAt ||
+                      answerData?.createdAt ||
+                      answerData?.updatedAt ||
+                      pickSubmittedAtFromProgressAssessment(progressRow) ||
+                      "",
+                  )
+                : pickSubmittedAtFromProgressAssessment(progressRow);
             const dueDate = pickAssignedDueDate(item) ?? flat.dueDate ?? null;
 
             return {
@@ -245,6 +349,7 @@ totalSteps:
               submittedOnRaw,
             };
           })
+        )
           .filter(Boolean);
 
         setAssessments(hydrated as any[]);
@@ -375,7 +480,7 @@ const progressForChart = {
 
           <section className="pb-8">
             <div className="mb-5 flex flex-col gap-4">
-              <h2 className="text-base font-bold text-white sm:text-lg">Survey progress</h2>
+              <h2 className="text-base font-bold text-white sm:text-lg">Assessment progress</h2>
               <ProgressFilterSegmented active={surveyFilter} setActive={setSurveyFilter} />
             </div>
             {filteredAssessments.length === 0 ? (
@@ -487,7 +592,7 @@ const completed = `${completedSteps}/${totalSteps}`;
 }
 
 function PastorAssessmentProgressCard({ assessment, onOpen }: { assessment: any; onOpen: () => void }) {
-  const isDone = assessment.status === "completed";
+  const isDone = isCompletedAssessmentStatus(assessment.status);
   const banner = assessment.bannerImage;
   const isHttp =
     typeof banner === "string" && (banner.startsWith("http://") || banner.startsWith("https://"));

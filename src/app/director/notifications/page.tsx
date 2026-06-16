@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { directorGlassCard, directorPageRoot } from "../directorUi";
 import { getNotification } from "@/app/Services/api";
@@ -11,11 +11,27 @@ import {
   unwrapNotificationsList,
 } from "@/app/Services/notificationUi";
 
+const notificationsPerPage = 10;
+
+const sortNotificationsNewestFirst = (list: NotificationItem[]) =>
+  [...list].sort((a: any, b: any) => {
+    const aTime = new Date(
+      a.createdAt || a.updatedAt || a.date || a.time || a.timestamp || 0,
+    ).getTime();
+
+    const bTime = new Date(
+      b.createdAt || b.updatedAt || b.date || b.time || b.timestamp || 0,
+    ).getTime();
+
+    return bTime - aTime;
+  });
+
 export default function NotificationsPage() {
   const router = useRouter();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const uid = resolveSessionUserId();
@@ -35,9 +51,12 @@ export default function NotificationsPage() {
 
         // if (!cancelled) setItems(list);
         const list = unwrapNotificationsList(res);
-const newestFirst = [...list].reverse();
+const newestFirst = sortNotificationsNewestFirst(list);
 
-if (!cancelled) setItems(newestFirst);
+if (!cancelled) {
+  setItems(newestFirst);
+  setCurrentPage(1);
+}
       } catch (e) {
         console.error(e);
         if (!cancelled) setError("Could not load notifications.");
@@ -50,6 +69,38 @@ if (!cancelled) setItems(newestFirst);
       cancelled = true;
     };
   }, []);
+
+  const totalPages = Math.ceil(items.length / notificationsPerPage);
+
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * notificationsPerPage;
+    return items.slice(start, start + notificationsPerPage);
+  }, [items, currentPage]);
+
+  const goToPage = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  function getPaginationItems(currentPage: number, totalPages: number): Array<number | "..."> {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, index) => index + 1);
+    }
+
+    if (currentPage <= 3) {
+      return [1, 2, 3, "...", totalPages];
+    }
+
+    if (currentPage >= totalPages - 2) {
+      return [1, "...", totalPages - 2, totalPages - 1, totalPages];
+    }
+
+    return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
+  }
+
+  const showingStart = items.length === 0 ? 0 : (currentPage - 1) * notificationsPerPage + 1;
+  const showingEnd = Math.min(items.length, currentPage * notificationsPerPage);
 
   return (
     <div className={directorPageRoot}>
@@ -78,8 +129,9 @@ if (!cancelled) setItems(newestFirst);
           )}
 
           {!loading && !error && items.length > 0 && (
+            <>
             <div className="space-y-4">
-              {items.map((n) => {
+              {paginatedItems.map((n) => {
                 const p = mapNotificationItemToPopup(n);
                 return (
                 
@@ -124,6 +176,58 @@ if (!cancelled) setItems(newestFirst);
                 );
               })}
             </div>
+            {totalPages > 1 && (
+              <div className="mt-6 flex flex-col items-center justify-between gap-4 sm:flex-row">
+                <p className="text-sm text-white/60">
+                  Showing {showingStart}-{showingEnd} of {items.length} notifications
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="rounded-lg border border-white/15 px-3 py-2 text-sm font-medium text-white/75 transition hover:border-white/30 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  {getPaginationItems(currentPage, totalPages).map((item, index) => {
+                    if (item === "...") {
+                      return (
+                        <span key={`ellipsis-${index}`} className="px-2 text-sm text-white/50">
+                          ...
+                        </span>
+                      );
+                    }
+
+                    const page = item;
+
+                    return (
+                      <button
+                        key={page}
+                        type="button"
+                        onClick={() => goToPage(page)}
+                        className={`h-8 min-w-8 rounded-lg border px-2 text-xs font-semibold transition ${
+                          currentPage === page
+                            ? "border-[#8ec5eb] bg-[#8ec5eb] text-[#062946]"
+                            : "border-white/15 text-white hover:bg-white/10"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg border border-white/15 px-3 py-2 text-sm font-medium text-white/75 transition hover:border-white/30 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+            </>
           )}
         </div>
       </section>

@@ -28,6 +28,13 @@ type RecommendationRow = {
   message: string;
   score?: number;
 };
+type PreSurveyAnswerRow = {
+  questionText?: string;
+  question?: string;
+  text?: string;
+  answer?: string;
+  value?: string;
+};
 type RecommendationRule = {
   level?: number | string;
   items?: string[];
@@ -211,6 +218,53 @@ function extractUserAnswerSectionsPayload(data: unknown): any[] {
   }
 
   return [];
+}
+
+function extractPreSurveyAnswers(body: unknown): PreSurveyAnswerRow[] {
+  const root =
+    body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+
+  const data =
+    root.data && typeof root.data === "object"
+      ? (root.data as Record<string, unknown>)
+      : root;
+
+  const rows = data.preSurveyAnswers ?? root.preSurveyAnswers;
+  return Array.isArray(rows) ? (rows as PreSurveyAnswerRow[]) : [];
+}
+
+function PreSurveyAnswersModal({
+  rows,
+  onClose,
+}: {
+  rows: PreSurveyAnswerRow[];
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/60 p-4">
+      <button type="button" aria-label="Close" className="absolute inset-0 bg-transparent" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-2xl rounded-2xl border border-white/15 bg-[#062946] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <h3 className="text-lg font-semibold text-white">Pre-survey Answers</h3>
+          <button type="button" onClick={onClose} className="text-[#8ec5eb] hover:text-white" aria-label="Close">
+            <i className="fa-solid fa-xmark text-xl" />
+          </button>
+        </div>
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto p-5">
+          {rows.map((row, index) => (
+            <div key={index} className="rounded-xl border border-white/15 bg-white/5 p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+                {row.questionText || row.question || row.text || "Question"}
+              </p>
+              <p className="whitespace-pre-line text-sm leading-relaxed text-[#d9ebf8]">
+                {row.answer || row.value || "—"}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function getLayerChoiceSelection(layer: any): string {
@@ -470,6 +524,8 @@ const contentTopRef = useRef<HTMLDivElement | null>(null);
   const [recommendationRows, setRecommendationRows] = useState<RecommendationRow[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [didAutoOpenRecommendation, setDidAutoOpenRecommendation] = useState(false);
+  const [preSurveyAnswers, setPreSurveyAnswers] = useState<PreSurveyAnswerRow[]>([]);
+  const [showPreSurveyAnswers, setShowPreSurveyAnswers] = useState(false);
 
   useEffect(() => {
     if (!assessmentId || !userId) {
@@ -496,6 +552,9 @@ const contentTopRef = useRef<HTMLDivElement | null>(null);
 
         try {
           const answersRes = await apiGetUserAnswers(assessmentId, userId);
+          if (!cancelled) {
+            setPreSurveyAnswers(extractPreSurveyAnswers(answersRes.data));
+          }
           const sectionsData = extractUserAnswerSectionsPayload(answersRes.data);
           if (!cancelled) {
             setAnswers(buildAnswerMapFromSections(normalizedSections, sectionsData));
@@ -523,7 +582,10 @@ const contentTopRef = useRef<HTMLDivElement | null>(null);
             });
           }
         } catch {
-          if (!cancelled) setAnswers({});
+          if (!cancelled) {
+            setAnswers({});
+            setPreSurveyAnswers([]);
+          }
         }
 
         try {
@@ -539,6 +601,7 @@ const contentTopRef = useRef<HTMLDivElement | null>(null);
           setSections([]);
           setAnswers({});
           setMentorLayerCdp({});
+          setPreSurveyAnswers([]);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -818,7 +881,16 @@ const scrollToSectionTop = () => {
             </aside>
 
             <section ref={contentTopRef} className="min-w-0 flex-1">
-              <div className="mb-5 flex justify-end">
+              <div className="mb-5 flex flex-col justify-end gap-3 sm:flex-row">
+                {preSurveyAnswers.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowPreSurveyAnswers(true)}
+                    className="rounded-lg border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+                  >
+                    View Pre-survey Answers
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={hasExistingCdp ? openExistingCdpPage : openRecommendationEditor}
@@ -936,6 +1008,10 @@ const scrollToSectionTop = () => {
           </div>
         )}
       </main>
+
+      {showPreSurveyAnswers && (
+        <PreSurveyAnswersModal rows={preSurveyAnswers} onClose={() => setShowPreSurveyAnswers(false)} />
+      )}
 
       {recommendationOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">

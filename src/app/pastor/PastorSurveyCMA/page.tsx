@@ -258,6 +258,61 @@ async function fetchMentorRecommendationsPayload(
   return null;
 }
 
+type PreSurveyAnswerRow = {
+  questionText?: string;
+  question?: string;
+  text?: string;
+  answer?: string;
+  value?: string;
+};
+
+function extractPreSurveyAnswers(body: unknown): PreSurveyAnswerRow[] {
+  const root =
+    body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+
+  const data =
+    root.data && typeof root.data === "object"
+      ? (root.data as Record<string, unknown>)
+      : root;
+
+  const rows = data.preSurveyAnswers ?? root.preSurveyAnswers;
+  return Array.isArray(rows) ? (rows as PreSurveyAnswerRow[]) : [];
+}
+
+function PreSurveyAnswersModal({
+  rows,
+  onClose,
+}: {
+  rows: PreSurveyAnswerRow[];
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/60 p-4">
+      <button type="button" aria-label="Close" className="absolute inset-0 bg-transparent" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-2xl rounded-2xl border border-white/15 bg-[#062946] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+          <h3 className="text-lg font-semibold text-white">Pre-survey Answers</h3>
+          <button type="button" onClick={onClose} className="text-[#8ec5eb] hover:text-white" aria-label="Close">
+            <i className="fa-solid fa-xmark text-xl" />
+          </button>
+        </div>
+        <div className="max-h-[60vh] space-y-3 overflow-y-auto p-5">
+          {rows.map((row, index) => (
+            <div key={index} className="rounded-xl border border-white/15 bg-white/5 p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#8ec5eb]">
+                {row.questionText || row.question || row.text || "Question"}
+              </p>
+              <p className="whitespace-pre-line text-sm leading-relaxed text-[#d9ebf8]">
+                {row.answer || row.value || "—"}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Get total days in a month */
 function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
@@ -450,6 +505,7 @@ function PastorSurveyCMAContent() {
   const router = useRouter();
   const [activeSection, setActiveSection] = useState(0);
   const sectionTopRef = useRef<HTMLDivElement | null>(null);
+  const layerRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const scrollToSectionTop = () => {
     requestAnimationFrame(() => {
@@ -519,6 +575,8 @@ const meetingPlatform = searchParams.get("platform")?.trim() || "";
   /** Mentor Customized Development Plan (CDP) text per layer — from answers doc + GET recommendations. */
   const [mentorLayerCdp, setMentorLayerCdp] = useState<Record<string, string>>({});
   const [hasRecommendationsInAnswer, setHasRecommendationsInAnswer] = useState(false);
+  const [preSurveyAnswers, setPreSurveyAnswers] = useState<PreSurveyAnswerRow[]>([]);
+  const [showPreSurveyAnswers, setShowPreSurveyAnswers] = useState(false);
   const hasSentRecommendations = Object.keys(mentorLayerCdp).length > 0;
   const canShowPastorCdp = selfReadOnlyMode && (hasSentRecommendations || hasRecommendationsInAnswer);
 
@@ -564,9 +622,11 @@ const meetingPlatform = searchParams.get("platform")?.trim() || "";
             setAnswers({});
             setHasRecommendationsInAnswer(false);
             setMentorLayerCdp({});
+            setPreSurveyAnswers([]);
           } else {
             try {
               const answersRes = await apiGetUserAnswers(assessmentId, answersUserId);
+              setPreSurveyAnswers(extractPreSurveyAnswers(answersRes.data));
               const body = answersRes.data as Record<string, unknown>;
               const inner = (body?.data as Record<string, unknown>) || body;
               const sectionsData = inner?.sections as unknown;
@@ -602,6 +662,7 @@ const meetingPlatform = searchParams.get("platform")?.trim() || "";
               const status = isAxiosError(err) ? err.response?.status : undefined;
               if (status === 404) {
                 setAnswers({});
+                setPreSurveyAnswers([]);
               } else {
                 console.error("Failed to fetch user answers", err);
               }
@@ -628,6 +689,7 @@ const meetingPlatform = searchParams.get("platform")?.trim() || "";
         setSections([]);
         setMentors([]);
         setMentorLayerCdp({});
+        setPreSurveyAnswers([]);
         setAssessmentTitle("");
       } finally {
         setLoading(false);
@@ -741,18 +803,52 @@ const meetingPlatform = searchParams.get("platform")?.trim() || "";
     });
   };
 
-  const handleNext = () => {
-    if (!isSectionComplete(activeSection)) {
-      setToast("Please answer all questions in this section before proceeding.");
-      setTimeout(() => setToast(null), 3000);
-      return;
-    }
+  const findFirstUnansweredLayerInSection = (sectionIndex: number): string | null => {
+  if (uiReadOnly) return null;
 
-    if (activeSection < sections.length - 1) {
-      setActiveSection((prev) => prev + 1);
-      scrollToSectionTop();
+  const section = sections[sectionIndex];
+  if (!section?.layers?.length) return null;
+
+  for (let layerIndex = 0; layerIndex < section.layers.length; layerIndex += 1) {
+    const layer = section.layers[layerIndex];
+    const layerId = resolveLayerKey(layer, sectionIndex, layerIndex);
+
+    if (!answers[layerId]) {
+      return layerId;
     }
-  };
+  }
+
+  return null;
+};
+
+const scrollToLayer = (layerId: string) => {
+  requestAnimationFrame(() => {
+    const el = layerRefs.current[layerId];
+
+    if (el) {
+      el.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  });
+};
+
+const handleNext = () => {
+  const firstMissingLayerId = findFirstUnansweredLayerInSection(activeSection);
+
+  if (firstMissingLayerId) {
+    setToast("Please answer all questions in this section before proceeding.");
+    scrollToLayer(firstMissingLayerId);
+    setTimeout(() => setToast(null), 3000);
+    return;
+  }
+
+  if (activeSection < sections.length - 1) {
+    setActiveSection((prev) => prev + 1);
+    scrollToSectionTop();
+  }
+};
 
   const handlePrev = () => {
     if (activeSection > 0) {
@@ -775,13 +871,42 @@ const confirmClearResponses = () => {
   // New Submit Flow
   const handleSubmitSurvey = async () => {
     if (uiReadOnly) return;
-    const allComplete = sections.every((_, idx) => isSectionComplete(idx));
-    if (!allComplete) {
-      setToast("Please complete all questions in every section before submitting.");
-      setTimeout(() => setToast(null), 3000);
-      return;
-    }
+    // const allComplete = sections.every((_, idx) => isSectionComplete(idx));
+    // if (!allComplete) {
+    //   setToast("Please complete all questions in every section before submitting.");
+    //   setTimeout(() => setToast(null), 3000);
+    //   return;
+    // }
 
+const allComplete = sections.every((_, idx) => isSectionComplete(idx));
+
+if (!allComplete) {
+  let firstMissingSectionIndex = -1;
+  let firstMissingLayerId: string | null = null;
+
+  for (let i = 0; i < sections.length; i += 1) {
+    const missingLayerId = findFirstUnansweredLayerInSection(i);
+
+    if (missingLayerId) {
+      firstMissingSectionIndex = i;
+      firstMissingLayerId = missingLayerId;
+      break;
+    }
+  }
+
+  setToast("Please complete all questions in every section before submitting.");
+
+  if (firstMissingSectionIndex >= 0 && firstMissingLayerId) {
+    setActiveSection(firstMissingSectionIndex);
+
+    requestAnimationFrame(() => {
+      scrollToLayer(firstMissingLayerId!);
+    });
+  }
+
+  setTimeout(() => setToast(null), 3000);
+  return;
+}
     try {
       await submitAllSectionAnswers();
     } catch (error) {
@@ -1131,8 +1256,18 @@ const confirmClearResponses = () => {
                   to provide the best support and guidance.
                 </p>
                 
-                {selfReadOnlyMode && assessmentId && canShowPastorCdp ? (
+                {uiReadOnly && (preSurveyAnswers.length > 0 || (selfReadOnlyMode && assessmentId && canShowPastorCdp)) ? (
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3 shrink-0">
+                    {preSurveyAnswers.length > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowPreSurveyAnswers(true)}
+                        className="rounded-lg border border-white/30 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15 whitespace-nowrap"
+                      >
+                        View Pre-survey Answers
+                      </button>
+                    ) : null}
+                    {selfReadOnlyMode && assessmentId && canShowPastorCdp ? (
                     <button
                       type="button"
                       onClick={() =>
@@ -1144,6 +1279,7 @@ const confirmClearResponses = () => {
                     >
                       View Customized Development Plans (CDP)
                     </button>
+                    ) : null}
                     {/* Retake Survey — commented out per product request; restore if needed.
                     <button
                       type="button"
@@ -1165,10 +1301,17 @@ const confirmClearResponses = () => {
                 {sections[activeSection]?.layers?.map((layer: any, layerIndex: number) => {
                   const layerId = resolveLayerKey(layer, activeSection, layerIndex);
                   return (
+                    // <div
+                    //   key={layerId}
+                    //   className="space-y-3 rounded-2xl border border-[#8ec5eb]/25 bg-[linear-gradient(180deg,rgba(12,58,95,0.55)_0%,rgba(9,49,80,0.72)_100%)] p-4 sm:p-5 shadow-[0_8px_32px_rgba(2,20,40,0.35)]"
+                    // >
                     <div
-                      key={layerId}
-                      className="space-y-3 rounded-2xl border border-[#8ec5eb]/25 bg-[linear-gradient(180deg,rgba(12,58,95,0.55)_0%,rgba(9,49,80,0.72)_100%)] p-4 sm:p-5 shadow-[0_8px_32px_rgba(2,20,40,0.35)]"
-                    >
+  key={layerId}
+  ref={(el) => {
+    layerRefs.current[layerId] = el;
+  }}
+  className="space-y-3 rounded-2xl border border-[#8ec5eb]/25 bg-[linear-gradient(180deg,rgba(12,58,95,0.55)_0%,rgba(9,49,80,0.72)_100%)] p-4 sm:p-5 shadow-[0_8px_32px_rgba(2,20,40,0.35)]"
+>
                       <h4 className="mb-1 text-base font-semibold text-white sm:text-lg">
                         {layer.question ||
                           layer.title ||
@@ -1307,6 +1450,10 @@ const confirmClearResponses = () => {
           </>
         )}
       </main>
+
+      {showPreSurveyAnswers && (
+        <PreSurveyAnswersModal rows={preSurveyAnswers} onClose={() => setShowPreSurveyAnswers(false)} />
+      )}
 
       {/* ✅ New Popups & Side Drawer */}
       {showSubmitPopup && (

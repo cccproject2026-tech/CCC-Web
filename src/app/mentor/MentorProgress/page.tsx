@@ -12,9 +12,9 @@ import { apiGetUserById } from "@/app/Services/users.service";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
 import {
   apiGetAssignedAssessments,
-  apiGetAssessmentById,
+  apiGetSectionRecommendations,
+  apiGetUserAnswers,
   flattenAssignedAssessmentRow,
-  parseAssessmentDetailPayload,
   parseAssignedAssessmentsListBody,
 } from "@/app/Services/assessment.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
@@ -41,6 +41,111 @@ import {
 function isCompletedAssessmentStatus(status: unknown): boolean {
   const s = String(status || "").toLowerCase().replace(/[_\s-]+/g, " ");
   return s === "completed" || s === "complete" || s === "reviewed";
+}
+
+function isSubmittedAssessmentStatus(status: unknown): boolean {
+  const s = String(status || "").toLowerCase().replace(/[_\s-]+/g, " ");
+  return s === "submitted";
+}
+
+function assessmentStatusLabel(status: unknown): string {
+  if (isCompletedAssessmentStatus(status)) return "Completed";
+  if (isSubmittedAssessmentStatus(status)) return "Submitted";
+  return "Not Started";
+}
+
+function assessmentStatusChipClass(status: unknown): string {
+  if (isCompletedAssessmentStatus(status)) {
+    return "border-emerald-400/40 bg-emerald-500/15 text-emerald-100";
+  }
+  if (isSubmittedAssessmentStatus(status)) {
+    return "border-amber-400/40 bg-amber-500/15 text-amber-100";
+  }
+  return "border-[#8ec5eb]/35 bg-[#8ec5eb]/10 text-[#cde9f7]";
+}
+
+function formatDateShort(raw: unknown): string | null {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
+function hasCdpInRecommendationsPayload(body: unknown): boolean {
+  const walk = (node: unknown, parentSent = false): boolean => {
+    if (!node) return false;
+    if (Array.isArray(node)) return node.some((item) => walk(item, parentSent));
+    if (typeof node !== "object") return false;
+    const row = node as Record<string, unknown>;
+    const sentRaw = row.sent ?? row.isSent ?? row.status;
+    const isSent =
+      parentSent ||
+      sentRaw === true ||
+      String(sentRaw ?? "").trim().toLowerCase() === "sent";
+    const message = String(row.message ?? row.text ?? row.cdp ?? row.mentorCdp ?? "").trim();
+    const recommendations = Array.isArray(row.recommendations)
+      ? row.recommendations.some((value) => String(value ?? "").trim())
+      : false;
+    if (isSent && (message || recommendations)) return true;
+    return (
+      walk(row.data, isSent) ||
+      walk(row.sections, isSent) ||
+      walk(row.recommendations, isSent) ||
+      walk(row.layers, isSent)
+    );
+  };
+  return walk(body);
+}
+
+function hasCdpInAnswerPayload(body: unknown): boolean {
+  const root = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const data = (root.data && typeof root.data === "object" ? root.data : root) as Record<string, unknown>;
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+  return sections.some((section: any) => {
+    const sectionRecommendations = Array.isArray(section?.recommendations)
+      ? section.recommendations.some((value: unknown) => String(value ?? "").trim())
+      : false;
+    const layerRecommendations = Array.isArray(section?.layers)
+      ? section.layers.some(
+          (layer: any) =>
+            Array.isArray(layer?.recommendations) &&
+            layer.recommendations.some((value: unknown) => String(value ?? "").trim()),
+        )
+      : false;
+    return sectionRecommendations || layerRecommendations;
+  });
+}
+
+function hasSubmittedMainAssessmentAnswers(body: unknown): boolean {
+  const root =
+    body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+
+  const data =
+    root.data && typeof root.data === "object"
+      ? (root.data as Record<string, unknown>)
+      : root;
+
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+
+  return sections.some((section: any) => {
+    const layers = Array.isArray(section?.layers) ? section.layers : [];
+
+    return layers.some((layer: any) => {
+      const selectedChoice = layer?.selectedChoice;
+      const selectedValues = layer?.selectedValues;
+
+      const hasSelectedChoice =
+        selectedChoice !== undefined &&
+        selectedChoice !== null &&
+        String(selectedChoice).trim() !== "";
+
+      const hasSelectedValues =
+        Array.isArray(selectedValues) &&
+        selectedValues.some((value) => String(value ?? "").trim() !== "");
+
+      return hasSelectedChoice || hasSelectedValues;
+    });
+  });
 }
 
 function PastorProgressPageContent() {
@@ -162,50 +267,20 @@ function PastorProgressPageContent() {
   }, [progress]);
 
   useEffect(() => {
-    if (!progress?.assessments?.length) return;
-    const hydrateAssessments = async () => {
-      try {
-        const results = await Promise.allSettled(
-          progress.assessments.map(async (a: any) => {
-            const res = await apiGetAssessmentById(a.assessmentId);
-            const assessment = parseAssessmentDetailPayload(res.data);
-
-            return {
-              ...a,
-              title: assessment?.name,
-              description: assessment?.description,
-              bannerImage: assessment?.bannerImage,
-              type: assessment?.type,
-              totalSections: assessment?.sections?.length || 0,
-              dueDate: a.dueDate,
-              status: a.status,
-            };
-          }),
-        );
-        const valid = results.filter((r) => r.status === "fulfilled").map((r: any) => r.value);
-
-        setAssessments(valid);
-      } catch (err) {
-        console.error("Failed to load assessments", err);
-      }
-    };
-
-    hydrateAssessments();
-  }, [progress]);
-
-  useEffect(() => {
     if (!userId) {
+      setAssessments([]);
       setAssignedAssessmentStats(null);
       return;
     }
 
-    const loadAssignedAssessmentStats = async () => {
+    const hydrateAssignedAssessments = async () => {
       try {
         const assignedRes = await apiGetAssignedAssessments(userId);
         const assignedRows = parseAssignedAssessmentsListBody(assignedRes.data);
         const progressAssessments = Array.isArray(progress?.assessments) ? progress.assessments : [];
         const seen = new Set<string>();
         let completed = 0;
+        const hydrated: any[] = [];
 
         for (const row of assignedRows) {
           const flat = flattenAssignedAssessmentRow(row);
@@ -214,6 +289,7 @@ function PastorProgressPageContent() {
           const key = assignmentId || assessmentId;
           if (!key || seen.has(key)) continue;
           seen.add(key);
+          if (!flat || !assessmentId) continue;
 
           const progressRow = progressAssessments.find(
             (item: any) =>
@@ -221,19 +297,66 @@ function PastorProgressPageContent() {
               Boolean(assignmentId && item?.assignmentId && String(item.assignmentId) === assignmentId),
           );
 
-          if (isCompletedAssessmentStatus(progressRow?.status ?? (flat as any)?.status ?? (row as any)?.status)) {
+          const detail = flat.assessment as Record<string, any>;
+          const [answersRes, recommendationsRes] = await Promise.allSettled([
+            apiGetUserAnswers(assessmentId, userId),
+            apiGetSectionRecommendations(assessmentId, userId),
+          ]);
+          const answerData =
+            answersRes.status === "fulfilled"
+              ? (answersRes.value.data as { data?: Record<string, unknown> })?.data
+              : undefined;
+          const hasMainSurveyAnswers =
+            answersRes.status === "fulfilled" &&
+            hasSubmittedMainAssessmentAnswers(answersRes.value.data);
+          const hasCdp =
+            (answersRes.status === "fulfilled" &&
+              hasCdpInAnswerPayload(answersRes.value.data)) ||
+            (recommendationsRes.status === "fulfilled" &&
+              hasCdpInRecommendationsPayload(recommendationsRes.value.data));
+          const status = hasCdp ? "completed" : hasMainSurveyAnswers ? "submitted" : "not_started";
+
+          if (isCompletedAssessmentStatus(status)) {
             completed += 1;
           }
+
+          hydrated.push({
+            ...flat,
+            ...(progressRow || {}),
+            assessmentId,
+            assignmentId: flat.assignmentId ?? progressRow?.assignmentId,
+            title: detail?.name || detail?.title || "Assessment",
+            description: detail?.description || "",
+            bannerImage: detail?.bannerImage || detail?.imageUrl || null,
+            type: detail?.type,
+            totalSections: Array.isArray(detail?.sections) ? detail.sections.length : 0,
+            dueDate: flat.dueDate ?? progressRow?.dueDate,
+            status,
+            submittedOnRaw:
+              hasMainSurveyAnswers || hasCdp
+                ? String(
+                    answerData?.submittedAt ||
+                      answerData?.createdAt ||
+                      answerData?.updatedAt ||
+                      progressRow?.submittedOn ||
+                      progressRow?.submittedAt ||
+                      progressRow?.updatedAt ||
+                      "",
+                  )
+                : progressRow?.submittedOn || progressRow?.submittedAt || progressRow?.updatedAt,
+          });
         }
 
+        setAssessments(hydrated);
         setAssignedAssessmentStats({ total: seen.size, completed });
       } catch (err) {
-        console.error("Failed to load assigned assessment stats", err);
+        console.error("Failed to load assigned assessments", err);
+        setAssessments([]);
         setAssignedAssessmentStats(null);
       }
     };
 
-    void loadAssignedAssessmentStats();
+    void hydrateAssignedAssessments();
   }, [progress, userId]);
 
   const handleMarkComplete = async () => {
@@ -640,10 +763,12 @@ function MentorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: 
 }
 
 function MentorAssessmentProgressCard({ assessment, onOpen }: { assessment: any; onOpen: () => void }) {
-  const isDone = assessment.status === "completed";
+  const isDone = isCompletedAssessmentStatus(assessment.status);
+  const isSubmitted = isSubmittedAssessmentStatus(assessment.status);
   const banner = assessment.bannerImage;
   const isHttp =
     typeof banner === "string" && (banner.startsWith("http://") || banner.startsWith("https://"));
+  const submittedOn = formatDateShort(assessment.submittedOnRaw);
 
   return (
     <div className={`${mentorGlassCardRoadmap} min-h-[200px] gap-4 p-4`}>
@@ -665,32 +790,9 @@ function MentorAssessmentProgressCard({ assessment, onOpen }: { assessment: any;
         <div className="min-w-0 flex-1">
           <h4 className="mb-1 line-clamp-1 text-[15px] font-bold text-white">{assessment.title || "Assessment"}</h4>
           <p className="mb-2 line-clamp-2 text-[13px] text-[#cde2f2]/90">{assessment.description || ""}</p>
-          <div className="mb-3">
-            <div className="mb-1 flex justify-between text-[11px] text-[#8ec5eb]/80">
-              <span>Sections</span>
-              <span className="tabular-nums text-[#cde2f2]">
-                {assessment.completedSections ?? 0}/{assessment.totalSections ?? 0}
-              </span>
-            </div>
-            <div className="h-2 w-full rounded-full bg-white/10">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[#5a9ec9] to-[#8ec5eb] transition-all duration-700"
-                style={{
-                  width: `${Math.min(
-                    100,
-                    assessment.status === "completed"
-                      ? 100
-                      : Number(
-                        assessment.progressPercentage ??
-                        (assessment.totalSections
-                          ? ((assessment.completedSections ?? 0) / Math.max(1, assessment.totalSections)) * 100
-                          : 0),
-                      ),
-                  )}%`,
-                }}
-              />
-            </div>
-          </div>
+          <span className={`mb-3 inline-flex w-fit rounded-md border px-3 py-1 text-xs font-semibold ${assessmentStatusChipClass(assessment.status)}`}>
+            {assessmentStatusLabel(assessment.status)}
+          </span>
           <button
             type="button"
             onClick={onOpen}
@@ -700,8 +802,11 @@ function MentorAssessmentProgressCard({ assessment, onOpen }: { assessment: any;
           </button>
         </div>
         <div className="mt-3 flex justify-between text-[12px] text-[#8ec5eb]/80">
-          {isDone ? (
-            <span className="font-semibold text-white">Submitted</span>
+          {isDone || isSubmitted ? (
+            <>
+              <span className="font-semibold text-[#cde2f2]">Submitted on</span>
+              <span className="font-semibold text-[#8ec5eb]">{submittedOn || "-"}</span>
+            </>
           ) : (
             <>
               <span className="font-semibold text-[#cde2f2]">Due date</span>

@@ -31,6 +31,19 @@ import {
 import type { NotificationPopupItem } from "@/app/Components/NotificationPopup";
 import type { NotificationItem } from "@/app/Services/types/home.types";
 
+const sortNotificationsNewestFirst = (list: NotificationItem[]) =>
+  [...list].sort((a: any, b: any) => {
+    const aTime = new Date(
+      a.createdAt || a.updatedAt || a.date || a.time || a.timestamp || 0,
+    ).getTime();
+
+    const bTime = new Date(
+      b.createdAt || b.updatedAt || b.date || b.time || b.timestamp || 0,
+    ).getTime();
+
+    return bTime - aTime;
+  });
+
 export default function AppHeader({ showFullHeader = false }) {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -73,15 +86,15 @@ export default function AppHeader({ showFullHeader = false }) {
 
         const res = await getNotification({ role: "director" });
 const list: NotificationItem[] = unwrapNotificationsList(res);
-const newestFirst = [...list].reverse();
+const newestFirst = sortNotificationsNewestFirst(list);
 
 if (cancelled) return;
 
 const unread = newestFirst.filter((n) => n.isRead === false).length;
 const badge = unread > 0 ? unread : newestFirst.length;
 
-setNotificationBadge(Math.min(badge, 99));
-setNotificationItems(newestFirst.slice(0, 6).map(mapNotificationItemToPopup));
+setNotificationBadge(badge);
+setNotificationItems(newestFirst.slice(0, 10).map(mapNotificationItemToPopup));
       } catch (e) {
         console.error("Director notifications:", e);
         if (!cancelled) {
@@ -471,8 +484,8 @@ useEffect(() => {
                   className="hover:opacity-80 cursor-pointer"
                 />
                 {notificationBadge > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-[#FFD700] px-0.5 text-[10px] font-bold text-[#0f4a76]">
-                    {notificationBadge}
+                  <span className="absolute -top-1 -right-1 flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-[#FFD700] px-1 text-[10px] font-bold text-[#0f4a76]">
+                    {notificationBadge > 99 ? "99+" : notificationBadge}
                   </span>
                 )}
               </button>

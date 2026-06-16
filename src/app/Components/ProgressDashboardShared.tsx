@@ -42,7 +42,8 @@ export function roadmapMatchesFilter(r: any, filter: RoadmapFilterTab): boolean 
 }
 
 export function assessmentMatchesFilter(a: any, filter: RoadmapFilterTab): boolean {
-  const done = String(a.status || "").toLowerCase() === "completed";
+  const status = String(a.status || "").toLowerCase().replace(/[_\s-]+/g, " ");
+  const done = status === "completed" || status === "complete" || status === "reviewed";
   const completedSecs = Number(a.completedSections ?? 0);
   if (filter === "All") return true;
   if (filter === "Completed") return done;

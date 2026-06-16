@@ -476,10 +476,14 @@ function SelfRevitalizationContent() {
   });
 
   const cardStatusBadge = (status: string) => {
-    if (isCompletedStatus(status)) return "border-emerald-400/35 bg-emerald-500/15 text-emerald-100";
-    if (status === "In-progress") return "border-[#3498DB]/40 bg-[#3498DB]/15 text-[#aed6f1]";
-    if (status === "Due") return "border-red-400/45 bg-red-500/15 text-red-100";
-    return "border-white/20 bg-white/10 text-white/85";
+    return "border-white/20 bg-[#10243a]/85 text-white shadow-md backdrop-blur-md";
+  };
+
+  const cardStatusDot = (status: string) => {
+    if (isCompletedStatus(status)) return "bg-emerald-400";
+    if (status === "In-progress") return "bg-amber-400";
+    if (status === "Due") return "bg-rose-400";
+    return "bg-rose-400";
   };
 
   if (loading) {
@@ -630,8 +634,9 @@ const updatedAt = taskId ? taskUpdatedDates[taskId] : "";
                         />
                         <div className="absolute left-3 top-3">
                           <span
-                            className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${cardStatusBadge(status)}`}
+                            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-wide ${cardStatusBadge(status)}`}
                           >
+                            <span className={`h-1.5 w-1.5 rounded-full ${cardStatusDot(status)}`} aria-hidden />
                             {status}
                           </span>
                         </div>

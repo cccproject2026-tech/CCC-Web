@@ -73,10 +73,10 @@ const goToPage = (page: number) => {
       <main className="flex-1 px-4 sm:px-10 md:px-20 py-5 sm:py-8 md:py-10 text-white">
         <div className="max-w-5xl mx-auto">
           <div className="mb-6 rounded-2xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.9)_0%,rgba(10,53,88,0.95)_100%)] p-5 shadow-[0_20px_45px_rgba(2,20,38,0.35)]">
-            <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
+            {/* <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs text-[#d9ebf8]">
               <span className="h-2 w-2 rounded-full bg-[#8ec5eb]" />
               Leadership Support Network
-            </p>
+            </p> */}
             <h1 className="mt-3 text-2xl font-semibold">Notifications</h1>
             <p className="mt-1 text-sm text-[#cde2f2]">
               Stay up to date with assessments, assignments, appointments, and roadmap activity.

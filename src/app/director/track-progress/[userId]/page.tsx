@@ -321,6 +321,38 @@ function hasCdpInAnswerPayload(body: unknown): boolean {
   });
 }
 
+function hasSubmittedMainAssessmentAnswers(body: unknown): boolean {
+  const root =
+    body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+
+  const data =
+    root.data && typeof root.data === "object"
+      ? (root.data as Record<string, unknown>)
+      : root;
+
+  const sections = Array.isArray(data.sections) ? data.sections : [];
+
+  return sections.some((section: any) => {
+    const layers = Array.isArray(section?.layers) ? section.layers : [];
+
+    return layers.some((layer: any) => {
+      const selectedChoice = layer?.selectedChoice;
+      const selectedValues = layer?.selectedValues;
+
+      const hasSelectedChoice =
+        selectedChoice !== undefined &&
+        selectedChoice !== null &&
+        String(selectedChoice).trim() !== "";
+
+      const hasSelectedValues =
+        Array.isArray(selectedValues) &&
+        selectedValues.some((value) => String(value ?? "").trim() !== "");
+
+      return hasSelectedChoice || hasSelectedValues;
+    });
+  });
+}
+
 export default function IndividualProgressPage() {
   const router = useRouter();
   const params = useParams();
@@ -536,18 +568,14 @@ export default function IndividualProgressPage() {
                 answersRes.status === "fulfilled"
                   ? (answersRes.value.data as { data?: Record<string, unknown> })?.data
                   : undefined;
-              const hasResult = Boolean(answerData?._id);
+              const hasResult =
+                answersRes.status === "fulfilled" &&
+                hasSubmittedMainAssessmentAnswers(answersRes.value.data);
               const hasCdp =
                 (answersRes.status === "fulfilled" &&
                   hasCdpInAnswerPayload(answersRes.value.data)) ||
                 (recommendationsRes.status === "fulfilled" &&
                   hasCdpInRecommendationsPayload(recommendationsRes.value.data));
-              const progressStatus = String(progressRow?.status || "").toLowerCase();
-              const submitted =
-                hasResult ||
-                progressStatus === "submitted" ||
-                progressStatus === "completed" ||
-                progressStatus === "reviewed";
 
               return {
                 id: flat.assessmentId,
@@ -556,16 +584,19 @@ export default function IndividualProgressPage() {
                 imageUrl: resolveApiMediaUrl(
                   flat.assessment.bannerImage || flat.assessment.imageUrl || flat.assessment.image,
                 ),
-                status: hasCdp ? "Completed" : submitted ? "Submitted" : "Remaining",
+                status: hasCdp ? "Completed" : hasResult ? "Submitted" : "Remaining",
                 progressStatusRaw: progressRow?.status,
                 hasResult,
                 hasCdp,
-                submittedDate: formatDateShort(
-                  answerData?.submittedAt ||
-                    answerData?.createdAt ||
-                    answerData?.updatedAt ||
-                    flat.updatedAt,
-                ),
+                submittedDate:
+                  hasResult || hasCdp
+                    ? formatDateShort(
+                        answerData?.submittedAt ||
+                          answerData?.createdAt ||
+                          answerData?.updatedAt ||
+                          flat.updatedAt,
+                      )
+                    : undefined,
                 dueDate: formatDateShort(flat.dueDate),
               };
             }),

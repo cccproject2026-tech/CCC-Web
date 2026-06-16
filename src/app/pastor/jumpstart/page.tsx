@@ -4143,6 +4143,11 @@ function normalizeUploadFieldName(value: unknown): string {
   return String(value ?? "").trim().toLowerCase();
 }
 
+function isRenderableUiLabel(value: unknown): value is string {
+  const label = String(value ?? "").trim();
+  return label.length > 0 && !["null", "undefined"].includes(label.toLowerCase());
+}
+
 function isImageUploadFile(file: { fileName?: string; fileUrl?: string }): boolean {
   const raw = `${file.fileName ?? ""} ${file.fileUrl ?? ""}`.toLowerCase();
   return /\.(png|jpe?g|webp|gif|bmp|svg)(\?|#|$)/i.test(raw);
@@ -4655,7 +4660,9 @@ if (extra.type === "DATE_PICKER") {
     const fetchRoadmap = async () => {
       let redirectingToNestedTask = false;
       try {
-        setLoading(true);
+        if (!roadmap) {
+          setLoading(true);
+        }
         setRoadmapLoadError(null);
         let data: any;
         if (parentRoadmapId) {
@@ -6594,14 +6601,6 @@ const allowPastorSelect =
         const defaultDate =
           typeof extra.date === "string" && extra.date.trim() ? extra.date.trim().slice(0, 10) : "";
         const value = String(formData[fieldKey] ?? defaultDate ?? "");
-        // const metaNames = new Set(["Allow pastor to select Date", "Show date on info card"]);
-        // const displayCheckboxes =
-        //   extra.checkboxes?.filter((cb) => !metaNames.has(String((cb as ExtraComponent)?.name ?? ""))) ?? [];
-        const metaNames = new Set(["allow pastor to select date", "show date on info card"]);
-const displayCheckboxes =
-  extra.checkboxes?.filter(
-    (cb) => !metaNames.has(normalizeMetaName((cb as ExtraComponent)?.name)),
-  ) ?? [];
 
         return (
           <div key={`${fieldKey}_${index}`} className="mb-5">
@@ -6629,19 +6628,6 @@ const displayCheckboxes =
                   : "cursor-not-allowed bg-white/10 opacity-80"
               }`}
             />
-            {extra.buttonName ? (
-              <button
-                type="button"
-                className="bg-[#103C8C] hover:bg-[#0B2E72] transition text-white text-sm font-medium px-5 py-2 rounded-md shadow"
-              >
-                {extra.buttonName}
-              </button>
-            ) : null}
-            {displayCheckboxes.length > 0 && (
-              <div className="mt-3 space-y-2 pl-1">
-                {displayCheckboxes.map((cb, i) => renderExtraComponent(cb, i, fieldKey))}
-              </div>
-            )}
           </div>
         );
       }
@@ -6859,11 +6845,13 @@ const displayCheckboxes =
         );
       }
 
-      case "CHECKBOX":
+      case "CHECKBOX": {
         console.log("PASTOR CHECKBOX EXTRA", extra);
+        const checkboxLabel = [extra.checkboxLabel, extra.label, extra.name].find(isRenderableUiLabel);
+        if (!checkboxLabel) return null;
         return (
           <div key={`${fieldKey}_${index}`} className="mb-4">
-            <h4 className="mb-2 text-sm font-semibold text-white">{extra.name}</h4>
+            <h4 className="mb-2 text-sm font-semibold text-white">{checkboxLabel}</h4>
             <label className="flex cursor-pointer items-start gap-2 text-sm text-white/90">
               <input
                 type="checkbox"
@@ -6871,10 +6859,11 @@ const displayCheckboxes =
                 onChange={(e) => handleInputChange(fieldKey, e.target.checked)}
                 className="mt-[3px] h-4 w-4 accent-[#103C8C]"
               />
-              <span>{extra.checkboxLabel || extra.label || extra.name}</span>
+              <span>{checkboxLabel}</span>
             </label>
           </div>
         );
+      }
 
       case "SIGNATURE":
         return (
