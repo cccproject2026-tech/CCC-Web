@@ -3999,6 +3999,7 @@ import {
   apiDeletePastorQuery,
   apiDeleteExtrasDocumentFile,
 } from "@/app/Services/api";
+import { apiGetMentorshipSessions } from "@/app/Services/roadmaps.service";
 import {
   deriveTaskStatusForList,
   normalizeRoadmapId,
@@ -4393,6 +4394,7 @@ const [assessmentTaskState, setAssessmentTaskState] = useState<
 
   /** Same as mobile `DynamicFormTask` — POST JUMPSTART_COMPLETE before first extras save. */
   const jumpstartTriggeredRef = useRef(false);
+  const jumpstartMentorshipRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Prevent "empty after save" when backend read is briefly stale. */
   const lastExtrasSaveAtRef = useRef<number>(0);
 
@@ -4401,8 +4403,29 @@ const [assessmentTaskState, setAssessmentTaskState] = useState<
   }, [nestedItemId, parentRoadmapId]);
 
   useEffect(() => {
+    return () => {
+      if (jumpstartMentorshipRefreshTimerRef.current) {
+        clearTimeout(jumpstartMentorshipRefreshTimerRef.current);
+        jumpstartMentorshipRefreshTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     setStatusUiOverride(null);
   }, [nestedItemId, parentRoadmapId]);
+
+  const refreshMentoringSessionsAfterJumpstart = useCallback(async () => {
+    if (!userId) return;
+    try {
+      await Promise.allSettled([
+        apiGetMentorshipSessions(userId),
+        apiGetAppointments({ userId, futureOnly: false }),
+      ]);
+    } catch (error) {
+      console.warn("[Jumpstart] mentoring session refresh failed:", error);
+    }
+  }, [userId]);
 
   const refetchProgressData = useCallback(async () => {
     if (!userId) return;
@@ -4485,6 +4508,13 @@ const [assessmentTaskState, setAssessmentTaskState] = useState<
     // If the extras row already exists, the backend may 400 this POST; no need to trigger.
     if (extrasExist) {
       jumpstartTriggeredRef.current = true;
+      void refreshMentoringSessionsAfterJumpstart();
+      if (jumpstartMentorshipRefreshTimerRef.current) {
+        clearTimeout(jumpstartMentorshipRefreshTimerRef.current);
+      }
+      jumpstartMentorshipRefreshTimerRef.current = setTimeout(() => {
+        void refreshMentoringSessionsAfterJumpstart();
+      }, 1500);
       return;
     }
     if (jumpstartTriggeredRef.current) return;
@@ -4494,11 +4524,18 @@ const [assessmentTaskState, setAssessmentTaskState] = useState<
       const r = await apiTriggerJumpstartComplete(roadmapId, userId, nestedForExtras);
       if (r?.success || r?.alreadyExists) {
         jumpstartTriggeredRef.current = true;
+        void refreshMentoringSessionsAfterJumpstart();
+        if (jumpstartMentorshipRefreshTimerRef.current) {
+          clearTimeout(jumpstartMentorshipRefreshTimerRef.current);
+        }
+        jumpstartMentorshipRefreshTimerRef.current = setTimeout(() => {
+          void refreshMentoringSessionsAfterJumpstart();
+        }, 1500);
       }
     } catch (e) {
       console.warn("[Jumpstart trigger] non-blocking:", e);
     }
-  }, [roadmapId, userId, parentRoadmapId, nestedItemId, extrasExist]);
+  }, [roadmapId, userId, parentRoadmapId, nestedItemId, extrasExist, refreshMentoringSessionsAfterJumpstart]);
 
   // Mobile parity: defaults only from the task definition itself.
   const buildDefaultFormDataFromTemplate = useCallback((): Record<string, any> => {

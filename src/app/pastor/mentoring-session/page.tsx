@@ -6,6 +6,7 @@ import {
   apiRequestPastorMentoringReschedulePreferred,
   isPastorMentoringRescheduleEligibleStatus,
 } from "@/app/Services/mentoring-sessions.service";
+import { apiGetMentorshipSessions } from "@/app/Services/roadmaps.service";
 import PastorHeader from "@/app/Components/PastorHeader";
 import HeroBg from "../../Assets/progress-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
@@ -97,8 +98,34 @@ function unwrapMentoringSessionsResponse(res: any): any[] {
   return [];
 }
 
+function getSessionAppointmentId(session: any): string {
+  return getStringValue(
+    session?.appointmentId,
+    session?.appointment?._id,
+    session?.appointment?.id,
+    session?.appointmentDetails?._id,
+    session?.appointmentDetails?.id,
+  );
+}
+
+function getSessionScheduledDate(session: any): string {
+  const appointment = session?.appointment || session?.appointmentDetails || {};
+  return getStringValue(
+    session?.scheduledDate,
+    session?.meetingDate,
+    session?.date,
+    appointment?.scheduledDate,
+    appointment?.meetingDate,
+    appointment?.date,
+  );
+}
+
 function normalizeBackendSession(session: any) {
   const sessionNumber = Number(session?.sessionNumber || session?.sessionNo || 0);
+  const statusRaw = getStringValue(session?.status, "LOCKED").toUpperCase();
+  const appointmentId = getSessionAppointmentId(session);
+  const scheduledDate = getSessionScheduledDate(session);
+  const hasRealSchedule = Boolean(appointmentId && scheduledDate);
 
   return {
     ...session,
@@ -106,9 +133,22 @@ function normalizeBackendSession(session: any) {
     sessionNumber,
     title: getStringValue(session?.title, SESSION_TITLES[sessionNumber - 1], `Session ${sessionNumber}`),
     mentorNote: getStringValue(session?.mentorNote, session?.title, `Session ${sessionNumber}`),
-    status: getStringValue(session?.status, "LOCKED").toUpperCase(),
-    scheduledDate: getStringValue(session?.scheduledDate, session?.meetingDate, session?.date),
-    appointmentId: getStringValue(session?.appointmentId),
+    status:
+      statusRaw === "COMPLETED"
+        ? "COMPLETED"
+        : statusRaw === "CANCELLED"
+          ? "CANCELLED"
+          : statusRaw === "MISSED"
+            ? "MISSED"
+            : hasRealSchedule
+              ? "SCHEDULED"
+              : "LOCKED",
+    scheduledDate:
+      hasRealSchedule || ["COMPLETED", "CANCELLED", "MISSED"].includes(statusRaw)
+        ? scheduledDate
+        : "",
+    appointmentId,
+    appointment: session?.appointment || session?.appointmentDetails || undefined,
   };
 }
 
@@ -144,7 +184,7 @@ export default function PastorMentoringSessionPage() {
     const [assignedMentor, setAssignedMentor] = useState<any>(null);
     const [rescheduleRequestingId, setRescheduleRequestingId] = useState<string | null>(null);
 
-    useEffect(() => {
+useEffect(() => {
   const getCookieValue = (name: string) => {
     if (typeof document === "undefined") return "";
     return (
@@ -242,10 +282,27 @@ useEffect(() => {
         return;
       }
 
-      const res = await apiGetPastorMentoringSessions(pastorId);
-      const rows = unwrapMentoringSessionsResponse(res)
-        .map(normalizeBackendSession)
-        .filter((session) => session.sessionNumber > 0);
+      const loadRows = async () => {
+        try {
+          const roadmapsRes = await apiGetMentorshipSessions(pastorId);
+          const roadmapsRawRows = unwrapMentoringSessionsResponse(roadmapsRes);
+          const roadmapsRows = roadmapsRawRows
+            .map(normalizeBackendSession)
+            .filter((session) => session.sessionNumber > 0);
+          if (roadmapsRows.length > 0) return roadmapsRows;
+        } catch {
+          // Fall back to the older endpoint below.
+        }
+
+        const fallbackRes = await apiGetPastorMentoringSessions(pastorId);
+        const fallbackRawRows = unwrapMentoringSessionsResponse(fallbackRes);
+        const fallbackRows = fallbackRawRows
+          .map(normalizeBackendSession)
+          .filter((session) => session.sessionNumber > 0);
+        return fallbackRows;
+      };
+
+      const rows = await loadRows();
       if (!cancelled) setSessions(rows);
     } catch (err) {
       if (!cancelled) {
@@ -283,13 +340,52 @@ useEffect(() => {
 );
 
 const completedCount = sortedSessions.filter((s) => s.status === "COMPLETED").length;
-const unlockedSessionNumber = Math.min(completedCount + 1, 10);
 const backendHasFullJourney = sortedSessions.length >= 10;
+const nextSessionNumber = Math.min(completedCount + 1, 10);
 
 const allSessions = useMemo(() => {
+  const getSessionDisplayState = (session: any, sessionNumber: number) => {
+    const hasBackendRow = Boolean(session);
+    const statusRaw = getStringValue(session?.status, "LOCKED").toUpperCase();
+    const appointmentId = getStringValue(
+      session?.appointmentId,
+      session?.appointment?._id,
+      session?.appointment?.id,
+      session?.appointmentDetails?._id,
+      session?.appointmentDetails?.id,
+    );
+    const scheduledDate = getStringValue(
+      session?.scheduledDate,
+      session?.meetingDate,
+      session?.date,
+      session?.appointment?.scheduledDate,
+      session?.appointment?.meetingDate,
+      session?.appointment?.date,
+      session?.appointmentDetails?.scheduledDate,
+      session?.appointmentDetails?.meetingDate,
+      session?.appointmentDetails?.date,
+    );
+    const hasRealSchedule = Boolean(appointmentId && scheduledDate);
+
+    if (statusRaw === "COMPLETED" || statusRaw === "CANCELLED" || statusRaw === "MISSED") {
+      return { status: statusRaw, scheduledDate, appointmentId };
+    }
+
+    if (hasRealSchedule) {
+      return { status: "SCHEDULED", scheduledDate, appointmentId };
+    }
+
+    return {
+      status: sessionNumber <= nextSessionNumber && hasBackendRow ? "PENDING" : "LOCKED",
+      scheduledDate: "",
+      appointmentId,
+    };
+  };
+
   if (backendHasFullJourney) {
     return sortedSessions.map((session) => {
       const sessionNumber = Number(session?.sessionNumber || session?.sessionNo || 0);
+      const displayState = getSessionDisplayState(session, sessionNumber);
 
       return {
         ...session,
@@ -305,8 +401,8 @@ const allSessions = useMemo(() => {
           session?.title,
           `Session ${sessionNumber}`,
         ),
-        status: getStringValue(session?.status, "LOCKED").toUpperCase(),
-        scheduledDate: getStringValue(session?.scheduledDate, session?.meetingDate, session?.date),
+        status: displayState.status,
+        scheduledDate: displayState.scheduledDate,
         raw: session,
       };
     });
@@ -317,53 +413,21 @@ const allSessions = useMemo(() => {
     const apiSession = sortedSessions.find((s) => s.sessionNumber === sessionNumber);
 
 
-    const previousCompletedSession = [...sortedSessions]
-      .filter((s) => s.status === "COMPLETED" && s.sessionNumber < sessionNumber)
-      .sort((a, b) => b.sessionNumber - a.sessionNumber)[0];
-
-    const baseDate = previousCompletedSession?.scheduledDate
-      ? new Date(previousCompletedSession.scheduledDate)
-      : null;
-
-    const fallbackDate = baseDate
-      ? new Date(baseDate.getTime() + 30 * 24 * 60 * 60 * 1000)
-      : null;
-
-
-    const isCompleted = apiSession?.status === "COMPLETED";
-
-const status = isCompleted
-  ? "COMPLETED"
-  : sessionNumber === unlockedSessionNumber
-    ? "SCHEDULED"
-    : "LOCKED";
+    const displayState = getSessionDisplayState(apiSession, sessionNumber);
 
     return {
       id: apiSession?.id || `locked-session-${sessionNumber}`,
       sessionNumber,
       title: apiSession?.title || title,
       mentorNote: apiSession?.mentorNote || `Session ${sessionNumber}—${title}`,
-      status,
-      appointmentId: getStringValue(apiSession?.appointmentId),
-    //   scheduledDate: apiSession?.scheduledDate || fallbackDate?.toISOString() || "",
-//     scheduledDate:
-//   apiSession?.status === "COMPLETED"
-//     ? apiSession?.scheduledDate || ""
-//     : fallbackDate?.toISOString() || apiSession?.scheduledDate || "",
-// scheduledDate: isCompleted
-//   ? apiSession?.scheduledDate || ""
-//   : sessionNumber === unlockedSessionNumber
-//     ? fallbackDate?.toISOString() || apiSession?.scheduledDate || ""
-//     : "",
-scheduledDate:
-  apiSession?.scheduledDate ||
-  (sessionNumber === unlockedSessionNumber
-    ? fallbackDate?.toISOString() || ""
-    : ""),
+      status: displayState.status,
+      appointmentId: displayState.appointmentId,
+      scheduledDate: displayState.scheduledDate,
       raw: apiSession,
     };
   });
-}, [backendHasFullJourney, sortedSessions, unlockedSessionNumber]);
+}, [backendHasFullJourney, sortedSessions]);
+
 const filteredSessions = allSessions.filter((session) => {
   if (filterStatus === "Completed") return session.status === "COMPLETED";
   if (filterStatus === "Cancelled") return session.status === "CANCELLED";
@@ -562,9 +626,12 @@ const selectedTranscriptText = getTranscriptText(
     {visible.map((session, index) => {
       const sessionStatus = String(session.status || "").toUpperCase();
       const isLockedSession = sessionStatus === "LOCKED";
-      const isCurrentSession = backendHasFullJourney
-        ? sessionStatus === "SCHEDULED" || sessionStatus === "MISSED"
-        : session.sessionNumber === unlockedSessionNumber;
+      const isCurrentSession =
+        session.sessionNumber === nextSessionNumber ||
+        sessionStatus === "SCHEDULED" ||
+        sessionStatus === "MISSED";
+      const isPendingSession = sessionStatus === "PENDING";
+      const hasRealScheduledDate = Boolean(session.scheduledDate);
 
       return (
       <div
@@ -601,8 +668,10 @@ const selectedTranscriptText = getTranscriptText(
                 </p>
 
                 <p className="text-sm text-white/60">
-                  {sessionStatus === "LOCKED" || !session.scheduledDate
+                  {sessionStatus === "LOCKED"
                     ? "Locked"
+                    : isPendingSession || !hasRealScheduledDate
+                      ? "Pending / Unscheduled"
                     : `${new Date(session.scheduledDate).toLocaleDateString("en-US", {
                         weekday: "short",
                         year: "numeric",
@@ -725,8 +794,10 @@ const selectedTranscriptText = getTranscriptText(
     <div className="flex items-start justify-between gap-4">
       <span className="text-white/45">Date & Time</span>
       <span className="text-right font-semibold text-white">
-        {selectedSession.status === "LOCKED" || !selectedSession.scheduledDate
+        {selectedSession.status === "LOCKED"
           ? "Locked"
+          : selectedSession.status === "PENDING" || !selectedSession.scheduledDate
+            ? "Pending / Unscheduled"
           : `${new Date(selectedSession.scheduledDate).toLocaleDateString("en-US", {
               month: "long",
               day: "numeric",
@@ -786,6 +857,8 @@ const selectedTranscriptText = getTranscriptText(
     ? "You can request a new time from your mentor for this session."
     : selectedSession.status === "LOCKED"
       ? "Complete the previous session to unlock this session."
+      : selectedSession.status === "PENDING"
+        ? "This session is unlocked and waiting for a real appointment."
       : "Summary will appear here once the session is underway."}
           </p>
           {pastorRescheduleEligible ? (
