@@ -866,7 +866,7 @@ Development
               </div>
               <div className="flex shrink-0 flex-wrap gap-2 sm:gap-3">
                 <Link
-                  href="/pastor/help"
+                  href="/pastor/faq"
                   prefetch
                   className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-medium backdrop-blur-sm transition hover:bg-white/15"
                 >

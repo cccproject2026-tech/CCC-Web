@@ -692,6 +692,11 @@ useEffect(() => {
         label: "Contact Details",
         path: "/director/contact-details",
       },
+      {
+        icon: "fa-regular fa-circle-question",
+        label: "Help",
+        path: "/director/faq",
+      },
     ].map((item, idx) => (
       <button
         key={idx}

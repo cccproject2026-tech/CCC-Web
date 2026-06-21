@@ -521,7 +521,7 @@ const currentDate = new Date().toLocaleDateString("en-US", {
               </div>
             </div>
             <Link
-              href="/mentor/help"
+              href="/mentor/faq"
               prefetch
               className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-white/15 sm:self-center"
             >
@@ -619,7 +619,7 @@ const currentDate = new Date().toLocaleDateString("en-US", {
               </div>
             </div>
             <Link
-              href="/mentor/help"
+              href="/mentor/faq"
               prefetch
               className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-white/15 bg-white/10 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-white/15 sm:self-center"
             >

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { mentorMainGradient, mentorPageRoot } from "@/app/Components/mentor/mentor-theme";
+import { Mail, Phone } from "lucide-react";
 
 type FaqItem = {
   id: number;
@@ -194,7 +195,46 @@ export default function MentorFaqPage() {
   return (
     <main className={`${mentorPageRoot} ${mentorMainGradient}`}>
       <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8 sm:px-6 lg:px-8">
-        <section className="rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0.04)_100%)] px-5 py-6 shadow-[0_20px_45px_rgba(3,24,43,0.35)] sm:px-6 sm:py-8">
+        <section className="rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0.04)_100%)] px-5 py-5 shadow-[0_20px_45px_rgba(3,24,43,0.35)] sm:px-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="max-w-2xl">
+              <h2 className="text-lg font-semibold text-white sm:text-xl">Need help?</h2>
+              <p className="mt-1 text-sm text-[#cde2f2]">
+                Reach out through the contact options below.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
+              <a
+                href="tel:269-471-0159"
+                className="inline-flex min-w-0 items-center gap-3 rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 text-sm text-white transition hover:bg-white/[0.1]"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 text-[#8ec5eb]">
+                  <Phone size={16} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[11px] uppercase tracking-[0.16em] text-white/55">Phone</span>
+                  <span className="block truncate font-medium text-white/95">269-471-0159</span>
+                </span>
+              </a>
+
+              <a
+                href="mailto:communitychange@andrews.edu"
+                className="inline-flex min-w-0 items-center gap-3 rounded-2xl border border-white/15 bg-white/[0.06] px-4 py-3 text-sm text-white transition hover:bg-white/[0.1]"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 text-[#8ec5eb]">
+                  <Mail size={16} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[11px] uppercase tracking-[0.16em] text-white/55">Email</span>
+                  <span className="block truncate font-medium text-white/95">communitychange@andrews.edu</span>
+                </span>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0.04)_100%)] px-5 py-6 shadow-[0_20px_45px_rgba(3,24,43,0.35)] sm:px-6 sm:py-8">
           <div className="max-w-3xl">
             <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-[#d9ebf8]">
               Mentor FAQ
