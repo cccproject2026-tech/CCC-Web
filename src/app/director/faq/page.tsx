@@ -211,9 +211,7 @@ export default function DirectorFaqPage() {
   const isFiltered = search.trim().length > 0;
 
   return (
-    <main
-      className={`${directorPageRoot} bg-[radial-gradient(circle_at_18%_8%,rgba(141,211,243,0.24),transparent_34%),radial-gradient(circle_at_82%_22%,rgba(245,204,118,0.18),transparent_35%),linear-gradient(180deg,#041f35_0%,#062946_100%)]`}
-    >
+    <main className={directorPageRoot}>
       <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8 sm:px-6 lg:px-8">
         <section className="rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.1)_0%,rgba(255,255,255,0.04)_100%)] px-5 py-5 shadow-[0_20px_45px_rgba(3,24,43,0.35)] sm:px-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

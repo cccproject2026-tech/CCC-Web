@@ -2887,8 +2887,37 @@ return (
         </div>
       </section>
 
+      <div className={directorPageContainer}>
+        <div
+          className={`mb-6 flex flex-col gap-3 rounded-xl p-4 text-white sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5 ${directorGlassCard}`}
+        >
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-white/15 bg-white/10">
+              <i className="fa-solid fa-book-open text-[#8ec5eb]" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold sm:text-base">Need a Help?</h3>
+              <p className="mt-1 text-xs text-white/65 sm:text-sm">
+                We&apos;ve got simple steps to help you move forward.
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0">
+            <Link
+              href="/director/faq"
+              prefetch
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/15"
+            >
+              <i className="fa-regular fa-circle-question text-[#8ec5eb]" />
+              Help
+            </Link>
+          </div>
+        </div>
+      </div>
+
       {/* Map */}
-      <section className="py-16">
+      <section className="pb-16">
+        <div className={directorPageContainer}>
        <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
   <div className="flex flex-wrap items-center gap-3">
     <h2 className="text-[22px] font-semibold text-white">Network map</h2>
@@ -2963,7 +2992,7 @@ return (
       aria-label="Filter people on the network map"
     />
   </div>
-</div>
+  </div>
         {networkMapLoading ? (
           <div
             className="flex h-[420px] w-full items-center justify-center rounded-2xl border border-white/10 bg-[#041f35]/50 md:h-[480px]"
@@ -2991,7 +3020,7 @@ return (
             />
           </div>
         )}
-      
+        </div>
       </section>
            {showQuickAssignModal && (
   <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#020b18]/75 px-4 backdrop-blur-md">
