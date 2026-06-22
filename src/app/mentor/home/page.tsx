@@ -309,7 +309,7 @@ setReviewCenterAttentionCount(attentionFlags.filter(Boolean).length);
   const lastName = mentorUser?.lastName ?? mentorStatic?.lastName ?? "";
   const mentorName =
     `${firstName} ${lastName}`.trim() || "Mentor";
-  const welcomeLine = `Welcome back, ${mentorName}!`;
+  const welcomeLine = `Welcome back, ${mentorName}`;
 
   const blockingLoad = loading || (Boolean(userId) && !focusInitialReady);
 
@@ -656,12 +656,17 @@ const pin = pins[index];
           `${mentee.firstName ?? ""} ${mentee.lastName ?? ""}`.trim() ||
           mentee.name ||
           "Mentee";
+        const clickedId = mentee._id || mentee.id || mentee.userId || mentee.pastorId;
 
         return (
           <button
             key={mentee._id ?? mentee.id ?? index}
             type="button"
-            onClick={() => router.push("/mentor/MenteesDetailed")}
+            onClick={() =>
+              router.push(
+                `/mentor/MenteesDetailed?userId=${encodeURIComponent(String(clickedId ?? ""))}`,
+              )
+            }
             className="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
             style={pin}
             title={name}

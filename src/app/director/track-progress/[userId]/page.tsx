@@ -734,9 +734,21 @@ export default function IndividualProgressPage() {
   };
 
   const roadmapPct =
-    progressData && progressData.totalRoadmaps > 0
-      ? Math.round((progressData.completedRoadmaps / progressData.totalRoadmaps) * 100)
+    roadmaps.length > 0
+      ? Math.round(
+          (roadmaps.filter((card) => isRoadmapComplete(card)).length / roadmaps.length) * 100,
+        )
       : 0;
+
+  const derivedTotalRoadmaps = roadmaps.length;
+  const derivedCompletedRoadmaps = roadmaps.filter((card) => isRoadmapComplete(card)).length;
+  const progressDataForChart = progressData
+    ? {
+        ...progressData,
+        totalRoadmaps: derivedTotalRoadmaps,
+        completedRoadmaps: derivedCompletedRoadmaps,
+      }
+    : progressData;
 
   const progress = {
     completed: progressData?.overallProgress ?? 0,
@@ -781,13 +793,13 @@ export default function IndividualProgressPage() {
     datasets: [
       {
         label: "Total",
-        data: [progressData?.totalRoadmaps ?? 0, totalAssessmentsForChart],
+        data: [progressDataForChart?.totalRoadmaps ?? 0, totalAssessmentsForChart],
         backgroundColor: "rgba(142, 197, 235, 0.35)",
         borderRadius: 4,
       },
       {
         label: "Completed",
-        data: [progressData?.completedRoadmaps ?? 0, completedAssessmentsForChart],
+        data: [progressDataForChart?.completedRoadmaps ?? 0, completedAssessmentsForChart],
         backgroundColor: "#8ec5eb",
         borderRadius: 4,
       },
@@ -796,9 +808,9 @@ export default function IndividualProgressPage() {
 
   const maxBar = Math.max(
     3,
-    progressData?.totalRoadmaps ?? 0,
+    progressDataForChart?.totalRoadmaps ?? 0,
     totalAssessmentsForChart,
-    progressData?.completedRoadmaps ?? 0,
+    progressDataForChart?.completedRoadmaps ?? 0,
     completedAssessmentsForChart,
   );
 

@@ -147,12 +147,11 @@ const navLinks: Array<{ name: string; path: string; desktopLabel?: string }> = [
             ? true
             : enabledCookie !== "false"
           : storedPreference !== "false";
+      if (typeof window !== "undefined" && storedPreference === null && enabledCookie !== null) {
+        window.localStorage.setItem(MENTOR_NOTIFICATIONS_STORAGE_KEY, enabled ? "true" : "false");
+      }
       setNotificationsEnabled(enabled);
       setCookie("mentor_notifications_enabled", enabled ? "true" : "false", 30);
-      if (!enabled) {
-        setNotificationList([]);
-        return;
-      }
 
       try {
      
@@ -357,7 +356,6 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
             <div className="relative">
               <button
                 onClick={() => {
-                  if (!notificationsEnabled) return;
                   setShowNotifications((prev) => !prev);
                   setShowProfileMenu(false);
                   setShowSettingsMenu(false);
@@ -558,9 +556,6 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
                                       }
                                       setCookie("mentor_notifications_enabled", nextEnabled ? "true" : "false", 30);
                                       setNotificationsEnabled(nextEnabled);
-                                      if (!nextEnabled) {
-                                        setNotificationList([]);
-                                      }
                                       setShowNotifications(false);
                                       setShowSettingsMenu(false);
                                       setShowProfileMenu(false);

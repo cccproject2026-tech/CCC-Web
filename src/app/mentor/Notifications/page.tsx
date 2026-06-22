@@ -36,16 +36,21 @@ export default function NotificationsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const loadNotifications = useCallback(async () => {
+    const storedPreference =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem("mentorNotificationsEnabled")
+        : null;
     const enabledCookie = getCookie("mentor_notifications_enabled");
-    const enabled = enabledCookie === null ? true : enabledCookie !== "false";
-    setNotificationsEnabled(enabled);
-
-    if (!enabled) {
-      setItems([]);
-      setLoading(false);
-      setError(null);
-      return;
+    const enabled =
+      storedPreference === null
+        ? enabledCookie === null
+          ? true
+          : enabledCookie !== "false"
+        : storedPreference !== "false";
+    if (typeof window !== "undefined" && storedPreference === null && enabledCookie !== null) {
+      window.localStorage.setItem("mentorNotificationsEnabled", enabled ? "true" : "false");
     }
+    setNotificationsEnabled(enabled);
 
     const mentorId = getMentorUserId();
     if (!mentorId) {
@@ -78,14 +83,17 @@ setItems(newestFirst);
   }, [loadNotifications]);
 
   const handleTurnOff = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("mentorNotificationsEnabled", "false");
+    }
     setCookie("mentor_notifications_enabled", "false", 30);
     setNotificationsEnabled(false);
-    setItems([]);
-    setError(null);
-    setLoading(false);
   };
 
   const handleTurnOn = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("mentorNotificationsEnabled", "true");
+    }
     setCookie("mentor_notifications_enabled", "true", 30);
     setNotificationsEnabled(true);
     void loadNotifications();
@@ -160,7 +168,7 @@ setItems(newestFirst);
             </div>
           )}
 
-          {!loading && !error && notificationsEnabled && items.length === 0 && (
+          {!loading && !error && items.length === 0 && (
             <div className={mentorEmptyPanel}>
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full border border-white/20 bg-white/5">
                 <i className="fa-regular fa-bell text-2xl text-[#8ec5eb]" aria-hidden />
@@ -169,7 +177,7 @@ setItems(newestFirst);
             </div>
           )}
 
-          {!loading && !error && notificationsEnabled && items.length > 0 && (
+          {!loading && !error && items.length > 0 && (
             <div className="flex flex-col gap-4">
               {items.map((note) => {
                 const p = mapNotificationItemToPopup(note);

@@ -11,6 +11,13 @@ import { apiAddFinalComment, apiGetUserProgress } from "@/app/Services/progress.
 import { apiGetUserById } from "@/app/Services/users.service";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
 import {
+  buildRoadmapAssignments,
+  collapseRoadmapAssignmentsToParents,
+  fetchMergedRoadmapsForAssignedUser,
+  normalizeRoadmapId,
+  unwrapProgressData,
+} from "@/app/Services/roadmap-assignments";
+import {
   apiGetAssignedAssessments,
   apiGetSectionRecommendations,
   apiGetUserAnswers,
@@ -18,7 +25,6 @@ import {
   parseAssignedAssessmentsListBody,
 } from "@/app/Services/assessment.service";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
-import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import {
   IndividualBreakdownBarChart,
   OverallProgressDonut,
@@ -62,6 +68,26 @@ function assessmentStatusChipClass(status: unknown): string {
     return "border-amber-400/40 bg-amber-500/15 text-amber-100";
   }
   return "border-[#8ec5eb]/35 bg-[#8ec5eb]/10 text-[#cde9f7]";
+}
+
+function isCompletedRoadmapAssignmentStatus(status: unknown): boolean {
+  return String(status ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s-]+/g, " ") === "completed";
+}
+
+function isCompletedStatus(status: unknown): boolean {
+  const normalized = String(status || "").toLowerCase().replace(/[_\s-]+/g, " ").trim();
+  return normalized === "completed" || normalized === "complete";
+}
+
+function isRoadmapDoneForChart(roadmap: Record<string, unknown>): boolean {
+  const total = Number(roadmap.displayTotalSteps ?? roadmap.totalSteps ?? 0);
+  const completed = Number(roadmap.displayCompletedSteps ?? roadmap.completedSteps ?? 0);
+
+  if (total > 0 && completed >= total) return true;
+  return isCompletedStatus(roadmap.status);
 }
 
 function formatDateShort(raw: unknown): string | null {
@@ -234,28 +260,84 @@ function PastorProgressPageContent() {
   }, [userId]);
 
   useEffect(() => {
-    if (!progress?.roadmaps?.length) return;
+    if (!progress?.roadmaps?.length) {
+      setRoadmaps([]);
+      return;
+    }
 
     const hydrateRoadmaps = async () => {
       try {
-        const results = await Promise.allSettled(
-          progress.roadmaps.map(async (r: any) => {
-            const rid = r.roadMapId ?? r.roadmapId ?? r._id;
-            const res = await apiGetRoadmapById(rid);
-            const roadmap = res.data?.data;
-            const percent = r.progressPercentage ?? 0;
+        const roadmapRows = Array.isArray(progress.roadmaps) ? progress.roadmaps : [];
+        const [results, mergedRoadmaps] = await Promise.all([
+          Promise.allSettled(
+            roadmapRows.map(async (r: any) => {
+              const rid = r.roadMapId ?? r.roadmapId ?? r._id;
+              const res = await apiGetRoadmapById(rid);
+              const roadmap = res.data?.data;
+              const percent = r.progressPercentage ?? 0;
+              return {
+                ...r,
+                roadMapId: rid,
+                title: roadmap?.name,
+                description: roadmap?.description,
+                timeline: roadmap?.timeline,
+                imageUrl: roadmap?.imageUrl,
+                percent,
+              };
+            }),
+          ),
+          userId
+            ? fetchMergedRoadmapsForAssignedUser(userId).catch(() => [])
+            : Promise.resolve([]),
+        ]);
+
+        const assignments = Array.isArray(mergedRoadmaps) && mergedRoadmaps.length
+          ? buildRoadmapAssignments(mergedRoadmaps as any, progress)
+          : [];
+        const parents = assignments.length ? collapseRoadmapAssignmentsToParents(assignments) : [];
+        const displayCounts = new Map<
+          string,
+          { displayCompletedSteps: number; displayTotalSteps: number }
+        >();
+
+        for (const parent of parents) {
+          const parentId = normalizeRoadmapId(parent.parentRoadmapId ?? parent.id);
+          if (!parentId) continue;
+          const tasks = assignments.filter(
+            (assignment) =>
+              normalizeRoadmapId(assignment.parentRoadmapId ?? assignment.id) === parentId,
+          );
+          const progressRow = roadmapRows.find(
+            (row: any) =>
+              normalizeRoadmapId(row.roadMapId ?? row.roadmapId ?? row._id) === parentId,
+          );
+          const hasNestedTasks = parent.hasNestedTasks === true;
+          const totalSteps = hasNestedTasks
+            ? tasks.length
+            : Math.max(0, Number(progressRow?.totalSteps ?? 0));
+          const completedSteps = hasNestedTasks
+            ? tasks.filter((task) => isCompletedRoadmapAssignmentStatus(task.status)).length
+            : Math.max(0, Number(progressRow?.completedSteps ?? 0));
+          displayCounts.set(parentId, {
+            displayCompletedSteps: completedSteps,
+            displayTotalSteps: totalSteps,
+          });
+        }
+
+        const valid = results
+          .filter((r) => r.status === "fulfilled")
+          .map((r: any) => {
+            const value = r.value ?? {};
+            const rid = normalizeRoadmapId(value.roadMapId ?? value.roadmapId ?? value._id);
+            const counts = displayCounts.get(rid);
             return {
-              ...r,
-              roadMapId: rid,
-              title: roadmap?.name,
-              description: roadmap?.description,
-              timeline: roadmap?.timeline,
-              imageUrl: roadmap?.imageUrl,
-              percent,
+              ...value,
+              displayCompletedSteps:
+                counts?.displayCompletedSteps ?? Math.max(0, Number(value.completedSteps ?? 0)),
+              displayTotalSteps:
+                counts?.displayTotalSteps ?? Math.max(0, Number(value.totalSteps ?? 0)),
             };
-          }),
-        );
-        const valid = results.filter((r) => r.status === "fulfilled").map((r: any) => r.value);
+          });
 
         setRoadmaps(valid);
       } catch (err) {
@@ -409,13 +491,19 @@ useEffect(() => {
     );
   }
 
-  const progressForChart = assignedAssessmentStats
-    ? {
-        ...(progress || {}),
-        totalAssessments: assignedAssessmentStats.total,
-        completedAssessments: assignedAssessmentStats.completed,
-      }
-    : progress;
+  const derivedTotalRoadmaps = roadmaps.length;
+  const derivedCompletedRoadmaps = roadmaps.filter((roadmap) => isRoadmapDoneForChart(roadmap)).length;
+  const progressForChart = {
+    ...(progress || {}),
+    totalRoadmaps: derivedTotalRoadmaps,
+    completedRoadmaps: derivedCompletedRoadmaps,
+    ...(assignedAssessmentStats
+      ? {
+          totalAssessments: assignedAssessmentStats.total,
+          completedAssessments: assignedAssessmentStats.completed,
+        }
+      : {}),
+  };
 
   return (
     <div className={mentorPageRoot}>
@@ -686,7 +774,7 @@ function MentorRoadmapProgressCard({ roadmap, onView }: { roadmap: any; onView: 
   const title = roadmap.title || "Roadmap";
   const desc = roadmap.description || "";
   const progressPct = Number(roadmap.percent ?? 0);
-  const completed = `${roadmap.completedSteps ?? 0}/${roadmap.totalSteps ?? 0}`;
+  const completed = `${roadmap.displayCompletedSteps ?? roadmap.completedSteps ?? 0}/${roadmap.displayTotalSteps ?? roadmap.totalSteps ?? 0}`;
   const time = roadmap.timeline || "—";
   const status = roadmap.status;
   const imgUrl =

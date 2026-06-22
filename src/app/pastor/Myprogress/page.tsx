@@ -72,6 +72,19 @@ function isCompletedAssessmentStatus(status: unknown): boolean {
   return s === "completed" || s === "complete" || s === "reviewed";
 }
 
+function isCompletedStatus(status: unknown): boolean {
+  const normalized = String(status || "").toLowerCase().replace(/[_\s-]+/g, " ").trim();
+  return normalized === "completed" || normalized === "complete";
+}
+
+function isRoadmapDoneForChart(roadmap: Record<string, unknown>): boolean {
+  const total = Number(roadmap.totalSteps ?? 0);
+  const completed = Number(roadmap.completedSteps ?? 0);
+
+  if (total > 0 && completed >= total) return true;
+  return isCompletedStatus(roadmap.status);
+}
+
 function hasCdpInRecommendationsPayload(body: unknown): boolean {
   const walk = (node: unknown, parentSent = false): boolean => {
     if (!node) return false;
@@ -378,8 +391,12 @@ totalSteps:
       </div>
     );
   }
+const derivedTotalRoadmaps = roadmaps.length;
+const derivedCompletedRoadmaps = roadmaps.filter((roadmap) => isRoadmapDoneForChart(roadmap)).length;
 const progressForChart = {
   ...(progress || {}),
+  totalRoadmaps: derivedTotalRoadmaps,
+  completedRoadmaps: derivedCompletedRoadmaps,
   totalAssessments: assessments.length,
   completedAssessments: assessments.filter((assessment) =>
     isCompletedAssessmentStatus(assessment.status),

@@ -13,7 +13,8 @@ function expiresDate(days: number): string {
 
 export function setCookie(name: string, value: string, days = DEFAULT_EXPIRES_DAYS): void {
   if (typeof document === "undefined") return;
-  document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)};expires=${expiresDate(days)};path=/;SameSite=Lax`;
+  const secure = typeof window !== "undefined" && window.location.protocol === "https:" ? ";Secure" : "";
+  document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)};expires=${expiresDate(days)};path=/;SameSite=Lax${secure}`;
 }
 
 export function getCookie(name: string): string | null {

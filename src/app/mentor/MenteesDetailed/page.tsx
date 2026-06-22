@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import axiosInstance from "@/app/Services/config/axios-instance";
 import HeroBg from "@/app/Assets/hero-bg.png";
 import MapImg from "@/app/Assets/map-view.png";
@@ -29,7 +29,7 @@ import {
 } from "@/app/Components/mentor/mentor-theme";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getMentorFromCookie } from "@/app/Services/utils/helpers";
 import { isRemoteImageSrc } from "@/app/utils/image";
 const getInitialsAvatar = (name: string) =>
@@ -63,8 +63,12 @@ const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
 const [drawerDocuments, setDrawerDocuments] = useState<any[]>([]);
 const [drawerDocsLoading, setDrawerDocsLoading] = useState(false);
 const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
+  const [progressHydrated, setProgressHydrated] = useState(false);
+  const autoOpenedUserIdRef = useRef<string | null>(null);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectedUserId = searchParams.get("userId");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -92,6 +96,7 @@ const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
         const res = await apiGetAssignedUsers(mentorId);
         const raw = res.data?.data;
         const menteeUsers = Array.isArray(raw) ? raw : [];
+        setProgressHydrated(false);
 
 
 const mapped = menteeUsers.map((u: any, i: number) => {
@@ -99,6 +104,10 @@ const mapped = menteeUsers.map((u: any, i: number) => {
 
   return {
     id: String(u.id ?? u._id ?? ""),
+    _id: String(u._id ?? u.id ?? ""),
+    userId: String(u.userId ?? u.user?._id ?? u.user?.id ?? ""),
+    pastorId: String(u.pastorId ?? u.userId ?? u.user?._id ?? u.user?.id ?? ""),
+    user: u.user,
     name: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Mentee",
     role: u.role ?? "",
     status: u.status,
@@ -122,6 +131,7 @@ const mapped = menteeUsers.map((u: any, i: number) => {
         console.error("Failed to load mentees", err);
         setLoadError("Could not load mentees. Please try again.");
         setMentees([]);
+        setProgressHydrated(true);
       } finally {
         setLoading(false);
       }
@@ -131,32 +141,58 @@ const mapped = menteeUsers.map((u: any, i: number) => {
   }, []);
 
   useEffect(() => {
+    if (!selectedUserId) return;
+    if (!progressHydrated) return;
+    if (autoOpenedUserIdRef.current === selectedUserId) return;
+    if (!mentees.length) return;
+
+    const match = mentees.find((mentee) => {
+      return (
+        String(mentee._id ?? "") === selectedUserId ||
+        String(mentee.id ?? "") === selectedUserId ||
+        String(mentee.userId ?? "") === selectedUserId ||
+        String(mentee.pastorId ?? "") === selectedUserId ||
+        String(mentee.user?._id ?? "") === selectedUserId ||
+        String(mentee.user?.id ?? "") === selectedUserId
+      );
+    });
+
+    if (!match) return;
+    autoOpenedUserIdRef.current = selectedUserId;
+    openMenteeDrawer(match);
+  }, [mentees, selectedUserId]);
+
+  useEffect(() => {
     if (!mentees.length) return;
 
     const hydrateProgress = async () => {
-      const results = await Promise.allSettled(
-        mentees.map((m) =>
-          apiGetUserProgress(m.id).then((res) => ({
-            userId: m.id,
-            progress: res.data?.data?.overallProgress ?? 0,
-            phase: res.data?.data?.currentPhase,
-            completed: res.data?.data?.overallCompleted ?? false,
-          })),
-        ),
-      );
+      try {
+        const results = await Promise.allSettled(
+          mentees.map((m) =>
+            apiGetUserProgress(m.id).then((res) => ({
+              userId: m.id,
+              progress: (res.data as any)?.data?.overallProgress ?? 0,
+              phase: (res.data as any)?.data?.currentPhase,
+              completed: (res.data as any)?.data?.overallCompleted ?? false,
+            })),
+          ),
+        );
 
-      setMentees((prev) =>
-        prev.map((m, idx) => {
-          const r = results[idx];
-          if (!r || r.status !== "fulfilled") return m;
-          const v = r.value;
-          return {
-            ...m,
-            progress: v.progress,
-            phase: v.phase,
-          };
-        }),
-      );
+        setMentees((prev) =>
+          prev.map((m, idx) => {
+            const r = results[idx];
+            if (!r || r.status !== "fulfilled") return m;
+            const v = r.value;
+            return {
+              ...m,
+              progress: v.progress,
+              phase: v.phase,
+            };
+          }),
+        );
+      } finally {
+        setProgressHydrated(true);
+      }
     };
 
     hydrateProgress();
