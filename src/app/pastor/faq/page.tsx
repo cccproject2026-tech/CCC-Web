@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { pastorMainGradient, pastorPageRoot } from "@/app/Components/pastor/pastor-theme";
 import { Mail, Phone } from "lucide-react";
+import PastorHeader from "@/app/Components/PastorHeader";
 
 type FaqItem = {
   id: number;
@@ -169,6 +172,7 @@ const FAQ_ITEMS: FaqItem[] = [
 ];
 
 export default function PastorFaqPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [openFaqId, setOpenFaqId] = useState<number | null>(1);
 
@@ -184,9 +188,30 @@ export default function PastorFaqPage() {
 
   const isSearchActive = search.trim().length > 0;
   const activeCount = filteredFaqs.length;
+  const goBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push("/pastor/home");
+  };
 
   return (
-    <main className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8 sm:px-6 lg:px-8">
+    <div className={pastorPageRoot}>
+      <PastorHeader showFullHeader={true} />
+      <main className={`${pastorMainGradient} relative z-10 flex-1`}>
+      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-4 flex items-center justify-start">
+          <button
+            type="button"
+            onClick={goBack}
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
+          >
+            <i className="fa-solid fa-arrow-left text-xs" />
+            Back
+          </button>
+        </div>
+
       <section className="rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.92)_0%,rgba(10,53,88,0.97)_100%)] px-5 py-5 shadow-[0_20px_45px_rgba(2,20,38,0.35)] sm:px-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="max-w-2xl">
@@ -346,6 +371,8 @@ export default function PastorFaqPage() {
           )}
         </div>
       </section>
-    </main>
+      </div>
+      </main>
+    </div>
   );
 }

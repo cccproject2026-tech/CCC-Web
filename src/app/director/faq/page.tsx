@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { directorPageRoot } from "@/app/director/directorUi";
 import { Mail, Phone } from "lucide-react";
 
@@ -194,6 +195,7 @@ const FAQ_ITEMS: FaqItem[] = [
 ];
 
 export default function DirectorFaqPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [openFaqId, setOpenFaqId] = useState<number | null>(1);
 
@@ -209,10 +211,28 @@ export default function DirectorFaqPage() {
 
   const resultCount = filteredFaqs.length;
   const isFiltered = search.trim().length > 0;
+  const goBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push("/director/home");
+  };
 
   return (
     <main className={directorPageRoot}>
       <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-4 flex items-center justify-start">
+          <button
+            type="button"
+            onClick={goBack}
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
+          >
+            <i className="fa-solid fa-arrow-left text-xs" />
+            Back
+          </button>
+        </div>
+
         <section className="rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.1)_0%,rgba(255,255,255,0.04)_100%)] px-5 py-5 shadow-[0_20px_45px_rgba(3,24,43,0.35)] sm:px-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-2xl">

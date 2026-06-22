@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { mentorMainGradient, mentorPageRoot } from "@/app/Components/mentor/mentor-theme";
 import { Mail, Phone } from "lucide-react";
+import MentorHeader from "@/app/Components/MentorHeader";
 
 type FaqItem = {
   id: number;
@@ -176,6 +178,7 @@ const FAQ_ITEMS: FaqItem[] = [
 ];
 
 export default function MentorFaqPage() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [openFaqId, setOpenFaqId] = useState<number | null>(1);
 
@@ -191,10 +194,30 @@ export default function MentorFaqPage() {
 
   const resultCount = filteredFaqs.length;
   const isFiltered = search.trim().length > 0;
+  const goBack = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    router.push("/mentor/home");
+  };
 
   return (
-    <main className={`${mentorPageRoot} ${mentorMainGradient}`}>
+    <div className={mentorPageRoot}>
+      <MentorHeader showFullHeader={true} />
+      <main className={`${mentorMainGradient} relative z-10 flex-1`}>
       <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-4 flex items-center justify-start">
+          <button
+            type="button"
+            onClick={goBack}
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
+          >
+            <i className="fa-solid fa-arrow-left text-xs" />
+            Back
+          </button>
+        </div>
+
         <section className="rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.09)_0%,rgba(255,255,255,0.04)_100%)] px-5 py-5 shadow-[0_20px_45px_rgba(3,24,43,0.35)] sm:px-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-2xl">
@@ -355,6 +378,7 @@ export default function MentorFaqPage() {
           </div>
         </section>
       </div>
-    </main>
+      </main>
+    </div>
   );
 }
