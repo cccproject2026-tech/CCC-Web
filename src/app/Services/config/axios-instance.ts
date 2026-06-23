@@ -196,12 +196,15 @@ axiosInstance.interceptors.response.use(
       const path = window.location.pathname;
       const search = window.location.search || "";
       const ret = `${path}${search}`;
+      if (path === "/login") {
+        return Promise.reject(error);
+      }
       if (path.startsWith("/pastor/") && !isPastorPublicRoute(path)) {
         clearAllCookies();
-        window.location.assign(`/pastor/login?returnUrl=${encodeURIComponent(ret)}`);
+        window.location.assign(`/login?returnUrl=${encodeURIComponent(ret)}`);
       } else if (path.startsWith("/mentor/") && !isMentorPublicRoute(path)) {
         clearAllCookies();
-        window.location.assign(`/mentor/login?returnUrl=${encodeURIComponent(ret)}`);
+        window.location.assign(`/login?returnUrl=${encodeURIComponent(ret)}`);
       } else if (path.startsWith("/director/") && !isDirectorPublicRoute(path)) {
         clearAllCookies();
         window.location.assign(`/director/login?returnUrl=${encodeURIComponent(ret)}`);

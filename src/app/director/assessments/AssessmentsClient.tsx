@@ -290,6 +290,33 @@ const mapUserToAssignUser = (user: any): AssignUserRow => {
   };
 };
 
+function getPastorContactNumber(pastor: any): string {
+  const candidates = [
+    pastor?.phone,
+    pastor?.phoneNumber,
+    pastor?.mobile,
+    pastor?.contactNumber,
+    pastor?.personalPhone,
+    pastor?.whatsapp,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate == null) continue;
+    const value = String(candidate).trim();
+    if (value) return value;
+  }
+
+  return "";
+}
+
+function cleanDialNumber(value: string): string {
+  return value.replace(/[^\d+]/g, "");
+}
+
+function cleanWhatsAppNumber(value: string): string {
+  return value.replace(/[^\d]/g, "");
+}
+
 function AssessmentsPageContent() {
   const router = useRouter();
   const pathname = usePathname();
@@ -930,6 +957,12 @@ const filteredMentorRows = useMemo(() => {
     return row?.name || "Pastor";
   }, [featuredItems, selectedMenteeId]);
 
+  const handleSelectPastorForAssessments = (pastorId: string) => {
+    setSearchQuery("");
+    setSelectedMenteeId(pastorId);
+    setShowOptionsMenu(null);
+  };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
@@ -1393,7 +1426,7 @@ const filteredMentorRows = useMemo(() => {
                     className="mb-0"
                     gapClass="gap-6 sm:gap-8"
                     selectedId={selectedMenteeId}
-                    onItemClick={(item) => setSelectedMenteeId(String(item.id))}
+                    onItemClick={(item) => handleSelectPastorForAssessments(String(item.id))}
                   />
                 </div>
               )}
@@ -1462,6 +1495,10 @@ const filteredMentorRows = useMemo(() => {
   })
   .map((pastor: any) => {
         const row = mapUserToAssignUser(pastor);
+        const contactNumber = getPastorContactNumber(pastor);
+        const dialNumber = contactNumber ? cleanDialNumber(contactNumber) : "";
+        const whatsAppNumber = contactNumber ? cleanWhatsAppNumber(contactNumber) : "";
+        const hasContactNumber = Boolean(dialNumber);
 
         return (
           // <div key={row.id} className={`${directorGlassCard} relative flex gap-5 p-5`}>
@@ -1518,22 +1555,69 @@ const filteredMentorRows = useMemo(() => {
     <i className="fa-regular fa-envelope" />
   </a>
 
-  <button type="button" disabled className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
-    <i className="fa-solid fa-phone" />
-  </button>
+  {hasContactNumber ? (
+    <a
+      href={`tel:${dialNumber}`}
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb]"
+      aria-label="Call pastor"
+    >
+      <i className="fa-solid fa-phone" />
+    </a>
+  ) : (
+    <button
+      type="button"
+      disabled
+      className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30"
+      aria-label="Call pastor"
+    >
+      <i className="fa-solid fa-phone" />
+    </button>
+  )}
 
-  <button type="button" disabled className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
-    <i className="fa-brands fa-whatsapp" />
-  </button>
+  {hasContactNumber ? (
+    <a
+      href={`https://wa.me/${whatsAppNumber}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb]"
+      aria-label="WhatsApp pastor"
+    >
+      <i className="fa-brands fa-whatsapp" />
+    </a>
+  ) : (
+    <button
+      type="button"
+      disabled
+      className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30"
+      aria-label="WhatsApp pastor"
+    >
+      <i className="fa-brands fa-whatsapp" />
+    </button>
+  )}
 
-  <button type="button" disabled className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
-    <i className="fa-regular fa-comment-dots" />
-  </button>
+  {hasContactNumber ? (
+    <a
+      href={`sms:${dialNumber}`}
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb]"
+      aria-label="Message pastor"
+    >
+      <i className="fa-regular fa-comment-dots" />
+    </a>
+  ) : (
+    <button
+      type="button"
+      disabled
+      className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30"
+      aria-label="Message pastor"
+    >
+      <i className="fa-regular fa-comment-dots" />
+    </button>
+  )}
 </div>
 
               <button
                 type="button"
-                onClick={() => setSelectedMenteeId(row.id)}
+                onClick={() => handleSelectPastorForAssessments(row.id)}
                 className={`${directorBtnPrimary} mt-4 w-full justify-center sm:mt-auto sm:w-auto sm:self-end`}
               >
                 View Assessments

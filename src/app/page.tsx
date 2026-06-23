@@ -17,7 +17,7 @@ export default function LandingPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
 
-  const isChooseModalOpen = modalMode === "login" || modalMode === "interest";
+  const isChooseModalOpen = modalMode === "interest";
 
   const roles = [
     {
@@ -115,12 +115,12 @@ export default function LandingPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setModalMode("login")}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-8 py-4 text-base font-semibold text-white shadow-[0_10px_24px_rgba(0,0,0,0.2)] backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ec5eb] focus-visible:ring-offset-2 focus-visible:ring-offset-[#062946]"
-                >
-                  Login
-                  <i className="fa-solid fa-right-to-bracket text-sm" />
-                </button>
+                onClick={() => router.push("/login")}
+                className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-8 py-4 text-base font-semibold text-white shadow-[0_10px_24px_rgba(0,0,0,0.2)] backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ec5eb] focus-visible:ring-offset-2 focus-visible:ring-offset-[#062946]"
+              >
+                Login
+                <i className="fa-solid fa-right-to-bracket text-sm" />
+              </button>
                 <button
                   type="button"
                   onClick={() => setModalMode("continue")}

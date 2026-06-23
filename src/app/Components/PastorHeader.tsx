@@ -615,7 +615,7 @@ const logoHref = isLoginPage ? "/" : "/pastor/home";
                             if (item.label === "Log out") {
                               void apiLogout().catch(() => { });
                               clearAllCookies();
-                              window.location.href = "/";
+                              window.location.href = "/login";
                               return;
                             }
                             if (item.path) {

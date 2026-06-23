@@ -90,8 +90,8 @@ function firstNonEmpty(...parts) {
 
 function pickRoadmapDescription(item, nested0) {
   return (
-    firstNonEmpty(nested0?.roadMapDetails, nested0?.description, nested0?.road_map_details) ||
     firstNonEmpty(item?.roadMapDetails, item?.description, item?.road_map_details) ||
+    firstNonEmpty(nested0?.roadMapDetails, nested0?.description, nested0?.road_map_details) ||
     (() => {
       for (const n of roadmapChildrenList(item)) {
         const t = firstNonEmpty(n?.roadMapDetails, n?.description, n?.road_map_details);

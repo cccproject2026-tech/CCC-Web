@@ -234,7 +234,7 @@ setNotificationList(newestFirst);
     },
     { icon: <UserX size={18} className="text-gray-400" />, label: "Change Mentor", active: false },
   ];
-const isLoginPage = pathname === "/mentor/login";
+const isLoginPage = pathname === "/mentor/login" || pathname === "/login";
 const logoHref = isLoginPage ? "/" : "/mentor/home";
   return (
     <>
@@ -502,7 +502,7 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
                             if (item.action === "logout") {
                               void apiLogout().catch(() => { });
                               clearAllCookies();
-                              window.location.href = "/";
+                              window.location.href = "/login";
                               return;
                             }
 
