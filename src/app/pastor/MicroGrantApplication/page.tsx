@@ -39,6 +39,13 @@ const TEXTAREA_QUESTION_LABELS = new Set<QuestionKey>([
 
   "What are the measurable markers of your success?",
 ]);
+const REPORTING_CONFIRMATION_KEYS = {
+  reviewed: "Reporting Procedures - Reviewed",
+  uploadsIncluded: "Reporting Procedures - Uploads Included",
+  other: "Other",
+} as const;
+const REPORTING_SECOND_LABEL =
+  "I have filled out the application, and I would like to discuss it with a center's director";
 type AnswersState = Record<QuestionKey, string>;
 
 const initialAnswers: AnswersState = {
@@ -171,7 +178,6 @@ export default function MicroGrantApplicationPage() {
     !!formId &&
     isCoverSheetValid &&
     confirmations.reviewed &&
-    confirmations.uploadsIncluded &&
     !submitting;
 
   const handleAnswerChange = (label: QuestionKey, value: string) => {
@@ -234,8 +240,8 @@ export default function MicroGrantApplicationPage() {
       return;
     }
 
-    if (!confirmations.reviewed || !confirmations.uploadsIncluded) {
-      setErrorMsg("Please complete the confirmations before submitting.");
+    if (!confirmations.reviewed) {
+      setErrorMsg("Please complete the required confirmation before submitting.");
       return;
     }
 
@@ -246,8 +252,11 @@ export default function MicroGrantApplicationPage() {
         ...answers,
       };
 
+      payloadAnswers[REPORTING_CONFIRMATION_KEYS.reviewed] = confirmations.reviewed ? "Checked" : "Not checked";
+      payloadAnswers[REPORTING_CONFIRMATION_KEYS.uploadsIncluded] = confirmations.uploadsIncluded ? "Checked" : "Not checked";
+
       if (otherNote.trim()) {
-        payloadAnswers["Other"] = otherNote.trim();
+        payloadAnswers[REPORTING_CONFIRMATION_KEYS.other] = otherNote.trim();
       }
 
       await applyMicroGrant(
@@ -518,10 +527,7 @@ export default function MicroGrantApplicationPage() {
                           }
                           className="accent-[#FFD84E] w-4 h-4 mt-[2px]"
                         />
-                        <span className="text-sm">
-                          I have included all of my uploads, and I realize this ensures
-                          it’s sent within 4 weeks after receipt.
-                        </span>
+                        <span className="text-sm">{REPORTING_SECOND_LABEL}</span>
                       </label>
 
                       <div className="flex flex-col gap-2 mt-4">

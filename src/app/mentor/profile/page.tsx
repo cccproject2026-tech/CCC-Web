@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { updateInterestByEmail } from "@/app/Services/pastor.service";
 import HeroBg from "@/app/Assets/hero-bg.png";
 import ProfilePic from "@/app/Assets/user-profile.png";
@@ -32,6 +33,7 @@ const inputClass =
   "w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white outline-none placeholder:text-[#cde2f2]/50 focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-75";
 
 export default function MentorProfile() {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [showDocuments, setShowDocuments] = useState(false);
   const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
@@ -322,6 +324,16 @@ setToast({
       </section>
 
       <main className={`${mentorMainGradient} flex-1 px-4 pb-16 pt-8 sm:px-6 lg:px-8`}>
+        <div className="mx-auto mb-4 flex w-full max-w-[1180px] justify-start">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
+          >
+            <span aria-hidden="true">←</span>
+            <span>Back</span>
+          </button>
+        </div>
         <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-8 md:flex-row">
           <div
             className={`${mentorGlassCardFrost} flex h-auto w-full flex-shrink-0 flex-col p-6 text-center md:sticky md:top-24 md:w-[300px] md:self-start`}

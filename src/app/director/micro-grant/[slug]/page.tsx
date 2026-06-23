@@ -24,6 +24,22 @@ const TEXTAREA_ANSWER_LABELS = new Set([
   "What are the measurable markers of your success?",
 ]);
 
+const REPORTING_CONFIRMATION_KEYS = {
+  reviewed: "Reporting Procedures - Reviewed",
+  uploadsIncluded: "Reporting Procedures - Uploads Included",
+  other: "Other",
+} as const;
+const REPORTING_SECOND_LABEL =
+  "I have filled out the application, and I would like to discuss it with a center's director";
+
+function reportingStatus(value: unknown): "Checked" | "Not checked" {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === "checked" || normalized === "true" || normalized === "yes" || normalized === "1") {
+    return "Checked";
+  }
+  return "Not checked";
+}
+
 const Page: React.FC = () => {
   const [activeStep, setActiveStep] = useState<number>(1);
   const [data, setData] = useState<MicroGrantResponse | null>(null);
@@ -114,6 +130,21 @@ setData(payload);
 console.log("MICRO GRANT ANSWERS:", data.application.answers);
 console.log("MICRO GRANT FORM:", data.application.formId);
   const supportingDocs = normalizeMicroGrantSupportingDocs(data.application.supportingDocs);
+  const coverSheetAnswers = Object.entries(answers).filter(
+    ([label]) => !Object.values(REPORTING_CONFIRMATION_KEYS).includes(label),
+  );
+  const reportingRows = [
+    {
+      label:
+        "I have reviewed the application and filled out each section to the best of my knowledge.",
+      value: reportingStatus(answers[REPORTING_CONFIRMATION_KEYS.reviewed]),
+    },
+    {
+      label: REPORTING_SECOND_LABEL,
+      value: reportingStatus(answers[REPORTING_CONFIRMATION_KEYS.uploadsIncluded]),
+    },
+  ];
+  const reportingOther = String(answers[REPORTING_CONFIRMATION_KEYS.other] ?? "").trim();
 
   /* ---------- right card (same design, dynamic) ---------- */
   const rightCard: ReactNode = (
@@ -284,7 +315,7 @@ console.log("MICRO GRANT FORM:", data.application.formId);
                 * Indicates required question
               </p>
 
-              {Object.entries(answers).map(
+              {coverSheetAnswers.map(
                 ([label, value]) => (
 
                   <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
@@ -356,16 +387,52 @@ console.log("MICRO GRANT FORM:", data.application.formId);
             </form>
           ) : (
             <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-6 text-white shadow-xl sm:p-8">
-              <p>⭐ Grant report required upon completion</p>
-              <p>⭐ Unused funds must be returned</p>
+              <div className="space-y-4">
+                <p>⭐ Grant report required upon completion</p>
+                <p>⭐ Unused funds must be returned</p>
 
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Reporting Procedures</h3>
+                  <p className="mt-1 text-sm text-white/65">
+                    Read-only reporting confirmations submitted with this application.
+                  </p>
+                </div>
+
+                <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  {reportingRows.map((row) => (
+                    <div
+                      key={row.label}
+                      className="flex items-start justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-white/90">{row.label}</p>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
+                          row.value === "Checked"
+                            ? "border border-emerald-300/25 bg-emerald-500/15 text-emerald-100"
+                            : "border border-white/15 bg-white/10 text-white/70"
+                        }`}
+                      >
+                        {row.value}
+                      </span>
+                    </div>
+                  ))}
+
+                  <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                    <p className="text-sm font-medium text-white/90">Other</p>
+                    <p className="mt-1 text-sm text-white/70">
+                      {reportingOther || "No other notes provided."}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
 {statusMessage ? (
   <div className="rounded-lg bg-white/10 px-4 py-3 text-sm font-medium text-white">
     {statusMessage}
   </div>
 ) : null}
-
 
 
               {/* <div className="flex justify-between mt-8">

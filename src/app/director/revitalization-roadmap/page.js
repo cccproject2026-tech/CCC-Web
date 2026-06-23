@@ -1367,6 +1367,9 @@ const selectedPastorRoadmaps =
           : false;
       });
 
+const selectedPastorRoadmapsLoading =
+  selectedPastorModalId != null && (loadingPastors || loadingMetrics);
+
 const selectedPastorNameForModal = (() => {
   if (selectedPastorModalId == null) return "";
 
@@ -2868,7 +2871,11 @@ onClick={() => {
 
       {/* <div className="max-h-[520px] space-y-4 overflow-y-auto pr-1"> */}
       <div className="custom-scrollbar max-h-[520px] space-y-4 overflow-y-auto pr-1">
-        {selectedPastorRoadmaps.length === 0 ? (
+        {selectedPastorRoadmapsLoading ? (
+          <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] px-4 py-10 text-sm text-white/60">
+            Loading assigned roadmaps...
+          </div>
+        ) : selectedPastorRoadmaps.length === 0 ? (
           <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-10 text-center text-sm text-white/60">
             No assigned roadmaps found for this pastor.
           </div>

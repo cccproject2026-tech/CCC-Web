@@ -59,6 +59,7 @@ const [showMobileMenu, setShowMobileMenu] = useState(false);
   }>({ roadmaps: [], assessments: [], mentees: [] });
 
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const mentorId = getMentorUserId();
@@ -91,6 +92,19 @@ const [showMobileMenu, setShowMobileMenu] = useState(false);
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!showSearch) return;
+
+    const handleClickOutsideSearch = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowSearch(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutsideSearch);
+    return () => document.removeEventListener("mousedown", handleClickOutsideSearch);
+  }, [showSearch]);
 
   // const navLinks: Array<{ name: string; path: string; desktopLabel?: string }> = [
   //   { name: "Home", path: "/mentor/home" },
@@ -288,20 +302,21 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
         {showFullHeader && (
           <>
             {/* 🔍 Search */}
-            <button
-              onClick={() => {
-                setShowSearch((prev) => !prev);
-                setShowNotifications(false);
-                setShowProfileMenu(false);
-                setShowSettingsMenu(false);
-              }}
-             className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15"
-            >
-              <Image src={SearchIcon} alt="Search" width={18} height={18} />
-            </button>
+            <div ref={searchRef} className="contents">
+              <button
+                onClick={() => {
+                  setShowSearch((prev) => !prev);
+                  setShowNotifications(false);
+                  setShowProfileMenu(false);
+                  setShowSettingsMenu(false);
+                }}
+               className="flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-white/5 transition hover:bg-white/15"
+              >
+                <Image src={SearchIcon} alt="Search" width={18} height={18} />
+              </button>
 
-            {showSearch && (
-              <div className="fixed left-4 right-4 top-[76px] z-[80] max-h-[calc(100vh-96px)] overflow-hidden rounded-2xl border border-white/20 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] p-3 shadow-2xl md:absolute md:left-auto md:right-0 md:top-12 md:z-[60] md:w-[min(420px,calc(100vw-2rem))] xl:right-[120px]">
+              {showSearch && (
+                <div className="fixed left-4 right-4 top-[76px] z-[80] max-h-[calc(100vh-96px)] overflow-hidden rounded-2xl border border-white/20 bg-[linear-gradient(180deg,#0f4a76_0%,#0c3f66_100%)] p-3 shadow-2xl md:absolute md:left-auto md:right-0 md:top-12 md:z-[60] md:w-[min(420px,calc(100vw-2rem))] xl:right-[120px]">
                 <div className="flex items-center gap-2">
                   <input
                     value={searchQuery}
@@ -350,7 +365,8 @@ const logoHref = isLoginPage ? "/" : "/mentor/home";
                   )}
                 </div>
               </div>
-            )}
+              )}
+            </div>
 
             {/* 🔔 Notification Dropdown */}
             <div className="relative">
