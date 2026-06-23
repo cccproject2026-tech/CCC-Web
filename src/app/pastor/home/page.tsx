@@ -131,6 +131,7 @@ useEffect(() => {
     try {
       const storedUser = JSON.parse(getCookie("user") || "{}");
       const userId = storedUser?.id || storedUser?._id;
+      setUserHasCompleted(Boolean(storedUser?.hasCompleted));
 
       const cookieName =
         `${storedUser?.firstName || ""} ${storedUser?.lastName || ""}`.trim() ||
@@ -174,6 +175,7 @@ useEffect(() => {
 
       setPastorName(apiName);
       setPastorProfilePicture(apiImage);
+      setUserHasCompleted(Boolean(user?.hasCompleted ?? storedUser?.hasCompleted));
     } catch {
       setPastorName("User");
     }
@@ -265,6 +267,8 @@ useEffect(() => {
   const [roadmaps, setRoadmaps] = useState<any[]>([]);
   const [roadmapsFull, setRoadmapsFull] = useState<any[]>([]);
   const [overallProgress, setOverallProgress] = useState<number | null>(null);
+  const [hasFinalComments, setHasFinalComments] = useState(false);
+  const [userHasCompleted, setUserHasCompleted] = useState(false);
   const [overallProgressWarning, setOverallProgressWarning] = useState<string | null>(null);
   const [pastorFocusSections, setPastorFocusSections] = useState<DashboardFocusSection[]>([]);
   const [pastorFocusLoading, setPastorFocusLoading] = useState(false);
@@ -388,6 +392,7 @@ const [assignedMentorLoading, setAssignedMentorLoading] = useState(false);
 
 const list = unwrapRoadmapsList(res as unknown as { data: unknown });
 const progressData = unwrapProgressData(progressRes);
+setHasFinalComments(Array.isArray(progressData?.finalComments) && progressData.finalComments.length > 0);
 
 const mergedList =
   progressData ? mergeProgressOntoRoadmaps(list as never[], progressData) : list;
@@ -573,6 +578,7 @@ setRoadmapsFull(mergedList);
       ),
     ),
   );
+  const isMarkedCompleted = progressPercent >= 100 && hasFinalComments && userHasCompleted;
   const nextAppointment = appointments[0];
   const greetingHour = new Date().getHours();
   const greeting =
@@ -745,26 +751,60 @@ Development
         {pastorName}
       </p>
 
-      <div className="mb-1.5 flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold text-[#cde2f2]">
-          Progress
-        </span>
+      {isMarkedCompleted ? (
+        <>
+          <button
+            type="button"
+            onClick={() => router.push("/pastor/Myprogress")}
+            className="completed-message mt-2 inline-flex w-full items-center justify-center rounded-2xl border border-[#8ec5eb]/55 bg-[#123f63]/70 px-6 py-3 text-center text-sm font-semibold text-white shadow-[0_0_22px_rgba(142,197,235,0.22)] transition duration-300 hover:border-[#8ec5eb] hover:bg-[#164c73]/80"
+          >
+            <span className="inline-flex items-center gap-2">
+              <i className="fa-solid fa-certificate text-[#cfeeff]"></i>
+              <span>You have been marked completed</span>
+            </span>
+          </button>
+          <style jsx>{`
+            .completed-message {
+              animation: completedGlow 2.8s ease-in-out infinite;
+            }
 
-        <span className="text-xs font-bold text-white">
-          {progressPercent}%
-        </span>
-      </div>
+            @keyframes completedGlow {
+              0%,
+              100% {
+                box-shadow: 0 0 16px rgba(142, 197, 235, 0.18);
+                border-color: rgba(142, 197, 235, 0.45);
+              }
+              50% {
+                box-shadow: 0 0 30px rgba(142, 197, 235, 0.38);
+                border-color: rgba(142, 197, 235, 0.9);
+              }
+            }
+          `}</style>
+        </>
+      ) : (
+        <>
+          <div className="mb-1.5 flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-[#cde2f2]">
+              Progress
+            </span>
 
-      <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
-        <div
-          className="h-full rounded-full bg-[#8ec5eb] transition-all duration-500"
-          style={{ width: `${progressPercent}%` }}
-        />
-      </div>
+            <span className="text-xs font-bold text-white">
+              {progressPercent}%
+            </span>
+          </div>
+
+          <div className="h-2 w-full overflow-hidden rounded-full bg-white/20">
+            <div
+              className="h-full rounded-full bg-[#8ec5eb] transition-all duration-500"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+        </>
+      )}
     </div>
   </div>
 
-  {overallProgressWarning ? (
+  {!isMarkedCompleted && overallProgressWarning ? (
     <p className="mt-2 truncate text-[10px] text-amber-200/90">
       {overallProgressWarning}
     </p>

@@ -443,6 +443,40 @@ const progressForChart = {
 
           {userId && progress && (
             <>
+              {Array.isArray(progress?.finalComments) && progress.finalComments.length > 0 && (
+                <section className="mb-8 rounded-2xl border border-[#8ec5eb]/40 bg-[#041f35]/60 p-5 shadow-lg backdrop-blur-md sm:p-7">
+                  <h2 className="mb-4 text-base font-bold text-white sm:text-lg">Final comments</h2>
+                  <div className="mb-4 rounded-xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 text-sm leading-relaxed text-amber-100">
+                    <p>
+                      Your course has been completed. To check whether your certificate has been issued, please visit
+                      the{" "}
+                      <Link
+                        href="/pastor/Certificates"
+                        className="font-semibold text-amber-200 underline decoration-amber-300/70 underline-offset-2 transition hover:text-amber-100"
+                      >
+                        Certificates page
+                      </Link>
+                      .
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    {progress.finalComments.map((comment: any, index: number) => (
+                      <div
+                        key={comment._id || `${comment.commentorId}-${index}`}
+                        className="rounded-xl border border-white/10 bg-white/5 p-4"
+                      >
+                        <p className="text-sm leading-relaxed text-[#d8edf9]">
+                          {comment.comment || "No comment provided."}
+                        </p>
+                        <p className="mt-2 text-xs text-white/55">
+                          {comment.createdAt ? formatDateShort(comment.createdAt) : "Unknown date"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
               <section className="mb-8 rounded-2xl border border-[#8ec5eb]/40 bg-[#041f35]/60 p-5 shadow-lg backdrop-blur-md sm:p-7">
                 <h2 className="mb-6 text-base font-bold text-white sm:text-lg">
                   Overall Progress — Roadmap &amp; Assessments
@@ -458,9 +492,7 @@ const progressForChart = {
                 <IndividualBreakdownBarChart progress={progressForChart} />
               </section>
             </>
-          )}
-
-          {userId && !progress && (
+          )}{userId && !progress && (
             <p className="mb-8 rounded-xl border border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-[#cde2f2]">
               No progress records found. Once you start roadmaps or surveys, your progress will appear here.
             </p>

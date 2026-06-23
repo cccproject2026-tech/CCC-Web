@@ -7,6 +7,7 @@ import { apiLogin } from "@/app/Services/api";
 import { setCookie } from "@/app/utils/cookies";
 import {
   hasMentorSession,
+  isMentorPortalRole,
   normalizeUserCookieForClient,
 } from "@/app/utils/mentor-auth";
 
@@ -92,42 +93,36 @@ function LoginInner() {
         setErrorMsg(json.message || "Login failed. Please try again.");
         return;
       }
-
-
-
       const { accessToken, refreshToken, user } = json.data || {};
+      if (!isMentorPortalRole(user)) {
+        setErrorMsg("Invalid email or password.");
+        return;
+      }
 
-const userRole = String(user?.role || "").toLowerCase();
+      if (accessToken) setCookie("accessToken", accessToken);
+      if (refreshToken) setCookie("refreshToken", refreshToken);
 
-if (userRole !== "mentor") {
-  setErrorMsg("Invalid email or password.");
-  return;
-}
-
-if (accessToken) setCookie("accessToken", accessToken);
-if (refreshToken) setCookie("refreshToken", refreshToken);
-   
       let hasProfilePicture = false;
 
-if (user) {
-  const normalized = normalizeUserCookieForClient(user as Record<string, unknown>);
-  setCookie("mentor", JSON.stringify(normalized));
+      if (user) {
+        const normalized = normalizeUserCookieForClient(user as Record<string, unknown>);
+        setCookie("mentor", JSON.stringify(normalized));
 
-  const uid = (normalized.id ?? normalized._id) as string | undefined;
-  if (uid) setCookie("userId", String(uid));
+        const uid = (normalized.id ?? normalized._id) as string | undefined;
+        if (uid) setCookie("userId", String(uid));
 
-  hasProfilePicture = Boolean(
-    typeof normalized.profilePicture === "string" &&
-      normalized.profilePicture.trim()
-  );
-}
+        hasProfilePicture = Boolean(
+          typeof normalized.profilePicture === "string" &&
+            normalized.profilePicture.trim(),
+        );
+      }
 
-const next = searchParams.get("returnUrl");
-const destination = isSafeMentorReturnUrl(next)
-  ? next
-  : hasProfilePicture
-    ? "/mentor/home"
-    : "/mentor/profile-incomplete";
+      const next = searchParams.get("returnUrl");
+      const destination = isSafeMentorReturnUrl(next)
+        ? next
+        : hasProfilePicture
+          ? "/mentor/home"
+          : "/mentor/profile-incomplete";
 
       showToast("Login successful. Redirecting...");
       setTimeout(() => router.push(destination), 350);

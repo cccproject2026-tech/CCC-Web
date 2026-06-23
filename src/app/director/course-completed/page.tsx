@@ -155,16 +155,19 @@ fieldMentorInvitation: u.fieldMentorInvitation,
     fetchUsers();
   }, [query]);
 
+  const isCompletedWithoutCertificate = (u: CourseUser) => u.hasCompleted && !u.hasRealCertificate;
+  const isCompletedWithCertificate = (u: CourseUser) => u.hasCompleted && u.hasRealCertificate;
+
 
   const data = useMemo(() => {
   return users.filter((u: any) => {
     const matchesSearch = u.name.toLowerCase().includes(query.toLowerCase());
 
   if (activeTab === "completed") {
-  return matchesSearch && u.hasCompleted;
+  return matchesSearch && isCompletedWithoutCertificate(u);
 }
     if (activeTab === "certificate_issued") {
-      return matchesSearch && u.hasRealCertificate;
+      return matchesSearch && isCompletedWithCertificate(u);
     }
 
     if (activeTab === "invited") {
@@ -176,11 +179,11 @@ fieldMentorInvitation: u.fieldMentorInvitation,
 }, [users, activeTab, query]);
 
  const completedCount = users.filter(
-  (u) => u.hasCompleted
+  (u) => isCompletedWithoutCertificate(u)
 ).length;
 
   const issuedCount = users.filter(
-    (u) => u.status === "certificate_issued"
+    (u) => isCompletedWithCertificate(u)
   ).length;
 
   const invitedCount = users.filter(

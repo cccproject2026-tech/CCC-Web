@@ -13,6 +13,12 @@ import { apiLogout } from "@/app/Services/api";
 import PastorHeader from "@/app/Components/PastorHeader";
 import ProfilePic from "@/app/Assets/user-profile.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import {
+  apiGetUserCertificate,
+  hasRealCertificate,
+  unwrapCertificate,
+  type CertificateRecord,
+} from "@/app/Services/certificates.service";
 import type { FieldMentorInvitation } from "@/app/Services/types/users.types";
 import {
   getSingleUser,
@@ -44,6 +50,8 @@ export default function PastorProfile() {
   const [invitationMessage, setInvitationMessage] = useState<string | null>(null);
   const [invitationMessageTone, setInvitationMessageTone] = useState<"success" | "error" | "info">("info");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [certificate, setCertificate] = useState<CertificateRecord | null>(null);
+  const [certificateLoading, setCertificateLoading] = useState(false);
 
   // Document modal state
   const [showDocsModal, setShowDocsModal] = useState(false);
@@ -57,6 +65,7 @@ const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
 
   const fieldMentorInvitation = profile?.fieldMentorInvitation as FieldMentorInvitation | undefined;
   const hasFieldMentorInvitation = profile?.role === "pastor" && Boolean(fieldMentorInvitation);
+  const hasCertificate = hasRealCertificate(certificate);
   const invitationExpired = Boolean(
     fieldMentorInvitation?.expiresAt && new Date(fieldMentorInvitation.expiresAt) < new Date(),
   );
@@ -207,6 +216,35 @@ const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
 
   fetchUser();
 }, []);
+
+  useEffect(() => {
+    const userId = profile?.id || profile?._id;
+    if (!userId) return;
+
+    let cancelled = false;
+
+    const fetchCertificate = async () => {
+      try {
+        setCertificateLoading(true);
+        const certRes = await apiGetUserCertificate(String(userId)).catch((error) => {
+          if (error?.response?.status === 404) return null;
+          throw error;
+        });
+        if (cancelled) return;
+        setCertificate(unwrapCertificate(certRes));
+      } catch {
+        if (!cancelled) setCertificate(null);
+      } finally {
+        if (!cancelled) setCertificateLoading(false);
+      }
+    };
+
+    void fetchCertificate();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id, profile?._id]);
 
   const initForm = (data: any) => {
     setForm({
@@ -586,15 +624,25 @@ console.log("FRESH USER AFTER SAVE:", freshRes.data?.data?.lastName);
 
             <div className="my-3 border-t border-white/15"></div>
 
+            <button
+              type="button"
+              disabled={!hasCertificate || certificateLoading}
+              onClick={() => {
+                if (hasCertificate) {
+                  router.push("/pastor/Certificates");
+                }
+              }}
+              className="mb-4 flex w-full items-center justify-center rounded-xl border border-[#8ec5eb]/45 bg-[#062946]/55 px-4 py-3 text-sm font-semibold text-[#d9ebf8] transition hover:border-[#8ec5eb]/70 hover:bg-[#0d426d] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {certificateLoading
+                ? "Checking certificate..."
+                : hasCertificate
+                  ? "View Certificate"
+                  : "Certificate not issued"}
+            </button>
+
             {hasFieldMentorInvitation && (
               <>
-                <button
-                  type="button"
-                  className="mb-4 flex w-full items-center justify-center rounded-xl border border-[#8ec5eb]/45 bg-[#062946]/55 px-4 py-3 text-sm font-semibold text-[#d9ebf8] transition hover:border-[#8ec5eb]/70 hover:bg-[#0d426d]"
-                >
-                  Download Certificate
-                </button>
-
                 <div className="mb-5 rounded-2xl border border-[#8ec5eb]/35 bg-[#8ec5eb]/10 p-4 text-left">
                   <div className="min-w-0">
                       <p className="text-sm font-semibold text-white">You have been invited as a Field Mentor.</p>

@@ -16,13 +16,11 @@ import {
   Legend,
 } from "chart.js";
 import DirectorHero from "../../DirectorHero";
-import { directorGlassCard, directorInputClass, directorPageRoot } from "../../directorUi";
+import { directorGlassCard, directorPageRoot } from "../../directorUi";
 import ProgressBg from "../../../Assets/progress-bg.jpg";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import {
-  apiAddFinalComment,
   apiGetUserProgress,
-  apiMarkProgramComplete,
   unwrapUserProgressDetail,
 } from "@/app/Services/progress.service";
 import { apiGetUserById, apiInviteFieldMentor, unwrapUserResponse } from "@/app/Services/users.service";
@@ -276,6 +274,49 @@ function isCompletedAssessmentStatus(status: unknown): boolean {
   return s === "completed" || s === "complete" || s === "reviewed";
 }
 
+function getFinalCommentMentorName(comment: any): string | null {
+  const toLabel = (value: unknown): string | null => {
+    if (!value) return null;
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      return trimmed ? trimmed : null;
+    }
+    if (typeof value === "object") {
+      const row = value as Record<string, unknown>;
+      const nestedCandidates = [
+        row.name,
+        row.fullName,
+        row.firstName && row.lastName ? `${String(row.firstName)} ${String(row.lastName)}` : null,
+        row.firstName,
+        row.lastName,
+        row.email,
+        row._id,
+        row.id,
+      ];
+      for (const candidate of nestedCandidates) {
+        const label = toLabel(candidate);
+        if (label) return label;
+      }
+    }
+    return null;
+  };
+
+  const candidates = [
+    comment.commentorName,
+    comment.mentorName,
+    comment.commentor,
+    comment.createdBy,
+    comment.commentorId,
+  ];
+
+  for (const candidate of candidates) {
+    const label = toLabel(candidate);
+    if (label) return label;
+  }
+
+  return null;
+}
+
 function hasCdpInRecommendationsPayload(body: unknown): boolean {
   const walk = (node: unknown, parentSent = false): boolean => {
     if (!node) return false;
@@ -359,13 +400,8 @@ export default function IndividualProgressPage() {
   const rawId = params?.userId;
   const userId =
     typeof rawId === "string" ? decodeURIComponent(rawId) : Array.isArray(rawId) ? decodeURIComponent(rawId[0] ?? "") : "";
-  const [isFinalCommentsModalOpen, setIsFinalCommentsModalOpen] = useState(false);
   const [isInviteFieldMentorModalOpen, setIsInviteFieldMentorModalOpen] = useState(false);
-  const [finalComments, setFinalComments] = useState("");
-  const [hasComments, setHasComments] = useState(false);
-  const [isMarkingProgramComplete, setIsMarkingProgramComplete] = useState(false);
   const [isInvitingFieldMentor, setIsInvitingFieldMentor] = useState(false);
-  const [completionMessage, setCompletionMessage] = useState<string | null>(null);
   const [inviteMessage, setInviteMessage] = useState<string | null>(null);
   const [certificateMessage, setCertificateMessage] = useState<string | null>(null);
   const [showStatusMessages, setShowStatusMessages] = useState(false);
@@ -401,9 +437,13 @@ export default function IndividualProgressPage() {
     Promise.all([apiGetUserById(userId), apiGetUserProgress(userId)])
       .then(async ([userRes, progressRes]) => {
         const loadedUser = unwrapUserResponse(userRes);
+        const loadedProgress = unwrapUserProgressDetail(progressRes);
         setUser(loadedUser);
-        setProgressData(unwrapUserProgressDetail(progressRes));
-        if (loadedUser?.hasCompleted) {
+        setProgressData(loadedProgress);
+        const shouldLoadCertificate =
+          Boolean(loadedUser?.hasCompleted) ||
+          (Array.isArray(loadedProgress?.finalComments) && loadedProgress.finalComments.length > 0);
+        if (shouldLoadCertificate) {
           try {
             setCertificate(unwrapCertificate(await apiGetUserCertificate(userId)));
           } catch {
@@ -421,13 +461,6 @@ export default function IndividualProgressPage() {
       })
       .finally(() => setLoading(false));
   }, [userId]);
-
-  useEffect(() => {
-    if (progressData?.finalComments?.length) {
-      setHasComments(true);
-      setFinalComments(progressData.finalComments[0].comment);
-    }
-  }, [progressData]);
 
   useEffect(() => {
     if (!userId || !progressData) return;
@@ -620,7 +653,7 @@ export default function IndividualProgressPage() {
   }, [progressData, userId]);
 
   useEffect(() => {
-    if (!completionMessage && !inviteMessage && !certificateMessage) {
+    if (!inviteMessage && !certificateMessage) {
       setShowStatusMessages(false);
       return;
     }
@@ -632,7 +665,6 @@ export default function IndividualProgressPage() {
     }, 2600);
 
     const clearTimer = window.setTimeout(() => {
-      setCompletionMessage(null);
       setInviteMessage(null);
       setCertificateMessage(null);
     }, 3200);
@@ -641,62 +673,7 @@ export default function IndividualProgressPage() {
       window.clearTimeout(fadeTimer);
       window.clearTimeout(clearTimer);
     };
-  }, [completionMessage, inviteMessage, certificateMessage]);
-
-  const handleSubmitComments = async () => {
-    if (!finalComments.trim()) return;
-
-
-    try {
-      await apiAddFinalComment({
-        userId,
-        commentorId: directorId,
-        comment: finalComments,
-      });
-
-
-      // Fetch latest progress after save
-      const progressRes = await apiGetUserProgress(userId);
-      setProgressData(unwrapUserProgressDetail(progressRes));
-
-
-      setHasComments(true);
-    } catch (error) {
-      console.error("Failed to add final comment", error);
-    }
-  };
-
-  const handleMarkAsCompleted = async () => {
-    if (!userId) return;
-    try {
-      setIsMarkingProgramComplete(true);
-      setCompletionMessage(null);
-      setInviteMessage(null);
-      setCertificateMessage(null);
-      await apiMarkProgramComplete(userId);
-
-      // Fetch latest progress and user state after marking complete
-      const [progressRes, userRes] = await Promise.all([
-        apiGetUserProgress(userId),
-        apiGetUserById(userId),
-      ]);
-      setProgressData(unwrapUserProgressDetail(progressRes));
-      setUser(unwrapUserResponse(userRes));
-
-      setIsFinalCommentsModalOpen(false);
-      setCompletionMessage("Programme marked as completed.");
-      if (user?.email && directorId) {
-        setIsInviteFieldMentorModalOpen(true);
-      } else {
-        setInviteMessage("Programme completed, but the field mentor invitation cannot be sent because the pastor email or director session is missing.");
-      }
-    } catch (error) {
-      console.error("Failed to mark program as completed", error);
-      setCompletionMessage("Failed to mark programme as completed.");
-    } finally {
-      setIsMarkingProgramComplete(false);
-    }
-  };
+  }, [inviteMessage, certificateMessage]);
 
   const handleInviteAsFieldMentor = async () => {
     if (!user?.email) {
@@ -914,18 +891,13 @@ export default function IndividualProgressPage() {
         </section>
       ) : null}
 
-      {!loadError && (completionMessage || inviteMessage || certificateMessage) ? (
+      {!loadError && (inviteMessage || certificateMessage) ? (
         <section className="relative px-4 pb-6 sm:px-6 md:px-12 lg:px-20">
           <div
             className={`mx-auto max-w-[1400px] space-y-3 transition-opacity duration-500 ${
               showStatusMessages ? "opacity-100" : "opacity-0"
             }`}
           >
-            {completionMessage ? (
-              <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-                {completionMessage}
-              </div>
-            ) : null}
             {inviteMessage ? (
               <div className="rounded-xl border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 px-4 py-3 text-sm text-[#d8edf9]">
                 {inviteMessage}
@@ -976,26 +948,35 @@ export default function IndividualProgressPage() {
                   </Link>
                 )
               )}
-              {/* <button
-                type="button"
-                onClick={() => setIsFinalCommentsModalOpen(true)}
-                className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
-              >
-                {isCompleted ? "Send final comments" : "Add final comments"}
-              </button> */}
-              <button
-  type="button"
-
-  onClick={() => {
-  if ((progressData?.overallProgress ?? 0) < 100 || user?.hasCompleted) return;
-  setIsFinalCommentsModalOpen(true);
-}}
-disabled={(progressData?.overallProgress ?? 0) < 100 || Boolean(user?.hasCompleted)}
-  className="rounded-lg border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
->
-  {user?.hasCompleted ? "Marked as completed" : hasComments ? "Send final comments" : "Add final comments"}
-</button>
             </div>
+            {Array.isArray(progressData?.finalComments) && progressData.finalComments.length > 0 ? (
+              <div className={`mb-8 mt-6 rounded-2xl border border-white/12 p-5 sm:p-6 ${directorGlassCard}`}>
+                <div className="mb-4 flex flex-col gap-3 sm:items-start">
+                  <h2 className="text-lg font-semibold text-white">Final comments by mentor</h2>
+                </div>
+                <div className="space-y-3">
+                  {progressData.finalComments.map((comment, index) => (
+                    <div
+                      key={comment._id || `${comment.commentorId}-${index}`}
+                      className="rounded-xl border border-white/10 bg-white/5 p-4"
+                    >
+                      <p className="text-sm font-semibold text-amber-200">
+                        {(() => {
+                          const mentorName = getFinalCommentMentorName(comment);
+                          return mentorName && !/^[a-f0-9]{24}$/i.test(mentorName)
+                            ? `Marked completed by Mentor: ${mentorName}`
+                            : "Marked completed by Mentor";
+                        })()}
+                      </p>
+                      <p className="text-sm leading-relaxed text-white/85">{comment.comment}</p>
+                      <p className="mt-2 text-xs text-white/55">
+                        {comment.createdAt ? new Date(comment.createdAt).toLocaleString() : "Unknown date"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               <div className={`p-6 sm:p-8 ${directorGlassCard}`}>
                 <h2 className="mb-6 text-xl font-semibold text-white">Roadmap &amp; assessments</h2>
@@ -1232,69 +1213,6 @@ disabled={(progressData?.overallProgress ?? 0) < 100 || Boolean(user?.hasComplet
           </div>
         </div>
       </section>
-      {/* Final Comments Modal */}
-      {isFinalCommentsModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
-          <div className={`max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl ${directorGlassCard}`}>
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
-              <div>
-                <h2 className="text-xl font-semibold text-white">Final comments</h2>
-                <p className="mt-1 text-sm text-white/55">{userName}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsFinalCommentsModalOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white transition hover:bg-white/20"
-              >
-                <i className="fa-solid fa-xmark"></i>
-              </button>
-            </div>
-
-            <div className="p-6">
-              <textarea
-                value={finalComments}
-                onChange={(e) => !hasComments && setFinalComments(e.target.value)}
-                placeholder={hasComments ? "" : "Write comments here…"}
-                readOnly={hasComments}
-                rows={10}
-                className={`${directorInputClass} min-h-[200px] resize-none ${
-                  hasComments ? "cursor-not-allowed opacity-90" : ""
-                }`}
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-3 border-t border-white/10 px-6 py-4">
-              <button
-                type="button"
-                onClick={() => setIsFinalCommentsModalOpen(false)}
-                className="rounded-xl border border-white/25 bg-white/10 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-white/15"
-              >
-                Cancel
-              </button>
-              {hasComments ? (
-                <button
-                  type="button"
-                  onClick={handleMarkAsCompleted}
-                  disabled={isMarkingProgramComplete}
-                  className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isMarkingProgramComplete ? "Marking programme..." : "Mark programme as completed"}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleSubmitComments}
-                  disabled={!directorId}
-                  className="rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Submit
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Invite as Field Mentor Modal */}
       {isInviteFieldMentorModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">

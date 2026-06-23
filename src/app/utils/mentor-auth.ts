@@ -9,6 +9,26 @@ export function isMentorPublicRoute(pathname: string): boolean {
   return PUBLIC_PATH_PREFIXES.some((prefix) => p === prefix || p.startsWith(`${prefix}/`));
 }
 
+export function normalizeRoleForAuth(role: unknown): string {
+  return String(role || "")
+    .trim()
+    .replace(/([a-z])([A-Z])/g, "$1-$2")
+    .replace(/[_\s]+/g, "-")
+    .toLowerCase();
+}
+
+export function isMentorPortalRole(user: unknown): boolean {
+  const row =
+    user && typeof user === "object" ? (user as Record<string, unknown>) : {};
+  const normalizedRole = normalizeRoleForAuth(row.role);
+
+  return (
+    normalizedRole === "mentor" ||
+    normalizedRole === "field-mentor" ||
+    row.isFieldMentor === true
+  );
+}
+
 /** Mentor area stores the profile JSON in the `mentor` cookie. */
 export function getMentorUserId(): string | null {
   if (typeof document === "undefined") return null;
@@ -30,11 +50,10 @@ export function hasMentorSession(): boolean {
   const raw = getCookie("mentor");
   if (!raw) return false;
   try {
-    const u = JSON.parse(raw) as { role?: unknown; id?: string; _id?: string };
+    const u = JSON.parse(raw) as { role?: unknown; id?: string; _id?: string; isFieldMentor?: unknown };
     const id = u.id ?? u._id;
     if (id == null || String(id).trim() === "") return false;
-    const r = u.role != null ? String(u.role).toLowerCase().trim() : "";
-    return r === "mentor";
+    return isMentorPortalRole(u);
   } catch {
     return false;
   }

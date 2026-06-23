@@ -38,6 +38,7 @@ import {
   unwrapCertificate,
   type CertificateRecord,
 } from "@/app/Services/certificates.service";
+import { addNotification } from "@/app/Services/notification.service";
 import { apiGetUserProgress } from "@/app/Services/progress.service";
 import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import { updateInterestByEmail } from "@/app/Services/pastor.service";
@@ -236,9 +237,13 @@ console.log("Mentee profile certificate debug:", {
 });
       const interest = user?.interest;
 
-      const marked =
+      const backendMarkedComplete =
         user.hasCompleted === true ||
         String(user.status ?? "").toLowerCase() === "completed";
+      const progressMarkedComplete =
+        Boolean(progress?.overallCompleted) ||
+        Number(progress?.overallProgress ?? 0) >= 100;
+      const marked = backendMarkedComplete || progressMarkedComplete;
       let loadedCertificate: CertificateRecord | null = null;
       if (marked) {
         try {
@@ -379,6 +384,17 @@ if (detailInviteState !== "none") {
                 return;
               }
               await apiInviteFieldMentor({ email: personal.email, invitedBy });
+              try {
+                await addNotification({
+                  name: "Field Mentor Invitation",
+                  details:
+                    "You have been invited to be a Field Mentor. Please visit your profile to accept or reject the invitation.",
+                  module: "general",
+                  userId: menteeId,
+                });
+              } catch (error) {
+                console.error("Failed to create field mentor invitation notification", error);
+              }
               setInviteState("invited");
               setToast({ message: "Invitation sent successfully.", variant: "success" });
             } catch (error) {
@@ -433,8 +449,26 @@ const handleIssueCertificate = async () => {
     setCertificate(issuedCertificate);
     setIsIssueCertificateModalOpen(false);
     setIsCertificateSuccessModalOpen(true);
+
+    try {
+      await addNotification({
+        name: "Certificate issued",
+        details: "Your certificate has been issued.",
+        module: "general",
+        userId: menteeId,
+      });
+    } catch (notificationError) {
+      console.error("Failed to send certificate notification", notificationError);
+    }
   } catch (error) {
-    console.error("Issue certificate failed", error);
+    const axiosError = error as {
+      response?: { status?: number; data?: unknown };
+    };
+    console.error("Issue certificate failed", {
+      status: axiosError.response?.status,
+      data: axiosError.response?.data,
+      error,
+    });
     setToast({ message: "Failed to issue certificate.", variant: "error" });
   } finally {
     setIsIssuingCertificate(false);

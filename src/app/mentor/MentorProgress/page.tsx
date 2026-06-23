@@ -7,9 +7,14 @@ import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { ApiImagePlaceholder } from "@/app/Components/ApiMediaPlaceholder";
 import card from "@/app/Assets/card1.png";
-import { apiAddFinalComment, apiGetUserProgress } from "@/app/Services/progress.service";
+import {
+  apiAddFinalComment,
+  apiGetUserProgress,
+  apiMarkProgramComplete,
+} from "@/app/Services/progress.service";
 import { apiGetUserById } from "@/app/Services/users.service";
 import { apiGetRoadmapById } from "@/app/Services/roadmaps.service";
+import { addNotification } from "@/app/Services/notification.service";
 import {
   buildRoadmapAssignments,
   collapseRoadmapAssignmentsToParents,
@@ -452,8 +457,38 @@ function PastorProgressPageContent() {
         comment: comment,
       });
 
+      try {
+        await apiMarkProgramComplete(userId as string);
+      } catch (markCompleteError) {
+        const axiosError = markCompleteError as {
+          response?: { status?: number; data?: { message?: string } | unknown };
+        };
+        const errorMessage =
+          typeof axiosError.response?.data === "object" && axiosError.response?.data
+            ? (axiosError.response.data as { message?: string }).message
+            : undefined;
+        const alreadyCompleted =
+          axiosError.response?.status === 400 &&
+          typeof errorMessage === "string" &&
+          errorMessage.toLowerCase().includes("already completed");
+        if (!alreadyCompleted) {
+          throw markCompleteError;
+        }
+      }
+
       const res = await apiGetUserProgress(userId as string);
       setProgress(unwrapProgressData(res));
+
+      try {
+        await addNotification({
+          name: "Programme completed",
+          details: "Congratulations, your programme has been marked as complete.",
+          module: "general",
+          userId: userId as string,
+        });
+      } catch (notificationError) {
+        console.error("Failed to send completion notification", notificationError);
+      }
 
       setIsDrawerOpen(false);
       setShowSuccess(true);
@@ -581,7 +616,7 @@ useEffect(() => {
     }}
     className="rounded-xl bg-[#8ec5eb] px-4 py-2 text-xs font-semibold text-[#062946] transition hover:bg-[#b8daf2] disabled:cursor-not-allowed disabled:opacity-50"
   >
-    Add final comments
+    Mark as Completed
   </button>
 ) : (
                       <button

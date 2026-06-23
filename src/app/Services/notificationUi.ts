@@ -237,6 +237,25 @@ export function getNotificationHref(n: NotificationItem): string {
   const details = String(n.details || "").toLowerCase();
   const text = `${module} ${title} ${details}`;
 
+  const isProgrammeCompletedNotification =
+    module === "general" &&
+    (title.includes("programme completed") ||
+      title.includes("programme complete") ||
+      details.includes("programme has been marked as complete"));
+
+  if (isProgrammeCompletedNotification) {
+    if (role === "pastor") return "/pastor/Myprogress";
+    return "/mentor/MentorProgress";
+  }
+
+  if (
+    role === "pastor" &&
+    (title.includes("field mentor invitation") ||
+      details.includes("invited to be a field mentor"))
+  ) {
+    return "/pastor/profile";
+  }
+
   if (text.includes("appointment") || module === "appointments") {
     if (role === "pastor") return "/pastor/appointments";
     if (role === "director") return "/director/schedule";
