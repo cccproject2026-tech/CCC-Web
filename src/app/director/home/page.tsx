@@ -1828,17 +1828,6 @@ const {
   meetingTime,
 } = formatAppointment(appointment);
 
-
-
-
-
-  const attendeeEmail =
-  appointment.user?.email ||
-  ((appointment as any).userId && typeof (appointment as any).userId === "object"
-    ? (appointment as any).userId.email
-    : "") ||
-  "";
-
   return (
             <div
               key={appointment.id}
@@ -1889,53 +1878,6 @@ const {
                     </span>
                   </div>
 
-             
-         <div className="mt-2 flex gap-4 text-sm text-white/70">
-  <button
-    type="button"
-    disabled={!attendeeEmail}
-    className="hover:text-[#8ec5eb] disabled:cursor-not-allowed disabled:opacity-40"
-    aria-label={`Email ${attendeeEmail || attendeeName}`}
-    onClick={() => {
-      if (!attendeeEmail) return;
-
-      const subject = encodeURIComponent("Community Change Appointment");
-      window.location.href = `mailto:${attendeeEmail}?subject=${subject}`;
-    }}
-  >
-    <i className="fa-regular fa-envelope" />
-  </button>
-
-  <button
-    type="button"
-    disabled
-    className="cursor-not-allowed opacity-40"
-    aria-label="Call disabled"
-    title="Call disabled"
-  >
-    <i className="fa-solid fa-phone" />
-  </button>
-
-  <button
-    type="button"
-    disabled
-    className="cursor-not-allowed opacity-40"
-    aria-label="Chat disabled"
-    title="Chat disabled"
-  >
-    <i className="fa-regular fa-comment" />
-  </button>
-
-  <button
-    type="button"
-    disabled
-    className="cursor-not-allowed opacity-40"
-    aria-label="WhatsApp disabled"
-    title="WhatsApp disabled"
-  >
-    <i className="fa-brands fa-whatsapp" />
-  </button>
-</div>
                 </div>
 
               

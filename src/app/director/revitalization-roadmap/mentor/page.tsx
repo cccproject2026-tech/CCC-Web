@@ -146,6 +146,20 @@ const mentorId = searchParams.get("mentorId") || "";
                   String(pastor?.profilePicture || "").trim() ||
                   getInitialsAvatar(pastor?.firstName, pastor?.lastName, "Pastor");
 
+                const phone = String(
+                  pastor?.phoneNumber ??
+                    pastor?.phone ??
+                    pastor?.mobileNumber ??
+                    pastor?.contactNumber ??
+                    pastor?.contact?.phoneNumber ??
+                    pastor?.contact?.phone ??
+                    pastor?.user?.phoneNumber ??
+                    pastor?.user?.phone ??
+                    "",
+                ).trim();
+                const phoneHref = phone.replace(/\s/g, "");
+                const phoneDigitsOnly = phone.replace(/\D/g, "");
+
                 return (
                   <div
                     key={pastorId}
@@ -278,17 +292,49 @@ const mentorId = searchParams.get("mentorId") || "";
       <i className="fa-regular fa-envelope" />
     </a>
 
-    <span className="cursor-not-allowed opacity-40">
-      <i className="fa-regular fa-comment-dots" />
-    </span>
+    {phoneHref ? (
+      <a
+        href={`sms:${phoneHref}`}
+        onClick={(e) => e.stopPropagation()}
+        className="transition hover:text-white"
+      >
+        <i className="fa-regular fa-comment-dots" />
+      </a>
+    ) : (
+      <span className="cursor-not-allowed opacity-40">
+        <i className="fa-regular fa-comment-dots" />
+      </span>
+    )}
 
-    <span className="cursor-not-allowed opacity-40">
-      <i className="fa-brands fa-whatsapp" />
-    </span>
+    {phoneDigitsOnly ? (
+      <a
+        href={`https://wa.me/${phoneDigitsOnly}`}
+        target="_blank"
+        rel="noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="transition hover:text-white"
+      >
+        <i className="fa-brands fa-whatsapp" />
+      </a>
+    ) : (
+      <span className="cursor-not-allowed opacity-40">
+        <i className="fa-brands fa-whatsapp" />
+      </span>
+    )}
 
-    <span className="cursor-not-allowed opacity-40">
-      <i className="fa-solid fa-phone" />
-    </span>
+    {phoneHref ? (
+      <a
+        href={`tel:${phoneHref}`}
+        onClick={(e) => e.stopPropagation()}
+        className="transition hover:text-white"
+      >
+        <i className="fa-solid fa-phone" />
+      </a>
+    ) : (
+      <span className="cursor-not-allowed opacity-40">
+        <i className="fa-solid fa-phone" />
+      </span>
+    )}
   </div>
 
   <button

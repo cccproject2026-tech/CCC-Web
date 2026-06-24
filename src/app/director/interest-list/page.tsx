@@ -57,6 +57,21 @@ function loadInterestsErrorMessage(err: unknown): string {
   return "Could not load interests. Check your connection and try again.";
 }
 
+function getInterestPhone(interest: Interest): string {
+  const interestAny = interest as any;
+  return String(
+    interestAny.phoneNumber ??
+      interestAny.phone ??
+      interestAny.mobileNumber ??
+      interestAny.contactNumber ??
+      interestAny.contact?.phoneNumber ??
+      interestAny.contact?.phone ??
+      interestAny.user?.phoneNumber ??
+      interestAny.user?.phone ??
+      "",
+  ).trim();
+}
+
 
 
 export default function InterestReceivedPage() {
@@ -352,6 +367,9 @@ const handleDeleteRejectedInterest = async () => {
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {filteredInterests.map((interest) => {
                   const rowId = interest._id;
+                  const phone = getInterestPhone(interest);
+                  const phoneHref = phone.replace(/\s/g, "");
+                  const phoneDigitsOnly = phone.replace(/\D/g, "");
                   return (
                   <div
                     key={rowId}
@@ -437,25 +455,58 @@ const handleDeleteRejectedInterest = async () => {
     <i className="fa-regular fa-envelope" />
   </button>
 
-  <button
-    type="button"
-    disabled
-    className="cursor-not-allowed opacity-40"
-    aria-label="Chat disabled"
-    title="Chat disabled"
-  >
-    <i className="fa-regular fa-comment" />
-  </button>
+  {phoneHref ? (
+    <a
+      href={`sms:${phoneHref}`}
+      className="hover:text-[#8ec5eb]"
+      aria-label="Message interest"
+    >
+      <i className="fa-regular fa-comment" />
+    </a>
+  ) : (
+    <span
+      className="cursor-not-allowed opacity-40"
+      aria-label="Message interest"
+    >
+      <i className="fa-regular fa-comment" />
+    </span>
+  )}
 
-  <button
-    type="button"
-    disabled
-    className="cursor-not-allowed opacity-40"
-    aria-label="Call disabled"
-    title="Call disabled"
-  >
-    <i className="fa-solid fa-phone" />
-  </button>
+  {phoneDigitsOnly ? (
+    <a
+      href={`https://wa.me/${phoneDigitsOnly}`}
+      target="_blank"
+      rel="noreferrer"
+      className="hover:text-[#8ec5eb]"
+      aria-label="WhatsApp interest"
+    >
+      <i className="fa-brands fa-whatsapp" />
+    </a>
+  ) : (
+    <span
+      className="cursor-not-allowed opacity-40"
+      aria-label="WhatsApp interest"
+    >
+      <i className="fa-brands fa-whatsapp" />
+    </span>
+  )}
+
+  {phoneHref ? (
+    <a
+      href={`tel:${phoneHref}`}
+      className="hover:text-[#8ec5eb]"
+      aria-label="Call interest"
+    >
+      <i className="fa-solid fa-phone" />
+    </a>
+  ) : (
+    <span
+      className="cursor-not-allowed opacity-40"
+      aria-label="Call interest"
+    >
+      <i className="fa-solid fa-phone" />
+    </span>
+  )}
 </div>
 
                       <button

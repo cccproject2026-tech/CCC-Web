@@ -46,6 +46,8 @@ export default function PastorScheduleDrawer({
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState(today.getDate());
   const [selectedTime, setSelectedTime] = useState("");
+  const [scheduleTitle, setScheduleTitle] = useState("");
+  const [scheduleDescription, setScheduleDescription] = useState("");
   const [schedulePlatform, setSchedulePlatform] = useState("Zoom");
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [monthlySlots, setMonthlySlots] = useState<any[]>([]);
@@ -172,6 +174,14 @@ export default function PastorScheduleDrawer({
       return;
     }
 
+    const trimmedTitle = scheduleTitle.trim();
+    const trimmedDescription = scheduleDescription.trim();
+
+    if (!trimmedTitle) {
+      setToast("Please enter a meeting title.");
+      return;
+    }
+
     const yyyyMmDd = new Date(
       currentYear,
       currentMonth,
@@ -188,9 +198,15 @@ export default function PastorScheduleDrawer({
         mentorId,
         meetingDate: meetingDateISO,
         platform: uiMeetingModeToPlatform(schedulePlatform),
+        title: trimmedTitle,
+        description: trimmedDescription,
         notes: "Mentorship session",
+        googleCalendarTitle: trimmedTitle,
+        googleCalendarDescription: trimmedDescription || "Mentorship session",
       });
 
+      setScheduleTitle("");
+      setScheduleDescription("");
       setSelectedTime("");
       setToast("New appointment has been scheduled.");
       onScheduled?.();
@@ -246,6 +262,30 @@ export default function PastorScheduleDrawer({
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-6">
+          <label className={pastorFieldLabel} htmlFor="schedule-title">
+            Meeting Title
+          </label>
+          <input
+            id="schedule-title"
+            type="text"
+            value={scheduleTitle}
+            onChange={(e) => setScheduleTitle(e.target.value)}
+            placeholder="Enter meeting title"
+            className="mb-4 w-full rounded-xl border border-white/20 bg-[#062946] px-3 py-2 text-sm text-white outline-none placeholder:text-white/40 focus:border-[#8ec5eb]/50"
+          />
+
+          <label className={pastorFieldLabel} htmlFor="schedule-description">
+            Meeting Description
+          </label>
+          <textarea
+            id="schedule-description"
+            value={scheduleDescription}
+            onChange={(e) => setScheduleDescription(e.target.value)}
+            placeholder="Enter meeting description"
+            rows={3}
+            className="mb-4 w-full rounded-xl border border-white/20 bg-[#062946] px-3 py-2 text-sm text-white outline-none placeholder:text-white/40 focus:border-[#8ec5eb]/50"
+          />
+
           <label className={pastorFieldLabel}>Mentor Availability</label>
 
           <AvailabilityCalendar

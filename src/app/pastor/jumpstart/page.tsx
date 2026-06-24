@@ -4149,6 +4149,17 @@ function isRenderableUiLabel(value: unknown): value is string {
   return label.length > 0 && !["null", "undefined"].includes(label.toLowerCase());
 }
 
+function getTaskActionFallbackLabel(status: unknown): string {
+  const normalized = String(status ?? "").trim().toLowerCase();
+  if (normalized === "completed") return "Completed";
+  if (normalized === "in-progress" || normalized === "in progress") return "Continue";
+  return "Start";
+}
+
+function getRenderableTaskActionLabel(rawLabel: unknown, status: unknown): string {
+  return isRenderableUiLabel(rawLabel) ? rawLabel : getTaskActionFallbackLabel(status);
+}
+
 function isImageUploadFile(file: { fileName?: string; fileUrl?: string }): boolean {
   const raw = `${file.fileName ?? ""} ${file.fileUrl ?? ""}`.toLowerCase();
   return /\.(png|jpe?g|webp|gif|bmp|svg)(\?|#|$)/i.test(raw);
@@ -7069,7 +7080,7 @@ const scheduledMeeting = assessmentId
           onClick={() => openAssessment(extra)}
           className="mb-3 rounded-md border border-white/25 bg-white/10 px-5 py-2 text-sm font-medium text-white transition hover:bg-white/20"
         >
-          {extra.buttonName || "Open Survey"}
+          {getRenderableTaskActionLabel(extra.buttonName, listAlignedStatus)}
         </button>
       )}
 

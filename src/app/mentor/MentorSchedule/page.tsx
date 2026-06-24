@@ -1090,6 +1090,7 @@ const isCancelled = status === "cancelled" || status === "canceled";
 
                           <div className="flex items-center justify-between">
                             <div className="flex gap-3 text-[15px] text-[#8ec5eb]">
+                              <a href={(otherPerson as any)?.email ? `mailto:${(otherPerson as any).email}` : undefined} aria-label="Email" className="transition hover:text-white"><i className="fa-regular fa-envelope" /></a>
                               <a href={(otherPerson as any)?.phoneNumber ? `tel:${(otherPerson as any).phoneNumber}` : undefined} aria-label="Call" className="transition hover:text-white"><i className="fa-solid fa-phone" /></a>
                               <a href={(otherPerson as any)?.phoneNumber ? `sms:${(otherPerson as any).phoneNumber}` : undefined} aria-label="Text" className="transition hover:text-white"><i className="fa-regular fa-comment" /></a>
                               <a href={(otherPerson as any)?.phoneNumber ? `https://wa.me/${String((otherPerson as any).phoneNumber).replace(/\D/g, "")}` : undefined} target="_blank" rel="noreferrer" aria-label="WhatsApp" className="transition hover:text-white"><i className="fa-brands fa-whatsapp" /></a>

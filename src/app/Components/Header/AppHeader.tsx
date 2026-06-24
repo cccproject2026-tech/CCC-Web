@@ -7,13 +7,13 @@ import Framelogo1 from "@/app/Assets/Frame-logo-1.png";
 import Connecticon from "@/app/Assets/Connect-icon.png";
 import NotificationIcon from "@/app/Assets/notification.png";
 import SearchIcon from "@/app/Assets/search.png";
-import UserProfile from "@/app/Assets/user-profile.png";
 import NotificationPopup from "../NotificationPopup";
 import ProfileDropdown from "../ProfileDropdown";
 import SettingsModal from "../SettingsModal";
 import CoursesDropdown from "../CoursesDropdown";
 import CCCDropdown from "../CCCDropdown";
 import DocumentsModal from "../DocumentsModal";
+import { apiGetUserById, unwrapUserResponse } from "@/app/Services/users.service";
 import {
   getNotification,
   apiGetRoadmaps,
@@ -22,6 +22,8 @@ import {
   apiGetAllInterests,
 } from "@/app/Services/api";
 import { parseAssessmentsListPayload } from "@/app/Services/assessment.service";
+import { getCookie } from "@/app/utils/cookies";
+import { resolveApiMediaUrl } from "@/app/utils/image";
 
 import {
   mapNotificationItemToPopup,
@@ -43,6 +45,37 @@ const sortNotificationsNewestFirst = (list: NotificationItem[]) =>
 
     return bTime - aTime;
   });
+
+function parseHeaderUserCookie():
+  | {
+      firstName?: string;
+      lastName?: string;
+      profilePicture?: string;
+      profileImage?: string;
+      image?: string;
+      avatar?: string;
+    }
+  | null {
+  try {
+    const raw = getCookie("user");
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function getHeaderUserImage(user: any): string {
+  const raw =
+    user?.profilePicture ??
+    user?.profileImage ??
+    user?.image ??
+    user?.avatar ??
+    "";
+
+  if (typeof raw !== "string" || !raw.trim()) return "";
+  return resolveApiMediaUrl(raw.trim()) ?? raw.trim();
+}
 
 export default function AppHeader({ showFullHeader = false }) {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -70,9 +103,47 @@ export default function AppHeader({ showFullHeader = false }) {
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [notificationBadge, setNotificationBadge] = useState(0);
   const [sessionUserId, setSessionUserId] = useState("");
+  const [cookieUser, setCookieUser] = useState<{
+    firstName?: string;
+    lastName?: string;
+    profilePicture?: string;
+    profileImage?: string;
+    image?: string;
+    avatar?: string;
+  } | null>(null);
+  const [headerUser, setHeaderUser] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     setSessionUserId(resolveSessionUserId() ?? "");
+    setCookieUser(parseHeaderUserCookie());
+  }, []);
+
+  useEffect(() => {
+    const uid = resolveSessionUserId();
+    if (!uid) return;
+
+    let cancelled = false;
+
+    const loadHeaderUser = async () => {
+      try {
+        const res = await apiGetUserById(uid);
+        const user = unwrapUserResponse(res);
+        if (!cancelled) {
+          setHeaderUser(user as Record<string, unknown> | null);
+        }
+      } catch (error) {
+        console.error("Director header user:", error);
+        if (!cancelled) {
+          setHeaderUser(null);
+        }
+      }
+    };
+
+    void loadHeaderUser();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -290,6 +361,16 @@ useEffect(() => {
     }
   };
 
+  const displayedName =
+    `${String(headerUser?.firstName ?? cookieUser?.firstName ?? "").trim()} ${String(
+      headerUser?.lastName ?? cookieUser?.lastName ?? "",
+    ).trim()}`.trim() || "Admin";
+
+  const headerAvatarSrc =
+    getHeaderUserImage(headerUser) ||
+    getHeaderUserImage(cookieUser) ||
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(displayedName)}&background=173653&color=ffffff`;
+
   return (
     <>
       <header className="relative z-50 flex items-center justify-between border-b border-white/10 bg-[#062946]/95 px-4 py-3 text-white shadow-[0_6px_20px_rgba(2,20,38,0.28)] backdrop-blur-md sm:px-6 lg:px-10 font-[Albert_Sans]">
@@ -502,17 +583,10 @@ useEffect(() => {
               >
                 <div className="hidden sm:block text-right text-[11px] leading-tight">
                   <p className="text-white/80">Good Morning</p>
-                  <p className="text-white font-medium">Admin</p>
+                  <p className="text-white font-medium">{displayedName}</p>
                 </div>
-                {/* <Image
-                  src={UserProfile}
-                  alt="User"
-                  width={30}
-                  height={30}
-                  className="rounded-full border border-white/40"
-                /> */}
                 <img
-  src={`https://ui-avatars.com/api/?name=${encodeURIComponent("Admin")}&background=173653&color=ffffff`}
+  src={headerAvatarSrc}
   alt="User"
   className="h-[30px] w-[30px] rounded-full border border-white/40 object-cover"
 />

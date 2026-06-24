@@ -24,11 +24,23 @@ function getInitialsAvatar(name: string, fallback = "User") {
 
 function mapUserToCardUser(user: any) {
   const name = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() || "User";
+  const phone = String(
+    user.phoneNumber ??
+      user.phone ??
+      user.mobileNumber ??
+      user.contactNumber ??
+      user.contact?.phoneNumber ??
+      user.contact?.phone ??
+      user.user?.phoneNumber ??
+      user.user?.phone ??
+      "",
+  ).trim();
 
   return {
     id: String(user.id ?? user._id ?? ""),
     name,
     email: String(user.email ?? ""),
+    phone,
     role: String(user.role ?? "Pastor"),
     avatar:
       resolveApiMediaUrl(String(user.profilePicture || "")) ||
@@ -127,6 +139,8 @@ function MentorAssessmentPastorsContent() {
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
               {assignedPastors.map((pastor: any) => {
                 const row = mapUserToCardUser(pastor);
+                const phoneHref = row.phone.replace(/\s/g, "");
+                const phoneDigitsOnly = row.phone.replace(/\D/g, "");
 
                 return (
                   // <div key={row.id} className={`${directorGlassCard} relative flex gap-5 p-5`}>
@@ -186,29 +200,49 @@ function MentorAssessmentPastorsContent() {
     <i className="fa-regular fa-envelope" />
   </a>
 
-  <button
-    type="button"
-    disabled
-    className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30"
-  >
-    <i className="fa-solid fa-phone" />
-  </button>
+  {phoneHref ? (
+    <a
+      href={`tel:${phoneHref}`}
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb]"
+      aria-label="Call pastor"
+    >
+      <i className="fa-solid fa-phone" />
+    </a>
+  ) : (
+    <span className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
+      <i className="fa-solid fa-phone" />
+    </span>
+  )}
 
-  <button
-    type="button"
-    disabled
-    className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30"
-  >
-    <i className="fa-brands fa-whatsapp" />
-  </button>
+  {phoneDigitsOnly ? (
+    <a
+      href={`https://wa.me/${phoneDigitsOnly}`}
+      target="_blank"
+      rel="noreferrer"
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb]"
+      aria-label="WhatsApp pastor"
+    >
+      <i className="fa-brands fa-whatsapp" />
+    </a>
+  ) : (
+    <span className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
+      <i className="fa-brands fa-whatsapp" />
+    </span>
+  )}
 
-  <button
-    type="button"
-    disabled
-    className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30"
-  >
-    <i className="fa-regular fa-comment-dots" />
-  </button>
+  {phoneHref ? (
+    <a
+      href={`sms:${phoneHref}`}
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 text-[#8ec5eb]"
+      aria-label="Text pastor"
+    >
+      <i className="fa-regular fa-comment-dots" />
+    </a>
+  ) : (
+    <span className="flex h-9 w-9 cursor-not-allowed items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/30">
+      <i className="fa-regular fa-comment-dots" />
+    </span>
+  )}
 </div>
 
                      <button
