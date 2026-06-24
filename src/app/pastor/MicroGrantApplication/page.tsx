@@ -7,7 +7,9 @@ import { useRouter } from "next/navigation";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import HeroBg from "@/app/Assets/jumpstart-hero.png";
 import PastorHeader from "@/app/Components/PastorHeader";
+import { getCookie } from "@/app/utils/cookies";
 import { getPastorUserId } from "@/app/utils/pastor-auth";
+import { addNotification } from "@/app/Services/api";
 import {
   applyMicroGrant,
   getMicroGrantForm,
@@ -78,6 +80,29 @@ function getStatusClasses(status?: string) {
     return "bg-yellow-100 text-yellow-700 border border-yellow-200";
   }
   return "bg-blue-100 text-blue-700 border border-blue-200";
+}
+
+function getPastorDisplayName(): string {
+  try {
+    const raw = getCookie("user");
+    if (!raw) return "Pastor";
+    const user = JSON.parse(raw) as {
+      firstName?: string;
+      lastName?: string;
+      name?: string;
+      username?: string;
+      email?: string;
+    };
+    return (
+      `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
+      user.name ||
+      user.username ||
+      user.email ||
+      "Pastor"
+    );
+  } catch {
+    return "Pastor";
+  }
 }
 
 export default function MicroGrantApplicationPage() {
@@ -267,6 +292,23 @@ export default function MicroGrantApplicationPage() {
       );
 
       setSuccessMsg("Micro Grant application submitted successfully.");
+
+      const pastorName = getPastorDisplayName();
+      const notificationJobs = [
+        addNotification({
+          name: "Micro Grant Application Received",
+          details: `Micro grant application received from ${pastorName}.`,
+          module: "microgrant",
+          role: "director",
+        }),
+      ];
+
+      const notificationResults = await Promise.allSettled(notificationJobs);
+      notificationResults.forEach((result, index) => {
+        if (result.status === "rejected") {
+          console.warn("Micro Grant notification director failed", result.reason);
+        }
+      });
 
       const appRes = await getMicroGrantByUserId(userId);
       const appPayload = unwrapMicroGrantWithUser(appRes);

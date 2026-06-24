@@ -4,6 +4,7 @@ import type {
   MonthlyCompletion,
   UserOverallProgress,
   ProgressResponse,
+  ProgressRoadmap,
   FinalComment,
   AssignRoadmapPayload,
   AssignAssessmentPayload,
@@ -474,6 +475,161 @@ export const apiGetUserProgress = (userId: string) =>
       Pragma: "no-cache",
     },
   });
+
+export type BulkProgressDetail = {
+  userId: string;
+  roadmapProgressPercent: number | null;
+  roadmaps?: ProgressRoadmap[];
+  failed?: boolean;
+  [key: string]: unknown;
+};
+
+export type BulkProgressByUserId = Record<string, number | null>;
+
+function parseBulkProgressPercent(raw: unknown): number | null {
+  if (typeof raw === "number" && Number.isFinite(raw)) {
+    return Math.min(100, Math.max(0, raw));
+  }
+  if (typeof raw === "string" && raw.trim() !== "" && Number.isFinite(Number(raw))) {
+    const value = Number(raw);
+    return Math.min(100, Math.max(0, value));
+  }
+  return null;
+}
+
+function unwrapBulkProgressPayload(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const body = raw as Record<string, unknown>;
+  if ("data" in body && (Array.isArray(body.data) || (body.data && typeof body.data === "object"))) {
+    return body.data;
+  }
+  return raw;
+}
+
+function bulkProgressRowLooksLikeSingleRow(row: Record<string, unknown>): boolean {
+  return (
+    "userId" in row ||
+    "user_id" in row ||
+    "userID" in row ||
+    "roadmapProgressPercent" in row ||
+    "roadmap_progress_percent" in row ||
+    "progressPercentage" in row ||
+    "progress_percentage" in row ||
+    "overallProgress" in row ||
+    "overall_progress" in row
+  );
+}
+
+function unwrapBulkRoadmaps(raw: unknown): ProgressRoadmap[] | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const o = raw as Record<string, unknown>;
+  const roadmaps = o.roadmaps ?? o.roadmapsItems ?? o.items;
+  if (Array.isArray(roadmaps)) return roadmaps as ProgressRoadmap[];
+  if (roadmaps && typeof roadmaps === "object" && Array.isArray((roadmaps as { items?: unknown }).items)) {
+    return (roadmaps as { items: ProgressRoadmap[] }).items;
+  }
+  return undefined;
+}
+
+function bulkProgressRowToDetail(row: unknown, fallbackUserId = ""): [string, BulkProgressDetail] | null {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return null;
+  const r = row as Record<string, unknown>;
+  const userId = coerceProgressUserId(r.userId ?? r.user_id ?? r.userID ?? fallbackUserId ?? r.id ?? r._id);
+  if (!userId) return null;
+
+  const failed =
+    r.success === false ||
+    r.error != null ||
+    r.message != null ||
+    r.failed === true ||
+    r.status === false ||
+    r.statusCode === 429 ||
+    r.code === 429;
+
+  const roadmapProgressPercent = parseBulkProgressPercent(
+    r.roadmapProgressPercent ??
+      r.roadmap_progress_percent ??
+      r.progressPercentage ??
+      r.progress_percentage ??
+      r.overallProgress ??
+      r.overall_progress ??
+      r.progress,
+  );
+
+  const detail: BulkProgressDetail = {
+    ...r,
+    userId,
+    roadmapProgressPercent,
+  };
+  const roadmaps = unwrapBulkRoadmaps(r.roadmaps ?? r.progress ?? r.data);
+  if (roadmaps) detail.roadmaps = roadmaps;
+  if (failed) detail.failed = true;
+  return [userId, detail];
+}
+
+/**
+ * Normalize POST `/progress/bulk` into a userId -> full row map.
+ * Supports both `{ data: { [userId]: row } }` and `{ data: row[] }` shapes.
+ */
+export function unwrapBulkProgressDetails(res: { data?: unknown }): Record<string, BulkProgressDetail> {
+  const raw = unwrapBulkProgressPayload(res?.data);
+  if (raw == null) return {};
+
+  if (Array.isArray(raw)) {
+    const out: Record<string, BulkProgressDetail> = {};
+    for (const row of raw) {
+      const entry = bulkProgressRowToDetail(row);
+      if (!entry) continue;
+      out[entry[0]] = entry[1];
+    }
+    return out;
+  }
+
+  if (typeof raw !== "object") return {};
+
+  const body = raw as Record<string, unknown>;
+  if (bulkProgressRowLooksLikeSingleRow(body)) {
+    const entry = bulkProgressRowToDetail(body);
+    return entry ? { [entry[0]]: entry[1] } : {};
+  }
+
+  const out: Record<string, BulkProgressDetail> = {};
+  for (const [userId, value] of Object.entries(body)) {
+    if (!userId.trim()) continue;
+    if (value == null) {
+      out[userId] = { userId, roadmapProgressPercent: null, failed: true };
+      continue;
+    }
+    if (typeof value === "number" || typeof value === "string") {
+      out[userId] = { userId, roadmapProgressPercent: parseBulkProgressPercent(value) };
+      continue;
+    }
+    if (typeof value === "object" && !Array.isArray(value)) {
+      const entry = bulkProgressRowToDetail(value, userId);
+      if (entry) {
+        out[userId] = entry[1];
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Normalize POST `/progress/bulk` into a userId -> progress percent map.
+ * This is the lightweight helper for UI surfaces that only need the number.
+ */
+export function unwrapBulkProgressMap(res: { data?: unknown }): BulkProgressByUserId {
+  const details = unwrapBulkProgressDetails(res);
+  const out: BulkProgressByUserId = {};
+  for (const [userId, detail] of Object.entries(details)) {
+    out[userId] = detail.roadmapProgressPercent ?? null;
+  }
+  return out;
+}
+
+// POST /progress/bulk  body: { userIds: string[] }
+export const apiGetBulkProgress = (userIds: string[]) =>
+  axiosInstance.post<{ success: boolean; data: unknown }>("/progress/bulk", { userIds });
 
 // POST /progress/assign-roadmap  body: { userIds, roadMapIds }
 export const apiAssignRoadmap = (payload: AssignRoadmapPayload) =>

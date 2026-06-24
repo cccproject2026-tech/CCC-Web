@@ -252,6 +252,16 @@ return {
     }) as Record<string, unknown>[];
   }
 
+  function resolveQueryTaskId(q: Record<string, unknown>): string {
+    return String(
+      q.nestedRoadMapItemId ??
+        q.nestedItemId ??
+        q.taskId ??
+        q.roadmapItemId ??
+        "",
+    ).trim();
+  }
+
   type QRow = DashboardFocusItem & { sortAtMs: number };
   const pastorQueryTemp: QRow[] = [];
   const seenQueryIds = new Set<string>();
@@ -279,6 +289,7 @@ return {
             if (!qid || seenQueryIds.has(qid)) continue;
             seenQueryIds.add(qid);
             const createdAt = String(q.createdDate ?? q.created_at ?? "");
+            const taskId = resolveQueryTaskId(q);
            
             pastorQueryTemp.push({
               id: `pastor-query-${qid}`,
@@ -286,7 +297,9 @@ return {
               description: (String(q.actualQueryText ?? "").slice(0, 140) || "Query needs response.") as string,
               meta: `${roadmapName} • ${pastorName} • ${formatDateTime(createdAt)}`,
               sortAtMs: toEpochMs(createdAt),
-              href: "/mentor/MenteesDetailed?focus=queries",
+              href: taskId
+                ? `/mentor/RevitalizationRoadmap/task?userId=${encodeURIComponent(pastorId)}&roadmapId=${encodeURIComponent(rid)}&taskId=${encodeURIComponent(taskId)}`
+                : "/mentor/MenteesDetailed?focus=queries",
             });
           }
         } catch {

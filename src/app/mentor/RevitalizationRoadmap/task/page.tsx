@@ -273,11 +273,25 @@ function TaskPageContent() {
     if (!roadmapId || !userId) return;
     try {
       const res = await apiGetComments(roadmapId, userId);
-      setComments(unwrapCommentsFromResponse(res));
+      const all = unwrapCommentsFromResponse(res);
+      const currentTaskId = String(taskId ?? "").trim();
+      const scoped = currentTaskId
+        ? all.filter((comment: Record<string, unknown>) => {
+            const commentTaskId = String(
+              comment.nestedRoadMapItemId ??
+                comment.nestedItemId ??
+                comment.taskId ??
+                comment.roadmapItemId ??
+                "",
+            ).trim();
+            return commentTaskId === currentTaskId;
+          })
+        : [];
+      setComments(scoped);
     } catch {
       setComments([]);
     }
-  }, [roadmapId, userId]);
+  }, [roadmapId, userId, taskId]);
 
   const fetchQueries = useCallback(async () => {
     if (!roadmapId || !userId) return;
@@ -683,6 +697,8 @@ useEffect(() => {
         text: newComment.trim(),
         userId,
         mentorId,
+        nestedRoadMapItemId: taskId ?? undefined,
+        taskId: taskId ?? undefined,
       });
       setNewComment("");
       await fetchComments();

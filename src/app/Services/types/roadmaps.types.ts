@@ -194,6 +194,10 @@ export interface AddCommentPayload {
   text: string;
   userId: string;
   mentorId: string;
+  nestedRoadMapItemId?: string;
+  nestedItemId?: string;
+  taskId?: string;
+  roadmapItemId?: string;
 }
 
 export interface CommentItem {

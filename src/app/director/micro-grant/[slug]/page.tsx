@@ -40,6 +40,32 @@ function reportingStatus(value: unknown): "Checked" | "Not checked" {
   return "Not checked";
 }
 
+function resolveApplicantPastorUserId(data: MicroGrantResponse | null): string {
+  const raw = data?.application?.userId as unknown;
+  if (!raw) return "";
+  if (typeof raw === "string") return raw.trim();
+  if (typeof raw === "object") {
+    const obj = raw as { _id?: unknown; id?: unknown };
+    const id = typeof obj._id === "string" ? obj._id : typeof obj.id === "string" ? obj.id : "";
+    return id.trim();
+  }
+  return "";
+}
+
+function resolveApplicantPastorName(data: MicroGrantResponse | null): string {
+  const raw = data?.application?.userId;
+  if (raw && typeof raw === "object") {
+    const obj = raw as { firstName?: string; lastName?: string; name?: string; email?: string };
+    return (
+      `${obj.firstName || ""} ${obj.lastName || ""}`.trim() ||
+      obj.name ||
+      obj.email ||
+      "Pastor"
+    );
+  }
+  return data?.user?.email || "Pastor";
+}
+
 const Page: React.FC = () => {
   const [activeStep, setActiveStep] = useState<number>(1);
   const [data, setData] = useState<MicroGrantResponse | null>(null);
@@ -130,9 +156,8 @@ setData(payload);
 console.log("MICRO GRANT ANSWERS:", data.application.answers);
 console.log("MICRO GRANT FORM:", data.application.formId);
   const supportingDocs = normalizeMicroGrantSupportingDocs(data.application.supportingDocs);
-  const coverSheetAnswers = Object.entries(answers).filter(
-    ([label]) => !Object.values(REPORTING_CONFIRMATION_KEYS).includes(label),
-  );
+  const reportingLabelSet = new Set<string>(Object.values(REPORTING_CONFIRMATION_KEYS));
+  const coverSheetAnswers = Object.entries(answers).filter(([label]) => !reportingLabelSet.has(label));
   const reportingRows = [
     {
       label:

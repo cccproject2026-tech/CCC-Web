@@ -3,6 +3,7 @@ export type DashboardFocusItem = {
   title: string;
   description: string;
   meta?: string;
+  status?: string;
   href: string;
 };
 

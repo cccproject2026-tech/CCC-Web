@@ -21,7 +21,9 @@ import {
   extractUserIdFromOverallProgressRow,
   unwrapOverallProgressList,
   apiGetOverallProgress,
+  apiGetBulkProgress,
   apiGetUserProgress,
+  unwrapBulkProgressDetails,
   unwrapUserProgressDetail,
 } from "@/app/Services/progress.service";
 import { unwrapRoadmapsList } from "@/app/Services/roadmap-assignments";
@@ -781,88 +783,103 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
       return;
     }
     let cancelled = false;
-    (async () => {
-      setLoadingMetrics(true);
-      const pastorRows = pastorProgressList;
-      const avatarByUserId = new Map();
-      for (const row of pastorRows) {
-        const uid = extractUserIdFromOverallProgressRow(row);
-        if (!uid) continue;
-        avatarByUserId.set(uid, row.profilePicture || null);
-      }
+    const loadMetrics = async () => {
+      try {
+        setLoadingMetrics(true);
+        const pastorRows = pastorProgressList;
+        const avatarByUserId = new Map();
+        for (const row of pastorRows) {
+          const uid = extractUserIdFromOverallProgressRow(row);
+          if (!uid) continue;
+          avatarByUserId.set(uid, row.profilePicture || null);
+        }
 
-      const ids = pastorRows.map((row) => extractUserIdFromOverallProgressRow(row)).filter(Boolean);
+        const ids = pastorRows.map((row) => extractUserIdFromOverallProgressRow(row)).filter(Boolean);
 
-      const aggregate = {};
+        const aggregate = {};
 
         const bump = (rid, userId, pct, status, taskStats) => {
-        if (!rid || !userId) return;
-        const uid = String(userId).trim();
-        if (!uid) return;
-        const cur = aggregate[rid] || {
-          assignedUserIds: new Set(),
-          progressSum: 0,
-          progressN: 0,
-          statuses: [],
-          sampleAvatarUrls: [],
-          taskStatsByUserId: {},
-        };
-        cur.assignedUserIds.add(uid);
-        if (typeof pct === "number" && !Number.isNaN(pct)) {
-          cur.progressSum += Math.min(100, Math.max(0, pct));
-          cur.progressN += 1;
-        }
-        if (status) cur.statuses.push(normLower(status));
-        const av = avatarByUserId.get(userId);
-        if (av && cur.sampleAvatarUrls.length < 6) cur.sampleAvatarUrls.push(av);
-        if (taskStats) {
-  cur.taskStatsByUserId[uid] = taskStats;
-}
-        aggregate[rid] = cur;
-      };
-
-      await mapLimit(ids, 8, async (userId) => {
-        try {
-          const res = await apiGetUserProgress(userId);
-          const pr = unwrapUserProgressDetail(res);
-          if (!pr || !Array.isArray(pr.roadmaps)) return null;
-          for (const rm of pr.roadmaps) {
-            const rid = stringifyRoadmapId(rm.roadMapId ?? rm.roadmapId ?? rm._id);
-            if (!rid) continue;
-        
-            bump(
-  rid,
-  userId,
-  typeof rm.progressPercentage === "number" ? rm.progressPercentage : Number(rm.progressPercentage),
-  rm.status,
-  getProgressTaskStats(rm),
-);
+          if (!rid || !userId) return;
+          const uid = String(userId).trim();
+          if (!uid) return;
+          const cur = aggregate[rid] || {
+            assignedUserIds: new Set(),
+            progressSum: 0,
+            progressN: 0,
+            statuses: [],
+            sampleAvatarUrls: [],
+            taskStatsByUserId: {},
+          };
+          cur.assignedUserIds.add(uid);
+          if (typeof pct === "number" && !Number.isNaN(pct)) {
+            cur.progressSum += Math.min(100, Math.max(0, pct));
+            cur.progressN += 1;
           }
-          return true;
+          if (status) cur.statuses.push(normLower(status));
+          const av = avatarByUserId.get(userId);
+          if (av && cur.sampleAvatarUrls.length < 6) cur.sampleAvatarUrls.push(av);
+          if (taskStats) {
+            cur.taskStatsByUserId[uid] = taskStats;
+          }
+          aggregate[rid] = cur;
+        };
+
+        try {
+          const res = await apiGetBulkProgress(ids);
+          const progressByUserId = unwrapBulkProgressDetails(res);
+
+          for (const userId of ids) {
+            const detail = progressByUserId[userId];
+            if (!detail || detail.failed) continue;
+
+            const roadmaps = Array.isArray(detail.roadmaps) ? detail.roadmaps : [];
+            if (!roadmaps.length) continue;
+
+            const overallPct =
+              typeof detail.roadmapProgressPercent === "number" &&
+              !Number.isNaN(detail.roadmapProgressPercent)
+                ? detail.roadmapProgressPercent
+                : null;
+
+            for (const rm of roadmaps) {
+              const rid = stringifyRoadmapId(rm.roadMapId ?? rm.roadmapId ?? rm._id);
+              if (!rid) continue;
+
+              const rmPct =
+                typeof rm.progressPercentage === "number"
+                  ? rm.progressPercentage
+                  : Number(rm.progressPercentage);
+              const pct = Number.isFinite(rmPct) ? rmPct : overallPct;
+
+              bump(rid, userId, pct, rm.status, getProgressTaskStats(rm));
+            }
+          }
         } catch (e) {
-          console.warn("progress fetch failed for", userId, e);
-          return null;
+          console.warn("bulk progress fetch failed for director roadmap metrics", e);
         }
-      });
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      const out = {};
-      for (const [rid, cur] of Object.entries(aggregate)) {
-        const nAssign = cur.assignedUserIds.size;
-        const avg = cur.progressN > 0 ? Math.round(cur.progressSum / cur.progressN) : 0;
-     
-        out[rid] = {
-  assignedCount: nAssign,
-  avgProgress: avg,
-  sampleAvatarUrls: cur.sampleAvatarUrls,
-  assignedUserIds: cur.assignedUserIds,
-  taskStatsByUserId: cur.taskStatsByUserId,
-};
+        const out = {};
+        for (const [rid, cur] of Object.entries(aggregate)) {
+          const nAssign = cur.assignedUserIds.size;
+          const avg = cur.progressN > 0 ? Math.round(cur.progressSum / cur.progressN) : 0;
+
+          out[rid] = {
+            assignedCount: nAssign,
+            avgProgress: avg,
+            sampleAvatarUrls: cur.sampleAvatarUrls,
+            assignedUserIds: cur.assignedUserIds,
+            taskStatsByUserId: cur.taskStatsByUserId,
+          };
+        }
+        setMetricsByRoadmapId(out);
+      } finally {
+        if (!cancelled) setLoadingMetrics(false);
       }
-      setMetricsByRoadmapId(out);
-      setLoadingMetrics(false);
-    })();
+    };
+
+    void loadMetrics();
 
     return () => {
       cancelled = true;
@@ -1368,7 +1385,10 @@ const selectedPastorRoadmaps =
       });
 
 const selectedPastorRoadmapsLoading =
-  selectedPastorModalId != null && (loadingPastors || loadingMetrics);
+  selectedPastorModalId != null &&
+  (loadingPastors ||
+    loadingMetrics ||
+    (selectedPastorRoadmaps.length === 0 && Object.keys(metricsByRoadmapId).length === 0));
 
 const selectedPastorNameForModal = (() => {
   if (selectedPastorModalId == null) return "";

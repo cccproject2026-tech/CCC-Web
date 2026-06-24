@@ -13,8 +13,8 @@ import {
 } from "@/app/director/directorUi";
 import { apiGetAssignedUsers } from "@/app/Services/users.service";
 import {
-  apiGetUserProgress,
-  unwrapUserProgressDetail,
+  apiGetBulkProgress,
+  unwrapBulkProgressMap,
 } from "@/app/Services/progress.service";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import { isRemoteImageSrc, resolveApiMediaUrl } from "@/app/utils/image";
@@ -33,7 +33,7 @@ const mentorId = searchParams.get("mentorId") || "";
   const [pastors, setPastors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [openPastorMenuId, setOpenPastorMenuId] = useState<string | null>(null);
-  const [progressByPastorId, setProgressByPastorId] = useState<Record<string, number>>({});
+  const [progressByPastorId, setProgressByPastorId] = useState<Record<string, number | null>>({});
 
   useEffect(() => {
     if (!mentorId) return;
@@ -55,92 +55,46 @@ const mentorId = searchParams.get("mentorId") || "";
     loadAssignedPastors();
   }, [mentorId]);
   useEffect(() => {
-  if (!pastors.length) return;
+    const pastorIds = pastors
+      .map((pastor) => String(pastor?._id ?? pastor?.id ?? ""))
+      .map((id) => id.trim())
+      .filter(Boolean);
 
-  let cancelled = false;
+    if (!pastorIds.length) {
+      setProgressByPastorId({});
+      return;
+    }
 
-  async function loadProgress() {
-    const entries = await Promise.all(
-      pastors.map(async (pastor) => {
-        const pastorId = String(pastor?._id ?? pastor?.id ?? "");
+    let cancelled = false;
 
-        if (!pastorId) return null;
+    async function loadProgress() {
+      try {
+        const res = await apiGetBulkProgress(pastorIds);
+        const progressMap = unwrapBulkProgressMap(res);
+        if (cancelled) return;
 
-        try {
-          const res = await apiGetUserProgress(pastorId);
-          const detail = unwrapUserProgressDetail(res);
-
-          const roadmaps = Array.isArray(detail?.roadmaps)
-            ? detail.roadmaps
-            : [];
-
-          const totalTasks = roadmaps.reduce((sum: number, roadmap: any) => {
-            const nested = Array.isArray(roadmap?.nestedRoadmaps)
-              ? roadmap.nestedRoadmaps
-              : [];
-
-            return sum + (nested.length || 1);
-          }, 0);
-
-          const completedTasks = roadmaps.reduce(
-            (sum: number, roadmap: any) => {
-              const nested = Array.isArray(roadmap?.nestedRoadmaps)
-                ? roadmap.nestedRoadmaps
-                : [];
-
-              if (nested.length > 0) {
-                return (
-                  sum +
-                  nested.filter((task: any) => {
-                    const status = String(task?.status || "").toLowerCase();
-
-                    return (
-                      status.includes("complete") ||
-                      Number(task?.progressPercentage || 0) >= 100
-                    );
-                  }).length
-                );
-              }
-
-              const status = String(roadmap?.status || "").toLowerCase();
-
-              return (
-                sum +
-                (status.includes("complete") ||
-                Number(roadmap?.progressPercentage || 0) >= 100
-                  ? 1
-                  : 0)
-              );
-            },
-            0
-          );
-
-          const progress =
-            totalTasks > 0
-              ? Math.round((completedTasks / totalTasks) * 100)
-              : 0;
-
-          return [pastorId, progress];
-        } catch (error) {
-          console.error("Failed to load pastor progress", error);
-          return [pastorId, 0];
+        const next: Record<string, number | null> = {};
+        for (const pastorId of pastorIds) {
+          next[pastorId] = progressMap[pastorId] ?? null;
         }
-      })
-    );
+        setProgressByPastorId(next);
+      } catch (error) {
+        if (cancelled) return;
+        console.warn("Failed to load bulk pastor progress", error);
+        const fallback: Record<string, number | null> = {};
+        for (const pastorId of pastorIds) {
+          fallback[pastorId] = null;
+        }
+        setProgressByPastorId(fallback);
+      }
+    }
 
-    if (cancelled) return;
+    void loadProgress();
 
-    setProgressByPastorId(
-      Object.fromEntries(entries.filter(Boolean) as [string, number][])
-    );
-  }
-
-  loadProgress();
-
-  return () => {
-    cancelled = true;
-  };
-}, [pastors]);
+    return () => {
+      cancelled = true;
+    };
+  }, [pastors]);
 
   return (
     <div className={directorPageRoot}>
@@ -180,7 +134,8 @@ const mentorId = searchParams.get("mentorId") || "";
             <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
               {pastors.map((pastor) => {
                 const pastorId = String(pastor?._id ?? pastor?.id ?? "");
-                const progress = progressByPastorId[pastorId] ?? 0;
+                const progress = progressByPastorId[pastorId];
+                const progressValue = typeof progress === "number" ? progress : null;
                 const name =
                   `${pastor?.firstName ?? ""} ${pastor?.lastName ?? ""}`.trim() ||
                   pastor?.email ||
@@ -286,14 +241,14 @@ const mentorId = searchParams.get("mentorId") || "";
 <div className="mt-4">
   <div className="mb-1 flex items-center justify-between text-[11px] font-semibold text-white/65">
     <span>Roadmap Progress</span>
-    <span>{progress}%</span>
+    <span>{progressValue == null ? "—" : `${progressValue}%`}</span>
   </div>
 
   <div className="h-2 overflow-hidden rounded-full bg-white/10">
     <div
       className="h-full rounded-full bg-[#3498DB] transition-all duration-500"
       style={{
-        width: `${Math.max(0, Math.min(100, progress))}%`,
+        width: `${Math.max(0, Math.min(100, progressValue ?? 0))}%`,
       }}
     />
   </div>

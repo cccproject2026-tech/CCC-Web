@@ -141,7 +141,14 @@ const todayOnlySections = useMemo(() => {
                             onClick={onClose}
                             className="block rounded-xl border border-white/10 bg-white/[0.06] px-3 py-3 transition hover:border-[#8ec5eb]/35 hover:bg-white/[0.09]"
                           >
-                            <p className="text-sm font-medium text-white">{item.title}</p>
+                            <div className="flex items-start justify-between gap-3">
+                              <p className="text-sm font-medium text-white">{item.title}</p>
+                              {section.id === "meetings" && item.status && item.status.toLowerCase() === "cancelled" ? (
+                                <span className="shrink-0 rounded-full border border-red-300/30 bg-red-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-100">
+                                  Cancelled
+                                </span>
+                              ) : null}
+                            </div>
                             {item.description ? (
                               <p className="mt-1 line-clamp-3 text-xs text-white/65">{item.description}</p>
                             ) : null}

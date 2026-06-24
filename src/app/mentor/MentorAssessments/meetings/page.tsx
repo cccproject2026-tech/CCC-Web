@@ -45,11 +45,18 @@ function getPastorName(item: any): string {
 }
 
 function getAssessmentIdFromAppointment(item: any): string {
-  const direct = String(item?.assessmentId ?? item?.assessment?._id ?? item?.assessment?.id ?? "").trim();
+  const direct = String(
+    item?.assessmentId ??
+      item?.assessment?._id ??
+      item?.assessment?.id ??
+      item?.metadata?.assessmentId ??
+      item?.meta?.assessmentId ??
+      "",
+  ).trim();
   if (direct) return direct;
 
   const notes = String(item?.notes ?? item?.description ?? "");
-  const match = notes.match(/assessmentId=([^|\s]+)/i);
+  const match = notes.match(/assessmentId\s*[:=]\s*([^|\s,]+)/i);
   return String(match?.[1] || "").trim();
 }
 

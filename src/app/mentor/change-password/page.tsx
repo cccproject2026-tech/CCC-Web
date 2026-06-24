@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import "@fortawesome/fontawesome-free/css/all.min.css";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import MentorHeader from "@/app/Components/MentorHeader";
 import { getCookie } from "@/app/utils/cookies";
 import { apiSetPassword } from "@/app/Services/auth.service";
 import { apiGetUserById } from "@/app/Services/users.service";
+import LoginPasswordField from "@/app/Components/LoginPasswordField";
 
 import UserProfile from "../../Assets/user-profile.png";
 import Image from "next/image";
@@ -21,6 +22,7 @@ import {
 
 export default function MentorChangePasswordPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState<string>("");
@@ -32,6 +34,32 @@ export default function MentorChangePasswordPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const backTarget = searchParams.get("returnTo");
+
+  const safeBackTarget = useCallback((value: string | null) => {
+    const target = String(value ?? "").trim();
+    if (!target) return "";
+    if (!target.startsWith("/")) return "";
+    if (target.startsWith("//")) return "";
+    if (target.startsWith("/\\") || target.includes("://")) return "";
+    return target;
+  }, []);
+
+  const handleBack = useCallback(() => {
+    const safeReturnTo = safeBackTarget(backTarget);
+    if (safeReturnTo) {
+      router.push(safeReturnTo);
+      return;
+    }
+
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+
+    router.push("/mentor/profile");
+  }, [backTarget, router, safeBackTarget]);
 
   useEffect(() => {
     let mounted = true;
@@ -116,11 +144,11 @@ export default function MentorChangePasswordPage() {
         <div className="mx-auto w-full max-w-4xl">
           <button
             type="button"
-            onClick={() => router.push("/mentor/profile")}
+            onClick={handleBack}
             className={`mb-4 inline-flex items-center gap-2 ${mentorSecondaryCta}`}
           >
             <i className="fa-solid fa-arrow-left" aria-hidden />
-            Back to profile
+            Back
           </button>
 
           <div className={`p-6 sm:p-8 ${mentorGlassCardFrost}`}>
@@ -151,35 +179,38 @@ export default function MentorChangePasswordPage() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className={mentorFieldLabel}>Current Password</label>
-                  <input
-                    type="password"
+                  <LoginPasswordField
                     value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30"
+                    onChange={setCurrentPassword}
+                    disabled={submitting}
                     placeholder="Enter current password"
+                    autoComplete="current-password"
+                    inputClassName="w-full rounded-xl border border-white/20 bg-white/10 py-2.5 pl-4 pr-12 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30"
                   />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className={mentorFieldLabel}>New Password</label>
-                    <input
-                      type="password"
+                    <LoginPasswordField
                       value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30"
+                      onChange={setNewPassword}
+                      disabled={submitting}
                       placeholder="Enter new password"
+                      autoComplete="new-password"
+                      inputClassName="w-full rounded-xl border border-white/20 bg-white/10 py-2.5 pl-4 pr-12 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30"
                     />
                   </div>
 
                   <div>
                     <label className={mentorFieldLabel}>Confirm New Password</label>
-                    <input
-                      type="password"
+                    <LoginPasswordField
                       value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30"
+                      onChange={setConfirmPassword}
+                      disabled={submitting}
                       placeholder="Confirm new password"
+                      autoComplete="new-password"
+                      inputClassName="w-full rounded-xl border border-white/20 bg-white/10 py-2.5 pl-4 pr-12 text-sm text-white placeholder:text-[#cde2f2] outline-none focus:border-[#8ec5eb]/50 focus:ring-2 focus:ring-[#8ec5eb]/30"
                     />
                   </div>
                 </div>
@@ -187,7 +218,7 @@ export default function MentorChangePasswordPage() {
                 <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
                   <button
                     type="button"
-                    onClick={() => router.push("/mentor/profile")}
+                    onClick={handleBack}
                     className={mentorSecondaryCta}
                   >
                     Cancel

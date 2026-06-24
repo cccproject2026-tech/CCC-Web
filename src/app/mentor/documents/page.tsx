@@ -3,7 +3,8 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { uploadDocument } from "@/app/Services/pastor.service";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import MentorHeader from "@/app/Components/MentorHeader";
@@ -19,6 +20,8 @@ import {
 } from "@/app/Components/mentor/mentor-theme";
 
 export default function MentorDocumentsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<any[]>([]);
   const [menteeDocuments, setMenteeDocuments] = useState<any[]>([]);
@@ -35,6 +38,30 @@ const [deleting, setDeleting] = useState(false);
 
   const [uploading, setUploading] = useState(false);
 const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const safeBackTarget = useCallback((value: string | null) => {
+    const target = String(value ?? "").trim();
+    if (!target) return "";
+    if (!target.startsWith("/")) return "";
+    if (target.startsWith("//")) return "";
+    if (target.startsWith("/\\") || target.includes("://")) return "";
+    return target;
+  }, []);
+
+  const handleBack = useCallback(() => {
+    const safeReturnTo = safeBackTarget(searchParams.get("returnTo"));
+    if (safeReturnTo) {
+      router.push(safeReturnTo);
+      return;
+    }
+
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+      return;
+    }
+
+    router.push("/mentor/home");
+  }, [router, safeBackTarget, searchParams]);
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -290,15 +317,17 @@ useEffect(() => {
 
       <main className={`${mentorMainGradient} flex-1 px-4 py-10 md:px-8 lg:px-16`}>
         <div className={`mx-auto max-w-6xl p-6 md:p-8 ${mentorGlassCardFrost}`}>
-          {/* <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-            <div>
-              <h1 className="text-3xl font-semibold md:text-4xl">Documents</h1>
-              <p className={`mt-2 ${mentorBodyText}`}>
-                Manage and review your uploaded ministry documents.
-              </p>
-            </div>
-          </div> */}
-          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div className="flex flex-col gap-4 md:gap-6">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="inline-flex w-fit items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10"
+            >
+              <i className="fa-solid fa-arrow-left" aria-hidden />
+              Back
+            </button>
+
+            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
   <div>
     <h1 className="text-3xl font-semibold md:text-4xl">Documents</h1>
     <p className={`mt-2 ${mentorBodyText}`}>
@@ -324,6 +353,7 @@ useEffect(() => {
     {uploading ? "Uploading..." : "Upload Document"}
   </button>
 </div>
+          </div>
           <div className="mt-8 grid grid-cols-2 overflow-hidden rounded-xl border border-white/15 bg-white/5">
   <button
     type="button"

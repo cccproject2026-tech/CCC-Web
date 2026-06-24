@@ -167,6 +167,20 @@ function appointmentMeetingDate(a: unknown): string {
   return v != null ? String(v) : "";
 }
 
+function appointmentStatus(a: unknown): string {
+  if (!a || typeof a !== "object") return "";
+  const o = a as Record<string, unknown>;
+  return String(o.status ?? o.appointmentStatus ?? o.meetingStatus ?? "").trim();
+}
+
+function isCancelledStatus(status: string): boolean {
+  const raw = String(status ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-");
+  return raw === "cancelled" || raw === "canceled";
+}
+
 function getSchedulerLabel(
   appointment: Record<string, unknown>,
   userId?: string,
@@ -331,11 +345,13 @@ const flattenedTasks: TaskWithRoadmap[] = roadmaps
       const md = appointmentMeetingDate(appointment);
       const scheduler = getSchedulerLabel(appointment, pastorUserId, mentorNameById);
       const withWhom = getWithWhomLabel(appointment, mentorNameById);
+      const status = appointmentStatus(appointment);
       return {
         id: `meeting-${String(appointment.id ?? appointment._id ?? md)}`,
         title: meetingListTitle(appointment),
         description: `Starts ${formatDateTime(md)}.`,
         meta: `${scheduler} • ${withWhom} • Next ${NEXT_APPOINTMENTS_WINDOW_DAYS} days`,
+        status: isCancelledStatus(status) ? "Cancelled" : status,
         href: appointmentDetailHref(appointment),
       };
     });
