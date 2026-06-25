@@ -518,11 +518,34 @@ const findAssessmentExtra = (items: any[] | undefined): any | null => {
 };
 const hasCdpContent = (row: any) => {
   if (!row) return false;
-  if (row.sent === true || row.status === "sent") return true;
+  const status = String(row.status ?? "").trim().toLowerCase();
+  if (row.sent === true) return true;
+  if (status === "sent" || status === "completed") return true;
 
-  return Object.values(row).some(
-    (value) => typeof value === "string" && value.trim().length > 0,
-  );
+  const sentAt = String(row.sentAt ?? "").trim();
+  if (sentAt) return true;
+
+  const recommendationSubmittedAt = String(row.submittedAt ?? "").trim();
+  if (recommendationSubmittedAt && String(row.type ?? "").trim().toLowerCase().includes("recommend")) {
+    return true;
+  }
+
+  const cdpId = String(
+    row.customizedDevelopmentPlanId ??
+      row.customizedDevelopmentPlan?._id ??
+      row.customizedDevelopmentPlan?.id ??
+      "",
+  ).trim();
+  if (cdpId) return true;
+
+  const cdpText = String(
+    row.customizedDevelopmentPlan ??
+      row.cdp ??
+      "",
+  ).trim();
+  if (cdpText) return true;
+
+  return false;
 };
 useEffect(() => {
   if (!task || !userId) {
@@ -642,6 +665,19 @@ useEffect(() => {
             score += 10;
           }
 
+          const assessmentMatched =
+            readAppointmentField(appt, "assessmentId") === assessmentTaskState.assessmentId ||
+            notesContainToken(notes, "assessmentId", assessmentTaskState.assessmentId);
+
+          const taskMatched =
+            !!taskId &&
+            (readAppointmentField(appt, "taskId") === taskId ||
+              notesContainToken(notes, "taskId", taskId));
+
+          if (!assessmentMatched && !taskMatched) {
+            return { appt, score: -1 };
+          }
+
           if (
             roadmapId &&
             (readAppointmentField(appt, "roadmapId") === roadmapId ||
@@ -650,11 +686,7 @@ useEffect(() => {
             score += 4;
           }
 
-          if (
-            taskId &&
-            (readAppointmentField(appt, "taskId") === taskId ||
-              notesContainToken(notes, "taskId", taskId))
-          ) {
+          if (taskMatched) {
             score += 4;
           }
 
@@ -1391,6 +1423,10 @@ const uploadedFiles = getUploadedFilesForSubmission(normalizedLabel, item, 0, tr
 const renderTemplateExtra = (extra: Record<string, any>, idx: number): JSX.Element | null => {
   const type = String(extra.type ?? "").toUpperCase();
   const label = String(extra.name ?? "").trim();
+
+  if (type === "ASSESSMENT" && assessmentTaskState?.submitted) {
+    return null;
+  }
 
   if (type === "SECTION") {
     const children = Array.isArray(extra.sections) ? extra.sections : [];

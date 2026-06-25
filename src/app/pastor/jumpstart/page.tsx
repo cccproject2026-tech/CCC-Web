@@ -5600,8 +5600,27 @@ const getRoadmapAssessmentMeeting = (assessmentId: string) => {
   return appointments.find((appt: any) => {
     const notes = String(appt?.notes || "");
     const status = String(appt?.status || "").toLowerCase();
+    const metadata = appt?.metadata || appt?.meta || appt?.context || {};
+    if (status.includes("cancel")) return false;
 
-    return !status.includes("cancel") && notes.includes(`assessmentId:${assessmentId}`);
+    const assessmentMatched =
+      notes.includes(`assessmentId:${assessmentId}`) ||
+      String(appt?.assessmentId ?? metadata?.assessmentId ?? "").trim() === assessmentId;
+
+    const taskMatched =
+      !!nestedItemId &&
+      ((notes.includes(`taskId:${nestedItemId}`) || notes.includes(`taskId=${nestedItemId}`)) ||
+        String(appt?.taskId ?? metadata?.taskId ?? "").trim() === nestedItemId);
+
+    if (!assessmentMatched && !taskMatched) return false;
+
+    if (!roadmapId) return true;
+
+    return (
+      notes.includes(`roadmapId:${roadmapId}`) ||
+      notes.includes(`roadmapId=${roadmapId}`) ||
+      String(appt?.roadmapId ?? metadata?.roadmapId ?? "").trim() === roadmapId
+    );
   });
 };
 
@@ -5722,11 +5741,25 @@ const getRoadmapAssessmentMeeting = (assessmentId: string) => {
 
 const hasCdpContent = (row: any) => {
   if (!row) return false;
-  if (row.sent === true || row.status === "sent") return true;
+  const status = String(row.status ?? "").trim().toLowerCase();
+  if (row.sent === true) return true;
+  if (status === "sent" || status === "completed") return true;
 
-  return Object.values(row).some(
-    (value) => typeof value === "string" && value.trim().length > 0,
-  );
+  const sentAt = String(row.sentAt ?? "").trim();
+  if (sentAt) return true;
+
+  const cdpId = String(
+    row.customizedDevelopmentPlanId ??
+      row.customizedDevelopmentPlan?._id ??
+      row.customizedDevelopmentPlan?.id ??
+      "",
+  ).trim();
+  if (cdpId) return true;
+
+  const cdpText = String(row.customizedDevelopmentPlan ?? row.cdp ?? "").trim();
+  if (cdpText) return true;
+
+  return false;
 };
 useEffect(() => {
   if (!userId || assessmentExtras.length === 0) {
@@ -6994,7 +7027,7 @@ const scheduledMeeting = assessmentId
                 Assessment submitted
               </p>
               <p className="mt-1 text-xs text-white/60">
-                You can view your submitted answers and CDP from this roadmap task.
+                You can view your submitted answers and track your meeting and CDP status from this roadmap task.
               </p>
             </div>
 
@@ -7044,21 +7077,23 @@ const scheduledMeeting = assessmentId
   {scheduledMeeting ? "View Meeting Details" : "Schedule Meeting"}
 </button>
               )} */}
-              {state.hasCdp && (
-
-  <button
-    type="button"
-    onClick={() =>
-      router.push(
-       `/pastor/assessmentRecommendations?assessmentId=${encodeURIComponent(assessmentId || "")}`,
-        // `/pastor/Assessments/result/cdp?assessmentId=${assessmentId}&userId=${userId}&roadmapId=${roadmapId || ""}&taskId=${nestedItemId || ""}&parentId=${parentRoadmapId || ""}`,
-      )
-    }
-    className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
-  >
-    View CDP
-  </button>
-)}
+              {state.hasCdp ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/pastor/assessmentRecommendations?assessmentId=${encodeURIComponent(assessmentId || "")}`,
+                    )
+                  }
+                  className="rounded-lg border border-white/25 bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/15"
+                >
+                  View CDP
+                </button>
+              ) : (
+                <span className="inline-flex items-center rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white/60">
+                  Waiting for CDP
+                </span>
+              )}
 
 <button
   type="button"

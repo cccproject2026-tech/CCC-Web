@@ -154,24 +154,28 @@ function matchAppointmentForTask(
 
       const notes = String(appt?.notes ?? "");
       let score = 0;
-
-      if (
+      const assessmentMatched =
         readAppointmentField(appt, "assessmentId") === params.assessmentId ||
-        notesContainToken(notes, "assessmentId", params.assessmentId)
-      ) {
+        notesContainToken(notes, "assessmentId", params.assessmentId);
+      const taskMatched =
+        readAppointmentField(appt, "taskId") === params.taskId ||
+        notesContainToken(notes, "taskId", params.taskId);
+
+      if (assessmentMatched) {
         score += 10;
+      }
+
+      if (taskMatched) {
+        score += 4;
+      }
+
+      if (!assessmentMatched && !taskMatched) {
+        return { appt, score: -1 };
       }
 
       if (
         readAppointmentField(appt, "roadmapId") === params.roadmapId ||
         notesContainToken(notes, "roadmapId", params.roadmapId)
-      ) {
-        score += 4;
-      }
-
-      if (
-        readAppointmentField(appt, "taskId") === params.taskId ||
-        notesContainToken(notes, "taskId", params.taskId)
       ) {
         score += 4;
       }

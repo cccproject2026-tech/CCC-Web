@@ -1,8 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import MentorHeader from "@/app/Components/MentorHeader";
-import AvailabilityCalendar from "@/app/Components/AvailabilityCalendar";
-import { mentorSelectDark } from "@/app/Components/mentor/mentor-theme";
+import MentorRescheduleAppointmentDrawer from "@/app/Components/mentor/MentorRescheduleAppointmentDrawer";
+import { useToast } from "@/app/Components/ui/Toast";
 import HeroBg from "../../Assets/progress-bg.png";
 import "@fortawesome/fontawesome-free/css/all.min.css";
 import SessionProgressHeader from "@/app/Components/mentorship-sessions/SessionProgressHeader";
@@ -12,9 +12,18 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   apiGetMentorMentoringSessionsGrouped,
   apiGetMentorRescheduleRequests,
-  apiRescheduleMentoringSession,
 } from "@/app/Services/mentoring-sessions.service";
-import axiosInstance from "@/app/Services/config/axios-instance";
+import {
+  apiGetAppointmentById,
+  apiGetAppointments,
+} from "@/app/Services/appointments.service";
+import {
+  appointmentEntityId,
+  extractApiErrorMessage,
+  meetingDateLocalYmd,
+  unwrapAppointmentsAxiosData,
+} from "@/app/Services/appointment-utils";
+import type { Appointment } from "@/app/Services/types";
 const SESSION_TITLES = [
   "Building Trust, Self-Awareness & Resources",
   "Creating a Life of Prayer, Vision, & Family Balance",
@@ -46,10 +55,6 @@ type MentorSessionGroup = {
   pastorName: string;
   pastorEmail: string;
   sessions: MentorSession[];
-};
-
-type RescheduleFormState = {
-  platform: string;
 };
 
 function getStringValue(...values: unknown[]): string {
@@ -111,16 +116,93 @@ function getRealSessionId(session: any) {
   return id;
 }
 
-function convertTo24Hour(time12: string, period: string): string {
-  let [hours, minutes] = time12.split(":").map(Number);
-  if (period.toUpperCase() === "PM" && hours !== 12) hours += 12;
-  if (period.toUpperCase() === "AM" && hours === 12) hours = 0;
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+function getPersonEntityId(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (!value || typeof value !== "object") return "";
+  return getStringValue((value as any)?._id, (value as any)?.id);
 }
 
-function availabilitySlotToIso(dateValue: string, slot: any) {
-  if (!dateValue || !slot?.startTime || !slot?.startPeriod) return "";
-  return new Date(`${dateValue.slice(0, 10)}T${convertTo24Hour(slot.startTime, slot.startPeriod)}`).toISOString();
+function getAppointmentUserId(appointment: Appointment) {
+  return getStringValue(
+    (appointment.user as any)?._id,
+    (appointment.user as any)?.id,
+    getPersonEntityId(appointment.userId),
+  );
+}
+
+function getAppointmentMentorId(appointment: Appointment) {
+  return getStringValue(
+    (appointment.mentor as any)?._id,
+    (appointment.mentor as any)?.id,
+    getPersonEntityId(appointment.mentorId),
+  );
+}
+
+function getAppointmentTitle(appointment: Appointment) {
+  return getStringValue(
+    appointment.title,
+    (appointment as any)?.meetingTitle,
+    (appointment as any)?.appointmentTitle,
+    (appointment as any)?.metadata?.title,
+    (appointment as any)?.meta?.title,
+  );
+}
+
+function textContainsSessionNumber(text: string, sessionNumber: number) {
+  if (!text || !sessionNumber) return false;
+  return text.toLowerCase().includes(`session ${sessionNumber}`);
+}
+
+function dedupeAppointments(appointments: Appointment[]) {
+  const seen = new Map<string, Appointment>();
+  appointments.forEach((appointment) => {
+    const key =
+      appointmentEntityId(appointment) ||
+      `${getAppointmentUserId(appointment)}-${getAppointmentMentorId(appointment)}-${appointment.meetingDate}`;
+    if (!seen.has(key)) seen.set(key, appointment);
+  });
+  return Array.from(seen.values());
+}
+
+function findMatchingAppointment(
+  appointments: Appointment[],
+  session: MentorSession,
+  mentorId: string,
+) {
+  const appointmentId = getStringValue(session.appointmentId);
+  const sessionDate = getStringValue(session.scheduledDate);
+  const sessionDateYmd = meetingDateLocalYmd(sessionDate);
+  const sessionTitle = getStringValue(session.title).toLowerCase();
+  const scoped = appointments.filter((appointment) => {
+    const matchesPastor = !session.pastorId || getAppointmentUserId(appointment) === session.pastorId;
+    const matchesMentor = !mentorId || getAppointmentMentorId(appointment) === mentorId;
+    return matchesPastor && matchesMentor;
+  });
+  const candidates = scoped.length > 0 ? scoped : appointments;
+
+  return (
+    candidates.find((appointment) => appointmentEntityId(appointment) === appointmentId) ||
+    candidates.find(
+      (appointment) =>
+        sessionDate &&
+        appointment.meetingDate === sessionDate &&
+        textContainsSessionNumber(getAppointmentTitle(appointment), session.sessionNumber),
+    ) ||
+    candidates.find(
+      (appointment) =>
+        sessionDateYmd &&
+        meetingDateLocalYmd(appointment.meetingDate) === sessionDateYmd &&
+        textContainsSessionNumber(getAppointmentTitle(appointment), session.sessionNumber),
+    ) ||
+    candidates.find(
+      (appointment) =>
+        sessionDateYmd &&
+        meetingDateLocalYmd(appointment.meetingDate) === sessionDateYmd &&
+        getAppointmentTitle(appointment).toLowerCase() === sessionTitle,
+    ) ||
+    candidates.find((appointment) => getAppointmentTitle(appointment).toLowerCase() === sessionTitle) ||
+    null
+  );
 }
 
 function normalizeBackendSession(session: any, group: any): MentorSession | null {
@@ -182,6 +264,7 @@ function normalizeGroupedSession(group: any): MentorSessionGroup | null {
   };
 }
 export default function MentorMentoringSessionPage() {
+    const toast = useToast();
     const router = useRouter();
     const searchParams = useSearchParams();
     const pastorIdFromQuery = searchParams.get("pastorId") || "";
@@ -193,17 +276,8 @@ export default function MentorMentoringSessionPage() {
     const [loading, setLoading] = useState(true);
     const [groupedError, setGroupedError] = useState<string | null>(null);
     const [rescheduleSession, setRescheduleSession] = useState<MentorSession | null>(null);
-    const [rescheduleForm, setRescheduleForm] = useState<RescheduleFormState>({
-      platform: "zoom",
-    });
-    const [rescheduleSubmittingId, setRescheduleSubmittingId] = useState<string | null>(null);
-    const today = new Date();
-    const [rescheduleMonth, setRescheduleMonth] = useState(today.getMonth());
-    const [rescheduleYear, setRescheduleYear] = useState(today.getFullYear());
-    const [rescheduleSelectedDate, setRescheduleSelectedDate] = useState(today.getDate());
-    const [rescheduleMonthlyAvailabilitySlots, setRescheduleMonthlyAvailabilitySlots] = useState<any[]>([]);
-    const [rescheduleAvailabilityLoading, setRescheduleAvailabilityLoading] = useState(false);
-    const [rescheduleSelectedSlot, setRescheduleSelectedSlot] = useState("");
+    const [rescheduleAppointment, setRescheduleAppointment] = useState<Appointment | null>(null);
+    const [rescheduleLookupId, setRescheduleLookupId] = useState<string | null>(null);
 
     const fetchGroupedSessions = useCallback(async () => {
       const mentorId = getBrowserMentorId();
@@ -232,102 +306,68 @@ export default function MentorMentoringSessionPage() {
       setRescheduleRequests(requests);
     }, []);
 
-    const openRescheduleDrawer = (session: MentorSession) => {
+    const showToast = useCallback(
+      (message: string, kind: "success" | "error" | "info" = "info", subtitle?: string) => {
+        toast.show({ kind, title: message, subtitle });
+      },
+      [toast],
+    );
+
+    const resolveAppointmentForSession = useCallback(async (session: MentorSession) => {
+      const mentorId = getBrowserMentorId();
+      if (!mentorId) return null;
+
+      const appointmentId = getStringValue(session.appointmentId);
+      if (appointmentId) {
+        try {
+          const response = await apiGetAppointmentById(appointmentId);
+          const appointment = ((response.data as any)?.data ?? response.data) as Appointment | null;
+          if (appointment && appointmentEntityId(appointment)) return appointment;
+        } catch {
+          // Fall back to schedule/upcoming endpoints below.
+        }
+      }
+
+      const [mentorAppointmentsRes, pastorAppointmentsRes] = await Promise.all([
+        apiGetAppointments({ mentorId, futureOnly: false }),
+        session.pastorId
+          ? apiGetAppointments({ userId: session.pastorId, futureOnly: false })
+          : Promise.resolve({ data: [] } as any),
+      ]);
+
+      const appointments = dedupeAppointments([
+        ...unwrapAppointmentsAxiosData(mentorAppointmentsRes),
+        ...unwrapAppointmentsAxiosData(pastorAppointmentsRes),
+      ] as Appointment[]);
+
+      return findMatchingAppointment(appointments, session, mentorId);
+    }, []);
+
+    const openRescheduleDrawer = async (session: MentorSession) => {
       const sessionId = getRealSessionId(session);
       if (!sessionId) {
-        alert("This session is not available for reschedule yet.");
-        return;
-      }
-
-      setRescheduleSession({ ...session, id: sessionId });
-      setRescheduleForm({
-        platform: getStringValue((session as any)?.platform, (session as any)?.meetingPlatform, "zoom"),
-      });
-      const now = new Date();
-      setRescheduleMonth(now.getMonth());
-      setRescheduleYear(now.getFullYear());
-      setRescheduleSelectedDate(now.getDate());
-      setRescheduleSelectedSlot("");
-      setRescheduleMonthlyAvailabilitySlots([]);
-    };
-
-    useEffect(() => {
-      if (!rescheduleSession) return;
-      const mentorId = getBrowserMentorId();
-      if (!mentorId) return;
-
-      let cancelled = false;
-      setRescheduleAvailabilityLoading(true);
-
-      void axiosInstance
-        .get(`/appointments/availability/${mentorId}/month`, {
-          params: { year: rescheduleYear, month: rescheduleMonth + 1 },
-        })
-        .then((response) => {
-          if (!cancelled) {
-            const raw = response.data?.data ?? response.data;
-            setRescheduleMonthlyAvailabilitySlots(Array.isArray(raw) ? raw : []);
-          }
-        })
-        .catch(() => {
-          if (!cancelled) setRescheduleMonthlyAvailabilitySlots([]);
-        })
-        .finally(() => {
-          if (!cancelled) setRescheduleAvailabilityLoading(false);
-        });
-
-      return () => {
-        cancelled = true;
-      };
-    }, [rescheduleSession, rescheduleMonth, rescheduleYear]);
-
-    const handleReschedulePrevMonth = () => {
-      setRescheduleSelectedSlot("");
-      if (rescheduleMonth === 0) {
-        setRescheduleMonth(11);
-        setRescheduleYear((year) => year - 1);
-      } else {
-        setRescheduleMonth((month) => month - 1);
-      }
-    };
-
-    const handleRescheduleNextMonth = () => {
-      setRescheduleSelectedSlot("");
-      if (rescheduleMonth === 11) {
-        setRescheduleMonth(0);
-        setRescheduleYear((year) => year + 1);
-      } else {
-        setRescheduleMonth((month) => month + 1);
-      }
-    };
-
-    const submitReschedule = async () => {
-      if (!rescheduleSession) return;
-
-      const sessionId = getRealSessionId(rescheduleSession);
-      if (!sessionId) {
-        alert("This session is not available for reschedule yet.");
-        return;
-      }
-
-      if (!rescheduleSelectedSlot) {
-        alert("Please select an available time slot.");
+        showToast("This session is not available for reschedule yet.", "error");
         return;
       }
 
       try {
-        setRescheduleSubmittingId(sessionId);
-        await apiRescheduleMentoringSession(sessionId, {
-          scheduledDate: rescheduleSelectedSlot,
-          ...(rescheduleForm.platform ? { platform: rescheduleForm.platform } : {}),
-        });
-        alert("Session rescheduled successfully.");
-        setRescheduleSession(null);
-        await fetchGroupedSessions();
-      } catch (err) {
-        alert(err instanceof Error ? err.message : "Failed to reschedule session.");
+        setRescheduleLookupId(sessionId);
+        const resolvedAppointment = await resolveAppointmentForSession({ ...session, id: sessionId });
+        if (!resolvedAppointment) {
+          showToast(
+            "Unable to find the appointment for this session.",
+            "error",
+            "Please refresh and try again.",
+          );
+          return;
+        }
+
+        setRescheduleSession({ ...session, id: sessionId });
+        setRescheduleAppointment(resolvedAppointment);
+      } catch (error) {
+        showToast("Cannot open reschedule drawer", "error", extractApiErrorMessage(error));
       } finally {
-        setRescheduleSubmittingId(null);
+        setRescheduleLookupId(null);
       }
     };
 
@@ -371,9 +411,9 @@ export default function MentorMentoringSessionPage() {
 
 
  const handleViewDetails = (session: MentorSession) => {
-  const sessionId = String(session.id || "");
+ const sessionId = String(session.id || "");
   if (!sessionId || sessionId.startsWith("locked-") || sessionId.startsWith("unscheduled-")) {
-    alert("This session is not available yet.");
+    showToast("This session is not available yet.", "error");
     return;
   }
 
@@ -522,136 +562,6 @@ const getRescheduleRequestForSession = (session: any) =>
     return (
         <div className="flex min-h-screen flex-col bg-[#062946] font-[Albert_Sans] text-white">
             <MentorHeader showFullHeader />
-
-            {rescheduleSession ? (
-              <>
-                <div
-                  className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
-                  onClick={() => {
-                    if (!rescheduleSubmittingId) setRescheduleSession(null);
-                  }}
-                  aria-hidden
-                />
-                <div className="fixed right-0 top-0 z-50 h-full w-full border-l border-white/15 bg-[#041f35] text-white shadow-2xl sm:max-w-[480px] sm:w-[480px]">
-                  <div className="flex h-full flex-col p-6">
-                    <div className="mb-6 flex shrink-0 items-center justify-between">
-                      <div>
-                        <h2 className="flex items-center gap-2 text-lg font-semibold">
-                          <i className="fa-regular fa-calendar-days text-[#8ec5eb]" />
-                          Reschedule session
-                        </h2>
-                        <p className="mt-1 pl-7 text-sm font-medium text-[#8ec5eb]">
-                          Session {rescheduleSession.sessionNumber}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setRescheduleSession(null)}
-                        disabled={rescheduleSubmittingId != null}
-                        className="rounded-lg p-2 text-[#cde2f2] transition hover:bg-white/10 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
-                        aria-label="Close"
-                      >
-                        <i className="fa-solid fa-xmark text-xl" />
-                      </button>
-                    </div>
-
-                    <div className="mb-6 flex-1 space-y-5 overflow-y-auto pr-3">
-                      <div className="rounded-xl border border-white/15 bg-white/5 p-4">
-                        <p className="mb-3 text-sm text-[#cde2f2]">Mentor Availability</p>
-                        {rescheduleAvailabilityLoading ? (
-                          <div className="flex justify-center py-8">
-                            <div className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-r-white" />
-                          </div>
-                        ) : (
-                          <AvailabilityCalendar
-                            mentorId={getBrowserMentorId()}
-                            currentMonth={rescheduleMonth}
-                            currentYear={rescheduleYear}
-                            selectedDate={rescheduleSelectedDate}
-                            onDateSelect={(day) => {
-                              setRescheduleSelectedDate(day);
-                              setRescheduleSelectedSlot("");
-                            }}
-                            onPrevMonth={handleReschedulePrevMonth}
-                            onNextMonth={handleRescheduleNextMonth}
-                            availabilitySlots={rescheduleMonthlyAvailabilitySlots}
-                            isLoading={rescheduleAvailabilityLoading}
-                          />
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="mb-3 block text-sm font-semibold text-[#cde2f2]">
-                          Available times on {new Date(rescheduleYear, rescheduleMonth, rescheduleSelectedDate).toLocaleDateString()}
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                          {(() => {
-                            const selectedDateSlots = rescheduleMonthlyAvailabilitySlots.find(
-                              (slot: any) => new Date(slot.date).getDate() === rescheduleSelectedDate,
-                            );
-                            const timeSlots = selectedDateSlots?.slots || [];
-                            if (timeSlots.length === 0) {
-                              return <p className="col-span-2 text-sm text-[#cde2f2]">No slots available on this date</p>;
-                            }
-                            return timeSlots.map((slot: any, index: number) => {
-                              const isoString = availabilitySlotToIso(selectedDateSlots.date, slot);
-                              const timeLabel = `${slot.startTime} ${slot.startPeriod}`;
-                              return (
-                                <button
-                                  key={`${timeLabel}-${index}`}
-                                  type="button"
-                                  onClick={() => setRescheduleSelectedSlot(isoString)}
-                                  className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition ${
-                                    rescheduleSelectedSlot === isoString
-                                      ? "border-blue-500 bg-blue-600 text-white"
-                                      : "border-white/20 text-white hover:bg-white/10"
-                                  }`}
-                                >
-                                  {timeLabel}
-                                </button>
-                              );
-                            });
-                          })()}
-                        </div>
-                      </div>
-
-                      <label className="block">
-                        <span className="text-sm font-semibold text-[#cde2f2]">Platform</span>
-                        <select
-                          value={rescheduleForm.platform}
-                          onChange={(event) => setRescheduleForm((prev) => ({ ...prev, platform: event.target.value }))}
-                          className={`${mentorSelectDark} mt-2 w-full`}
-                        >
-                          <option className="bg-[#062946]" value="zoom">Zoom</option>
-                          <option className="bg-[#062946]" value="google-meet">Google Meet</option>
-                          <option className="bg-[#062946]" value="teams">Microsoft Teams</option>
-                          <option className="bg-[#062946]" value="phone">Phone</option>
-                        </select>
-                      </label>
-                    </div>
-
-                    <div className="flex shrink-0 justify-end gap-3 border-t border-white/10 pt-6">
-                      <button
-                        type="button"
-                        onClick={() => setRescheduleSession(null)}
-                        disabled={rescheduleSubmittingId != null}
-                        className="rounded-lg border border-white/20 px-4 py-2 text-xs text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        disabled={rescheduleSubmittingId === rescheduleSession.id}
-                        onClick={submitReschedule}
-                        className="rounded-lg bg-blue-600 px-6 py-2 text-xs font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        {rescheduleSubmittingId === rescheduleSession.id ? "Saving..." : "Save changes"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : null}
 
             {/* HERO SECTION */}
             <section
@@ -918,10 +828,11 @@ const filteredSessions = allSessions.filter((session) => {
 
     <button
       type="button"
-      onClick={() => openRescheduleDrawer(missedSession as MentorSession)}
+      onClick={() => void openRescheduleDrawer(missedSession as MentorSession)}
+      disabled={rescheduleLookupId === getRealSessionId(missedSession)}
      className="self-end rounded-lg border border-green-400/30 bg-green-500/20 px-3 py-1.5 text-xs font-semibold text-green-100 hover:bg-green-500/30"
     >
-      Reschedule meeting
+      {rescheduleLookupId === getRealSessionId(missedSession) ? "Opening..." : "Reschedule meeting"}
     </button>
   </div>
 ) : null}
@@ -1058,10 +969,11 @@ const filteredSessions = allSessions.filter((session) => {
                                                               <div className="border-t border-white/10 px-6 py-3 text-right">
                                                                 <button
                                                                   type="button"
-                                                                  onClick={() => openRescheduleDrawer({ ...session, id: sessionId })}
+                                                                  onClick={() => void openRescheduleDrawer({ ...session, id: sessionId })}
+                                                                  disabled={rescheduleLookupId === sessionId}
                                                                   className="rounded-lg border border-green-400/30 bg-green-500/20 px-3 py-1.5 text-xs font-semibold text-green-100 hover:bg-green-500/30"
                                                                 >
-                                                                  Reschedule
+                                                                  {rescheduleLookupId === sessionId ? "Opening..." : "Reschedule"}
                                                                 </button>
                                                               </div>
                                                             ) : null}
@@ -1092,6 +1004,26 @@ const filteredSessions = allSessions.filter((session) => {
                     </div>
                 )}
             </main>
+            <MentorRescheduleAppointmentDrawer
+              open={Boolean(rescheduleAppointment)}
+              appointment={rescheduleAppointment}
+              mentorId={getBrowserMentorId() || null}
+              onClose={() => {
+                setRescheduleAppointment(null);
+                setRescheduleSession(null);
+              }}
+              onSuccess={async () => {
+                if (rescheduleSession?.pastorId) {
+                  setSelectedPastorId(rescheduleSession.pastorId);
+                }
+                await fetchGroupedSessions();
+              }}
+              onToast={(message) => {
+                const normalized = message.toLowerCase();
+                const kind = normalized.includes("success") ? "success" : "error";
+                showToast(message, kind);
+              }}
+            />
         </div>
     );
 }

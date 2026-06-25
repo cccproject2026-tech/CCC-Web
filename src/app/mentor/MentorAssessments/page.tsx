@@ -128,6 +128,44 @@ function hasSubmittedMainAssessmentAnswers(body: unknown): boolean {
   });
 }
 
+function hasStrictSentCdp(node: unknown): boolean {
+  if (!node) return false;
+
+  if (Array.isArray(node)) {
+    return node.some((item) => hasStrictSentCdp(item));
+  }
+
+  if (typeof node !== "object") return false;
+
+  const row = node as Record<string, unknown>;
+  const status = String(row.status ?? "").trim().toLowerCase();
+  const type = String(row.type ?? "").trim().toLowerCase();
+
+  if (row.sent === true || row.isSent === true) return true;
+  if (status === "sent" || status === "completed") return true;
+  if (row.sentAt != null) return true;
+  if (row.submittedAt != null && type.includes("recommend")) return true;
+
+  const customizedDevelopmentPlan = row.customizedDevelopmentPlan;
+  if (row.customizedDevelopmentPlanId != null) return true;
+  if (row.cdp != null) return true;
+  if (typeof customizedDevelopmentPlan === "string" && customizedDevelopmentPlan.trim() !== "") return true;
+  if (
+    customizedDevelopmentPlan &&
+    typeof customizedDevelopmentPlan === "object" &&
+    Object.keys(customizedDevelopmentPlan as Record<string, unknown>).length > 0
+  ) {
+    return true;
+  }
+
+  if (row.data != null && hasStrictSentCdp(row.data)) return true;
+  if (row.sections != null && hasStrictSentCdp(row.sections)) return true;
+  if (row.recommendations != null && hasStrictSentCdp(row.recommendations)) return true;
+  if (row.layers != null && hasStrictSentCdp(row.layers)) return true;
+
+  return false;
+}
+
 function statusChipClass(status: MentorAssessmentStatus): string {
   if (status === "completed") return "border-emerald-300/40 bg-emerald-400/20 text-emerald-100";
   if (status === "submitted") return "border-amber-300/40 bg-amber-400/20 text-amber-100";
@@ -705,9 +743,7 @@ const progressStatus = progressRow?.status || "not_started";
 let normalizedStatus: MentorAssessmentStatus = "not_started";
 
 
-const hasMeetingDetails = Boolean(resolvedAppointmentId || appt?.meetingDate);
-
-if (hasMeetingDetails && hasSentCdp) {
+if (hasSentCdp) {
   normalizedStatus = "completed";
 } else if (hasSubmittedAnswers) {
   normalizedStatus = "submitted";
@@ -729,7 +765,6 @@ console.log("CDP CHECK:", {
 _mentorCreatedAt:
   (item as any)?.assignedAt ||
   flat?.updatedAt ||
-  flat?.assignedAt ||
   fullAssessment?.createdAt ||
   assessment?.createdAt ||
   fullAssessment?.updatedAt ||
@@ -782,54 +817,15 @@ const assignedWithCdp = await Promise.all(
       const data = body?.data ?? body;
 
     
-  const hasRecommendationContent = (node: any): boolean => {
-    if (!node) return false;
-
-    if (typeof node === "string") return node.trim() !== "";
-
-    if (Array.isArray(node)) {
-      return node.some((item) => hasRecommendationContent(item));
-    }
-
-    if (typeof node !== "object") return false;
-
-    if (node.sent === true || node.status === "sent") return true;
-
-    const contentKeys = ["message", "text", "cdp", "mentorCdp", "recommendation"];
-    if (contentKeys.some((key) => hasRecommendationContent(node[key]))) return true;
-
-    if (
-      Array.isArray(node.recommendations) &&
-      node.recommendations.some((rec: any) =>
-        typeof rec === "string" ? rec.trim() !== "" : rec != null || hasRecommendationContent(rec),
-      )
-    ) {
-      return true;
-    }
-
-    if (Array.isArray(node.sections) && node.sections.some((section: any) => hasRecommendationContent(section))) {
-      return true;
-    }
-
-    if (Array.isArray(node.layers) && node.layers.some((layer: any) => hasRecommendationContent(layer))) {
-      return true;
-    }
-
-    return false;
-  };
-
-  const hasBackendCdp = hasRecommendationContent(data);
+  const hasBackendCdp = hasStrictSentCdp(data);
 
 const finalHasCdp = assessment._mentorHasSentCdp || hasBackendCdp;
-const hasMeetingDetails = Boolean(
-  assessment._mentorAppointmentId || assessment._mentorMeetingDate
-);
 
 return {
   ...assessment,
   _mentorHasSentCdp: finalHasCdp,
   _mentorAssignmentStatus:
-    hasMeetingDetails && finalHasCdp
+    finalHasCdp
       ? "completed"
       : assessment._mentorAssignmentStatus,
 };
@@ -1180,20 +1176,7 @@ try {
   const recRes = await apiGetSectionRecommendations(assessmentId, String(pastor.id));
   const data: any = recRes.data?.data ?? recRes.data;
 
-  hasSentCdp = Array.isArray(data)
-    ? data.some((rec: any) => {
-        const recs = Array.isArray(rec?.recommendations)
-          ? rec.recommendations.filter((x: any) => String(x || "").trim())
-          : [];
-
-        return (
-          rec?.sent === true ||
-          rec?.status === "sent" ||
-          recs.length > 0 ||
-          String(rec?.message || rec?.text || "").trim() !== ""
-        );
-      })
-    : false;
+  hasSentCdp = hasStrictSentCdp(data);
 } catch {
   hasSentCdp = false;
 }
