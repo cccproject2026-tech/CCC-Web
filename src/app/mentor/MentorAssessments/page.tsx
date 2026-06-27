@@ -1034,6 +1034,11 @@ return {
     }
   };
 
+  const selectPastorForAssessments = (pastorId: string) => {
+    setSelectedMenteeId(pastorId);
+    setSearchTerm("");
+  };
+
   const activeSortBy = activeTab === "pastors" ? pastorSortBy : librarySortBy;
 
   const filtered = useMemo(() => {
@@ -1656,7 +1661,7 @@ try {
                         sizePx={72}
                         gapClass="gap-6 sm:gap-8"
                         selectedId={selectedMenteeId}
-                        onItemClick={(item) => setSelectedMenteeId(String(item.id))}
+                        onItemClick={(item) => selectPastorForAssessments(String(item.id))}
                       />
                     </div>
                   )}
@@ -1802,7 +1807,7 @@ try {
 
   <button
     type="button"
-    onClick={() => setSelectedMenteeId(String(pastor.id))}
+    onClick={() => selectPastorForAssessments(String(pastor.id))}
     className="mr-12 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/25"
   >
     View

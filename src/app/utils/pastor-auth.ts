@@ -1,5 +1,6 @@
 import { getCookie } from "@/app/utils/cookies";
 import { getAccessToken } from "@/app/utils/auth-tokens";
+import { isPastorSideRole } from "@/app/utils/common-login";
 export { normalizeUserCookieForClient, getRoleFromUserCookie } from "@/app/utils/user-cookie";
 
 /** Routes under /pastor that do not require a session (onboarding / auth). */
@@ -45,9 +46,8 @@ export function hasPastorSession(): boolean {
   const raw = getCookie("user");
   if (!raw) return false;
   try {
-    const u = JSON.parse(raw) as { role?: unknown };
-    const r = u.role != null ? String(u.role).toLowerCase().trim() : "";
-    return r === "pastor";
+    const u = JSON.parse(raw) as Record<string, unknown>;
+    return isPastorSideRole(u);
   } catch {
     return false;
   }

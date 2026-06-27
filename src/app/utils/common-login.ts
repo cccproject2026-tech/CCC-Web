@@ -11,6 +11,7 @@ export interface CommonLoginSessionInput {
 }
 
 const ROLE_KEYS = ["role", "userType", "accountType", "type", "portalRole"] as const;
+const PASTOR_SIDE_ROLES = new Set(["pastor", "lay-leader", "layleader", "seminarian"]);
 
 function readRoleCandidate(user: unknown): string {
   if (!user || typeof user !== "object") return "";
@@ -24,13 +25,19 @@ function readRoleCandidate(user: unknown): string {
   return "";
 }
 
+export function isPastorSideRole(user: unknown): boolean {
+  const row = user && typeof user === "object" ? (user as Record<string, unknown>) : {};
+  const role = readRoleCandidate(row);
+  return PASTOR_SIDE_ROLES.has(role) || PASTOR_SIDE_ROLES.has(normalizeRoleForAuth(row.role));
+}
+
 export function detectPortalRole(user: unknown): PortalRole | "director" | null {
   const row = user && typeof user === "object" ? (user as Record<string, unknown>) : {};
   const role = readRoleCandidate(user);
 
   if (role === "director") return "director";
   if (isMentorPortalRole({ ...row, role })) return "mentor";
-  if (role === "pastor") return "pastor";
+  if (isPastorSideRole({ ...row, role })) return "pastor";
   return null;
 }
 

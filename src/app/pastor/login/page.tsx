@@ -9,6 +9,7 @@ import {
   hasPastorSession,
   normalizeUserCookieForClient,
 } from "@/app/utils/pastor-auth";
+import { isPastorSideRole } from "@/app/utils/common-login";
 
 import LoginPasswordField from "@/app/Components/LoginPasswordField";
 import ContinueApplicationModal from "@/app/Components/ContinueApplicationModal";
@@ -96,38 +97,35 @@ function LoginInner() {
 
       const { accessToken, refreshToken, user } = json.data || {};
 
-const userRole = String(user?.role || "").toLowerCase();
+      if (!isPastorSideRole(user)) {
+        setErrorMsg("Invalid email or password.");
+        return;
+      }
 
-if (userRole !== "pastor") {
-  setErrorMsg("Invalid email or password.");
-  return;
-}
-
-if (accessToken) setCookie("accessToken", accessToken);
-if (refreshToken) setCookie("refreshToken", refreshToken);
-   
+      if (accessToken) setCookie("accessToken", accessToken);
+      if (refreshToken) setCookie("refreshToken", refreshToken);
 
       let hasProfilePicture = false;
 
-if (user) {
-  const normalized = normalizeUserCookieForClient(user as Record<string, unknown>);
-  setCookie("user", JSON.stringify(normalized));
+      if (user) {
+        const normalized = normalizeUserCookieForClient(user as Record<string, unknown>);
+        setCookie("user", JSON.stringify(normalized));
 
-  const uid = (normalized.id ?? normalized._id) as string | undefined;
-  if (uid) setCookie("userId", String(uid));
+        const uid = (normalized.id ?? normalized._id) as string | undefined;
+        if (uid) setCookie("userId", String(uid));
 
-  hasProfilePicture = Boolean(
-    typeof normalized.profilePicture === "string" &&
-      normalized.profilePicture.trim()
-  );
-}
+        hasProfilePicture = Boolean(
+          typeof normalized.profilePicture === "string" &&
+            normalized.profilePicture.trim(),
+        );
+      }
 
-const next = searchParams.get("returnUrl");
-const destination = isSafePastorReturnUrl(next)
-  ? next
-  : hasProfilePicture
-    ? "/pastor/home"
-    : "/pastor/profile-incomplete";
+      const next = searchParams.get("returnUrl");
+      const destination = isSafePastorReturnUrl(next)
+        ? next
+        : hasProfilePicture
+          ? "/pastor/home"
+          : "/pastor/profile-incomplete";
 
       showToast("Login successful. Redirecting...");
       setTimeout(() => router.push(destination), 350);
