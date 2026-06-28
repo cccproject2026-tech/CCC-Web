@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import SearchBar from "@/app/Components/SearchBar";
 import DirectorHero from "../DirectorHero";
@@ -74,6 +74,79 @@ function labelForSortKey(k: MenteeSortKey): string {
       return "Progress High–Low";
     default:
       return "Latest Join";
+  }
+}
+
+function normalizeQueryValue(value: string | null | undefined): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-_–—]+/g, "");
+}
+
+function parseSortKeyFromQuery(value: string | null): MenteeSortKey {
+  switch (normalizeQueryValue(value)) {
+    case "nameaz":
+      return { kind: "name_az" };
+    case "nameza":
+      return { kind: "name_za" };
+    case "progresslowhigh":
+      return { kind: "progress_low" };
+    case "progresshighlow":
+      return { kind: "progress_high" };
+    case "latestjoin":
+    default:
+      return { kind: "latest" };
+  }
+}
+
+function parseActiveTabFromQuery(value: string | null): "all" | "active" | "completed" {
+  switch (normalizeQueryValue(value)) {
+    case "inprogress":
+    case "active":
+      return "active";
+    case "completed":
+      return "completed";
+    case "all":
+    default:
+      return "all";
+  }
+}
+
+function parseViewModeFromQuery(value: string | null): "grid" | "list" {
+  return normalizeQueryValue(value) === "list" ? "list" : "grid";
+}
+
+function parsePageFromQuery(value: string | null): number {
+  const raw = Number.parseInt(String(value ?? "").trim(), 10);
+  return Number.isFinite(raw) && raw > 0 ? raw : 1;
+}
+
+function sortKeyToQueryValue(key: MenteeSortKey): string {
+  switch (key.kind) {
+    case "name_az":
+      return "Name A-Z";
+    case "name_za":
+      return "Name Z-A";
+    case "progress_low":
+      return "Progress Low-High";
+    case "progress_high":
+      return "Progress High-Low";
+    case "latest":
+    default:
+      return "Latest Join";
+  }
+}
+
+function activeTabToQueryValue(tab: "all" | "active" | "completed"): string {
+  switch (tab) {
+    case "active":
+      return "In-Progress";
+    case "completed":
+      return "Completed";
+    case "all":
+    default:
+      return "All";
   }
 }
 
@@ -194,23 +267,32 @@ const mapUserToMentee = (user: any, index: number): Mentee => ({
 });
 
 export default function MenteesPage() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
+  const searchParamsString = searchParams.toString();
 
   const [mentees, setMentees] = useState<Mentee[]>([]);
   const [featuredMentees, setFeaturedMentees] = useState<Mentee[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(() =>
+    parsePageFromQuery(searchParams.get("page")),
+  );
   const [tabCounts, setTabCounts] = useState({
   active: 0,
   completed: 0,
 });
   const [activeTab, setActiveTab] = useState<"all" | "active" | "completed">(
-    "all"
+    () => parseActiveTabFromQuery(searchParams.get("filter")),
   );
-  const [sortKey, setSortKey] = useState<MenteeSortKey>({ kind: "latest" });
+  const [sortKey, setSortKey] = useState<MenteeSortKey>(() =>
+    parseSortKeyFromQuery(searchParams.get("sortBy")),
+  );
   const [showSortMenu, setShowSortMenu] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [query, setQuery] = useState("");
-  const [debouncedQuery, setDebouncedQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">(() =>
+    parseViewModeFromQuery(searchParams.get("view") ?? searchParams.get("viewMode")),
+  );
+  const [query, setQuery] = useState(() => searchParams.get("search") ?? "");
+  const [debouncedQuery, setDebouncedQuery] = useState(() => searchParams.get("search") ?? "");
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -257,6 +339,36 @@ setAssignedMentorList(
     const t = setTimeout(() => setDebouncedQuery(query.trim()), 300);
     return () => clearTimeout(t);
   }, [query]);
+
+  const menteesReturnTo = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("sortBy", sortKeyToQueryValue(sortKey));
+    params.set("filter", activeTabToQueryValue(activeTab));
+    params.set("page", String(currentPage));
+    const trimmedSearch = query.trim();
+    if (trimmedSearch) {
+      params.set("search", trimmedSearch);
+    }
+    params.set("view", viewMode);
+    return `${pathname}?${params.toString()}`;
+  }, [activeTab, currentPage, pathname, query, sortKey, viewMode]);
+
+  useEffect(() => {
+    const nextParams = new URLSearchParams();
+    nextParams.set("sortBy", sortKeyToQueryValue(sortKey));
+    nextParams.set("filter", activeTabToQueryValue(activeTab));
+    nextParams.set("page", String(currentPage));
+    const trimmedSearch = query.trim();
+    if (trimmedSearch) {
+      nextParams.set("search", trimmedSearch);
+    }
+    nextParams.set("view", viewMode);
+
+    const nextQuery = nextParams.toString();
+    if (nextQuery !== searchParamsString) {
+      router.replace(`${pathname}?${nextQuery}`, { scroll: false });
+    }
+  }, [activeTab, currentPage, pathname, query, router, searchParamsString, sortKey, viewMode]);
 
   /* ---------------- FETCH MENTEES ---------------- */
 
@@ -632,7 +744,7 @@ const getMenteeOptions = (mentee: Mentee) => {
         router.push(
           `/director/revitalization-roadmap?tab=pastor&pastorId=${encodeURIComponent(
             menteeId,
-          )}&returnTo=${encodeURIComponent("/director/mentees")}`,
+          )}&returnTo=${encodeURIComponent(menteesReturnTo)}`,
         ),
     },
     {

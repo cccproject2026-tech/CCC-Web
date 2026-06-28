@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiGetDocuments } from "@/app/Services/api";
 import Image from "next/image";
-import Link from "next/link";
 import { isAxiosError } from "axios";
 import DirectorHero from "@/app/director/DirectorHero";
 import {
@@ -21,7 +20,6 @@ import ProfileForm from "@/app/Components/ProfileForm";
 import type { PersonalInfo, ChurchInfo, OtherInfo } from "@/app/Components/ProfileForm";
 
 import MentorBg from "@/app/Assets/mentor-bg.png";
-import Mentor1 from "@/app/Assets/mentor1.png";
 
 import {
   apiDeleteUser,
@@ -91,6 +89,56 @@ function churchInfoToDetails(c: ChurchInfo): ChurchDetails {
 
 function hasChurchData(c: ChurchInfo): boolean {
   return Object.values(c).some((v) => typeof v === "string" && v.trim() !== "");
+}
+
+function getInitialsFromName(name: string): string {
+  const parts = String(name ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (!parts.length) return "U";
+
+  return (
+    parts
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "U"
+  );
+}
+
+function getTrimmedString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function resolvePersonalPhone(user: any): string {
+  const pick = (...values: unknown[]): string => {
+    for (const value of values) {
+      const text = getTrimmedString(value);
+      if (text) return text;
+    }
+    return "";
+  };
+
+  const contact = user?.contact;
+  const profile = user?.profile;
+  const nestedUser = user?.user;
+  const interest = user?.interest;
+
+  return (
+    pick(
+      user?.phoneNumber,
+      user?.phone,
+      contact?.phoneNumber,
+      contact?.phone,
+      profile?.phoneNumber,
+      profile?.phone,
+      nestedUser?.phoneNumber,
+      nestedUser?.phone,
+      interest?.phoneNumber,
+      interest?.phone,
+    ) || ""
+  );
 }
 
 type Props = {
@@ -171,7 +219,7 @@ const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState("");
   const [profileProgress, setProfileProgress] = useState(0);
-  const [profileImage, setProfileImage] = useState<string | typeof Mentor1>(Mentor1);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
 
   const [personal, setPersonal] = useState<PersonalInfo>({
     firstName: "",
@@ -270,7 +318,7 @@ console.log("Mentee profile certificate debug:", {
         typeof rawPic === "string" && rawPic.trim()
           ? resolveApiMediaUrl(rawPic) ?? rawPic
           : null;
-      setProfileImage(resolved || Mentor1);
+      setProfileImage(resolved);
       // setInviteState(deriveInviteState(user));
       const detailInviteState = deriveInviteState(user);
 
@@ -281,10 +329,12 @@ if (detailInviteState !== "none") {
   setInviteState(listInviteState ?? "none");
 }
 
+      const resolvedPhone = resolvePersonalPhone(user);
+
       setPersonal({
         firstName: user.firstName ?? "",
         lastName: user.lastName ?? "",
-        phoneNumber: user.phoneNumber ?? "",
+        phoneNumber: resolvedPhone,
         email: user.email ?? "",
       });
 
@@ -365,6 +415,9 @@ if (detailInviteState !== "none") {
       ? `https://wa.me/${phoneDigits.replace(/^0+/, "")}`
       : undefined;
   const smsHref = phoneDigits ? `sms:${phoneDigits}` : undefined;
+  const showMissingContactToast = (label: string) => {
+    setToast({ message: `${label} not available`, variant: "error" });
+  };
 
   const canInviteFieldMentor =
     progressOverallDone && userMarkedComplete;
@@ -688,14 +741,20 @@ const handleProfileImageChange = async (
               <div className={`p-6 sm:p-8 ${directorGlassCard}`}>
                 <div className="mb-6 flex flex-col items-center">
                   <div className="relative mb-4 h-[140px] w-[140px] overflow-hidden rounded-full border border-white/20 bg-white/10">
-                    <Image
-                      src={profileImage}
-                      alt={fullName}
-                      width={140}
-                      height={140}
-                      unoptimized={typeof profileImage === "string" && isRemoteImageSrc(profileImage)}
-                      className="h-full w-full object-cover"
-                    />
+                    {profileImage ? (
+                      <Image
+                        src={profileImage}
+                        alt={fullName}
+                        width={140}
+                        height={140}
+                        unoptimized={isRemoteImageSrc(profileImage)}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-[#173653] text-[42px] font-bold uppercase text-white">
+                        {getInitialsFromName(fullName)}
+                      </div>
+                    )}
 
                     {isEditing && (
                       <>
@@ -728,36 +787,60 @@ const handleProfileImageChange = async (
                       <i className="fa-regular fa-envelope" />
                     </a>
                   ) : (
-                    <span className="opacity-40" title="No email">
+                    <button
+                      type="button"
+                      onClick={() => showMissingContactToast("Email address")}
+                      className="opacity-40 transition hover:opacity-80"
+                      aria-label="Email not available"
+                      title="No email"
+                    >
                       <i className="fa-regular fa-envelope" />
-                    </span>
+                    </button>
                   )}
                   {smsHref ? (
                     <a href={smsHref} className="transition hover:opacity-80" aria-label="Message">
                       <i className="fa-regular fa-comment" />
                     </a>
                   ) : (
-                    <span className="opacity-40" title="No phone">
+                    <button
+                      type="button"
+                      onClick={() => showMissingContactToast("Phone number")}
+                      className="opacity-40 transition hover:opacity-80"
+                      aria-label="Message not available"
+                      title="No phone"
+                    >
                       <i className="fa-regular fa-comment" />
-                    </span>
+                    </button>
                   )}
                   {whatsappHref ? (
                     <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="transition hover:opacity-80" aria-label="WhatsApp">
                       <i className="fa-brands fa-whatsapp" />
                     </a>
                   ) : (
-                    <span className="opacity-40" title="No phone">
+                    <button
+                      type="button"
+                      onClick={() => showMissingContactToast("Phone number")}
+                      className="opacity-40 transition hover:opacity-80"
+                      aria-label="WhatsApp not available"
+                      title="No phone"
+                    >
                       <i className="fa-brands fa-whatsapp" />
-                    </span>
+                    </button>
                   )}
                   {telHref ? (
                     <a href={telHref} className="transition hover:opacity-80" aria-label="Call">
                       <i className="fa-solid fa-phone" />
                     </a>
                   ) : (
-                    <span className="opacity-40" title="No phone">
+                    <button
+                      type="button"
+                      onClick={() => showMissingContactToast("Phone number")}
+                      className="opacity-40 transition hover:opacity-80"
+                      aria-label="Call not available"
+                      title="No phone"
+                    >
                       <i className="fa-solid fa-phone" />
-                    </span>
+                    </button>
                   )}
                 </div>
 
@@ -843,14 +926,6 @@ const handleProfileImageChange = async (
                           >
                             <i className="fa-regular fa-trash-can" />
                             Delete
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setIsEditing(true)}
-                            className="inline-flex items-center gap-2 rounded-lg border border-[#8ec5eb]/40 bg-[#8ec5eb]/15 px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-[#8ec5eb]/25"
-                          >
-                            <i className="fa-regular fa-pen-to-square" />
-                            Edit
                           </button>
                         </>
                       ) : (

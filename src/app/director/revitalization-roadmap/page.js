@@ -26,7 +26,7 @@ import {
   unwrapBulkProgressDetails,
   unwrapUserProgressDetail,
 } from "@/app/Services/progress.service";
-import { unwrapRoadmapsList } from "@/app/Services/roadmap-assignments";
+import { unwrapRoadmapsList, resolveNestedTemplateItemId } from "@/app/Services/roadmap-assignments";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import DirectorHero from "../DirectorHero";
 import {
@@ -69,6 +69,28 @@ function roadmapChildrenList(rm) {
   if (Array.isArray(raw)) return raw;
   if (raw && typeof raw === "object" && Array.isArray(raw.items)) return raw.items;
   return [];
+}
+
+function roadmapTaskRows(rm) {
+  const direct = roadmapChildrenList(rm);
+  if (direct.length > 0) return direct;
+  const nested = rm?.nestedRoadmaps;
+  if (Array.isArray(nested)) return nested;
+  if (nested && typeof nested === "object" && Array.isArray(nested.items)) return nested.items;
+  return [];
+}
+
+function normalizeJumpstartName(value) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function isJumpstartRoadmap(row) {
+  const rm = row?.raw || {};
+  const candidates = [row?.title, row?.name, rm?.title, rm?.name, rm?.type];
+  return candidates.some((value) => normalizeJumpstartName(value) === "jumpstart");
 }
 
 function roadmapDetailText(raw) {
@@ -2969,6 +2991,26 @@ onClick={() => {
           <button
   type="button"
   onClick={() => {
+    const rm = roadmap?.raw || {};
+    const tasks = roadmapTaskRows(rm);
+    const pastorId =
+      selectedPastorModalId != null
+        ? String(selectedPastorModalId)
+        : filterPastorId !== "all"
+          ? String(filterPastorId)
+          : "";
+    const firstTask = tasks.length === 1 ? tasks[0] : null;
+    const taskId = firstTask ? resolveNestedTemplateItemId(firstTask) : "";
+
+    if (isJumpstartRoadmap(roadmap) && tasks.length === 1 && taskId && pastorId) {
+      const qp = new URLSearchParams();
+      qp.set("roadmapId", String(roadmap.id));
+      qp.set("taskId", taskId);
+      qp.set("userId", pastorId);
+      router.push(`/director/revitalization-roadmap/task?${qp.toString()}`);
+      return;
+    }
+
     const qp = new URLSearchParams();
 
     qp.set("roadmapId", roadmap.id);
