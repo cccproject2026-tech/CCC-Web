@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import DirectorHero from "../DirectorHero";
-import { directorGlassCard, directorInputClass, directorPageRoot } from "../directorUi";
+import { directorGlassCard, directorIconButton, directorPageRoot } from "../directorUi";
 import ContactDetailHeader from "../../Assets/contactdetailheader.jpg";
 
 const CONTACT_DETAILS_STORAGE_KEY = "director_contact_details";
@@ -157,240 +157,26 @@ export default function ContactDetailsPage() {
 
       <section className="relative py-10">
         <div className="mx-auto max-w-[1000px]">
-          <div className={`overflow-hidden rounded-xl ${directorGlassCard}`}>
-            <div className="border-b border-white/10 px-8 py-6">
-              <h2 className="text-3xl font-bold text-white">Contact Details</h2>
-            </div>
-
-            <div className="p-8">
-              {/* Phone Numbers - Side by Side */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label className="mb-2 block font-semibold text-white/85">
-                    Phone Number 1
-                  </label>
-                  <input
-                    type="tel"
-                    name="phoneNumber1"
-                    value={formData.phoneNumber1}
-                    onChange={handleInputChange}
-                    placeholder="Enter Phone number"
-                    className={directorInputClass}
-                  />
-                </div>
-                <div>
-                  <label className="mb-2 block font-semibold text-white/85">
-                    Phone Number 2
-                  </label>
-                  <input
-                    type="tel"
-                    name="phoneNumber2"
-                    value={formData.phoneNumber2}
-                    onChange={handleInputChange}
-                    placeholder="Enter Phone number"
-                    className={directorInputClass}
-                  />
-                </div>
+          <div className={`mx-auto flex min-h-[420px] max-w-3xl items-center justify-center rounded-xl px-4 py-8 ${directorGlassCard}`}>
+            <div className="max-w-xl text-center">
+              <div className={`${directorIconButton} mx-auto mb-5 h-14 w-14 border-white/15 bg-white/10 text-[#8ec5eb]`}>
+                <i className="fa-solid fa-phone text-xl" />
               </div>
-
-              {/* Address */}
-              <div className="mb-6">
-                <label className="mb-2 block font-semibold text-white/85">
-                  Address
-                </label>
-                <textarea
-                  name="address"
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  placeholder="Enter Address"
-                  rows={4}
-                  className={`${directorInputClass} resize-none`}
-                />
-              </div>
-
-              {/* Social Media Links */}
-              <div className="mb-6">
-                <label className="mb-4 block font-semibold text-white/85">
-                  Social Media Links
-                </label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Facebook */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        id="facebook"
-                        checked={formData.socialMedia.facebook.enabled}
-                        onChange={() => handleSocialMediaToggle("facebook")}
-                        className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <label htmlFor="facebook" className="font-semibold text-white/85">
-                        Facebook
-                      </label>
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="url"
-                        value={formData.socialMedia.facebook.url}
-                        onChange={(e) => handleSocialMediaUrlChange("facebook", e)}
-                        disabled={!formData.socialMedia.facebook.enabled}
-                        className={`${directorInputClass} text-white disabled:cursor-not-allowed disabled:opacity-50`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => copyText(formData.socialMedia.facebook.url, "Facebook link")}
-                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
-                        title="Copy"
-                      >
-                        <i className="fa-regular fa-copy" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => shareText(formData.socialMedia.facebook.url, "Facebook link")}
-                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
-                        title="Share"
-                      >
-                        <i className="fa-solid fa-share-nodes" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Twitter */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        id="twitter"
-                        checked={formData.socialMedia.twitter.enabled}
-                        onChange={() => handleSocialMediaToggle("twitter")}
-                        className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <label htmlFor="twitter" className="font-semibold text-white/85">
-                        Twitter
-                      </label>
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="url"
-                        value={formData.socialMedia.twitter.url}
-                        onChange={(e) => handleSocialMediaUrlChange("twitter", e)}
-                        disabled={!formData.socialMedia.twitter.enabled}
-                        className={`${directorInputClass} text-white disabled:cursor-not-allowed disabled:opacity-50`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => copyText(formData.socialMedia.twitter.url, "Twitter link")}
-                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
-                        title="Copy"
-                      >
-                        <i className="fa-regular fa-copy" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => shareText(formData.socialMedia.twitter.url, "Twitter link")}
-                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
-                        title="Share"
-                      >
-                        <i className="fa-solid fa-share-nodes" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* LinkedIn */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        id="linkedin"
-                        checked={formData.socialMedia.linkedin.enabled}
-                        onChange={() => handleSocialMediaToggle("linkedin")}
-                        className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <label htmlFor="linkedin" className="font-semibold text-white/85">
-                        Linkedin
-                      </label>
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="url"
-                        value={formData.socialMedia.linkedin.url}
-                        onChange={(e) => handleSocialMediaUrlChange("linkedin", e)}
-                        disabled={!formData.socialMedia.linkedin.enabled}
-                        className={`${directorInputClass} text-white disabled:cursor-not-allowed disabled:opacity-50`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => copyText(formData.socialMedia.linkedin.url, "LinkedIn link")}
-                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
-                        title="Copy"
-                      >
-                        <i className="fa-regular fa-copy" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => shareText(formData.socialMedia.linkedin.url, "LinkedIn link")}
-                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
-                        title="Share"
-                      >
-                        <i className="fa-solid fa-share-nodes" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* WhatsApp */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <input
-                        type="checkbox"
-                        id="whatsapp"
-                        checked={formData.socialMedia.whatsapp.enabled}
-                        onChange={() => handleSocialMediaToggle("whatsapp")}
-                        className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                      <label htmlFor="whatsapp" className="font-semibold text-white/85">
-                        Whatsapp
-                      </label>
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="url"
-                        value={formData.socialMedia.whatsapp.url}
-                        onChange={(e) => handleSocialMediaUrlChange("whatsapp", e)}
-                        disabled={!formData.socialMedia.whatsapp.enabled}
-                        className={`${directorInputClass} text-white disabled:cursor-not-allowed disabled:opacity-50`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => copyText(formData.socialMedia.whatsapp.url, "WhatsApp link")}
-                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
-                        title="Copy"
-                      >
-                        <i className="fa-regular fa-copy" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => shareText(formData.socialMedia.whatsapp.url, "WhatsApp link")}
-                        className="rounded-lg border border-white/15 bg-white/10 px-3 text-white hover:bg-white/15"
-                        title="Share"
-                      >
-                        <i className="fa-solid fa-share-nodes" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Save Button */}
-              <div className="flex justify-end mt-8">
-                <button
-                  onClick={handleSave}
-                  className="bg-[#1E366F] text-white text-sm font-semibold px-6 py-3 rounded-lg hover:bg-[#1a2f5a] transition-colors"
-                >
-                  Save
-                </button>
-              </div>
+              <h2 className="text-2xl font-bold text-white sm:text-3xl">Contact Details</h2>
+              <p className="mt-3 text-sm leading-6 text-white/70 sm:text-[15px]">
+                CCC contact details are shown in the drawer footer. A dedicated screen is not available yet.
+              </p>
             </div>
           </div>
+          {/*
+            Legacy contact details form preserved for restore.
+            <div className={`overflow-hidden rounded-xl ${directorGlassCard}`}>
+              <div className="border-b border-white/10 px-8 py-6">
+                <h2 className="text-3xl font-bold text-white">Contact Details</h2>
+              </div>
+              <div className="p-8"> ... phone inputs, address, social links, copy/share buttons, and Save button ... </div>
+            </div>
+          */}
         </div>
       </section>
       {toast && (

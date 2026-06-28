@@ -27,6 +27,19 @@ import {
   getUserDocuments,
 } from "@/app/Services/pastor.service";
 
+function normalizeInterestsList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 type UploadedDoc = {
   fileName: string;
   fileUrl: string;
@@ -258,7 +271,7 @@ const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
       yearsInMinistry: data.interest?.yearsInMinistry || "",
       conference: data.interest?.conference || "",
       currentCommunityProjects: data.interest?.currentCommunityProjects || "",
-      interests: data.interest?.interests?.join(", ") || "",
+      interests: normalizeInterestsList(data.interest?.interests).join(", "),
       comments: data.interest?.comments || "",
       churchName: data.interest?.churchDetails?.[0]?.churchName || "",
       churchPhone: data.interest?.churchDetails?.[0]?.churchPhone || "",
@@ -386,12 +399,7 @@ if (uploadedUrl) {
       conference: form.conference,
       currentCommunityProjects: form.currentCommunityProjects,
       comments: form.comments,
-      interests: form.interests
-        ? form.interests
-            .split(",")
-            .map((s: string) => s.trim())
-            .filter(Boolean)
-        : [],
+      interests: normalizeInterestsList(form.interests),
       churchDetails: churchDetailsPayload,
     };
 
@@ -431,9 +439,7 @@ console.log("FRESH USER AFTER SAVE:", freshRes.data?.data?.lastName);
       ...prev,
       ...userPayload,
       ...interestPayload,
-      interests: Array.isArray(interestPayload.interests)
-        ? interestPayload.interests.join(", ")
-        : prev.interests,
+      interests: normalizeInterestsList(interestPayload.interests).join(", "),
       churchName: churchDetailsPayload[0].churchName,
       churchPhone: churchDetailsPayload[0].churchPhone,
       churchWebsite: churchDetailsPayload[0].churchWebsite,

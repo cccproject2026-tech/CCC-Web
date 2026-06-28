@@ -25,14 +25,11 @@ import {
   apiRemoveAssignedUsers,
   unwrapUserResponse,
 } from "@/app/Services/users.service";
-import { apiGetUserProgress } from "@/app/Services/progress.service";
-import type { ProgressResponse } from "@/app/Services/types/progress.types";
-import { unwrapProgressData } from "@/app/Services/roadmap-assignments";
 import {
-  deriveCurrentRoadmapPhaseLabel,
-  fetchRoadmapTitlesForIds,
-} from "@/app/utils/roadmap-phase-from-progress";
-import { deriveOverallProgressPercent } from "@/app/utils/user-progress-display";
+  apiGetOverallProgress,
+  extractUserIdFromOverallProgressRow,
+  unwrapOverallProgressList,
+} from "@/app/Services/progress.service";
 import { resolveApiMediaUrl } from "@/app/utils/image";
 import { formatUserLastLoginDisplay } from "@/app/utils/last-login-display";
 
@@ -88,6 +85,7 @@ const getInitialsAvatar = (name: string) =>
 
 const PAGE_SIZE = 10;
 const FEATURED_THUMB_LIMIT = 500;
+const FULL_LIST_LIMIT = 9999;
 
 function getUserListEmail(person: {
   email?: string;
@@ -179,7 +177,10 @@ const mapUserToMentee = (user: any, index: number): Mentee => ({
     : user.status === "pending"
       ? "pending"
       : "active",
-  progress: user.progressPercentage ?? 0,
+  progress:
+    typeof user.progressPercentage === "number" && Number.isFinite(user.progressPercentage)
+      ? user.progressPercentage
+      : undefined,
   phase: user.currentPhase ?? undefined,
   assignedId: [],
   assignedLoaded: false,
@@ -198,8 +199,6 @@ export default function MenteesPage() {
   const [mentees, setMentees] = useState<Mentee[]>([]);
   const [featuredMentees, setFeaturedMentees] = useState<Mentee[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
   const [tabCounts, setTabCounts] = useState({
   active: 0,
   completed: 0,
@@ -266,18 +265,58 @@ setAssignedMentorList(
   }, [debouncedQuery, activeTab]);
 
   useEffect(() => {
+    setCurrentPage(1);
+  }, [sortKey.kind]);
+
+  useEffect(() => {
     const fetchMentees = async () => {
       setLoading(true);
       try {
-        const search =
-          debouncedQuery.length > 0 ? debouncedQuery : undefined;
+        const search = debouncedQuery.length > 0 ? debouncedQuery : undefined;
         const res = await apiGetAllUsers(
-          buildMenteeListParams(activeTab, search, currentPage, PAGE_SIZE) as any,
+          buildMenteeListParams(activeTab, search, 1, FULL_LIST_LIMIT) as any,
         );
-        const { users, total, totalPages: tp } = res.data.data;
-        setMentees(users.map((u: any, i: number) => mapUserToMentee(u, i)));
-        setTotalCount(total);
-        setTotalPages(tp);
+        const users = Array.isArray(res?.data?.data?.users) ? res.data.data.users : [];
+        const baseMentees = users.map((u: any, i: number) => mapUserToMentee(u, i));
+        let progressRows: any[] = [];
+        try {
+          const progressRes = await apiGetOverallProgress("pastor");
+          progressRows = unwrapOverallProgressList(progressRes) ?? [];
+        } catch (progressError) {
+          console.warn("Failed to load mentee overall progress", progressError);
+        }
+
+        if (progressRows.length) {
+          const progressById = new Map<string, { progress: number; completed?: boolean }>();
+          for (const row of progressRows) {
+            const id = extractUserIdFromOverallProgressRow(row);
+            if (!id) continue;
+            const rawProgress = Number(row?.overallProgress);
+            const progress = Number.isFinite(rawProgress)
+              ? Math.min(100, Math.max(0, rawProgress))
+              : undefined;
+            if (progress === undefined) continue;
+            progressById.set(id, {
+              progress,
+              completed: Boolean(row?.overallCompleted),
+            });
+          }
+
+          setMentees(
+            baseMentees.map((m) => {
+              const detail = progressById.get(m.id);
+              if (!detail) return m;
+              return {
+                ...m,
+                progress: detail.progress,
+                ...(detail.completed ? { status: "completed" as const } : {}),
+              };
+            }),
+          );
+          return;
+        }
+
+        setMentees(baseMentees);
       } catch (e) {
         console.error("Failed to load mentees", e);
         setMentees([]);
@@ -287,44 +326,40 @@ setAssignedMentorList(
     };
 
     fetchMentees();
-  }, [debouncedQuery, currentPage, activeTab]);
+  }, [debouncedQuery, activeTab]);
 
   useEffect(() => {
-  let cancelled = false;
+    let cancelled = false;
 
-  const fetchTabCounts = async () => {
-    try {
-      const search = debouncedQuery.length > 0 ? debouncedQuery : undefined;
+    const fetchTabCounts = async () => {
+      try {
+        const search = debouncedQuery.length > 0 ? debouncedQuery : undefined;
 
-      const [activeRes, completedRes] = await Promise.all([
-        apiGetAllUsers(
-          buildMenteeListParams("active", search, 1, 1) as any,
-        ),
-        apiGetAllUsers(
-          buildMenteeListParams("completed", search, 1, 1) as any,
-        ),
-      ]);
+        const [activeRes, completedRes] = await Promise.all([
+          apiGetAllUsers(buildMenteeListParams("active", search, 1, 1) as any),
+          apiGetAllUsers(buildMenteeListParams("completed", search, 1, 1) as any),
+        ]);
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      setTabCounts({
-        active: Number(activeRes.data?.data?.total ?? 0),
-        completed: Number(completedRes.data?.data?.total ?? 0),
-      });
-    } catch (error) {
-      console.error("Failed to load mentee tab counts", error);
-      if (!cancelled) {
-        setTabCounts({ active: 0, completed: 0 });
+        setTabCounts({
+          active: Number(activeRes.data?.data?.total ?? 0),
+          completed: Number(completedRes.data?.data?.total ?? 0),
+        });
+      } catch (error) {
+        console.error("Failed to load mentee tab counts", error);
+        if (!cancelled) {
+          setTabCounts({ active: 0, completed: 0 });
+        }
       }
-    }
-  };
+    };
 
-  void fetchTabCounts();
+    void fetchTabCounts();
 
-  return () => {
-    cancelled = true;
-  };
-}, [debouncedQuery]);
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedQuery]);
 
   // First 6 profile thumbnails: page 1 for current search + tab (not paged / client sort)
   useEffect(() => {
@@ -351,86 +386,6 @@ setAssignedMentorList(
       cancelled = true;
     };
   }, [debouncedQuery, activeTab]);
-
-  /* ---------------- PROGRESS ---------------- */
-
-  // Stable key: changes whenever the set of users on the current page changes
-  const menteeIdsKey = mentees.map((m) => m.id).join(",");
-
-  useEffect(() => {
-    if (!mentees.length) return;
-
-    let cancelled = false;
-
-    const hydrateProgress = async () => {
-      const currentMentees = mentees.slice();
-      try {
-        const results = await Promise.all(
-          currentMentees.map(async (m) => {
-            try {
-              const res = await apiGetUserProgress(m.id);
-              const pr = unwrapProgressData(res) as ProgressResponse | null | undefined;
-              return { id: m.id, pr };
-            } catch {
-              return { id: m.id, pr: null as ProgressResponse | null };
-            }
-          }),
-        );
-        if (cancelled) return;
-
-        const roadMapIds: string[] = [];
-        for (const r of results) {
-          const list = r.pr?.roadmaps;
-          if (!list?.length) continue;
-          for (const row of list) {
-            if (row.roadMapId) roadMapIds.push(String(row.roadMapId));
-          }
-        }
-        const nameById = await fetchRoadmapTitlesForIds(roadMapIds);
-        if (cancelled) return;
-
-        const patch = new Map<
-          string,
-          { progress: number; phase?: string; markCompleted?: boolean }
-        >();
-        for (const { id, pr } of results) {
-          if (!pr) continue;
-          const safeProgress = deriveOverallProgressPercent(pr);
-          const completed = Boolean(pr.overallCompleted);
-          const hasRoadmaps = Array.isArray(pr.roadmaps) && pr.roadmaps.length > 0;
-          const phase = hasRoadmaps
-            ? deriveCurrentRoadmapPhaseLabel(pr, nameById)
-            : "Phase not assigned";
-          patch.set(id, {
-            progress: safeProgress,
-            phase: phase ?? "Phase not assigned",
-            ...(completed ? { markCompleted: true as const } : {}),
-          });
-        }
-
-        setMentees((prev) =>
-          prev.map((item) => {
-            const u = patch.get(item.id);
-            if (!u) return item;
-            return {
-              ...item,
-              progress: u.progress,
-              phase: u.phase ?? item.phase,
-              ...(u.markCompleted ? { status: "completed" as const } : {}),
-            };
-          }),
-        );
-      } catch {
-        // keep list without progress
-      }
-    };
-
-    void hydrateProgress();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [menteeIdsKey]);
 
   /* ---------------- FETCH MENTORS (assign / remove modals) ---------------- */
 
@@ -585,6 +540,17 @@ setAssignedMentorList(
 
     return arr;
   }, [mentees, sortKey]);
+
+  const totalCount = sortedMentees.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const pagedMentees = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return sortedMentees.slice(start, start + PAGE_SIZE);
+  }, [currentPage, sortedMentees]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
 
   const featuredItems: FeaturedAvatarItem[] = useMemo(
     () =>
@@ -941,7 +907,7 @@ const getMenteeOptions = (mentee: Mentee) => {
               : "grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 md:gap-5"
           }
         >
-          {sortedMentees.map((m) => (
+          {pagedMentees.map((m) => (
             <PersonListCard
               key={m.id}
               id={m.id}
@@ -956,9 +922,10 @@ const getMenteeOptions = (mentee: Mentee) => {
               phoneNumber={m.phoneNumber}
               progress={
                 m.progress !== undefined
-                  ? { phase: m.phase, value: m.progress }
+                  ? { value: m.progress }
                   : undefined
               }
+              showPhase={false}
               optionsMenu={getMenteeOptions(m)}
               actionButton={
                 activeTab === "active" && m.progress === 100

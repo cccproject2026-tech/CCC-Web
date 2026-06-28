@@ -34,7 +34,7 @@ interface ProfileFormProps {
   church1?: ChurchInfo;
   church2?: ChurchInfo;
   other?: OtherInfo;
-  interests?: string;
+  interests?: string | string[];
   comments?: string;
   showInterests?: boolean;
   showComments?: boolean;
@@ -51,6 +51,11 @@ function digitsOnly(value: string, maxLen?: number) {
   const d = value.replace(/\D/g, "");
   if (maxLen != null) return d.slice(0, maxLen);
   return d;
+}
+
+function formatInterests(value?: string | string[]) {
+  if (Array.isArray(value)) return value.filter(Boolean).join(", ");
+  return value || "";
 }
 
 export default function ProfileForm({
@@ -262,7 +267,7 @@ export default function ProfileForm({
             Interests
           </label>
           <textarea
-            value={interests || ""}
+            value={formatInterests(interests)}
             readOnly={!editable}
             onChange={(e) => onInterestsChange?.(e.target.value)}
             rows={3}

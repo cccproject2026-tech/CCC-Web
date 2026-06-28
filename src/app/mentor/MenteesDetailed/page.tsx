@@ -38,6 +38,19 @@ const getInitialsAvatar = (name: string) =>
   )}&background=173653&color=ffffff`;
 const IMAGE_POOL = [Mentor1, Mentor2, Mentor3];
 
+function normalizeInterestsList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 
 type ViewMode = "map" | "grid" | "list";
 
@@ -826,9 +839,9 @@ const handleCardMenuAction = (action: "schedule" | "roadmap" | "assessments", me
 
     <div>
       <span className="text-white/50">Interests:</span>
-      {selectedMentee.interests?.length ? (
+      {normalizeInterestsList(selectedMentee.interests).length ? (
         <div className="mt-2 flex flex-wrap gap-2">
-          {selectedMentee.interests.map((item: string) => (
+          {normalizeInterestsList(selectedMentee.interests).map((item) => (
             <span key={item} className="rounded-full border border-[#8ec5eb]/30 bg-[#8ec5eb]/10 px-3 py-1 text-xs text-[#8ec5eb]">
               {item}
             </span>

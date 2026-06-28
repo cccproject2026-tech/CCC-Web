@@ -33,6 +33,7 @@ import { apiGetUserById } from "@/app/Services/users.service";
 import DirectorHero from "@/app/director/DirectorHero";
 import { directorPageContainer, directorPageRoot, directorSpinner } from "../../directorUi";
 import { getDirectorUserId } from "@/app/utils/director-auth";
+import { idsMatch, normalizeComparableId } from "@/app/utils/roadmap-id-utils";
 
 import { verifyDirectorOrMentorPastorAccess } from "@/app/utils/mentor-pastor-link";
 import { getMentorUserId } from "@/app/utils/mentor-auth";
@@ -198,23 +199,26 @@ function TaskPageContent() {
 const res = await apiGetComments(roadmapId, userId);
 
 const all = unwrapCommentsFromResponse(res);
+const currentTaskId = normalizeComparableId(taskId);
 
 const hasScopedIds = all.some((c: any) =>
-  Boolean(c.nestedRoadMapItemId ?? c.nestedItemId ?? c.taskId ?? c.roadmapItemId)
+  Boolean(c.nestedRoadMapItemId ?? c.nestedItemId ?? c.taskId ?? c.roadmapItemId) ||
+  idsMatch(c.roadmapId, currentTaskId) ||
+  idsMatch(c.roadMapId, currentTaskId)
 );
 
 
 const scoped = hasScopedIds
   ? all.filter((c: any) => {
-      const cTaskId = String(
+      const cTaskId = normalizeComparableId(
         c.nestedRoadMapItemId ??
           c.nestedItemId ??
           c.taskId ??
           c.roadmapItemId ??
           ""
       );
-
-      return cTaskId === String(taskId);
+      const mobileDirectMatch = idsMatch(c.roadmapId, currentTaskId) || idsMatch(c.roadMapId, currentTaskId);
+      return cTaskId === currentTaskId || mobileDirectMatch;
     })
   : [];
 
@@ -272,6 +276,7 @@ const fetchQueries = useCallback(async () => {
     );
 
     let all = unwrapQueriesFromResponse(taskScopedRes);
+    const currentTaskId = normalizeComparableId(taskId);
 
     // Single roadmap / Jumpstart queries may not be saved with nested task ids.
     // If task-scoped fetch returns nothing, fall back to roadmap-level queries.
@@ -288,20 +293,22 @@ const fetchQueries = useCallback(async () => {
     }
 
     const hasScopedIds = all.some((q: any) =>
-      Boolean(q.nestedRoadMapItemId ?? q.nestedItemId ?? q.taskId ?? q.roadmapItemId),
+      Boolean(q.nestedRoadMapItemId ?? q.nestedItemId ?? q.taskId ?? q.roadmapItemId) ||
+      idsMatch(q.roadmapId, currentTaskId) ||
+      idsMatch(q.roadMapId, currentTaskId),
     );
 
     const scoped = hasScopedIds
       ? all.filter((q: any) => {
-          const qTaskId = String(
+          const qTaskId = normalizeComparableId(
             q.nestedRoadMapItemId ??
               q.nestedItemId ??
               q.taskId ??
               q.roadmapItemId ??
               "",
           );
-
-          return qTaskId === String(taskId);
+          const mobileDirectMatch = idsMatch(q.roadmapId, currentTaskId) || idsMatch(q.roadMapId, currentTaskId);
+          return qTaskId === currentTaskId || mobileDirectMatch;
         })
       : all;
 

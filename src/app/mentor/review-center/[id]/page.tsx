@@ -16,6 +16,7 @@ import {
   apiGetQueries,
   type RoadmapSubmissionActivity,
 } from "@/app/Services/roadmaps.service";
+import { normalizeComparableId } from "@/app/utils/roadmap-id-utils";
 import {
   apiGetAssessments,
   apiGetAssignedAssessments,
@@ -558,8 +559,10 @@ function getNestedTaskId(item: any): string {
       item?.nestedItemId ??
       item?.taskId ??
       item?.roadmapItemId ??
+      item?.roadmapId ??
+      item?.roadMapId ??
       "",
-  ).trim();
+  ).trim() || normalizeComparableId(item?.roadmapId ?? item?.roadMapId);
 }
 
 function hasQueryAnswerText(query: any): boolean {

@@ -39,6 +39,19 @@ function statusBadgeClass(status: Interest["status"]): string {
   }
 }
 
+function normalizeInterestsList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 const panelInner = "p-5 sm:p-6";
 
 export default function InterestDetailPage() {
@@ -57,6 +70,7 @@ const [assignLoading, setAssignLoading] = useState(false);
 const [selectedAssignUserId, setSelectedAssignUserId] = useState<string>("");
 const [assignError, setAssignError] = useState<string | null>(null);
 const [hasAssignedMentor, setHasAssignedMentor] = useState(false);
+const [assignSearch, setAssignSearch] = useState("");
 
   const [interestData, setInterestData] = useState<Interest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -195,6 +209,7 @@ const handleAssign = async () => {
   try {
     await apiAssignUsers(interestData.userId, [selectedAssignUserId]);
 
+    setAssignSearch("");
     setShowAssignModal(false);
     setToast(assignSuccessMessage);
 
@@ -325,7 +340,7 @@ const handleAssign = async () => {
   const church = interestData.churchDetails?.[0];
 
   
-  const interestsList = interestData.interests ?? [];
+  const interestsList = normalizeInterestsList(interestData.interests);
   const fullName = `${interestData.firstName} ${interestData.lastName}`.trim();
 
 
@@ -341,6 +356,22 @@ const assignModalDescription = isMentorInterest
   ? "Select a mentee to assign this interest to."
   : "Select a mentor to assign this interest to.";
   const churches = interestData.churchDetails ?? [];
+  const normalizedAssignSearch = assignSearch.trim().toLowerCase();
+  const filteredAssignUsers = normalizedAssignSearch
+    ? assignUsers.filter((user) => {
+        const firstName = String(user?.firstName ?? "").trim().toLowerCase();
+        const lastName = String(user?.lastName ?? "").trim().toLowerCase();
+        const fullName = `${firstName} ${lastName}`.trim();
+        const name = String(user?.name ?? "").trim().toLowerCase();
+        const email = String(user?.email ?? "").trim().toLowerCase();
+        const phoneNumber = String(user?.phoneNumber ?? "").trim().toLowerCase();
+        const role = String(user?.role ?? "").trim().toLowerCase();
+
+        return [fullName, name, email, phoneNumber, role].some((field) =>
+          field.includes(normalizedAssignSearch)
+        );
+      })
+    : assignUsers;
 
   return (
     <div className={directorPageRoot}>
@@ -537,6 +568,7 @@ const assignModalDescription = isMentorInterest
     onClick={() => {
       setSelectedAssignUserId("");
       setAssignError(null);
+      setAssignSearch("");
       setShowAssignModal(true);
     }}
     className="mx-auto mt-3 flex w-fit items-center justify-center gap-2 rounded-lg border border-[#8ec5eb]/45 bg-[#8ec5eb]/15 px-5 py-2 text-xs font-semibold text-white transition hover:bg-[#8ec5eb]/25"
@@ -815,6 +847,7 @@ const assignModalDescription = isMentorInterest
             type="button"
             onClick={() => {
               setShowAcceptedModal(false);
+              setAssignSearch("");
               setShowAssignModal(true);
             }}
             className="flex-1 rounded-xl border border-[#8ec5eb]/50 bg-[#8ec5eb]/20 py-2.5 text-sm font-semibold text-white transition hover:bg-[#8ec5eb]/30"
@@ -849,7 +882,15 @@ const assignModalDescription = isMentorInterest
   {assignModalDescription}
 </p>
 
-<div className="mt-5 max-h-72 space-y-2 overflow-y-auto pr-1">
+<input
+  type="text"
+  value={assignSearch}
+  onChange={(e) => setAssignSearch(e.target.value)}
+  placeholder={isMentorInterest ? "Search pastors" : "Search mentors"}
+  className="mt-5 w-full rounded-xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/45 outline-none transition focus:border-[#8ec5eb]/50 focus:bg-white/10"
+/>
+
+<div className="mt-4 max-h-72 space-y-2 overflow-y-auto pr-1">
   {assignLoading ? (
     <p className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm text-[#cde2f2]/80">
       {isMentorInterest ? "Loading pastors…" : "Loading mentors…"}
@@ -858,8 +899,8 @@ const assignModalDescription = isMentorInterest
     <p className="rounded-xl border border-red-400/30 bg-red-500/10 px-3 py-3 text-sm text-red-100">
       {assignError}
     </p>
-  ) : assignUsers.length > 0 ? (
-    assignUsers.map((user) => {
+  ) : filteredAssignUsers.length > 0 ? (
+    filteredAssignUsers.map((user) => {
       const userId = String(user._id ?? user.id ?? "");
       const fullName =
         `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() ||
@@ -945,6 +986,10 @@ const assignModalDescription = isMentorInterest
         </label>
       );
     })
+  ) : assignSearch.trim() ? (
+    <p className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm text-[#cde2f2]/80">
+      {isMentorInterest ? "No pastors found." : "No mentors found."}
+    </p>
   ) : (
     <p className="rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-sm text-[#cde2f2]/80">
       {isMentorInterest ? "No pastors found." : "No mentors found."}

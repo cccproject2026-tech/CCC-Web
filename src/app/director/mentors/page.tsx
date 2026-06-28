@@ -286,8 +286,6 @@ export default function MyMentorsPage() {
   const [loading, setLoading] = useState(true);
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
   const [tabCounts, setTabCounts] = useState({
   all: 0,
   mentors: 0,
@@ -308,6 +306,10 @@ export default function MyMentorsPage() {
   useEffect(() => {
     setCurrentPage(1);
   }, [activeFilter, debouncedQuery]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [sortBy]);
 
 useEffect(() => {
   let cancelled = false;
@@ -368,39 +370,33 @@ useEffect(() => {
           debouncedQuery.length > 0 ? debouncedQuery : undefined;
 
         if (activeFilter === "Field Mentor") {
-          const { users, total, totalPages: tp } = await fetchFieldMentorPage({
+          const { users } = await fetchFieldMentorPage({
             search,
-            page: currentPage,
-            limit: PAGE_SIZE,
+            page: 1,
+            limit: MENTOR_LIST_CLIENT_FILTER_LIMIT,
           });
           setAllMentors(
             users.map((u: any, i: number) => convertUserToMentor(u, i))
           );
-          setTotalCount(total);
-          setTotalPages(tp);
         } else if (activeFilter === "Mentors") {
-          const { users, total, totalPages: tp } = await fetchMentorOnlyPage({
+          const { users } = await fetchMentorOnlyPage({
             search,
-            page: currentPage,
-            limit: PAGE_SIZE,
+            page: 1,
+            limit: MENTOR_LIST_CLIENT_FILTER_LIMIT,
           });
           setAllMentors(
             users.map((u: any, i: number) => convertUserToMentor(u, i))
           );
-          setTotalCount(total);
-          setTotalPages(tp);
         } else {
           const response = await buildMentorListRequest(activeFilter, {
             search,
-            page: currentPage,
-            limit: PAGE_SIZE,
+            page: 1,
+            limit: MENTOR_LIST_CLIENT_FILTER_LIMIT,
           });
-          const { users, total, totalPages: tp } = response.data.data;
+          const { users } = response.data.data;
           setAllMentors(
             users.map((u: any, i: number) => convertUserToMentor(u, i))
           );
-          setTotalCount(total);
-          setTotalPages(tp);
         }
       } catch (error) {
         console.error("Error fetching mentors:", error);
@@ -411,7 +407,7 @@ useEffect(() => {
     };
 
     fetchMentors();
-  }, [activeFilter, debouncedQuery, currentPage]);
+  }, [activeFilter, debouncedQuery]);
 
   // First 6 profile thumbnails always match the current search/filter (page 1),
   // not the paged list — so they stay in sync when searching and when you're on page 2+.
@@ -474,14 +470,47 @@ useEffect(() => {
     [featuredMentors]
   );
 
+  const filteredMentors = useMemo(() => {
+    const filtered = [...allMentors];
+
+    // Sort
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "Least Mentees":
+          return a.menteeCount - b.menteeCount;
+        case "Most Mentees":
+          return b.menteeCount - a.menteeCount;
+        case "Name A-Z":
+          return a.name.localeCompare(b.name);
+        case "Name Z-A":
+          return b.name.localeCompare(a.name);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [allMentors, sortBy]);
+
+  const totalCount = filteredMentors.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const pagedMentors = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredMentors.slice(start, start + PAGE_SIZE);
+  }, [currentPage, filteredMentors]);
+
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(page, totalPages));
+  }, [totalPages]);
+
   /** Authoritative count from `GET /users/:id/assigned` (avoids list DTO `menteeCount` drift). */
   const mentorAssignedFetchKey = useMemo(
     () =>
-      `${mentorMenteeHydrateNonce}|${[...new Set([...allMentors, ...featuredMentors].map((m) => m.id))]
+      `${mentorMenteeHydrateNonce}|${[...new Set([...pagedMentors, ...featuredMentors].map((m) => m.id))]
         .filter(Boolean)
         .sort()
         .join(",")}`,
-    [allMentors, featuredMentors, mentorMenteeHydrateNonce],
+    [pagedMentors, featuredMentors, mentorMenteeHydrateNonce],
   );
 
   const assignMenteeCountGen = useRef(0);
@@ -536,28 +565,6 @@ useEffect(() => {
     };
   }, [mentorAssignedFetchKey]);
 
-  const filteredMentors = useMemo(() => {
-    const filtered = [...allMentors];
-
-    // Sort
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case "Least Mentees":
-          return a.menteeCount - b.menteeCount;
-        case "Most Mentees":
-          return b.menteeCount - a.menteeCount;
-        case "Name A-Z":
-          return a.name.localeCompare(b.name);
-        case "Name Z-A":
-          return b.name.localeCompare(a.name);
-        default:
-          return 0;
-      }
-    });
-
-    return filtered;
-  }, [allMentors, sortBy]);
-
   const sortOptions = [
     "Least Mentees",
     "Most Mentees",
@@ -601,8 +608,8 @@ const handleListMentees = useCallback((mentor: Mentor) => {
         const [list, feat] = await Promise.all([
           fetchFieldMentorPage({
             search,
-            page: currentPage,
-            limit: PAGE_SIZE,
+            page: 1,
+            limit: MENTOR_LIST_CLIENT_FILTER_LIMIT,
           }),
           fetchFieldMentorPage({
             search,
@@ -613,8 +620,6 @@ const handleListMentees = useCallback((mentor: Mentor) => {
         setAllMentors(
           list.users.map((u: any, i: number) => convertUserToMentor(u, i))
         );
-        setTotalCount(list.total);
-        setTotalPages(list.totalPages);
         setFeaturedMentors(
           feat.users.map((u: any, i: number) => convertUserToMentor(u, i))
         );
@@ -622,8 +627,8 @@ const handleListMentees = useCallback((mentor: Mentor) => {
         const [list, feat] = await Promise.all([
           fetchMentorOnlyPage({
             search,
-            page: currentPage,
-            limit: PAGE_SIZE,
+            page: 1,
+            limit: MENTOR_LIST_CLIENT_FILTER_LIMIT,
           }),
           fetchMentorOnlyPage({
             search,
@@ -634,8 +639,6 @@ const handleListMentees = useCallback((mentor: Mentor) => {
         setAllMentors(
           list.users.map((u: any, i: number) => convertUserToMentor(u, i))
         );
-        setTotalCount(list.total);
-        setTotalPages(list.totalPages);
         setFeaturedMentors(
           feat.users.map((u: any, i: number) => convertUserToMentor(u, i))
         );
@@ -643,8 +646,8 @@ const handleListMentees = useCallback((mentor: Mentor) => {
         const [listRes, featRes] = await Promise.all([
           buildMentorListRequest(activeFilter, {
             search,
-            page: currentPage,
-            limit: PAGE_SIZE,
+            page: 1,
+            limit: MENTOR_LIST_CLIENT_FILTER_LIMIT,
           }),
           buildMentorListRequest(activeFilter, {
             search,
@@ -652,12 +655,10 @@ const handleListMentees = useCallback((mentor: Mentor) => {
             limit: FEATURED_THUMB_LIMIT,
           }),
         ]);
-        const { users, total, totalPages: tp } = listRes.data.data;
+        const { users } = listRes.data.data;
         setAllMentors(
           users.map((u: any, i: number) => convertUserToMentor(u, i))
         );
-        setTotalCount(total);
-        setTotalPages(tp);
         const featUsers = featRes.data.data.users;
         setFeaturedMentors(
           featUsers.map((u: any, i: number) => convertUserToMentor(u, i))
@@ -667,7 +668,7 @@ const handleListMentees = useCallback((mentor: Mentor) => {
     } catch (error) {
       console.error("Error refreshing mentors:", error);
     }
-  }, [activeFilter, currentPage, debouncedQuery]);
+  }, [activeFilter, debouncedQuery]);
 
   const getMentorOptions = (mentor: Mentor) => [
     {
@@ -866,7 +867,7 @@ const handleListMentees = useCallback((mentor: Mentor) => {
                   : "grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 md:gap-5"
               }
             >
-              {filteredMentors.map((mentor) => (
+              {pagedMentors.map((mentor) => (
                 <PersonListCard
                   key={mentor.id}
                   id={mentor.id}

@@ -4000,6 +4000,7 @@ import {
   apiDeleteExtrasDocumentFile,
 } from "@/app/Services/api";
 import { apiGetMentorshipSessions } from "@/app/Services/roadmaps.service";
+import { idsMatch, normalizeComparableId } from "@/app/utils/roadmap-id-utils";
 import {
   deriveTaskStatusForList,
   normalizeRoadmapId,
@@ -5123,19 +5124,20 @@ const refreshSubmissionHistory = useCallback(async (
     const thread = res.data?.data || res.data;
     const list = Array.isArray(thread?.comments) ? thread.comments : [];
 
-    const currentTaskId = String(queryNestedRoadMapItemId || nestedItemId || "");
+    const currentTaskId = normalizeComparableId(queryNestedRoadMapItemId || nestedItemId || "");
 
     const scopedComments = currentTaskId
       ? list.filter((comment: any) => {
-          const commentTaskId = String(
+          const commentTaskId = normalizeComparableId(
             comment?.nestedRoadMapItemId ??
               comment?.nestedItemId ??
               comment?.taskId ??
               comment?.roadmapItemId ??
               ""
           );
-
-          return commentTaskId === currentTaskId;
+          const mobileDirectMatch =
+            idsMatch(comment?.roadmapId, currentTaskId) || idsMatch(comment?.roadMapId, currentTaskId);
+          return commentTaskId === currentTaskId || mobileDirectMatch;
         })
       : [];
 
@@ -5165,8 +5167,10 @@ const refreshSubmissionHistory = useCallback(async (
         : (threads as any)?.queries || [];
       const scopedQueries = queryNestedRoadMapItemId
         ? allQueries.filter((q: any) => {
-            const qTaskId = String(q.nestedRoadMapItemId || q.nestedItemId || q.taskId || q.roadmapItemId || "");
-            return qTaskId === queryNestedRoadMapItemId;
+            const currentTaskId = normalizeComparableId(queryNestedRoadMapItemId || nestedItemId || "");
+            const qTaskId = normalizeComparableId(q.nestedRoadMapItemId || q.nestedItemId || q.taskId || q.roadmapItemId || "");
+            const mobileDirectMatch = idsMatch(q.roadmapId, currentTaskId) || idsMatch(q.roadMapId, currentTaskId);
+            return qTaskId === currentTaskId || mobileDirectMatch;
           })
         : allQueries;
       setQueries(scopedQueries);

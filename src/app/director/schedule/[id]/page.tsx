@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -88,11 +88,8 @@ function StatusBadge({ status }: { status: string }) {
 export default function DirectorAppointmentDetailPage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
-  const searchParams = useSearchParams();
-const returnTo =
-  searchParams.get("returnTo") || "/director/schedule?tab=appointment-history";
-const backLabel =
-  returnTo === "/director/home" ? "Back to Home" : "Back to Appointment History";
+  const backRoute = "/director/schedule";
+  const backLabel = "Back";
   const apptId = decodeURIComponent(params.id);
 
   const [loading, setLoading] = useState(true);
@@ -175,10 +172,10 @@ const backLabel =
             <p className="text-sm text-white/70">{error ?? "Appointment not found."}</p>
             <button
               type="button"
-              onClick={() => router.push("/director/schedule?tab=appointment-history")}
+              onClick={() => router.push(backRoute)}
               className={`${directorBtnSecondary} mt-4 px-4 py-2 text-sm`}
             >
-              Back to History
+              {backLabel}
             </button>
           </div>
         </div>
@@ -232,12 +229,10 @@ const meetingDescription = String((appt as any).description || "").trim();
         {/* Back */}
         <button
           type="button"
-          // onClick={() => router.push("/director/schedule?tab=appointment-history")}
-          onClick={() => router.push(returnTo)}
+          onClick={() => router.push(backRoute)}
           className="flex items-center gap-2 text-sm text-[#8ec5eb] hover:text-white"
         >
           <i className="fa-solid fa-arrow-left" />
-          {/* Back to Appointment History */}
           {backLabel}
         </button>
 

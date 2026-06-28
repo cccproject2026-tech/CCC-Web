@@ -9,6 +9,7 @@ import {
   flattenAssignedAssessmentRow,
   parseAssignedAssessmentsListBody,
 } from "@/app/Services/assessment.service";
+import { normalizeComparableId } from "@/app/utils/roadmap-id-utils";
 import type { DashboardFocusItem, DashboardFocusSection } from "./types";
 
 const MAX_ITEMS_PER_SECTION = 10;
@@ -258,8 +259,10 @@ return {
         q.nestedItemId ??
         q.taskId ??
         q.roadmapItemId ??
+        q.roadmapId ??
+        q.roadMapId ??
         "",
-    ).trim();
+    ).trim() || normalizeComparableId(q.roadmapId ?? q.roadMapId);
   }
 
   type QRow = DashboardFocusItem & { sortAtMs: number };

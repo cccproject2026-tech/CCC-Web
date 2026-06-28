@@ -43,7 +43,6 @@ export default function CCCDropdown({ isOpen, onClose }: CCCDropdownProps) {
       label: "Assessments",
       path: "/director/assessments",
     },
-    
   ];
 
   const handleNavigation = (path: string) => {

@@ -33,6 +33,7 @@ interface PersonListCardProps {
     phase?: string;
     value: number;
   };
+  showPhase?: boolean;
   optionsMenu?: {
     icon: string;
     label: string;
@@ -146,6 +147,7 @@ export default function PersonListCard({
   invitationInfo,
   menteeCount,
   progress,
+  showPhase = true,
   optionsMenu,
   variant = "light",
   listLayout = false,
@@ -377,13 +379,15 @@ export default function PersonListCard({
 
           {progress && (
             <div className="mb-3 mt-1">
-              <p
-                className={`mb-2 text-[12px] font-semibold leading-snug ${
-                  isGlass ? "text-[#8ec5eb]" : "text-[#2E3B8E]"
-                }`}
-              >
-                Phase: {progress.phase?.trim() ? progress.phase : "—"}
-              </p>
+              {showPhase ? (
+                <p
+                  className={`mb-2 text-[12px] font-semibold leading-snug ${
+                    isGlass ? "text-[#8ec5eb]" : "text-[#2E3B8E]"
+                  }`}
+                >
+                  Phase: {progress.phase?.trim() ? progress.phase : "—"}
+                </p>
+              ) : null}
               <div className="flex items-center gap-3">
                 <div className="flex-1">
                   <div

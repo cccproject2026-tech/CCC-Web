@@ -40,6 +40,12 @@ const emptyChurch = (): ChurchRow => ({
   country: "",
 });
 
+const INTEREST_OPTIONS = [
+  "Children/Youth Ministry",
+  "Community Outreach",
+  "Leadership Development",
+] as const;
+
 /** Map URL `userType` (from onboarding) onto API `InterestTitle` when role matches. */
 function interestTitleFromUserType(
   userTypeRaw: string | null,
@@ -95,6 +101,7 @@ function InterestFormContent() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [personalCountry, setPersonalCountry] = useState("");
   const [personalDialCode, setPersonalDialCode] = useState("");
+  const [isInterestsOpen, setIsInterestsOpen] = useState(false);
   
 
   const [form, setForm] = useState({
@@ -106,7 +113,7 @@ function InterestFormContent() {
     yearsInMinistry: "",
     conference: "",
     currentProjects: "",
-    interestSelect: "",
+    interests: [] as string[],
     comments: "",
   });
 
@@ -124,6 +131,21 @@ function InterestFormContent() {
   const setField = (k: keyof typeof form, v: string) => {
     setForm((prev) => ({ ...prev, [k]: v }));
     setErrors((prev) => { const e = { ...prev }; delete e[k]; return e; });
+  };
+
+  const toggleInterest = (interest: string) => {
+    setForm((prev) => {
+      const exists = prev.interests.includes(interest);
+      const nextInterests = exists
+        ? prev.interests.filter((item) => item !== interest)
+        : [...prev.interests, interest];
+      return { ...prev, interests: nextInterests };
+    });
+    setErrors((prev) => {
+      const e = { ...prev };
+      delete e.interests;
+      return e;
+    });
   };
 // Restrict name-like fields to letters, spaces, apostrophes, and hyphens.
 const sanitizeName = (value: string) => value.replace(/[^A-Za-z\s'-]/g, "");
@@ -281,7 +303,7 @@ if (c.churchWebsite.trim()) {
   if (!form.yearsInMinistry.trim()) errs.yearsInMinistry = "Years in Ministry is required.";
   if (!form.conference.trim()) errs.conference = "Conference is required.";
   if (!form.currentProjects.trim()) errs.currentProjects = "Current Community Service Projects is required.";
-  if (!form.interestSelect) errs.interestSelect = "Please select an interest.";
+  if (!form.interests.length) errs.interests = "Please select at least one interest.";
   // comments is optional
 
   setErrors(errs);
@@ -318,7 +340,7 @@ if (c.churchWebsite.trim()) {
       title: titleForApi,
     };
     if (form.comments.trim()) createPayload.comments = form.comments.trim();
-    if (form.interestSelect) createPayload.interests = [form.interestSelect];
+    if (form.interests.length) createPayload.interests = form.interests;
     if (form.conference.trim()) createPayload.conference = form.conference.trim();
     if (form.yearsInMinistry.trim()) createPayload.yearsInMinistry = form.yearsInMinistry.trim();
     if (form.currentProjects.trim()) createPayload.currentCommunityProjects = form.currentProjects.trim();
@@ -776,18 +798,51 @@ try {
                     />
                     <Err k="currentProjects" />
                   </div>
-                  <div>
-                    <select
-                      value={form.interestSelect}
-                      onChange={(e) => setField("interestSelect", e.target.value)}
-                      className={inputCls("interestSelect")}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsInterestsOpen((prev) => !prev)}
+                      className={`${inputCls("interests")} flex items-center justify-between gap-3 text-left`}
+                      aria-haspopup="listbox"
+                      aria-expanded={isInterestsOpen}
                     >
-                      <option value="" disabled>Interests *</option>
-                      <option value="Children/Youth Ministry">Children/Youth Ministry</option>
-                      <option value="Community Outreach">Community Outreach</option>
-                      <option value="Leadership Development">Leadership Development</option>
-                    </select>
-                    <Err k="interestSelect" />
+                      <span className={form.interests.length ? "text-white" : "text-white/60"}>
+                        {form.interests.length === 0
+                          ? "Interests *"
+                          : form.interests.length === 1
+                            ? form.interests[0]
+                            : `${form.interests.length} interests selected`}
+                      </span>
+                      <i
+                        className={`fa-solid fa-chevron-down text-xs transition-transform ${
+                          isInterestsOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </button>
+                    {isInterestsOpen && (
+                      <div className="absolute z-20 mt-2 w-full rounded-xl border border-white/20 bg-[#0a3558] p-2 shadow-[0_20px_45px_rgba(0,0,0,0.28)]">
+                        <div className="space-y-1">
+                          {INTEREST_OPTIONS.map((option) => {
+                            const checked = form.interests.includes(option);
+                            return (
+                              <label
+                                key={option}
+                                className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm text-white transition hover:bg-white/5"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={() => toggleInterest(option)}
+                                  className="h-4 w-4 rounded border-white/40 bg-transparent text-[#47c0ff] accent-[#47c0ff]"
+                                />
+                                <span>{option}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    <Err k="interests" />
                   </div>
                   <div className="sm:col-span-2">
                     <textarea

@@ -16,6 +16,7 @@ import {
 import { getStoredRecommendationsForPastorAssessment } from "@/app/utils/assessment-recommendations";
 import HeroBg from "@/app/Assets/roadmap-bg.png";
 import UserProfile from "@/app/Assets/user-profile.png";
+import { idsMatch, normalizeComparableId } from "@/app/utils/roadmap-id-utils";
 
 import {
   apiGetRoadmapById,
@@ -274,7 +275,7 @@ function TaskPageContent() {
     try {
       const res = await apiGetComments(roadmapId, userId);
       const all = unwrapCommentsFromResponse(res);
-      const currentTaskId = String(taskId ?? "").trim();
+      const currentTaskId = normalizeComparableId(taskId);
       const scoped = currentTaskId
         ? all.filter((comment: Record<string, unknown>) => {
             const commentTaskId = String(
@@ -284,7 +285,9 @@ function TaskPageContent() {
                 comment.roadmapItemId ??
                 "",
             ).trim();
-            return commentTaskId === currentTaskId;
+            const mobileDirectMatch =
+              idsMatch(comment.roadmapId, currentTaskId) || idsMatch(comment.roadMapId, currentTaskId);
+            return commentTaskId === currentTaskId || mobileDirectMatch;
           })
         : [];
       setComments(scoped);
@@ -300,8 +303,10 @@ function TaskPageContent() {
       const res = await apiGetQueries(roadmapId, userId, status, taskId || undefined, "pastor");
       const all = unwrapQueriesFromResponse(res);
       const scoped = all.filter((q: any) => {
-        const qTaskId = String(q.nestedRoadMapItemId || q.nestedItemId || q.taskId || q.roadmapItemId || "");
-        return qTaskId === String(taskId);
+        const currentTaskId = normalizeComparableId(taskId);
+        const qTaskId = normalizeComparableId(q.nestedRoadMapItemId || q.nestedItemId || q.taskId || q.roadmapItemId || "");
+        const mobileDirectMatch = idsMatch(q.roadmapId, currentTaskId) || idsMatch(q.roadMapId, currentTaskId);
+        return qTaskId === currentTaskId || mobileDirectMatch;
       });
       setQueries(scoped);
     } catch {
