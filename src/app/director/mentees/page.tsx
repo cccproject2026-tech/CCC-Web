@@ -920,6 +920,8 @@ const getMenteeOptions = (mentee: Mentee) => {
               profileLink={`/director/mentees/profile/${m.id}`}
               email={m.email}
               phoneNumber={m.phoneNumber}
+              showProgress={viewMode !== "list"}
+              showInlineEmail={viewMode === "list"}
               progress={
                 m.progress !== undefined
                   ? { value: m.progress }

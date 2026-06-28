@@ -1,5 +1,11 @@
 "use client";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import Image, { type StaticImageData } from "next/image";
 import Link from "next/link";
 import { isRemoteImageSrc } from "@/app/utils/image";
@@ -34,6 +40,8 @@ interface PersonListCardProps {
     value: number;
   };
   showPhase?: boolean;
+  showProgress?: boolean;
+  showInlineEmail?: boolean;
   optionsMenu?: {
     icon: string;
     label: string;
@@ -153,10 +161,14 @@ export default function PersonListCard({
   listLayout = false,
   email,
   phoneNumber,
+  showProgress = true,
+  showInlineEmail = false,
 }: PersonListCardProps) {
   const [showOptions, setShowOptions] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const isGlass = variant === "glass";
   const optionsRef = useRef<HTMLDivElement | null>(null);
+  const copyTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
   useEffect(() => {
     if (!showOptions) return;
@@ -176,12 +188,63 @@ export default function PersonListCard({
     };
   }, [showOptions]);
 
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) {
+        window.clearTimeout(copyTimerRef.current);
+      }
+    };
+  }, []);
+
   const emailTrim = email?.trim().replace(/[\u200B-\u200D\uFEFF]/g, "") ?? "";
   const hasEmail = emailTrim.length > 0 && emailTrim.includes("@");
   const mailto = hasEmail ? mailtoHref(emailTrim) : "";
   const phoneTrim = phoneNumber?.trim() ?? "";
   const hasPhone = phoneTrim.length > 0;
   const wa = hasPhone ? whatsappHref(phoneTrim) : null;
+
+  const copyEmailToClipboard = async (value: string) => {
+    const text = value.trim().replace(/[\u200B-\u200D\uFEFF]/g, "");
+    if (!text) return false;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const copied = document.execCommand("copy");
+      document.body.removeChild(textarea);
+      return copied;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleEmailCopy = async (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!hasEmail) return;
+
+    const copied = await copyEmailToClipboard(emailTrim);
+    if (!copied) return;
+
+    setCopiedEmail(emailTrim);
+    if (copyTimerRef.current) {
+      window.clearTimeout(copyTimerRef.current);
+    }
+    copyTimerRef.current = window.setTimeout(() => {
+      setCopiedEmail(null);
+    }, 1500);
+  };
 
   const shellClass = isGlass
     ? listLayout
@@ -351,8 +414,48 @@ export default function PersonListCard({
             />
           </Link>
           {role ? (
-            <p className={`mb-1 text-[12px] capitalize ${isGlass ? "text-white/50" : "text-gray-400"}`}>
-              {role}
+            <p
+              className={`mb-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] capitalize ${
+                isGlass ? "text-white/50" : "text-gray-400"
+              }`}
+            >
+              <span>{role}</span>
+              {listLayout && showInlineEmail ? (
+                <>
+                  <span aria-hidden="true">·</span>
+                  {hasEmail ? (
+                    <>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={handleEmailCopy}
+                        className={`normal-case transition hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                          isGlass
+                            ? "text-[#8ec5eb] focus-visible:outline-[#8ec5eb]/60"
+                            : "text-[#2E3B8E] focus-visible:outline-[#2E3B8E]/50"
+                        }`}
+                        aria-label={`Copy email address ${emailTrim}`}
+                        title={`Copy ${emailTrim}`}
+                      >
+                        {emailTrim}
+                      </button>
+                      {copiedEmail === emailTrim ? (
+                        <span
+                          className={`ml-1 rounded-full px-2 py-0.5 text-[10px] font-semibold normal-case ${
+                            isGlass
+                              ? "bg-[#8ec5eb]/15 text-[#cde2f2]"
+                              : "bg-[#e8f1f8] text-[#0f4a76]"
+                          }`}
+                        >
+                          Copied
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span className="normal-case text-gray-400/80">—</span>
+                  )}
+                </>
+              ) : null}
             </p>
           ) : null}
           {!listLayout ? <p className={descClass}>{description}</p> : null}
@@ -377,7 +480,7 @@ export default function PersonListCard({
             </div>
           )}
 
-          {progress && (
+          {progress && showProgress !== false && (
             <div className="mb-3 mt-1">
               {showPhase ? (
                 <p

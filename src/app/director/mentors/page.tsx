@@ -271,7 +271,7 @@ export default function MyMentorsPage() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [sortBy, setSortBy] = useState("Least Mentees");
   const [showSortMenu, setShowSortMenu] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const isGridView = true as const;
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showListMenteesModal, setShowListMenteesModal] = useState(false);
@@ -734,10 +734,9 @@ const handleListMentees = useCallback((mentor: Mentor) => {
               </button>
               <button
                 type="button"
-                onClick={() => setViewMode("grid")}
-                aria-pressed={viewMode === "grid"}
+                aria-pressed={isGridView}
                 className={`flex h-11 w-11 items-center justify-center rounded-lg border text-[#8ec5eb] transition hover:bg-white/15 ${
-                  viewMode === "grid"
+                  isGridView
                     ? "border-[#8ec5eb]/50 bg-[#8ec5eb]/20"
                     : "border-white/15 bg-white/10"
                 }`}
@@ -745,7 +744,7 @@ const handleListMentees = useCallback((mentor: Mentor) => {
               >
                 <i className="fa-solid fa-table-cells" />
               </button>
-              <button
+              {/* <button
                 type="button"
                 onClick={() => setViewMode("list")}
                 aria-pressed={viewMode === "list"}
@@ -757,7 +756,7 @@ const handleListMentees = useCallback((mentor: Mentor) => {
                 aria-label="List view"
               >
                 <i className="fa-solid fa-list" />
-              </button>
+              </button> */}
             </div>
           </div>
 
@@ -860,31 +859,53 @@ const handleListMentees = useCallback((mentor: Mentor) => {
               </p>
             </div>
           ) : (
-            <div
-              className={
-                viewMode === "list"
-                  ? "flex flex-col gap-3"
-                  : "grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 md:gap-5"
-              }
-            >
-              {pagedMentors.map((mentor) => (
-                <PersonListCard
-                  key={mentor.id}
-                  id={mentor.id}
-                  name={mentor.name}
-                  role={mentor.role}
-                  description={mentor.description}
-                  image={mentor.img}
-                  variant="glass"
-                  listLayout={viewMode === "list"}
-                  profileLink={`/director/mentors/profile/${mentor.id}`}
-                  menteeCount={mentor.menteeCount}
-                  optionsMenu={getMentorOptions(mentor)}
-                  email={mentor.email}
-                  phoneNumber={mentor.phoneNumber}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 md:gap-5">
+                {pagedMentors.map((mentor) => (
+                  <PersonListCard
+                    key={mentor.id}
+                    id={mentor.id}
+                    name={mentor.name}
+                    role={mentor.role}
+                    description={mentor.description}
+                    image={mentor.img}
+                    variant="glass"
+                    profileLink={`/director/mentors/profile/${mentor.id}`}
+                    menteeCount={mentor.menteeCount}
+                    optionsMenu={getMentorOptions(mentor)}
+                    email={mentor.email}
+                    phoneNumber={mentor.phoneNumber}
+                  />
+                ))}
+              </div>
+              {/*
+              <div
+                className={
+                  viewMode === "list"
+                    ? "flex flex-col gap-3"
+                    : "grid grid-cols-1 items-stretch gap-4 md:grid-cols-2 md:gap-5"
+                }
+              >
+                {pagedMentors.map((mentor) => (
+                  <PersonListCard
+                    key={mentor.id}
+                    id={mentor.id}
+                    name={mentor.name}
+                    role={mentor.role}
+                    description={mentor.description}
+                    image={mentor.img}
+                    variant="glass"
+                    listLayout={viewMode === "list"}
+                    profileLink={`/director/mentors/profile/${mentor.id}`}
+                    menteeCount={mentor.menteeCount}
+                    optionsMenu={getMentorOptions(mentor)}
+                    email={mentor.email}
+                    phoneNumber={mentor.phoneNumber}
+                  />
+                ))}
+              </div>
+              */}
+            </>
           )}
 
           {/* Pagination */}
