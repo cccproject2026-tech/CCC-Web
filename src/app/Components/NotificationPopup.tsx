@@ -171,12 +171,12 @@ export default function NotificationPopup({
       router.push(notification.link);
     }
   }}
-  className={`relative rounded-2xl border border-white/10 bg-white/[0.06] p-4 transition hover:bg-white/[0.1] ${
+  className={`relative max-w-full overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] p-4 transition hover:bg-white/[0.1] ${
     notification.link ? "cursor-pointer" : "cursor-default"
   }`}
 >
 
-            <div className="flex gap-4">
+            <div className="flex min-w-0 gap-4">
               {/* Icon */}
               <div className="flex-shrink-0 mt-1">
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
@@ -187,8 +187,8 @@ export default function NotificationPopup({
               </div>
 
               {/* Content */}
-              <div className="flex-1">
-                <h4 className="mb-1 text-sm font-semibold text-white">
+              <div className="min-w-0 max-w-full flex-1 overflow-hidden">
+                <h4 className="mb-1 min-w-0 max-w-full break-words text-sm font-semibold text-white [overflow-wrap:anywhere] whitespace-normal">
                   {notification.title}
                 </h4>
 
@@ -199,14 +199,14 @@ export default function NotificationPopup({
                       <div className="w-5 h-5 rounded-full bg-gray-400 border-2 border-white"></div>
                       <div className="w-5 h-5 rounded-full bg-gray-500 border-2 border-white"></div>
                     </div>
-                    <span className="text-[11px] text-gray-600">
+                    <span className="min-w-0 break-words text-[11px] text-gray-600 [overflow-wrap:anywhere] whitespace-normal">
                       {notification.count}
                     </span>
                   </div>
                 )}
 
                 {notification.subtitle && (
-                  <p className="mb-1 text-xs leading-5 text-[#cde2f2]">
+                  <p className="mb-1 min-w-0 max-w-full break-words text-xs leading-5 text-[#cde2f2] [overflow-wrap:anywhere] whitespace-normal">
                     {notification.subtitle}
                   </p>
                 )}
@@ -224,13 +224,13 @@ export default function NotificationPopup({
       router.push(notification.link);
     }
   }}
-  className="text-[12px] text-[#2E3B8E] hover:underline"
+  className="block min-w-0 max-w-full break-words text-[12px] text-[#2E3B8E] hover:underline [overflow-wrap:anywhere] whitespace-normal"
 >
                     {'linkText' in notification && notification.linkText ? notification.linkText : notification.link}
                   </a>
                 )}
 
-                <p className="text-[11px] text-gray-400 mt-2">
+                <p className="mt-2 min-w-0 max-w-full break-words text-[11px] text-gray-400 [overflow-wrap:anywhere] whitespace-normal">
                   {notification.time}
                 </p>
               </div>

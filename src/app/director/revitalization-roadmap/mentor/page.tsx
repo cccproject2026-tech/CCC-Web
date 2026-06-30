@@ -25,10 +25,17 @@ function getInitialsAvatar(firstName?: string, lastName?: string, fallback = "Pa
   )}&background=173653&color=ffffff`;
 }
 
+function normalizeRevitalizationTab(tab: string | null) {
+  const value = String(tab || "").trim().toLowerCase();
+  if (value === "mentor" || value === "pastor" || value === "library") return value;
+  return "library";
+}
+
 export default function MentorAssignedPastorsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 const mentorId = searchParams.get("mentorId") || "";
+  const fromTab = normalizeRevitalizationTab(searchParams.get("fromTab"));
 
   const [pastors, setPastors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,7 +111,7 @@ const mentorId = searchParams.get("mentorId") || "";
         image={HeroBg}
         breadcrumbItems={[
           { label: "Home", href: "/director/home" },
-          { label: "Revitalization Roadmap", href: "/director/revitalization-roadmap" },
+          { label: "Revitalization Roadmap", href: `/director/revitalization-roadmap?tab=${fromTab}` },
           { label: "Assigned Pastors" },
         ]}
       />
@@ -114,7 +121,7 @@ const mentorId = searchParams.get("mentorId") || "";
           <div className="mb-6">
             <button
               type="button"
-              onClick={() => router.push("/director/revitalization-roadmap")}
+              onClick={() => router.push(`/director/revitalization-roadmap?tab=${fromTab}`)}
               className={`${directorBtnSecondary} !px-4 !py-2.5 !text-[13px]`}
             >
               <i className="fa-solid fa-arrow-left text-sm" />

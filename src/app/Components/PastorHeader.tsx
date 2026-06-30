@@ -456,7 +456,7 @@ const logoHref = isLoginPage ? "/" : "/pastor/home";
 
               {/* Notification Dropdown */}
               {showNotifications && (
-                <div className="absolute -right-4 md:-right-8 mt-4 w-[300px] md:w-[450px] rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.98)_0%,rgba(6,36,62,0.98)_100%)] text-white shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+                <div className="fixed right-2 top-[60px] w-[calc(100vw-24px)] max-w-sm overflow-hidden rounded-3xl border border-white/15 bg-[linear-gradient(180deg,rgba(12,58,95,0.98)_0%,rgba(6,36,62,0.98)_100%)] text-white shadow-[0_24px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl md:absolute md:-right-8 md:top-auto md:mt-4 md:w-[450px] md:max-w-none">
                   {/* Pointer */}
                  <div className="absolute -top-2 right-4 md:right-8 h-4 w-4 rotate-45 border-l border-t border-white/15 bg-[#0c3a5f]" />
 
@@ -505,18 +505,18 @@ const logoHref = isLoginPage ? "/" : "/pastor/home";
               router.push(p.link);
             }
           }}
-          className={`flex items-start justify-between rounded-2xl border border-white/10 bg-white/[0.06] p-4 transition hover:bg-white/[0.1] ${
+          className={`flex max-w-full items-start justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] p-4 transition hover:bg-white/[0.1] ${
             p.link ? "cursor-pointer" : ""
           }`}
         >
-          <div className="flex w-full items-start gap-3">
+          <div className="flex w-full min-w-0 items-start gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/10">
               <i className={`${p.icon} text-base ${p.iconColor}`} aria-hidden />
             </div>
 
-            <div className="flex min-w-0 flex-1 flex-col">
-              <div className="flex justify-between gap-2">
-                <h3 className="text-[14px] font-semibold text-white">
+            <div className="flex min-w-0 max-w-full flex-1 flex-col overflow-hidden">
+              <div className="flex min-w-0 justify-between gap-2">
+                <h3 className="min-w-0 max-w-full break-words text-[14px] font-semibold text-white [overflow-wrap:anywhere] whitespace-normal">
                   {p.title}
                 </h3>
 
@@ -529,12 +529,12 @@ const logoHref = isLoginPage ? "/" : "/pastor/home";
               </div>
 
               {p.subtitle ? (
-                <p className="mt-0.5 text-[13px] leading-snug text-[#cde2f2]">
+                <p className="mt-0.5 min-w-0 max-w-full break-words text-[13px] leading-snug text-[#cde2f2] [overflow-wrap:anywhere] whitespace-normal">
                   {p.subtitle}
                 </p>
               ) : null}
 
-              <p className="mt-1 text-right text-[12px] text-white/50">
+              <p className="mt-1 min-w-0 max-w-full break-words text-right text-[12px] text-white/50 [overflow-wrap:anywhere] whitespace-normal">
                 {p.time}
               </p>
             </div>

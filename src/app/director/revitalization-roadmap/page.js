@@ -237,6 +237,12 @@ function getInitialsAvatar(firstName, lastName, fallback = "User") {
   )}&background=173653&color=ffffff`;
 }
 
+function normalizeRevitalizationTab(tab) {
+  const value = String(tab || "").trim().toLowerCase();
+  if (value === "mentor" || value === "pastor" || value === "library") return value;
+  return "library";
+}
+
 function unwrapRoadmapAssignmentsResponse(res) {
   const body = res?.data ?? res;
   if (Array.isArray(body)) return body;
@@ -600,21 +606,7 @@ const [pastorSearch, setPastorSearch] = useState("");
   const [removeAssignedError, setRemoveAssignedError] = useState("");
   const [removeAssignedSuccess, setRemoveAssignedSuccess] = useState("");
   const [selectedPastorModalId, setSelectedPastorModalId] = useState(null);
-  const [activeTab, setActiveTab] = useState("library");
-
-  useEffect(() => {
-  const tab = searchParams.get("tab");
-  const pastorId = searchParams.get("pastorId");
-
-  if (tab === "pastor") {
-    setActiveTab("pastor");
-
-    if (pastorId) {
-      setFilterPastorId(pastorId);
-      setSelectedPastorModalId(pastorId);
-    }
-  }
-}, [searchParams]);
+  const [activeTab, setActiveTab] = useState(() => normalizeRevitalizationTab(searchParams.get("tab")));
   const [mentorList, setMentorList] = useState([]);
 const [mentorListLoading, setMentorListLoading] = useState(false);
 const [selectedMentor, setSelectedMentor] = useState(null);
@@ -643,6 +635,44 @@ const [selectedRoadmapIds, setSelectedRoadmapIds] = useState([]);
   useEffect(() => {
     setBrowserMounted(true);
   }, []);
+
+  useEffect(() => {
+    const nextTab = normalizeRevitalizationTab(searchParams.get("tab"));
+    const pastorId = searchParams.get("pastorId");
+
+    setActiveTab(nextTab);
+
+    if (nextTab === "pastor" && pastorId) {
+      setFilterPastorId(pastorId);
+      setSelectedPastorModalId(pastorId);
+    } else if (nextTab !== "pastor") {
+      setFilterPastorId("all");
+      setSelectedPastorModalId(null);
+    }
+  }, [searchParams]);
+
+  const updateHubUrl = useCallback(
+    (nextTab, extraParams = {}) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("tab", normalizeRevitalizationTab(nextTab));
+
+      if (nextTab !== "pastor") {
+        params.delete("pastorId");
+      }
+
+      Object.entries(extraParams).forEach(([key, value]) => {
+        if (value == null || value === "") {
+          params.delete(key);
+        } else {
+          params.set(key, String(value));
+        }
+      });
+
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname);
+    },
+    [pathname, router, searchParams],
+  );
 
   const updateSortMenuPosition = useCallback(() => {
     const el = sortTriggerRef.current;
@@ -1603,6 +1633,7 @@ const filteredMentorList = useMemo(() => {
   setActiveTab("library");
   setFilterPastorId("all");
   setSelectedPastorModalId(null);
+  updateHubUrl("library");
 }}
     className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
       activeTab === "library"
@@ -1619,6 +1650,7 @@ const filteredMentorList = useMemo(() => {
   setActiveTab("mentor");
   setFilterPastorId("all");
   setSelectedPastorModalId(null);
+  updateHubUrl("mentor");
 }}
     className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
       activeTab === "mentor"
@@ -1631,7 +1663,10 @@ const filteredMentorList = useMemo(() => {
 
   <button
     type="button"
-    onClick={() => setActiveTab("pastor")}
+    onClick={() => {
+      setActiveTab("pastor");
+      updateHubUrl("pastor");
+    }}
     className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
       activeTab === "pastor"
         ? "bg-[#3498DB] text-white"
@@ -2200,10 +2235,12 @@ const filteredMentorList = useMemo(() => {
             //   onClick={() => router.push(`/director/revitalization-roadmap/mentor?mentorId=${encodeURIComponent(mentorId)}`)}
             //   className={`${directorGlassCard} flex items-center gap-4 p-4 text-left transition hover:border-[#3498DB]/40`}
             // >
-            <div
+  <div
   key={mentorId}
   onClick={() =>
-    router.push(`/director/revitalization-roadmap/mentor?mentorId=${encodeURIComponent(mentorId)}`)
+    router.push(
+      `/director/revitalization-roadmap/mentor?mentorId=${encodeURIComponent(mentorId)}&fromTab=${encodeURIComponent(activeTab)}`
+    )
   }
   className={`${directorGlassCard} relative flex cursor-pointer items-center gap-4 overflow-visible p-4 text-left transition hover:border-[#3498DB]/40`}
 >
